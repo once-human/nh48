@@ -45,16 +45,24 @@ export class CityMap {
     this.pgrid = new Map(); this.pcell = 120;
     for (const p of P) { const k = this.key(p.x, p.z); if (!this.pgrid.has(k)) this.pgrid.set(k, []); this.pgrid.get(k).push(p); }
     // areas (suburbs) and districts for labels at low zoom
-    this.areas = (M.pois || []).filter(p => p[4] === 'suburb' || p[4] === 'neighbourhood' || p[4] === 'locality')
-      .map(p => ({ n: p[0], x: p[2] / 100, z: p[3] / 100 }));
+    this.areas = (M.areas || (M.pois || []).filter(p => p[4] === 'suburb').map(p => [p[0], p[1], p[2], p[3], 2]))
+      .map(a => ({ n: a[0], mr: a[1], x: a[2] / 100, z: a[3] / 100, tier: a[4] }))
+      .sort((a, b) => a.tier - b.tier);
     // streets for search and labels: one entry per name, at its longest edge
     const G = W.graph, best = new Map();
     for (const e of G.edges) {
       const nm = G.names[e.name]; if (!nm || !nm[0]) continue;
       const o = best.get(nm[0]); if (!o || e.len > o.e.len) best.set(nm[0], { e, nm });
     }
-    this.streets = [...best.values()].map(({ e, nm }) => { const t = G.at(e, e.len / 2); return { n: nm[0], mr: nm[1], c: 'street', x: t[0], z: t[1], rank: e.rank }; });
+    this.streets = [...best.values()].map(({ e, nm }) => {
+      const t = G.at(e, e.len / 2);
+      let a = Math.atan2(t[3], t[2]); if (a > Math.PI / 2) a -= Math.PI; else if (a < -Math.PI / 2) a += Math.PI;
+      return { n: nm[0], mr: nm[1], c: 'street', x: t[0], z: t[1], rank: e.rank, a, len: e.len };
+    }).sort((a, b) => b.rank - a.rank || b.len - a.len);
     this.chunks = I.chunks;
+    this.res = Math.min(2, Math.max(1, Math.round(window.devicePixelRatio || 1)));   // tile pixels per CSS pixel
+    this.cap = 160;
+    this.prepped = new Map();
   }
   // level-0 tiles for the whole city, drawn once while loading so the map never opens empty
   warm(z = 0) {
@@ -81,11 +89,11 @@ export class CityMap {
   tile(z, tx, ty, request = true) {
     const k = z + '/' + tx + '/' + ty;
     const t = this.cache.get(k);
-    if (t) { t.u = this.useT; return t.c; }
+    if (t) { if (t.u < 1e12) t.u = this.useT; return t.c; }
     if (request && !this.queued.has(k)) { this.queued.add(k); this.queue.push([z, tx, ty, k]); }
     return null;
   }
-  // render queued tiles within a time budget (ms); nearest-requested last-in first
+  // render queued tiles within a time budget (ms), newest request first
   pump(budget = 4) {
     const t0 = performance.now();
     this.useT++;
@@ -95,66 +103,95 @@ export class CityMap {
       if (this.cache.has(k)) continue;
       this.cache.set(k, { c: this.renderTile(z, tx, ty), u: this.useT });
     }
-    if (this.queue.length > 64) { for (const q of this.queue.splice(0, this.queue.length - 64)) this.queued.delete(q[3]); }
-    if (this.cache.size > 140) {         // evict least recently used
-      const arr = [...this.cache.entries()].sort((a, b) => a[1].u - b[1].u);
-      for (let i = 0; i < arr.length - 110; i++) this.cache.delete(arr[i][0]);
+    if (this.queue.length > 160) { for (const q of this.queue.splice(0, this.queue.length - 160)) this.queued.delete(q[3]); }
+    if (this.cache.size > this.cap) {      // evict least recently used, never what is on screen
+      const arr = [...this.cache.entries()].filter(e => e[1].u < this.useT - 1).sort((a, b) => a[1].u - b[1].u);
+      for (let i = 0; i < arr.length && this.cache.size > this.cap * 0.85; i++) this.cache.delete(arr[i][0]);
     }
   }
+  // per-chunk shapes with bounding boxes, built the first time a tile needs the chunk
+  prep(ci) {
+    let P = this.prepped.get(ci);
+    if (P) return P;
+    const C = this.chunks[ci], M = this.W.M;
+    const bb = (r) => { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; for (let k = 0; k < r.length; k += 2) { const x = r[k], z = r[k + 1]; if (x < a) a = x; if (x > c) c = x; if (z < b) b = z; if (z > d) d = z; } return [a, b, c, d]; };
+    P = { ground: [], road: [], water: [], bld: [], rails: [] };
+    for (const g of C.ground) {
+      const road = g.kind === 'asphalt' || g.kind === 'concrete' || g.kind === 'bridge_road';
+      if (!road && !COL[g.kind]) continue;
+      const box = [Infinity, Infinity, -Infinity, -Infinity];
+      for (const r of g.rings) { const q = bb(r); box[0] = Math.min(box[0], q[0]); box[1] = Math.min(box[1], q[1]); box[2] = Math.max(box[2], q[2]); box[3] = Math.max(box[3], q[3]); }
+      (road ? P.road : P.ground).push({ kind: g.kind, rings: g.rings, bb: box });
+    }
+    for (const rs of C.water) for (const r of rs) P.water.push({ r, bb: bb(r) });
+    for (const r of C.rails) P.rails.push({ r, bb: bb(r) });
+    for (const bi of C.bld) {
+      const b = M.buildings[bi], r = cmRing(b[1]);
+      P.bld.push({ r, bb: bb(r), lm: b[3] === 8 || b[3] === 11 || b[3] === 5 || b[3] === 12 });
+    }
+    this.prepped.set(ci, P);
+    return P;
+  }
   renderTile(z, tx, ty) {
-    const W = this.W, S = this.tileSize(z), ppm = TILE / S;
-    const wx0 = this.x0 + tx * S, wz0 = this.z0 + ty * S;
-    const c = document.createElement('canvas'); c.width = TILE; c.height = TILE;
+    const W = this.W, S = this.tileSize(z), ppm = TILE / S, res = this.res, px = TILE * res;
+    const wx0 = this.x0 + tx * S, wz0 = this.z0 + ty * S, wx1 = wx0 + S, wz1 = wz0 + S;
+    const c = document.createElement('canvas'); c.width = px; c.height = px;
     const x = c.getContext('2d');
-    x.fillStyle = COL.land; x.fillRect(0, 0, TILE, TILE);
-    x.setTransform(ppm, 0, 0, ppm, -wx0 * ppm, -wz0 * ppm);
-    const I = W.index, cs = I.size;
-    const i0 = Math.max(0, Math.floor((wx0 - this.x0) / cs) - 1), i1 = Math.min(I.ncx - 1, Math.floor((wx0 + S - this.x0) / cs) + 1);
-    const j0 = Math.max(0, Math.floor((wz0 - this.z0) / cs) - 1), j1 = Math.min(I.ncz - 1, Math.floor((wz0 + S - this.z0) / cs) + 1);
-    const ring = (r) => { x.moveTo(r[0], r[1]); for (let k = 2; k < r.length; k += 2) x.lineTo(r[k], r[k + 1]); x.closePath(); };
-    const layer = (fn) => { for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) fn(this.chunks[i + j * I.ncx]); };
-    // ground (parks, plazas), water
+    x.fillStyle = COL.land; x.fillRect(0, 0, px, px);
+    const k = ppm * res;
+    x.setTransform(k, 0, 0, k, -wx0 * k, -wz0 * k);
+    const I = W.index, cs = I.size, m = 2 / k;
+    const hit = (b) => b[0] < wx1 + m && b[2] > wx0 - m && b[1] < wz1 + m && b[3] > wz0 - m;
+    const i0 = Math.max(0, Math.floor((wx0 - this.x0) / cs) - 1), i1 = Math.min(I.ncx - 1, Math.floor((wx1 - this.x0) / cs) + 1);
+    const j0 = Math.max(0, Math.floor((wz0 - this.z0) / cs) - 1), j1 = Math.min(I.ncz - 1, Math.floor((wz1 - this.z0) / cs) + 1);
+    const Ps = [];
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) Ps.push(this.prep(i + j * I.ncx));
+    const ring = (r) => { x.moveTo(r[0], r[1]); for (let q = 2; q < r.length; q += 2) x.lineTo(r[q], r[q + 1]); x.closePath(); };
+    // ground: parks, plazas, medians
     for (const kind of ['grass', 'scrub', 'soil', 'median', 'plaza', 'pavers']) {
       x.beginPath(); let any = false;
-      layer(C => { for (const g of C.ground) if (g.kind === kind) { for (const r of g.rings) ring(r); any = true; } });
+      for (const P of Ps) for (const g of P.ground) if (g.kind === kind && hit(g.bb)) { for (const r of g.rings) ring(r); any = true; }
       if (any) { x.fillStyle = COL[kind]; x.fill('evenodd'); }
     }
-    x.beginPath(); layer(C => { for (const rs of C.water) for (const r of rs) ring(r); }); x.fillStyle = COL.water; x.fill('evenodd');
-    // roads: true asphalt shapes when zoomed in, graph lines with a minimum width when zoomed out
-    const G = W.graph, mid = [wx0 + S / 2, wz0 + S / 2];
-    const edges = G.gridQuery(mid[0], mid[1], S * 0.75);
+    x.beginPath(); let any = false;
+    for (const P of Ps) for (const w of P.water) if (hit(w.bb)) { ring(w.r); any = true; }
+    if (any) { x.fillStyle = COL.water; x.fill('evenodd'); }
+    // roads: real asphalt shapes close up, graph lines with a minimum width further out
     if (z >= 3) {
-      x.beginPath(); layer(C => { for (const g of C.ground) if (g.kind === 'asphalt' || g.kind === 'concrete' || g.kind === 'bridge_road') for (const r of g.rings) ring(r); });
-      x.fillStyle = COL.road; x.fill('evenodd');
+      x.beginPath(); any = false;
+      for (const P of Ps) for (const g of P.road) if (hit(g.bb)) { for (const r of g.rings) ring(r); any = true; }
+      if (any) { x.fillStyle = COL.road; x.fill('evenodd'); }
     }
-    const order = [...edges].sort((a, b) => a.rank - b.rank);
+    const edges = [...W.graph.gridQuery(wx0 + S / 2, wz0 + S / 2, S * 0.75)].sort((a, b) => a.rank - b.rank);
     x.lineCap = 'round'; x.lineJoin = 'round';
-    for (const e of order) {
+    for (const e of edges) {
       if (z < 2 && e.rank < 3) continue;
-      if (z >= 3 && e.rank < 4) continue;           // small streets: the asphalt fill already shows them
-      const minPx = e.rank >= 5 ? 3.2 : e.rank >= 4 ? 2.4 : e.rank >= 3 ? 1.6 : 1.1;
+      if (z >= 3 && e.rank < 4) continue;
+      const minPx = e.rank >= 5 ? 3.4 : e.rank >= 4 ? 2.6 : e.rank >= 3 ? 1.7 : 1.1;
       x.lineWidth = Math.max(e.w * (z >= 3 ? 0.9 : 1), minPx / ppm);
       x.strokeStyle = e.bridge ? COL.bridge : e.rank >= 5 ? COL.arterial : e.rank >= 4 ? COL.main : COL.road;
-      const p = e.pts; x.beginPath(); x.moveTo(p[0], p[1]); for (let k = 2; k < p.length; k += 2) x.lineTo(p[k], p[k + 1]); x.stroke();
+      const p = e.pts; x.beginPath(); x.moveTo(p[0], p[1]); for (let q = 2; q < p.length; q += 2) x.lineTo(p[q], p[q + 1]); x.stroke();
     }
-    // rails
     x.strokeStyle = COL.rail; x.lineWidth = Math.max(1.2, 1.4 / ppm); x.beginPath();
-    layer(C => { for (const r of C.rails) { x.moveTo(r[0], r[1]); for (let k = 2; k < r.length; k += 2) x.lineTo(r[k], r[k + 1]); } }); x.stroke();
+    for (const P of Ps) for (const r of P.rails) if (hit(r.bb)) { const q = r.r; x.moveTo(q[0], q[1]); for (let n = 2; n < q.length; n += 2) x.lineTo(q[n], q[n + 1]); }
+    x.stroke();
     // buildings
-    {
-      const M = W.M;
-      x.beginPath(); const lm = [];
-      layer(C => { for (const bi of C.bld) { const b = M.buildings[bi]; if (b[3] === 8 || b[3] === 11 || b[3] === 5 || b[3] === 12) lm.push(b); else ring(cmRing(b[1])); } });
-      x.fillStyle = COL.building; x.fill();
-      x.beginPath(); for (const b of lm) ring(cmRing(b[1])); x.fillStyle = COL.landmark; x.fill();
-      if (z >= 4) { x.strokeStyle = 'rgba(0,0,0,.35)'; x.lineWidth = 0.6 / ppm * 2; x.beginPath(); layer(C => { for (const bi of C.bld) ring(cmRing(M.buildings[bi][1])); }); x.stroke(); }
+    x.beginPath(); const lm = [];
+    for (const P of Ps) for (const b of P.bld) if (hit(b.bb)) { if (b.lm) lm.push(b); else ring(b.r); }
+    x.fillStyle = COL.building; x.fill();
+    if (lm.length) { x.beginPath(); for (const b of lm) ring(b.r); x.fillStyle = COL.landmark; x.fill(); }
+    if (z >= 4) {
+      x.strokeStyle = 'rgba(0,0,0,.35)'; x.lineWidth = 1 / ppm; x.beginPath();
+      for (const P of Ps) for (const b of P.bld) if (hit(b.bb)) ring(b.r);
+      x.stroke();
     }
     return c;
   }
   // draw the map into ctx: view centred at (cx,cz) in metres, ppm screen px per metre, rotation rot (rad),
   // ctx already translated to the view centre in screen px; radius = half-diagonal of the view in px
-  drawTiles(ctx, cx, cz, ppm, rot, radius) {
-    const z = this.level(ppm), S = this.tileSize(z), r = radius / ppm;
+  // lvlPpm: device pixels per metre (picks the level so tile pixels match screen pixels)
+  drawTiles(ctx, cx, cz, ppm, rot, radius, lvlPpm = ppm) {
+    const z = this.level(lvlPpm / this.res), S = this.tileSize(z), r = radius / ppm;
     const t0x = Math.floor((cx - r - this.x0) / S), t1x = Math.floor((cx + r - this.x0) / S);
     const t0y = Math.floor((cz - r - this.z0) / S), t1y = Math.floor((cz + r - this.z0) / S);
     const nx = Math.ceil((this.x1 - this.x0) / S), ny = Math.ceil((this.z1 - this.z0) / S);
@@ -168,6 +205,7 @@ export class CityMap {
       want.push([Math.hypot(this.x0 + (tx + 0.5) * S - cx, this.z0 + (ty + 0.5) * S - cz), tx, ty]);
     }
     want.sort((a, b) => b[0] - a[0]);
+    this.cap = Math.max(this.cap, Math.min(400, want.length * 2 + 60));
     for (const [, tx, ty] of want) {
       const wx = this.x0 + tx * S, wz = this.z0 + ty * S;
       const c = this.tile(z, tx, ty);
@@ -177,7 +215,7 @@ export class CityMap {
         const PS = this.tileSize(pz), px = Math.floor((wx + 1e-3 - this.x0) / PS), py = Math.floor((wz + 1e-3 - this.z0) / PS);
         const pc = this.tile(pz, px, py, pz === 0);
         if (!pc) continue;
-        const f = TILE / PS;
+        const f = TILE * this.res / PS;
         ctx.drawImage(pc, (wx - (this.x0 + px * PS)) * f, (wz - (this.z0 + py * PS)) * f, S * f, S * f, wx, wz, S, S);
         break;
       }
@@ -456,9 +494,9 @@ export class MapScreen {
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
     x.fillStyle = COL.bg; x.fillRect(0, 0, w, h);
     x.save(); x.translate(w / 2, h / 2);
-    this.city.drawTiles(x, v.x, v.z, v.ppm * dpr / dpr, 0, Math.hypot(w, h) / 2);
+    this.city.drawTiles(x, v.x, v.z, v.ppm, 0, Math.hypot(w, h) / 2, v.ppm * dpr);
     x.restore();
-    this.city.pump(this.g.state === 'map' ? 7 : 3);
+    this.city.pump(this.g.state === 'map' ? 12 : 3);
     const g = this.g, T = (X, Z) => this.toScreen(X, Z);
     // routes: ride (yellow), waypoint (blue)
     const line = (pts, col, wpx) => {
@@ -469,57 +507,92 @@ export class MapScreen {
     };
     line(g.nav && g.nav.pts, '#5fd0ff', 4);
     line(g.rides && g.rides.routePts, '#f2b705', 4);
-    // labels with simple collision boxes
+    // labels, most important first; each claims a box so nothing overlaps
     const boxes = [];
+    // keep labels out from under the search bar, filter chips, buttons and the place card
+    for (const el of [this.$('bm-filters'), this.el.querySelector('.bm-top'), this.$('bm-close'), this.el.querySelector('.bm-tools'), this.$('bm-card')]) {
+      if (!el || el.hidden) continue;
+      const r = el.getBoundingClientRect(), o = cv.getBoundingClientRect();
+      boxes.push([r.left - o.left - 6, r.top - o.top - 6, r.width + 12, r.height + 12]);
+    }
     const free = (bx, by, bw, bh) => { for (const b of boxes) if (bx < b[0] + b[2] && bx + bw > b[0] && by < b[1] + b[3] && by + bh > b[1]) return false; boxes.push([bx, by, bw, bh]); return true; };
-    const pad = 40;
+    const pad = 60;
     const [xa, za] = this.toWorld(-pad, -pad), [xb, zb] = this.toWorld(w + pad, h + pad);
-    // street names along their longest edge
-    if (v.ppm >= 0.55) {
-      x.font = '600 11px Inter, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-      const minRank = v.ppm >= 2.2 ? 1 : v.ppm >= 1.1 ? 3 : 4;
-      for (const s of this.city.streets) {
-        if (s.rank < minRank || s.x < xa || s.x > xb || s.z < za || s.z > zb) continue;
-        const [X, Y] = T(s.x, s.z); const tw = x.measureText(s.n).width;
-        if (!free(X - tw / 2 - 3, Y - 7, tw + 6, 14)) continue;
-        x.strokeStyle = 'rgba(16,18,22,.85)'; x.lineWidth = 3.5; x.strokeText(s.n, X, Y);
-        x.fillStyle = s.rank >= 4 ? '#d9d5cc' : '#a7a49c'; x.fillText(s.n, X, Y);
-      }
-    }
-    // areas at low zoom
-    if (v.ppm < 1.4) {
-      x.font = '700 12px Inter, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-      for (const a of this.city.areas) {
-        const [X, Y] = T(a.x, a.z); const t = a.n.toUpperCase(); const tw = x.measureText(t).width * 1.12;
-        if (!free(X - tw / 2, Y - 8, tw, 16)) continue;
-        x.save(); x.letterSpacing = '1.5px'; x.strokeStyle = 'rgba(16,18,22,.9)'; x.lineWidth = 4; x.strokeText(t, X, Y);
-        x.fillStyle = 'rgba(244,241,234,.78)'; x.fillText(t, X, Y); x.restore();
-      }
-    }
-    // places: landmarks always, others by zoom
+    const inV = (p) => p.x > xa && p.x < xb && p.z > za && p.z < zb;
+    const fade = (ppm, lo, hi, e = 0.18) => Math.max(0, Math.min(1, (Math.log(ppm) - Math.log(lo)) / e + 1, (Math.log(hi) - Math.log(ppm)) / e + 1));
+    const text = (t, X, Y, font, fill, halo = 'rgba(16,18,22,.92)', hw = 3.5) => { x.font = font; x.strokeStyle = halo; x.lineWidth = hw; x.strokeText(t, X, Y); x.fillStyle = fill; x.fillText(t, X, Y); };
     const vis = [];
+    const z = v.ppm;
+    const TOP = new Set(['Shaniwar Wada', 'Dagdusheth Halwai Ganpati', 'Pune Junction', 'Fergusson College', 'Osho Teerth Park', 'Mahatma Phule Mandai', 'Sassoon Hospital', 'Bund Garden', 'College of Engineering Pune']);
+    // 1. landmarks: a handful when the whole city is in view, all of them from district zoom in
+    if (this.filters.has('landmark')) {
+      for (const p of this.city.places) {
+        if (p.c !== 'landmark' || !inV(p)) continue;
+        if (z < 0.45 && !TOP.has(p.n)) continue;
+        const [X, Y] = T(p.x, p.z), s = z < 0.45 ? 7 : 9;
+        x.font = '700 12px Inter, system-ui, sans-serif';
+        const tw = x.measureText(p.n).width;
+        if (!free(X - s, Y - s, s * 2 + tw + 8, s * 2)) continue;
+        drawPin(x, X, Y, CATS.landmark[1], CATS.landmark[2], s);
+        x.textAlign = 'left'; x.textBaseline = 'middle';
+        text(p.n, X + s + 5, Y, '700 12px Inter, system-ui, sans-serif', '#f7e3a1');
+        vis.push(p);
+      }
+    }
+    // 2. areas: big districts zoomed out, neighbourhoods mid, chowks close in
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    for (const a of this.city.areas) {
+      const al = a.tier === 1 ? fade(z, 0.1, 1.15) : a.tier === 2 ? fade(z, 0.5, 2.4) : fade(z, 1.3, 4.5);
+      if (al <= 0.02 || !inV(a)) continue;
+      const [X, Y] = T(a.x, a.z);
+      const big = a.tier === 1 && z < 0.7;
+      const t = a.tier === 3 ? a.n : a.n.toUpperCase();
+      const font = a.tier === 3 ? '600 11.5px Inter, system-ui, sans-serif' : big ? '750 15px Archivo, Inter, system-ui, sans-serif' : '700 12px Inter, system-ui, sans-serif';
+      x.font = font; x.letterSpacing = a.tier === 3 ? '0px' : big ? '2.5px' : '1.6px';
+      const tw = x.measureText(t).width, th = big ? 34 : 18;
+      if (!free(X - tw / 2 - 4, Y - th / 2, tw + 8, th)) { x.letterSpacing = '0px'; continue; }
+      x.globalAlpha = al;
+      text(t, X, big ? Y - 6 : Y, font, a.tier === 3 ? 'rgba(244,241,234,.7)' : 'rgba(244,241,234,.86)', 'rgba(16,18,22,.9)', 4);
+      x.letterSpacing = '0px';
+      if (big && a.mr) text(a.mr, X, Y + 11, '600 12px Mukta, "Nirmala UI", sans-serif', 'rgba(244,241,234,.55)', 'rgba(16,18,22,.9)', 3);
+      x.globalAlpha = 1;
+    }
+    // 3. street names, rotated along the road
+    if (z >= 0.6) {
+      const minRank = z >= 3 ? 1 : z >= 1.6 ? 3 : z >= 0.85 ? 4 : 5;
+      x.font = '600 11px Inter, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      let n = 0;
+      for (const s of this.city.streets) {
+        if (s.rank < minRank || !inV(s)) continue;
+        const tw = x.measureText(s.n).width;
+        if (tw > s.len * z * 0.9) continue;            // name longer than the road at this zoom
+        const [X, Y] = T(s.x, s.z);
+        const ca = Math.abs(Math.cos(s.a)), sa = Math.abs(Math.sin(s.a));
+        const bw = tw * ca + 14 * sa, bh = tw * sa + 14 * ca;
+        if (!free(X - bw / 2, Y - bh / 2, bw, bh)) continue;
+        x.save(); x.translate(X, Y); x.rotate(s.a);
+        text(s.n, 0, 0, '600 11px Inter, system-ui, sans-serif', s.rank >= 4 ? '#e2ded5' : '#b3b0a8', 'rgba(16,18,22,.88)', 3.5);
+        x.restore();
+        if (++n > 120) break;
+      }
+    }
+    // 4. places by category, appearing as you zoom in
     const near = this.city.placesIn(xa, za, xb, zb);
-    near.sort((a, b) => (b.c === 'landmark') - (a.c === 'landmark'));
+    const MINZ = { police: 1.2, fuel: 1.2, transit: 1.2, hospital: 1.9, temple: 1.9, park: 1.6, college: 1.6, cinema: 1.6, food: 3.2, shop: 3.2, bank: 3.2 };
+    const NAMEZ = { police: 1.8, fuel: 1.8, transit: 1.8, hospital: 3.5, temple: 3, park: 2.2, college: 2.2, cinema: 2.2, food: 5, shop: 5, bank: 5 };
     for (const p of near) {
-      if (!this.filters.has(p.c)) continue;
-      const big = p.c === 'landmark';
-      const minPpm = big ? 0 : (p.c === 'police' || p.c === 'transit' || p.c === 'fuel') ? 0.5 : p.c === 'hospital' ? 1.4 : (p.c === 'park' || p.c === 'temple' || p.c === 'college' || p.c === 'cinema') ? 0.9 : 3.0;
-      if (v.ppm < minPpm) continue;
+      if (p.c === 'landmark' || !this.filters.has(p.c) || z < (MINZ[p.c] || 3)) continue;
       const [X, Y] = T(p.x, p.z);
-      const s = big ? 10 : (p.c === 'food' || p.c === 'shop' || p.c === 'bank') ? (v.ppm >= 5 ? 6 : 4.5) : v.ppm >= 3 ? 7 : 5.5;
-      if (!free(X - s, Y - s, s * 2, s * 2) && !big) continue;
+      const small = p.c === 'food' || p.c === 'shop' || p.c === 'bank';
+      const s = small ? (z >= 5 ? 6 : 4.5) : z >= 3 ? 7 : 5.5;
+      if (!free(X - s, Y - s, s * 2, s * 2)) continue;
       const [, col, gl] = CATS[p.c];
       drawPin(x, X, Y, col, s >= 7 ? gl : null, s);
       vis.push(p);
-      const showName = big ? v.ppm >= 0.35 : v.ppm >= (p.c === 'food' || p.c === 'shop' || p.c === 'bank' || p.c === 'hospital' ? 3.2 : 1.4);
-      if (showName) {
-        x.font = big ? '700 12px Inter, system-ui, sans-serif' : '600 11px Inter, system-ui, sans-serif';
-        x.textAlign = 'left'; x.textBaseline = 'middle';
+      if (z >= (NAMEZ[p.c] || 5)) {
+        x.font = '600 11px Inter, system-ui, sans-serif'; x.textAlign = 'left'; x.textBaseline = 'middle';
         const tw = x.measureText(p.n).width;
-        if (free(X + s + 3, Y - 7, tw + 4, 14)) {
-          x.strokeStyle = 'rgba(16,18,22,.9)'; x.lineWidth = 3.5; x.strokeText(p.n, X + s + 4, Y);
-          x.fillStyle = big ? '#f7e3a1' : '#e9e6de'; x.fillText(p.n, X + s + 4, Y);
-        }
+        if (free(X + s + 3, Y - 7, tw + 6, 14)) text(p.n, X + s + 4, Y, '600 11px Inter, system-ui, sans-serif', '#e9e6de');
       }
     }
     this.visiblePlaces = vis;

@@ -104,6 +104,42 @@ for name, t, x, z, area in sorted(feats, key=lambda f: -f[4]):
     seen.add(key)
     places.append([name, t.get('name:mr', ''), c, round(x * 100), round(z * 100)])
 print('places', len(places), collections.Counter(p[2] for p in places))
+
+# ---------------------------------------------------------------- areas (neighbourhood names for the map)
+# Positions: the OSM place node when there is one, else the median of Overture places whose
+# address names the area (a few hundred addresses per peth, so the median lands in the middle).
+AREAS = {   # english -> (marathi, tier)  tier 1 shows on the whole-city view, 2 mid zoom, 3 close
+    'Deccan Gymkhana': ('डेक्कन जिमखाना', 1), 'Shivajinagar': ('शिवाजीनगर', 1), 'Camp': ('कॅम्प', 1), 'Koregaon Park': ('कोरेगाव पार्क', 1),
+    'Pune Station': ('पुणे स्टेशन', 1), 'Model Colony': ('मॉडेल कॉलनी', 1), 'Erandwane': ('एरंडवणे', 1), 'Sadashiv Peth': ('सदाशिव पेठ', 1),
+    'Kasba Peth': ('कसबा पेठ', 1), 'Bund Garden': ('बंड गार्डन', 1), 'Rasta Peth': ('रास्ता पेठ', 1), 'Budhwar Peth': ('बुधवार पेठ', 1),
+    'Raviwar Peth': ('रविवार पेठ', 2), 'Bhavani Peth': ('भवानी पेठ', 2), 'Nana Peth': ('नाना पेठ', 2), 'Ganj Peth': ('गंज पेठ', 2),
+    'Guruwar Peth': ('गुरुवार पेठ', 2), 'Shukrawar Peth': ('शुक्रवार पेठ', 2), 'Narayan Peth': ('नारायण पेठ', 2), 'Shaniwar Peth': ('शनिवार पेठ', 2),
+    'Mangalwar Peth': ('मंगळवार पेठ', 2), 'Somwar Peth': ('सोमवार पेठ', 2), 'Ganesh Peth': ('गणेश पेठ', 2), 'Navi Peth': ('नवी पेठ', 2),
+    'Prabhat Road': ('प्रभात रस्ता', 2), 'Sangamwadi': ('संगमवाडी', 2), 'Tadiwala Road': ('ताडीवाला रस्ता', 2), 'Dhole Patil Road': ('ढोले पाटील रस्ता', 2),
+    'Agarkar Nagar': ('आगरकर नगर', 2), 'Boat Club Road': ('बोट क्लब रस्ता', 2), 'Gokhale Nagar': ('गोखलेनगर', 2), 'Wakdewadi': ('वाकडेवाडी', 2),
+    'Ghorpuri': ('घोरपडी', 2), 'Pune Cantonment': ('पुणे छावणी', 2),
+}
+import duckdb, statistics
+con = duckdb.connect(); con.sql('load spatial')
+OVT = os.path.join(ROOT, 'data/raw/overture/places.parquet')
+addr = con.sql(f"select ST_X(geometry), ST_Y(geometry), lower(addresses[1].freeform) from '{OVT}' where addresses[1].freeform is not null").fetchall()
+osm_areas = {p[0]: p for p in M['pois'] if p[4] in ('suburb', 'neighbourhood', 'locality')}
+areas = []
+for en, (mr, tier) in AREAS.items():
+    if en in osm_areas:
+        p = osm_areas[en]; areas.append([en, mr, p[2], p[3], tier]); continue
+    key = en.lower()
+    pts = [proj(y, x) for x, y, a in addr if key in a]
+    pts = [p for p in pts if inside(*p)]
+    if len(pts) < 20: continue
+    mx = statistics.median(p[0] for p in pts); mz = statistics.median(p[1] for p in pts)
+    near = [p for p in pts if abs(p[0] - mx) < 1200 and abs(p[1] - mz) < 1200]
+    mx = statistics.median(p[0] for p in near); mz = statistics.median(p[1] for p in near)
+    areas.append([en, mr, round(mx * 100), round(mz * 100), tier])
+for en, p in osm_areas.items():           # chowks and societies OSM knows about
+    if en not in AREAS: areas.append([en, p[1], p[2], p[3], 3])
+print('areas', len(areas), sorted(a[0] for a in areas))
+M['areas'] = areas
 M['landmarks'] = landmarks
 M['places'] = places
 json.dump(M, open(MAP, 'w'), separators=(',', ':'), ensure_ascii=False)
