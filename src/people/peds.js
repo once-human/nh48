@@ -248,7 +248,7 @@ export class People {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const p = this.list[i];
       if (p.pax || p.fixed) continue;
-      if (Math.hypot(p.x - px, p.z - pz) > 150 || p.dead) { if (p.door) p.door.n--; if (p.body) p.body.release(); this.list[i] = this.list[this.list.length - 1]; this.list.pop(); }
+      if (Math.hypot(p.x - px, p.z - pz) > 150 || p.dead) { if (p.door) p.door.n--; if (p.venue) p.venue.crowd--; if (p.body) p.body.release(); this.list[i] = this.list[this.list.length - 1]; this.list.pop(); }
     }
     // traffic police (fixed) and waiting passengers don't count towards the walking crowd
     if (this.act && (this.actT -= dt) <= 0) {
@@ -266,7 +266,7 @@ export class People {
       for (let i = this.list.length - 1; i >= 0 && walkers > this.target * 1.15; i--) {
         const p = this.list[i];
         if (p.pax || p.fixed || p.body || Math.hypot(p.x - px, p.z - pz) < 70 || (avoidView && avoidView(p.x, p.z))) continue;
-        if (p.door) p.door.n--;
+        if (p.door) p.door.n--; if (p.venue) p.venue.crowd--;
         this.list[i] = this.list[this.list.length - 1]; this.list.pop(); walkers--;
       }
     }
@@ -277,6 +277,7 @@ export class People {
       // outside the bars at night people stand around in groups rather than walk
       if (p && this.rng.chance(0.18 + 0.55 * this.nightHere)) { p.mode = 'stand'; p.wait = this.rng.range(15, 90) * (1 + this.nightHere * 2); }
     }
+    if ((this.venueT = (this.venueT || 0) - dt) <= 0) { this.venueT = 0.7; this.venueCrowds(px, pz, avoidView); }
     const pv = Math.abs(player.v);
     const phx = Math.cos(player.th), phz = Math.sin(player.th);
     this.lineT -= dt;
@@ -345,7 +346,7 @@ export class People {
       if (p.anchor) {
         p.x = p.anchor.x; p.z = p.anchor.z;
         if (p.anchor.fx !== undefined) this.face(p, p.anchor.fx, p.anchor.fz, dt);
-        if (p.wait <= 0) { p.anchor = null; this.backToPath(p); }
+        if (p.wait <= 0) { p.anchor = null; if (p.venue) { p.venue.crowd--; p.venue = null; } this.backToPath(p); }
         return;
       }
       if (p.wait <= 0) p.mode = 'walk';
@@ -479,6 +480,49 @@ export class People {
     p.lat = p.latT = this.sidewalkLat(p.e, p.side || 1);
     const x = TMP[0] + TMP[3] * p.lat, z = TMP[1] - TMP[2] * p.lat;
     this.goTo(p, x, z, (q) => { q.mode = 'walk'; q.dodgeX = q.dodgeZ = 0; q.anim = null; this.place(q); });
+  }
+  // people standing in groups outside real bars, cafes and restaurants: the Mills or a KP lane at
+  // night, a vada pav place at lunch. Only at doors of real businesses (world/buildingsChunk.js),
+  // as many as the place and the hour call for; they drift off to the footpath when they're done.
+  venueCrowds(px, pz, avoidView) {
+    if (!this.act) return;
+    let n = 0;
+    for (const p of this.list) if (p.venue) n++;
+    const want = Math.round(this.target * clamp(0.08 + this.nightHere * 0.7, 0, 0.6));
+    if (n >= want) return;
+    const st = this.W.streamer, cands = [];
+    let tot = 0;
+    for (const c of st.built) {
+      if (!c.doors || Math.abs(c.cx - px) > 140 || Math.abs(c.cz - pz) > 140) continue;
+      for (const d of c.doors) {
+        const dd = Math.hypot(d.x - px, d.z - pz);
+        if (dd > 120 || d.crowd > 4) continue;
+        const o = {}, a = this.act.at(d.x, d.z, o);
+        const w = a * (0.2 + o.night) ** 2;
+        if (w < 1.5) continue;
+        cands.push([d, w]); tot += w;
+      }
+    }
+    if (!cands.length) return;
+    let r = this.rng.next() * tot, d = cands[0][0];
+    for (const [dd, w] of cands) { r -= w; if (r <= 0) { d = dd; break; } }
+    const urgent = n < want * 0.4;
+    // a group of 2-5 a couple of metres out from the door
+    const k = this.rng.int(2, 5), gx = d.x + d.nx * this.rng.range(1.6, 3.2), gz = d.z + d.nz * this.rng.range(1.6, 3.2);
+    if (!urgent && avoidView && avoidView(gx, gz)) return;
+    const near = this.g.nearest(gx, gz, 90);
+    if (!near) return;
+    d.crowd = (d.crowd || 0) + k;
+    for (let i = 0; i < k; i++) {
+      const a = i / k * Math.PI * 2 + this.rng.range(-0.3, 0.3), rr = this.rng.range(0.45, 0.8);
+      const x = gx + Math.cos(a) * rr, z = gz + Math.sin(a) * rr;
+      const res = this.W.collision.resolve(x, z, 0.25);
+      if (res && res.kind !== 3) continue;
+      const p = this.make(near.e, near.s, near.side || 1, { mode: 'stand' });
+      p.anchor = { x, z, fx: gx, fz: gz }; p.x = x; p.z = z; p.venue = d;
+      p.wait = this.rng.range(40, 160) * (1 + this.nightHere);
+      p.idle = this.rng.pick(['talk', 'talk', 'phone', 'idle', 'arms_folded']);
+    }
   }
   doorNear(x, z, r, p) {
     let best = null, bd = r;
