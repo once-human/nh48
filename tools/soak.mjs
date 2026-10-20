@@ -11,7 +11,7 @@ const logs = [];
 page.on('console', m => { if (m.type() !== 'log') logs.push(`[${m.type()}] ${m.text()}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + e.message + '\n' + e.stack));
 await page.goto(url, { waitUntil: 'load', timeout: 300000 });
-await page.waitForFunction('window.__game && window.__game.state === "play"', { timeout: 300000, polling: 300 });
+await page.waitForFunction('window.__game && window.__perf && window.__game.state === "play"', { timeout: 300000, polling: 300 });
 await page.evaluate(() => { window.__perf.n = 0; window.__perf.upd = 0; window.__perf.worst = 0; });
 const t0 = Date.now();
 const samples = [];
