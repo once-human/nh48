@@ -10,7 +10,8 @@ function glowable(mat, key) {
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float glow; varying float vGlow;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = glow;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNight; varying float vGlow;')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vColor.rgb * vGlow * (0.25 + uNight * 3.0);');
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nif (vGlow < -0.5) roughnessFactor = 0.93;')     // glow -1 marks matte parts: tyres, canvas, plastic
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vColor.rgb * max(vGlow, 0.0) * (0.25 + uNight * 3.0);');
   };
   const k = mat.customProgramCacheKey;
   mat.customProgramCacheKey = () => (k ? k.call(mat) : '') + '-glow-' + key;
@@ -18,8 +19,8 @@ function glowable(mat, key) {
 }
 
 export function vehicleMaterials() {
-  const body = glowable(paintable(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.12, envMapIntensity: 0.9 }), 'veh'), 'veh');
-  const solid = glowable(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.1, envMapIntensity: 0.9 }), 'solid');
+  const body = glowable(paintable(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.1, envMapIntensity: 0.8 }), 'veh'), 'veh');
+  const solid = glowable(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.05, envMapIntensity: 0.45 }), 'solid');
   const glass = new THREE.MeshStandardMaterial({ color: 0x15191d, roughness: 0.05, metalness: 0.3, envMapIntensity: 1.4 });
   return { body, solid, glass };
 }
