@@ -7,6 +7,7 @@ import { GL } from '../gfx/pbr.js';
 import { DECAL } from '../gfx/textures.js';
 import { RNG } from '../core/util.js';
 import { pointInRings } from './mapdata.js';
+import { scatterTufts } from './grass.js';
 
 export const KERB_H = 0.15;
 export const WATER_Y = -2.4;
@@ -133,7 +134,9 @@ export function prepareGroundGlobals(W) {
   for (const z of W.M.marks.zebra) W.zebras.push({ x: z[0] / 100, z: z[1] / 100, ang: z[2], w: z[3] / 100 });
 }
 
-export function buildGroundChunk(W, C, group) {
+export function* buildGroundChunk(W, C, group) {
+  let ops = 0;
+  W.sliceLabel = 'gSurf';
   const { mats, decalUV, graph } = W;
   const gb = new GB(), db = new QuadBuilder(), wb = new GB();
   const cellUV = (i) => { const [u, v, s] = decalUV(i); return [u + 0.002, v + 0.002, u + s - 0.002, v + s - 0.002]; };
@@ -141,6 +144,7 @@ export function buildGroundChunk(W, C, group) {
   // surfaces
   const bridgeRings = [];
   for (const g of C.ground) {
+    if ((++ops & 7) === 0) yield;
     const kl = kindLayer(g.kind, dist);
     if (!kl) continue;
     gb.poly(g.rings, kl[1], kl[0], g.kind === 'compound' ? 0.95 : 1);
@@ -151,7 +155,9 @@ export function buildGroundChunk(W, C, group) {
   // kerbs: road on the N side; painted black/yellow within ~14 m of big chowks
   const nearJ = (x, z, extra) => W.junctionNear(x, z, extra);
   const dustUV = cellUV(DECAL.dust);
+  yield;
   for (const p of C.kerbs) {
+    if ((++ops & 7) === 0) yield;
     let run = [p[0], p[1]], painted = null;
     const flush = () => {
       if (run.length >= 4) {
@@ -177,6 +183,7 @@ export function buildGroundChunk(W, C, group) {
     }
   }
   // water + stone embankments
+  yield;
   for (const rr of C.water) wb.poly(rr, WATER_Y, 0, 1);
   for (const p of C.banks) {
     gb.wall(p, WATER_Y - 1.2, KERB_H, GL.rubble, 1, 0.9);
@@ -206,6 +213,7 @@ export function buildGroundChunk(W, C, group) {
       gb.box(px, WATER_Y - 1.5, pz, 1.1, -WATER_Y + 1.5 - 1.15, 1.1, Math.atan2(dz, dx), GL.rubble, 0.8);
     }, 6);
   }
+  yield;
   // lane paint
   const paintUV = cellUV(DECAL.paint), yellowUV = cellUV(DECAL.yellow), zebraUV = cellUV(DECAL.zebra);
   const lineQuad = (x0, z0, x1, z1, w, uv, y = 0.014) => {
@@ -254,6 +262,11 @@ export function buildGroundChunk(W, C, group) {
       }
     }
   }
+  yield;
+  // grass and weed tufts for the near-camera grass field
+  W.sliceLabel = 'gGrass';
+  if (!C.tufts) yield* scatterTufts(C);
+  W.sliceLabel = 'gDecal';
   // potholes, oil stains, litter
   const rng = new RNG(1000 + C.ci);
   const potUV = cellUV(DECAL.pothole), oilUV = cellUV(DECAL.oil), garbUV = cellUV(DECAL.garbage);
@@ -269,8 +282,11 @@ export function buildGroundChunk(W, C, group) {
   for (const s of C.stalls) {
     if (rng.chance(0.5)) db.ground(s[0] / 100 + rng.range(-1.5, 1.5), KERB_H + 0.02, s[1] / 100 + rng.range(-1.5, 1.5), rng.range(0, 6.28), rng.range(0.6, 1.1), rng.range(0.5, 0.9), garbUV);
   }
-  // emit
+  // emit (one heavy array conversion per step)
+  yield;
+  W.sliceLabel = 'gEmit';
   if (!gb.empty) { const m = new THREE.Mesh(gb.build(), mats.ground); m.receiveShadow = true; group.add(m); }
+  yield;
   if (!wb.empty) { const m = new THREE.Mesh(wb.build(), mats.water); m.receiveShadow = true; group.add(m); }
   if (!db.empty) { const m = new THREE.Mesh(db.build(), mats.decal); m.renderOrder = 1; m.receiveShadow = true; group.add(m); }
 }

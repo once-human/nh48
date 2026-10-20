@@ -260,7 +260,7 @@ function windPatch(mat, key, leaves) {
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = (sh, r) => {
     if (prev) prev(sh, r);
-    sh.uniforms.uTime = U.uTime; sh.uniforms.uWind = U.uWind;
+    sh.uniforms.uTime = U.uTime; sh.uniforms.uWind = U.uWind; sh.uniforms.uNight = U.uNight;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime; uniform float uWind; attribute float wind;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         #ifdef USE_INSTANCING
@@ -276,7 +276,8 @@ function windPatch(mat, key, leaves) {
       // keep the soft crown normals on both faces; a little light bleeding through the leaves
       sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>',
         'float faceDirection = 1.0;\nvec3 normal = normalize(vNormal);\nvec3 nonPerturbedNormal = normal;')
-        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * 0.06;');
+        .replace('#include <common>', '#include <common>\nuniform float uNight;')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * 0.06 * (1.0 - uNight);');
     }
   };
   mat.customProgramCacheKey = () => 'nh-tree-' + key;
@@ -333,13 +334,14 @@ function renderImpostors(renderer, arch, mats, cell = 256) {
   return { albedo: rtA.texture, normal: rtN.texture, frames: cams, rtA, rtN };
 }
 
-function billboardMaterial(imp, n, sizes) {
+function billboardMaterial(imp, n, sizes, inner = 0) {
   const m = new THREE.MeshStandardMaterial({ map: imp.albedo, normalMap: imp.normal, alphaTest: 0.45, roughness: 0.85, metalness: 0, side: THREE.DoubleSide });
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uCells = { value: n };
     sh.uniforms.uSizes = { value: sizes };     // per species: half width, bottom, top (in metres)
+    sh.uniforms.uInner = m.userData.uInner;    // impostors closer than this are hidden (real trees there)
     sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
-      attribute float aCell; uniform float uCells; uniform vec3 uSizes[8];`)
+      attribute float aCell; uniform float uCells; uniform vec3 uSizes[8]; uniform float uInner;`)
       .replace('#include <uv_vertex>', `#include <uv_vertex>
       #ifdef USE_MAP
         vMapUv = vec2((aCell + uv.x) / uCells, uv.y);
@@ -356,7 +358,8 @@ function billboardMaterial(imp, n, sizes) {
         vec3 sz = uSizes[int(aCell + 0.5)];
         vec3 wp = iC + right * (position.x * 2.0 * sz.x * iS) + vec3(0.0, 1.0, 0.0) * mix(sz.y, sz.z, position.y) * iS;
         vec4 mvPosition = viewMatrix * vec4(wp, 1.0);
-        gl_Position = projectionMatrix * mvPosition;`)
+        gl_Position = projectionMatrix * mvPosition;
+        if (distance(iC.xz, cameraPosition.xz) < uInner) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);`)
       .replace('#include <defaultnormal_vertex>', `
         vec3 iC0 = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
         vec3 tc = cameraPosition - iC0; tc.y = 0.0; tc = normalize(tc + vec3(1e-4, 0.0, 0.0));
@@ -364,6 +367,7 @@ function billboardMaterial(imp, n, sizes) {
       .replace('#include <worldpos_vertex>', '')
       .replace('#include <shadowmap_vertex>', '');
   };
+  m.userData.uInner = { value: inner };
   m.customProgramCacheKey = () => 'nh-tree-billboard';
   return m;
 }
@@ -389,10 +393,12 @@ export function createTreeKit(renderer, quality, tex) {
   }
   const bark = (map, key) => windPatch(new THREE.MeshStandardMaterial({ map, normalMap: tex.barkN || null, roughness: 0.92, metalness: 0 }), key, false);
   const barkMats = arch.map((A) => { const m = bark(A.palm ? palmMap : barkMap, 'bark'); m.color.setHex(A.bark); return m; });
-  const leafMat = windPatch(new THREE.MeshStandardMaterial({ map: atlas.tex, vertexColors: true, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.78, metalness: 0 }), 'leaf', true);
+  // alpha-to-coverage: with MSAA on, cut-out leaf edges come out smooth instead of jagged
+  const leafMat = windPatch(new THREE.MeshStandardMaterial({ map: atlas.tex, vertexColors: true, alphaTest: 0.45, alphaToCoverage: !!quality.msaa, side: THREE.DoubleSide, roughness: 0.78, metalness: 0 }), 'leaf', true);
   const imp = renderImpostors(renderer, arch, mats, quality.impostorCell || 256);
   const sizes = arch.map((A, i) => new THREE.Vector3(imp.frames[i].half, imp.frames[i].top - 2 * imp.frames[i].half, imp.frames[i].top));
   const bbMat = billboardMaterial(imp, 8, sizes);
+  bbMat.alphaToCoverage = !!quality.msaa;
   return { atlas, arch, barkMats, leafMat, imp, bbMat };
 }
 
@@ -428,8 +434,8 @@ export class TreeField {
     this.sets = this.arch.map((A, k) => ({
       nb: mk(A.near.b, this.barkMats[k], Math.min(counts[k], capNear), quality.shadows),
       nl: mk(A.near.l, this.leafMat, Math.min(counts[k], capNear), quality.shadows),
-      mb: mk(A.mid.b, this.barkMats[k], Math.min(counts[k], capMid), quality.shadows),
-      ml: mk(A.mid.l, this.leafMat, Math.min(counts[k], capMid), quality.shadows),
+      mb: mk(A.mid.b, this.barkMats[k], Math.min(counts[k], capMid), false),     // only near trees cast shadows
+      ml: mk(A.mid.l, this.leafMat, Math.min(counts[k], capMid), false),
     }));
     const quad = new THREE.PlaneGeometry(1, 1, 1, 1);
     quad.translate(0, 0.5, 0);
@@ -443,25 +449,28 @@ export class TreeField {
     this.m4 = new THREE.Matrix4(); this.q4 = new THREE.Quaternion(); this.v3 = new THREE.Vector3(); this.s3 = new THREE.Vector3(); this.e3 = new THREE.Euler();
     this.lastX = 1e9; this.lastZ = 1e9;
   }
+  // near/mid trees follow the camera every few metres; the far impostor field (thousands of
+  // instances) is only rebuilt every 30 m, so driving fast doesn't re-upload it several times a second
   update(cx, cz, force = false) {
-    if (!force && Math.hypot(cx - this.lastX, cz - this.lastZ) < 3) return;
+    const moved = Math.hypot(cx - this.lastX, cz - this.lastZ);
+    if (!force && moved < 3) return;
     this.lastX = cx; this.lastZ = cz;
+    const farDue = force || Math.hypot(cx - (this.farX ?? 1e9), cz - (this.farZ ?? 1e9)) > 30;
     const { nearR, midR, farR, cell } = this;
     const n2 = nearR * nearR, m2 = midR * midR, f2 = farR * farR;
     const cnt = this.sets.map(() => [0, 0]);
-    let fb = 0;
-    const capFar = this.bb.instanceMatrix.count;
-    const i0 = Math.floor((cx - farR) / cell), i1 = Math.floor((cx + farR) / cell);
-    const j0 = Math.floor((cz - farR) / cell), j1 = Math.floor((cz + farR) / cell);
     const m = this.m4, Q = this.q4, V = this.v3, S = this.s3, E = this.e3;
-    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
-      const l = this.grid.get(i + ',' + j);
-      if (!l) continue;
-      for (const t of l) {
-        const dx = this.x[t] - cx, dz = this.z[t] - cz, d2 = dx * dx + dz * dz;
-        if (d2 > f2) continue;
-        const k = this.k[t], s = this.s[t];
-        if (d2 < m2) {
+    // near + mid
+    {
+      const i0 = Math.floor((cx - midR) / cell), i1 = Math.floor((cx + midR) / cell);
+      const j0 = Math.floor((cz - midR) / cell), j1 = Math.floor((cz + midR) / cell);
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+        const l = this.grid.get(i + ',' + j);
+        if (!l) continue;
+        for (const t of l) {
+          const dx = this.x[t] - cx, dz = this.z[t] - cz, d2 = dx * dx + dz * dz;
+          if (d2 >= m2) continue;
+          const k = this.k[t], s = this.s[t];
           const lod = d2 < n2 ? 0 : 1;
           const set = this.sets[k];
           const c = cnt[k];
@@ -473,20 +482,37 @@ export class TreeField {
           m.toArray(mb.instanceMatrix.array, c[lod] * 16);
           m.toArray(ml.instanceMatrix.array, c[lod] * 16);
           c[lod]++;
-          if (d2 < m2 * 0.72) continue;     // short overlap band with the impostors avoids a hard pop
         }
-        if (fb >= capFar || d2 < m2 * 0.72) continue;
+      }
+      this.sets.forEach((set, k) => {
+        set.nb.count = set.nl.count = cnt[k][0];
+        set.mb.count = set.ml.count = cnt[k][1];
+        for (const mm of [set.nb, set.nl, set.mb, set.ml]) mm.instanceMatrix.needsUpdate = true;
+      });
+    }
+    if (!farDue) return;
+    this.farX = cx; this.farZ = cz;
+    // far impostors: everything from ~85% of the mid radius out (the overlap hides the swap);
+    // measured from where the field was built, with a margin for the 30 m of drift
+    let fb = 0;
+    const capFar = this.bb.instanceMatrix.count;
+    const inner = Math.max(0, midR * 0.85 - 34), in2 = inner * inner;
+    this.bbMat.userData.uInner.value = midR * 0.85;
+    const i0 = Math.floor((cx - farR) / cell), i1 = Math.floor((cx + farR) / cell);
+    const j0 = Math.floor((cz - farR) / cell), j1 = Math.floor((cz + farR) / cell);
+    for (let i = i0; i <= i1 && fb < capFar; i++) for (let j = j0; j <= j1; j++) {
+      const l = this.grid.get(i + ',' + j);
+      if (!l) continue;
+      for (const t of l) {
+        const dx = this.x[t] - cx, dz = this.z[t] - cz, d2 = dx * dx + dz * dz;
+        if (d2 > f2 || d2 < in2 || fb >= capFar) continue;
+        const s = this.s[t];
         m.makeScale(s, s, s); m.setPosition(this.x[t], 0.12, this.z[t]);
         m.toArray(this.bb.instanceMatrix.array, fb * 16);
-        this.bbCell.array[fb] = k;
+        this.bbCell.array[fb] = this.k[t];
         fb++;
       }
     }
-    this.sets.forEach((set, k) => {
-      set.nb.count = set.nl.count = cnt[k][0];
-      set.mb.count = set.ml.count = cnt[k][1];
-      for (const mm of [set.nb, set.nl, set.mb, set.ml]) mm.instanceMatrix.needsUpdate = true;
-    });
     this.bb.count = fb;
     this.bb.instanceMatrix.needsUpdate = true;
     this.bbCell.needsUpdate = true;

@@ -163,15 +163,18 @@ export function buildGlobalProps(W) {
 export function updateProps(W, cx, cz) {
   for (const s of W.instSets) s.update(cx, cz);
   W.trees?.update(cx, cz);
+  W.grass?.update(cx, cz);
 }
 
-export function buildPropsChunk(W, C, group) {
+export function* buildPropsChunk(W, C, group) {
+  let ops = 0;
   const { M, mats, signs, index } = W;
   const P = W.proto;
   const cb = new ColorBuilder(), sb = new QuadBuilder(), gb = new GB(), fb = new FacadeB();
   const rng = new RNG(5000 + C.ci);
   const mm = new THREE.Matrix4();
 
+  W.sliceLabel = 'pBus';
   for (const b of C.buses) {
     const x = b[0] / 100, z = b[1] / 100, a = b[2];
     const dx = Math.cos(a), dz = Math.sin(a);
@@ -222,9 +225,12 @@ export function buildPropsChunk(W, C, group) {
       gb.box(x, 10.2, z, 6.5, 1.2, 2.2, -Math.atan2(dx, -dz) + Math.PI / 2, GL.concrete, 0.9);
     }
   }
+  yield;
+  W.sliceLabel = 'pWalls';
   // compound walls: plastered, painted, with a coping and gate pillars
   const wallH = 1.65;
   for (const p of C.walls) {
+    if ((++ops & 7) === 0) yield;
     if (p.length < 4) continue;
     const seed = Math.floor(hash1(p[0] * 13 + p[1]) * 255);
     const tint = WALL_PAL[Math.floor(hash1(p[0] + p[1]) * WALL_PAL.length)].map(lin);
@@ -259,6 +265,8 @@ export function buildPropsChunk(W, C, group) {
       fb.flat([[sq[0][0], BASE + h, sq[0][1]], [sq[1][0], BASE + h, sq[1][1]], [sq[2][0], BASE + h, sq[2][1]], [sq[3][0], BASE + h, sq[3][1]]], 1, { ...A, layer: WL.concrete, flags: 6 });
     }
   }
+  yield;
+  W.sliceLabel = 'pMetro';
   // metro viaduct decks
   for (const m of C.metro) {
     const [constr, ax, az, bx, bz] = m;
@@ -317,10 +325,18 @@ export function buildPropsChunk(W, C, group) {
     }
   }
   // emit
+  yield;
+  W.sliceLabel = 'pEmitC';
   if (!cb.empty) { const m = new THREE.Mesh(cb.build(), mats.prop); m.castShadow = true; m.receiveShadow = true; group.add(m); }
+  yield;
+  W.sliceLabel = 'pEmitS';
   if (!sb.empty) { const m = new THREE.Mesh(sb.build(), mats.oldSign); m.receiveShadow = true; group.add(m); }
+  yield;
+  W.sliceLabel = 'pEmitG';
   if (!gb.empty) { const m = new THREE.Mesh(gb.build(), mats.ground); m.castShadow = true; m.receiveShadow = true; group.add(m); }
-  if (!fb.empty) { const m = new THREE.Mesh(fb.build(), mats.facade); m.castShadow = true; m.receiveShadow = true; group.add(m); }
+  yield;
+  W.sliceLabel = 'pEmitF';
+  if (!fb.empty) { const m = new THREE.Mesh(yield* fb.buildSliced(), mats.facade); m.castShadow = true; m.receiveShadow = true; group.add(m); }
   if (C.wires.length) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(C.wires, 3));

@@ -71,7 +71,25 @@ export class FacadeB {
     if ((cy >= 0) === (ny > 0)) this.i.push(vs[0], vs[1], vs[2], vs[0], vs[2], vs[3]); else this.i.push(vs[0], vs[2], vs[1], vs[0], vs[3], vs[2]);
   }
   get empty() { return this.c === 0; }
-  build() {
+  build() { const it = this.buildSliced(); let st; while (!(st = it.next()).done); return st.value; }
+  // the same, one attribute per step (a dense chunk has hundreds of thousands of values)
+  *buildSliced() {
+    const q = (src, k, T) => { const o = new T(src.length); for (let i = 0; i < src.length; i++) o[i] = Math.round(src[i] * k); return o; };
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.p), 3)); yield;
+    g.setAttribute('normal', new THREE.BufferAttribute(q(this.n, 127, Int8Array), 3, true));
+    g.setAttribute('fuv', new THREE.BufferAttribute(new Float32Array(this.uv), 2)); yield;
+    g.setAttribute('fedge', new THREE.BufferAttribute(new Float32Array(this.e), 2));
+    const t = new Uint8Array(this.t.length); for (let i = 0; i < t.length; i++) t[i] = Math.min(255, Math.round(this.t[i] * 255));
+    g.setAttribute('ftint', new THREE.BufferAttribute(t, 3, true)); yield;
+    g.setAttribute('fstyle', new THREE.BufferAttribute(new Uint8Array(this.s), 4, false));
+    g.setAttribute('ftan', new THREE.BufferAttribute(q(this.tn, 127, Int8Array), 2, true));
+    g.setAttribute('ftop', new THREE.BufferAttribute(new Float32Array(this.top), 1)); yield;
+    g.setIndex(new THREE.BufferAttribute(this.c > 65535 ? new Uint32Array(this.i) : new Uint16Array(this.i), 1));
+    g.computeBoundingSphere(); g.computeBoundingBox();
+    return g;
+  }
+  buildOld() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(new Int8Array(this.n.map(v => Math.round(v * 127))), 3, true));
@@ -184,15 +202,19 @@ export function buildingHeight(B) {
 }
 
 // ---------------------------------------------------------------- chunk builder
-export function buildBuildingsChunk(W, C, group) {
+export function* buildBuildingsChunk(W, C, group) {
+  let ops = 0;
   const { M, mats, index } = W;
   proto();
   const fb = new FacadeB(), rb = new RoofB(), cb = new ColorBuilder(), sb = new QuadBuilder(), ob = new QuadBuilder();
   const signs = W.boards;
-  const local = signs.chunkAtlas(C, (bi) => index.shopsByBld.get(bi));
+  W.sliceLabel = 'atlas';
+  const local = yield* signs.chunkAtlas(C, (bi) => index.shopsByBld.get(bi));
+  W.sliceLabel = 'bld';
   const footprints = [];
   C.doors = [];                    // shop fronts people can walk into
   for (const bi of C.bld) {
+    yield;
     const B = M.buildings[bi];
     const [, ringCm, levels, styleId, roof, flags, , hoard, peth, district] = B;
     const p = cmRing(ringCm);
@@ -223,6 +245,7 @@ export function buildBuildingsChunk(W, C, group) {
     let u = 0;
     const osm = index.shopsByBld.get(bi);
     for (let i = 0; i < n; i++) {
+      if ((++ops & 15) === 0) yield;
       const j = (i + 1) % n;
       const ax = p[2 * i], az = p[2 * i + 1], bx = p[2 * j], bz = p[2 * j + 1];
       const nx = normals[2 * i], nz = normals[2 * i + 1];
@@ -249,6 +272,25 @@ export function buildBuildingsChunk(W, C, group) {
           fb.flat([[a0[0], y, a0[1]], [b0[0], y, b0[1]], [b1[0], y, b1[1]], [a1[0], y, a1[1]]], 1, At);
           fb.flat([[a0[0], y - th, a0[1]], [b0[0], y - th, b0[1]], [b1[0], y - th, b1[1]], [a1[0], y - th, a1[1]]], -1, At);
           fb.wall(a1[0], a1[1], b1[0], b1[1], y - th, y, nx, nz, 0, At);
+        }
+      }
+      // split AC outdoor units hung under some windows (apartments, offices, old wadas)
+      if ((styleId === 0 || styleId === 1 || styleId === 2 || styleId === 4) && !(ef & 2) && levels > 1 && L > 2.4 && S[2] > 0) {
+        const nWin = Math.max(1, Math.floor(L / S[4] + 0.2)), cell = L / nWin;
+        const hwin = Math.min(S[2] * 0.5, cell * 0.38);
+        const nFl = Math.floor((wallTop - BASE - S[1] - 0.8) / S[0]) + 1;
+        const ry = Math.atan2(-tz, tx), fy = Math.atan2(nz, -nx);
+        for (let f = 0; f < nFl; f++) for (let c = 0; c < nWin; c++) {
+          if (!rng.chance(styleId === 1 ? 0.14 : 0.09)) continue;
+          const side = rng.chance(0.5) ? 1 : -1;
+          const t = (c + 0.5) * cell + (rng.chance(0.6) ? 0 : side * (hwin + 0.5));
+          if (t < 0.5 || t > L - 0.5) continue;
+          const y = BASE + S[1] + f * S[0] + S[5] - 0.42;
+          if (y > wallTop - 1.2) continue;
+          const px = ax + tx * t, pz = az + tz * t;
+          cb.addGeo(GEO.box, mat(px + nx * 0.17, y, pz + nz * 0.17, 0.8, 0.56, 0.3, ry), [0.88, 0.88, 0.86]);
+          cb.addGeo(GEO.ring, mat(px + nx * 0.325 + tx * 0.12, y, pz + nz * 0.325 + tz * 0.12, 0.2, 0.012, 0.2, fy, 0, Math.PI / 2), [0.22, 0.23, 0.24]);
+          cb.addGeo(GEO.box, mat(px + nx * 0.15, y - 0.31, pz + nz * 0.15, 0.85, 0.04, 0.34, ry), [0.4, 0.4, 0.4]);    // bracket
         }
       }
       // ground-floor shop boards
@@ -308,6 +350,7 @@ export function buildBuildingsChunk(W, C, group) {
     }
   }
   // rooftop hoardings facing chowks
+  W.sliceLabel = 'hoard';
   for (const h of C.hoardings) {
     const x = h[2] / 100, z = h[3] / 100, ang = h[4];
     const f = footprints.find(f => insideRing(x, z, f.p));
@@ -315,8 +358,14 @@ export function buildBuildingsChunk(W, C, group) {
   }
   W.footprintsByChunk.set(C.ci, footprints);
   // emit
-  if (!fb.empty) { const m = new THREE.Mesh(fb.build(), mats.facade); m.castShadow = true; m.receiveShadow = true; group.add(m); }
+  yield;
+  W.sliceLabel = 'emitF';
+  if (!fb.empty) { const m = new THREE.Mesh(yield* fb.buildSliced(), mats.facade); m.castShadow = true; m.receiveShadow = true; group.add(m); }
+  yield;
+  W.sliceLabel = 'emitR';
   if (!rb.empty) { const m = new THREE.Mesh(rb.build(), mats.roof); m.castShadow = true; m.receiveShadow = true; group.add(m); }
+  yield;
+  W.sliceLabel = 'emitC';
   if (!cb.empty) { const m = new THREE.Mesh(cb.build(), mats.prop); m.castShadow = true; m.receiveShadow = true; group.add(m); }
   if (!sb.empty) { const m = new THREE.Mesh(sb.build(), mats.sign); m.receiveShadow = true; group.add(m); }
   let localMat = null;

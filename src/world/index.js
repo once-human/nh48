@@ -71,78 +71,148 @@ export class WorldIndex {
   }
 }
 
-// Streams chunks around a focus point. `builders` is a list of fn(W, chunk, group) that add meshes
-// to the chunk group (and may return a dispose callback).
+// Streams chunks around a focus point. `builders` are generator functions fn*(W, chunk, group)
+// that add meshes to the chunk group and `yield` between pieces of work (they may return a dispose
+// callback). One chunk is built at a time and resumed every frame until this frame's time budget is
+// spent, so even a dense chunk never stalls a frame: it just appears a few frames later. Finished
+// meshes join the scene one per frame so their GPU uploads are spread out too.
 export class Streamer {
   constructor(W, scene, builders, opts = {}) {
     this.W = W; this.scene = scene; this.builders = builders;
     this.radius = opts.radius || 420;       // build within
     this.keep = opts.keep || 560;           // dispose beyond
-    this.budgetMs = opts.budgetMs || 7;
+    this.budgetMs = opts.budgetMs || 4;
     this.built = new Set();
-    this.queue = [];
-    this.stats = { built: 0, disposed: 0, ms: 0 };
+    this.job = null;                        // chunk being built
+    this.pendingAdd = [];                   // finished chunks whose meshes are joining the scene
+    this.stats = { built: 0, disposed: 0, ms: 0, worst: 0, slices: 0 };
   }
   setRadius(r) { this.radius = r; this.keep = r + 140; }
-  buildChunk(c) {
-    const t0 = performance.now();
+  *run(c, g, disposers) {
+    for (const b of this.builders) {
+      if (this.job) this.job.stage = b.name;
+      const r = b(this.W, c, g);
+      let d = r;
+      if (r && typeof r.next === 'function') {
+        let st;
+        while (!(st = r.next()).done) yield;
+        d = st.value;
+      }
+      if (typeof d === 'function') disposers.push(d);
+      yield;
+    }
+  }
+  startJob(c) {
     const g = new THREE.Group();
     g.name = 'chunk' + c.ci;
-    const disposers = [];
-    for (const b of this.builders) {
-      const d = b(this.W, c, g);
-      if (typeof d === 'function') disposers.push(d);
-    }
-    g.traverse(o => { if (o.isMesh) { o.matrixAutoUpdate = false; o.updateMatrix(); } });
     g.matrixAutoUpdate = false;
-    this.scene.add(g);
+    const disposers = [];
+    this.job = { c, g, disposers, it: this.run(c, g, disposers), ms: 0 };
+  }
+  finishJob() {
+    const { c, g, disposers } = this.job;
+    g.traverse(o => { if (o.isMesh || o.isLine) { o.matrixAutoUpdate = false; o.updateMatrix(); } });
     c.built = { group: g, disposers };
     this.built.add(c);
-    this.W.farGround?.set(c, true);
     this.stats.built++;
-    this.stats.ms = performance.now() - t0;
+    this.stats.ms = this.job.ms;
+    (this.times = this.times || []).push(+this.job.ms.toFixed(1));
+    this.job = null;
+    return c;
+  }
+  // show a finished chunk: everything at once (loading screen) or one mesh per frame
+  reveal(c, all) {
+    const g = c.built.group;
+    if (all) { this.scene.add(g); this.W.farGround?.set(c, true); return; }
+    const kids = g.children.slice();
+    for (const k of kids) k.visible = false;
+    this.scene.add(g);
+    this.pendingAdd.push({ c, kids, i: 0 });
+  }
+  cancelJob() {
+    const { g, disposers } = this.job;
+    g.traverse(o => { if ((o.isMesh || o.isLine) && o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); });
+    for (const d of disposers) d();
+    this.job = null;
   }
   disposeChunk(c) {
     const b = c.built;
     if (!b) return;
+    this.pendingAdd = this.pendingAdd.filter(p => p.c !== c);
     this.scene.remove(b.group);
-    b.group.traverse(o => { if (o.isMesh && o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); });
+    b.group.traverse(o => { if ((o.isMesh || o.isLine) && o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); });
     for (const d of b.disposers) d();
     c.built = null;
     this.built.delete(c);
     this.W.farGround?.set(c, false);
     this.stats.disposed++;
   }
+  buildNow(c) {
+    const t0 = performance.now();
+    this.startJob(c);
+    while (!this.job.it.next().done) { /* drain */ }
+    this.job.ms = performance.now() - t0;
+    this.reveal(this.finishJob(), true);
+  }
   // build everything within `r` right now (loading screen)
   warm(x, z, r, onEach) {
+    if (this.job) this.cancelJob();
+    for (const p of this.pendingAdd) { for (const k of p.kids) k.visible = true; this.W.farGround?.set(p.c, true); }
+    this.pendingAdd.length = 0;
     const list = this.W.index.chunks.filter(c => Math.hypot(c.cx - x, c.cz - z) < r + this.W.index.size * 0.7 && !c.built);
     list.sort((a, b) => Math.hypot(a.cx - x, a.cz - z) - Math.hypot(b.cx - x, b.cz - z));
-    for (let k = 0; k < list.length; k++) { this.buildChunk(list[k]); if (onEach) onEach(k + 1, list.length); }
+    for (let k = 0; k < list.length; k++) { this.buildNow(list[k]); if (onEach) onEach(k + 1, list.length); }
   }
-  update(x, z, viewDir) {
+  pickNext(x, z, viewDir) {
     const I = this.W.index, half = I.size * 0.71;
-    const t0 = performance.now();
-    // drop far chunks
-    for (const c of [...this.built]) if (Math.hypot(c.cx - x, c.cz - z) - half > this.keep) this.disposeChunk(c);
-    // candidates: nearest missing chunks, slightly favouring the view direction
     const r2 = this.radius;
     const i0 = Math.max(0, Math.floor((x - r2 - I.x0) / I.size)), i1 = Math.min(I.ncx - 1, Math.floor((x + r2 - I.x0) / I.size));
     const j0 = Math.max(0, Math.floor((z - r2 - I.z0) / I.size)), j1 = Math.min(I.ncz - 1, Math.floor((z + r2 - I.z0) / I.size));
-    const cand = [];
+    let best = null, bs = 1e18, n = 0;
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const c = I.chunks[i + j * I.ncx];
       if (c.built) continue;
       const dx = c.cx - x, dz = c.cz - z, d = Math.hypot(dx, dz) - half;
       if (d > this.radius) continue;
+      n++;
       let score = d;
       if (viewDir && d > 60) score -= (dx * viewDir.x + dz * viewDir.z) / Math.max(1, d + half) * 80;
-      cand.push([score, c]);
+      if (score < bs) { bs = score; best = c; }
     }
-    cand.sort((a, b) => a[0] - b[0]);
-    for (const [, c] of cand) {
-      if (performance.now() - t0 > this.budgetMs) break;
-      this.buildChunk(c);
+    this.missing = n;
+    return best;
+  }
+  update(x, z, viewDir) {
+    const I = this.W.index, half = I.size * 0.71;
+    const t0 = performance.now();
+    // drop far chunks (and a half-built one we've driven away from)
+    for (const c of this.built) if (Math.hypot(c.cx - x, c.cz - z) - half > this.keep) this.disposeChunk(c);
+    if (this.job && Math.hypot(this.job.c.cx - x, this.job.c.cz - z) - half > this.keep) this.cancelJob();
+    // one finished mesh joins the scene per frame
+    if (this.pendingAdd.length) {
+      const p = this.pendingAdd[0];
+      p.kids[p.i++].visible = true;
+      if (p.i >= p.kids.length) { this.pendingAdd.shift(); this.W.farGround?.set(p.c, true); }
     }
-    return cand.length;
+    // resume the current build until the budget is spent
+    let slices = 0;
+    while (performance.now() - t0 < this.budgetMs) {
+      if (!this.job) {
+        const c = this.pickNext(x, z, viewDir);
+        if (!c) break;
+        this.startJob(c);
+      }
+      const s0 = performance.now();
+      const st = this.job.it.next();
+      const sl = performance.now() - s0;
+      this.job.ms += sl;
+      if (sl > (this.stats.maxSlice || 0)) { this.stats.maxSlice = sl; this.stats.maxSliceAt = this.job.stage + ':' + (this.W.sliceLabel || ''); }
+      slices++;
+      if (st.done) this.reveal(this.finishJob(), false);
+    }
+    const spent = performance.now() - t0;
+    this.stats.slices = slices;
+    this.stats.worst = Math.max(this.stats.worst * 0.995, spent);
+    return (this.missing || 0) + (this.job ? 1 : 0) + this.pendingAdd.length;
   }
 }
