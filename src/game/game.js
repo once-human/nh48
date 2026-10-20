@@ -175,6 +175,7 @@ export class Game {
     if (!wp && this.beacon) this.beacon.visible = false;
     this.nav = wp ? { pts: null, left: Math.hypot(wp.x - this.player.x, wp.z - this.player.z), t: 0 } : null;
     if (wp) this.hud.toast('Waypoint set', wp.name || '', 'info', 2.5);
+    if (this.hud.mapScreen && this.hud.mapScreen.sel) this.hud.mapScreen.renderCard();
   }
   updateNav(dt) {
     const wp = this.waypoint, nav = this.nav;

@@ -141,7 +141,7 @@ export class CityMap {
     x.strokeStyle = COL.rail; x.lineWidth = Math.max(1.2, 1.4 / ppm); x.beginPath();
     layer(C => { for (const r of C.rails) { x.moveTo(r[0], r[1]); for (let k = 2; k < r.length; k += 2) x.lineTo(r[k], r[k + 1]); } }); x.stroke();
     // buildings
-    if (z >= 1) {
+    {
       const M = W.M;
       x.beginPath(); const lm = [];
       layer(C => { for (const bi of C.bld) { const b = M.buildings[bi]; if (b[3] === 8 || b[3] === 11 || b[3] === 5 || b[3] === 12) lm.push(b); else ring(cmRing(b[1])); } });
@@ -503,15 +503,15 @@ export class MapScreen {
     for (const p of near) {
       if (!this.filters.has(p.c)) continue;
       const big = p.c === 'landmark';
-      const minPpm = big ? 0 : (p.c === 'police' || p.c === 'hospital' || p.c === 'transit' || p.c === 'fuel') ? 0.5 : (p.c === 'park' || p.c === 'temple' || p.c === 'college' || p.c === 'cinema') ? 0.9 : 1.8;
+      const minPpm = big ? 0 : (p.c === 'police' || p.c === 'transit' || p.c === 'fuel') ? 0.5 : p.c === 'hospital' ? 1.4 : (p.c === 'park' || p.c === 'temple' || p.c === 'college' || p.c === 'cinema') ? 0.9 : 3.0;
       if (v.ppm < minPpm) continue;
       const [X, Y] = T(p.x, p.z);
-      const s = big ? 10 : v.ppm >= 3 ? 7 : 5.5;
+      const s = big ? 10 : (p.c === 'food' || p.c === 'shop' || p.c === 'bank') ? (v.ppm >= 5 ? 6 : 4.5) : v.ppm >= 3 ? 7 : 5.5;
       if (!free(X - s, Y - s, s * 2, s * 2) && !big) continue;
       const [, col, gl] = CATS[p.c];
       drawPin(x, X, Y, col, s >= 7 ? gl : null, s);
       vis.push(p);
-      const showName = big ? v.ppm >= 0.35 : v.ppm >= (p.c === 'food' || p.c === 'shop' || p.c === 'bank' ? 3.2 : 1.2);
+      const showName = big ? v.ppm >= 0.35 : v.ppm >= (p.c === 'food' || p.c === 'shop' || p.c === 'bank' || p.c === 'hospital' ? 3.2 : 1.4);
       if (showName) {
         x.font = big ? '700 12px Inter, system-ui, sans-serif' : '600 11px Inter, system-ui, sans-serif';
         x.textAlign = 'left'; x.textBaseline = 'middle';

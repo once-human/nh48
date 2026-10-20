@@ -232,7 +232,7 @@ async function main() {
     propT -= dt;
     if (propT <= 0) { updateProps(W, camera.position.x, camera.position.z); propT = 0.2; }
     const t1 = performance.now();
-    post.render(dt);
+    if (game.state !== 'map') post.render(dt);      // the map covers the screen: give its frames the whole budget
     const t2 = performance.now();
     perf.n++; perf.upd += t1 - t0; perf.rnd += t2 - t1; perf.worst = Math.max(perf.worst, t1 - t0);
     if (!perfBox.hidden) {
