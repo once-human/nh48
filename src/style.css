@@ -63,9 +63,9 @@ body { margin: 0; font-family: var(--font-ui); font-size: 14px; -webkit-font-smo
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .scrim { position: absolute; inset: 0; pointer-events: none;
   background:
-    radial-gradient(60% 40% at 0% 0%, rgba(6, 7, 9, 0.5), transparent 70%),
-    radial-gradient(50% 36% at 100% 100%, rgba(6, 7, 9, 0.55), transparent 70%),
-    radial-gradient(40% 30% at 0% 100%, rgba(6, 7, 9, 0.35), transparent 70%); }
+    radial-gradient(46% 30% at 0% 0%, rgba(6, 7, 9, 0.28), transparent 70%),
+    radial-gradient(40% 28% at 100% 100%, rgba(6, 7, 9, 0.3), transparent 70%),
+    radial-gradient(32% 24% at 0% 100%, rgba(6, 7, 9, 0.2), transparent 70%); }
 .cap { font-size: 11px; font-weight: 650; letter-spacing: .14em; text-transform: uppercase; color: var(--paper-3); }
 .num { font-family: var(--font-display); font-stretch: 112%; font-variant-numeric: tabular-nums; }
 .glass { background: var(--glass); border: 1px solid var(--line); border-radius: var(--r-2);

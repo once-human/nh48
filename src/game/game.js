@@ -47,6 +47,13 @@ export class Game {
     const st = safeStorage();
     if (st) { try { const s = JSON.parse(st.getItem('nh48_stats') || 'null'); if (s) Object.assign(this.stats, s); } catch (e) { /* ignore */ } }
     const start = this.findStart(this.params.get('spawn') || 'FC Road');
+    // coming back from a graphics reset: same spot, same time of day, straight into play
+    let resume = null;
+    try { resume = JSON.parse(sessionStorage.getItem('nh48_resume') || 'null'); sessionStorage.removeItem('nh48_resume'); } catch (e) { /* ignore */ }
+    if (resume && Date.now() - resume.t < 120000 && !this.params.has('test')) {
+      start.x = resume.x; start.z = resume.z; start.th = resume.th; this.hour = resume.hour;
+      this.resumed = true;
+    }
     player.reset(start.x, start.z, start.th);
     this.start = start;
     this.audio = new Audio(this.sounds);
@@ -89,6 +96,12 @@ export class Game {
     window.addEventListener('pointermove', (e) => { if (drag) { this.rig.drag(e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; } });
     window.addEventListener('pointerup', () => { drag = null; });
     if (this.test.play) this.startPlay(this.test.play === 'shift');
+    if (this.resumed) { this.startPlay(false); this.hud.toast('Recovered', 'Your graphics driver reset, so the game reloaded where you were.', 'info', 4); }
+  }
+  saveResume() {
+    const P = this.player;
+    try { sessionStorage.setItem('nh48_resume', JSON.stringify({ x: P.x, z: P.z, th: P.th, hour: this.hour, t: Date.now() })); } catch (e) { /* ignore */ }
+    this.saveStats();
   }
 
   findStart(roadName) {
@@ -115,7 +128,8 @@ export class Game {
     this.rides.setEnabled(shift);
     this.hud.setPlaying(true);
     this.rig.inited = false;
-    this.hud.toast(shift ? 'Shift started' : 'Free roam', shift ? 'People waving for an auto show up green on the map' : 'Deccan to Koregaon Park is open — M for the map', shift ? 'meter' : 'info', 3.6);
+    this.playT0 = this.t;
+    if (shift) this.hud.toast('Shift started', 'People waving for an auto show up green on the map', 'meter', 3.6);
   }
   endShift() {
     this.togglePause(false);
@@ -158,7 +172,7 @@ export class Game {
       this.sky.setShadows(Q.shadows, Q.shadowSize || 1024);
       this.scene.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => (m.needsUpdate = true)); });
     }
-    this.qualityNote = Q.texMax !== this.quality.texMax || Q.ao !== this.quality.ao ? 'Some changes (textures, ambient occlusion) apply after you reload the page.' : '';
+    this.qualityNote = Q.texMax !== this.quality.texMax || Q.msaa !== this.quality.msaa ? 'Some changes (textures, edge smoothing) apply after you reload the page.' : '';
   }
   applyPixelRatio(pr) {
     this.renderer.setPixelRatio(pr);
@@ -172,7 +186,8 @@ export class Game {
   objective() {
     const r = this.rides, P = this.player;
     if (P.tipped) return { main: 'Auto tipped over!', sub: 'Hold on… getting it back on three wheels', urgent: true };
-    if (!r.enabled) return { main: 'Free roam', sub: 'Esc for menu · M for map' };
+    // free roam: a short hint at the start, then a clean screen
+    if (!r.enabled) return this.t - (this.playT0 || 0) < 6 ? { main: 'Free roam', sub: 'Esc for menu · M for map' } : { main: '', sub: '' };
     const c = r.current;
     if (c && c.state === 'boarding') return { main: `${c.name} is getting in…`, sub: '' };
     if (c && c.state === 'onboard') {
@@ -216,7 +231,7 @@ export class Game {
     this._took = true;
     let offer = null;
     if (T.take === 'parked') {
-      let best = null, bd = 80;
+      let best = null, bd = this.params.get('kind') ? 400 : 80;
       for (const r of this.W.parkedList || []) { const d = Math.hypot(r.x - P.x, r.z - P.z); if (d < bd && !r.taken && (!this.params.get('kind') || r.kind === this.params.get('kind'))) { bd = d; best = r; } }
       if (best) offer = { kind: 'parked', r: best };
     } else if (T.take === 'traffic') {
@@ -338,6 +353,22 @@ export class Game {
     if (this.fauna) this.fauna.update(Math.min(dt, 0.05), this.camera.position.x, this.camera.position.z);
     if (this.state === 'play' || this.state === 'pause' || this.state === 'map') this.hud.update(dt);
     this.input.endFrame();
+    this.sanity();
+  }
+  // a single NaN in the physics or the camera turns the whole frame black for good; catch it and
+  // put things back where they last were valid
+  sanity() {
+    const P = this.player, C = this.camera.position;
+    const okP = Number.isFinite(P.x) && Number.isFinite(P.z) && Number.isFinite(P.th);
+    if (okP) { (this._good = this._good || {}).x = P.x; this._good.z = P.z; this._good.th = P.th; }
+    else if (this._good) { console.warn('player state was invalid; restored'); P.reset(this._good.x, this._good.z, this._good.th); }
+    if (!(Number.isFinite(C.x) && Number.isFinite(C.y) && Number.isFinite(C.z))) {
+      console.warn('camera was invalid; reset');
+      this.rig.inited = false;
+      C.set(P.x - 6, 3, P.z);
+      this.camera.quaternion.identity();
+      this.camera.lookAt(P.x, 1, P.z);
+    }
   }
 
   backOnRoad() {
@@ -477,10 +508,10 @@ export class Game {
     if (p.acc >= 2) {
       const fps = p.n / p.acc;
       p.acc = 0; p.n = 0;
-      if (fps < 38) p.slow++; else p.slow = 0;
+      if (fps < 45) p.slow++; else p.slow = 0;
       if (fps > 57) p.fast++; else p.fast = 0;
       const maxPr = Math.min(window.devicePixelRatio || 1, this.QUALITY[this.qualityName].pixelRatio);
-      if (p.slow >= 1 && p.pr > 0.6) { p.pr = Math.max(0.6, p.pr - 0.12); this.applyPixelRatio(p.pr); p.slow = 0; }
+      if (p.slow >= 1 && p.pr > 0.6) { p.pr = Math.max(0.6, p.pr - (fps < 30 ? 0.2 : 0.1)); this.applyPixelRatio(p.pr); p.slow = 0; }
       else if (p.fast >= 3 && p.pr < maxPr) { p.pr = Math.min(maxPr, p.pr + 0.08); this.applyPixelRatio(p.pr); p.fast = 0; }
       // still struggling at the lowest resolution: step the graphics preset down once per level
       // (only when the player hasn't picked a preset themselves)

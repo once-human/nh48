@@ -6,6 +6,8 @@ import { Sky } from './gfx/sky.js';
 import { Post } from './gfx/post.js';
 import { U } from './gfx/materials.js';
 import { RNG } from './core/util.js';
+import { vehicleMaterials } from './vehicles/vehmat.js';
+import { buildCar, buildAuto, buildScooter, buildBike, buildTempo } from './vehicles/models.js';
 
 export function runTreeLab(renderer, quality, T, params) {
   const scene = new THREE.Scene();
@@ -105,6 +107,53 @@ export function runPeopleLab(renderer, quality, kit, params, animals) {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   let frames = 0;
   window.__nh = { setView: (x, z, y, yaw, pitch) => { camera.position.set(x, y, z); camera.rotation.set(pitch * Math.PI / 180, yaw * Math.PI / 180, 0, 'YXZ'); }, pending: () => 0 };
+  const loop = () => {
+    sky.update(+(params.get('hour') || 10.5), new THREE.Vector3(), 1 / 30);
+    post.render(1 / 30);
+    if (++frames === 3) window.__shotReady = true;
+    requestAnimationFrame(loop);
+  };
+  document.getElementById('loading').classList.add('done');
+  requestAnimationFrame(loop);
+}
+
+// vehicle lineup: ?lab=cars&at=x,z,y,yaw,pitch — every traffic model plus the player's auto
+export function runCarLab(renderer, quality, params) {
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 500);
+  const sky = new Sky(renderer, scene);
+  sky.shadowRange = 25; sky.setShadows(quality.shadows, quality.shadowSize);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x6f6d6a, roughness: 1 }));
+  ground.rotateX(-Math.PI / 2); ground.receiveShadow = true; scene.add(ground);
+  const vm = vehicleMaterials();
+  for (const m of Object.values(vm)) sky.reflective(m);
+  const list = [['hatch', buildCar('hatch'), [0.85, 0.1, 0.1]], ['sedan', buildCar('sedan'), [0.92, 0.92, 0.9]], ['suv', buildCar('suv'), [0.12, 0.14, 0.18]],
+    ['taxi', buildCar('taxi'), [0.1, 0.1, 0.1]], ['auto', buildAuto({ withWheels: true, driver: true }), [1, 1, 1]], ['scooter', buildScooter({ helmet: true }), [0.2, 0.35, 0.7]],
+    ['bike', buildBike({ helmet: true }), [0.1, 0.1, 0.1]], ['tempo', buildTempo(), [0.9, 0.9, 0.9]]];
+  const lin = (c) => new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace);
+  const pick = params.get('pick');
+  const shown = pick ? list.filter(([n]) => pick.split(',').includes(n)) : list;
+  shown.forEach(([name, m, col], i) => {
+    const mk = (geo, mat) => {
+      const im = new THREE.InstancedMesh(geo, mat, 1);
+      im.setMatrixAt(0, new THREE.Matrix4().makeRotationY(-Math.PI / 2 * 0 + (+(params.get('rot') || 30)) * Math.PI / 180));
+      im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array([...lin(col).toArray()]), 3);
+      if (geo.attributes.paint) { geo.setAttribute('aColB', new THREE.InstancedBufferAttribute(new Float32Array([0.8, 0.3, 0.2]), 3)); geo.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array([0.9, 0.9, 0.9]), 3)); }
+      im.castShadow = true; im.receiveShadow = true;
+      if (pick) im.position.set((i - (shown.length - 1) / 2) * 3.2, 0, 0); else im.position.set((i % 4 - 1.5) * 6, 0, Math.floor(i / 4) * -6);
+      scene.add(im);
+    };
+    mk(m.body, m.body.attributes.paint ? vm.body : vm.solid);
+    if (m.glass && m.glass.attributes.position.count) mk(m.glass, vm.glass);
+  });
+  const post = new Post(renderer, scene, camera, quality);
+  const at = (params.get('at') || '0,14,4,0,-12').split(',').map(Number);
+  camera.position.set(at[0], at[2], at[1]);
+  camera.rotation.set(at[4] * Math.PI / 180, at[3] * Math.PI / 180, 0, 'YXZ');
+  post.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  let frames = 0;
+  window.__nh = { setView: (x, z, y, yaw, pitch) => { camera.position.set(x, y, z); camera.rotation.set(pitch * Math.PI / 180, yaw * Math.PI / 180, 0, 'YXZ'); }, setHour: (h) => { params.set('hour', h); }, pending: () => 0, stats: () => ({}) };
   const loop = () => {
     sky.update(+(params.get('hour') || 10.5), new THREE.Vector3(), 1 / 30);
     post.render(1 / 30);

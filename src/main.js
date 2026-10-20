@@ -7,7 +7,8 @@ import { updateProps } from './world/propsChunk.js';
 import { Sky } from './gfx/sky.js';
 import { Post } from './gfx/post.js';
 import { U } from './gfx/materials.js';
-import { runTreeLab, runPeopleLab } from './lab.js';
+import { installAtmosphere } from './gfx/atmos.js';
+import { runTreeLab, runPeopleLab, runCarLab } from './lab.js';
 import { vehicleMaterials } from './vehicles/vehmat.js';
 import { PlayerAuto } from './vehicles/player.js';
 import { Traffic } from './traffic/traffic.js';
@@ -19,12 +20,12 @@ import { HumanKit } from './people/humans.js';
 import { AnimalKit } from './people/animals.js';
 
 export const QUALITY = {
-  low: { name: 'low', pixelRatio: 0.75, shadows: false, shadowSize: 0, ao: false, smaa: false, texMax: 512, boardRes: 0.5, signScale: 0.5,
-    streamRadius: 360, streamBudget: 4, treeNearRange: 28, treeMidRange: 100, treeFarRange: 600, treeNearCap: 100, treeMidCap: 700, treeFarCap: 5000, leafCell: 256, impostorCell: 128, propRange: 110, far: 1400, traffic: 70, peds: 110 },
-  med: { name: 'med', pixelRatio: 1.0, shadows: true, shadowSize: 2048, ao: true, aoSamples: 8, smaa: true, texMax: 1024, boardRes: 1, signScale: 1,
-    streamRadius: 520, streamBudget: 6, treeNearRange: 42, treeMidRange: 150, treeFarRange: 900, treeNearCap: 200, treeMidCap: 1400, treeFarCap: 9000, leafCell: 512, impostorCell: 256, propRange: 170, far: 2200, traffic: 130, peds: 190 },
-  high: { name: 'high', pixelRatio: 1.5, shadows: true, shadowSize: 4096, ao: true, aoSamples: 16, smaa: true, texMax: 1024, boardRes: 1, signScale: 1,
-    streamRadius: 720, streamBudget: 8, treeNearRange: 80, treeMidRange: 240, treeFarRange: 1200, treeNearCap: 500, treeMidCap: 2800, treeFarCap: 14000, leafCell: 512, impostorCell: 256, propRange: 240, far: 3000, traffic: 170, peds: 260 },
+  low: { name: 'low', pixelRatio: 0.8, shadows: false, shadowSize: 0, msaa: false, texMax: 512, boardRes: 0.5, signScale: 0.5,
+    streamRadius: 360, streamBudget: 3, grassRange: 22, grassCap: 2200, treeNearRange: 28, treeMidRange: 100, treeFarRange: 600, treeNearCap: 100, treeMidCap: 700, treeFarCap: 5000, leafCell: 256, impostorCell: 128, propRange: 110, far: 1400, traffic: 70, peds: 110 },
+  med: { name: 'med', pixelRatio: 1.0, shadows: true, shadowSize: 2048, msaa: true, texMax: 1024, boardRes: 1, signScale: 1,
+    streamRadius: 520, streamBudget: 4, grassRange: 34, grassCap: 5000, treeNearRange: 42, treeMidRange: 150, treeFarRange: 900, treeNearCap: 200, treeMidCap: 1400, treeFarCap: 9000, leafCell: 512, impostorCell: 256, propRange: 170, far: 2200, traffic: 130, peds: 190 },
+  high: { name: 'high', pixelRatio: 1.25, shadows: true, shadowSize: 2048, msaa: true, texMax: 1024, boardRes: 1, signScale: 1,
+    streamRadius: 720, streamBudget: 5, grassRange: 46, grassCap: 9000, treeNearRange: 80, treeMidRange: 240, treeFarRange: 1200, treeNearCap: 500, treeMidCap: 2800, treeFarCap: 14000, leafCell: 512, impostorCell: 256, propRange: 240, far: 3000, traffic: 170, peds: 260 },
 };
 
 const params = new URLSearchParams(location.search);
@@ -69,13 +70,25 @@ const SOUNDS = ['horn_car', 'horn_beep', 'horn_truck', 'horn_truck_short', 'dog_
 async function main() {
   if (!document.createElement('canvas').getContext('webgl2')) throw new Error('This browser has no WebGL 2. NH48 needs a recent Chrome, Edge, Firefox or Safari.');
   const quality = pickQuality();
+  installAtmosphere();
   const canvas = document.getElementById('gl');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false, depth: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !!quality.msaa, powerPreference: 'high-performance', stencil: false, depth: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatio));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.shadowMap.enabled = quality.shadows;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.info.autoReset = false;
+  // If the GPU driver resets (out of memory, a too-long frame) the browser drops the WebGL context
+  // and the canvas goes black. Recover: remember where the player was, then reload into the same spot.
+  let ctxGame = null;
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    try { ctxGame?.saveResume(); } catch (err) { /* ignore */ }
+    const m = document.getElementById('ld-msg'), ld = document.getElementById('loading');
+    if (ld) { ld.classList.remove('done'); ld.hidden = false; }
+    if (m) m.textContent = 'Graphics driver reset — reloading where you were…';
+    setTimeout(() => location.reload(), 1200);
+  });
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.3, quality.far);
 
@@ -129,6 +142,7 @@ async function main() {
   };
   for (const b of [gAlb, gNrm, gArm, wAlb, wNrm, wArm]) b.close?.();
   if (params.get('lab') === 'people' && kit) return runPeopleLab(renderer, quality, kit, params, animalKit);
+  if (params.get('lab') === 'cars') return runCarLab(renderer, quality, params);
   if (params.get('lab') === 'trees') { renderer.info.autoReset = false; return runTreeLab(renderer, quality, T, params); }
 
   const W = await buildWorld(M, T, renderer, scene, quality, (t, f) => progress(t, 0.62 + f * 0.2));
@@ -136,12 +150,13 @@ async function main() {
   sky.setShadows(quality.shadows, quality.shadowSize);
   W.sky = sky;
   const post = new Post(renderer, scene, camera, quality);
-  window.__W = W;
+  window.__W = W; window.__updateProps = updateProps; window.__U = U;
 
   if (params.has('fly')) return runFly({ W, renderer, scene, camera, sky, post, quality, progress });
 
   // ---- gameplay
   const vmats = vehicleMaterials();
+  for (const m of Object.values(vmats)) sky.reflective(m);
   const auto = new PlayerAuto(W, scene, vmats);
   const player = new Pilot({ W, scene, vmats, kit, auto });
   W.kit = kit; W.animalKit = animalKit;
@@ -151,6 +166,8 @@ async function main() {
   rig.traffic = traffic;
   const input = new Input(canvas);
   const game = new Game({ W, scene, camera, renderer, sky, player, traffic, rig, input, quality, params, QUALITY, vmats, post, sounds });
+  ctxGame = game;
+  window.__game = game;
   await game.init(progress);
   // warm the chunks around the start before the first frame
   await progress('Building the streets', 0.86);
@@ -176,6 +193,12 @@ async function main() {
   game.inView = inView;
   let last = performance.now(), acc = 0, propT = 0, frames = 0;
   const STEP = 1 / 60;
+  // F3: performance overlay
+  const perfBox = document.createElement('div');
+  perfBox.className = 'dev'; perfBox.hidden = !params.has('perf');
+  document.getElementById('ui').appendChild(perfBox);
+  addEventListener('keydown', (e) => { if (e.code === 'F3') { e.preventDefault(); perfBox.hidden = !perfBox.hidden; } });
+  const pf = { t: 0, n: 0, worst: 0, cpu: 0, gpuish: 0, hitch: 0 };
   const fwd = new THREE.Vector3();
   const perf = window.__perf = { n: 0, upd: 0, rnd: 0, worst: 0 };
   function frame(now) {
@@ -211,6 +234,18 @@ async function main() {
     post.render(dt);
     const t2 = performance.now();
     perf.n++; perf.upd += t1 - t0; perf.rnd += t2 - t1; perf.worst = Math.max(perf.worst, t1 - t0);
+    if (!perfBox.hidden) {
+      const ft = dt * 1000;
+      pf.t += dt; pf.n++; pf.worst = Math.max(pf.worst, ft); pf.cpu += t2 - t0; if (ft > 33) pf.hitch++;
+      if (pf.t >= 0.5) {
+        const i = renderer.info, st = W.streamer.stats;
+        perfBox.textContent = `${(pf.n / pf.t).toFixed(0)} fps · worst ${pf.worst.toFixed(0)} ms · hitches ${pf.hitch}\n` +
+          `cpu ${(pf.cpu / pf.n).toFixed(1)} ms/frame · ${quality.name} · ${GPU} · res ${renderer.getPixelRatio().toFixed(2)}x\n` +
+          `${i.render.calls} draws · ${(i.render.triangles / 1e6).toFixed(2)}M tris · ${i.memory.geometries} geos · ${i.memory.textures} tex\n` +
+          `stream: ${W.streamer.built.size} chunks · last ${st.ms.toFixed(0)} ms (sliced) · peak/frame ${st.worst.toFixed(1)} ms`;
+        pf.t = 0; pf.n = 0; pf.worst = 0; pf.cpu = 0; pf.hitch = 0;
+      }
+    }
     game.afterRender(dt, now);
     frames++;
     if (TEST && game.testDone(frames)) {
