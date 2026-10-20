@@ -3,6 +3,7 @@
 // top-left, wallet top-right, map bottom-left, the vehicle bottom-right, prompts and subtitles
 // bottom-centre, toasts under the objective.
 import { fmtRupees, isTouch } from '../core/util.js';
+import { MapScreen, CATS, drawPin, drawArrow, drawFlag, fmtDist } from './map.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 const STONE = '<svg viewBox="0 0 40 52" aria-hidden="true"><path d="M4 22a16 16 0 0 1 32 0v26H4z" fill="#F4F1EA"/><path d="M4 22a16 16 0 0 1 32 0z" fill="#F2B705"/><rect x="4" y="44" width="32" height="4" fill="#C9C4B8"/></svg>';
@@ -132,18 +133,22 @@ export class HUD {
     this.drawCityArt(t.querySelector('#c-pune canvas'));
   }
   drawCityArt(cv) {
-    const mm = this.game.minimap;
-    if (!mm) return;
+    const city = this.game.city;
+    if (!city) return;
     const x = cv.getContext('2d');
-    x.fillStyle = '#121418'; x.fillRect(0, 0, cv.width, cv.height);
-    // crop around Deccan–Peth–Camp
-    const sx = mm.canvas.width * 0.18, sy = mm.canvas.height * 0.22, sw = mm.canvas.width * 0.62, sh = sw * cv.height / cv.width;
-    x.globalAlpha = 0.9;
-    x.drawImage(mm.canvas, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
-    x.globalAlpha = 1;
-    const g = x.createLinearGradient(0, 0, 0, cv.height);
-    g.addColorStop(0, 'rgba(18,20,24,0)'); g.addColorStop(1, 'rgba(18,20,24,.65)');
-    x.fillStyle = g; x.fillRect(0, 0, cv.width, cv.height);
+    const cx = city.x0 + (city.x1 - city.x0) * 0.49, cz = city.z0 + (city.z1 - city.z0) * 0.5;
+    const ppm = cv.width / ((city.x1 - city.x0) * 0.62);
+    const draw = () => {
+      x.setTransform(1, 0, 0, 1, 0, 0);
+      x.fillStyle = '#101216'; x.fillRect(0, 0, cv.width, cv.height);
+      x.save(); x.translate(cv.width / 2, cv.height / 2); x.globalAlpha = 0.92;
+      city.drawTiles(x, cx, cz, ppm, 0, Math.hypot(cv.width, cv.height) / 2);
+      x.restore();
+      const gr = x.createLinearGradient(0, 0, 0, cv.height);
+      gr.addColorStop(0, 'rgba(16,18,22,0)'); gr.addColorStop(1, 'rgba(16,18,22,.65)');
+      x.fillStyle = gr; x.fillRect(0, 0, cv.width, cv.height);
+    };
+    draw(); city.pump(400); draw();
   }
 
   buildPhoneNotice() {
@@ -225,14 +230,8 @@ export class HUD {
   }
 
   buildBigMap() {
-    const m = el('div', 'ov bigmap');
-    m.hidden = true;
-    m.innerHTML = '<div class="bm-head"><span class="ttl">Pune</span><button class="btn small" id="bm-close">Close <span class="kbd">M</span></button></div>';
-    this.bmCanvas = el('canvas', 'bm-canvas');
-    m.appendChild(this.bmCanvas);
-    this.root.appendChild(m);
-    this.bigmap = m;
-    m.querySelector('#bm-close').onclick = () => this.game.toggleMap(false);
+    this.mapScreen = new MapScreen(this.game, this.root, this.game.city);
+    this.bigmap = this.mapScreen.el;
   }
 
   setPlaying(on) {
@@ -297,8 +296,26 @@ export class HUD {
     this.obj.classList.toggle('urgent', !!o.urgent);
     // gps chip
     const dest = g.rides && g.rides.current && g.rides.routeLeft;
-    this.gps.hidden = !dest;
-    if (dest) this.$('h-gps-d').textContent = dest > 1000 ? (dest / 1000).toFixed(1) + ' km' : Math.round(dest / 10) * 10 + ' m';
+    const wpLeft = !dest && g.waypoint && g.nav ? g.nav.left : 0;
+    this.gps.hidden = !dest && !wpLeft;
+    this.gps.classList.toggle('wp', !dest && !!wpLeft);
+    if (dest) { this.$('h-gps-t').textContent = 'Destination'; this.$('h-gps-d').textContent = fmtDist(dest); }
+    else if (wpLeft) { this.$('h-gps-t').textContent = g.waypoint.name || 'Waypoint'; this.$('h-gps-d').textContent = fmtDist(wpLeft); }
+    // landmark arrival cards
+    this.lmT = (this.lmT || 0) - dt;
+    if (this.lmT <= 0 && g.state === 'play') {
+      this.lmT = 1;
+      this.lmSeen = this.lmSeen || new Map();
+      const now = performance.now();
+      for (const l of g.city.places) {
+        if (l.c !== 'landmark') continue;
+        if ((l.x - p.x) ** 2 + (l.z - p.z) ** 2 > 70 * 70) continue;
+        if (now - (this.lmSeen.get(l.n) || -1e9) < 600000) continue;
+        this.lmSeen.set(l.n, now);
+        this.flash(l.n, l.blurb || l.mr || '');
+        break;
+      }
+    }
     // timed bits
     for (let i = this.toasts.length - 1; i >= 0; i--) {
       const t = this.toasts[i];
@@ -308,8 +325,9 @@ export class HUD {
     }
     if (this.subT > 0) { this.subT -= dt; if (this.subT <= 0) this.$('h-sub').classList.remove('show'); }
     if (this.promptT > 0) { this.promptT -= dt; if (this.promptT <= 0) this.$('h-prompt').classList.remove('show'); }
-    this.drawMinimap();
-    if (!this.bigmap.hidden) this.drawBigMap();
+    this.drawMinimap(dt);
+    if (!this.mapScreen.hidden) this.mapScreen.draw(dt);
+    else g.city.pump(1.5);
   }
 
   toast(main, sub = '', kind = 'info', life = 3) {
@@ -422,138 +440,60 @@ export class HUD {
     clearTimeout(this._flT); this._flT = setTimeout(() => { F.hidden = true; }, 4200);
   }
 
-  // ---------------------------------------------------------------- minimap (square, north-up rotating with heading)
+  // ---------------------------------------------------------------- minimap (heading-up, drawn from the shared map tiles)
   drawMinimap() {
-    const g = this.game, p = g.player, mm = g.minimap;
-    if (!mm) return;
+    const g = this.game, p = g.player, city = g.city;
+    if (!city) return;
     const c = this.mmCanvas, x = c.getContext('2d');
     const S = c.width, r = S / 2;
     x.setTransform(1, 0, 0, 1, 0, 0);
-    x.fillStyle = '#121418'; x.fillRect(0, 0, S, S);
-    const k = S / 216;     // canvas px per css px
-    const sc = this.mmScale * k * (1 - Math.min(0.4, Math.abs(p.v) / 36));
+    x.fillStyle = '#101216'; x.fillRect(0, 0, S, S);
+    const k = S / 216;                 // canvas px per css px
+    const sc = this.mmScale * k * (1 - Math.min(0.45, Math.abs(p.v) / 32));     // canvas px per metre, zooms out with speed
     const rot = -p.th - Math.PI / 2;
-    const cy = r + 36 * k;
-    x.save();
-    x.translate(r, cy); x.rotate(rot); x.scale(sc / mm.ppm, sc / mm.ppm);
-    x.translate(-(p.x - mm.x0) * mm.ppm, -(p.z - mm.z0) * mm.ppm);
-    x.imageSmoothingQuality = 'high';
-    x.drawImage(mm.canvas, 0, 0);
-    const route = g.rides && g.rides.routePts;
-    if (route && route.length > 3) {
-      x.strokeStyle = '#f2b705'; x.lineWidth = 6 * k * mm.ppm / sc; x.lineJoin = 'round'; x.lineCap = 'round';
-      x.beginPath();
-      for (let i = 0; i < route.length; i += 2) { const X = (route[i] - mm.x0) * mm.ppm, Z = (route[i + 1] - mm.z0) * mm.ppm; i ? x.lineTo(X, Z) : x.moveTo(X, Z); }
-      x.stroke();
+    const cy = r + 34 * k;             // player sits below centre: more road ahead
+    x.save(); x.translate(r, cy);
+    city.drawTiles(x, p.x, p.z, sc, rot, S * 0.95);
+    // world-space overlays
+    x.rotate(rot); x.scale(sc, sc); x.translate(-p.x, -p.z);
+    const line = (pts, col, w) => {
+      if (!pts || pts.length < 4) return;
+      x.lineJoin = 'round'; x.lineCap = 'round';
+      x.beginPath(); for (let i = 0; i < pts.length; i += 2) i ? x.lineTo(pts[i], pts[i + 1]) : x.moveTo(pts[i], pts[i + 1]);
+      x.strokeStyle = 'rgba(0,0,0,.5)'; x.lineWidth = (w + 3) * k / sc; x.stroke();
+      x.strokeStyle = col; x.lineWidth = w * k / sc; x.stroke();
+    };
+    line(g.nav && g.nav.pts, '#5fd0ff', 5);
+    line(g.rides && g.rides.routePts, '#f2b705', 5);
+    x.restore();
+    // screen-space markers (kept upright)
+    const toS = (X, Z) => { const dx = X - p.x, dz = Z - p.z; return [r + (dx * Math.cos(rot) - dz * Math.sin(rot)) * sc, cy + (dx * Math.sin(rot) + dz * Math.cos(rot)) * sc]; };
+    const lim = r - 14 * k;
+    const inView = (X, Y) => Math.abs(X - r) < lim && Math.abs(Y - r) < lim;
+    const vr = S / sc;
+    for (const l of city.placesNear(p.x, p.z, vr)) {
+      if (l.c !== 'landmark' && l.c !== 'police' && l.c !== 'fuel' && l.c !== 'hospital') continue;
+      const [X, Y] = toS(l.x, l.z); if (!inView(X, Y)) continue;
+      const [, col, gl] = CATS[l.c];
+      drawPin(x, X, Y, col, gl, (l.c === 'landmark' ? 8 : 6.5) * k);
     }
     const marks = [...(g.rides ? g.rides.markers() : []), ...(g.police ? g.police.markers() : [])];
+    if (g.waypoint) marks.push({ kind: 'wp', x: g.waypoint.x, z: g.waypoint.z });
     for (const m of marks) {
-      const X = (m.x - mm.x0) * mm.ppm, Z = (m.z - mm.z0) * mm.ppm;
-      x.save(); x.translate(X, Z); x.rotate(-rot); x.scale(mm.ppm / sc * k, mm.ppm / sc * k);
-      x.fillStyle = markColor(m); x.strokeStyle = '#0a0b0d'; x.lineWidth = 2.5;
-      x.beginPath(); x.arc(0, 0, m.kind === 'marshal' ? 6 : 7, 0, Math.PI * 2); x.fill(); x.stroke();
-      if (m.kind === 'tow') { x.fillStyle = '#0a0b0d'; x.font = '700 9px Inter, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('A', 0, 0.5); }
-      x.restore();
+      let [X, Y] = toS(m.x, m.z);
+      const edge = !inView(X, Y);
+      if (edge) {
+        if (m.kind === 'marshal' || m.kind === 'cop') continue;
+        const f = lim / Math.max(Math.abs(X - r), Math.abs(Y - r)); X = r + (X - r) * f; Y = r + (Y - r) * f;
+      }
+      if (m.kind === 'wp') { if (edge) drawPin(x, X, Y, '#5fd0ff', null, 6 * k); else { x.save(); x.scale(k, k); drawFlag(x, X / k, Y / k); x.restore(); } continue; }
+      drawPin(x, X, Y, markColor(m), m.kind === 'tow' ? 'A' : null, (m.kind === 'marshal' ? 6 : 7) * k);
     }
-    x.restore();
-    // off-map markers on the edge
-    for (const m of marks) {
-      const dx = m.x - p.x, dz = m.z - p.z;
-      const px = (dx * Math.cos(rot) - dz * Math.sin(rot)) * sc, pz = (dx * Math.sin(rot) + dz * Math.cos(rot)) * sc + (cy - r);
-      const lim = r - 14 * k;
-      if (Math.abs(px) < lim && Math.abs(pz) < lim) continue;
-      const f = lim / Math.max(Math.abs(px), Math.abs(pz));
-      if (m.kind === 'marshal' || m.kind === 'cop') continue;
-      x.fillStyle = markColor(m);
-      x.beginPath(); x.arc(r + px * f, r + pz * f, 6 * k, 0, Math.PI * 2); x.fill();
-    }
-    // player
-    x.save(); x.translate(r, cy); x.scale(k, k);
-    x.fillStyle = '#f4f1ea'; x.strokeStyle = '#0a0b0d'; x.lineWidth = 2;
-    x.beginPath(); x.moveTo(0, -11); x.lineTo(8, 8); x.lineTo(0, 4); x.lineTo(-8, 8); x.closePath(); x.fill(); x.stroke();
-    x.restore();
+    drawArrow(x, r, cy, 0, k);
     const n = this.mm.querySelector('.mm-n');
     const na = rot - Math.PI / 2, R2 = 216 / 2 - 14;
     const nx = Math.cos(na), nz = Math.sin(na), f = R2 / Math.max(Math.abs(nx), Math.abs(nz));
-    n.style.transform = `translate(${(nx * f).toFixed(1)}px, ${(nz * f + 36 * 0).toFixed(1)}px)`;
-  }
-
-  drawBigMap() {
-    const g = this.game, mm = g.minimap, c = this.bmCanvas;
-    const w = c.clientWidth, h = c.clientHeight;
-    if (!w || !h) return;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
-    const x = c.getContext('2d');
-    x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    x.fillStyle = '#0e1013'; x.fillRect(0, 0, w, h);
-    const sc = Math.min(w / mm.canvas.width, h / mm.canvas.height);
-    const ox = (w - mm.canvas.width * sc) / 2, oy = (h - mm.canvas.height * sc) / 2;
-    x.drawImage(mm.canvas, ox, oy, mm.canvas.width * sc, mm.canvas.height * sc);
-    const T = (X, Z) => [ox + (X - mm.x0) * mm.ppm * sc, oy + (Z - mm.z0) * mm.ppm * sc];
-    x.font = '600 12px Inter, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    for (const l of mm.labels) {
-      const [X, Y] = T(l.x, l.z);
-      const tw = x.measureText(l.t).width + 12;
-      x.fillStyle = 'rgba(10,11,13,.78)'; x.beginPath(); x.roundRect(X - tw / 2, Y - 10, tw, 20, 6); x.fill();
-      x.fillStyle = l.area ? '#f2b705' : '#f4f1ea'; x.fillText(l.t, X, Y + 0.5);
-    }
-    const route = g.rides && g.rides.routePts;
-    if (route && route.length > 3) {
-      x.strokeStyle = '#f2b705'; x.lineWidth = 3.5; x.lineJoin = 'round'; x.beginPath();
-      for (let k = 0; k < route.length; k += 2) { const [X, Y] = T(route[k], route[k + 1]); k ? x.lineTo(X, Y) : x.moveTo(X, Y); }
-      x.stroke();
-    }
-    for (const m of [...(g.rides ? g.rides.markers() : []), ...(g.police ? g.police.markers() : [])]) {
-      const [X, Y] = T(m.x, m.z);
-      x.fillStyle = markColor(m);
-      x.beginPath(); x.arc(X, Y, 6, 0, Math.PI * 2); x.fill();
-    }
-    const p = g.player;
-    const [PX, PY] = T(p.x, p.z);
-    x.save(); x.translate(PX, PY); x.rotate(p.th + Math.PI / 2);
-    x.fillStyle = '#f4f1ea'; x.strokeStyle = '#0a0b0d'; x.lineWidth = 2;
-    x.beginPath(); x.moveTo(0, -11); x.lineTo(8, 8); x.lineTo(0, 4); x.lineTo(-8, 8); x.closePath(); x.fill(); x.stroke();
-    x.restore();
+    n.style.transform = `translate(${(nx * f).toFixed(1)}px, ${(nz * f).toFixed(1)}px)`;
   }
 }
 
-// pre-rendered map image used by the minimap, the full map and the city card
-export function buildMinimap(W) {
-  const M = W.M;
-  const vis = M.meta.vis.map(v => v / 100);
-  const ppm = 0.75;
-  const w = Math.ceil((vis[2] - vis[0]) * ppm), h = Math.ceil((vis[3] - vis[1]) * ppm);
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const x = c.getContext('2d');
-  const T = (X, Z) => [(X - vis[0]) * ppm, (Z - vis[1]) * ppm];
-  x.fillStyle = '#16181c'; x.fillRect(0, 0, w, h);
-  const poly = (rings, fill) => {
-    x.beginPath();
-    for (const r of rings) {
-      for (let k = 0; k < r.length; k += 2) { const [X, Y] = T(r[k] / 100, r[k + 1] / 100); k ? x.lineTo(X, Y) : x.moveTo(X, Y); }
-      x.closePath();
-    }
-    x.fillStyle = fill; x.fill('evenodd');
-  };
-  const col = { grass: '#1f2b20', soil: '#2a2420', scrub: '#1f2a1f', plaza: '#1d1f23', median: '#22281f', pavers: '#22252a' };
-  for (const [kind, polys] of M.ground) if (col[kind]) for (const [, rings] of polys) poly(rings, col[kind]);
-  for (const [, rings] of M.water) poly(rings, '#16303f');
-  for (const b of M.buildings) poly([b[1]], '#272a30');
-  for (const [kind, polys] of M.ground) if (kind === 'asphalt' || kind === 'concrete' || kind === 'bridge_road') for (const [, rings] of polys) poly(rings, kind === 'asphalt' ? '#7d7f84' : '#5d5f63');
-  // labels: main roads, areas, landmarks
-  const labels = [];
-  const seen = new Set();
-  for (const e of W.graph.edges) {
-    const nm = W.graph.names[e.name];
-    if (!nm || !nm[0] || e.rank < 4 || e.len < 80 || seen.has(nm[0])) continue;
-    seen.add(nm[0]);
-    const t = W.graph.at(e, e.len / 2);
-    labels.push({ t: nm[0], x: t[0], z: t[1] });
-  }
-  for (const p of M.pois) {
-    if (p[4] === 'suburb' && !/ Post Office|Police/.test(p[0])) labels.push({ t: p[0], x: p[2] / 100, z: p[3] / 100, area: true });
-    else if (/College|Rangmandir|Station|Wada|Garden|Udyan|Mandir$|Bakery/.test(p[0]) && labels.length < 70) labels.push({ t: p[0], x: p[2] / 100, z: p[3] / 100 });
-  }
-  return { canvas: c, ppm, x0: vis[0], z0: vis[1], labels };
-}
