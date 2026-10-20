@@ -2,7 +2,8 @@
 // signals, challans, street names; pause/map/settings; adaptive resolution.
 import * as THREE from 'three';
 import { clamp, lerp, RNG, safeStorage, wrapAngle, damp } from '../core/util.js';
-import { HUD, buildMinimap } from '../ui/hud.js';
+import { HUD } from '../ui/hud.js';
+import { CityMap } from '../ui/map.js';
 import { Rides } from './rides.js';
 import { Audio } from './audio.js';
 import { People } from '../people/peds.js';
@@ -64,7 +65,21 @@ export class Game {
     this.crowd = new Crowd(this.people, W.kit, this.scene, W, this.quality);
     this.fauna = new Fauna(this.people, W.animalKit, this.scene, W);
     this.traffic.peds = this.people;
-    this.minimap = buildMinimap(W);
+    this.city = new CityMap(W);
+    this.city.warm(0);
+    // waypoint beacon: a soft column of light you can see over the rooftops
+    {
+      const g = new THREE.CylinderGeometry(0.9, 0.9, 140, 20, 1, true); g.translate(0, 70, 0);
+      const m = new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
+        uniforms: { uA: { value: 0 } },
+        vertexShader: 'varying float vY; varying vec3 vN; varying vec3 vV; void main(){ vY = position.y; vec4 w = modelViewMatrix * vec4(position,1.); vN = normalize(normalMatrix*normal); vV = normalize(-w.xyz); gl_Position = projectionMatrix * w; }',
+        fragmentShader: 'uniform float uA; varying float vY; varying vec3 vN; varying vec3 vV; void main(){ float rim = pow(1. - abs(dot(vN, vV)), 1.5); float f = (1. - smoothstep(10., 140., vY)) * (0.35 + 0.65 * (1. - rim)); gl_FragColor = vec4(vec3(0.37,0.82,1.0) * f * uA, 1.); }',
+      });
+      this.beacon = new THREE.Mesh(g, m); this.beacon.visible = false; this.beacon.frustumCulled = false; this.beacon.renderOrder = 5;
+      this.scene.add(this.beacon);
+    }
+    this.waypoint = null; this.nav = null;
     this.hud = new HUD(this);
     player.hud = this.hud; player.audio = this.audio;
     this.rides = new Rides(this);
@@ -84,6 +99,8 @@ export class Game {
     for (let k = 0; k < 10; k++) this.people.update(0.1, player, null);
     // keys
     window.addEventListener('keydown', (e) => {
+      const ae = document.activeElement;
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;     // typing in the map search
       if (e.code === 'Escape' || e.code === 'KeyP') { if (this.state === 'play' || this.state === 'pause') this.togglePause(); }
       if (e.code === 'KeyM' && (this.state === 'play' || this.state === 'map')) this.toggleMap();
       if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space')) this.startPlay(false);
@@ -149,8 +166,34 @@ export class Game {
   }
   toggleMap(force) {
     const to = force !== undefined ? force : this.hud.bigmap.hidden;
-    if (to && this.state === 'play') { this.state = 'map'; this.hud.bigmap.hidden = false; this.audio.updateEngine(0, 0, false); }
-    else if (!to && this.state === 'map') { this.state = 'play'; this.hud.bigmap.hidden = true; }
+    if (to && this.state === 'play') { this.state = 'map'; this.hud.mapScreen.open(); this.audio.updateEngine(0, 0, false); }
+    else if (!to && this.state === 'map') { this.state = 'play'; this.hud.mapScreen.close(); }
+  }
+  // waypoint + GPS: a blue route along the road graph, refreshed as you drive
+  setWaypoint(wp) {
+    this.waypoint = wp;
+    if (!wp && this.beacon) this.beacon.visible = false;
+    this.nav = wp ? { pts: null, left: Math.hypot(wp.x - this.player.x, wp.z - this.player.z), t: 0 } : null;
+    if (wp) this.hud.toast('Waypoint set', wp.name || '', 'info', 2.5);
+  }
+  updateNav(dt) {
+    const wp = this.waypoint, nav = this.nav;
+    if (!wp || !nav) return;
+    const P = this.player, d = Math.hypot(wp.x - P.x, wp.z - P.z);
+    this.beacon.visible = true; this.beacon.position.set(wp.x, 0, wp.z);
+    this.beacon.material.uniforms.uA.value = Math.min(1, Math.max(0.15, (d - 20) / 120)) * 0.55;
+    if (d < 28) { this.hud.toast('Arrived', wp.name || '', 'good', 3); this.setWaypoint(null); return; }
+    nav.t -= dt;
+    if (nav.t > 0) return;
+    nav.t = 1.5;
+    const G = this.W.graph;
+    const from = G.nearest(P.x, P.z, 80), to = G.nearest(wp.x, wp.z, 250);
+    if (!from || !to) { nav.pts = null; nav.left = d; return; }
+    const r = G.route(from, to, false) || G.route(from, to, true);
+    if (!r) { nav.pts = null; nav.left = d; return; }
+    nav.pts = G.routePolyline(r, from, to);
+    nav.pts.push(wp.x, wp.z);
+    nav.left = r.cost + from.d;
   }
   setHour(h) { this.hour = h; }
   setQuality(name, auto = false) {
@@ -318,6 +361,7 @@ export class Game {
       this.rig.lookBack = this.input.key('KeyB');
       if (this.input.took('KeyR') && P.tipped === 0 && !P.onFoot) this.backOnRoad();
       this.checkRoad(dt);
+      this.updateNav(dt);
       this.rig.update(dt, P);
       const S = P.spec;
       const kind = !S ? 'none' : P.inAuto ? 'auto' : S.two ? 'two' : S.L > 6 ? 'bus' : 'car';
