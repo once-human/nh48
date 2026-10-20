@@ -23,11 +23,14 @@ const I4 = new THREE.Matrix4();
 
 function buildParts() {
   const P = {};
+  // rounded parts (no boxes): ellipsoid torsos, capsule limbs
+  const ell = (rx, ry, rz, x, y, z) => new THREE.SphereGeometry(1, 12, 9).scale(rx, ry, rz).translate(x, y, z);
+  const cap = (r, len, y) => new THREE.CapsuleGeometry(r, len, 2, 8).translate(0, y, 0);
   // male torso (incl. head) : hips at y=0.95, faces +x
   {
     const b = new ColorBuilder(); b.paint = [];
-    b.addGeo(boxG(0.22, 0.56, 0.38, 0, 1.22, 0), I4, [1, 1, 1], 0, 1);
-    b.addGeo(boxG(0.2, 0.1, 0.34, 0, 0.92, 0), I4, [1, 1, 1], 0, 2);           // belt line in pants colour
+    b.addGeo(ell(0.12, 0.3, 0.195, 0, 1.24, 0), I4, [1, 1, 1], 0, 1);
+    b.addGeo(ell(0.115, 0.1, 0.18, 0, 0.96, 0), I4, [1, 1, 1], 0, 2);          // hips in pants colour
     b.addGeo(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 6).translate(0, 1.53, 0), I4, [1, 1, 1], 0, 3);
     b.addGeo(new THREE.SphereGeometry(0.11, 10, 8).scale(1, 1.15, 0.95).translate(0.01, 1.66, 0), I4, [1, 1, 1], 0, 3);
     b.addGeo(new THREE.SphereGeometry(0.115, 10, 6, 0, 6.29, 0, 1.7).scale(1, 0.9, 1).translate(-0.01, 1.7, 0), I4, [0.07, 0.06, 0.05]);
@@ -36,9 +39,9 @@ function buildParts() {
   // female torso + saree/salwar skirt + pallu + hair bun
   {
     const b = new ColorBuilder(); b.paint = [];
-    b.addGeo(boxG(0.2, 0.5, 0.33, 0, 1.2, 0), I4, [1, 1, 1], 0, 1);
-    b.addGeo(new THREE.CylinderGeometry(0.17, 0.27, 0.98, 10).translate(0, 0.5, 0), I4, [1, 1, 1], 0, 2);
-    b.addGeo(boxR(0.23, 0.62, 0.08, 0.55, 0, 0.02, 1.2, 0.0), I4, [1, 1, 1], 0, 2);   // pallu across the chest
+    b.addGeo(ell(0.11, 0.27, 0.17, 0, 1.22, 0), I4, [1, 1, 1], 0, 1);
+    b.addGeo(new THREE.CylinderGeometry(0.17, 0.27, 0.98, 14).translate(0, 0.5, 0), I4, [1, 1, 1], 0, 2);
+    b.addGeo(new THREE.SphereGeometry(1, 10, 8).scale(0.12, 0.32, 0.05).rotateX(0.55).translate(0.03, 1.2, 0.0), I4, [1, 1, 1], 0, 2);   // pallu across the chest
     b.addGeo(new THREE.CylinderGeometry(0.045, 0.05, 0.1, 6).translate(0, 1.5, 0), I4, [1, 1, 1], 0, 3);
     b.addGeo(new THREE.SphereGeometry(0.105, 10, 8).scale(1, 1.15, 0.95).translate(0.01, 1.62, 0), I4, [1, 1, 1], 0, 3);
     b.addGeo(new THREE.SphereGeometry(0.11, 10, 6, 0, 6.29, 0, 1.75).translate(-0.015, 1.66, 0), I4, [0.06, 0.05, 0.05]);
@@ -49,15 +52,15 @@ function buildParts() {
   // leg (pivot at hip, hangs down -y) : pants + shoe
   {
     const b = new ColorBuilder(); b.paint = [];
-    b.addGeo(boxG(0.14, 0.86, 0.14, 0, -0.43, 0), I4, [1, 1, 1], 0, 1);
-    b.addGeo(boxG(0.24, 0.08, 0.12, 0.05, -0.9, 0), I4, [0.12, 0.1, 0.09]);
+    b.addGeo(cap(0.068, 0.74, -0.43), I4, [1, 1, 1], 0, 1);
+    b.addGeo(ell(0.12, 0.045, 0.06, 0.05, -0.9, 0), I4, [0.12, 0.1, 0.09]);
     P.leg = b.build();
   }
   // arm (pivot at shoulder): sleeve + forearm skin + hand
   {
     const b = new ColorBuilder(); b.paint = [];
-    b.addGeo(boxG(0.09, 0.3, 0.09, 0, -0.15, 0), I4, [1, 1, 1], 0, 1);
-    b.addGeo(boxG(0.075, 0.28, 0.075, 0, -0.43, 0), I4, [1, 1, 1], 0, 3);
+    b.addGeo(cap(0.047, 0.24, -0.15), I4, [1, 1, 1], 0, 1);
+    b.addGeo(cap(0.038, 0.24, -0.43), I4, [1, 1, 1], 0, 3);
     b.addGeo(new THREE.SphereGeometry(0.045, 6, 4).translate(0, -0.6, 0), I4, [1, 1, 1], 0, 3);
     P.arm = b.build();
   }

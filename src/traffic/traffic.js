@@ -323,6 +323,7 @@ export class Traffic {
     if (v.fallen > 0) { v.fallen -= dt; v.v = 0; return; }
     if (v.ignoreT > 0) v.ignoreT -= dt;
     if (v.angry > 0) v.angry -= dt;
+    if (v.honkT > 0) v.honkT -= dt;
     // --- desired speed
     const e = v.l.e;
     let vDes = SPEED_BY_RANK[e.rank] * v.vMul;
