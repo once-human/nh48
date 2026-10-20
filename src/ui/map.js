@@ -269,7 +269,7 @@ export class MapScreen {
       <div class="bm-card glass" id="bm-card" hidden>
         <div class="bm-c-cat" id="bm-c-cat"></div><div class="bm-c-n" id="bm-c-n"></div><div class="bm-c-mr" lang="mr" id="bm-c-mr"></div>
         <div class="bm-c-b" id="bm-c-b"></div>
-        <div class="bm-c-act"><button class="btn primary small" id="bm-c-go">Set waypoint</button><button class="btn small" id="bm-c-x">Close</button></div>
+        <div class="bm-c-act"><button class="btn primary small" id="bm-c-go">Set waypoint</button><button class="btn small" id="bm-c-ft">Fast travel</button><button class="btn small" id="bm-c-x">Close</button></div>
       </div>
       <div class="bm-foot"><span class="bm-scale" id="bm-scale"><i></i><b></b></span><span class="bm-hint">Drag to move · scroll to zoom · right-click to drop a pin · <span class="kbd">M</span> close</span></div>`;
     root.appendChild(m);
@@ -290,6 +290,7 @@ export class MapScreen {
     this.$('bm-out').onclick = () => this.zoomAt(1 / 1.6);
     this.$('bm-me').onclick = () => this.centerOnMe();
     this.$('bm-c-x').onclick = () => this.select(null);
+    this.$('bm-c-ft').onclick = () => { const s = this.sel; if (s && this.g.fastTravel(s.x, s.z, s.n)) this.select(null); };
     this.$('bm-c-go').onclick = () => {
       const s = this.sel; if (!s) return;
       if (this.g.waypoint && this.g.waypoint.x === s.x && this.g.waypoint.z === s.z) this.g.setWaypoint(null);
@@ -411,6 +412,10 @@ export class MapScreen {
     this.$('bm-c-mr').textContent = p.mr || '';
     this.$('bm-c-b').textContent = p.blurb || '';
     this.$('bm-c-b').hidden = !p.blurb;
+    const ft = this.$('bm-c-ft'), cost = this.g.fastTravelCost(p.x, p.z), why = this.g.fastTravelBlock();
+    ft.textContent = `Fast travel · ₹${cost}`;
+    ft.disabled = !!why || this.g.stats.money < cost || d < 40;
+    ft.title = why || (this.g.stats.money < cost ? `You have ₹${this.g.stats.money}` : 'Skip the drive');
     const wp = this.g.waypoint;
     this.$('bm-c-go').textContent = wp && wp.x === p.x && wp.z === p.z ? 'Remove waypoint' : 'Set waypoint';
   }

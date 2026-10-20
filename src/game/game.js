@@ -27,7 +27,7 @@ export class Game {
     const st0 = safeStorage();
     let saved = null; try { saved = st0 && st0.getItem('nh48_quality'); } catch (e) { /* ignore */ }
     this.userQuality = !!(this.params.get('q') || saved);
-    this.stats = { money: 0, rides: 0, starSum: 0, rating: 0 };
+    this.stats = { money: 2000, rides: 0, starSum: 0, rating: 0, grant: 1 };     // every new player starts with ₹2,000
     this.test = {
       drive: parseFloat(this.params.get('drive') || '0'),
       steer: parseFloat(this.params.get('steer') || '0'),
@@ -46,7 +46,7 @@ export class Game {
   async init(progress) {
     const { W, player, traffic } = this;
     const st = safeStorage();
-    if (st) { try { const s = JSON.parse(st.getItem('nh48_stats') || 'null'); if (s) Object.assign(this.stats, s); } catch (e) { /* ignore */ } }
+    if (st) { try { const s = JSON.parse(st.getItem('nh48_stats') || 'null'); if (s) { Object.assign(this.stats, s); if (!s.grant) { this.stats.money += 2000; this.stats.grant = 1; } } } catch (e) { /* ignore */ } }
     const start = this.findStart(this.params.get('spawn') || 'FC Road');
     // coming back from a graphics reset: same spot, same time of day, straight into play
     let resume = null;
@@ -169,6 +169,43 @@ export class Game {
     if (to && this.state === 'play') { this.state = 'map'; this.hud.mapScreen.open(); this.audio.updateEngine(0, 0, false); }
     else if (!to && this.state === 'map') { this.state = 'play'; this.hud.mapScreen.close(); }
   }
+  // fast travel: a cab ride you skip. ₹20 + ₹30/km, never more than ₹200
+  fastTravelCost(x, z) {
+    const d = Math.hypot(x - this.player.x, z - this.player.z);
+    return Math.min(200, Math.max(20, Math.round((20 + d / 1000 * 30) / 5) * 5));
+  }
+  fastTravelBlock() {
+    if (this.police && this.police.heat > 0) return 'Not while the police are after you';
+    if (this.rides && this.rides.current) return 'Finish the ride first';
+    if (this.player.tipped) return 'Get back on your wheels first';
+    return '';
+  }
+  fastTravel(x, z, name) {
+    const why = this.fastTravelBlock();
+    if (why) { this.hud.toast('Can’t fast travel', why, 'warn', 2.6); return false; }
+    const cost = this.fastTravelCost(x, z);
+    if (this.stats.money < cost) { this.hud.toast('Not enough money', `Fast travel here costs ₹${cost}`, 'warn', 2.6); return false; }
+    const G = this.W.graph;
+    const near = G.nearest(x, z, 300, e => e.rank >= 1 && !e.restricted) || G.nearest(x, z, 600);
+    if (!near) { this.hud.toast('Can’t fast travel', 'No road near there', 'warn', 2.4); return false; }
+    const e = near.e, t = G.at(e, near.s), th = Math.atan2(t[3], t[2]);
+    const P = this.player;
+    if (P.onFoot) {
+      const sw = e.w / 2 + Math.max(0.8, e.sw / 2);           // step onto the footpath
+      P.teleportFoot(t[0] + t[3] * sw, t[1] - t[2] * sw, th + Math.PI / 2, this.traffic);
+    } else {
+      const lat = e.oneway ? e.w / 2 - 1.6 : 1.6;
+      const X = t[0] + t[3] * lat, Z = t[1] - t[2] * lat;
+      if (P.cur && P.cur !== P.auto) P.cur.reset(X, Z, th); else P.reset(X, Z, th);
+    }
+    this.stats.money -= cost; this.saveStats();
+    this.setWaypoint(null);
+    this.W.streamer.warm(P.x, P.z, Math.min(260, this.quality.streamRadius || 260));
+    this.traffic.prefill(P.x, P.z);
+    this.toggleMap(false);
+    this.hud.flash(name || 'Fast travel', `₹${cost} · ${this.W.graph.names[e.name] ? this.W.graph.names[e.name][0] : ''}`);
+    return true;
+  }
   // waypoint + GPS: a blue route along the road graph, refreshed as you drive
   setWaypoint(wp) {
     this.waypoint = wp;
@@ -224,7 +261,7 @@ export class Game {
   }
   saveStats() {
     const st = safeStorage();
-    if (st) try { st.setItem('nh48_stats', JSON.stringify({ money: this.stats.money, rides: this.stats.rides, starSum: this.stats.starSum, rating: this.stats.rating })); } catch (e) { /* ignore */ }
+    if (st) try { st.setItem('nh48_stats', JSON.stringify({ money: this.stats.money, rides: this.stats.rides, starSum: this.stats.starSum, rating: this.stats.rating, grant: 1 })); } catch (e) { /* ignore */ }
   }
 
   objective() {

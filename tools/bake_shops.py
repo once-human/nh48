@@ -24,7 +24,8 @@ MAP = os.path.join(ROOT, 'data/map.json')
 OSM = os.path.join(ROOT, 'data/raw/merged.json')
 OVT = os.path.join(ROOT, 'data/raw/overture/places.parquet')
 SHOP_CELL = 3.6                 # must match buildingsChunk.js / the facade shader
-SNAP = 6.0                      # a place must be inside its building or within this many metres of it
+SNAP = 6.0                      # first pass: inside its building or within this many metres of it
+NEAR_R = 25.0                   # second pass: nearest real building within this radius
 UNIQUE_R = 90.0                 # no repeated name within this radius
 DEFAULT_SHOP_STYLES = {0, 1, 2, 9}           # apartment, commercial, old, glass
 REAL_SHOP_STYLES = {0, 1, 2, 3, 9, 14}       # + bungalow and brick: converted bungalows do have shops
@@ -197,19 +198,20 @@ def slot_point(bi, ei, k):
     return ax + (bx - ax) * t, az + (bz - az) * t
 
 NO_BOARD_STYLES = {6, 7, 8, 10, 11, 13}       # sheds, fuel canopies, temples, churches, the fort, Osho pyramid
-def try_place(c):
+def try_place(c, radius=None):
     """A real place goes on its own building: the footprint that contains the point, or one within
     SNAP metres of it. The board hangs on that building's street-facing wall nearest the point.
     Nothing is moved onto a neighbour, and a place with no such building is left off."""
     p = Point(c['x'], c['z'])
-    near = [int(i) for i in tree.query(p.buffer(SNAP))]
+    R = radius or SNAP
+    near = [int(i) for i in tree.query(p.buffer(R))]
     inside = [bi for bi in near if polys[bi].contains(p)]
-    cand = inside or sorted((bi for bi in near if polys[bi].distance(p) <= SNAP), key=lambda bi: polys[bi].distance(p))[:1]
+    cand = inside or sorted((bi for bi in near if polys[bi].distance(p) <= R), key=lambda bi: polys[bi].distance(p))[:3 if radius else 1]
     for bi in cand:
         if B[bi][3] in NO_BOARD_STYLES: return False
         opts = []
         for ei, (ax, az, bx, bz, L, fl) in enumerate(edges[bi]):
-            if not (L > 2.6 and fl in '12'): continue
+            if not (L > 2.6 and fl in '123'): continue
             ex, ez = bx - ax, bz - az
             t = max(0.0, min(1.0, ((c['x'] - ax) * ex + (c['z'] - az) * ez) / (L * L)))
             opts.append((math.hypot(ax + ex * t - c['x'], az + ez * t - c['z']), ei, t))
@@ -225,6 +227,10 @@ def try_place(c):
 
 placed = sum(try_place(c) for c in cands)
 log('real places on their own building', placed, 'of', len(cands), '| frontage edges', len(front))
+# Overture/OSM points are often a few metres to 25 m off (geocoded to the road or the plot);
+# those businesses still exist, so they go on the nearest real building's street wall
+placed2 = sum(try_place(c, NEAR_R) for c in cands if 'placed' not in c)
+log('real places on the nearest building (point off its footprint)', placed2, '| still unplaced', len(cands) - placed - placed2)
 
 # ---------------------------------------------------------------- write
 names, nidx, shops = [], {}, []
