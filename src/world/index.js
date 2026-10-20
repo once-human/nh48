@@ -55,9 +55,14 @@ export class WorldIndex {
     for (const r of M.railways || []) { const p = cmRing(r[1]); put('railways', at(p[0], p[1]), { yard: r[0], pts: p }); }
     for (const pf of M.platforms || []) { const p = cmRing(pf); put('platforms', at(p[0], p[1]), p); }
     for (const st of M.mstations || []) { const p = cmRing(st[1]); put('mstations', at(p[0], p[1]), { name: st[0], pts: p }); }
-    // shops grouped by building
+    // shops grouped by building: bi -> Map(edge * 4096 + slot -> [bi, edge, slot, nameIndex, source])
+    this.shopNames = M.shopNames || [];
     this.shopsByBld = new Map();
-    for (const s of M.shops || []) { if (!this.shopsByBld.has(s[0])) this.shopsByBld.set(s[0], []); this.shopsByBld.get(s[0]).push(s); }
+    for (const s of M.shops || []) {
+      let m = this.shopsByBld.get(s[0]);
+      if (!m) { m = new Map(); this.shopsByBld.set(s[0], m); }
+      m.set(s[1] * 4096 + s[2], s);
+    }
   }
   chunkOf(x, z) {
     const i = Math.floor((x - this.x0) / this.size), j = Math.floor((z - this.z0) / this.size);

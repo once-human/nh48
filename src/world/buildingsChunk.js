@@ -209,7 +209,8 @@ export function* buildBuildingsChunk(W, C, group) {
   const fb = new FacadeB(), rb = new RoofB(), cb = new ColorBuilder(), sb = new QuadBuilder(), ob = new QuadBuilder();
   const signs = W.boards;
   W.sliceLabel = 'atlas';
-  const local = yield* signs.chunkAtlas(C, (bi) => index.shopsByBld.get(bi));
+  const local = yield* signs.chunkAtlas(C, (bi) => index.shopsByBld.get(bi), index.shopNames);
+  const nearRecs = [];
   W.sliceLabel = 'bld';
   const footprints = [];
   C.doors = [];                    // shop fronts people can walk into
@@ -241,9 +242,8 @@ export function* buildBuildingsChunk(W, C, group) {
     const top = BASE + H;
     const wallTop = top + parapet;
     footprints.push({ bi, p, h: wallTop });
-    const shopsCapable = styleId === 0 || styleId === 1 || styleId === 2 || styleId === 9;
     let u = 0;
-    const osm = index.shopsByBld.get(bi);
+    const shopsHere = index.shopsByBld.get(bi);
     for (let i = 0; i < n; i++) {
       if ((++ops & 15) === 0) yield;
       const j = (i + 1) % n;
@@ -254,7 +254,8 @@ export function* buildBuildingsChunk(W, C, group) {
       const tx = (bx - ax) / L, tz = (bz - az) / L;
       const fl = flags[i] || '0';
       let ef = 0;
-      const shop = shopsCapable && L > 2.6 && (fl === '2' || (fl === '1' && (styleId === 1 || ((peth || district === 2 || district === 4) && rng.chance(0.5)))));
+      // shop frontages are decided by the map baker (tools/bake_shops.py) and flagged '3'
+      const shop = fl === '3' && L > 2.6;
       if (shop) ef |= 1;
       if (fl === '0' && (L < 3 || rng.chance(0.45))) ef |= 2;
       if (fort) ef |= 2;
@@ -298,9 +299,8 @@ export function* buildBuildingsChunk(W, C, group) {
         const ns = Math.max(1, Math.floor(L / SHOP_CELL));
         const cw = L / ns;
         for (let k = 0; k < ns; k++) {
-          let board = null;
-          if (osm) { const s = osm.find(s => s[1] === i && Math.floor(s[2] * ns) === k); if (s) board = local.get(s); }
-          if (!board) board = signs.generic(district, rng);
+          const sh = shopsHere && shopsHere.get(i * 4096 + k);
+          const board = (sh && local.get(sh)) || signs.generic(district, rng);
           const t0 = (k * cw + 0.15), t1 = ((k + 1) * cw - 0.15);
           const w = t1 - t0, h = Math.min(0.85, w / 4.1);
           const y1 = BASE + gh - 0.1, y0 = y1 - h;
@@ -309,6 +309,7 @@ export function* buildBuildingsChunk(W, C, group) {
           C.doors.push({ x: (x0 + x1) / 2 + nx * 0.25, z: (z0 + z1) / 2 + nz * 0.25, nx, nz, n: 0 });
           const ltr = (tx * nz - tz * nx) > 0;
           (board.local ? ob : sb).quad([x0, y0, z0], [x1, y0, z1], [x1, y1, z1], [x0, y1, z0], [nx, 0, nz], ltr ? board.u0 : board.u1, board.v0, ltr ? board.u1 : board.u0, board.v1);
+          if (sh) nearRecs.push({ s: sh, x0, y0, z0, x1, y1, z1, nx, nz, ltr, mx: (x0 + x1) / 2, mz: (z0 + z1) / 2 });
           // board frame edges
           const fc = [0.12, 0.12, 0.13];
           cb.addGeo(GEO.box, mat((x0 + x1) / 2 - nx * 0.05, y1 + 0.02, (z0 + z1) / 2 - nz * 0.05, w + 0.06, 0.04, 0.12, Math.atan2(-tz, tx)), fc);
@@ -372,9 +373,16 @@ export function* buildBuildingsChunk(W, C, group) {
   if (!ob.empty && local.tex) {
     localMat = mats.sign.clone();
     localMat.map = local.tex; localMat.emissiveMap = local.tex;
+    W.signMats.add(localMat);
     const m = new THREE.Mesh(ob.build(), localMat); m.receiveShadow = true; group.add(m);
   }
-  return () => { W.footprintsByChunk.delete(C.ci); if (local.tex) local.tex.dispose(); if (localMat) localMat.dispose(); };
+  if (W.nearBoards) W.nearBoards.addChunk(C.ci, C.cx, C.cz, nearRecs);
+  return () => {
+    W.footprintsByChunk.delete(C.ci);
+    if (W.nearBoards) W.nearBoards.dropChunk(C.ci);
+    if (local.tex) local.tex.dispose();
+    if (localMat) { W.signMats.delete(localMat); localMat.dispose(); }
+  };
 }
 
 function insideRing(x, z, p) {
