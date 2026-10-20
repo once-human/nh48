@@ -44,6 +44,18 @@ for e in E:
 ltree = STRtree(lines); ptree = STRtree(polys)
 def nearest_edge(x, z):
     i = ltree.nearest(Point(x, z)); return i, lines[i], info[i]
+def dirs_at(j, x, z):
+    l = lines[j]; s = l.project(Point(x, z)); a = l.interpolate(max(0, s - 1)); b = l.interpolate(min(l.length, s + 1))
+    return math.atan2(b.y - a.y, b.x - a.x)
+def median_side(x, z, ox, oz, own):
+    a0 = dirs_at(own, x, z)
+    for k in range(3, 19):
+        r = k * 0.5; px, pz = x + ox * r, z + oz * r; p = Point(px, pz)
+        for j in ptree.query(p):
+            if j != own and polys[j].contains(p):
+                da = abs((a0 - dirs_at(j, px, pz) + math.pi) % (2 * math.pi) - math.pi)
+                if min(da, math.pi - da) < 0.45: return True
+    return False
 def on_other_road(x, z, own):
     p = Point(x, z)
     for j in ptree.query(p):
@@ -94,11 +106,15 @@ for p in M['parked']:
     q = ln.interpolate(ln.project(Point(x, z)))
     dx, dz = x - q.x, z - q.y; d = math.hypot(dx, dz) or 1e-6
     ox, oz = dx / d, dz / d                              # outward, away from this carriageway
-    # the far side of a median, or the middle of the road: another carriageway right behind the row
-    if on_other_road(x + ox * 2.5, z + oz * 2.5, i) or on_other_road(x + ox * 5.0, z + oz * 5.0, i):
+    # the far side of a median, or the middle of the road: a parallel carriageway within 9 m behind the row
+    if median_side(x, z, ox, oz, i):
         why['median / between carriageways'] += 1; continue
     if kind != 1 and on_other_road(x, z, i):
         why['on another road'] += 1; continue
+    # bake_map lined every street; Pune parks where people are going. Keep rows near real places,
+    # a few on quiet residential streets (people park outside their own building)
+    if not biz_near(x, z, 35) and rng.random() > 0.3:
+        why['quiet street, thinned'] += 1; continue
     kept.append(p)
 print('parked kept', len(kept), dict(why))
 
@@ -149,14 +165,14 @@ for bi in order:
     if car:
         off = inf['w'] / 2 - 1.0
         x, z = q.x + nx * off, q.y + nz * off
-        if occ_hit(x, z, 2.4) or near_junction(x, z, 14) or on_other_road(x + nx * 2.5, z + nz * 2.5, i): car = False
+        if occ_hit(x, z, 2.4) or near_junction(x, z, 14) or median_side(x, z, nx, nz, i): car = False
         else:
             ang = math.atan2(tz, tx) if rng.random() < 0.5 else math.atan2(-tz, -tx)
             kept.append([cm(x), cm(z), round(ang, 3), 1, 1, sd, 1]); occ_add(x, z, 2.4); added['car'] += 1
             continue
     off = inf['w'] / 2 + (0.6 if inf['sw'] > 0.8 else 0.55)
     x, z = q.x + nx * off, q.y + nz * off
-    if near_junction(x, z, 10) or on_other_road(x, z, i) or on_other_road(x + nx * 2.5, z + nz * 2.5, i): continue
+    if near_junction(x, z, 10) or on_other_road(x, z, i) or median_side(x, z, nx, nz, i): continue
     n = rng.randint(3, 7) if cat != 'service' else rng.randint(1, 3)
     ang = math.atan2(tz, tx); ca, sa = math.cos(ang), math.sin(ang)
     mask = 0

@@ -7,6 +7,7 @@ import * as esbuild from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import crypto from 'node:crypto';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const dev = process.argv.includes('--dev');
@@ -100,8 +101,8 @@ if (fs.existsSync(voiceDir)) {
   fs.rmSync(path.join(dist, 'assets/voice'), { recursive: true, force: true });
 }
 // manifest with byte sizes (honest progress bar)
-const sizes = {};
-const walk = (d, rel = '') => { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); const r = rel ? rel + '/' + f : f; if (fs.statSync(p).isDirectory()) walk(p, r); else sizes['assets/' + r] = fs.statSync(p).size; } };
+const sizes = {}, hashes = {};
+const walk = (d, rel = '') => { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); const r = rel ? rel + '/' + f : f; if (fs.statSync(p).isDirectory()) walk(p, r); else { sizes['assets/' + r] = fs.statSync(p).size; hashes['assets/' + r] = crypto.createHash('sha1').update(fs.readFileSync(p)).digest('hex').slice(0, 10); } } };
 walk(path.join(dist, 'assets'));
 
 const tpl = fs.readFileSync(path.join(root, 'src/page.html'), 'utf8');
@@ -111,7 +112,7 @@ const body = tpl
   .replace('/*FONTS*/', () => fontCss)
   .replace('/*CSS*/', () => css)
   .replace('<!--IMPORTMAP-->', () => importMap)
-  .replace('/*MANIFEST*/', () => JSON.stringify({ ...sizes, __voices: voiceIndex }))
+  .replace('/*MANIFEST*/', () => JSON.stringify({ ...sizes, __voices: voiceIndex, __v: hashes }))
   .replace('/*JS*/', () => js.replace(/<\/script/gi, '<\\/script'));
 fs.writeFileSync(path.join(dist, 'index.html'), body);
 fs.writeFileSync(path.join(dist, 'test.html'), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:dark}body{margin:0}[hidden]{display:none!important}</style></head><body>${body}</body></html>`);

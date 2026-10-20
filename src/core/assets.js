@@ -17,7 +17,10 @@ export class Loader {
     this.onProgress(this.total ? Math.min(1, this.done / this.total) : 0);
   }
   async bytes(url) {
-    const res = await fetch(url);
+    // every asset URL carries its content hash, so a new map or model is never served from a stale cache
+    let v = null;
+    try { v = (Loader.versions || (Loader.versions = JSON.parse(document.getElementById('manifest').textContent).__v || {}))[url]; } catch (e) { Loader.versions = {}; }
+    const res = await fetch(v ? url + '?v=' + v : url);
     if (!res.ok) throw new Error(`Could not load ${url} (${res.status})`);
     const len = +res.headers.get('content-length') || 0;
     if (!this.jobs.has(url)) this.expect(url, len || 1);
