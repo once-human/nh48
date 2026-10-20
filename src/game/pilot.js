@@ -1,0 +1,374 @@
+// The player: on foot or driving. Walk, jog or sprint around the city, take your own auto, any
+// parked scooter/bike/car, or pull a driver out of their vehicle (they won't be happy). The rest
+// of the game talks to this object as "the player" — it forwards to whatever you're driving.
+import * as THREE from 'three';
+import { Vehicle, specOf } from '../vehicles/vehicle.js';
+import { clamp, damp, dampAngle, wrapAngle, RNG } from '../core/util.js';
+
+const WALK = 1.55, JOG = 3.4, SPRINT = 6.2;
+const SHOUTS = [
+  ['Arre, gaadi kyon cheen rahe ho?!', 'Hey, why are you taking my vehicle?!'],
+  ['Thamba! Maazi gaadi aahe ti!', 'Stop! That’s my vehicle!'],
+  ['Police la bolavto aata!', 'I’m calling the police!'],
+  ['Kay chalu aahe he?!', 'What is going on?!'],
+  ['Abey, utar neeche!', 'Hey, get down from there!'],
+];
+
+export class Pilot {
+  constructor({ W, scene, vmats, kit, auto, hud, audio }) {
+    this.W = W; this.scene = scene; this.vmats = vmats; this.kit = kit;
+    this.auto = auto; this.hud = hud; this.audio = audio;
+    this.rng = new RNG(99);
+    this.mode = 'auto';
+    this.cur = auto;
+    this.dropped = [];             // vehicles you left on the street (incl. your auto when on foot)
+    this.npcs = [];                // drivers you pulled out, storming off
+    this.events = [];
+    this.foot = { x: 0, z: 0, y: 0, yaw: 0, v: 0, vx: 0, vz: 0, anim: 'idle', agent: { x: 0, z: 0, hx: 1, hz: 0, v: 0, W: 0.6, L: 0.6, isPlayer: true } };
+    this.offer = null; this.offerT = 0; this.busy = 0;
+    if (kit) {
+      const look = kit.randomLook(new RNG(2024), { female: false });
+      look.top = new THREE.Color(0x2f6f73).convertSRGBToLinear(); look.bottom = new THREE.Color(0x2b3550).convertSRGBToLinear();
+      look.cut = new THREE.Vector4(0.36, 0.93, 0.5, 0); look.scale = 0.95; look.acc = 'hair_short';
+      this.look = look;
+      this.human = kit.create(look);
+      this.human.holder.visible = false;
+      scene.add(this.human.holder);
+      this.human.play('idle');
+    }
+    this.parkGrid = null;
+  }
+  // ---------------------------------------------------------------- facade
+  get onFoot() { return this.mode === 'foot'; }
+  get x() { return this.onFoot ? this.foot.x : this.cur.x; }
+  get z() { return this.onFoot ? this.foot.z : this.cur.z; }
+  get y() { return this.onFoot ? this.foot.y : this.cur.y || 0; }
+  get th() { return this.onFoot ? this.foot.yaw : this.cur.th; }
+  get v() { return this.onFoot ? this.foot.v : this.cur.v; }
+  get rpm() { return this.onFoot ? 0 : this.cur.rpm; }
+  get gear() { return this.onFoot ? 0 : this.cur.gear; }
+  get throttle() { return this.onFoot ? 0 : this.cur.throttle; }
+  get reverse() { return this.onFoot ? false : this.cur.reverse; }
+  get lift() { return this.onFoot ? 0 : this.cur.lift || 0; }
+  get tipped() { return this.onFoot ? 0 : this.cur.tipped || 0; }
+  get onFootpath() { return this.onFoot ? true : this.cur.onFootpath; }
+  get root() { return this.onFoot ? this.human.holder : this.cur.root; }
+  get tilt() { return this.cur.tilt; }
+  get headlight() { return this.cur.headlight; }
+  get agent() { return this.onFoot ? this.foot.agent : this.cur.agent; }
+  get spec() { return this.onFoot ? null : this.cur === this.auto ? specOf('auto') : this.cur.spec; }
+  get inAuto() { return this.cur === this.auto && !this.onFoot; }
+  get camDist() { const s = this.spec; return s ? Math.max(0, s.L - 2.7) * 0.75 : -2; }
+  setCockpit(on) { if (!this.onFoot && this.cur.setCockpit) this.cur.setCockpit(on); }
+  setPassengers(n, s) { this.auto.setPassengers(n, s); }
+  reset(x, z, th) {
+    if (this.mode !== 'auto') this.switchTo(this.auto);
+    this.auto.reset(x, z, th);
+  }
+  vehicleLabel() {
+    if (this.onFoot) return 'On foot';
+    const s = this.spec;
+    return `${s.model} · ${s.name}`;
+  }
+
+  // ---------------------------------------------------------------- per tick
+  update(dt, inp, traffic, input, camYaw) {
+    this.events.length = 0;
+    this.busy = Math.max(0, this.busy - dt);
+    if (this.onFoot) this.updateFoot(dt, input, traffic, camYaw);
+    else {
+      this.cur.update(dt, inp, traffic);
+      for (const e of this.cur.events) this.events.push(e);
+      if (this.riderShown) this.placeRider();
+    }
+    // vehicles left behind settle and stay solid
+    for (const d of this.dropped) if (d.veh !== this.cur && d.veh.sync) d.veh.sync(0);
+    this.updateNpcs(dt);
+    // what can I get into?
+    this.offerT -= dt;
+    if (this.offerT <= 0) { this.offerT = 0.15; this.offer = this.findOffer(traffic); }
+    if (input.took('KeyF') && this.busy <= 0) {
+      if (this.onFoot && this.offer) this.enter(this.offer, traffic);
+      else if (!this.onFoot) this.exit(traffic);
+    }
+  }
+
+  updateFoot(dt, input, traffic, camYaw) {
+    const F = this.foot, k = (...c) => input.key(...c);
+    let fw = (k('KeyW', 'ArrowUp') ? 1 : 0) - (k('KeyS', 'ArrowDown') ? 1 : 0);
+    let sd = (k('KeyD', 'ArrowRight') ? 1 : 0) - (k('KeyA', 'ArrowLeft') ? 1 : 0);
+    const len = Math.hypot(fw, sd) || 1;
+    fw /= len; sd /= len;
+    const run = k('ShiftLeft', 'ShiftRight');
+    const target = (fw || sd) ? (run ? SPRINT : k('AltLeft') ? WALK : JOG) : 0;
+    const cy = camYaw ?? F.yaw;
+    const dx = Math.cos(cy) * fw - Math.sin(cy) * sd, dz = Math.sin(cy) * fw + Math.cos(cy) * sd;
+    const tvx = dx * target, tvz = dz * target;
+    const acc = target > F.v ? 10 : 14;
+    F.vx = damp(F.vx, tvx, acc, dt); F.vz = damp(F.vz, tvz, acc, dt);
+    F.v = Math.hypot(F.vx, F.vz);
+    if (F.v > 0.2) F.yaw = dampAngle(F.yaw, Math.atan2(F.vz, F.vx), 10, dt);
+    F.x += F.vx * dt; F.z += F.vz * dt;
+    // walls, poles, parked vehicles, trees
+    for (let it = 0; it < 2; it++) {
+      const res = this.W.collision.resolve(F.x, F.z, 0.3);
+      if (res) { F.x += res.nx * res.depth; F.z += res.nz * res.depth; }
+    }
+    // traffic: get shoved / knocked down
+    if (traffic) traffic.near(F.x, F.z, 6, (o) => {
+      if (o.isPlayer || !o.T && !o.parked) return;
+      const T = o.T || { L: o.L, W: o.W };
+      const rx = F.x - o.x, rz = F.z - o.z;
+      const al = rx * o.hx + rz * o.hz, ac = -rx * o.hz + rz * o.hx;
+      const hl = T.L / 2 + 0.3, hw = T.W / 2 + 0.3;
+      if (Math.abs(al) > hl || Math.abs(ac) > hw) return;
+      // push out along the shallower axis
+      const pa = hl - Math.abs(al), pc = hw - Math.abs(ac);
+      if (pa < pc) { const s = Math.sign(al) || 1; F.x += o.hx * s * pa; F.z += o.hz * s * pa; }
+      else { const s = Math.sign(ac) || 1; F.x += -o.hz * s * pc; F.z += o.hx * s * pc; }
+      if ((o.v || 0) > 3.5 && !this.downT) {
+        this.downT = 3.2;
+        this.events.push({ type: 'gotHit', speed: o.v, who: o.type });
+        this.human.play('knockback', { once: true, fade: 0.08 });
+        o.angry = 6;
+      }
+    });
+    // footpath height
+    const gy = this.W.surf.height(F.x, F.z);
+    F.y = damp(F.y, gy, 18, dt);
+    Object.assign(F.agent, { x: F.x, z: F.z, hx: Math.cos(F.yaw), hz: Math.sin(F.yaw), v: F.v });
+    // animation
+    if (this.downT > 0) {
+      this.downT -= dt;
+      F.vx *= 0.9; F.vz *= 0.9;
+      if (this.downT < 1.4 && this.human.cur !== this.human.actions.getup) this.human.play('getup', { once: true, fade: 0.2 });
+      if (this.downT <= 0) { this.downT = 0; this.human.play('idle'); }
+    } else {
+      const a = F.v < 0.25 ? 'idle' : F.v < 2.2 ? 'walk' : F.v < 4.6 ? 'jog' : 'sprint';
+      const nat = { idle: 1, walk: 1.25, jog: 3.2, sprint: 5.6 }[a];
+      this.human.play(a, { speed: a === 'idle' ? 1 : clamp(F.v / nat, 0.6, 1.6) });
+    }
+    const H = this.human;
+    H.holder.position.set(F.x, F.y, F.z);
+    H.holder.rotation.set(0, -F.yaw, 0);
+    H.mixer.update(dt);
+  }
+
+  // ---------------------------------------------------------------- getting in and out
+  buildParkGrid() {
+    this.parkGrid = new Map();
+    for (const r of this.W.parkedList || []) {
+      const key = Math.floor(r.x / 20) + ',' + Math.floor(r.z / 20);
+      let l = this.parkGrid.get(key); if (!l) this.parkGrid.set(key, l = []);
+      l.push(r);
+    }
+  }
+  findOffer(traffic) {
+    if (!this.onFoot || this.downT > 0) return null;
+    const F = this.foot;
+    let best = null, bd = 1e9;
+    const consider = (d, o) => { if (d < bd) { bd = d; best = o; } };
+    // own auto + vehicles you left
+    for (const d of this.dropped) {
+      const v = d.veh, S = v === this.auto ? specOf('auto') : v.spec;
+      const dist = this.distToBox(F.x, F.z, v.x, v.z, Math.cos(v.th), Math.sin(v.th), S.L, S.W);
+      if (dist < 1.6) consider(dist, { kind: 'dropped', d, label: d.towed ? `Pay ₹${d.towed.fee} and take your auto` : v === this.auto ? 'Get in your auto' : S.two ? `Get on the ${S.name.toLowerCase()}` : `Get in the ${S.name.toLowerCase()}`, key: 'F' });
+    }
+    // parked vehicles
+    if (!this.parkGrid) this.buildParkGrid();
+    const i0 = Math.floor(F.x / 20), j0 = Math.floor(F.z / 20);
+    for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) {
+      const l = this.parkGrid.get(i + ',' + j);
+      if (l) for (const r of l) {
+        if (r.taken) continue;
+        const S = specOf(r.kind);
+        const dist = this.distToBox(F.x, F.z, r.x, r.z, r.hx, r.hz, S.L, S.W);
+        if (dist < 1.3) consider(dist + 0.2, { kind: 'parked', r, label: `Take the parked ${S.name.toLowerCase()}`, key: 'F' });
+      }
+    }
+    // traffic: slow or stopped vehicles can be taken from their driver
+    if (traffic) traffic.near(F.x, F.z, 8, (o) => {
+      if (!o.T || o.isPlayer || o.parked || o.fallen > 0) return;
+      const dist = this.distToBox(F.x, F.z, o.x, o.z, o.hx, o.hz, o.T.L, o.T.W);
+      if (dist < 1.4 && o.v < 3.5) consider(dist + 0.4, { kind: 'traffic', o, label: `Take the ${specOf(o.type).name.toLowerCase()} from its driver`, key: 'F' });
+    });
+    return best;
+  }
+  distToBox(px, pz, cx, cz, hx, hz, L, W) {
+    const rx = px - cx, rz = pz - cz;
+    const a = Math.abs(rx * hx + rz * hz) - L / 2, c = Math.abs(-rx * hz + rz * hx) - W / 2;
+    return Math.hypot(Math.max(0, a), Math.max(0, c));
+  }
+
+  enter(offer, traffic) {
+    let veh = null;
+    if (offer.kind === 'dropped') {
+      if (offer.d.towed && this.onRelease && !this.onRelease(offer.d)) return;
+      veh = offer.d.veh;
+      this.removeDropped(offer.d, traffic);
+    } else if (offer.kind === 'parked') {
+      const r = offer.r;
+      r.taken = true;
+      for (const it of r.items) it.off = true;
+      for (const c of r.circles) c.off = true;
+      if (r.static && traffic.statics) { const i = traffic.statics.indexOf(r.static); if (i >= 0) traffic.statics.splice(i, 1); traffic.staticsT = 0; }
+      veh = new Vehicle(this.W, this.scene, this.vmats, r.kind, r.col);
+      veh.reset(r.x, r.z, Math.atan2(r.hz, r.hx));
+      veh.y = this.W.surf.height(r.x, r.z);
+      // about half the parked two-wheelers have a helmet hanging off the mirror
+      veh.helmet = ((Math.abs(r.x * 7.31 + r.z * 3.17) | 0) % 2) === 0;
+      veh.stolen = true; veh.plate = this.randomPlate();
+      this.events.push({ type: 'stoleParked', veh, name: veh.spec.name.toLowerCase(), x: r.x, z: r.z });
+    } else if (offer.kind === 'traffic') {
+      const o = offer.o;
+      veh = new Vehicle(this.W, this.scene, this.vmats, o.type, o.col);
+      veh.reset(o.x, o.z, Math.atan2(o.hz, o.hx));
+      veh.v = 0;
+      veh.helmet = false;                       // the rider keeps theirs
+      veh.stolen = true; veh.plate = this.randomPlate();
+      const idx = traffic.list.indexOf(o);
+      if (idx >= 0) traffic.despawn(idx);
+      this.spawnAngryDriver(o);
+      this.events.push({ type: 'carjack', who: o.type, x: o.x, z: o.z });
+    }
+    if (!veh) return;
+    this.switchTo(veh);
+    this.busy = 0.6;
+    this.audio?.blip?.();
+  }
+  randomPlate() {
+    const L = 'ABCDEFGHJKLMNPRSTUVWXYZ', r = this.rng;
+    return `MH 12 ${L[r.int(0, L.length - 1)]}${L[r.int(0, L.length - 1)]} ${r.int(1000, 9999)}`;
+  }
+  exit(traffic, force = false) {
+    const veh = this.cur;
+    if (this.onFoot) return;
+    if (Math.abs(veh.v) > 2.5 && !force) { this.hud?.toast('Slow down first', 'You can only get out below ~9 km/h', 'warn', 1.6); return; }
+    const S = veh === this.auto ? specOf('auto') : veh.spec;
+    const hx = Math.cos(veh.th), hz = Math.sin(veh.th);
+    // Indian cars are right-hand drive: out of the right door; off a two-wheeler to the left
+    const side = S.two ? -1 : 1;
+    const off = S.W / 2 + 0.55;
+    let px = veh.x + (-hz) * off * side, pz = veh.z + hx * off * side;
+    if (this.W.collision.resolve(px, pz, 0.3)) { px = veh.x - (-hz) * off * side; pz = veh.z - hx * off * side; }
+    veh.v = 0; veh.throttle = 0;
+    if (veh === this.auto) { this.auto.driver.visible = false; this.auto.driverArms.visible = false; }
+    this.addDropped(veh, traffic);
+    this.mode = 'foot';
+    this.hideRider();
+    Object.assign(this.foot, { x: px, z: pz, y: this.W.surf.height(px, pz), yaw: veh.th, v: 0, vx: 0, vz: 0 });
+    this.human.holder.visible = true;
+    this.setAcc(this.look.acc);
+    this.human.play('idle', { fade: 0.1 });
+    this.busy = 0.5;
+    this.events.push({ type: 'exit' });
+  }
+  switchTo(veh) {
+    this.cur = veh;
+    if (veh === this.auto) { this.auto.cockpit = undefined; this.auto.setCockpit(false); }
+    this.mode = veh === this.auto ? 'auto' : 'veh';
+    const S = veh === this.auto ? specOf('auto') : veh.spec;
+    // ride a two-wheeler: the player sits on it (with a helmet); cars, buses, autos: inside
+    if (S.two && this.human) this.showRider(veh); else this.hideRider();
+    if (this.human) this.human.holder.visible = S.two;
+    this.events.push({ type: 'enter', vehicle: veh });
+  }
+  showRider(veh) {
+    this.riderShown = veh;
+    this.setAcc(veh.spec.helmet && veh.helmet ? 'helmet' : this.look.acc);
+    this.human.play('drive', { fade: 0.1 });
+    this.placeRider();
+  }
+  hideRider() { this.riderShown = null; }
+  placeRider() {
+    const v = this.riderShown, H = this.human;
+    const seat = v.spec.seat || [-0.3, 0.8];
+    v.tilt.updateWorldMatrix(true, false);
+    const p = new THREE.Vector3(seat[0] - 0.05, seat[1] - 0.62, 0).applyMatrix4(v.tilt.matrixWorld);
+    H.holder.position.copy(p);
+    H.holder.rotation.set(0, -v.th, 0);
+    H.root.rotation.x = 0;
+    H.holder.rotateX(v.lean || 0);
+    H.mixer.update(1 / 60);
+  }
+  setAcc(name) {
+    this.human.root.traverse(o => { if (o.isSkinnedMesh && !o.name.startsWith('body')) o.visible = o.name === name; });
+    if (name === 'helmet') this.human.acc.color.set(0x1b1d22); else this.human.acc.color.copy(this.look.hair);
+  }
+  addDropped(veh, traffic) {
+    const S = veh === this.auto ? specOf('auto') : veh.spec;
+    const st = { x: veh.x, z: veh.z, hx: Math.cos(veh.th), hz: Math.sin(veh.th), v: 0, W: S.W, L: S.L, parked: true };
+    const d = { veh, st };
+    if (traffic && traffic.statics) { traffic.statics.push(st); traffic.staticsT = 0; }
+    this.dropped.push(d);
+    // keep at most a few abandoned vehicles around
+    while (this.dropped.filter(q => q.veh !== this.auto).length > 4) {
+      const old = this.dropped.find(q => q.veh !== this.auto);
+      this.removeDropped(old, traffic);
+      old.veh.dispose();
+    }
+  }
+  removeDropped(d, traffic) {
+    const i = this.dropped.indexOf(d);
+    if (i >= 0) this.dropped.splice(i, 1);
+    if (traffic && traffic.statics) { const j = traffic.statics.indexOf(d.st); if (j >= 0) traffic.statics.splice(j, 1); traffic.staticsT = 0; }
+  }
+
+  // the police take the vehicle you're on; you're left standing next to it
+  abandon(traffic, confiscate) {
+    const veh = this.cur;
+    if (this.onFoot || veh === this.auto) return;
+    this.exit(traffic, true);
+    const d = this.dropped.find(q => q.veh === veh);
+    if (d) this.removeDropped(d, traffic);
+    if (confiscate) veh.dispose();
+  }
+  teleportFoot(x, z, th, traffic = null) {
+    if (!this.onFoot) this.exit(traffic, true);
+    Object.assign(this.foot, { x, z, y: this.W.surf.height(x, z), yaw: th || 0, v: 0, vx: 0, vz: 0 });
+  }
+  // move your auto (towed, or brought round to the chowki)
+  moveAuto(x, z, th, traffic) {
+    if (this.cur === this.auto && !this.onFoot) { this.auto.reset(x, z, th); return; }
+    let d = this.dropped.find(q => q.veh === this.auto);
+    if (!d) { this.addDropped(this.auto, traffic); d = this.dropped.find(q => q.veh === this.auto); }
+    this.auto.reset(x, z, th);
+    if (this.auto.driver) { this.auto.driver.visible = false; this.auto.driverArms.visible = false; }
+    Object.assign(d.st, { x, z, hx: Math.cos(th), hz: Math.sin(th) });
+    if (traffic) traffic.staticsT = 0;
+  }
+
+  // ---------------------------------------------------------------- the driver you pulled out
+  spawnAngryDriver(o) {
+    if (!this.kit) return;
+    const H = this.kit.create(this.kit.randomLook(this.rng, { female: this.rng.chance(0.25), helmet: o.T && o.T.two }));
+    const side = o.T && o.T.two ? -1 : 1;
+    const x = o.x + (-o.hz) * (o.T.W / 2 + 0.7) * side, z = o.z + o.hx * (o.T.W / 2 + 0.7) * side;
+    H.holder.position.set(x, this.W.surf.height(x, z), z);
+    this.scene.add(H.holder);
+    H.play('no', { fade: 0.1 });
+    if (this.speak) this.speak(this.rng.pick(['sh1', 'sh2', 'sh3', 'sh4', 'sh5']), { x, z });
+    else { const [line, tr] = this.rng.pick(SHOUTS); this.hud?.say('Driver', line, tr, 3.6); }
+    this.npcs.push({ H, x, z, t: 0, yaw: Math.atan2(this.foot.z - z, this.foot.x - x) });
+  }
+  updateNpcs(dt) {
+    for (let i = this.npcs.length - 1; i >= 0; i--) {
+      const n = this.npcs[i];
+      n.t += dt;
+      if (n.t < 2.6) {
+        n.yaw = dampAngle(n.yaw, Math.atan2(this.z - n.z, this.x - n.x), 6, dt);
+        if (n.t > 1.4 && n.H.cur !== n.H.actions.punch && Math.hypot(this.x - n.x, this.z - n.z) < 4) n.H.play('punch', { fade: 0.15 });
+      } else {
+        if (n.H.cur !== n.H.actions.jog) n.H.play('jog', { fade: 0.3 });
+        n.x += Math.cos(n.yaw) * 3 * dt; n.z += Math.sin(n.yaw) * 3 * dt;
+        const res = this.W.collision.resolve(n.x, n.z, 0.3);
+        if (res) { n.x += res.nx * res.depth; n.z += res.nz * res.depth; n.yaw += 1.2; }
+        if (n.t > 2.6 && n.t < 2.7) n.yaw += Math.PI;
+      }
+      n.H.holder.position.set(n.x, this.W.surf.height(n.x, n.z), n.z);
+      n.H.holder.rotation.set(0, -n.yaw, 0);
+      n.H.mixer.update(dt);
+      if (n.t > 14) { this.scene.remove(n.H.holder); n.H.dispose(); this.npcs.splice(i, 1); }
+    }
+  }
+}

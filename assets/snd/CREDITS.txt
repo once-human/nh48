@@ -1,0 +1,16 @@
+NH48 sound credits — all recordings are Creative Commons 0 (public domain) from freesound.org,
+trimmed, looped and re-encoded for the game. Thank you to the recordists.
+
+horn_car          Car Horn Skoda Fabia — innov8_Music — https://freesound.org/s/871628/
+horn_beep         Beeping car horn from inside car, engine off — misperpodcast — https://freesound.org/s/733553/
+horn_truck(_short) truck throaty real horn honks — kyles — https://freesound.org/s/406888/
+dog_bark(2)       Dog barking — felix.blume — https://freesound.org/s/832435/
+crow              House Crow at the beach — Breview777 — https://freesound.org/s/486870/
+cow_moo           Cow moo #8 — spurioustransients — https://freesound.org/s/513565/
+temple_bells      2HinduTemplesBells2 — LoopUdu — https://freesound.org/s/271627/
+auto_start        rickshaw ignition — rsn267 — https://freesound.org/s/273961/
+car_idle          hyundai-i20-car-idle-9 — compsgn120JP — https://freesound.org/s/776234/
+diesel_idle       Diesel engine idling — chungus43A — https://freesound.org/s/705386/
+amb_street        Street Ambience India — guidofm — https://freesound.org/s/509181/
+amb_auto_ride     AMB_CITY_INDIA_BENGALORE_Ride_in_TukTuk_3 — DavidBlouin — https://freesound.org/s/832083/
+amb_traffic       Rickshaw traffic noise in Varanasi — ali.g — https://freesound.org/s/815104/

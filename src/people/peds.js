@@ -1,0 +1,643 @@
+// Pedestrians and animals: people walking the footpaths (or the road edge where there is no
+// footpath), crossing wherever they like, waiting passengers waving down autos, cows and dogs.
+// People also pop into shops and come back out, stand around chai stalls, glare when you honk,
+// get up angry when you knock them over, and crowd round (phones out) when something happens.
+import * as THREE from 'three';
+import { ColorBuilder, lin } from '../world/geo.js';
+import { RNG, clamp, lerp, wrapAngle } from '../core/util.js';
+
+const SKINS = [[0.78, 0.6, 0.47], [0.69, 0.5, 0.37], [0.6, 0.43, 0.31], [0.52, 0.36, 0.26], [0.45, 0.31, 0.22], [0.82, 0.66, 0.53]];
+const SHIRTS = [[0.95, 0.95, 0.93], [0.42, 0.6, 0.85], [0.85, 0.3, 0.28], [0.2, 0.24, 0.36], [0.95, 0.84, 0.48], [0.3, 0.55, 0.36], [0.62, 0.22, 0.52],
+  [0.95, 0.6, 0.22], [0.58, 0.58, 0.58], [0.16, 0.16, 0.18], [0.75, 0.82, 0.9], [0.9, 0.75, 0.75]];
+const PANTS = [[0.15, 0.18, 0.28], [0.22, 0.2, 0.18], [0.5, 0.45, 0.38], [0.12, 0.12, 0.13], [0.35, 0.38, 0.45], [0.85, 0.82, 0.75]];
+const SAREES = [[0.8, 0.1, 0.25], [0.95, 0.5, 0.05], [0.1, 0.45, 0.35], [0.5, 0.1, 0.5], [0.95, 0.8, 0.15], [0.15, 0.3, 0.7], [0.95, 0.4, 0.55], [0.6, 0.15, 0.1]];
+
+const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(0, 0, 0, 'YXZ'), P3 = new THREE.Vector3(), S3 = new THREE.Vector3(1, 1, 1);
+const TMP = [0, 0, 0, 0];
+const BASE = new THREE.Matrix4(), MM = new THREE.Matrix4(), TA = new THREE.Matrix4(), RA = new THREE.Matrix4(), RB = new THREE.Matrix4();
+
+function boxG(sx, sy, sz, ox = 0, oy = 0, oz = 0) { const g = new THREE.BoxGeometry(sx, sy, sz); g.translate(ox, oy, oz); return g; }
+// rotated box: rotate about its own centre, then move into place
+function boxR(sx, sy, sz, rx, rz, ox, oy, oz) { const g = new THREE.BoxGeometry(sx, sy, sz); g.rotateX(rx); g.rotateZ(rz); g.translate(ox, oy, oz); return g; }
+const I4 = new THREE.Matrix4();
+
+function buildParts() {
+  const P = {};
+  // male torso (incl. head) : hips at y=0.95, faces +x
+  {
+    const b = new ColorBuilder(); b.paint = [];
+    b.addGeo(boxG(0.22, 0.56, 0.38, 0, 1.22, 0), I4, [1, 1, 1], 0, 1);
+    b.addGeo(boxG(0.2, 0.1, 0.34, 0, 0.92, 0), I4, [1, 1, 1], 0, 2);           // belt line in pants colour
+    b.addGeo(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 6).translate(0, 1.53, 0), I4, [1, 1, 1], 0, 3);
+    b.addGeo(new THREE.SphereGeometry(0.11, 10, 8).scale(1, 1.15, 0.95).translate(0.01, 1.66, 0), I4, [1, 1, 1], 0, 3);
+    b.addGeo(new THREE.SphereGeometry(0.115, 10, 6, 0, 6.29, 0, 1.7).scale(1, 0.9, 1).translate(-0.01, 1.7, 0), I4, [0.07, 0.06, 0.05]);
+    P.male = b.build();
+  }
+  // female torso + saree/salwar skirt + pallu + hair bun
+  {
+    const b = new ColorBuilder(); b.paint = [];
+    b.addGeo(boxG(0.2, 0.5, 0.33, 0, 1.2, 0), I4, [1, 1, 1], 0, 1);
+    b.addGeo(new THREE.CylinderGeometry(0.17, 0.27, 0.98, 10).translate(0, 0.5, 0), I4, [1, 1, 1], 0, 2);
+    b.addGeo(boxR(0.23, 0.62, 0.08, 0.55, 0, 0.02, 1.2, 0.0), I4, [1, 1, 1], 0, 2);   // pallu across the chest
+    b.addGeo(new THREE.CylinderGeometry(0.045, 0.05, 0.1, 6).translate(0, 1.5, 0), I4, [1, 1, 1], 0, 3);
+    b.addGeo(new THREE.SphereGeometry(0.105, 10, 8).scale(1, 1.15, 0.95).translate(0.01, 1.62, 0), I4, [1, 1, 1], 0, 3);
+    b.addGeo(new THREE.SphereGeometry(0.11, 10, 6, 0, 6.29, 0, 1.75).translate(-0.015, 1.66, 0), I4, [0.06, 0.05, 0.05]);
+    b.addGeo(new THREE.SphereGeometry(0.07, 8, 6).translate(-0.11, 1.62, 0), I4, [0.06, 0.05, 0.05]);
+    b.addGeo(new THREE.SphereGeometry(0.015, 4, 3).translate(0.11, 1.66, 0), I4, [0.8, 0.05, 0.05]);  // bindi
+    P.female = b.build();
+  }
+  // leg (pivot at hip, hangs down -y) : pants + shoe
+  {
+    const b = new ColorBuilder(); b.paint = [];
+    b.addGeo(boxG(0.14, 0.86, 0.14, 0, -0.43, 0), I4, [1, 1, 1], 0, 1);
+    b.addGeo(boxG(0.24, 0.08, 0.12, 0.05, -0.9, 0), I4, [0.12, 0.1, 0.09]);
+    P.leg = b.build();
+  }
+  // arm (pivot at shoulder): sleeve + forearm skin + hand
+  {
+    const b = new ColorBuilder(); b.paint = [];
+    b.addGeo(boxG(0.09, 0.3, 0.09, 0, -0.15, 0), I4, [1, 1, 1], 0, 1);
+    b.addGeo(boxG(0.075, 0.28, 0.075, 0, -0.43, 0), I4, [1, 1, 1], 0, 3);
+    b.addGeo(new THREE.SphereGeometry(0.045, 6, 4).translate(0, -0.6, 0), I4, [1, 1, 1], 0, 3);
+    P.arm = b.build();
+  }
+  // cow (zebu: hump, horns) standing
+  {
+    const b = new ColorBuilder(); b.paint = [];
+    const c = [1, 1, 1];
+    b.addGeo(new THREE.SphereGeometry(1, 12, 8).scale(0.95, 0.42, 0.36).translate(0, 1.05, 0), I4, c, 0, 1);
+    b.addGeo(new THREE.SphereGeometry(0.2, 8, 6).scale(1, 1.2, 0.8).translate(0.48, 1.45, 0), I4, c, 0, 1);        // hump
+    b.addGeo(boxR(0.5, 0.26, 0.2, 0, -0.5, 1.05, 1.25, 0), I4, c, 0, 1);                                      // neck
+    b.addGeo(boxR(0.38, 0.2, 0.18, 0, -0.2, 1.32, 1.14, 0), I4, c, 0, 1);                                    // head
+    b.addGeo(boxG(0.1, 0.1, 0.16, 1.5, 1.05, 0), I4, [0.25, 0.2, 0.18]);                                          // muzzle
+    for (const s of [-1, 1]) b.addGeo(new THREE.ConeGeometry(0.035, 0.28, 5).rotateX(s * 0.7).translate(1.2, 1.36, s * 0.12), I4, [0.75, 0.7, 0.6]);
+    for (const [x, z] of [[0.6, 0.18], [0.6, -0.18], [-0.65, 0.18], [-0.65, -0.18]]) b.addGeo(boxG(0.12, 0.8, 0.12, x, 0.4, z), I4, c, 0, 1);
+    b.addGeo(boxR(0.05, 0.75, 0.05, 0, 0.15, -0.95, 0.8, 0), I4, [0.2, 0.18, 0.16]);
+    P.cow = b.build();
+  }
+  // street dog (Indie) standing
+  {
+    const b = new ColorBuilder(); b.paint = [];
+    const c = [1, 1, 1];
+    b.addGeo(new THREE.SphereGeometry(1, 10, 6).scale(0.36, 0.17, 0.14).translate(0, 0.42, 0), I4, c, 0, 1);
+    b.addGeo(new THREE.SphereGeometry(0.11, 8, 6).scale(1.3, 1, 0.9).translate(0.38, 0.55, 0), I4, c, 0, 1);
+    b.addGeo(boxG(0.14, 0.07, 0.07, 0.52, 0.52, 0), I4, c, 0, 1);
+    for (const s of [-1, 1]) b.addGeo(new THREE.ConeGeometry(0.035, 0.1, 4).translate(0.36, 0.66, s * 0.05), I4, c, 0, 1);
+    for (const [x, z] of [[0.22, 0.07], [0.22, -0.07], [-0.24, 0.07], [-0.24, -0.07]]) b.addGeo(boxG(0.05, 0.36, 0.05, x, 0.18, z), I4, c, 0, 1);
+    b.addGeo(boxR(0.04, 0.26, 0.04, 0, 0.9, -0.42, 0.55, 0), I4, c, 0, 1);
+    P.dog = b.build();
+  }
+  return P;
+}
+
+function instMesh(scene, geo, mat, cap, extra = true) {
+  const g = geo.clone();
+  const m = new THREE.InstancedMesh(g, mat, cap);
+  m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3);
+  g.setAttribute('aColB', new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3));
+  g.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3));
+  m.frustumCulled = false; m.count = 0; m.castShadow = true; m.receiveShadow = true;
+  scene.add(m);
+  return m;
+}
+
+export class People {
+  constructor(W, scene, mat, quality) {
+    this.W = W; this.g = W.graph; this.rng = new RNG(31337);
+    this.max = quality.peds;
+    this.list = []; this.animals = [];
+    const P = buildParts();
+    const cap = this.cap = this.max + 120;      // + traffic police and passengers
+    this.mMale = instMesh(scene, P.male, mat, cap);
+    this.mFemale = instMesh(scene, P.female, mat, cap);
+    this.mLeg = instMesh(scene, P.leg, mat, cap * 2);
+    this.mArm = instMesh(scene, P.arm, mat, cap * 2);
+    this.mCow = instMesh(scene, P.cow, mat, 24);
+    this.mDog = instMesh(scene, P.dog, mat, 48);
+    this.events = [];
+    this.crossers = [];
+    this.kit = W.kit;
+    this.stallsUsed = new Map();   // stall index → people standing there
+    this.lineT = 0;                // voice cooldown
+    this.say = null;               // (lineId, source) — set by the game
+    this.spawnAnimals();
+  }
+  speak(ids, src, chance = 1) {
+    if (!this.say || this.lineT > 0 || this.rng.next() > chance) return;
+    this.lineT = 5;
+    this.say(ids[Math.floor(this.rng.next() * ids.length)], src);
+  }
+
+  // ---------------------------------------------------------------- spawning
+  sidewalkLat(e, side) {
+    if (e.sw > 0.7) return side * (e.w / 2 + e.sw * 0.5);
+    return side * (e.w / 2 - 0.35);
+  }
+  spawnOne(px, pz, rMin, rMax, avoidView, opts = {}) {
+    // candidate streets near the player (refreshed every couple of seconds)
+    if (!this._near || (this._nearT = (this._nearT || 0) - 1) <= 0 || Math.hypot(px - this._nearX, pz - this._nearZ) > 40) {
+      this._near = [...this.g.gridQuery(px, pz, 160)].filter(e => e.rank >= 2);
+      this._nearT = 120; this._nearX = px; this._nearZ = pz;
+    }
+    const edges = this._near.length ? this._near : this.g.edges;
+    for (let t = 0; t < 30; t++) {
+      const e = edges[Math.floor(this.rng.next() * edges.length)];
+      if (e.rank < 2) continue;
+      if (this.rng.next() > 0.3 + e.rank * 0.14) continue;
+      const s = this.rng.range(1, Math.max(1.1, e.len - 1));
+      const side = this.rng.chance(0.5) ? 1 : -1;
+      this.g.at(e, s, TMP);
+      const lat = this.sidewalkLat(e, side);
+      const x = TMP[0] + TMP[3] * lat, z = TMP[1] - TMP[2] * lat;
+      const d = Math.hypot(x - px, z - pz);
+      if (d < rMin || d > rMax) continue;
+      if (avoidView && avoidView(x, z)) continue;
+      return this.make(e, s, side, opts);
+    }
+    return null;
+  }
+  make(e, s, side, opts = {}) {
+    const r = this.rng;
+    const female = opts.female ?? r.chance(0.42);
+    const kid = !opts.pax && r.chance(0.08);
+    const p = {
+      e, s, side, dir: r.chance(0.5) ? 1 : -1, female, scale: kid ? 0.68 : r.range(0.94, 1.06),
+      speed: kid ? 1.5 : r.range(1.05, 1.5), phase: r.range(0, 6.28), x: 0, z: 0, hx: 1, hz: 0, yaw: 0,
+      lat: this.sidewalkLat(e, side), latT: 0, mode: opts.mode || 'walk', t: 0, wait: 0, fallen: 0, dodge: 0, dodgeX: 0, dodgeZ: 0,
+      shirt: lin3(female ? r.pick(SAREES) : r.pick(SHIRTS)), lower: lin3(female ? r.pick(SAREES) : r.pick(PANTS)), skin: lin3(r.pick(SKINS)),
+      pax: !!opts.pax, kid, wave: 0, W: 0.6, L: 0.6, v: 0, id: r.int(0, 1e9), onRoad: false,
+    };
+    if (female && r.chance(0.5)) p.shirt = p.lower.map(v => v * 0.85);
+    // the dressed look used up close; the far figure takes its colours from it
+    if (this.kit) {
+      p.look = this.kit.randomLook(new RNG(p.id), { female });
+      p.shirt = [p.look.top.r, p.look.top.g, p.look.top.b];
+      p.lower = [p.look.bottom.r, p.look.bottom.g, p.look.bottom.b];
+      p.skin = [p.look.skin.r, p.look.skin.g, p.look.skin.b];
+    }
+    p.idle = r.pick(['idle', 'idle', 'phone', 'talk', 'arms_folded']);
+    p.latT = p.lat;
+    if (p.mode === 'stand') p.wait = r.range(20, 80);
+    this.place(p);
+    this.list.push(p);
+    return p;
+  }
+  spawnAnimals() {
+    const r = this.rng;
+    const edges = this.g.edges.filter(e => e.rank >= 2 && e.rank <= 4 && e.len > 30);
+    for (let k = 0; k < 14; k++) {
+      const e = r.pick(edges), s = r.range(5, e.len - 5), side = r.chance(0.5) ? 1 : -1;
+      const cow = k < 6;
+      const a = { cow, e, s, side, lat: side * (e.w / 2 - (cow ? 1.0 : 0.2)), dir: r.chance(0.5) ? 1 : -1, speed: cow ? 0.35 : 1.2, x: 0, z: 0, yaw: 0, hx: 1, hz: 0,
+        rest: r.range(5, 60), moving: false, col: cow ? lin3(r.pick([[0.92, 0.9, 0.85], [0.85, 0.82, 0.78], [0.55, 0.45, 0.38], [0.95, 0.94, 0.9]])) : lin3(r.pick([[0.7, 0.5, 0.3], [0.2, 0.18, 0.16], [0.85, 0.8, 0.7], [0.6, 0.4, 0.22]])),
+        W: cow ? 0.7 : 0.35, L: cow ? 2.2 : 0.9, v: 0 };
+      if (!cow) a.lat = side * (e.w / 2 + Math.max(0.6, e.sw * 0.5));
+      a.kind = cow ? 'cow' : 'dog';
+      this.placeAnimal(a);
+      this.animals.push(a);
+    }
+    // cats keep to the building side of the footpath
+    for (let k = 0; k < 6; k++) {
+      const e = r.pick(edges), s = r.range(5, e.len - 5), side = r.chance(0.5) ? 1 : -1;
+      const a = { kind: 'cat', cow: false, e, s, side, lat: side * (e.w / 2 + Math.max(0.5, e.sw - 0.35)), dir: r.chance(0.5) ? 1 : -1, speed: 0.8, x: 0, z: 0, yaw: 0, hx: 1, hz: 0,
+        rest: r.range(5, 40), moving: false, col: [0.4, 0.4, 0.4], W: 0.25, L: 0.5, v: 0 };
+      this.placeAnimal(a);
+      this.animals.push(a);
+    }
+  }
+
+  place(p) {
+    this.g.at(p.e, p.s, TMP);
+    const x = TMP[0] + TMP[3] * p.lat, z = TMP[1] - TMP[2] * p.lat;
+    let hx = TMP[2] * p.dir, hz = TMP[3] * p.dir;
+    if (p.mode === 'cross') { hx = TMP[3] * -Math.sign(p.lat - p.latT) * -1; hz = -TMP[2] * -Math.sign(p.lat - p.latT) * -1; }
+    p.x = x + p.dodgeX; p.z = z + p.dodgeZ;
+    if (p.mode !== 'stand' || !p.faced) {
+      const yaw = Math.atan2(hz, hx);
+      p.yaw = p.yaw + wrapAngle(yaw - p.yaw) * 0.25;
+      p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
+    }
+    p.onRoad = Math.abs(p.lat) < p.e.w / 2 + 0.1;
+  }
+  placeAnimal(a) {
+    this.g.at(a.e, a.s, TMP);
+    a.x = TMP[0] + TMP[3] * a.lat; a.z = TMP[1] - TMP[2] * a.lat;
+    a.yaw = Math.atan2(TMP[3] * a.dir, TMP[2] * a.dir);
+    a.hx = Math.cos(a.yaw); a.hz = Math.sin(a.yaw);
+  }
+
+  // agents standing or walking on the carriageway (for traffic avoidance)
+  *roadAgents() {
+    for (const p of this.list) if (p.onRoad && !p.fallen) yield p;
+    for (const a of this.animals) if (a.cow) yield a;
+  }
+
+  // ---------------------------------------------------------------- update
+  update(dt, player, avoidView) {
+    const px = player.x, pz = player.z;
+    // population
+    for (let i = this.list.length - 1; i >= 0; i--) {
+      const p = this.list[i];
+      if (p.pax || p.fixed) continue;
+      if (Math.hypot(p.x - px, p.z - pz) > 150 || p.dead) { if (p.door) p.door.n--; if (p.body) p.body.release(); this.list[i] = this.list[this.list.length - 1]; this.list.pop(); }
+    }
+    // traffic police (fixed) and waiting passengers don't count towards the walking crowd
+    let tries = 5;
+    let walkers = 0;
+    for (const p of this.list) if (!p.fixed && !p.pax) walkers++;
+    while (walkers + (5 - tries) < this.max && tries-- > 0) {
+      const urgent = walkers < this.max * 0.5;
+      // most people appear within ~100 m (out of view), so the street around you feels busy
+      const p = this.spawnOne(px, pz, urgent ? 8 : 26, this.rng.chance(0.65) ? 90 : 140, urgent ? null : avoidView);
+      if (p && this.rng.chance(0.18)) { p.mode = 'stand'; p.wait = this.rng.range(15, 90); }
+    }
+    const pv = Math.abs(player.v);
+    const phx = Math.cos(player.th), phz = Math.sin(player.th);
+    this.lineT -= dt;
+    if ((this._stallT = (this._stallT || 0) - dt) <= 0) { this._stallT = 2; this.populateStalls(px, pz); }
+    if (player.onFoot) this.bumpPlayer(player);
+    for (const p of this.list) this.step(p, dt, player, player.onFoot ? 0 : pv, phx, phz);
+    for (const a of this.animals) this.stepAnimal(a, dt, px, pz, player);
+  }
+
+  step(p, dt, player, pv, phx, phz) {
+    if (p.ctl) { if (p.v > 0) p.phase += dt * p.v * 4.2; return; }     // driven by someone else (police stop)
+    if (p.react > 0) p.react -= dt;
+    if (p.bumpT > 0) p.bumpT -= dt;
+    if (p.mode === 'inside') {
+      p.wait -= dt; p.v = 0;
+      if (p.wait <= 0) {
+        const d = p.door; p.hidden = false; p.door = null; if (d) d.n--;
+        if (d) { p.x = d.x + d.nx * 0.35; p.z = d.z + d.nz * 0.35; p.yaw = Math.atan2(d.nz, d.nx); }
+        this.backToPath(p);
+      }
+      return;
+    }
+    if (p.fallen > 0) {
+      p.fallen -= dt;
+      if (p.fallen <= 0) {
+        p.wave = 0; p.angry = 4;
+        if (Math.hypot(p.x - player.x, p.z - player.z) < 30) { this.lineT = 0; this.speak(['f1', 'f2', 'f3'], p); }
+      }
+      return;
+    }
+    if (p.angry > 0) p.angry -= dt;
+    // react to the player's auto
+    const dx = p.x - player.x, dz = p.z - player.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 6 && !player.tipped) {
+      const along = dx * phx + dz * phz;                  // in front of the auto?
+      const side = -dx * phz + dz * phx;
+      if (along > -1.5 && along < 2 + pv * 0.9 && Math.abs(side) < 1.6 && pv > 2.2 && p.dodge <= 0) {
+        // jump out of the way, sideways from the auto's path
+        const s = Math.sign(side) || 1;
+        p.dodge = 0.45; p.dodgeVX = -phz * s * 4.2; p.dodgeVZ = phx * s * 4.2;
+        this.events.push({ type: 'dodge', p, x: p.x, z: p.z });
+      }
+      if (d < 1.15 && pv > 2.0) {
+        p.fallen = 2.6; p.dodge = 0;
+        this.events.push({ type: 'pedHit', p, speed: pv, x: p.x, z: p.z });
+        return;
+      }
+    }
+    if (p.mode === 'free') return this.stepFree(p, dt);
+    if (p.mode === 'watch') {
+      p.wait -= dt; p.v = 0;
+      this.face(p, p.watch.x, p.watch.z, dt);
+      if (p.wait <= 0) { p.anim = null; this.backToPath(p); }
+      return;
+    }
+    if (p.dodge > 0) {
+      p.dodge -= dt;
+      p.dodgeX += p.dodgeVX * dt; p.dodgeZ += p.dodgeVZ * dt;
+    } else { p.dodgeX *= Math.exp(-dt * 0.8); p.dodgeZ *= Math.exp(-dt * 0.8); }
+
+    if (p.fixed) { p.v = 0; p.x += p.dodgeX * 0; return; }
+    if (p.pax) { p.wave += dt; p.v = 0; this.face(p, player.x, player.z, dt); return; }
+    if (p.mode === 'stand') {
+      p.wait -= dt; p.v = 0;
+      if (p.anchor) {
+        p.x = p.anchor.x; p.z = p.anchor.z;
+        if (p.anchor.fx !== undefined) this.face(p, p.anchor.fx, p.anchor.fz, dt);
+        if (p.wait <= 0) { p.anchor = null; this.backToPath(p); }
+        return;
+      }
+      if (p.wait <= 0) p.mode = 'walk';
+      this.place(p);
+      return;
+    }
+    // stop and glare at whoever just honked
+    if (p.react > 0 && p.mode === 'walk' && p.reactAt) { p.v = 0; this.face(p, p.reactAt.x, p.reactAt.z, dt); return; }
+    if (p.mode === 'cross') {
+      const sp = p.speed * (p.hurry ? 1.9 : 1.0);
+      const dl = p.latT - p.lat;
+      const step = Math.sign(dl) * Math.min(Math.abs(dl), sp * dt);
+      p.lat += step;
+      p.v = sp;
+      p.phase += dt * sp * 4.2;
+      // hurry if something is coming
+      p.hurry = false;
+      if (Math.abs(p.lat - p.latT) < 0.05) { p.mode = 'walk'; p.side = Math.sign(p.latT); }
+      this.placeCross(p);
+      return;
+    }
+    // walk along the footpath
+    p.s += p.dir * p.speed * dt;
+    p.v = p.speed;
+    p.phase += dt * p.speed * 4.2;
+    if (p.s < 0 || p.s > p.e.len) {
+      const nodeIdx = p.s < 0 ? p.e.a : p.e.b;
+      const node = this.g.nodes[nodeIdx];
+      const opts = [...node.out, ...node.inc].map(l => l.e).filter(e => e !== p.e && e.rank >= 2);
+      if (!opts.length || node.portal) { p.dir = -p.dir; p.s = clamp(p.s, 0, p.e.len); }
+      else {
+        const e = this.rng.pick(opts);
+        p.e = e;
+        p.dir = e.a === nodeIdx ? 1 : -1;
+        p.s = p.dir > 0 ? 0.5 : e.len - 0.5;
+        p.side = this.rng.chance(0.5) ? 1 : -1;
+        p.lat = p.latT = this.sidewalkLat(e, p.side);
+      }
+    }
+    // pop into a shop now and then
+    if (!p.kid && this.rng.next() < dt * 0.05) {
+      const d = this.doorNear(p.x, p.z, 7, p);
+      if (d) { d.n++; this.goTo(p, d.x, d.z, (q) => { q.mode = 'inside'; q.hidden = true; q.door = d; q.wait = this.rng.range(6, 35); }); return; }
+    }
+    // occasionally cross the road wherever (very Pune)
+    if (this.rng.next() < dt * 0.012 && p.e.rank <= 5) {
+      p.mode = 'cross';
+      p.latT = this.sidewalkLat(p.e, -p.side);
+    }
+    this.place(p);
+  }
+  placeCross(p) {
+    this.g.at(p.e, p.s, TMP);
+    p.x = TMP[0] + TMP[3] * p.lat + p.dodgeX; p.z = TMP[1] - TMP[2] * p.lat + p.dodgeZ;
+    const s = Math.sign(p.latT - p.lat) || 1;
+    const hx = TMP[3] * s, hz = -TMP[2] * s;     // across the road
+    const yaw = Math.atan2(hz, hx);
+    p.yaw += wrapAngle(yaw - p.yaw) * 0.3;
+    p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
+    p.onRoad = Math.abs(p.lat) < p.e.w / 2 + 0.1;
+  }
+  face(p, tx, tz, dt) {
+    const yaw = Math.atan2(tz - p.z, tx - p.x);
+    p.yaw += wrapAngle(yaw - p.yaw) * Math.min(1, dt * 3);
+    p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
+  }
+  stepAnimal(a, dt, px, pz, player) {
+    // animals far away jump to a new spot near the player now and then, so there are always some around
+    if (Math.abs(a.x - px) > 260 || Math.abs(a.z - pz) > 260) { if (this.relocate(a, px, pz)) return; }
+    a.rest -= dt;
+    if (a.rest <= 0) { a.moving = !a.moving; a.rest = a.moving ? this.rng.range(4, 15) : this.rng.range(10, 60); }
+    let sp = a.speed;
+    // street dogs chase two-wheelers (and bark at everything else)
+    if (a.kind === 'dog' && player && !player.onFoot) {
+      const d = Math.hypot(a.x - px, a.z - pz), v = Math.abs(player.v);
+      if (!(a.chase > 0) && d < 14 && v > 2.5 && v < 11 && player.spec && player.spec.two && this.rng.next() < dt * 0.5) { a.chase = 5 + this.rng.next() * 3; this.events.push({ type: 'dogChase', x: a.x, z: a.z }); }
+      if (a.chase > 0) {
+        a.chase -= dt;
+        this.g.at(a.e, clamp(a.s, 0, a.e.len), TMP);
+        const along = (px - a.x) * TMP[2] + (pz - a.z) * TMP[3];
+        a.dir = along >= 0 ? 1 : -1;
+        a.moving = true; sp = 5.4; a.rest = 3;
+        if (d > 30) a.chase = 0;
+        if (this.rng.next() < dt * 1.5) this.events.push({ type: 'bark', x: a.x, z: a.z });
+      }
+    }
+    if (a.moving) {
+      a.s += a.dir * sp * dt;
+      if (a.s < 2 || a.s > a.e.len - 2) { a.dir = -a.dir; a.s = clamp(a.s, 2, a.e.len - 2); a.chase = 0; }
+      a.v = sp;
+    } else a.v = 0;
+    this.placeAnimal(a);
+  }
+  relocate(a, px, pz) {
+    for (let t = 0; t < 12; t++) {
+      const e = this.g.edges[Math.floor(this.rng.next() * this.g.edges.length)];
+      if (e.rank < 2 || e.rank > 4 || e.len < 30) continue;
+      this.g.at(e, e.len / 2, TMP);
+      const d = Math.hypot(TMP[0] - px, TMP[1] - pz);
+      if (d < 90 || d > 220) continue;
+      a.e = e; a.s = this.rng.range(5, e.len - 5);
+      a.lat = a.cow ? a.side * (e.w / 2 - 1.0) : a.kind === 'cat' ? a.side * (e.w / 2 + Math.max(0.5, e.sw - 0.35)) : a.side * (e.w / 2 + Math.max(0.6, e.sw * 0.5));
+      this.placeAnimal(a);
+      return true;
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------------- off-path movement
+  // walk straight to (tx, tz), then call then(p)
+  goTo(p, tx, tz, then, hurry = false) {
+    p.mode = 'free'; p.goal = { x: tx, z: tz, then, hurry, t: 0 };
+  }
+  stepFree(p, dt) {
+    const g = p.goal, dx = g.x - p.x, dz = g.z - p.z, d = Math.hypot(dx, dz);
+    g.t += dt;
+    if (d < 0.3 || g.t > 25) { p.goal = null; g.then(p); return; }
+    const sp = p.speed * (g.hurry ? 1.9 : 1);
+    const st = Math.min(d, sp * dt);
+    p.x += dx / d * st; p.z += dz / d * st;
+    const res = this.W.collision.resolve(p.x, p.z, 0.22);
+    if (res && res.kind !== 3) { p.x += res.nx * res.depth; p.z += res.nz * res.depth; }
+    p.yaw += wrapAngle(Math.atan2(dz, dx) - p.yaw) * Math.min(1, dt * 8);
+    p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
+    p.v = sp; p.phase += dt * sp * 4.2;
+    p.onRoad = this.W.surf.isRoad(p.x, p.z);
+  }
+  // back to the footpath and carry on walking
+  backToPath(p) {
+    this.g.at(p.e, clamp(p.s, 0, p.e.len), TMP);
+    p.lat = p.latT = this.sidewalkLat(p.e, p.side || 1);
+    const x = TMP[0] + TMP[3] * p.lat, z = TMP[1] - TMP[2] * p.lat;
+    this.goTo(p, x, z, (q) => { q.mode = 'walk'; q.dodgeX = q.dodgeZ = 0; q.anim = null; this.place(q); });
+  }
+  doorNear(x, z, r, p) {
+    let best = null, bd = r;
+    const st = this.W.streamer, half = this.W.index.size * 0.75;
+    for (const c of st.built) {
+      if (!c.doors || Math.abs(c.cx - x) > half + r || Math.abs(c.cz - z) > half + r) continue;
+      for (const d of c.doors) {
+        if (d.n > 1) continue;
+        const dx = x - d.x, dz = z - d.z, dd = Math.hypot(dx, dz);
+        if (dd < bd && dx * d.nx + dz * d.nz > 0.2) { bd = dd; best = d; }
+      }
+    }
+    return best;
+  }
+  // ---------------------------------------------------------------- reactions
+  // the player honked: people ahead stop and glare; crossers hurry
+  onHorn(P) {
+    const hx = Math.cos(P.th), hz = Math.sin(P.th);
+    let any = null;
+    for (const p of this.list) {
+      if (p.pax || p.cop || p.fallen > 0 || p.hidden || p.ctl) continue;
+      const dx = p.x - P.x, dz = p.z - P.z;
+      if (Math.abs(dx) > 18 || Math.abs(dz) > 18) continue;
+      const along = dx * hx + dz * hz, side = -dx * hz + dz * hx;
+      if (along < -2 || along > 18 || Math.abs(side) > 7) continue;
+      if (p.mode === 'cross') { p.hurry = true; p.speed = Math.max(p.speed, 1.9); }
+      if (!(p.react > 0)) { p.react = 2.2; p.reactAt = { x: P.x, z: P.z }; p.reactAnim = 'no'; any = p; }
+    }
+    if (any) this.speak(['h1', 'h2', 'h3', 'h4'], any, 0.35);
+  }
+  // something happened at (x, z): people nearby come and stand around, some filming it
+  gather(x, z, n = 5) {
+    const c = [];
+    for (const p of this.list) {
+      if (p.pax || p.cop || p.fallen > 0 || p.hidden || p.ctl || p.mode === 'free' || p.mode === 'watch' || p.mode === 'inside') continue;
+      const d = Math.hypot(p.x - x, p.z - z);
+      if (d < 42 && d > 1.5) c.push([d, p]);
+    }
+    c.sort((a, b) => a[0] - b[0]);
+    c.slice(0, n).forEach(([, p], i) => {
+      const a = (i / n) * Math.PI * 2 + this.rng.next() * 0.8, r = 2.6 + this.rng.next() * 1.6;
+      p.anchor = null;
+      this.goTo(p, x + Math.cos(a) * r, z + Math.sin(a) * r, (q) => {
+        q.mode = 'watch'; q.watch = { x, z }; q.wait = 14 + this.rng.next() * 12;
+        q.anim = this.rng.pick(['arms_folded', 'phone', 'phone', 'talk', 'idle']);
+      }, true);
+    });
+    if (c.length) setTimeout(() => this.speak(['c1', 'c2', 'c3', 'c4'], c[0][1], 0.9), 1600);
+  }
+  // you, on foot, walking into people
+  bumpPlayer(P) {
+    for (const p of this.list) {
+      if (p.hidden || p.fallen > 0 || p.ctl) continue;
+      const dx = p.x - P.x, dz = p.z - P.z;
+      if (Math.abs(dx) > 0.8 || Math.abs(dz) > 0.8) continue;
+      const d = Math.hypot(dx, dz);
+      if (d > 0.62 || d < 1e-3) continue;
+      const push = 0.62 - d;
+      if (p.mode === 'walk' || p.mode === 'cross') { p.dodgeX += dx / d * push; p.dodgeZ += dz / d * push; }
+      else { p.x += dx / d * push; p.z += dz / d * push; }
+      if (P.v > 2.4 && !(p.bumpT > 0)) {
+        p.bumpT = 3; p.react = 1.4; p.reactAt = { x: P.x, z: P.z }; p.reactAnim = 'hit';
+        if (P.v > 5.2 && !p.cop) { p.fallen = 2.4; this.events.push({ type: 'pedBumped', p, x: p.x, z: p.z }); }
+        else this.speak(['b1', 'b2', 'b3'], p, 0.6);
+      }
+    }
+  }
+  // chai and vada-pav stalls get a few people standing around them
+  populateStalls(px, pz) {
+    const S = this.W.M.stalls || [];
+    for (const [k, list] of this.stallsUsed) {
+      const st = S[k];
+      if (Math.hypot(st[0] / 100 - px, st[1] / 100 - pz) > 220) { this.stallsUsed.delete(k); }
+    }
+    for (let k = 0; k < S.length; k++) {
+      const st = S[k], x = st[0] / 100, z = st[1] / 100;
+      if (Math.abs(x - px) > 110 || Math.abs(z - pz) > 110 || this.stallsUsed.has(k)) continue;
+      const d = Math.hypot(x - px, z - pz);
+      if (d > 110 || d < 30) continue;
+      const n = this.rng.int(0, 3);
+      this.stallsUsed.set(k, n);
+      for (let i = 0; i < n; i++) {
+        const a = st[2] + Math.PI / 2 + (this.rng.next() - 0.5) * 2.2, r = 1.3 + this.rng.next() * 0.7;
+        let sx = x + Math.cos(a) * r, sz = z + Math.sin(a) * r;
+        const res = this.W.collision.resolve(sx, sz, 0.3); if (res) { sx += res.nx * res.depth; sz += res.nz * res.depth; }
+        const near = this.g.nearest(sx, sz, 30, e => e.rank >= 2);
+        if (!near) continue;
+        const p = this.make(near.e, near.s, near.side || 1, { mode: 'stand' });
+        p.anchor = { x: sx, z: sz, fx: x, fz: z }; p.x = sx; p.z = sz;
+        p.wait = this.rng.range(50, 160);
+        p.idle = this.rng.pick(['drink', 'drink', 'talk', 'phone', 'idle']);
+      }
+    }
+  }
+
+  // traffic police at some signalised junctions: khaki uniform, standing at the corner
+  addCops(cops, heads) {
+    for (const c of cops) {
+      const near = this.g.nearest(c.x, c.z, 40);
+      if (!near) continue;
+      const p = this.make(near.e, near.s, near.side || 1, { female: false, mode: 'fixed' });
+      p.fixed = true; p.x = c.x; p.z = c.z; p.cop = true;
+      if (this.kit) { p.look = this.kit.randomLook(new RNG(p.id), { role: 'police' }); p.idle = 'arms_folded'; }
+      c.ped = p;
+      p.shirt = [0.42, 0.36, 0.2].map(v => v); p.lower = [0.4, 0.34, 0.2]; p.skin = [0.32, 0.2, 0.13];
+      p.yaw = Math.atan2(near.e.pts[1] - c.z, near.e.pts[0] - c.x);
+      p.onRoad = false;
+    }
+  }
+
+  // passengers for the ride system
+  spawnPassenger(e, s, side) {
+    const p = this.make(e, s, side, { pax: true, mode: 'stand' });
+    p.wait = 1e9;
+    return p;
+  }
+  remove(p) { const i = this.list.indexOf(p); if (i >= 0) { if (p.body) p.body.release(); this.list[i] = this.list[this.list.length - 1]; this.list.pop(); } }
+
+  // ---------------------------------------------------------------- render
+  render(cx, cz) {
+    let nm = 0, nf = 0, nl = 0, na = 0;
+    const mm = this.mMale, mf = this.mFemale, ml = this.mLeg, ma = this.mArm;
+    for (const p of this.list) {
+      if (p.body || p.hidden) continue;    // drawn up close by crowd.js, or inside a shop
+      if (nm >= this.cap - 1 || nf >= this.cap - 1) break;
+      if (Math.abs(p.x - cx) > 130 || Math.abs(p.z - cz) > 130) continue;
+      const y = this.W.surf.height(p.x, p.z) * 0 + (p.onRoad ? 0 : 0.15);
+      const s = p.scale;
+      const swing = p.mode === 'stand' || p.pax ? 0 : Math.sin(p.phase) * 0.5;
+      // body
+      E.set(p.fallen > 0 ? 0 : 0, -p.yaw, p.fallen > 0 ? -1.45 : 0, 'YXZ');
+      Q.setFromEuler(E);
+      P3.set(p.x, y + (p.fallen > 0 ? 0.15 : Math.abs(Math.sin(p.phase)) * 0.03), p.z);
+      S3.set(s, s, s);
+      M4.compose(P3, Q, S3);
+      const body = p.female ? mf : mm;
+      const bi = p.female ? nf++ : nm++;
+      body.setMatrixAt(bi, M4);
+      body.instanceColor.setXYZ(bi, p.shirt[0], p.shirt[1], p.shirt[2]);
+      body.geometry.attributes.aColB.setXYZ(bi, p.lower[0], p.lower[1], p.lower[2]);
+      body.geometry.attributes.aColC.setXYZ(bi, p.skin[0], p.skin[1], p.skin[2]);
+      BASE.copy(M4);
+      if (p.fallen > 0) continue;
+      // legs (men only; saree hides them)
+      if (!p.female) for (const sd of [-1, 1]) {
+        TA.makeTranslation(0, 0.95, sd * 0.09); RA.makeRotationZ(swing * sd);
+        MM.copy(BASE).multiply(TA).multiply(RA);
+        ml.setMatrixAt(nl, MM);
+        ml.instanceColor.setXYZ(nl, p.lower[0], p.lower[1], p.lower[2]);
+        nl++;
+      }
+      // arms (passengers wave one arm)
+      for (const sd of [-1, 1]) {
+        let rot = -swing * sd * 0.8, lift = 0;
+        if (p.pax && sd === -1) { rot = 0.3; lift = -2.6 + Math.sin(p.wave * 7) * 0.35; }
+        if (p.angry > 0 && sd === 1) { lift = -2.2 + Math.sin(p.angry * 14) * 0.3; }
+        const sh = p.female ? 1.4 : 1.46;
+        TA.makeTranslation(0, sh, sd * (p.female ? 0.19 : 0.23)); RA.makeRotationZ(rot); RB.makeRotationX(lift * sd);
+        MM.copy(BASE).multiply(TA).multiply(RA).multiply(RB);
+        ma.setMatrixAt(na, MM);
+        ma.instanceColor.setXYZ(na, p.shirt[0], p.shirt[1], p.shirt[2]);
+        ma.geometry.attributes.aColC.setXYZ(na, p.skin[0], p.skin[1], p.skin[2]);
+        na++;
+      }
+    }
+    for (const [m, n] of [[mm, nm], [mf, nf], [ml, nl], [ma, na]]) {
+      m.count = n; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true;
+      m.geometry.attributes.aColB.needsUpdate = true; m.geometry.attributes.aColC.needsUpdate = true;
+    }
+    if (this.drawAnimals === false) return;
+    let nc = 0, nd = 0;
+    for (const a of this.animals) {
+      if (a.kind === 'cat') continue;
+      const mesh = a.cow ? this.mCow : this.mDog;
+      const i = a.cow ? nc++ : nd++;
+      E.set(0, -a.yaw, 0, 'YXZ'); Q.setFromEuler(E);
+      const lie = !a.moving && !a.cow;
+      P3.set(a.x, (Math.abs(a.lat) < a.e.w / 2 ? 0 : 0.15) - (lie ? 0.18 : 0), a.z);
+      S3.set(1, lie ? 0.6 : 1, 1);
+      M4.compose(P3, Q, S3);
+      mesh.setMatrixAt(i, M4);
+      mesh.instanceColor.setXYZ(i, a.col[0], a.col[1], a.col[2]);
+    }
+    for (const [m, n] of [[this.mCow, nc], [this.mDog, nd]]) { m.count = n; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }
+  }
+}
+
+function lin3(c) { return [lin(c[0]), lin(c[1]), lin(c[2])]; }

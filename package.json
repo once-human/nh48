@@ -1,0 +1,24 @@
+{
+  "name": "nh48",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "NH48: Pune — open-world driving game",
+  "dependencies": {
+    "@dgreenheck/ez-tree": "^1.1.0",
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource/hind": "^5.3.0",
+    "@fontsource/mukta": "^5.3.0",
+    "@fontsource/rozha-one": "^5.3.0",
+    "@fontsource/teko": "^5.3.0",
+    "@fontsource/tiro-devanagari-marathi": "^5.3.0",
+    "@fontsource/yatra-one": "^5.3.0",
+    "earcut": "^3.2.4",
+    "esbuild": "^0.28.2",
+    "n8ao": "^2.0.1",
+    "postprocessing": "^6.39.5",
+    "puppeteer-core": "^25.14.0",
+    "three": "^0.186.1"
+  }
+}

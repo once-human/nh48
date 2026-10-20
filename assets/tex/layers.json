@@ -1,0 +1,45 @@
+{
+ "ground": [
+  "asphalt_01",
+  "asphalt_02",
+  "interlocking_concrete_pavers",
+  "concrete_pavers_02",
+  "park_dirt",
+  "leafy_grass",
+  "grass_path_2",
+  "dirty_concrete",
+  "forest_ground_04",
+  "road_damaged",
+  "castle_wall_varriation"
+ ],
+ "wall": [
+  "plastered_wall",
+  "white_stucco",
+  "beige_wall_002",
+  "concrete_wall_008",
+  "worn_plaster_wall",
+  "damaged_plaster",
+  "exterior_wall_cladding",
+  "rectangular_facade_tiles",
+  "brick_wall_001",
+  "castle_wall_varriation",
+  "large_sandstone_blocks_01",
+  "painted_metal_shutter",
+  "rusty_metal_shutter",
+  "corrugated_iron",
+  "bitumen",
+  "clay_roof_tiles",
+  "dark_wooden_planks",
+  "concrete_floor_worn_001"
+ ],
+ "tintable": [
+  "beige_wall_002",
+  "concrete_wall_008",
+  "damaged_plaster",
+  "exterior_wall_cladding",
+  "painted_metal_shutter",
+  "plastered_wall",
+  "white_stucco",
+  "worn_plaster_wall"
+ ]
+}

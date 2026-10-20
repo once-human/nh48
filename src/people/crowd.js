@@ -1,0 +1,93 @@
+// Close-up people: the nearest pedestrians and the traffic police are drawn as animated, dressed
+// humans (HumanKit); everyone further away stays a cheap instanced figure from peds.js. A small
+// pool of skinned bodies is re-dressed and handed from person to person as you move.
+import * as THREE from 'three';
+import { clamp, RNG } from '../core/util.js';
+
+const RANGE = 34;            // metres from the camera
+const NAT = { walk: 1.25, jog: 3.0 };
+
+export class Crowd {
+  constructor(people, kit, scene, W, quality) {
+    this.people = people; this.kit = kit; this.scene = scene; this.W = W;
+    this.cap = quality.name === 'low' ? 7 : quality.name === 'med' ? 12 : 18;
+    this.pool = [];
+    this.t = 0;
+  }
+  setQuality(q) { this.cap = q.name === 'low' ? 7 : q.name === 'med' ? 12 : 18; }
+  makeSkin(female) {
+    const kit = this.kit;
+    const look = kit.randomLook(new RNG(this.pool.length + 1), { female });
+    const H = kit.create(look);
+    H.holder.visible = false;
+    this.scene.add(H.holder);
+    const accs = [];
+    H.root.traverse(o => { if (o.isSkinnedMesh && !o.name.startsWith('body')) accs.push(o); });
+    const s = { H, female, p: null, accs, dtAcc: 0 };
+    s.release = () => { if (s.p) s.p.body = null; s.p = null; H.holder.visible = false; };
+    this.pool.push(s);
+    return s;
+  }
+  dress(s, look) {
+    const u = s.H.mat.userData;
+    u.top.copy(look.top); u.bottom.copy(look.bottom); u.skin.copy(look.skin); u.shoe.copy(look.shoe); u.cut.copy(look.cut);
+    for (const o of s.accs) o.visible = o.name === look.acc || (look.acc === 'cap_police' && o.name === 'hair_short');
+    s.H.acc.color.copy(look.acc === 'cap_police' ? new THREE.Color(0xf4f4f0) : look.acc === 'helmet' ? new THREE.Color(0x222428) : look.hair);
+    s.H.root.scale.setScalar(look.scale);
+  }
+
+  update(dt, cx, cz) {
+    if (!this.kit) return;
+    this.t -= dt;
+    if (this.t <= 0) { this.t = 0.25; this.assign(cx, cz); }
+    for (const s of this.pool) if (s.p) this.drive(s, dt, cx, cz);
+  }
+  assign(cx, cz) {
+    const cand = [];
+    for (const p of this.people.list) {
+      if (p.hidden || !p.look) continue;
+      const d = Math.hypot(p.x - cx, p.z - cz);
+      const r = p.cop || p.ctl ? RANGE + 14 : RANGE;
+      if (d < r) cand.push([d - (p.cop || p.ctl ? 12 : 0), p]);
+    }
+    cand.sort((a, b) => a[0] - b[0]);
+    const want = new Set(cand.slice(0, this.cap).map(c => c[1]));
+    for (const s of this.pool) if (s.p && (!want.has(s.p) || s.p.hidden)) s.release();
+    for (const p of want) {
+      if (p.body) continue;
+      const fem = !!p.look.female;
+      let s = this.pool.find(q => !q.p && q.female === fem);
+      if (!s && this.pool.length < this.cap + 4) s = this.makeSkin(fem);
+      if (!s) continue;
+      this.dress(s, p.look);
+      if (p.kid) s.H.root.scale.setScalar(p.look.scale * 0.7);
+      s.p = p; p.body = s;
+      s.cur = null;
+      s.H.holder.visible = true;
+    }
+  }
+  animFor(p) {
+    if (p.anim) return [p.anim, 1];
+    if (p.fallen > 0) return [p.fallen > 1.3 ? 'knockback' : 'getup', 1, true];
+    if (p.react > 0 && p.reactAnim) return [p.reactAnim, 1, p.reactAnim === 'hit'];
+    if (p.angry > 0) return ['no', 1];
+    if (p.pax) return ['wave', 1];
+    if (p.cop) return [(performance.now() / 1000 + p.id % 17) % 14 < 4 ? 'wave' : 'arms_folded', 1];
+    if (p.mode === 'stand' || p.mode === 'watch' || p.v < 0.15) return [p.idle || 'idle', 1];
+    if (p.v > 2.2) return ['jog', clamp(p.v / NAT.jog, 0.7, 1.4)];
+    return ['walk', clamp(p.v / NAT.walk, 0.7, 1.4)];
+  }
+  drive(s, dt, cx, cz) {
+    const p = s.p, H = s.H;
+    const y = this.W.surf.height(p.x, p.z);
+    H.holder.position.set(p.x, y, p.z);
+    H.holder.rotation.set(0, -p.yaw, 0);
+    const [name, speed, once] = this.animFor(p);
+    H.play(name, { speed, once, fade: 0.25 });
+    // people further away animate at half rate
+    s.dtAcc += dt;
+    const far = Math.abs(p.x - cx) + Math.abs(p.z - cz) > 30;
+    if (!far || s.flip) { H.mixer.update(s.dtAcc); s.dtAcc = 0; }
+    s.flip = !s.flip;
+  }
+}

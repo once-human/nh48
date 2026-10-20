@@ -1,0 +1,573 @@
+// Lane-less Pune traffic: drive on the left, fill every gap, honk, mostly obey signals.
+// Vehicles follow the OSM road graph with a free lateral offset; IDM car-following
+// plus gap-seeking weaving for two-wheelers and autos.
+import * as THREE from 'three';
+import { RNG, clamp, lerp, wrapAngle } from '../core/util.js';
+import { buildAuto, buildScooter, buildBike, buildCar, buildBus, buildTempo, buildCycle, buildLow, PAINTS } from '../vehicles/models.js';
+import { lin } from '../world/geo.js';
+
+export const TYPES = {
+  scooter: { w: 30, L: 1.85, W: 0.75, vMul: [1.0, 1.25], A: 2.6, B: 5, T: 0.55, s0: 0.6, agile: 1.0, mass: 160, two: true, honk: 'beep' },
+  scooterP: { w: 9, L: 1.85, W: 0.75, vMul: [0.95, 1.15], A: 2.2, B: 5, T: 0.65, s0: 0.7, agile: 0.9, mass: 220, two: true, honk: 'beep' },
+  bike: { w: 20, L: 2.0, W: 0.78, vMul: [1.05, 1.35], A: 3.0, B: 5.5, T: 0.5, s0: 0.6, agile: 1.0, mass: 170, two: true, honk: 'beep' },
+  bikeP: { w: 6, L: 2.0, W: 0.78, vMul: [1.0, 1.25], A: 2.7, B: 5.5, T: 0.55, s0: 0.65, agile: 0.9, mass: 230, two: true, honk: 'beep' },
+  cycle: { w: 1.5, L: 1.75, W: 0.6, vMul: [0.35, 0.5], A: 0.8, B: 3, T: 0.8, s0: 0.6, agile: 0.6, mass: 90, two: true, honk: 'bell' },
+  auto: { w: 15, L: 2.7, W: 1.4, vMul: [0.82, 1.0], A: 1.8, B: 4.5, T: 0.7, s0: 0.8, agile: 0.75, mass: 450, honk: 'auto' },
+  hatch: { w: 10, L: 3.65, W: 1.6, vMul: [0.9, 1.1], A: 2.2, B: 5.5, T: 0.9, s0: 1.2, agile: 0.35, mass: 950, honk: 'car' },
+  sedan: { w: 7, L: 4.0, W: 1.7, vMul: [0.9, 1.15], A: 2.4, B: 5.5, T: 0.9, s0: 1.2, agile: 0.3, mass: 1100, honk: 'car' },
+  suv: { w: 4, L: 4.5, W: 1.8, vMul: [0.9, 1.15], A: 2.3, B: 5.5, T: 1.0, s0: 1.3, agile: 0.25, mass: 1700, honk: 'car' },
+  taxi: { w: 2, L: 4.0, W: 1.7, vMul: [0.95, 1.15], A: 2.4, B: 5.5, T: 0.9, s0: 1.2, agile: 0.35, mass: 1100, honk: 'car' },
+  tempo: { w: 4, L: 3.8, W: 1.55, vMul: [0.75, 0.95], A: 1.6, B: 4.5, T: 1.0, s0: 1.4, agile: 0.25, mass: 1400, honk: 'tempo' },
+  bus: { w: 3, L: 11.4, W: 2.55, vMul: [0.7, 0.85], A: 1.1, B: 3.5, T: 1.4, s0: 2.0, agile: 0.05, mass: 9000, honk: 'bus', mainOnly: true },
+};
+const TYPE_NAMES = Object.keys(TYPES);
+
+const SPEED_BY_RANK = [4.5, 5, 7, 9.5, 11.5, 13.5, 14.5];
+const tmpA = [0, 0, 0, 0], tmpB = [0, 0, 0, 0];
+
+function linkLen(l) { return l.e.len; }
+// point on a directed link at distance s from its start
+function linkAt(graph, l, s, out) {
+  const e = l.e;
+  if (l.dir > 0) graph.at(e, s, out);
+  else { graph.at(e, e.len - s, out); out[2] = -out[2]; out[3] = -out[3]; }
+  return out;
+}
+function linkEnd(l) { return l.dir > 0 ? l.e.b : l.e.a; }
+function linkStart(l) { return l.dir > 0 ? l.e.a : l.e.b; }
+// lateral bounds (driver's left positive)
+function latBounds(l) {
+  const hw = l.e.w / 2 - 0.55;
+  if (l.e.oneway) return [-hw, hw];
+  return [0.45, Math.max(0.6, hw)];
+}
+
+export class Traffic {
+  constructor(W, scene, mats, quality) {
+    this.W = W; this.graph = W.graph; this.scene = scene;
+    this.rng = new RNG(4242);
+    this.max = quality.traffic;
+    this.list = [];
+    this.pool = [];
+    this.grid = new Map();
+    this.cell = 10;
+    this.honks = [];        // events for audio: {x,z,kind}
+    this.player = null;
+    this.peds = null;
+    this.signals = new Signals(W);
+    this.time = 0;
+    // build models + instanced meshes
+    const models = {
+      scooter: buildScooter({ helmet: true }), scooterP: buildScooter({ helmet: false, pillion: true, sideSaddle: true }),
+      bike: buildBike({ helmet: true }), bikeP: buildBike({ helmet: true, pillion: true }), cycle: buildCycle(),
+      auto: buildAuto({ driver: true, inst: true, withWheels: true }),
+      hatch: buildCar('hatch'), sedan: buildCar('sedan'), suv: buildCar('suv'), taxi: buildCar('taxi'),
+      tempo: buildTempo(), bus: buildBus(),
+    };
+    this.models = models;
+    this.inst = {};
+    const cap = Math.max(8, Math.ceil(this.max * 0.6));
+    for (const k of TYPE_NAMES) {
+      const m = models[k];
+      const c = k === 'bus' ? Math.max(4, Math.ceil(this.max * 0.08)) : cap;
+      const body = new THREE.InstancedMesh(m.body.clone(), mats.body, c);
+      body.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3);
+      body.geometry.setAttribute('aColB', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));
+      body.geometry.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));
+      body.castShadow = quality.shadows; body.receiveShadow = true;
+      body.frustumCulled = false; body.count = 0;
+      scene.add(body);
+      let glass = null;
+      if (m.glass.attributes.position.count) {
+        glass = new THREE.InstancedMesh(m.glass, mats.glass, c);
+        glass.frustumCulled = false; glass.count = 0;
+        scene.add(glass);
+      }
+      // far LOD: a handful of boxes
+      const lowGeo = buildLow(k);
+      const low = new THREE.InstancedMesh(lowGeo, mats.body, c);
+      low.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3);
+      lowGeo.setAttribute('aColB', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));
+      lowGeo.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));
+      low.castShadow = false; low.receiveShadow = true; low.frustumCulled = false; low.count = 0;
+      scene.add(low);
+      this.inst[k] = { body, glass, low, cap: c, n: 0, nl: 0 };
+    }
+    this.lodDist = 58;
+    this.cam = new THREE.Vector3();
+    this.mtx = new THREE.Matrix4();
+    this.q = new THREE.Quaternion();
+    this.eul = new THREE.Euler(0, 0, 0, 'YXZ');
+    this.v3 = new THREE.Vector3(); this.s3 = new THREE.Vector3(1, 1, 1);
+  }
+
+  // ---------------------------------------------------------------- spawning
+  pickType(link) {
+    const main = link.e.rank >= 4;
+    let tot = 0;
+    for (const k of TYPE_NAMES) { const t = TYPES[k]; if (t.mainOnly && !main) continue; tot += t.w; }
+    let x = this.rng.next() * tot;
+    for (const k of TYPE_NAMES) { const t = TYPES[k]; if (t.mainOnly && !main) continue; x -= t.w; if (x <= 0) return k; }
+    return 'scooter';
+  }
+  randomLink(px, pz, rMin, rMax) {
+    const edges = this.graph.edges;
+    for (let tries = 0; tries < 40; tries++) {
+      const e = edges[Math.floor(this.rng.next() * edges.length)];
+      if (e.rank < 2) continue;
+      if (this.rng.next() > [0, 0, 0.2, 0.45, 0.8, 1, 1][e.rank]) continue;
+      const s = this.rng.range(2, Math.max(2.1, e.len - 2));
+      this.graph.at(e, s, tmpA);
+      const d = Math.hypot(tmpA[0] - px, tmpA[1] - pz);
+      if (d < rMin || d > rMax) continue;
+      const dir = e.oneway ? 1 : (this.rng.chance(0.5) ? 1 : -1);
+      return { l: { e, dir }, s: dir > 0 ? s : e.len - s, x: tmpA[0], z: tmpA[1] };
+    }
+    return null;
+  }
+  spawn(px, pz, rMin, rMax, avoidView) {
+    const r = this.randomLink(px, pz, rMin, rMax);
+    if (!r) return null;
+    if (avoidView && avoidView(r.x, r.z)) return null;
+    for (const o of this.list) if (Math.abs(o.x - r.x) < 9 && Math.abs(o.z - r.z) < 9) return null;
+    const type = this.pickType(r.l);
+    const T = TYPES[type];
+    // never drop a bus or truck right on top of the player's camera
+    if (T.L > 5 && Math.hypot(r.x - px, r.z - pz) < 45) return null;
+    const v = this.pool.pop() || {};
+    const [lo, hi] = latBounds(r.l);
+    Object.assign(v, {
+      type, T, l: r.l, s: r.s, lat: this.rng.range(lo, hi), latT: 0, v: 0, vMul: this.rng.range(T.vMul[0], T.vMul[1]),
+      next: null, jc: null, x: r.x, z: r.z, hx: 1, hz: 0, yaw: 0, roll: 0, pitch: 0, stuck: 0, honkT: this.rng.range(2, 12),
+      ignore: null, ignoreT: 0, fallen: 0, alive: true, redRunner: this.rng.chance(T.two ? 0.12 : 0.03), id: Math.floor(this.rng.next() * 1e9),
+      col: null, colB: null, colC: null, angry: 0, prevV: 0,
+    });
+    v.latT = v.lat;
+    v.v = SPEED_BY_RANK[r.l.e.rank] * v.vMul * this.rng.range(0.3, 0.8);
+    // colours
+    const P = PAINTS;
+    const pick = (a) => a[Math.floor(this.rng.next() * a.length)].map(lin);
+    if (type === 'auto') v.col = [lin(0.12), lin(0.12), lin(0.12)];
+    else if (type === 'taxi') v.col = [lin(0.96), lin(0.96), lin(0.95)];
+    else if (type === 'tempo') v.col = pick(P.tempo);
+    else if (type === 'bus') v.col = [1, 1, 1];
+    else if (T.two) v.col = pick(P.two);
+    else v.col = pick(P.car);
+    v.colB = pick(P.shirt); v.colC = pick(P.helmet);
+    this.place(v, 0);
+    this.list.push(v);
+    return v;
+  }
+  despawn(i) {
+    const v = this.list[i];
+    v.alive = false;
+    this.list[i] = this.list[this.list.length - 1];
+    this.list.pop();
+    this.pool.push(v);
+  }
+
+  // ---------------------------------------------------------------- routing
+  chooseNext(v) {
+    const node = this.graph.nodes[linkEnd(v.l)];
+    if (node.portal) return null;
+    const outs = node.out;
+    linkAt(this.graph, v.l, linkLen(v.l), tmpA);
+    const inx = tmpA[2], inz = tmpA[3];
+    let best = null, tot = 0;
+    const cands = [];
+    for (const o of outs) {
+      if (o.e === v.l.e) continue;     // no U-turns unless dead end
+      if (o.e.rank < 2) continue;
+      if (TYPES[v.type].mainOnly && o.e.rank < 4) continue;
+      linkAt(this.graph, o, 0, tmpB);
+      const dot = inx * tmpB[2] + inz * tmpB[3];
+      const cross = inx * tmpB[3] - inz * tmpB[2];
+      let w = Math.pow(o.e.rank + 1, 1.4);
+      if (dot > 0.8) w *= 3;
+      else if (dot < -0.3) w *= 0.25;
+      if (this.graph.nodes[linkEnd(o)].portal) w *= 0.5;
+      cands.push([o, w, cross, dot]);
+      tot += w;
+    }
+    if (!cands.length) {
+      // dead end: turn around if allowed
+      const back = outs.find(o => o.e === v.l.e);
+      return back ? { l: back, turn: Math.PI } : null;
+    }
+    let x = this.rng.next() * tot;
+    for (const c of cands) { x -= c[1]; if (x <= 0) { best = c; break; } }
+    best = best || cands[0];
+    return { l: best[0], turn: Math.atan2(best[2], best[3]) };
+  }
+
+  // build the junction connector curve from current position to the next link
+  startJunction(v) {
+    const n = v.next;
+    const node = this.graph.nodes[linkEnd(v.l)];
+    const r = Math.min(node.jr, n.l.e.len * 0.45);
+    linkAt(this.graph, n.l, r, tmpB);
+    const [lo, hi] = latBounds(n.l);
+    let lat2 = clamp(v.lat, lo, hi);
+    // turning left: hug the kerb, turning right: stay toward centre
+    if (n.turn < -0.6) lat2 = lerp(lat2, hi, 0.5);
+    else if (n.turn > 0.6) lat2 = lerp(lat2, lo, 0.6);
+    const p2x = tmpB[0] + tmpB[3] * lat2, p2z = tmpB[1] - tmpB[2] * lat2;
+    const p0x = v.x, p0z = v.z;
+    // control point: intersect the two tangents (fallback midpoint)
+    const d0x = v.hx, d0z = v.hz, d2x = tmpB[2], d2z = tmpB[3];
+    const den = d0x * d2z - d0z * d2x;
+    let cx, cz;
+    if (Math.abs(den) > 0.15) {
+      const t = ((p2x - p0x) * d2z - (p2z - p0z) * d2x) / den;
+      cx = p0x + d0x * t; cz = p0z + d0z * t;
+      if (t < 0 || t > 40) { cx = (p0x + p2x) / 2; cz = (p0z + p2z) / 2; }
+    } else { cx = (p0x + p2x) / 2; cz = (p0z + p2z) / 2; }
+    // approximate length
+    let L = 0, px = p0x, pz = p0z;
+    for (let k = 1; k <= 8; k++) {
+      const t = k / 8, a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t;
+      const x = a * p0x + b * cx + c * p2x, z = a * p0z + b * cz + c * p2z;
+      L += Math.hypot(x - px, z - pz); px = x; pz = z;
+    }
+    v.jc = { p0x, p0z, cx, cz, p2x, p2z, L: Math.max(0.5, L), t: 0, s2: r, lat2, turn: n.turn };
+  }
+
+  // ---------------------------------------------------------------- per-frame update
+  update(dt, px, pz, avoidView) {
+    this.time += dt;
+    this.signals.update(dt);
+    // keep population
+    for (let i = this.list.length - 1; i >= 0; i--) {
+      const v = this.list[i];
+      const d = Math.hypot(v.x - px, v.z - pz);
+      if (d > 300 || !v.alive) this.despawn(i);
+    }
+    let tries = 8;
+    while (this.list.length < this.max && tries-- > 0) {
+      const urgent = this.list.length < this.max * 0.5;
+      this.spawn(px, pz, urgent ? 25 : 80, 240, urgent ? null : avoidView);
+    }
+    this.buildGrid();
+    for (const v of this.list) this.step(v, dt);
+    this.render();
+  }
+  prefill(px, pz) {
+    for (let k = 0; k < this.max * 6 && this.list.length < this.max; k++) this.spawn(px, pz, 22, 240, null);
+    // let them settle
+    for (let k = 0; k < 40; k++) { this.buildGrid(); for (const v of this.list) this.step(v, 0.1); }
+  }
+
+  // parked cars / auto stands on the carriageway: obstacles the traffic has to steer around
+  setStatics(list) { this.statics = list; this.staticsNear = []; this.staticsT = 0; }
+  buildGrid() {
+    const g = this.grid;
+    g.clear();
+    const c = this.cell;
+    const put = (a) => {
+      const key = Math.floor(a.x / c) * 73856 + Math.floor(a.z / c);
+      let l = g.get(key); if (!l) g.set(key, l = []);
+      l.push(a);
+    };
+    for (const v of this.list) put(v);
+    if (this.player) put(this.player.agent);
+    if (this.extra) for (const a of this.extra) put(a);
+    if (this.peds) for (const p of this.peds.roadAgents()) put(p);
+    if (this.statics) {
+      if ((this.staticsT -= 1 / 60) <= 0 && this.player) {
+        this.staticsT = 1;
+        const px = this.player.x, pz = this.player.z;
+        this.staticsNear = this.statics.filter(s => Math.abs(s.x - px) < 320 && Math.abs(s.z - pz) < 320);
+      }
+      for (const s of this.staticsNear) put(s);
+    }
+  }
+  near(x, z, r, cb) {
+    const c = this.cell;
+    const i0 = Math.floor((x - r) / c), i1 = Math.floor((x + r) / c), j0 = Math.floor((z - r) / c), j1 = Math.floor((z + r) / c);
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+      const l = this.grid.get(i * 73856 + j);
+      if (l) for (const a of l) cb(a);
+    }
+  }
+
+  // nearest obstacle in a lateral corridor ahead: returns {gap, v, agent}
+  scan(v, latOffset, look) {
+    const T = v.T;
+    const hx = v.hx, hz = v.hz, nx = hz, nz = -hx;     // n = driver's left
+    const cx = v.x + nx * latOffset, cz = v.z + nz * latOffset;
+    let best = null;
+    this.near(v.x + hx * look * 0.5, v.z + hz * look * 0.5, look * 0.6 + 4, (o) => {
+      if (o === v || (v.ignore && o === v.ignore && v.ignoreT > 0)) return;
+      const rx = o.x - cx, rz = o.z - cz;
+      const along = rx * hx + rz * hz;
+      if (along <= 0 || along > look) return;
+      const side = rx * nx + rz * nz;
+      const ow = o.W !== undefined ? o.W : o.T.W;
+      const oL = o.L !== undefined ? o.L : o.T.L;
+      // project other's extent sideways when it's crossing our path
+      const ohx = o.hx ?? 1, ohz = o.hz ?? 0;
+      const cross = Math.abs(ohx * nx + ohz * nz);
+      const halfO = ow / 2 * (1 - cross) + oL / 2 * cross;
+      if (Math.abs(side) > T.W / 2 + halfO + 0.22) return;
+      const gap = along - T.L / 2 - (oL / 2 * (1 - cross) + ow / 2 * cross);
+      if (!best || gap < best.gap) {
+        const ov = (o.v || 0) * (ohx * hx + ohz * hz);
+        best = { gap, v: ov, agent: o, side };
+      }
+    });
+    return best;
+  }
+
+  step(v, dt) {
+    const T = v.T;
+    if (v.fallen > 0) { v.fallen -= dt; v.v = 0; return; }
+    if (v.ignoreT > 0) v.ignoreT -= dt;
+    if (v.angry > 0) v.angry -= dt;
+    // --- desired speed
+    const e = v.l.e;
+    let vDes = SPEED_BY_RANK[e.rank] * v.vMul;
+    if (!v.jc) {
+      // slow for upcoming turn
+      const remain = e.len - v.s;
+      if (!v.next && remain < 30) v.next = this.chooseNext(v);
+      if (v.next && Math.abs(v.next.turn) > 0.5) {
+        const turnV = 3.2 + (1 - Math.min(1, Math.abs(v.next.turn) / 1.6)) * 5;
+        if (remain < 25) vDes = Math.min(vDes, lerp(turnV, vDes, clamp((remain - 6) / 19, 0, 1)));
+      }
+    } else if (Math.abs(v.jc.turn) > 0.5) vDes = Math.min(vDes, 3.5 + (1 - Math.min(1, Math.abs(v.jc.turn) / 1.6)) * 5);
+    // --- obstacles
+    const look = 7 + v.v * 2.4;
+    const ob = this.scan(v, 0, look);
+    let gap = 999, vo = 0, agent = null;
+    if (ob) { gap = ob.gap; vo = ob.v; agent = ob.agent; }
+    // signal stop line
+    if (!v.jc) {
+      const endNode = this.graph.nodes[linkEnd(v.l)];
+      if (endNode.signal) {
+        const st = this.signals.state(endNode.i, v.l);
+        const stopAt = e.len - Math.min(endNode.jr, e.len * 0.45) - 3.5;
+        const dStop = stopAt - v.s;
+        const freeLeft = v.next && v.next.turn < -0.6;
+        if (st !== 'g' && !freeLeft && dStop > -1 && dStop < 60) {
+          const canStop = v.v * v.v / (2 * T.B) < dStop + 1;
+          if (!(st === 'a' && !canStop) && !(v.redRunner && st === 'r' && this.signals.crossClear(endNode.i))) {
+            if (dStop < gap) { gap = Math.max(0, dStop); vo = 0; agent = null; }
+          }
+        }
+      }
+    }
+    // --- IDM
+    const dv = v.v - vo;
+    const sStar = T.s0 + v.v * T.T + (v.v * dv) / (2 * Math.sqrt(T.A * T.B));
+    let acc = T.A * (1 - Math.pow(v.v / Math.max(0.5, vDes), 4) - Math.pow(Math.max(0, sStar) / Math.max(0.1, gap), 2));
+    acc = clamp(acc, -T.B * 1.8, T.A);
+    v.prevV = v.v;
+    v.v = Math.max(0, v.v + acc * dt);
+    if (gap < 0.2) v.v = Math.min(v.v, 0.3);
+    // --- weaving: look for a gap beside the slow thing in front
+    if (!v.jc && ob && ob.gap < 9 && (vo < v.v - 0.5 || vo < 1.0) && this.rng.next() < T.agile * dt * 3) {
+      const [lo, hi] = latBounds(v.l);
+      const half = T.W / 2 + (ob.agent.W ?? ob.agent.T?.W ?? 1) / 2 + 0.3;
+      const opts = [v.lat + ob.side - half, v.lat + ob.side + half];   // pass on its right, or its left
+      if (this.rng.next() < 0.35) opts.reverse();
+      for (const nl of opts) {
+        if (nl < lo || nl > hi) continue;
+        const o2 = this.scan(v, nl - v.lat, look + 6);
+        if (!o2 || o2.gap > ob.gap + 6) { v.latT = nl; break; }
+      }
+    }
+    // drift back toward a comfortable lane position when free
+    if (!v.jc && (!ob || ob.gap > 25)) {
+      const [lo, hi] = latBounds(v.l);
+      const pref = e.oneway ? lerp(lo, hi, T.two ? 0.75 : 0.45) : lerp(lo, hi, T.two ? 0.7 : 0.35);
+      v.latT = lerp(v.latT, pref, dt * 0.08);
+    }
+    // --- stuck handling (deadlocks in junctions)
+    if (v.v < 0.25 && agent && agent.v !== undefined && agent.v < 0.25) {
+      v.stuck += dt;
+      if (v.stuck > 4.5 + (v.id % 5)) {
+        if (agent.parked && !v.jc) {
+          // squeeze past a parked car, even if it means a moment on the wrong side of the road
+          const [lo, hi] = latBounds(v.l);
+          const half = T.W / 2 + agent.W / 2 + 0.35;
+          v.latT = Math.max(Math.min(lo, 0) - (v.l.e.oneway ? 0 : v.l.e.w * 0.2), v.lat + (ob ? ob.side : 0) - half);
+          v.stuck = 0;
+        } else { v.ignore = agent; v.ignoreT = 2.5; v.stuck = 0; }
+      }
+    } else v.stuck = Math.max(0, v.stuck - dt);
+    // --- honking
+    v.honkT -= dt;
+    if (v.honkT <= 0) {
+      const blocked = ob && ob.gap < 10 && vo < 1.5;
+      const isPlayer = agent && agent.isPlayer;
+      if (blocked || isPlayer || this.rng.next() < 0.15) {
+        this.honks.push({ x: v.x, z: v.z, kind: T.honk, n: blocked ? this.rng.int(1, 3) : 1 });
+      }
+      v.honkT = blocked ? this.rng.range(1.2, 4) : this.rng.range(6, 22);
+    }
+    // --- move
+    const ds = v.v * dt;
+    const latRate = (T.two ? 1.5 : 0.9) * dt;
+    v.lat += clamp(v.latT - v.lat, -latRate, latRate);
+    if (v.jc) {
+      const j = v.jc;
+      j.t += ds / j.L;
+      if (j.t >= 1) {
+        const over = (j.t - 1) * j.L;
+        v.l = v.next.l; v.s = j.s2 + over; v.lat = j.lat2; v.latT = j.lat2; v.next = null; v.jc = null;
+        if (this.graph.nodes[linkStart(v.l)].portal && v.l.e.len < 5) v.alive = false;
+      }
+    } else {
+      v.s += ds;
+      const node = this.graph.nodes[linkEnd(v.l)];
+      const r = Math.min(node.jr, e.len * 0.45);
+      if (v.s >= e.len - r) {
+        if (!v.next) v.next = this.chooseNext(v);
+        if (!v.next) { v.alive = false; return; }
+        if (v.next.l.e === v.l.e && v.next.l.dir !== v.l.dir) {
+          // U-turn at dead end
+          v.l = v.next.l; v.s = Math.max(0.5, e.len - v.s); v.next = null;
+        } else this.startJunction(v);
+      }
+    }
+    this.place(v, dt);
+  }
+
+  place(v, dt) {
+    let x, z, hx, hz;
+    if (v.jc) {
+      const j = v.jc, t = clamp(j.t, 0, 1);
+      const a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t;
+      x = a * j.p0x + b * j.cx + c * j.p2x; z = a * j.p0z + b * j.cz + c * j.p2z;
+      hx = 2 * (1 - t) * (j.cx - j.p0x) + 2 * t * (j.p2x - j.cx);
+      hz = 2 * (1 - t) * (j.cz - j.p0z) + 2 * t * (j.p2z - j.cz);
+      const L = Math.hypot(hx, hz) || 1; hx /= L; hz /= L;
+    } else {
+      linkAt(this.graph, v.l, v.s, tmpA);
+      hx = tmpA[2]; hz = tmpA[3];
+      x = tmpA[0] + hz * v.lat; z = tmpA[1] - hx * v.lat;
+    }
+    // smooth heading and lean
+    const yaw = Math.atan2(hz, hx);
+    if (dt > 0) {
+      const dy = wrapAngle(yaw - v.yaw);
+      const yawRate = dy / dt;
+      v.yaw += dy * Math.min(1, dt * 12);
+      const latAcc = clamp(v.v * yawRate, -6, 6);
+      const targetRoll = v.T.two ? clamp(Math.atan(latAcc / 9.8), -0.45, 0.45) : clamp(-latAcc * 0.012, -0.05, 0.05);
+      v.roll += (targetRoll - v.roll) * Math.min(1, dt * 6);
+      const lonAcc = (v.v - v.prevV) / dt;
+      v.pitch += (clamp(lonAcc * 0.006, -0.03, 0.03) - v.pitch) * Math.min(1, dt * 5);
+    } else v.yaw = yaw;
+    v.hx = Math.cos(v.yaw); v.hz = Math.sin(v.yaw);
+    v.x = x; v.z = z;
+    v.y = this.W.surf.isRoad(x, z) ? 0 : 0.15;
+  }
+
+  render() {
+    for (const k in this.inst) { this.inst[k].n = 0; this.inst[k].nl = 0; }
+    const m = this.mtx, q = this.q, e = this.eul, p = this.v3, s = this.s3;
+    const cx = this.cam.x, cz = this.cam.z, L2 = this.lodDist * this.lodDist;
+    for (const v of this.list) {
+      const I = this.inst[v.type];
+      const far = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) > L2;
+      const roll = v.fallen > 0 ? 1.3 : v.roll;
+      e.set(roll, -v.yaw, v.pitch, 'YXZ');
+      q.setFromEuler(e);
+      p.set(v.x, (v.y || 0) + (v.fallen > 0 ? 0.3 : 0), v.z);
+      m.compose(p, q, s);
+      const mesh = far ? I.low : I.body;
+      const i = far ? I.nl : I.n;
+      if (i >= I.cap) continue;
+      mesh.setMatrixAt(i, m);
+      mesh.instanceColor.setXYZ(i, v.col[0], v.col[1], v.col[2]);
+      mesh.geometry.attributes.aColB.setXYZ(i, v.colB[0], v.colB[1], v.colB[2]);
+      mesh.geometry.attributes.aColC.setXYZ(i, v.colC[0], v.colC[1], v.colC[2]);
+      if (far) I.nl++;
+      else { if (I.glass) I.glass.setMatrixAt(i, m); I.n++; }
+    }
+    for (const k in this.inst) {
+      const I = this.inst[k];
+      for (const [mesh, n] of [[I.body, I.n], [I.low, I.nl]]) {
+        mesh.count = n;
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.instanceColor.needsUpdate = true;
+        mesh.geometry.attributes.aColB.needsUpdate = true;
+        mesh.geometry.attributes.aColC.needsUpdate = true;
+      }
+      if (I.glass) { I.glass.count = I.n; I.glass.instanceMatrix.needsUpdate = true; }
+    }
+  }
+}
+
+// ---------------------------------------------------------------- traffic signals
+// Each signalised junction rotates green between its approach arms; left turns are free.
+class Signals {
+  constructor(W) {
+    this.W = W;
+    this.g = W.graph;
+    this.j = new Map();
+    const rng = new RNG(99);
+    for (const n of this.g.nodes) {
+      if (!n.signal) continue;
+      const arms = [];
+      for (const l of n.inc) {
+        // incoming direction at the node
+        const tmp = [0, 0, 0, 0];
+        if (l.dir > 0) this.g.at(l.e, l.e.len, tmp); else { this.g.at(l.e, 0, tmp); tmp[2] = -tmp[2]; tmp[3] = -tmp[3]; }
+        const ang = Math.atan2(tmp[3], tmp[2]);
+        let arm = arms.find(a => Math.abs(wrapAngle(a.ang - ang)) < 0.5);
+        if (!arm) { arm = { ang, links: [] }; arms.push(arm); }
+        arm.links.push(l.e.i * 2 + (l.dir > 0 ? 1 : 0));
+      }
+      if (arms.length < 2) continue;
+      // pair opposite arms into one phase when the junction is a simple crossroad
+      const phases = [];
+      const used = new Set();
+      for (const a of arms) {
+        if (used.has(a)) continue;
+        const opp = arms.find(b => b !== a && !used.has(b) && Math.abs(wrapAngle(b.ang - a.ang - Math.PI)) < 0.45);
+        used.add(a);
+        const ph = { links: new Set(a.links), angs: [a.ang] };
+        if (opp && arms.length >= 4) { used.add(opp); opp.links.forEach(x => ph.links.add(x)); ph.angs.push(opp.ang); }
+        phases.push(ph);
+      }
+      this.j.set(n.i, { phases, cur: rng.int(0, phases.length - 1), t: rng.range(0, 15), green: rng.range(16, 26), amber: 3, allRed: 1.2 });
+    }
+    this.heads = [];
+  }
+  update(dt) {
+    for (const s of this.j.values()) {
+      s.t += dt;
+      if (s.t > s.green + s.amber + s.allRed) { s.t = 0; s.cur = (s.cur + 1) % s.phases.length; }
+    }
+  }
+  phaseState(s, linkKey) {
+    const ph = s.phases[s.cur];
+    if (!ph.links.has(linkKey)) return 'r';
+    if (s.t < s.green) return 'g';
+    if (s.t < s.green + s.amber) return 'a';
+    return 'r';
+  }
+  state(nodeIdx, l) {
+    const s = this.j.get(nodeIdx);
+    if (!s) return 'g';
+    return this.phaseState(s, l.e.i * 2 + (l.dir > 0 ? 1 : 0));
+  }
+  // state for a direction of travel (heading angle) approaching a node: used by signal heads & player checks
+  stateForAngle(nodeIdx, ang) {
+    const s = this.j.get(nodeIdx);
+    if (!s) return null;
+    for (let k = 0; k < s.phases.length; k++) {
+      const ph = s.phases[k];
+      if (ph.angs.some(a => Math.abs(wrapAngle(a - ang)) < 0.6)) {
+        if (k !== s.cur) return 'r';
+        if (s.t < s.green) return 'g';
+        if (s.t < s.green + s.amber) return 'a';
+        return 'r';
+      }
+    }
+    return null;
+  }
+  crossClear(nodeIdx) { const s = this.j.get(nodeIdx); return s ? s.t > s.green + 0.5 : true; }
+}

@@ -1,0 +1,318 @@
+// NH48 — entry point. Stage 1 boot: renderer + post-processing, asset loading with honest progress,
+// the streamed PBR city, and a free camera for checking the world. Gameplay plugs in on top.
+import * as THREE from 'three';
+import { Loader, stripToArray, bitmapTexture } from './core/assets.js';
+import { buildWorld, updateWorldMaterials } from './world/world.js';
+import { updateProps } from './world/propsChunk.js';
+import { Sky } from './gfx/sky.js';
+import { Post } from './gfx/post.js';
+import { U } from './gfx/materials.js';
+import { runTreeLab, runPeopleLab } from './lab.js';
+import { vehicleMaterials } from './vehicles/vehmat.js';
+import { PlayerAuto } from './vehicles/player.js';
+import { Traffic } from './traffic/traffic.js';
+import { CameraRig } from './game/camera.js';
+import { Input } from './game/input.js';
+import { Game } from './game/game.js';
+import { Pilot } from './game/pilot.js';
+import { HumanKit } from './people/humans.js';
+import { AnimalKit } from './people/animals.js';
+
+export const QUALITY = {
+  low: { name: 'low', pixelRatio: 0.75, shadows: false, shadowSize: 0, ao: false, smaa: false, texMax: 512, boardRes: 0.5, signScale: 0.5,
+    streamRadius: 360, streamBudget: 4, treeNearRange: 28, treeMidRange: 100, treeFarRange: 600, treeNearCap: 100, treeMidCap: 700, treeFarCap: 5000, leafCell: 256, impostorCell: 128, propRange: 110, far: 1400, traffic: 70, peds: 110 },
+  med: { name: 'med', pixelRatio: 1.0, shadows: true, shadowSize: 2048, ao: true, aoSamples: 8, smaa: true, texMax: 1024, boardRes: 1, signScale: 1,
+    streamRadius: 520, streamBudget: 6, treeNearRange: 42, treeMidRange: 150, treeFarRange: 900, treeNearCap: 200, treeMidCap: 1400, treeFarCap: 9000, leafCell: 512, impostorCell: 256, propRange: 170, far: 2200, traffic: 130, peds: 190 },
+  high: { name: 'high', pixelRatio: 1.5, shadows: true, shadowSize: 4096, ao: true, aoSamples: 16, smaa: true, texMax: 1024, boardRes: 1, signScale: 1,
+    streamRadius: 720, streamBudget: 8, treeNearRange: 80, treeMidRange: 240, treeFarRange: 1200, treeNearCap: 500, treeMidCap: 2800, treeFarCap: 14000, leafCell: 512, impostorCell: 256, propRange: 240, far: 3000, traffic: 170, peds: 260 },
+};
+
+const params = new URLSearchParams(location.search);
+const EXPO = +(params.get('expo') || 1.0);
+export const TEST = params.has('test');
+
+function gpuClass() {
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl2');
+    if (!gl) return 'none';
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const r = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    if (/SwiftShader|llvmpipe|softpipe|Software|Microsoft Basic/i.test(r)) return 'soft';
+    if (/HD Graphics(?! [6-9]\d\d)|Mali-[GT]?\d{1,2}\b|Adreno \(TM\) [2-5]\d\d|PowerVR|Vivante/i.test(r) && !/UHD|Iris|Arc/i.test(r)) return 'weak';
+    if (/Intel|UHD|Iris|Radeon\(TM\) Graphics|Radeon Graphics|Vega \d+ Graphics|Mali|Adreno|Apple/i.test(r) && !/Arc/i.test(r)) return 'integrated';
+    return 'discrete';
+  } catch (e) { return 'unknown'; }
+}
+const GPU = gpuClass();
+function pickQuality() {
+  const q = params.get('q');
+  if (q && QUALITY[q]) return { ...QUALITY[q] };
+  try { const s = localStorage.getItem('nh48_quality'); if (s && QUALITY[s]) return { ...QUALITY[s] }; } catch (e) { /* storage blocked */ }
+  if (GPU === 'soft' || GPU === 'weak') return { ...QUALITY.low };
+  return { ...QUALITY.med };
+}
+
+const ASSETS = {
+  map: 'assets/map.gz.txt',
+  gAlb: 'assets/tex/ground_alb.jpg', gNrm: 'assets/tex/ground_nrm.jpg', gArm: 'assets/tex/ground_arm.jpg',
+  wAlb: 'assets/tex/wall_alb.jpg', wNrm: 'assets/tex/wall_nrm.jpg', wArm: 'assets/tex/wall_arm.jpg',
+  bark: 'assets/tex/bark_brown_02_diff.jpg', barkN: 'assets/tex/bark_brown_02_nor.jpg', palm: 'assets/tex/palm_bark_diff.jpg',
+  // models ship as gzip+base64 text (the artifact host doesn't serve .glb)
+  peopleM: 'assets/people/people_m.glb.gz.txt', peopleF: 'assets/people/people_f.glb.gz.txt',
+  animals: { dog: 'assets/animals/dog.glb.gz.txt', cat: 'assets/animals/cat.glb.gz.txt', cow: 'assets/animals/cow.glb.gz.txt', kite: 'assets/animals/kite.glb.gz.txt' },
+};
+const SOUNDS = ['horn_car', 'horn_beep', 'horn_truck', 'horn_truck_short', 'dog_bark', 'dog_bark2', 'crow', 'cow_moo', 'temple_bells',
+  'auto_start', 'car_idle', 'diesel_idle', 'amb_street', 'amb_auto_ride', 'amb_traffic'];
+
+async function main() {
+  if (!document.createElement('canvas').getContext('webgl2')) throw new Error('This browser has no WebGL 2. NH48 needs a recent Chrome, Edge, Firefox or Safari.');
+  const quality = pickQuality();
+  const canvas = document.getElementById('gl');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false, depth: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatio));
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  renderer.shadowMap.enabled = quality.shadows;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.info.autoReset = false;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.3, quality.far);
+
+  const fill = document.getElementById('ld-fill'), msg = document.getElementById('ld-msg');
+  let shownF = 0;
+  const progress = async (text, f) => {
+    if (text && msg) msg.textContent = text;
+    if (f != null) { shownF = Math.max(shownF, f); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; }
+    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+  };
+
+  // ---- downloads (0 .. 0.6 of the bar)
+  let manifest = {};
+  try { manifest = JSON.parse(document.getElementById('manifest').textContent); } catch (e) { /* dev */ }
+  const loader = new Loader((f) => { shownF = Math.max(shownF, f * 0.6); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
+  for (const v of Object.values(ASSETS)) for (const u of typeof v === 'string' ? [v] : Object.values(v)) loader.expect(u, manifest[u] || 1e6);
+  const sndUrl = (n) => `assets/snd/${n}.mp3`;
+  for (const n of SOUNDS) loader.expect(sndUrl(n), manifest[sndUrl(n)] || 5e4);
+  const VOICE_BIN = 'assets/voices.mp3';
+  loader.expect(VOICE_BIN, manifest[VOICE_BIN] || 1.2e6);
+  await progress('Downloading Pune', 0.01);
+  const sounds = {};
+  const sndJob = Promise.all([...SOUNDS.map(async (n) => {
+    try { const b = await loader.bytes(sndUrl(n)); sounds[n] = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); } catch (e) { /* plays without it */ }
+  }), (async () => {
+    // all voice lines in one file; the manifest says where each one starts
+    try {
+      const b = await loader.bytes(VOICE_BIN), idx = manifest.__voices || {};
+      for (const [id, [off, len]] of Object.entries(idx)) sounds['v_' + id] = b.buffer.slice(b.byteOffset + off, b.byteOffset + off + len);
+    } catch (e) { /* silent dialogue */ }
+  })()]);
+  const [M, gAlb, gNrm, gArm, wAlb, wNrm, wArm, bark, barkN, palm] = await Promise.all([
+    loader.json(ASSETS.map), loader.bitmap(ASSETS.gAlb), loader.bitmap(ASSETS.gNrm), loader.bitmap(ASSETS.gArm),
+    loader.bitmap(ASSETS.wAlb), loader.bitmap(ASSETS.wNrm), loader.bitmap(ASSETS.wArm),
+    loader.bitmap(ASSETS.bark), loader.bitmap(ASSETS.barkN), loader.bitmap(ASSETS.palm)]);
+  await sndJob;
+  let kit = null;
+  try { const [gm, gf] = await Promise.all([loader.gltf(ASSETS.peopleM), loader.gltf(ASSETS.peopleF)]); kit = new HumanKit(gm, gf); } catch (e) { console.warn('people models failed', e); }
+  let animalKit = null;
+  try {
+    const ents = Object.entries(ASSETS.animals);
+    const gl = await Promise.all(ents.map(([, u]) => loader.gltf(u).catch(() => null)));
+    animalKit = new AnimalKit(Object.fromEntries(ents.map(([k], i) => [k, gl[i]])));
+  } catch (e) { console.warn('animal models failed', e); }
+  await progress('Preparing materials', 0.62);
+  const tm = quality.texMax;
+  const T = {
+    groundAlb: stripToArray(gAlb, { srgb: true, maxSize: tm, anisotropy: 8 }), groundNrm: stripToArray(gNrm, { maxSize: tm, anisotropy: 8 }), groundArm: stripToArray(gArm, { maxSize: tm }),
+    wallAlb: stripToArray(wAlb, { srgb: true, maxSize: tm }), wallNrm: stripToArray(wNrm, { maxSize: tm }), wallArm: stripToArray(wArm, { maxSize: tm }),
+    bark: bitmapTexture(bark), barkN: bitmapTexture(barkN, { srgb: false }), palm: bitmapTexture(palm),
+  };
+  for (const b of [gAlb, gNrm, gArm, wAlb, wNrm, wArm]) b.close?.();
+  if (params.get('lab') === 'people' && kit) return runPeopleLab(renderer, quality, kit, params, animalKit);
+  if (params.get('lab') === 'trees') { renderer.info.autoReset = false; return runTreeLab(renderer, quality, T, params); }
+
+  const W = await buildWorld(M, T, renderer, scene, quality, (t, f) => progress(t, 0.62 + f * 0.2));
+  const sky = new Sky(renderer, scene);
+  sky.setShadows(quality.shadows, quality.shadowSize);
+  W.sky = sky;
+  const post = new Post(renderer, scene, camera, quality);
+  window.__W = W;
+
+  if (params.has('fly')) return runFly({ W, renderer, scene, camera, sky, post, quality, progress });
+
+  // ---- gameplay
+  const vmats = vehicleMaterials();
+  const auto = new PlayerAuto(W, scene, vmats);
+  const player = new Pilot({ W, scene, vmats, kit, auto });
+  W.kit = kit; W.animalKit = animalKit;
+  const traffic = new Traffic(W, scene, vmats, quality);
+  traffic.player = player;
+  const rig = new CameraRig(camera, W);
+  rig.traffic = traffic;
+  const input = new Input(canvas);
+  const game = new Game({ W, scene, camera, renderer, sky, player, traffic, rig, input, quality, params, QUALITY, vmats, post, sounds });
+  await game.init(progress);
+  // warm the chunks around the start before the first frame
+  await progress('Building the streets', 0.86);
+  const sx = player.x, sz = player.z;
+  W.streamer.warm(sx, sz, Math.min(260, quality.streamRadius), (k, n) => { shownF = Math.max(shownF, 0.86 + 0.1 * k / n); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
+  updateProps(W, sx, sz);
+  sky.update(game.hour, game.focus(), 0);
+  await progress('Compiling shaders', 0.98);
+  await renderer.compileAsync(scene, camera);
+  const onResize = () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    post.setSize(window.innerWidth, window.innerHeight);
+  };
+  window.addEventListener('resize', onResize);
+  onResize();
+  await progress('Ready', 1);
+  document.getElementById('loading').classList.add('done');
+
+  const frustum = new THREE.Frustum(), pv = new THREE.Matrix4();
+  const sphere = new THREE.Sphere(new THREE.Vector3(), 12);
+  const inView = (x, z) => { sphere.center.set(x, 4, z); return frustum.intersectsSphere(sphere); };
+  game.inView = inView;
+  let last = performance.now(), acc = 0, propT = 0, frames = 0;
+  const STEP = 1 / 60;
+  const fwd = new THREE.Vector3();
+  const perf = window.__perf = { n: 0, upd: 0, rnd: 0, worst: 0 };
+  function frame(now) {
+    const t0 = performance.now();
+    let dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    if (TEST) dt = 1 / 30;
+    renderer.info.reset();
+    // tests can simulate several frames per rendered frame (?simx=4) — software GL is slow
+    const simx = TEST ? Math.max(1, parseInt(params.get('simx') || '1')) : 1;
+    for (let k = 0; k < simx; k++) {
+      acc += dt;
+      let steps = 0;
+      while (acc >= STEP && steps < 6) { game.fixed(STEP); acc -= STEP; steps++; }
+      if (steps >= 6) acc = 0;
+      game.frame(dt);
+      if (k < simx - 1) { frames++; if (game.testDone(frames)) break; }
+    }
+    U.uTime.value += dt;
+    const focus = game.focus();
+    sky.update(game.hour, focus, dt);
+    renderer.toneMappingExposure *= EXPO;
+    U.uShopsOpen.value = game.hour > 22.8 || game.hour < 8.5 ? 0.25 : 1;
+    updateWorldMaterials(W);
+    camera.updateMatrixWorld();
+    pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    frustum.setFromProjectionMatrix(pv);
+    camera.getWorldDirection(fwd);
+    W.streamer.update(focus.x, focus.z, fwd);
+    propT -= dt;
+    if (propT <= 0) { updateProps(W, camera.position.x, camera.position.z); propT = 0.2; }
+    const t1 = performance.now();
+    post.render(dt);
+    const t2 = performance.now();
+    perf.n++; perf.upd += t1 - t0; perf.rnd += t2 - t1; perf.worst = Math.max(perf.worst, t1 - t0);
+    game.afterRender(dt, now);
+    frames++;
+    if (TEST && game.testDone(frames)) {
+      window.__stats = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures,
+        traffic: traffic.list.length, player: { x: +player.x.toFixed(1), z: +player.z.toFixed(1), v: +player.v.toFixed(2), th: +player.th.toFixed(2) }, ...game.testInfo() };
+      window.__shotReady = true;
+    }
+    requestAnimationFrame(frame);
+  }
+  window.__nh = {
+    stats: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures, chunks: W.streamer.built.size, traffic: traffic.list.length }),
+    setView: () => {}, setHour: (h) => game.setHour(h), play: (shift) => game.startPlay(!!shift), game,
+  };
+  requestAnimationFrame(frame);
+}
+
+// ---- free camera for checking the world: ?fly&at=x,z,height,yawDeg,pitchDeg&hour=16.5
+async function runFly({ W, renderer, scene, camera, sky, post, quality, progress }) {
+  const canvas = renderer.domElement;
+  const fill = document.getElementById('ld-fill');
+  const start = (params.get('at') || '-2530,380,2,0,-4').split(',').map(Number);
+  const cam = { x: start[0], z: start[1], y: start[2] ?? 2, yaw: (start[3] || 0) * Math.PI / 180, pitch: (start[4] || 0) * Math.PI / 180 };
+  let hour = +(params.get('hour') || 16.5);
+  const keys = new Set();
+  addEventListener('keydown', (e) => { keys.add(e.code); });
+  addEventListener('keyup', (e) => { keys.delete(e.code); });
+  let drag = null;
+  canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    cam.yaw -= (e.clientX - drag.x) * 0.004; cam.pitch = Math.max(-1.45, Math.min(1.45, cam.pitch - (e.clientY - drag.y) * 0.004));
+    drag = { x: e.clientX, y: e.clientY };
+  });
+  canvas.addEventListener('pointerup', () => { drag = null; });
+  const placeCamera = () => { camera.position.set(cam.x, cam.y, cam.z); camera.rotation.set(cam.pitch, cam.yaw, 0, 'YXZ'); camera.updateMatrixWorld(); };
+  placeCamera();
+  const warmR = Math.min(260, quality.streamRadius);
+  W.streamer.warm(cam.x, cam.z, warmR, (k, n) => { if (fill) fill.style.width = Math.round((0.82 + 0.16 * k / n) * 100) + '%'; });
+  updateProps(W, cam.x, cam.z);
+  sky.update(hour, camera.position, 0);
+  await progress('Compiling shaders', 0.99);
+  await renderer.compileAsync(scene, camera);
+  const onResize = () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); post.setSize(window.innerWidth, window.innerHeight); };
+  window.addEventListener('resize', onResize);
+  onResize();
+  await progress('Ready', 1);
+  document.getElementById('loading').classList.add('done');
+  const dev = document.createElement('div');
+  dev.className = 'dev';
+  if (!TEST) document.getElementById('ui').appendChild(dev);
+  let pending = 0;
+  window.__nh = {
+    setView: (x, z, y, yawDeg, pitchDeg) => { Object.assign(cam, { x, z, y, yaw: yawDeg * Math.PI / 180, pitch: pitchDeg * Math.PI / 180 }); placeCamera(); W.streamer.warm(x, z, warmR); updateProps(W, x, z); },
+    setHour: (h) => { hour = h; },
+    pending: () => pending,
+    stats: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures, chunks: W.streamer.built.size }),
+  };
+  let last = performance.now(), propT = 0, frames = 0, fpsAcc = 0, fpsN = 0;
+  const fwd = new THREE.Vector3();
+  function frame(now) {
+    let dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    if (TEST) dt = 1 / 30;
+    renderer.info.reset();
+    const sp = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 60 : 14) * dt;
+    const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw);
+    if (keys.has('KeyW')) { cam.x += fx * sp; cam.z += fz * sp; }
+    if (keys.has('KeyS')) { cam.x -= fx * sp; cam.z -= fz * sp; }
+    if (keys.has('KeyA')) { cam.x += fz * sp; cam.z -= fx * sp; }
+    if (keys.has('KeyD')) { cam.x -= fz * sp; cam.z += fx * sp; }
+    if (keys.has('KeyE')) cam.y += sp;
+    if (keys.has('KeyQ')) cam.y = Math.max(0.6, cam.y - sp);
+    if (keys.has('BracketRight')) hour = (hour + dt * 1.5) % 24;
+    if (keys.has('BracketLeft')) hour = (hour - dt * 1.5 + 24) % 24;
+    placeCamera();
+    U.uTime.value += dt;
+    sky.update(hour, camera.position, dt);
+    renderer.toneMappingExposure *= EXPO;
+    U.uShopsOpen.value = hour > 22.8 || hour < 8.5 ? 0.25 : 1;
+    updateWorldMaterials(W);
+    camera.getWorldDirection(fwd);
+    pending = W.streamer.update(cam.x, cam.z, fwd);
+    propT -= dt;
+    if (propT <= 0) { updateProps(W, cam.x, cam.z); propT = 0.25; }
+    post.render(dt);
+    frames++; fpsAcc += dt; fpsN++;
+    if (fpsAcc > 0.5) {
+      const fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0;
+      const i = renderer.info;
+      dev.textContent = `NH48 fly · ${quality.name} · ${GPU}\n${fps.toFixed(0)} fps · ${i.render.calls} calls · ${(i.render.triangles / 1e6).toFixed(2)}M tris\n` +
+        `chunks ${W.streamer.built.size} · queue ${pending} · last ${W.streamer.stats.ms.toFixed(1)} ms\n` +
+        `x ${cam.x.toFixed(0)} z ${cam.z.toFixed(0)} · ${Math.floor(hour)}:${String(Math.floor(hour % 1 * 60)).padStart(2, '0')}\nWASD fly · Q/E down/up · Shift fast · [ ] time`;
+    }
+    if (TEST && frames === 3) window.__shotReady = true;
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+main().catch((e) => {
+  console.error(e);
+  const m = document.getElementById('ld-msg');
+  if (m) { m.className = 'ld-err'; m.textContent = 'Something went wrong while loading: ' + (e && e.message ? e.message : e); }
+  window.__error = String(e && e.stack || e);
+});

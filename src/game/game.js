@@ -1,0 +1,506 @@
+// Game flow: title → shift (rides) or free roam; per-frame updates; events → feedback;
+// signals, challans, street names; pause/map/settings; adaptive resolution.
+import * as THREE from 'three';
+import { clamp, lerp, RNG, safeStorage, wrapAngle, damp } from '../core/util.js';
+import { HUD, buildMinimap } from '../ui/hud.js';
+import { Rides } from './rides.js';
+import { Audio } from './audio.js';
+import { People } from '../people/peds.js';
+import { buildParked } from '../traffic/parked.js';
+import { Police } from './police.js';
+import { Crowd } from '../people/crowd.js';
+import { Fauna } from '../people/animals.js';
+
+export class Game {
+  constructor(ctx) {
+    Object.assign(this, ctx);
+    this.hour = parseFloat(this.params.get('hour') || '15.75');
+    this.timeScale = 1 / 180;        // game hours per real second (1 h = 3 min)
+    this.state = 'title';
+    this.clock = 0;                  // game hours since the save began (never wraps)
+    this.viewScale = 1;
+    this.t = 0;
+    this.rng = new RNG(1);
+    this.qualityName = this.quality.name;
+    // a preset the player chose (or a ?q= test override) is never changed automatically
+    const st0 = safeStorage();
+    let saved = null; try { saved = st0 && st0.getItem('nh48_quality'); } catch (e) { /* ignore */ }
+    this.userQuality = !!(this.params.get('q') || saved);
+    this.stats = { money: 0, rides: 0, starSum: 0, rating: 0 };
+    this.test = {
+      drive: parseFloat(this.params.get('drive') || '0'),
+      steer: parseFloat(this.params.get('steer') || '0'),
+      frames: parseInt(this.params.get('frames') || '4'),
+      cam: parseInt(this.params.get('cammode') || '0'),
+      brakeAfter: parseFloat(this.params.get('brakeafter') || '999'),
+      play: this.params.get('play'),
+      foot: parseFloat(this.params.get('foot') || '0'),
+      take: this.params.get('take'),
+    };
+    this.perf = { acc: 0, n: 0, slow: 0, fast: 0, pr: Math.min(window.devicePixelRatio || 1, this.quality.pixelRatio) };
+    this.timers = { street: 0, wrong: 0, sig: 0, finesCool: 0 };
+    this.lastJunction = -1;
+  }
+
+  async init(progress) {
+    const { W, player, traffic } = this;
+    const st = safeStorage();
+    if (st) { try { const s = JSON.parse(st.getItem('nh48_stats') || 'null'); if (s) Object.assign(this.stats, s); } catch (e) { /* ignore */ } }
+    const start = this.findStart(this.params.get('spawn') || 'FC Road');
+    player.reset(start.x, start.z, start.th);
+    this.start = start;
+    this.audio = new Audio(this.sounds);
+    // browsers only allow sound after a gesture: start on the first click or key anywhere
+    const unlock = () => { this.audio.start(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
+    window.addEventListener('pointerdown', unlock); window.addEventListener('keydown', unlock);
+    this.people = new People(W, this.scene, this.vmats.body, this.quality);
+    this.crowd = new Crowd(this.people, W.kit, this.scene, W, this.quality);
+    this.fauna = new Fauna(this.people, W.animalKit, this.scene, W);
+    this.traffic.peds = this.people;
+    this.minimap = buildMinimap(W);
+    this.hud = new HUD(this);
+    player.hud = this.hud; player.audio = this.audio;
+    this.rides = new Rides(this);
+    this.rides.enabled = false;
+    this.rig.setMode(this.test.cam);
+    this.placeCops();
+    this.police = new Police(this);
+    player.onRelease = (d) => this.police.release(d);
+    player.speak = (id, src) => this.police.say(id, src);
+    this.people.say = (id, src) => this.police.say(id, src);
+    this.buildLightPools();
+    const parked = buildParked(W, this.scene, this.vmats, this.quality);
+    W.instSets.push(...parked.sets);
+    this.traffic.setStatics(parked.statics);
+    await progress('Waking up the traffic', 0.94);
+    traffic.prefill(player.x, player.z);
+    for (let k = 0; k < 10; k++) this.people.update(0.1, player, null);
+    // keys
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Escape' || e.code === 'KeyP') { if (this.state === 'play' || this.state === 'pause') this.togglePause(); }
+      if (e.code === 'KeyM' && (this.state === 'play' || this.state === 'map')) this.toggleMap();
+      if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space')) this.startPlay(false);
+    });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'play') this.togglePause(true); });
+    // drag on the canvas orbits the camera a little
+    const cv = this.renderer.domElement;
+    let drag = null;
+    cv.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse' && e.button === 0) drag = { x: e.clientX, y: e.clientY }; });
+    window.addEventListener('pointermove', (e) => { if (drag) { this.rig.drag(e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; } });
+    window.addEventListener('pointerup', () => { drag = null; });
+    if (this.test.play) this.startPlay(this.test.play === 'shift');
+  }
+
+  findStart(roadName) {
+    const { W } = this;
+    const ids = new Set(W.graph.names.map((n, i) => (n[0] === roadName ? i : -1)).filter(i => i >= 0));
+    let edges = W.graph.edges.filter(e => ids.has(e.name) && e.len > 40);
+    if (!edges.length) edges = W.graph.edges.filter(e => e.rank >= 4 && e.len > 60);
+    edges.sort((a, b) => b.pts[1] - a.pts[1]);
+    const e = edges[Math.min(edges.length - 1, parseInt(this.params.get('ei') || '1'))];
+    const s = Math.min(e.len * 0.5, 30);
+    const t = W.graph.at(e, s);
+    const lat = e.oneway ? e.w / 2 - 1.8 : 1.8;
+    return { x: t[0] + t[3] * lat, z: t[1] - t[2] * lat, th: Math.atan2(t[3], t[2]) };
+  }
+  focus() { return this.state === 'title' ? this.camera.position : this.player.root.position; }
+
+  // ---------------------------------------------------------------- state changes
+  startPlay(shift) {
+    // drop focus from the menu button so Space (handbrake) can't press it again
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+    this.state = 'play';
+    this.audio.start();
+    if (shift && this.police.suspended) { shift = false; this.hud.toast('Licence suspended', 'No fares until it’s back — free roam only. Pay pending challans from the menu.', 'bad', 4); }
+    this.rides.setEnabled(shift);
+    this.hud.setPlaying(true);
+    this.rig.inited = false;
+    this.hud.toast(shift ? 'Shift started' : 'Free roam', shift ? 'People waving for an auto show up green on the map' : 'Deccan to Koregaon Park is open — M for the map', shift ? 'meter' : 'info', 3.6);
+  }
+  endShift() {
+    this.togglePause(false);
+    this.state = 'title';
+    this.rides.setEnabled(false);
+    this.hud.setPlaying(false);
+    this.audio.updateEngine(0, 0, false);
+    this.saveStats();
+  }
+  togglePause(force) {
+    const to = force !== undefined ? force : this.state !== 'pause';
+    if (to && this.state === 'play') { this.state = 'pause'; this.hud.pause.hidden = false; this.hud.syncPause(); this.audio.updateEngine(0, 0, false); this.audio.playerHorn(false); }
+    else if (!to && this.state === 'pause') {
+      this.state = 'play'; this.hud.pause.hidden = true;
+      if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+    }
+  }
+  toggleMap(force) {
+    const to = force !== undefined ? force : this.hud.bigmap.hidden;
+    if (to && this.state === 'play') { this.state = 'map'; this.hud.bigmap.hidden = false; this.audio.updateEngine(0, 0, false); }
+    else if (!to && this.state === 'map') { this.state = 'play'; this.hud.bigmap.hidden = true; }
+  }
+  setHour(h) { this.hour = h; }
+  setQuality(name, auto = false) {
+    const Q = this.QUALITY[name];
+    if (!Q) return;
+    if (!auto) {
+      this.userQuality = true;
+      const st = safeStorage();
+      if (st) try { st.setItem('nh48_quality', name); } catch (e) { /* ignore */ }
+    }
+    this.qualityName = name;
+    this.perf.pr = Math.min(window.devicePixelRatio || 1, Q.pixelRatio);
+    this.applyPixelRatio(this.perf.pr);
+    this.W.streamer.setRadius(Q.streamRadius);
+    this.traffic.max = Q.traffic; this.people.max = Math.min(Q.peds, this.people.cap - 120);
+    if (this.crowd) this.crowd.setQuality(Q);
+    if (Q.shadows !== this.renderer.shadowMap.enabled) {
+      this.renderer.shadowMap.enabled = Q.shadows;
+      this.sky.setShadows(Q.shadows, Q.shadowSize || 1024);
+      this.scene.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => (m.needsUpdate = true)); });
+    }
+    this.qualityNote = Q.texMax !== this.quality.texMax || Q.ao !== this.quality.ao ? 'Some changes (textures, ambient occlusion) apply after you reload the page.' : '';
+  }
+  applyPixelRatio(pr) {
+    this.renderer.setPixelRatio(pr);
+    if (this.post) this.post.setSize(window.innerWidth, window.innerHeight); else this.renderer.setSize(window.innerWidth, window.innerHeight, false);
+  }
+  saveStats() {
+    const st = safeStorage();
+    if (st) try { st.setItem('nh48_stats', JSON.stringify({ money: this.stats.money, rides: this.stats.rides, starSum: this.stats.starSum, rating: this.stats.rating })); } catch (e) { /* ignore */ }
+  }
+
+  objective() {
+    const r = this.rides, P = this.player;
+    if (P.tipped) return { main: 'Auto tipped over!', sub: 'Hold on… getting it back on three wheels', urgent: true };
+    if (!r.enabled) return { main: 'Free roam', sub: 'Esc for menu · M for map' };
+    const c = r.current;
+    if (c && c.state === 'boarding') return { main: `${c.name} is getting in…`, sub: '' };
+    if (c && c.state === 'onboard') {
+      const d = Math.hypot(c.dest.x - P.x, c.dest.z - P.z);
+      const left = Math.max(0, c.limit - c.elapsed);
+      return { main: `Drop at ${c.dest.name}`, sub: `${d > 950 ? (d / 1000).toFixed(1) + ' km' : Math.round(d / 10) * 10 + ' m'} away · ${left > 0 ? Math.ceil(left) + ' s left for a tip' : 'running late'}`, urgent: left <= 0 };
+    }
+    const n = r.offers.length;
+    if (!n) return { main: 'Looking for passengers…', sub: 'Keep driving' };
+    let near = Infinity;
+    for (const o of r.offers) near = Math.min(near, Math.hypot(o.p.x - P.x, o.p.z - P.z));
+    return { main: `${n} ${n === 1 ? 'person is' : 'people are'} waving for an auto`, sub: `Nearest ${Math.round(near / 10) * 10} m · stop next to them to pick up` };
+  }
+
+  // ---------------------------------------------------------------- simulation
+  fixed(dt) {
+    if (this.state !== 'play') return;
+    const inp = this.input.poll(dt);
+    if (this.params.has('test')) {
+      const tt = this.t, T = this.test;
+      const d0 = T.foot ? T.foot + 0.4 : 0;           // driving starts after the on-foot part
+      const driving = tt >= d0 && tt < d0 + T.drive;
+      inp.throttle = driving ? 1 : 0;
+      inp.brake = tt > T.brakeAfter ? 1 : 0;
+      inp.steer = driving ? T.steer : 0;
+      if (T.foot) this.testFoot(tt);
+      if (this.params.get('police')) this.testPolice(tt);
+    }
+    // a police stop holds you in place
+    if (this.police.holding()) { inp.throttle = 0; inp.brake = Math.abs(this.player.v) > 0.5 ? 1 : 0; inp.steer = 0; inp.handbrake = true; inp.horn = false; }
+    this.player.update(dt, inp, this.traffic, this.input, this.rig.footMode ? this.rig.footYaw : undefined);
+    this.t += dt;
+    this.handleEvents();
+  }
+  // test script: hop out, walk forward, then take a vehicle (parked / traffic / auto)
+  testFoot(tt) {
+    const T = this.test, P = this.player;
+    if (tt > 0.2 && !this._footOut) { this._footOut = true; P.exit(this.traffic); }
+    if (tt > 0.2 && tt < T.foot) this.input.keys.add('KeyW'); else this.input.keys.delete('KeyW');
+    if (!T.take || this._took || tt < T.foot) return;
+    this._took = true;
+    let offer = null;
+    if (T.take === 'parked') {
+      let best = null, bd = 80;
+      for (const r of this.W.parkedList || []) { const d = Math.hypot(r.x - P.x, r.z - P.z); if (d < bd && !r.taken && (!this.params.get('kind') || r.kind === this.params.get('kind'))) { bd = d; best = r; } }
+      if (best) offer = { kind: 'parked', r: best };
+    } else if (T.take === 'traffic') {
+      let best = null, bd = 80;
+      for (const o of this.traffic.list) { if (!o.T || o.isPlayer) continue; const d = Math.hypot(o.x - P.x, o.z - P.z); if (d < bd) { bd = d; best = o; } }
+      if (best) { best.v = 0; offer = { kind: 'traffic', o: best }; }
+    } else offer = P.offer;
+    if (offer) {
+      const tx = offer.r ? offer.r.x : offer.o ? offer.o.x : P.x, tz = offer.r ? offer.r.z : offer.o ? offer.o.z : P.z;
+      P.foot.x = tx + 1.5; P.foot.z = tz;
+      P.enter(offer, this.traffic);
+    }
+    console.log('test take', T.take, offer ? offer.kind : 'none', P.vehicleLabel());
+  }
+  // test script for the police: ?police=stop&pick=1  or  ?police=heat
+  testPolice(tt) {
+    const mode = this.params.get('police'), pol = this.police, P = this.player;
+    if (tt > 0.3 && !this._polT) {
+      this._polT = 1;
+      if (mode === 'stop') {
+        let best = null, bd = 1e9;
+        for (const c of pol.cops) { const d = Math.hypot(c.x - P.x, c.z - P.z); if (d < bd) { bd = d; best = c; } }
+        const sp = pol.kerbSpot(best.x, best.z);
+        P.reset(sp.x, sp.z, sp.th);
+        pol.beginStop(best, this.params.get('kind') || 'signal', {});
+        console.log('test stop with', best.name, 'dist', bd.toFixed(0));
+      } else if (mode === 'heat') { pol.raiseHeat(+(this.params.get('lvl') || 2), 'test'); }
+      else if (mode === 'echallan') { pol.offence('signal', P.x, P.z, { cop: false, camChance: 1, how: 'signal camera' }); pol.addDue('signal', 1500, 'test'); }
+    }
+    if (mode === 'heat' && Math.floor(tt) !== Math.floor(tt - 1 / 60)) {
+      console.log('t', tt.toFixed(0), 'heat', pol.heat, pol.marshals.map(m => `d=${Math.hypot(m.veh.x - P.x, m.veh.z - P.z).toFixed(0)} v=${m.veh.v.toFixed(1)} sees=${m.sees} route=${m.route ? m.route.length / 2 : 0} stuck=${m.stuckT.toFixed(1)} hit=${m.lastHit || '-'} at=${m.veh.x.toFixed(0)},${m.veh.z.toFixed(0)} foot=${m.veh.onFootpath}`).join(' | '));
+    }
+    const pick = parseInt(this.params.get('pick') || '0');
+    if (pick && pol.stop && pol.stop.phase === 'talk' && pol.stop.t > 1.5) pol.choose(pick - 1);
+  }
+  handleEvents() {
+    const P = this.player;
+    const evs = [...this.player.events, ...this.people.events];
+    this.people.events.length = 0;
+    for (const ev of evs) {
+      if (ev.type === 'crash') {
+        this.rig.shake(Math.min(0.5, ev.speed * 0.06)); this.audio.crash(Math.min(1, ev.speed / 8));
+        if (ev.kind === 3) this.hud.toast('End of the shift area', 'Turn back — the map ends here', 'warn', 2);
+      }
+      if (ev.type === 'scrape') this.audio.thud(0.15);
+      if (ev.type === 'bark' || ev.type === 'dogChase') { const d = Math.hypot(ev.x - P.x, ev.z - P.z); if (d < 60) this.audio.bark(Math.min(0.9, 12 / (d + 6))); }
+      if (ev.type === 'dogChase' && (this._dogT || 0) < this.t) { this._dogT = this.t + 30; this.hud.toast('A street dog is chasing you', 'Classic. Keep going — it’ll give up.', 'info', 2.4); }
+      if (ev.type === 'bump') { this.rig.shake(Math.min(0.25, ev.strength * 0.03)); this.audio.thud(Math.min(0.6, ev.strength * 0.12)); }
+      if (ev.type === 'tip') { this.rig.shake(0.5); this.audio.crash(0.8); this.hud.toast('Auto tipped over!', 'Corner slower — autos lift a wheel easily', 'warn', 3); }
+      if (ev.type === 'hit') { this.audio.crash(Math.min(1, ev.speed / 6)); }
+      if (ev.type === 'knock') { this.audio.crash(0.7); this.hud.toast('You knocked over a two-wheeler', 'They’re fine. Very, very angry, but fine.', 'warn', 2.6); }
+      if (ev.type === 'pedHit') { this.audio.thud(0.4); this.hud.toast('Watch the pedestrians!', 'They’re fine, just furious', 'warn', 2.4); this.stats.money = Math.max(0, this.stats.money - 50); }
+      if (ev.type === 'dodge') { if (this.rng.chance(0.35) && (this._dodgeT || 0) < this.t) { this._dodgeT = this.t + 4; this.police.say(this.rng.pick(['d1', 'd2', 'd3', 'd4']), ev); } }
+      if (ev.type === 'recovered') this.hud.toast('Back on three wheels', '', 'info', 1.6);
+      if (ev.type === 'gotHit') { this.audio.thud(0.6); this.rig.shake(0.4); this.hud.toast('Knocked down', 'Traffic doesn\u2019t stop for pedestrians here. Stay on the footpath.', 'bad', 3); }
+      if (ev.type === 'carjack') { this.audio.crash(0.2); }
+      if (ev.type === 'exit' && this.state === 'play' && (this._parkHintT || 0) < this.t && this.W.surf.isRoad(P.cur.x, P.cur.z)) {
+        const near = this.W.graph.nearest(P.cur.x, P.cur.z, 12);
+        if (near && near.e.rank >= 4) { this._parkHintT = this.t + 120; this.hud.toast('No parking on main roads', 'Pune’s tow vans are quick. Side lanes are safer.', 'warn', 3.2); }
+      }
+      if (ev.type === 'enter' && ev.vehicle && this.state === 'play') { const S = this.player.spec; if (S) this.hud.toast(S.name, `${S.model} \u00b7 top speed ~${Math.round(S.vTop * 3.6 * 0.9)} km/h`, 'info', 2.4); }
+      if (this.rides) this.rides.onEvent(ev);
+      this.police.onEvent(ev);
+      // accidents draw a crowd
+      if (ev.type === 'pedHit' || ev.type === 'knock' || ev.type === 'gotHit' || ev.type === 'pedBumped' || (ev.type === 'crash' && ev.speed > 6 && ev.kind !== 3)) {
+        if ((this._gatherT || 0) < this.t) { this._gatherT = this.t + 8; this.people.gather(ev.x ?? P.x, ev.z ?? P.z, ev.type === 'crash' ? 3 : 5); }
+      }
+    }
+  }
+
+  frame(dt) {
+    const P = this.player;
+    if (this.state === 'play') { this.hour = (this.hour + dt * this.timeScale) % 24; this.clock += dt * this.timeScale; }
+    const live = this.state === 'play' || this.state === 'title';
+    if (live) {
+      this.traffic.cam.copy(this.camera.position);
+      this.traffic.update(Math.min(dt, 0.05), P.x, P.z, this.inView);
+      this.people.update(Math.min(dt, 0.05), P, this.inView);
+    }
+    if (this.state === 'play') {
+      this.rides.update(dt);
+      this.police.update(dt);
+      if (this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);
+      this.rig.lookBack = this.input.key('KeyB');
+      if (this.input.took('KeyR') && P.tipped === 0 && !P.onFoot) this.backOnRoad();
+      this.checkRoad(dt);
+      this.rig.update(dt, P);
+      const S = P.spec;
+      const kind = !S ? 'none' : P.inAuto ? 'auto' : S.two ? 'two' : S.L > 6 ? 'bus' : 'car';
+      this.audio.updateEngine(P.rpm, P.throttle, kind !== 'none', kind);
+      const horn = this.input.state.horn && !P.onFoot;
+      this.audio.playerHorn(horn, S ? S.honk : 'auto');
+      if (horn) { this.hornScare(); this.police.honked(); if ((this._pedHornT = (this._pedHornT || 0) - dt) <= 0) { this._pedHornT = 0.5; this.people.onHorn(P); } }
+      if (P.offer && P.onFoot) this.hud.prompt(P.offer.key, P.offer.label, 0.3);
+      else if (!P.onFoot && Math.abs(P.v) < 1 && this.state === 'play') this.hud.prompt('F', P.inAuto ? 'Get out of the auto' : 'Get off', 0.3);
+      this.playHonks();
+      this.audio.updateAmbient(Math.min(1, this.traffic.list.length / 100), this.sky.state ? this.sky.state.night : 0, P.inAuto ? Math.abs(P.v) : 0);
+    } else if (this.state === 'title') {
+      // slow orbit around the auto
+      P.setCockpit(false); this.rig.setNear(0.3);
+      this.camera.up.set(0, 1, 0);
+      const a = performance.now() / 1000 * 0.05 + 2.3;
+      const r = 11;
+      this.camera.position.set(P.x + Math.cos(a) * r, 3.2 + Math.sin(a * 0.7) * 0.5, P.z + Math.sin(a) * r);
+      this.camera.lookAt(P.x - Math.cos(a) * 6, 2.2, P.z - Math.sin(a) * 6);
+      if (this.camera.fov !== 50) { this.camera.fov = 50; this.camera.updateProjectionMatrix(); }
+      this.traffic.honks.length = 0;
+    }
+    if (this.state !== 'play') this.input.poll(dt);
+    // signals: lamp colours (4 Hz)
+    this.timers.sig -= dt;
+    if (this.timers.sig <= 0) { this.timers.sig = 0.25; this.updateSignalLamps(); }
+    // night lights
+    const night = this.sky.state ? this.sky.state.night : 0;
+    P.headlight.intensity = night * 24;
+    if (this.lightPools) { this.lightPools.mesh.visible = night > 0.05; this.lightPools.mesh.material.opacity = night * 0.55; }
+    this.people.render(P.x, P.z);
+    if (this.crowd) this.crowd.update(dt, this.camera.position.x, this.camera.position.z);
+    if (this.fauna) this.fauna.update(Math.min(dt, 0.05), this.camera.position.x, this.camera.position.z);
+    if (this.state === 'play' || this.state === 'pause' || this.state === 'map') this.hud.update(dt);
+    this.input.endFrame();
+  }
+
+  backOnRoad() {
+    const near = this.W.graph.nearest(this.player.x, this.player.z, 120, e => e.rank >= 2);
+    if (!near) return;
+    const e = near.e;
+    const t = this.W.graph.at(e, near.s);
+    const lat = e.oneway ? e.w / 2 - 1.6 : 1.6;
+    if (this.player.cur && this.player.cur !== this.player.auto) this.player.cur.reset(t[0] + t[3] * lat, t[1] - t[2] * lat, Math.atan2(t[3], t[2]));
+    else this.player.reset(t[0] + t[3] * lat, t[1] - t[2] * lat, Math.atan2(t[3], t[2]));
+    this.hud.toast('Back on the road', '', 'info', 1.4);
+  }
+
+  // street names, wrong way, red lights
+  checkRoad(dt) {
+    const P = this.player, G = this.W.graph;
+    this.timers.street -= dt; this.timers.wrong -= dt; this.timers.finesCool -= dt;
+    if (this.timers.street > 0) return;
+    this.timers.street = 0.4;
+    const near = G.nearest(P.x, P.z, 14);
+    if (!near) return;
+    const e = near.e;
+    const nm = G.names[e.name];
+    if (nm && nm[0]) this.hud.showStreet(nm[1], nm[0]);
+    const t = G.at(e, near.s);
+    const hx = Math.cos(P.th), hz = Math.sin(P.th);
+    const dot = hx * t[2] + hz * t[3];
+    if (e.oneway && dot < -0.5 && P.v > 3 && this.timers.wrong <= 0 && !P.onFoot) {
+      this.timers.wrong = 6;
+      this.police.offence('wrong', P.x, P.z, { camChance: e.rank >= 4 ? 0.2 : 0, how: 'junction camera', missed: ['Wrong side of a one-way', 'Very Pune. Also very dangerous.'] });
+      this.rides.onEvent({ type: 'wrongway' });
+    }
+    // red light: entering a signalised junction while our approach is red
+    for (const nd of [G.nodes[e.a], G.nodes[e.b]]) {
+      if (!nd.signal) continue;
+      const d = Math.hypot(nd.x - P.x, nd.z - P.z);
+      if (d < nd.jr && this.lastJunction !== nd.i) {
+        this.lastJunction = nd.i;
+        const st = this.traffic.signals.stateForAngle(nd.i, Math.atan2(hz, hx));
+        const pol = this.police;
+        if (P.v > 3 && !P.onFoot) {
+          if (st === 'r') pol.offence('signal', nd.x, nd.z, { camChance: 0.35, how: 'signal camera', missed: ['Jumped a red light', 'Nobody saw. This time.'] });
+          else if (st === 'a') {
+            // strict officers stop you for amber too — and then you can argue, and be right
+            const cop = pol.copSeeing(nd.x, nd.z, 40);
+            if (cop && cop.mood < 0.3) pol.offence('signal', nd.x, nd.z, { amber: true, stopChance: 1 });
+          }
+          // helmet cameras at signals (two-wheelers without a helmet)
+          const S = P.spec;
+          if (S && S.helmet && P.cur && !P.cur.helmet) pol.offence('helmet', nd.x, nd.z, { camChance: 0.3, how: 'ITMS helmet camera', stopChance: 0.7 });
+        }
+      }
+      if (d > nd.jr + 8 && this.lastJunction === nd.i) this.lastJunction = -1;
+    }
+  }
+
+  hornScare() {
+    // honking makes the vehicles right in front edge aside (sometimes)
+    const P = this.player;
+    if ((this._hornT = (this._hornT || 0) - 1 / 60) > 0) return;
+    this._hornT = 0.4;
+    const hx = Math.cos(P.th), hz = Math.sin(P.th);
+    this.traffic.near(P.x + hx * 8, P.z + hz * 8, 9, (o) => {
+      if (!o.T || o.jc) return;
+      const along = (o.x - P.x) * hx + (o.z - P.z) * hz;
+      if (along < 0 || along > 18) return;
+      if (this.rng.next() < 0.6) {
+        const side = -(o.x - P.x) * hz + (o.z - P.z) * hx;
+        o.latT = o.lat + (side > 0 ? -1 : 1) * 1.2;
+      }
+    });
+  }
+  playHonks() {
+    const P = this.player, A = this.audio;
+    const hx = Math.cos(P.th), hz = Math.sin(P.th);
+    let n = 0;
+    for (const h of this.traffic.honks) {
+      const dx = h.x - P.x, dz = h.z - P.z, d = Math.hypot(dx, dz);
+      if (d > 90 || n > 2) continue;
+      const side = (-dx * hz + dz * hx) / (d || 1);
+      A.horn(h.kind, Math.min(1, 9 / (d + 6)), side, h.n || 1);
+      n++;
+    }
+    this.traffic.honks.length = 0;
+  }
+
+  // ---------------------------------------------------------------- signals & extras
+  updateSignalLamps() {
+    const heads = this.W.signalHeads, bulbs = this.W.signalBulbs, S = this.traffic.signals;
+    if (!heads) return;
+    const ON = [[1.0, 0.08, 0.04], [1.0, 0.6, 0.0], [0.15, 1.0, 0.35]];
+    const OFF = [[0.18, 0.03, 0.02], [0.16, 0.1, 0.0], [0.02, 0.12, 0.05]];
+    for (const h of heads) {
+      const st = S.stateForAngle(h.node, Math.atan2(-h.dz, -h.dx)) || 'g';
+      const lit = st === 'r' ? 0 : st === 'a' ? 1 : 2;
+      for (let k = 0; k < 3; k++) {
+        const c = k === lit ? ON[k] : OFF[k];
+        bulbs.instanceColor.setXYZ(h.bulbs[k], c[0], c[1], c[2]);
+      }
+    }
+    bulbs.instanceColor.needsUpdate = true;
+  }
+  placeCops() {
+    this.cops = [];
+    const heads = this.W.signalHeads || [];
+    const used = new Set();
+    for (const h of heads) {
+      if (used.has(h.node) || this.rng.next() > 0.3) continue;
+      used.add(h.node);
+      this.cops.push({ x: h.x, z: h.z });
+    }
+    this.people.addCops(this.cops, heads);
+  }
+  buildLightPools() {
+    const pos = this.W.lampPositions || [];
+    if (!pos.length) return;
+    const tex = this.W.tex.decal;
+    const uv = this.W.decalUV(6);
+    const g = new THREE.PlaneGeometry(1, 1);
+    g.rotateX(-Math.PI / 2);
+    const uva = g.attributes.uv;
+    for (let i = 0; i < uva.count; i++) uva.setXY(i, uv[0] + uva.getX(i) * uv[2], uv[1] + uva.getY(i) * uv[2]);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, color: 0xffe0a8, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4 });
+    const mesh = new THREE.InstancedMesh(g, mat, pos.length);
+    const m = new THREE.Matrix4();
+    pos.forEach(([x, z], i) => { m.makeScale(11, 1, 11); m.setPosition(x, 0.05, z); mesh.setMatrixAt(i, m); });
+    mesh.frustumCulled = false; mesh.renderOrder = 2; mesh.visible = false;
+    this.scene.add(mesh);
+    this.lightPools = { mesh };
+  }
+
+  // adaptive resolution for weak GPUs
+  afterRender(dt) {
+    if (this.state !== 'play' || this.params.has('test')) return;
+    const p = this.perf;
+    p.acc += dt; p.n++;
+    if (p.acc >= 2) {
+      const fps = p.n / p.acc;
+      p.acc = 0; p.n = 0;
+      if (fps < 38) p.slow++; else p.slow = 0;
+      if (fps > 57) p.fast++; else p.fast = 0;
+      const maxPr = Math.min(window.devicePixelRatio || 1, this.QUALITY[this.qualityName].pixelRatio);
+      if (p.slow >= 1 && p.pr > 0.6) { p.pr = Math.max(0.6, p.pr - 0.12); this.applyPixelRatio(p.pr); p.slow = 0; }
+      else if (p.fast >= 3 && p.pr < maxPr) { p.pr = Math.min(maxPr, p.pr + 0.08); this.applyPixelRatio(p.pr); p.fast = 0; }
+      // still struggling at the lowest resolution: step the graphics preset down once per level
+      // (only when the player hasn't picked a preset themselves)
+      p.floor = (p.pr <= 0.61 && fps < 30) ? (p.floor || 0) + 1 : 0;
+      if (p.floor >= 2 && !this.userQuality && this.qualityName !== 'low') {
+        p.floor = 0;
+        const next = this.qualityName === 'high' ? 'med' : 'low';
+        this.setQuality(next, true);
+        p.pr = Math.min(window.devicePixelRatio || 1, this.QUALITY[next].pixelRatio, 0.85);
+        this.applyPixelRatio(p.pr);
+        this.hud.toast('Graphics lowered', 'Switched to ' + (next === 'med' ? 'Medium' : 'Low') + ' for smoother driving · change it in the menu', 'info', 3);
+      }
+    }
+  }
+  testDone(frames) {
+    const need = Math.max(this.test.frames, Math.ceil((this.test.drive + this.test.foot + 0.5) * 30));
+    return frames >= need && (frames === need || frames % 30 === 0);
+  }
+  testInfo() { const P = this.player, pol = this.police; return { hour: +this.hour.toFixed(2), state: this.state, peds: this.people.list.length, offers: this.rides.offers.length, mode: P.mode, offer: P.offer && P.offer.label, veh: P.vehicleLabel && P.vehicleLabel(), heat: pol.heat, dues: pol.duesTotal, stop: pol.stop && pol.stop.phase, marshals: pol.marshals.length,
+    crowd: this.crowd ? { pool: this.crowd.pool.length, used: this.crowd.pool.filter(s => s.p).length, vis: this.crowd.pool.filter(s => s.p && s.H.holder.visible).map(s => [+(s.H.holder.position.x - P.x).toFixed(1), +(s.H.holder.position.z - P.z).toFixed(1), s.p.mode]) } : null,
+    near: this.people.list.map(p => Math.hypot(p.x - P.x, p.z - P.z)).sort((a, b) => a - b).slice(0, 6).map(d => +d.toFixed(0)),
+    modes: this.people.list.reduce((m, p) => (m[p.mode] = (m[p.mode] || 0) + 1, m), {}) }; }
+}
