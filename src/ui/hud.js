@@ -123,7 +123,7 @@ export class HUD {
             <span><span class="kbd">Space</span> handbrake</span><span><span class="kbd">H</span> horn</span>
             <span><span class="kbd">F</span> get out / take a vehicle</span><span><span class="kbd">C</span> camera</span><span><span class="kbd">M</span> map</span><span><span class="kbd">Esc</span> pause</span>
           </span>
-          <span>Map data © OpenStreetMap contributors (ODbL). Businesses are fictional parodies.</span>
+          <span>Map data © OpenStreetMap contributors (ODbL) and Overture Maps Foundation. Businesses are fictional parodies.</span>
         </div>
       </div>`;
     this.root.appendChild(t);
@@ -191,7 +191,7 @@ export class HUD {
             <span class="k"><span class="kbd">1</span><span class="kbd">4</span></span><span>Answer the police</span>
           </div></div>
         <button class="btn" id="p-title">Quit to title</button>
-        <div class="fine">Map data © OpenStreetMap contributors (ODbL). All business names are fictional parodies of real places. People and animals: Quaternius (CC0). Voices: Kokoro-82M (Apache-2.0) and Piper mr_IN, trained on Google’s crowdsourced Marathi speech (OpenSLR 64, CC BY-SA 4.0). Sounds: Freesound (CC0). Fines follow the MV Act as reported for Pune and may be out of date.</div>
+        <div class="fine">Map data © OpenStreetMap contributors (ODbL); buildings and places from Overture Maps Foundation (ODbL, CDLA-Permissive-2.0), including Google Open Buildings and Microsoft footprints. All business names are fictional parodies of real places. People and animals: Quaternius (CC0). Voices: Kokoro-82M (Apache-2.0) and Piper mr_IN, trained on Google’s crowdsourced Marathi speech (OpenSLR 64, CC BY-SA 4.0). Sounds: Freesound (CC0). Fines follow the MV Act as reported for Pune and may be out of date.</div>
       </div>`;
     this.root.appendChild(p);
     this.pause = p;
