@@ -2,6 +2,7 @@
 // taxis, tempos and the city bus. Same arcade core as the auto, tuned per class from real-world
 // figures (top speed, 0–60 feel, braking, turning circle), slowed by load, footpaths and potholes.
 import * as THREE from 'three';
+import { flyResolve, flyTrack, flyHeight } from '../world/flyover.js';
 import { buildScooter, buildBike, buildCycle, buildCar, buildBus, buildTempo, buildAuto, PAINTS } from './models.js';
 import { buildCarCockpit } from './cockpit.js';
 import { clamp, lerp, wrapAngle } from '../core/util.js';
@@ -93,6 +94,7 @@ export class Vehicle {
     this.reset(0, 0, 0);
   }
   reset(x, z, th) {
+    this.deck = -1;
     Object.assign(this, { x, z, th, v: 0, vl: 0, w: 0, steer: 0, y: 0, vy: 0, pitch: 0, roll: 0, lean: 0, lift: 0, tipped: 0,
       gear: 1, rpm: 0.15, shiftT: 0, reverse: false, revT: 0, throttle: 0, brake: 0, prevH: [0, 0], onFootpath: false, load: 0 });
     this.sync();
@@ -111,7 +113,7 @@ export class Vehicle {
       if (Math.abs(across) < b.w / 2 + 0.2 && Math.abs(along) < 0.55) h = Math.max(h, 0.1 * Math.cos(along / 0.55 * Math.PI / 2) ** 2);
     }
     for (const p of W.potholeNear || []) { const d = Math.hypot(x - p.x, z - p.z); if (d < p.r) h -= 0.07 * (1 - d / p.r); }
-    return h;
+    return flyHeight(this, x, z, h);
   }
 
   update(dt, inp, traffic) {
@@ -171,8 +173,9 @@ export class Vehicle {
     // ---- integrate
     const hx = Math.cos(this.th), hz = Math.sin(this.th);
     this.x += (hx * this.v - hz * this.vl) * dt; this.z += (hz * this.v + hx * this.vl) * dt;
+    flyTrack(this);
     this.collideStatic();
-    if (traffic) this.collideTraffic(traffic);
+    if (traffic && !(this.deck >= 0 && this.y > 2.2)) this.collideTraffic(traffic);
     // ---- suspension
     const half = S.wb / 2;
     const hF = this.heightAt(this.x + hx * half, this.z + hz * half), hR = this.heightAt(this.x - hx * half, this.z - hz * half);
@@ -193,7 +196,7 @@ export class Vehicle {
     const hx = Math.cos(this.th), hz = Math.sin(this.th);
     for (let it = 0; it < 2; it++) for (const [o, r] of this.circles) {
       const cx = this.x + hx * o, cz = this.z + hz * o;
-      const res = this.W.collision.resolve(cx, cz, r);
+      const res = this.flyResolve(this, cx, cz, r);
       if (!res) continue;
       this.x += res.nx * res.depth; this.z += res.nz * res.depth;
       const vx = hx * this.v - hz * this.vl, vz = hz * this.v + hx * this.vl;

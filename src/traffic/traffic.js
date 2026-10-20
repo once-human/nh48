@@ -2,6 +2,7 @@
 // Vehicles follow the OSM road graph with a free lateral offset; IDM car-following
 // plus gap-seeking weaving for two-wheelers and autos.
 import * as THREE from 'three';
+import { TRAFFIC, curve } from '../world/activity.js';
 import { RNG, clamp, lerp, wrapAngle } from '../core/util.js';
 import { buildAuto, buildScooter, buildBike, buildCar, buildBus, buildTempo, buildCycle, buildLow, PAINTS } from '../vehicles/models.js';
 import { lin } from '../world/geo.js';
@@ -56,6 +57,7 @@ export class Traffic {
     this.peds = null;
     this.signals = new Signals(W);
     this.time = 0;
+    this.hour = 12;
     // build models + instanced meshes
     const models = {
       scooter: buildScooter({ helmet: true }), scooterP: buildScooter({ helmet: false, pillion: true, sideSaddle: true }),
@@ -104,11 +106,21 @@ export class Traffic {
   // ---------------------------------------------------------------- spawning
   pickType(link) {
     const main = link.e.rank >= 4;
+    const mix = this.mix();
     let tot = 0;
-    for (const k of TYPE_NAMES) { const t = TYPES[k]; if (t.mainOnly && !main) continue; tot += t.w; }
+    for (const k of TYPE_NAMES) { const t = TYPES[k]; if (t.mainOnly && !main) continue; tot += t.w * (mix[k] ?? 1); }
     let x = this.rng.next() * tot;
-    for (const k of TYPE_NAMES) { const t = TYPES[k]; if (t.mainOnly && !main) continue; x -= t.w; if (x <= 0) return k; }
+    for (const k of TYPE_NAMES) { const t = TYPES[k]; if (t.mainOnly && !main) continue; x -= t.w * (mix[k] ?? 1); if (x <= 0) return k; }
     return 'scooter';
+  }
+  // what is on the road by hour: PMPML buses stop around 11 pm, goods tempos run early morning,
+  // late at night it is cabs, autos and bikes
+  mix() {
+    const h = this.hour;
+    if (h >= 23.5 || h < 5) return { bus: 0.1, tempo: 0.5, cycle: 0.2, taxi: 3.5, auto: 1.3, scooterP: 0.6, suv: 1.4, sedan: 1.3 };
+    if (h < 7) return { bus: 0.6, tempo: 1.8, cycle: 2.5, taxi: 1.5 };
+    if (h >= 21) return { bus: 0.6, taxi: 2.2, tempo: 0.6, cycle: 0.5, auto: 1.15 };
+    return {};
   }
   randomLink(px, pz, rMin, rMax) {
     const edges = this.graph.edges;
@@ -242,9 +254,15 @@ export class Traffic {
       const d = Math.hypot(v.x - px, v.z - pz);
       if (d > 300 || !v.alive) this.despawn(i);
     }
+    // fewer vehicles at 3 am than at 6 pm; the far ones drop out as it thins
+    const target = Math.round(this.max * curve(TRAFFIC, this.hour));
+    for (let i = this.list.length - 1; i >= 0 && this.list.length > target * 1.1; i--) {
+      const v = this.list[i];
+      if (Math.hypot(v.x - px, v.z - pz) > 150 && (!avoidView || !avoidView(v.x, v.z))) this.despawn(i);
+    }
     let tries = 8;
-    while (this.list.length < this.max && tries-- > 0) {
-      const urgent = this.list.length < this.max * 0.5;
+    while (this.list.length < target && tries-- > 0) {
+      const urgent = this.list.length < target * 0.5;
       this.spawn(px, pz, urgent ? 25 : 80, 240, urgent ? null : avoidView);
     }
     this.buildGrid();
@@ -252,7 +270,8 @@ export class Traffic {
     this.render();
   }
   prefill(px, pz) {
-    for (let k = 0; k < this.max * 6 && this.list.length < this.max; k++) this.spawn(px, pz, 22, 240, null);
+    const target = Math.round(this.max * curve(TRAFFIC, this.hour));
+    for (let k = 0; k < this.max * 6 && this.list.length < target; k++) this.spawn(px, pz, 22, 240, null);
     // let them settle
     for (let k = 0; k < 40; k++) { this.buildGrid(); for (const v of this.list) this.step(v, 0.1); }
   }
@@ -269,7 +288,7 @@ export class Traffic {
       l.push(a);
     };
     for (const v of this.list) put(v);
-    if (this.player) put(this.player.agent);
+    if (this.player && !(this.player.y > 2.2)) put(this.player.agent);     // up on a flyover: not in the street's way
     if (this.extra) for (const a of this.extra) put(a);
     if (this.peds) for (const p of this.peds.roadAgents()) put(p);
     if (this.statics) {

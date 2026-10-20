@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { makeDecalTexture } from '../gfx/textures.js';
 import { makeSignAtlas, ensureFonts } from '../gfx/signs.js';
 import { Boards, NearBoards, ensureBoardFonts } from '../gfx/boards.js';
+import { Flyovers } from './flyover.js';
+import { Activity } from './activity.js';
 import { propMaterial, waterMaterial, U } from '../gfx/materials.js';
 import { groundMaterial, facadeMaterial, roofMaterial } from '../gfx/pbr.js';
 import { Graph, Surfaces, Collision } from './mapdata.js';
@@ -64,6 +66,8 @@ export async function buildWorld(M, T, renderer, scene, quality, progress) {
   W.signMats = new Set();           // per-chunk board materials (follow the night glow too)
   W.nearBoards = new NearBoards(renderer, scene, W.mats.sign, W.index ? W.index.shopNames : (M.shopNames || []));
   W.signMats.add(W.nearBoards.mat);
+  W.fly = new Flyovers(W, scene);
+  W.activity = new Activity(W.M);
   await progress('Laying out the roads', 0.2);
   prepareGroundGlobals(W);
   // static collision for the whole map (cheap 2D grid)

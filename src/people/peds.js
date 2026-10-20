@@ -110,7 +110,10 @@ export class People {
     this.max = quality.peds;
     this.list = []; this.animals = [];
     const P = buildParts();
-    const cap = this.cap = this.max + 120;      // + traffic police and passengers
+    // the crowd swells to 1.6x on FC Road at 7 pm or outside the Mills' bars at 11, and thins to a
+    // few people on a residential lane at 3 am (world/activity.js)
+    this.act = W.activity; this.target = this.max; this.actT = 0; this.actHere = 10; this.nightHere = 0;
+    const cap = this.cap = Math.ceil(this.max * 1.6) + 120;      // + traffic police and passengers
     this.mMale = instMesh(scene, P.male, mat, cap);
     this.mFemale = instMesh(scene, P.female, mat, cap);
     this.mLeg = instMesh(scene, P.leg, mat, cap * 2);
@@ -139,14 +142,15 @@ export class People {
   spawnOne(px, pz, rMin, rMax, avoidView, opts = {}) {
     // candidate streets near the player (refreshed every couple of seconds)
     if (!this._near || (this._nearT = (this._nearT || 0) - 1) <= 0 || Math.hypot(px - this._nearX, pz - this._nearZ) > 40) {
-      this._near = [...this.g.gridQuery(px, pz, 160)].filter(e => e.rank >= 2);
+      // lanes and compound roads too (the Mills, a KP lane of cafes), but only where real places draw people
+      this._near = [...this.g.gridQuery(px, pz, 160)].filter(e => e.rank >= 2 || (this.act && this.act.at(e.pts[0], e.pts[1]) > 6));
       this._nearT = 120; this._nearX = px; this._nearZ = pz;
     }
     const edges = this._near.length ? this._near : this.g.edges;
     for (let t = 0; t < 30; t++) {
       const e = edges[Math.floor(this.rng.next() * edges.length)];
-      if (e.rank < 2) continue;
-      if (this.rng.next() > 0.3 + e.rank * 0.14) continue;
+      if (e.rank < 2 && !this.act) continue;
+      if (this.rng.next() > 0.3 + Math.max(1, e.rank) * 0.14) continue;
       const s = this.rng.range(1, Math.max(1.1, e.len - 1));
       const side = this.rng.chance(0.5) ? 1 : -1;
       this.g.at(e, s, TMP);
@@ -155,6 +159,8 @@ export class People {
       const d = Math.hypot(x - px, z - pz);
       if (d < rMin || d > rMax) continue;
       if (avoidView && avoidView(x, z)) continue;
+      // more people where the real places are busy at this hour
+      if (this.act && this.rng.next() > clamp(this.act.at(x, z) / (this.actHere * 1.3 + 1), 0.12, 1)) continue;
       return this.make(e, s, side, opts);
     }
     return null;
@@ -245,14 +251,31 @@ export class People {
       if (Math.hypot(p.x - px, p.z - pz) > 150 || p.dead) { if (p.door) p.door.n--; if (p.body) p.body.release(); this.list[i] = this.list[this.list.length - 1]; this.list.pop(); }
     }
     // traffic police (fixed) and waiting passengers don't count towards the walking crowd
+    if (this.act && (this.actT -= dt) <= 0) {
+      this.actT = 2;
+      const o = {};
+      this.actHere = this.act.around(px, pz, 110);
+      this.act.at(px, pz, o); this.nightHere = o.night;
+      this.target = Math.round(this.max * clamp(Math.sqrt(this.actHere / 14), 0.15, 1.6));
+    }
     let tries = 5;
     let walkers = 0;
     for (const p of this.list) if (!p.fixed && !p.pax) walkers++;
-    while (walkers + (5 - tries) < this.max && tries-- > 0) {
-      const urgent = walkers < this.max * 0.5;
+    // thinning out (late at night): let the far ones go home
+    if (walkers > this.target * 1.15) {
+      for (let i = this.list.length - 1; i >= 0 && walkers > this.target * 1.15; i--) {
+        const p = this.list[i];
+        if (p.pax || p.fixed || p.body || Math.hypot(p.x - px, p.z - pz) < 70 || (avoidView && avoidView(p.x, p.z))) continue;
+        if (p.door) p.door.n--;
+        this.list[i] = this.list[this.list.length - 1]; this.list.pop(); walkers--;
+      }
+    }
+    while (walkers + (5 - tries) < this.target && tries-- > 0) {
+      const urgent = walkers < this.target * 0.5;
       // most people appear within ~100 m (out of view), so the street around you feels busy
       const p = this.spawnOne(px, pz, urgent ? 8 : 26, this.rng.chance(0.65) ? 90 : 140, urgent ? null : avoidView);
-      if (p && this.rng.chance(0.18)) { p.mode = 'stand'; p.wait = this.rng.range(15, 90); }
+      // outside the bars at night people stand around in groups rather than walk
+      if (p && this.rng.chance(0.18 + 0.55 * this.nightHere)) { p.mode = 'stand'; p.wait = this.rng.range(15, 90) * (1 + this.nightHere * 2); }
     }
     const pv = Math.abs(player.v);
     const phx = Math.cos(player.th), phz = Math.sin(player.th);
@@ -351,7 +374,7 @@ export class People {
     if (p.s < 0 || p.s > p.e.len) {
       const nodeIdx = p.s < 0 ? p.e.a : p.e.b;
       const node = this.g.nodes[nodeIdx];
-      const opts = [...node.out, ...node.inc].map(l => l.e).filter(e => e !== p.e && e.rank >= 2);
+      const opts = [...node.out, ...node.inc].map(l => l.e).filter(e => e !== p.e && (e.rank >= 2 || p.e.rank < 2 || (this.act && this.act.at(e.pts[0], e.pts[1]) > 6)));
       if (!opts.length || node.portal) { p.dir = -p.dir; p.s = clamp(p.s, 0, p.e.len); }
       else {
         const e = this.rng.pick(opts);

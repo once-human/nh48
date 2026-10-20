@@ -99,6 +99,8 @@ lm_names = {l[0].lower() for l in landmarks}
 for name, t, x, z, area in sorted(feats, key=lambda f: -f[4]):
     c = pcat(t)
     if not c: continue
+    # junk OSM names: private parking lots tagged as gardens, test edits ('asd', '3'), all-lowercase scribbles
+    if re.search(r'\bparking\b', name, re.I) or len(name.strip()) <= 3 or (c == 'park' and name == name.lower()): continue
     key = (name.lower(), c)
     if key in seen or name.lower() in lm_names: continue
     seen.add(key)

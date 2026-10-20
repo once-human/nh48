@@ -17,7 +17,7 @@ import json, math, os, re, sys, collections, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from shapely.geometry import Polygon, Point
 from shapely.strtree import STRtree
-from shopnames import board_name, _h
+from shopnames import board_name, pin_name, _h
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 MAP = os.path.join(ROOT, 'data/map.json')
@@ -109,7 +109,12 @@ BASIC = {'restaurant': 'food', 'casual_eatery': 'food', 'fast_food_restaurant': 
          'travel_service': 'travel', 'hotel': 'hotel', 'lodging': 'hotel', 'flowers_and_gifts_store': 'generic',
          'sporting_goods_store': 'shoes', 'arts_crafts_and_hobby_store': 'generic', 'specialty_store': 'generic',
          'vehicle_parts_store': 'hardware', 'gym': 'generic', 'warehouse_club_store': 'grocery', 'vision_or_eye_care_clinic': 'optician',
-         'diagnostics_imaging_or_lab_service': 'clinic', 'shopping': '?', 'grocery_store': 'grocery', 'convenience_store': 'grocery'}
+         'diagnostics_imaging_or_lab_service': 'clinic', 'shopping': '?', 'grocery_store': 'grocery', 'convenience_store': 'grocery',
+         'lounge': 'bar', 'dance_club': 'bar', 'nightclub': 'bar', 'pub': 'bar', 'brewery': 'bar', 'night_club': 'bar',
+         'cocktail_bar': 'bar', 'wine_bar': 'bar', 'hookah_bar': 'bar', 'sports_bar': 'bar', 'beer_bar': 'bar',
+         'dessert_shop': 'icecream', 'bakery': 'bakery', 'specialized_health_care': 'clinic', 'health_care': 'clinic',
+         'wellness_service': 'salon', 'pet_store': 'generic', 'furniture_store': 'hardware', 'auto_dealer': 'generic',
+         'vehicle_dealer': 'generic', 'automotive_service': 'hardware', 'tutoring_service': 'books', 'educational_service': 'books'}
 KW = [('jewel|saraf|gold|diamond|bangle', 'jewellery'), ('medical|chemist|pharma|drug', 'pharmacy'),
       ('mobile|telecom|cellular|phone', 'mobile'), ('saree|sari|cloth|textile|fashion|boutique|dress|garment|tailor|wear|collection|paithani', 'clothes'),
       ('foot|shoe|chappal|sandal', 'shoes'), ('electric|electronic|appliance|radio|computer', 'electronics'),
@@ -122,19 +127,25 @@ def kw_cat(name):
         if re.search(pat, low): return c
     return 'generic'
 
-cands = []      # dict(x, z, en, mr, cat, brand, src, pri)
-def add(x, z, raw, cat, src, conf):
-    r = board_name(raw, cat)
+cands = []      # dict(x, z, en, mr, cat, brand, src, pri, board)
+def add(x, z, raw, cat, src, conf, board=True):
+    r = board_name(raw, cat) if board else pin_name(raw)
+    if not r and board: r = pin_name(raw); board = False         # a real place, just not one for a shop board
     if not r: return
     en, mr, brand = r
-    if cat == 'atm' and not brand: return
-    cands.append(dict(x=x, z=z, en=en, mr=mr, cat=cat, brand=brand, src=src, pri=(2 if brand else 0) + (1 if src == 1 else 0) + conf))
+    if cat == 'atm' and not brand: board = False
+    cands.append(dict(x=x, z=z, en=en, mr=mr, cat=cat, brand=brand, src=src, board=board, raw=raw,
+                      pri=(2 if brand else 0) + (1 if src == 1 else 0) + conf))
 
 D = json.load(open(OSM))
 P = {int(k): proj(v[0], v[1]) for k, v in D['nodes'].items()}
+PIN_KEYS = ('amenity', 'shop', 'office', 'tourism', 'leisure', 'craft', 'healthcare', 'club')
 for k, (lat, lon, t) in D['nodes'].items():
-    c = osm_cat(t) if t.get('name') else None
+    if not t.get('name'): continue
+    c = osm_cat(t)
     if c: x, z = proj(lat, lon); add(x, z, t['name'], c, 1, 1.0)
+    elif any(kk in t for kk in PIN_KEYS) and t.get('amenity') not in ('police', 'hospital', 'place_of_worship', 'bus_station', 'parking', 'toilets', 'bench', 'waste_basket', 'drinking_water'):
+        x, z = proj(lat, lon); add(x, z, t['name'], 'service', 1, 1.0, board=False)
 for k, w in D['ways'].items():
     t = w.get('tags', {})
     c = osm_cat(t) if t.get('name') and 'highway' not in t else None
@@ -160,31 +171,60 @@ log('osm candidates', n_osm)
 import duckdb
 con = duckdb.connect(); con.sql('load spatial')
 rows = con.sql(f"""select ST_X(geometry), ST_Y(geometry), names.primary, basic_category, taxonomy.primary, confidence
-                   from '{OVT}' where confidence >= 0.45 and names.primary is not null""").fetchall()
+                   from '{OVT}' where confidence >= 0.35 and names.primary is not null""").fetchall()
+# geocoder fallbacks: Overture lists hundreds of businesses at the city centroid (18.5203, 73.8567),
+# at pin-code centroids, or stacked on one hospital point. Those are not where the business is, so
+# any point shared by 5+ listings, and anything on the city centroid, is dropped.
+stack = collections.Counter((round(r[0], 5), round(r[1], 5)) for r in rows)
+def geocode_fallback(lon, lat):
+    if abs(lat - 18.5203) < 0.0004 and abs(lon - 73.8567) < 0.0004: return True
+    return stack[(round(lon, 5), round(lat, 5))] >= 5
+n_fb = sum(1 for r in rows if geocode_fallback(r[0], r[1]))
+rows = [r for r in rows if not geocode_fallback(r[0], r[1])]
+log('dropped geocoder-fallback listings', n_fb)
+SKIP_BASIC = {'hindu_place_of_worship', 'christian_place_of_worship', 'religious_organization', 'historic_site', 'park', 'police_station',
+              'hospital', 'college_university', 'high_school', 'preschool', 'place_of_learning', 'education', 'community_and_government'}
 for lon, lat, name, basic, tax, conf in rows:
     cat = TAX.get(tax) or BASIC.get(basic)
-    if not cat: continue
-    if cat == '?': cat = kw_cat(name)
     x, z = proj(lat, lon)
+    if not cat:
+        if basic in SKIP_BASIC: continue                       # those come from OSM as their own map layers
+        if conf >= 0.45: add(x, z, name, 'service', 2, conf, board=False)
+        continue
+    if cat == '?': cat = kw_cat(name)
     add(x, z, name, cat, 2, conf)
 log('overture candidates', len(cands) - n_osm, 'of', len(rows))
 
-# dedupe: same board name within 45 m (OSM and Overture often list the same shop)
+# dedupe: OSM and Overture often list the same place, sometimes hundreds of metres apart
+# (Overture had Bira 91 Taproom 600 m from the taproom). Same name within 45 m, or one name's words
+# all contained in the other's within 800 m, is the same place; the higher-priority entry (OSM,
+# brands, confidence) keeps its position.
+STOP = {'the', 'pune', 'and', 'of', 'in', 'at', 'pvt', 'ltd', 'shop', 'store', 'mills', 'road', 'camp', 'deccan', 'kp'}
+def toks(c):
+    w = re.findall(r'[a-z0-9]+', (c.get('raw') or c['en']).lower())
+    return frozenset(x for x in w if x not in STOP and len(x) > 1)
 cands.sort(key=lambda c: -c['pri'])
 grid = collections.defaultdict(list)
 kept = []
 for c in cands:
-    key = c['en'].lower()
-    gx, gz = int(c['x'] // 45), int(c['z'] // 45)
+    key = c['en'].lower(); tk = toks(c); c['tk'] = tk
+    gx, gz = int(c['x'] // 800), int(c['z'] // 800)
     dup = False
     for dx in (-1, 0, 1):
         for dz in (-1, 0, 1):
             for o in grid[(gx + dx, gz + dz)]:
-                if o['en'].lower() == key and math.hypot(o['x'] - c['x'], o['z'] - c['z']) < 45: dup = True; break
+                d = math.hypot(o['x'] - c['x'], o['z'] - c['z'])
+                if o['en'].lower() == key and d < 300: dup = o; break
+                if d < 800 and tk and o['tk']:
+                    small, big = (tk, o['tk']) if len(tk) <= len(o['tk']) else (o['tk'], tk)
+                    if small <= big and (len(small) >= 2 or (len(small) == 1 and len(next(iter(small))) >= 7 and d < 150)): dup = o; break
             if dup: break
         if dup: break
     if not dup:
         grid[(gx, gz)].append(c); kept.append(c)
+    elif c.get('board', True) and not dup.get('board', True):
+        # the kept entry wins on position; take the better trade from the other listing
+        dup['cat'] = c['cat']; dup['board'] = True; dup['mr'] = dup['mr'] if dup['brand'] else c['mr']
 cands = kept
 log('unique real places', len(cands))
 
@@ -208,10 +248,11 @@ def try_place(c, radius=None):
     inside = [bi for bi in near if polys[bi].contains(p)]
     cand = inside or sorted((bi for bi in near if polys[bi].distance(p) <= R), key=lambda bi: polys[bi].distance(p))[:3 if radius else 1]
     for bi in cand:
-        if B[bi][3] in NO_BOARD_STYLES: return False
+        if B[bi][3] in NO_BOARD_STYLES: continue          # a hut or canopy: try the next building
         opts = []
+        street = any(L > 2.6 and fl in '123' for (ax, az, bx, bz, L, fl) in edges[bi])
         for ei, (ax, az, bx, bz, L, fl) in enumerate(edges[bi]):
-            if not (L > 2.6 and fl in '123'): continue
+            if not (L > 2.6 and (fl in '123' or not street)): continue      # inside a compound: any wall will do
             ex, ez = bx - ax, bz - az
             t = max(0.0, min(1.0, ((c['x'] - ax) * ex + (c['z'] - az) * ez) / (L * L)))
             opts.append((math.hypot(ax + ex * t - c['x'], az + ez * t - c['z']), ei, t))
@@ -225,12 +266,12 @@ def try_place(c, radius=None):
                     return True
     return False
 
-placed = sum(try_place(c) for c in cands)
+placed = sum(try_place(c) for c in cands if c.get('board', True))
 log('real places on their own building', placed, 'of', len(cands), '| frontage edges', len(front))
 # Overture/OSM points are often a few metres to 25 m off (geocoded to the road or the plot);
 # those businesses still exist, so they go on the nearest real building's street wall
-placed2 = sum(try_place(c, NEAR_R) for c in cands if 'placed' not in c)
-log('real places on the nearest building (point off its footprint)', placed2, '| still unplaced', len(cands) - placed - placed2)
+placed2 = sum(try_place(c, NEAR_R) for c in cands if c.get('board', True) and 'placed' not in c)
+log('real places on the nearest building (point off its footprint)', placed2, '| boards still unplaced', sum(1 for c in cands if c.get('board', True) and 'placed' not in c))
 
 # ---------------------------------------------------------------- write
 names, nidx, shops = [], {}, []
@@ -252,6 +293,9 @@ for bi, b in enumerate(B):
     b[5] = ''.join(fl)
 M['shopNames'] = names
 M['shops'] = shops
+# every real place for the map, at its source position (not the board it was given)
+M['pins'] = [[c['en'], c['mr'], c['cat'], round(c['x'] * 100), round(c['z'] * 100), 1 if 'placed' in c else 0] for c in cands]
+log('map pins', len(M['pins']))
 att = meta.get('attribution', '')
 if 'Overture' not in att:
     meta['attribution'] = att + '; places (c) Overture Maps Foundation, CDLA-Permissive-2.0'

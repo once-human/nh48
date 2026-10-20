@@ -96,6 +96,7 @@ export class Game {
     this.traffic.setStatics(parked.statics);
     await progress('Waking up the traffic', 0.94);
     traffic.prefill(player.x, player.z);
+    W.activity.setHour(this.hour); this.traffic.hour = this.hour;
     for (let k = 0; k < 10; k++) this.people.update(0.1, player, null);
     // keys
     window.addEventListener('keydown', (e) => {
@@ -388,6 +389,8 @@ export class Game {
     if (this.state === 'play') { this.hour = (this.hour + dt * this.timeScale) % 24; this.clock += dt * this.timeScale; }
     const live = this.state === 'play' || this.state === 'title';
     if (live) {
+      this.W.activity.setHour(this.hour);
+      this.traffic.hour = this.hour;
       this.traffic.cam.copy(this.camera.position);
       this.traffic.update(Math.min(dt, 0.05), P.x, P.z, this.inView);
       this.people.update(Math.min(dt, 0.05), P, this.inView);
@@ -470,6 +473,9 @@ export class Game {
     this.timers.street -= dt; this.timers.wrong -= dt; this.timers.finesCool -= dt;
     if (this.timers.street > 0) return;
     this.timers.street = 0.4;
+    // up on a flyover the streets below don't apply (no signals, no wrong way checks against them)
+    const veh = !P.onFoot && P.cur, deck = veh && veh.deck >= 0 ? this.W.fly.decks[veh.deck] : null;
+    if (deck) { const mr = (this.W.M.names.find(n => n[0] === deck.name) || [])[1]; this.hud.showStreet(mr || 'उड्डाणपूल', deck.name || 'Flyover'); return; }
     const near = G.nearest(P.x, P.z, 14);
     if (!near) return;
     const e = near.e;

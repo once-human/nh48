@@ -251,3 +251,21 @@ def filler(cat, seed):
     en = en_t.replace('{D}', d[0]).replace('{S}', s[0]).replace('{M}', m[0])
     mr = mr_t.replace('{D}', d[1]).replace('{S}', s[1]).replace('{M}', m[1])
     return en, mr
+
+def pin_name(raw):
+    """Name for a map pin: brands parodied, local names lightly cleaned and given the usual
+    spelling change; offices and services allowed (they are real places too)."""
+    b = brand_parody(raw)
+    if b: return b[0], b[1], True
+    if not raw: return None
+    s = _strip_accents(raw).replace('_', ' ').strip()
+    if sum(c.isascii() for c in s) < 0.8 * len(s) or AWAY.search(s): return None
+    s = re.sub(r'\bOYO\s*\d+\s*', '', s)
+    s = _CUT.sub('', s).strip(' .-&')
+    s = re.sub(r'\s+', ' ', s)
+    if len(s) < 2: return None
+    if len(s) > 40: s = ' '.join(s.split()[:5])
+    if s.isupper() and len(s) > 5 or s.islower():
+        s = ' '.join(w if (w.isupper() and len(w) <= 3) else w.capitalize() for w in s.split())
+    en, mr = local_parody(s, 'generic')
+    return en, mr, False

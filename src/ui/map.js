@@ -15,7 +15,7 @@ export const CATS = {
   landmark: ['Landmarks', '#f2b705', '★'], police: ['Police', '#5aa2ff', 'P'], hospital: ['Health', '#ff5a4f', '+'],
   food: ['Food & drink', '#ffb020', '●'], shop: ['Shops', '#7fd1ff', '●'], bank: ['Banks', '#4dd0c8', '₹'], fuel: ['Fuel', '#a08cff', 'F'],
   transit: ['Transit', '#33d17a', 'T'], park: ['Parks', '#5bbf6a', '♣'], temple: ['Temples', '#ff9f43', 'ॐ'], college: ['Colleges', '#c08cff', 'C'],
-  cinema: ['Theatres', '#ff6ec7', '▶'],
+  cinema: ['Theatres', '#ff6ec7', '▶'], service: ['Offices & services', '#9aa0aa', '●'],
 };
 const FOOD = new Set(['food', 'cafe', 'bar', 'icecream', 'sweets', 'bakery']);
 const SHOPC = { bank: 'bank', atm: 'bank', police: 'police', clinic: 'hospital' };
@@ -31,14 +31,11 @@ export class CityMap {
     const P = [];
     for (const l of M.landmarks || []) P.push({ n: l[0], mr: l[1], c: 'landmark', x: l[2] / 100, z: l[3] / 100, blurb: l[4], k: l[5] });
     for (const p of M.places || []) P.push({ n: p[0], mr: p[1], c: p[2], x: p[3] / 100, z: p[4] / 100 });
-    const names = M.shopNames || [];
-    for (const s of M.shops || []) {
-      if (!s[4]) continue;                       // invented boards are not on the map
-      const nm = names[s[3]]; if (!nm || nm[2] === 'police') continue;   // police come from `places`
-      const B = M.buildings[s[0]], r = B[1], n = r.length / 2, i = s[1], j = (i + 1) % n;
-      const ax = r[2 * i] / 100, az = r[2 * i + 1] / 100, bx = r[2 * j] / 100, bz = r[2 * j + 1] / 100;
-      const L = Math.hypot(bx - ax, bz - az), ns = Math.max(1, Math.floor(L / 3.6)), t = (s[2] + 0.5) / ns;
-      P.push({ n: nm[0], mr: nm[1], c: FOOD.has(nm[2]) ? 'food' : (SHOPC[nm[2]] || 'shop'), sub: nm[2], x: ax + (bx - ax) * t, z: az + (bz - az) * t });
+    // every real place at its source position (tools/bake_shops.py); boards in the street carry the same names
+    for (const q of M.pins || []) {
+      const c = q[2];
+      if (c === 'police') continue;                      // police come from `places`
+      P.push({ n: q[0], mr: q[1], c: FOOD.has(c) ? 'food' : (SHOPC[c] || (c === 'service' ? 'service' : 'shop')), sub: c, x: q[3] / 100, z: q[4] / 100 });
     }
     this.places = P;
     // grid of places for hit tests and culling
@@ -172,6 +169,13 @@ export class CityMap {
       x.strokeStyle = e.bridge ? COL.bridge : e.rank >= 5 ? COL.arterial : e.rank >= 4 ? COL.main : COL.road;
       const p = e.pts; x.beginPath(); x.moveTo(p[0], p[1]); for (let q = 2; q < p.length; q += 2) x.lineTo(p[q], p[q + 1]); x.stroke();
     }
+    // flyovers on top of the streets they cross
+    if (W.fly) for (const dk of W.fly.decks) {
+      const p = dk.pts;
+      x.lineWidth = Math.max(dk.w, 3.4 / ppm); x.strokeStyle = 'rgba(0,0,0,.45)';
+      x.beginPath(); x.moveTo(p[0], p[1]); for (let q = 2; q < p.length; q += 2) x.lineTo(p[q], p[q + 1]); x.stroke();
+      x.lineWidth = Math.max(dk.w * 0.8, 2.6 / ppm); x.strokeStyle = '#8b909a'; x.stroke();
+    }
     x.strokeStyle = COL.rail; x.lineWidth = Math.max(1.2, 1.4 / ppm); x.beginPath();
     for (const P of Ps) for (const r of P.rails) if (hit(r.bb)) { const q = r.r; x.moveTo(q[0], q[1]); for (let n = 2; n < q.length; n += 2) x.lineTo(q[n], q[n + 1]); }
     x.stroke();
@@ -246,7 +250,7 @@ const norm = (s) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').re
 export class MapScreen {
   constructor(game, root, city) {
     this.g = game; this.city = city;
-    this.filters = new Set(['landmark', 'police', 'hospital', 'transit', 'fuel', 'food', 'shop', 'bank', 'park', 'temple', 'college', 'cinema']);
+    this.filters = new Set(['landmark', 'police', 'hospital', 'transit', 'fuel', 'food', 'shop', 'bank', 'park', 'temple', 'college', 'cinema', 'service']);
     this.view = { x: 0, z: 0, ppm: 0.6 };
     this.target = null;            // smooth fly-to {x,z,ppm}
     this.sel = null;
@@ -583,13 +587,13 @@ export class MapScreen {
     }
     // 4. places by category, appearing as you zoom in
     const near = this.city.placesIn(xa, za, xb, zb);
-    const MINZ = { police: 1.2, fuel: 1.2, transit: 1.2, hospital: 1.9, temple: 1.9, park: 1.6, college: 1.6, cinema: 1.6, food: 3.2, shop: 3.2, bank: 3.2 };
-    const NAMEZ = { police: 1.8, fuel: 1.8, transit: 1.8, hospital: 3.5, temple: 3, park: 2.2, college: 2.2, cinema: 2.2, food: 5, shop: 5, bank: 5 };
+    const MINZ = { police: 1.0, fuel: 1.0, transit: 1.0, hospital: 1.4, temple: 1.6, park: 1.3, college: 1.3, cinema: 1.3, food: 1.4, shop: 1.8, bank: 1.6, service: 2.6 };
+    const NAMEZ = { police: 1.5, fuel: 1.5, transit: 1.5, hospital: 2.4, temple: 2.6, park: 1.8, college: 1.8, cinema: 1.8, food: 2.2, shop: 2.8, bank: 2.8, service: 3.6 };
     for (const p of near) {
       if (p.c === 'landmark' || !this.filters.has(p.c) || z < (MINZ[p.c] || 3)) continue;
       const [X, Y] = T(p.x, p.z);
-      const small = p.c === 'food' || p.c === 'shop' || p.c === 'bank';
-      const s = small ? (z >= 5 ? 6 : 4.5) : z >= 3 ? 7 : 5.5;
+      const small = p.c === 'food' || p.c === 'shop' || p.c === 'bank' || p.c === 'service';
+      const s = small ? (z >= 4 ? 6 : 4.5) : z >= 3 ? 7 : 5.5;
       if (!free(X - s, Y - s, s * 2, s * 2)) continue;
       const [, col, gl] = CATS[p.c];
       drawPin(x, X, Y, col, s >= 7 ? gl : null, s);

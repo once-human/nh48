@@ -61,6 +61,8 @@ export class HUD {
     this.stopEl.setAttribute('role', 'dialog'); this.stopEl.setAttribute('aria-label', 'Police stop');
     this.flashEl = el('div', 'flashov', '<div class="fl-in"><div class="fl-t"></div><div class="fl-s"></div></div>');
     this.flashEl.hidden = true;
+    this.placeEl = el('div', 'h placecard', '<div class="pc-k">Landmark</div><div class="pc-t" id="h-pc-t"></div><div class="pc-mr" lang="mr" id="h-pc-mr"></div><div class="pc-s" id="h-pc-s"></div>');
+    this.placeEl.hidden = true;
     this.obj = el('div', 'h obj', '<div class="obj-main" id="h-obj"></div><div class="obj-sub" id="h-obj-sub"></div>');
     this.mm = el('div', 'h mm');
     this.mmCanvas = el('canvas'); this.mmCanvas.width = 432; this.mmCanvas.height = 432;
@@ -85,7 +87,7 @@ export class HUD {
     const mkBtn = (icon, label, fn) => { const b = el('button', 'ibtn', `${ICON[icon]}<span class="sr">${label}</span>`); b.title = label; b.onclick = fn; return b; };
     this.corner.append(mkBtn('cam', 'Camera (C)', () => this.game.rig.setMode(this.game.rig.mode + 1)), mkBtn('map', 'Map (M)', () => this.game.toggleMap()),
       mkBtn('pause', 'Pause (Esc)', () => this.game.togglePause()));
-    R.append(this.scrim, this.loc, this.wallet, this.obj, this.mm, this.zoneEl, this.dash, this.lower, this.toastWrap, this.smsWrap, this.stopEl, this.flashEl);
+    R.append(this.scrim, this.loc, this.wallet, this.placeEl, this.obj, this.mm, this.zoneEl, this.dash, this.lower, this.toastWrap, this.smsWrap, this.stopEl, this.flashEl);
     this.$ = (id) => document.getElementById(id);
     this.$money = this.$('h-money'); this.$speed = this.$('h-speed'); this.$gear = this.$('h-gear'); this.$rpm = this.$('h-rpm');
     this.buildTitle();
@@ -264,6 +266,7 @@ export class HUD {
     }
     this.$('h-rides').textContent = g.stats.rides ? `${g.stats.rides} ${g.stats.rides === 1 ? 'ride' : 'rides'} · ★ ${g.stats.rating.toFixed(1)}` : '';
     this.$('h-clock').textContent = clock(g.hour);
+    if (this.pcT > 0) { this.pcT -= dt; if (this.pcT <= 0) this.placeEl.classList.remove('show'); if (this.pcT < -0.5) this.placeEl.hidden = true; }
     // fare meter only on a shift
     const shift = g.rides && g.rides.enabled;
     this.$('h-fare-box').hidden = !shift;
@@ -312,7 +315,7 @@ export class HUD {
         if ((l.x - p.x) ** 2 + (l.z - p.z) ** 2 > 70 * 70) continue;
         if (now - (this.lmSeen.get(l.n) || -1e9) < 600000) continue;
         this.lmSeen.set(l.n, now);
-        this.flash(l.n, l.blurb || l.mr || '');
+        this.placeCard(l);
         break;
       }
     }
@@ -433,6 +436,12 @@ export class HUD {
   }
   closeStop() { this.stopEl.hidden = true; this.lower.classList.remove('dim'); }
   // full-screen moment (arrest): fades in and out
+  // small lower-left card when you pass a landmark (never covers the screen)
+  placeCard(l) {
+    this.$('h-pc-t').textContent = l.n; this.$('h-pc-mr').textContent = l.mr || ''; this.$('h-pc-s').textContent = l.blurb || '';
+    this.placeEl.hidden = false; void this.placeEl.offsetWidth; this.placeEl.classList.add('show');
+    this.pcT = 6;
+  }
   flash(title, sub) {
     const F = this.flashEl;
     F.querySelector('.fl-t').textContent = title; F.querySelector('.fl-s').textContent = sub;

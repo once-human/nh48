@@ -3,6 +3,7 @@
 // of the game talks to this object as "the player" — it forwards to whatever you're driving.
 import * as THREE from 'three';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
+import { flyResolve } from '../world/flyover.js';
 import { clamp, damp, dampAngle, wrapAngle, RNG } from '../core/util.js';
 
 const WALK = 1.55, JOG = 3.4, SPRINT = 6.2;
@@ -112,7 +113,7 @@ export class Pilot {
     F.x += F.vx * dt; F.z += F.vz * dt;
     // walls, poles, parked vehicles, trees
     for (let it = 0; it < 2; it++) {
-      const res = this.W.collision.resolve(F.x, F.z, 0.3);
+      const res = flyResolve({ W: this.W, deck: F.deck ?? -1 }, F.x, F.z, 0.3);
       if (res) { F.x += res.nx * res.depth; F.z += res.nz * res.depth; }
     }
     // traffic: get shoved / knocked down
@@ -135,7 +136,9 @@ export class Pilot {
       }
     });
     // footpath height
-    const gy = this.W.surf.height(F.x, F.z);
+    const FL = this.W.fly;
+    F.deck = FL ? FL.track(F.x, F.z, F.deck ?? -1, F.y) : -1;
+    const gy = F.deck >= 0 ? FL.heightOn(F.deck, F.x, F.z) : this.W.surf.height(F.x, F.z);
     F.y = damp(F.y, gy, 18, dt);
     Object.assign(F.agent, { x: F.x, z: F.z, hx: Math.cos(F.yaw), hz: Math.sin(F.yaw), v: F.v });
     // animation
@@ -257,7 +260,8 @@ export class Pilot {
     this.addDropped(veh, traffic);
     this.mode = 'foot';
     this.hideRider();
-    Object.assign(this.foot, { x: px, z: pz, y: this.W.surf.height(px, pz), yaw: veh.th, v: 0, vx: 0, vz: 0 });
+    const onDeck = veh.deck >= 0 && this.W.fly;
+    Object.assign(this.foot, { x: px, z: pz, y: onDeck ? this.W.fly.heightOn(veh.deck, px, pz) : this.W.surf.height(px, pz), deck: onDeck ? veh.deck : -1, yaw: veh.th, v: 0, vx: 0, vz: 0 });
     this.human.holder.visible = true;
     this.setAcc(this.look.acc);
     this.human.play('idle', { fade: 0.1 });
@@ -326,7 +330,7 @@ export class Pilot {
   }
   teleportFoot(x, z, th, traffic = null) {
     if (!this.onFoot) this.exit(traffic, true);
-    Object.assign(this.foot, { x, z, y: this.W.surf.height(x, z), yaw: th || 0, v: 0, vx: 0, vz: 0 });
+    Object.assign(this.foot, { x, z, y: this.W.surf.height(x, z), deck: -1, yaw: th || 0, v: 0, vx: 0, vz: 0 });
   }
   // move your auto (towed, or brought round to the chowki)
   moveAuto(x, z, th, traffic) {

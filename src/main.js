@@ -209,13 +209,14 @@ async function main() {
     renderer.info.reset();
     // tests can simulate several frames per rendered frame (?simx=4) — software GL is slow
     const simx = TEST ? Math.max(1, parseInt(params.get('simx') || '1')) : 1;
+    let simDone = false;
     for (let k = 0; k < simx; k++) {
       acc += dt;
       let steps = 0;
       while (acc >= STEP && steps < 6) { game.fixed(STEP); acc -= STEP; steps++; }
       if (steps >= 6) acc = 0;
       game.frame(dt);
-      if (k < simx - 1) { frames++; if (game.testDone(frames)) break; }
+      if (k < simx - 1) { frames++; if (game.testDone(frames)) { simDone = true; break; } }
     }
     U.uTime.value += dt;
     const focus = game.focus();
@@ -249,7 +250,7 @@ async function main() {
     }
     game.afterRender(dt, now);
     frames++;
-    if (TEST && game.testDone(frames)) {
+    if (TEST && (simDone || game.testDone(frames))) {
       window.__stats = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures,
         traffic: traffic.list.length, player: { x: +player.x.toFixed(1), z: +player.z.toFixed(1), v: +player.v.toFixed(2), th: +player.th.toFixed(2) }, ...game.testInfo() };
       window.__shotReady = true;

@@ -1,6 +1,7 @@
 // The player's auto-rickshaw: arcade physics tuned to feel like a Bajaj RE — slow to pick up,
 // turns on a coin, lifts a rear wheel if you corner too hard, and tips over if you insist.
 import * as THREE from 'three';
+import { flyResolve, flyTrack, flyHeight } from '../world/flyover.js';
 import { buildAuto, addRider } from './models.js';
 import { ColorBuilder } from '../world/geo.js';
 import { clamp, lerp, wrapAngle, RNG } from '../core/util.js';
@@ -95,6 +96,7 @@ export class PlayerAuto {
   }
 
   reset(x, z, th) {
+    this.deck = -1;
     Object.assign(this, {
       x, z, th, v: 0, vl: 0, w: 0, steer: 0, y: 0, vy: 0, pitch: 0, roll: 0, lift: 0, liftT: 0,
       gear: 1, rpm: 0.15, shiftT: 0, reverse: false, revT: 0, tipped: 0, tipSide: 1, tipAng: 0, latAcc: 0,
@@ -132,7 +134,7 @@ export class PlayerAuto {
       const d = Math.hypot(x - p.x, z - p.z);
       if (d < p.r) h -= 0.07 * (1 - d / p.r);
     }
-    return h;
+    return flyHeight(this, x, z, h);
   }
 
   update(dt, inp, traffic) {
@@ -219,8 +221,9 @@ export class PlayerAuto {
     this.odometer += Math.hypot(dx, dz);
 
     // ---- collisions with the city
+    flyTrack(this);
     this.collideStatic();
-    if (traffic) this.collideTraffic(traffic);
+    if (traffic && !(this.deck >= 0 && this.y > 2.2)) this.collideTraffic(traffic);
 
     // ---- suspension & terrain
     const fx = this.x + nhx * 1.0, fz = this.z + nhz * 1.0;
@@ -252,7 +255,7 @@ export class PlayerAuto {
     for (let it = 0; it < 2; it++) {
       for (const [o, r] of circles) {
         const cx = this.x + hx * o, cz = this.z + hz * o;
-        const res = W.collision.resolve(cx, cz, r);
+        const res = flyResolve(this, cx, cz, r);
         if (!res) continue;
         this.x += res.nx * res.depth; this.z += res.nz * res.depth;
         // velocity in world, remove normal component

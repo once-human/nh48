@@ -375,3 +375,21 @@ input[type=range] { width: 100%; accent-color: var(--stone); }
 .mm-gps.wp b { color: #5fd0ff; }
 .mm-gps span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .bm-c-act { flex-wrap: wrap; }
+
+/* time of day, top centre */
+.clockchip { top: calc(16px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
+  padding: 7px 14px 7px 11px; border-radius: 99px; background: rgba(10, 11, 13, .5); border: 1px solid var(--line); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  font-size: 12px; color: var(--paper-2); white-space: nowrap; }
+.clockchip b { font-size: 16px; font-weight: 800; color: var(--paper); letter-spacing: .01em; }
+.clockchip .ck-ico { width: 15px; height: 15px; color: var(--stone); display: grid; }
+.clockchip .ck-ico svg { width: 15px; height: 15px; }
+/* landmark card, lower left above the minimap */
+.placecard { left: max(22px, env(safe-area-inset-left, 0px)); bottom: calc(256px + env(safe-area-inset-bottom, 0px)); width: min(320px, calc(100vw - 44px));
+  padding: 14px 16px; border-radius: 16px; background: rgba(12, 13, 16, .72); border: 1px solid var(--line); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  display: grid; gap: 2px; opacity: 0; transform: translateY(8px); transition: opacity .4s ease, transform .4s ease; }
+.placecard.show { opacity: 1; transform: none; }
+.placecard .pc-k { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--stone); }
+.placecard .pc-t { font-family: var(--font-display); font-weight: 800; font-stretch: 112%; font-size: 20px; letter-spacing: -0.01em; }
+.placecard .pc-mr { font-family: var(--font-dev); font-size: 14px; color: var(--paper-2); }
+.placecard .pc-mr:empty, .placecard .pc-s:empty { display: none; }
+.placecard .pc-s { font-size: 12.5px; line-height: 1.45; color: var(--paper-2); margin-top: 4px; }
