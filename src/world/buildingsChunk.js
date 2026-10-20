@@ -294,8 +294,10 @@ export function* buildBuildingsChunk(W, C, group) {
           cb.addGeo(GEO.box, mat(px + nx * 0.15, y - 0.31, pz + nz * 0.15, 0.85, 0.04, 0.34, ry), [0.4, 0.4, 0.4]);    // bracket
         }
       }
-      // ground-floor shop boards
-      if (shop) {
+      // ground-floor shop boards: on shop fronts, and on plain walls that carry a real business
+      let boards = shop;
+      if (!boards && shopsHere && L > 2.6) { const ns0 = Math.max(1, Math.floor(L / SHOP_CELL)); for (let k = 0; k < ns0 && !boards; k++) boards = shopsHere.has(i * 4096 + k); }
+      if (boards) {
         const ns = Math.max(1, Math.floor(L / SHOP_CELL));
         const cw = L / ns;
         for (let k = 0; k < ns; k++) {
@@ -316,7 +318,7 @@ export function* buildBuildingsChunk(W, C, group) {
           cb.addGeo(GEO.box, mat((x0 + x1) / 2 - nx * 0.05, y1 + 0.02, (z0 + z1) / 2 - nz * 0.05, w + 0.06, 0.04, 0.12, Math.atan2(-tz, tx)), fc);
           cb.addGeo(GEO.box, mat((x0 + x1) / 2 - nx * 0.05, y0 - 0.02, (z0 + z1) / 2 - nz * 0.05, w + 0.06, 0.04, 0.12, Math.atan2(-tz, tx)), fc);
           // awnings over peth / camp shops
-          if ((peth || district === 2) && rng.chance(0.3)) awning(cb, rng, ax + tx * t0, az + tz * t0, ax + tx * t1, az + tz * t1, nx, nz, y0 - 0.05);
+          if (shop && (peth || district === 2) && rng.chance(0.3)) awning(cb, rng, ax + tx * t0, az + tz * t0, ax + tx * t1, az + tz * t1, nx, nz, y0 - 0.05);
         }
       }
       // Diwali lanterns on balconies

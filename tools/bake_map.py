@@ -10,7 +10,7 @@ triangulate and build meshes:
   road graph for AI traffic + GPS, markings, signals, trees, props, POIs.
 Map data (c) OpenStreetMap contributors, ODbL.
 """
-import json, math, random, sys, os, collections
+import json, math, random, sys, os, collections, re
 import numpy as np
 import shapely
 from shapely.geometry import (LineString, Polygon, MultiPolygon, Point, box,
@@ -758,7 +758,7 @@ for p, t, oid in bpolys:
         continue
     q = fix(p.difference(BLOCKERS).difference(WATER)).intersection(VIS)
     lost = 1 - q.area / max(p.area, 1e-6)
-    if lost > 0.3 and t.get('building') == 'train_station':
+    if lost > 0.3 and t.get('building') == 'train_station' and not re.search(r'railway station|junction', t.get('name', ''), re.I):
         cut_stats['elevated station skipped'] += 1
         continue                      # metro stations stand over the road; the metro layer draws them
     if lost > 0.3 and p.area > 150:

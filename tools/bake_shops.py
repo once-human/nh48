@@ -233,6 +233,11 @@ for (bi, ei, k), c in sorted(occupied.items()):
     key = (c['en'], c['mr'], c['cat'], kind)
     if key not in nidx: nidx[key] = len(names); names.append(list(key))
     shops.append([bi, ei, k, nidx[key], c['src']])
+# a wall only gets the open-shutter shop front where real businesses fill at least half its slots;
+# otherwise the boards hang on an ordinary wall (offices, clinics, upstairs shops)
+filled = collections.Counter((bi, ei) for (bi, ei, k) in occupied)
+front = {f for f in front if filled[f] * 2 >= nslots(edges[f[0]][f[1]][4])}
+log('shop-front walls', len(front))
 for bi, b in enumerate(B):
     fl = list(b[5])
     for ei in range(len(fl)):

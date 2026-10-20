@@ -17,7 +17,7 @@ const logs = [];
 page.on('console', m => { const t = m.text(); if (!/GPU stall|GL Driver/.test(t)) logs.push(`[${m.type()}] ${t.slice(0, 2000)}`); });
 page.on('pageerror', e => logs.push(`[pageerror] ${e.message}\n${e.stack || ''}`));
 const t0 = Date.now();
-await page.goto(`http://127.0.0.1:8848/test.html?test&${query}`, { waitUntil: 'load', timeout: 300000 });
+await page.goto(`http://127.0.0.1:${process.env.PORT || 8848}/test.html?test&${query}`, { waitUntil: 'load', timeout: 300000 });
 try { await page.waitForFunction('window.__shotReady === true || window.__error', { timeout: 600000, polling: 500 }); } catch (e) { logs.push('[harness] timeout'); }
 const err = await page.evaluate('window.__error');
 if (err) logs.push('[error] ' + err);
