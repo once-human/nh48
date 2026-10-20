@@ -300,7 +300,8 @@ export function* buildBuildingsChunk(W, C, group) {
         const cw = L / ns;
         for (let k = 0; k < ns; k++) {
           const sh = shopsHere && shopsHere.get(i * 4096 + k);
-          const board = (sh && local.get(sh)) || signs.generic(district, rng);
+          const board = sh && local.get(sh);
+          if (!board) continue;           // no real business listed here: no invented signboard
           const t0 = (k * cw + 0.15), t1 = ((k + 1) * cw - 0.15);
           const w = t1 - t0, h = Math.min(0.85, w / 4.1);
           const y1 = BASE + gh - 0.1, y0 = y1 - h;

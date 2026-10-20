@@ -297,6 +297,83 @@ def road_dims(t):
         sw = 1.2
     return w, sw, ow
 
+log('buildings start')
+bpolys = []
+for k, w in WAYS.items():
+    t = w['tags']
+    if 'building' in t or 'building:part' in t:
+        if 'building:part' in t and 'building' not in t:
+            continue
+        for p in way_poly(w):
+            bpolys.append((p, t, int(k)))
+for k, r in RELS.items():
+    t = r['tags']
+    if 'building' in t:
+        for p in rel_polys(r):
+            bpolys.append((p, t, int(k)))
+# Overture Maps buildings (Google Open Buildings + Microsoft ML footprints) fill the gaps OSM has
+# in the dense peths and bastis. Footprints already in OSM, or mostly covered by an OSM building,
+# are skipped so OSM's tagged detail (names, levels, landmarks) always wins.
+OVT_B = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data/raw/overture/buildings.parquet')
+if os.path.exists(OVT_B) and not os.environ.get('NO_OVERTURE'):
+    import duckdb
+    from shapely import wkb as _wkb
+    con = duckdb.connect(); con.sql('load spatial')
+    rows = con.sql(f"""select ST_AsWKB(geometry), list_transform(sources, s -> s.dataset), num_floors, height
+                       from '{OVT_B}'""").fetchall()
+    osm_tree = STRtree([b[0] for b in bpolys])
+    added = 0
+    for i, (g, srcs, floors, height) in enumerate(rows):
+        if 'OpenStreetMap' in srcs:
+            continue
+        geom = _wkb.loads(bytes(g))
+        for gp in ([geom] if geom.geom_type == 'Polygon' else list(getattr(geom, 'geoms', []))):
+            p = fix(Polygon([proj(y, x) for x, y in gp.exterior.coords]))
+            if p.is_empty or p.area < 14:
+                continue
+            cover = sum(bpolys[j][0].intersection(p).area for j in osm_tree.query(p))
+            if cover > 0.3 * p.area:
+                continue
+            t = {'building': 'yes', 'source': 'overture'}
+            if floors: t['building:levels'] = str(int(floors))
+            elif height: t['height'] = str(round(float(height), 1))
+            bpolys.append((p, t, 9_000_000_000 + i))
+            added += 1
+    log('overture buildings added', added)
+
+
+# ---------------------------------------------------------------- street corridors
+# Real carriageway width is rarely tagged in Pune. The buildings on both sides are real
+# (satellite-traced footprints), so the gap between them caps how wide a street can be.
+_bgeo = [bp[0] for bp in bpolys]
+_btree = STRtree(_bgeo)
+def corridor_widths(ln, step=12.0, reach=25.0):
+    out = []
+    L = ln.length
+    n = max(1, int(L // step))
+    for i in range(n):
+        d = (i + 0.5) * L / n
+        p = ln.interpolate(d)
+        q = ln.interpolate(min(L, d + 0.5)); o = ln.interpolate(max(0.0, d - 0.5))
+        tx, tz = q.x - o.x, q.y - o.y; tl = math.hypot(tx, tz) or 1.0
+        nx, nz = -tz / tl, tx / tl
+        side = []
+        for sgn in (1, -1):
+            ray = LineString([(p.x + nx * sgn * 0.3, p.y + nz * sgn * 0.3), (p.x + nx * sgn * reach, p.y + nz * sgn * reach)])
+            best = None
+            for j in _btree.query(ray):
+                g = _bgeo[j]
+                if g.intersects(ray):
+                    dd = p.distance(g.intersection(ray))
+                    best = dd if best is None else min(best, dd)
+            side.append(best)
+        if side[0] is not None and side[1] is not None:
+            out.append(side[0] + side[1])
+    return out, n
+MINW = {'trunk': 7.0, 'primary': 6.5, 'secondary': 6.0, 'tertiary': 5.0, 'unclassified': 3.6, 'residential': 3.6, 'road': 3.6,
+        'living_street': 3.0, 'service': 2.8}
+corr_stats = collections.Counter()
+
 RD = []      # dicts: line, w, sw, ow, cls, rank, name, nid, oid, nodes, bridge, service
 for k, w in WAYS.items():
     t = w['tags']
@@ -335,6 +412,25 @@ for k, w in WAYS.items():
         ln = LineString(cs)
     wd, sw, ow = road_dims(t)
     base = h.replace('_link', '')
+    try:
+        tagged_w = float(t.get('width', '').replace('m', '').strip())
+    except ValueError:
+        tagged_w = 0
+    if 2.5 <= tagged_w <= 40:
+        wd = tagged_w; corr_stats['tagged'] += 1
+    elif not (t.get('bridge') in ('yes', 'viaduct')):
+        cw, ns = corridor_widths(ln)
+        if len(cw) >= max(2, 0.4 * ns):
+            c = sorted(cw)[len(cw) // 4]               # a narrow-but-not-extreme point of the street
+            if c < wd + 2 * sw:
+                sw2 = 0.0 if sw == 0 else max(0.6, min(sw, (c - wd) / 2))
+                wd2 = max(MINW.get(base, 3.0), min(wd, c - 2 * sw2))
+                corr_stats['narrowed'] += 1
+                wd, sw = wd2, sw2
+            else:
+                corr_stats['fits'] += 1
+        else:
+            corr_stats['open'] += 1
     nm = t.get('name', '')
     en, mr = POPULAR.get(nm, (nm, t.get('name:mr', '')))
     if nm and not mr:
@@ -343,7 +439,7 @@ for k, w in WAYS.items():
                    nid=name_id(en, mr) if nm else 0, oid=int(k), nodes=nds, bridge=is_bridge,
                    service=(base == 'service' or base == 'living_street'),
                    access=t.get('access', '')))
-log('road ways', len(RD))
+log('road ways', len(RD), dict(corr_stats))
 
 def buf(r, extra=0.0):
     return r['line'].buffer(r['w'] / 2 + extra, cap_style='round', join_style='round', quad_segs=4)
@@ -421,7 +517,8 @@ for kind in ('soil', 'grass', 'scrub', 'plaza'):
 GROUND_DEFAULT = fix(GROUND.difference(used))
 
 # ---------------------------------------------------------------- road graph (AI + GPS)
-graph_ways = [r for r in RD if not r['service'] and r['access'] not in ('private', 'no')]
+graph_ways = [r for r in RD if r['access'] != 'no']        # navigation uses every drivable road
+def MAJOR(e): return not e['r']['service'] and e['r']['access'] not in ('private',)
 cnt = collections.Counter()
 for r in graph_ways:
     for n in r['nodes']:
@@ -495,9 +592,9 @@ remap = {o: i for i, o in enumerate(used_nodes)}
 node_xy = [gnode_xy[o] for o in used_nodes]
 for e in edges:
     e['a'] = remap[e['a']]; e['b'] = remap[e['b']]
-deg = collections.Counter()
+deg = collections.Counter()           # junction degree for markings/signals: public through-roads only
 for e in edges:
-    deg[e['a']] += 1; deg[e['b']] += 1
+    if MAJOR(e): deg[e['a']] += 1; deg[e['b']] += 1
 log('graph nodes', len(node_xy), 'edges', len(edges), 'components', len(comps))
 
 # junction radius: max half width of incident roads
@@ -536,6 +633,7 @@ def junction_cut(n):
     return Point(node_xy[n]).buffer(jrad[n] + 2.5)
 
 for e in edges:
+    if not MAJOR(e): continue
     r = e['r']
     ln = LineString(e['pts'])
     cut = Polygon()
@@ -571,6 +669,7 @@ def tangent_at(ln, d):
 
 # zebras + stop lines at signal approaches, speed bumps near minor junctions
 for e in edges:
+    if not MAJOR(e): continue
     r = e['r']
     ln = LineString(e['pts'])
     for end, n in ((0, e['a']), (1, e['b'])):
@@ -626,57 +725,13 @@ for k, v in NODES.items():
 log('markings: center', len(marks_center), 'lane', len(marks_lane), 'zebras', len(zebras), 'bumps', len(bumps))
 
 # ---------------------------------------------------------------- buildings
-BLOCKERS = fix(unary_union([ROAD, SW, MEDIANS]).buffer(0.25))
+BLOCKERS = fix(unary_union([ROAD, MEDIANS]).buffer(0.1))      # carriageway only: sidewalks never cut a real building
 log('blockers ready')
 main_lines = [r['line'] for r in RD if r['rank'] >= 4]
 main_tree = STRtree(main_lines)
 anyroad_lines = [r['line'] for r in RD]
 anyroad_tree = STRtree(anyroad_lines)
 campus_tree = STRtree([c[0] for c in campus_polys]) if campus_polys else None
-
-log('buildings start')
-bpolys = []
-for k, w in WAYS.items():
-    t = w['tags']
-    if 'building' in t or 'building:part' in t:
-        if 'building:part' in t and 'building' not in t:
-            continue
-        for p in way_poly(w):
-            bpolys.append((p, t, int(k)))
-for k, r in RELS.items():
-    t = r['tags']
-    if 'building' in t:
-        for p in rel_polys(r):
-            bpolys.append((p, t, int(k)))
-# Overture Maps buildings (Google Open Buildings + Microsoft ML footprints) fill the gaps OSM has
-# in the dense peths and bastis. Footprints already in OSM, or mostly covered by an OSM building,
-# are skipped so OSM's tagged detail (names, levels, landmarks) always wins.
-OVT_B = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data/raw/overture/buildings.parquet')
-if os.path.exists(OVT_B) and not os.environ.get('NO_OVERTURE'):
-    import duckdb
-    from shapely import wkb as _wkb
-    con = duckdb.connect(); con.sql('load spatial')
-    rows = con.sql(f"""select ST_AsWKB(geometry), list_transform(sources, s -> s.dataset), num_floors, height
-                       from '{OVT_B}'""").fetchall()
-    osm_tree = STRtree([b[0] for b in bpolys])
-    added = 0
-    for i, (g, srcs, floors, height) in enumerate(rows):
-        if 'OpenStreetMap' in srcs:
-            continue
-        geom = _wkb.loads(bytes(g))
-        for gp in ([geom] if geom.geom_type == 'Polygon' else list(getattr(geom, 'geoms', []))):
-            p = fix(Polygon([proj(y, x) for x, y in gp.exterior.coords]))
-            if p.is_empty or p.area < 14:
-                continue
-            cover = sum(bpolys[j][0].intersection(p).area for j in osm_tree.query(p))
-            if cover > 0.3 * p.area:
-                continue
-            t = {'building': 'yes', 'source': 'overture'}
-            if floors: t['building:levels'] = str(int(floors))
-            elif height: t['height'] = str(round(float(height), 1))
-            bpolys.append((p, t, 9_000_000_000 + i))
-            added += 1
-    log('overture buildings added', added)
 
 STYLE = {'apartment': 0, 'commercial': 1, 'old': 2, 'bungalow': 3, 'institution': 4,
          'heritage': 5, 'shed': 6, 'canopy': 7, 'temple': 8, 'glass': 9,
@@ -695,18 +750,26 @@ LANDMARK_STYLE = [
 ]
 buildings = []
 btree_src = []
+cut_stats = collections.Counter()
 for p, t, oid in bpolys:
     if not p.intersects(VIS):
         continue
     if p.area < 10:
         continue
     q = fix(p.difference(BLOCKERS).difference(WATER)).intersection(VIS)
+    lost = 1 - q.area / max(p.area, 1e-6)
+    if lost > 0.3 and t.get('building') == 'train_station':
+        cut_stats['elevated station skipped'] += 1
+        continue                      # metro stations stand over the road; the metro layer draws them
+    if lost > 0.3 and p.area > 150:
+        q = fix(p.difference(WATER)).intersection(VIS)        # the footprint is real; the road overlap is a data artefact
+        cut_stats['kept whole'] += 1
     parts = [x for x in as_polys(q) if x.area > 12]
     if not parts:
         continue
     btype = t.get('building', 'yes')
     for part in parts:
-        part = part.simplify(0.35, preserve_topology=True)
+        part = part.simplify(0.06, preserve_topology=True)   # drop only collinear points
         if part.is_empty or part.area < 12:
             continue
         part = shapely.geometry.polygon.orient(part, 1.0)
@@ -837,7 +900,7 @@ for p, t, oid in bpolys:
         buildings.append(dict(p=part, levels=levels, style=STYLE[style], roof=roof, flags=''.join(flags),
                               tint=tint, oid=oid, peth=peth, dist=dist, name=bname if (lm or len(bname) < 40) else ''))
         btree_src.append(part)
-log('buildings', len(buildings), collections.Counter(b['style'] for b in buildings))
+log('buildings', len(buildings), collections.Counter(b['style'] for b in buildings), dict(cut_stats))
 
 ALL_BLD = unary_union([b['p'] for b in buildings])
 bld_tree = STRtree([b['p'] for b in buildings])
@@ -1049,6 +1112,7 @@ log('lamps', len(lamps), 'poles', len(poles))
 
 # signal heads: one pole per approach at the kerb on the left, facing traffic
 for e in edges:
+    if not MAJOR(e): continue
     ln = LineString(e['pts'])
     r = e['r']
     for end, n in ((0, e['a']), (1, e['b'])):
@@ -1488,7 +1552,7 @@ graph_edges = []
 for e in edges:
     r = e['r']
     graph_edges.append([e['a'], e['b'], cm(r['w']), r['rank'], 1 if r['ow'] else 0, r['nid'], cm(r['sw']),
-                        line_out(e['pts']), 1 if r['bridge'] else 0])
+                        line_out(e['pts']), 1 if r['bridge'] else 0, 1 if r['access'] in ('private',) else 0])
 
 metro_out = []
 for g, constr, name in metro_lines:

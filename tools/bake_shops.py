@@ -1,4 +1,4 @@
-# Bake every shop front in the city from real Pune data.
+# Bake the shop boards of the city from real Pune data only (no invented shops).
 #
 #   python3 tools/bake_shops.py        (after tools/bake_map.py; rewrites data/map.json in place)
 #
@@ -17,15 +17,14 @@ import json, math, os, re, sys, collections, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from shapely.geometry import Polygon, Point
 from shapely.strtree import STRtree
-from shopnames import board_name, filler, DIST_W, TRAD, _h
+from shopnames import board_name, _h
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 MAP = os.path.join(ROOT, 'data/map.json')
 OSM = os.path.join(ROOT, 'data/raw/merged.json')
 OVT = os.path.join(ROOT, 'data/raw/overture/places.parquet')
 SHOP_CELL = 3.6                 # must match buildingsChunk.js / the facade shader
-SNAP = 30.0                     # metres from a real place to the wall it is put on
-SECOND = 60.0                   # second pass: unplaced real places into empty nearby slots
+SNAP = 6.0                      # a place must be inside its building or within this many metres of it
 UNIQUE_R = 90.0                 # no repeated name within this radius
 DEFAULT_SHOP_STYLES = {0, 1, 2, 9}           # apartment, commercial, old, glass
 REAL_SHOP_STYLES = {0, 1, 2, 3, 9, 14}       # + bungalow and brick: converted bungalows do have shops
@@ -197,98 +196,35 @@ def slot_point(bi, ei, k):
     t = (k + 0.5) / nslots(L)
     return ax + (bx - ax) * t, az + (bz - az) * t
 
-def try_place(c, radius, allowed):
+NO_BOARD_STYLES = {6, 7, 8, 10, 11, 13}       # sheds, fuel canopies, temples, churches, the fort, Osho pyramid
+def try_place(c):
+    """A real place goes on its own building: the footprint that contains the point, or one within
+    SNAP metres of it. The board hangs on that building's street-facing wall nearest the point.
+    Nothing is moved onto a neighbour, and a place with no such building is left off."""
     p = Point(c['x'], c['z'])
-    near = [int(i) for i in tree.query(p.buffer(radius))]
-    near.sort(key=lambda bi: polys[bi].distance(p))
-    for bi in near[:4]:
-        if polys[bi].distance(p) > radius: break
+    near = [int(i) for i in tree.query(p.buffer(SNAP))]
+    inside = [bi for bi in near if polys[bi].contains(p)]
+    cand = inside or sorted((bi for bi in near if polys[bi].distance(p) <= SNAP), key=lambda bi: polys[bi].distance(p))[:1]
+    for bi in cand:
+        if B[bi][3] in NO_BOARD_STYLES: return False
         opts = []
         for ei, (ax, az, bx, bz, L, fl) in enumerate(edges[bi]):
-            if not allowed(bi, ei): continue
+            if not (L > 2.6 and fl in '12'): continue
             ex, ez = bx - ax, bz - az
             t = max(0.0, min(1.0, ((c['x'] - ax) * ex + (c['z'] - az) * ez) / (L * L)))
-            d = math.hypot(ax + ex * t - c['x'], az + ez * t - c['z'])
-            opts.append((d, ei, t))
-        opts.sort()
-        for d, ei, t in opts:
+            opts.append((math.hypot(ax + ex * t - c['x'], az + ez * t - c['z']), ei, t))
+        for d, ei, t in sorted(opts):
             ns = nslots(edges[bi][ei][4])
             k0 = min(ns - 1, int(t * ns))
-            for dk in sorted(range(-ns, ns + 1), key=abs):
+            for dk in (0, 1, -1, 2, -2):
                 k = k0 + dk
                 if 0 <= k < ns and (bi, ei, k) not in occupied:
                     occupied[(bi, ei, k)] = c; front.add((bi, ei)); c['placed'] = (bi, ei, k)
                     return True
     return False
 
-for bi in range(len(B)):
-    for ei in range(len(edges[bi])):
-        if default_front(bi, ei): front.add((bi, ei))
-n_default = len(front)
-placed = sum(try_place(c, SNAP, real_ok) for c in cands)
-log('placed (pass 1)', placed)
-# pass 2: places a bit further from any wall go into empty slots of existing frontages nearby
-placed2 = sum(try_place(c, SECOND, lambda bi, ei: (bi, ei) in front) for c in cands if 'placed' not in c)
-log('placed (pass 2)', placed2, '| frontage edges', n_default, '->', len(front))
-
-# ---------------------------------------------------------------- fill the rest
-cat_grid = collections.defaultdict(collections.Counter)   # 120 m cells: what real shops sell around here
-for c in cands:
-    cat_grid[(int(c['x'] // 120), int(c['z'] // 120))][c['cat']] += 1
-name_grid = collections.defaultdict(list)
-def name_near(en, x, z):
-    gx, gz = int(x // UNIQUE_R), int(z // UNIQUE_R)
-    for dx in (-1, 0, 1):
-        for dz in (-1, 0, 1):
-            for (n2, x2, z2) in name_grid[(gx + dx, gz + dz)]:
-                if n2 == en and (x2 - x) ** 2 + (z2 - z) ** 2 < UNIQUE_R * UNIQUE_R: return True
-    return False
-def remember(en, x, z): name_grid[(int(x // UNIQUE_R), int(z // UNIQUE_R))].append((en, x, z))
-for (bi, ei, k), c in occupied.items():
-    x, z = slot_point(bi, ei, k); remember(c['en'], x, z)
-
-LOC_DAMP = {'hotel': 0.45, 'clinic': 0.35, 'travel': 0.6, 'generic': 0.7}   # often upstairs / over-listed
-NO_FILL = {'bank', 'atm'}      # banks only where real ones are
-def pick_cat(x, z, dist, seed):
-    w = collections.Counter()
-    base = DIST_W[dist] if 0 <= dist < len(DIST_W) else DIST_W[5]
-    tb = sum(base.values())
-    for k, v in base.items(): w[k] += 0.35 * v / tb
-    loc = collections.Counter()
-    gx, gz = int(x // 120), int(z // 120)
-    for dx in (-1, 0, 1):
-        for dz in (-1, 0, 1):
-            loc.update(cat_grid[(gx + dx, gz + dz)])
-    for k in NO_FILL: loc.pop(k, None)
-    for k, f in LOC_DAMP.items():
-        if k in loc: loc[k] *= f
-    tl = sum(loc.values())
-    if tl >= 4:
-        for k, v in loc.items(): w[k] += 0.65 * v / tl
-    else:
-        for k, v in base.items(): w[k] += 0.65 * v / tb
-    tot = sum(w.values()); r = (seed % 100000) / 100000 * tot
-    for k, v in sorted(w.items()):
-        r -= v
-        if r <= 0: return k
-    return 'generic'
-
-fills = 0
-for (bi, ei) in sorted(front):
-    ns = nslots(edges[bi][ei][4])
-    for k in range(ns):
-        if (bi, ei, k) in occupied: continue
-        x, z = slot_point(bi, ei, k)
-        dist = B[bi][9]
-        cat = pick_cat(x, z, dist, _h('cat', bi, ei, k))
-        s0 = _h('name', bi, ei, k)
-        for tr in range(24):
-            en, mr = filler(cat, s0 + tr * 7919)
-            if not name_near(en, x, z): break
-        trad = cat in TRAD and (B[bi][8] or dist in (1, 5, 6)) and (_h('trad', bi, ei, k) % 100) < 55
-        occupied[(bi, ei, k)] = dict(en=en, mr=mr, cat=cat, brand=False, src=0, trad=trad)
-        remember(en, x, z); fills += 1
-log('invented fillers', fills)
+placed = sum(try_place(c) for c in cands)
+log('real places on their own building', placed, 'of', len(cands), '| frontage edges', len(front))
 
 # ---------------------------------------------------------------- write
 names, nidx, shops = [], {}, []

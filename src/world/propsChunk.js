@@ -190,8 +190,8 @@ export function* buildPropsChunk(W, C, group) {
     const proto = P['stall' + t] || P.stall0;
     const ry = Math.atan2(Math.cos(a), Math.sin(a));
     cb.addGeo(proto, compose(x, 0.15, z, ry, 1, 1, 1, 0, 0, mm), [1, 1, 1]);
-    if (t === 0 && rng.chance(0.6)) {
-      const sh = signs.shops[rng.int(0, signs.shops.length - 1)];
+    if (false) {                       // stall boards used invented shop names; real stalls are unnamed
+      const sh = signs.shops[0];
       const fx = Math.cos(ry), fz = -Math.sin(ry), nx = Math.sin(ry), nz = Math.cos(ry);
       const cx = x + nx * 0.6, cz = z + nz * 0.6;
       sb.quad([cx - fx * 1.1, 1.75, cz - fz * 1.1], [cx + fx * 1.1, 1.75, cz + fz * 1.1], [cx + fx * 1.1, 2.3, cz + fz * 1.1], [cx - fx * 1.1, 2.3, cz - fz * 1.1],

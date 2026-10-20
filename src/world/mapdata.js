@@ -24,7 +24,7 @@ export class Graph {
       const pts = cmRing(e[7]);
       const cum = [0];
       for (let k = 2; k < pts.length; k += 2) cum.push(cum[cum.length - 1] + Math.hypot(pts[k] - pts[k - 2], pts[k + 1] - pts[k - 1]));
-      return { i, a: e[0], b: e[1], w: e[2] / 100, rank: e[3], oneway: !!e[4], name: e[5], sw: e[6] / 100, pts, cum, len: cum[cum.length - 1], bridge: !!e[8] };
+      return { i, a: e[0], b: e[1], w: e[2] / 100, rank: e[3], oneway: !!e[4], name: e[5], sw: e[6] / 100, pts, cum, len: cum[cum.length - 1], bridge: !!e[8], restricted: !!e[9] };
     });
     for (const e of this.edges) {
       const A = this.nodes[e.a], B = this.nodes[e.b];
@@ -134,7 +134,7 @@ export class Graph {
       }
       for (const l of N[n].out) {
         const m = l.dir > 0 ? l.e.b : l.e.a;
-        const w = l.e.len * (l.e.rank >= 4 ? 0.85 : l.e.rank <= 2 ? 1.25 : 1.0);
+        const w = l.e.len * (l.e.restricted ? 3 : l.e.rank >= 4 ? 0.85 : l.e.rank === 0 ? 1.7 : l.e.rank <= 2 ? 1.25 : 1.0);   // gated and compound roads only when they really are the way
         const c = gn + w;
         if (!g.has(m) || c < g.get(m)) { g.set(m, c); prev.set(m, { from: n, link: l }); open.push(m, c + h(m)); }
       }
