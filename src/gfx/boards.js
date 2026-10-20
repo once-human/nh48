@@ -85,6 +85,7 @@ const CAT_STYLE = {
   books: ['flex', '#1e6b3a', '#fff6d8', '#f2c230'], hotel: ['flex', '#16324f', '#ffffff', '#f2c230'], bar: ['modern', '#0b0b0d', '#f2c230', '#8a6cf0'],
   grocery: ['flex', '#e86a1a', '#ffffff', '#1e6b3a'], hardware: ['flex', '#2b7a8c', '#ffffff', '#f2c230'], salon: ['modern', '#f5d6df', '#3a1020', '#b3125a'],
   optician: ['modern', '#ffffff', '#0f4c8a', '#0f4c8a'], electronics: ['modern', '#141f33', '#ffffff', '#33a1fd'], travel: ['flex', '#0f4c8a', '#ffffff', '#f2c230'],
+  police: ['bank', '#0b3d91', '#ffffff', '#e8b923'],
   icecream: ['modern', '#fff2f5', '#b3125a', '#f28fb0'], generic: ['flex', '#f7f1e1', '#0f4c8a', '#b3121b'],
 };
 const FLEX_BG = [['#b3121b', '#ffe7a1'], ['#f2c230', '#2a1a0c'], ['#0f4c8a', '#ffffff'], ['#1e6b3a', '#fff6d8'], ['#ffffff', '#b3121b'],

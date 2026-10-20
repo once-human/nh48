@@ -648,6 +648,35 @@ for k, r in RELS.items():
     if 'building' in t:
         for p in rel_polys(r):
             bpolys.append((p, t, int(k)))
+# Overture Maps buildings (Google Open Buildings + Microsoft ML footprints) fill the gaps OSM has
+# in the dense peths and bastis. Footprints already in OSM, or mostly covered by an OSM building,
+# are skipped so OSM's tagged detail (names, levels, landmarks) always wins.
+OVT_B = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data/raw/overture/buildings.parquet')
+if os.path.exists(OVT_B) and not os.environ.get('NO_OVERTURE'):
+    import duckdb
+    from shapely import wkb as _wkb
+    con = duckdb.connect(); con.sql('load spatial')
+    rows = con.sql(f"""select ST_AsWKB(geometry), list_transform(sources, s -> s.dataset), num_floors, height
+                       from '{OVT_B}'""").fetchall()
+    osm_tree = STRtree([b[0] for b in bpolys])
+    added = 0
+    for i, (g, srcs, floors, height) in enumerate(rows):
+        if 'OpenStreetMap' in srcs:
+            continue
+        geom = _wkb.loads(bytes(g))
+        for gp in ([geom] if geom.geom_type == 'Polygon' else list(getattr(geom, 'geoms', []))):
+            p = fix(Polygon([proj(y, x) for x, y in gp.exterior.coords]))
+            if p.is_empty or p.area < 14:
+                continue
+            cover = sum(bpolys[j][0].intersection(p).area for j in osm_tree.query(p))
+            if cover > 0.3 * p.area:
+                continue
+            t = {'building': 'yes', 'source': 'overture'}
+            if floors: t['building:levels'] = str(int(floors))
+            elif height: t['height'] = str(round(float(height), 1))
+            bpolys.append((p, t, 9_000_000_000 + i))
+            added += 1
+    log('overture buildings added', added)
 
 STYLE = {'apartment': 0, 'commercial': 1, 'old': 2, 'bungalow': 3, 'institution': 4,
          'heritage': 5, 'shed': 6, 'canopy': 7, 'temple': 8, 'glass': 9,

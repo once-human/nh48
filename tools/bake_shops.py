@@ -13,7 +13,7 @@
 #   shopNames: [[english, marathi, category, kind]]          kind: '' | 'brand' | 'trad'
 #   shops:     [[building, edge, slot, nameIndex, source]]   source: 0 invented, 1 OSM, 2 Overture
 #   buildings[..][5] (edge flags): '3' marks a shop frontage edge (decided here, not at runtime)
-import json, math, os, sys, collections, time
+import json, math, os, re, sys, collections, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from shapely.geometry import Polygon, Point
 from shapely.strtree import STRtree
@@ -116,7 +116,6 @@ KW = [('jewel|saraf|gold|diamond|bangle', 'jewellery'), ('medical|chemist|pharma
       ('hardware|paint|plywood|glass|steel|sanitary|tiles|traders', 'hardware'), ('book|stationer|xerox|print', 'books'),
       ('sweet|mithai|farsan|chiwda', 'sweets'), ('bakery|cake|bakers', 'bakery'), ('optic|eye', 'optician'),
       ('kirana|provision|general store|super ?market|mart|dairy|fruit', 'grocery'), ('travel|tour', 'travel')]
-import re
 def kw_cat(name):
     low = name.lower()
     for pat, c in KW:
@@ -144,6 +143,17 @@ for k, w in D['ways'].items():
     if len(cs) >= 3:
         x = sum(p[0] for p in cs) / len(cs); z = sum(p[1] for p in cs) / len(cs)
         add(x, z, t['name'], c, 1, 1.0)
+# police stations and chowkis get the real name on a blue board; hospitals keep their real names too
+for pn, pmr, px, pz, kind, *_ in M['pois']:
+    if kind not in ('police', 'hospital'): continue
+    en = re.split(r'[\u0900-\u097f]', pn)[0].strip(' -,')
+    mr = pmr or ''.join(re.findall(r'[\u0900-\u097f][\u0900-\u097f ]*', pn)).strip()
+    if not en or len(en) > 34: continue
+    if kind == 'police':
+        en = re.sub(r'\bstation\b', 'Station', re.sub(r'\bchowki\b', 'Chowki', en, flags=re.I), flags=re.I)
+        mr = mr or 'महाराष्ट्र पोलीस'
+    cands.append(dict(x=px / 100, z=pz / 100, en=en, mr=mr or 'रुग्णालय', cat='police' if kind == 'police' else 'clinic',
+                      brand=False, src=1, pri=20 if kind == 'police' else 6))
 n_osm = len(cands)
 log('osm candidates', n_osm)
 
