@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { makeDecalTexture } from '../gfx/textures.js';
 import { makeSignAtlas, ensureFonts } from '../gfx/signs.js';
-import { Boards, ensureBoardFonts } from '../gfx/boards.js';
+import { Boards, NearBoards, ensureBoardFonts } from '../gfx/boards.js';
 import { propMaterial, waterMaterial, U } from '../gfx/materials.js';
 import { groundMaterial, facadeMaterial, roofMaterial } from '../gfx/pbr.js';
 import { Graph, Surfaces, Collision } from './mapdata.js';
@@ -61,6 +61,9 @@ export async function buildWorld(M, T, renderer, scene, quality, progress) {
     sign: new THREE.MeshStandardMaterial({ map: W.boards.tex, emissiveMap: W.boards.tex, emissive: 0xffffff, emissiveIntensity: 0.05, roughness: 0.55, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }),
     oldSign: new THREE.MeshStandardMaterial({ map: W.signs.tex, emissiveMap: W.signs.tex, emissive: 0xffffff, emissiveIntensity: 0.05, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }),
   };
+  W.signMats = new Set();           // per-chunk board materials (follow the night glow too)
+  W.nearBoards = new NearBoards(renderer, scene, W.mats.sign, W.index ? W.index.shopNames : (M.shopNames || []));
+  W.signMats.add(W.nearBoards.mat);
   await progress('Laying out the roads', 0.2);
   prepareGroundGlobals(W);
   // static collision for the whole map (cheap 2D grid)
@@ -84,5 +87,6 @@ export async function buildWorld(M, T, renderer, scene, quality, progress) {
 export function updateWorldMaterials(W) {
   const n = U.uNight.value;
   W.mats.sign.emissiveIntensity = 0.05 + n * 0.9;
+  for (const m of W.signMats) m.emissiveIntensity = W.mats.sign.emissiveIntensity;
   W.mats.oldSign.emissiveIntensity = 0.05 + n * 0.8;
 }

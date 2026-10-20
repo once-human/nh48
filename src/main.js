@@ -228,6 +228,7 @@ async function main() {
     frustum.setFromProjectionMatrix(pv);
     camera.getWorldDirection(fwd);
     W.streamer.update(focus.x, focus.z, fwd);
+    W.nearBoards.update(camera.position.x, camera.position.z, dt);
     propT -= dt;
     if (propT <= 0) { updateProps(W, camera.position.x, camera.position.z); propT = 0.2; }
     const t1 = performance.now();
@@ -328,6 +329,7 @@ async function runFly({ W, renderer, scene, camera, sky, post, quality, progress
     updateWorldMaterials(W);
     camera.getWorldDirection(fwd);
     pending = W.streamer.update(cam.x, cam.z, fwd);
+    W.nearBoards.update(cam.x, cam.z, dt);
     propT -= dt;
     if (propT <= 0) { updateProps(W, cam.x, cam.z); propT = 0.25; }
     post.render(dt);

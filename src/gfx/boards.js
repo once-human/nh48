@@ -209,7 +209,7 @@ export class Boards {
     this.res = quality.boardRes || 1;               // 1: 512x128 boards, 0.5: 256x64
     const bw = Math.round(512 * this.res), bh = Math.round(128 * this.res);
     this.bw = bw; this.bh = bh;
-    const cols = 8, rows = 24;
+    const cols = 8, rows = 12;     // 4 rows of fallback boards + 8 rows of billboard ads
     const cv = document.createElement('canvas');
     cv.width = cols * bw; cv.height = rows * bh;
     const ctx = cv.getContext('2d');
@@ -222,8 +222,7 @@ export class Boards {
     };
     for (const key of DIST_POOL) {
       this.slots[key] = [];
-      for (const shop of POOLS[key]) {
-        if (k >= cols * 15) break;
+      for (const shop of POOLS[key].slice(0, 4)) {     // fallback only: real shops come from the map
         const cx = k % cols, cy = Math.floor(k / cols);
         ctx.save(); ctx.translate(cx * bw, cy * bh);
         drawBoard(ctx, bw, bh, shop, rng);
@@ -256,33 +255,139 @@ export class Boards {
     return pool[rng.int(0, pool.length - 1)];
   }
   ad(k) { return this.ads[k % this.ads.length]; }
-  // per-chunk atlas for real (OSM) places in this chunk, drawn under their parody names
-  *chunkAtlas(C, shopsOf) {
+  // Per-chunk atlas of every shop board in the chunk (real places under parody names, plus the
+  // invented ones for frontages no dataset knows), drawn small: past ~35 m a board is only
+  // ~100 px wide on screen. Boards close to the camera are redrawn sharp by NearBoards.
+  *chunkAtlas(C, shopsOf, names) {
     const list = [];
-    for (const bi of C.bld) { const s = shopsOf(bi); if (s) list.push(...s); }
+    for (const bi of C.bld) { const m = shopsOf(bi); if (m) for (const s of m.values()) list.push(s); }
     const out = { tex: null, map: new Map(), get: (s) => out.map.get(s) };
     if (!list.length) return out;
-    const n = Math.min(list.length, 32);
-    const bw = this.bw / 2 | 0, bh = this.bh / 2 | 0;
-    const cols = 4, rows = Math.ceil(n / cols);
+    const bw = BASE_W, bh = BASE_H, cols = 8, rows = Math.ceil(list.length / cols);
     const cv = document.createElement('canvas');
-    cv.width = cols * bw; cv.height = Math.max(1, rows) * bh;
+    cv.width = cols * bw; cv.height = rows * bh;
     const ctx = cv.getContext('2d');
-    const rng = new RNG(C.ci * 13 + 7);
-    for (let k = 0; k < n; k++) {
+    for (let k = 0; k < list.length; k++) {
       const s = list[k];
       const cx = k % cols, cy = Math.floor(k / cols);
-      const kind = (s[3] === 'sweets' || s[3] === 'jewellery') && C.district === 1 ? 'trad' : undefined;
       ctx.save(); ctx.translate(cx * bw, cy * bh);
-      drawBoard(ctx, bw, bh, [s[4], s[5] || '', s[3], kind], rng);
+      ctx.beginPath(); ctx.rect(0, 0, bw, bh); ctx.clip();
+      drawBoard(ctx, bw, bh, names[s[3]] || EMPTY, boardRng(s));
       ctx.restore();
-      yield;
+      if (k & 1) yield;
       out.map.set(s, { local: true, u0: (cx * bw + 1) / cv.width, u1: ((cx + 1) * bw - 1) / cv.width, v0: 1 - ((cy + 1) * bh - 1) / cv.height, v1: 1 - (cy * bh + 1) / cv.height });
     }
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    tex.onUpdate = () => { cv.width = cv.height = 1; };      // the GPU copy is all we need
     out.tex = tex;
     return out;
+  }
+}
+
+const BASE_W = 96, BASE_H = 24;
+const EMPTY = ['', '', 'generic', ''];
+// same colours/fonts for a board whether it is drawn small (chunk atlas) or sharp (NearBoards)
+const boardRng = (s) => new RNG(s[0] * 7919 + s[1] * 131 + s[2] * 17 + 1);
+
+// Sharp versions of the boards around the camera: a fixed 2048x2048 atlas of 256x64 cells that is
+// filled a few boards per frame, and one small mesh of quads laid 1.5 cm in front of the blurry
+// chunk-atlas boards. Memory stays fixed however dense the street is.
+const NCW = 256, NCH = 64, NCOLS = 8, NROWS = 32, NCAP = NCOLS * NROWS;
+export class NearBoards {
+  constructor(renderer, scene, baseMat, names, radius = 36) {
+    this.renderer = renderer; this.names = names; this.R = radius;
+    const cv = document.createElement('canvas');
+    cv.width = NCW * NCOLS; cv.height = NCH * NROWS;
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    tex.onUpdate = () => { cv.width = cv.height = 1; };
+    this.tex = tex;
+    this.scratch = document.createElement('canvas');
+    this.scratch.width = NCW; this.scratch.height = NCH;
+    this.sctx = this.scratch.getContext('2d');
+    this.stex = new THREE.CanvasTexture(this.scratch);
+    this.stex.colorSpace = THREE.SRGBColorSpace;
+    this.mat = baseMat.clone();
+    this.mat.map = tex; this.mat.emissiveMap = tex;
+    this.mat.polygonOffsetFactor = -2; this.mat.polygonOffsetUnits = -4;
+    const g = new THREE.BufferGeometry();
+    this.pos = new Float32Array(NCAP * 12); this.nrm = new Float32Array(NCAP * 12); this.uv = new Float32Array(NCAP * 8);
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('normal', new THREE.BufferAttribute(this.nrm, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('uv', new THREE.BufferAttribute(this.uv, 2).setUsage(THREE.DynamicDrawUsage));
+    const idx = new Uint16Array(NCAP * 6);
+    for (let q = 0; q < NCAP; q++) idx.set([q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3], q * 6);
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.setDrawRange(0, 0);
+    this.geo = g;
+    this.mesh = new THREE.Mesh(g, this.mat);
+    this.mesh.frustumCulled = false; this.mesh.receiveShadow = true;
+    scene.add(this.mesh);
+    this.chunks = new Map();           // ci -> { cx, cz, recs }
+    this.slotOf = new Map();           // rec -> slot
+    this.recOf = new Array(NCAP).fill(null);
+    this.lastUse = new Float64Array(NCAP);
+    this.ready = false; this.t = 0; this.dirty = false; this.want = [];
+  }
+  addChunk(ci, cx, cz, recs) { if (recs.length) this.chunks.set(ci, { cx, cz, recs }); }
+  dropChunk(ci) {
+    const c = this.chunks.get(ci);
+    if (!c) return;
+    for (const r of c.recs) { const sl = this.slotOf.get(r); if (sl !== undefined) { this.slotOf.delete(r); this.recOf[sl] = null; } }
+    this.chunks.delete(ci); this.dirty = true;
+  }
+  update(x, z, dt) {
+    if (!this.ready) { this.renderer.initTexture(this.tex); this.ready = true; }
+    this.t += dt;
+    const now = performance.now();
+    if (this.t > 0.2) {                // re-pick the boards that deserve to be sharp
+      this.t = 0;
+      const R = this.R, R2 = R * R, list = [];
+      for (const c of this.chunks.values()) {
+        if (Math.abs(c.cx - x) > R + 150 || Math.abs(c.cz - z) > R + 150) continue;
+        for (const r of c.recs) { const d = (r.mx - x) ** 2 + (r.mz - z) ** 2; if (d < R2) list.push([d, r]); }
+      }
+      list.sort((a, b) => a[0] - b[0]);
+      this.want = list.slice(0, NCAP - 16).map(e => e[1]);
+      for (const r of this.want) { const sl = this.slotOf.get(r); if (sl !== undefined) this.lastUse[sl] = now; }
+      this.dirty = true;
+    }
+    // draw up to 2 missing boards per frame, nearest first
+    let drawn = 0;
+    for (const r of this.want) {
+      if (drawn >= 2) break;
+      if (this.slotOf.has(r)) continue;
+      let sl = this.recOf.indexOf(null);
+      if (sl < 0) { let best = Infinity; for (let i = 0; i < NCAP; i++) if (this.lastUse[i] < best) { best = this.lastUse[i]; sl = i; } this.slotOf.delete(this.recOf[sl]); }
+      const ctx = this.sctx;
+      ctx.clearRect(0, 0, NCW, NCH);
+      drawBoard(ctx, NCW, NCH, this.names[r.s[3]] || EMPTY, boardRng(r.s));
+      const cx = sl % NCOLS, cy = Math.floor(sl / NCOLS);
+      this.renderer.copyTextureToTexture(this.stex, this.tex, null, new THREE.Vector2(cx * NCW, cy * NCH));
+      this.recOf[sl] = r; this.slotOf.set(r, sl); this.lastUse[sl] = now;
+      drawn++; this.dirty = true;
+    }
+    if (!this.dirty) return;
+    this.dirty = false;
+    let q = 0;
+    const W = NCW * NCOLS, H = NCH * NROWS, o = 0.015;
+    for (const r of this.want) {
+      const sl = this.slotOf.get(r);
+      if (sl === undefined) continue;
+      const cx = sl % NCOLS, cy = Math.floor(sl / NCOLS);
+      const u0 = (cx * NCW + 1.5) / W, u1 = ((cx + 1) * NCW - 1.5) / W;
+      const v0 = (cy * NCH + 1.5) / H, v1 = ((cy + 1) * NCH - 1.5) / H;
+      const ua = r.ltr ? u0 : u1, ub = r.ltr ? u1 : u0;
+      const ox = r.nx * o, oz = r.nz * o;
+      this.pos.set([r.x0 + ox, r.y0, r.z0 + oz, r.x1 + ox, r.y0, r.z1 + oz, r.x1 + ox, r.y1, r.z1 + oz, r.x0 + ox, r.y1, r.z0 + oz], q * 12);
+      for (let k = 0; k < 4; k++) this.nrm.set([r.nx, 0, r.nz], q * 12 + k * 3);
+      this.uv.set([ua, v0, ub, v0, ub, v1, ua, v1], q * 8);
+      q++;
+    }
+    const g = this.geo;
+    g.attributes.position.needsUpdate = true; g.attributes.normal.needsUpdate = true; g.attributes.uv.needsUpdate = true;
+    g.setDrawRange(0, q * 6);
   }
 }
 
