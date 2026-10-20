@@ -54,22 +54,23 @@ export class CameraRig {
     const th = p.th;
     if (this.orbitT > 0) this.orbitT -= dt; else { this.orbit = damp(this.orbit, 0, 2.5, dt); this.pitchOff = damp(this.pitchOff, 0, 2.5, dt); }
     const speed = Math.abs(p.v);
-    if (this.mode === 2 && p.inAuto !== false) {
+    const E = p.cockpitEye;
+    if (this.mode === 2 && E) {
       // driver's seat: eyes above the seat; the view rides on the body (roll, pitch, wheel lift, tip-over)
       p.setCockpit(true);
-      this.setNear(0.1);
+      this.setNear(0.05);
       const m = p.tilt.matrixWorld;
       p.tilt.updateWorldMatrix(true, false);
       const yaw = this.orbit + (this.lookBack ? Math.PI : 0);
-      const pitch = -0.17 + this.pitchOff * 0.6;
-      const ex = this.lookBack ? 0.2 : 0.3, ey = 1.49;
-      _eye.set(ex, ey, 0).applyMatrix4(m);
-      _tgt.set(ex + Math.cos(yaw) * Math.cos(pitch) * 10, ey + Math.sin(pitch) * 10, Math.sin(yaw) * Math.cos(pitch) * 10).applyMatrix4(m);
+      const pitch = (p.inAuto ? -0.17 : -0.09) + this.pitchOff * 0.6;
+      const ex = E[0] - (this.lookBack ? 0.1 : 0), ey = E[1], ez = E[2];
+      _eye.set(ex, ey, ez).applyMatrix4(m);
+      _tgt.set(ex + Math.cos(yaw) * Math.cos(pitch) * 10, ey + Math.sin(pitch) * 10, ez + Math.sin(yaw) * Math.cos(pitch) * 10).applyMatrix4(m);
       _up.set(0, 1, 0).transformDirection(m);
       cam.position.copy(_eye);
       cam.up.copy(_up);
       cam.lookAt(_tgt);
-      this.setFov(dt, 78 + speed * 0.3);
+      this.setFov(dt, (p.inAuto ? 78 : 70) + speed * 0.3);
       this.applyShake(dt);
       return;
     }
@@ -77,8 +78,9 @@ export class CameraRig {
     this.setNear(0.3);
     const far = this.mode === 1;
     const big = p.camDist || 0;
-    const dist = (far ? 8.2 : 5.4) + speed * 0.08 + big;
-    const height = (far ? 3.2 : 2.25) + speed * 0.02 + this.pitchOff * 4 + big * 0.35;
+    // framing like Slow Roads: the vehicle sits low in the frame with the road opening up ahead
+    const dist = (far ? 8.6 : 6.2) + speed * 0.07 + big;
+    const height = (far ? 3.3 : 2.45) + speed * 0.015 + this.pitchOff * 4 + big * 0.35;
     if (!this.inited) { this.yaw = th; this.inited = true; this.pos.set(p.x - Math.cos(th) * dist, p.y + height, p.z - Math.sin(th) * dist); }
     // heading lag: the camera swings behind the auto smoothly
     this.yaw = dampAngle(this.yaw, th, speed > 0.5 ? 3.2 : 1.6, dt);
@@ -94,7 +96,7 @@ export class CameraRig {
     this.pos.x = damp(this.pos.x, cx, 9, dt); this.pos.z = damp(this.pos.z, cz, 9, dt); this.pos.y = damp(this.pos.y, cy, 6, dt);
     cam.position.copy(this.pos);
     cam.up.set(0, 1, 0);
-    this.look.set(tx, ty + 0.15, tz);
+    this.look.set(tx + Math.cos(th) * 1.6, ty + 0.35, tz + Math.sin(th) * 1.6);
     cam.lookAt(this.look);
     this.setFov(dt, 60 + speed * 0.65);
     this.applyShake(dt);

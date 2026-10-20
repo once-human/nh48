@@ -17,7 +17,7 @@ export class PlayerAuto {
     this.tilt = new THREE.Group();       // roll/pitch/bounce
     this.root.add(this.tilt);
     scene.add(this.root);
-    const m = buildAuto({ solid: true, sepShield: true });
+    const m = buildAuto({ solid: true, sepShield: true, sepBar: true });
     this.bodyMesh = new THREE.Mesh(m.body, mats.solid);
     this.bodyMesh.castShadow = true; this.bodyMesh.receiveShadow = true;
     this.glassMesh = new THREE.Mesh(m.glass, mats.glass);
@@ -26,6 +26,14 @@ export class PlayerAuto {
     this.shieldMesh = new THREE.Mesh(m.shield, shieldMat);
     this.shieldMesh.renderOrder = 3;
     this.tilt.add(this.bodyMesh, this.glassMesh, this.shieldMesh);
+    // handlebar on its own pivot: turns with the front wheel (and the driver's hands go with it)
+    this.barPivot = new THREE.Group();
+    this.barPivot.position.set(...m.barPivot);
+    this.barAxis = new THREE.Vector3(...m.barAxis).normalize();
+    this.barMesh = new THREE.Mesh(m.bar, mats.solid);
+    this.barMesh.castShadow = true;
+    this.barPivot.add(this.barMesh);
+    this.tilt.add(this.barPivot);
     // wheels
     const wg = new ColorBuilder();
     wg.addGeo(new THREE.CylinderGeometry(1, 1, 1, 16), new THREE.Matrix4().makeRotationX(Math.PI / 2).multiply(new THREE.Matrix4().makeScale(R_WHEEL, 0.12, R_WHEEL)), [0.06, 0.06, 0.06]);
@@ -52,7 +60,8 @@ export class PlayerAuto {
     addRider(da, 0.32, 0.8, 0, { lean: 0.08, shirt: [0.78, 0.76, 0.7], pants: [0.24, 0.2, 0.18], handX: 0.72, handY: 1.07, handW: 0.33, footX: 0.66, footY: 0.42, noUpper: true });
     this.driverArms = new THREE.Mesh(da.build(), mats.solid);
     this.driverArms.visible = false;
-    this.tilt.add(this.driverArms);
+    this.driverArms.position.set(-m.barPivot[0], -m.barPivot[1], -m.barPivot[2]);
+    this.barPivot.add(this.driverArms);
     this.paxMeshes = [];
     for (let k = 0; k < 2; k++) {
       const pb = new ColorBuilder();
@@ -69,7 +78,7 @@ export class PlayerAuto {
       const uv = g.attributes.uv;
       for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) ? s.u1 : s.u0, uv.getY(i) ? s.v1 : s.v0);
       const st = new THREE.Mesh(g, W.mats.oldSign);
-      st.position.set(-1.418, 1.08, 0);
+      st.position.set(-1.452, 1.1, 0);
       st.rotation.y = -Math.PI / 2;
       this.tilt.add(st);
     }
@@ -79,6 +88,7 @@ export class PlayerAuto {
     this.tilt.add(this.headlight, this.headlight.target);
 
     this.agent = { x: 0, z: 0, hx: 1, hz: 0, v: 0, W: 1.4, L: 2.7, isPlayer: true };
+    this.cockpitEye = [0.3, 1.49, 0];
     this.rng = new RNG(7);
     this.reset(0, 0, 0);
     this.events = [];          // impacts, bumps, tipovers, etc. for game + audio
@@ -293,7 +303,7 @@ export class PlayerAuto {
             o.angry = 6;
             if (T.two && imp > 3.0 && !o.fallen) { o.fallen = 3.5; this.events.push({ type: 'knock', who: 'two', speed: imp, x: o.x, z: o.z }); }
             else if (imp > 1.5) this.events.push({ type: 'hit', who: o.type, speed: imp, x: o.x, z: o.z });
-            traffic.honks.push({ x: o.x, z: o.z, kind: T.honk, n: 3 });
+            if (!(o.honkT > 0)) { o.honkT = 2.5; traffic.honks.push({ x: o.x, z: o.z, kind: T.honk, n: 2 }); }   // once per bump, not every frame of contact
           }
           return;
         }
@@ -341,5 +351,6 @@ export class PlayerAuto {
       w.mesh.rotation.z = -this.wheelSpin;
       if (w.front) w.steer.rotation.y = -this.steer;
     }
+    this.barPivot.quaternion.setFromAxisAngle(this.barAxis, -this.steer);
   }
 }

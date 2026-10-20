@@ -58,6 +58,7 @@ export class Pilot {
   get agent() { return this.onFoot ? this.foot.agent : this.cur.agent; }
   get spec() { return this.onFoot ? null : this.cur === this.auto ? specOf('auto') : this.cur.spec; }
   get inAuto() { return this.cur === this.auto && !this.onFoot; }
+  get cockpitEye() { return this.onFoot ? null : this.cur.cockpitEye || null; }
   get camDist() { const s = this.spec; return s ? Math.max(0, s.L - 2.7) * 0.75 : -2; }
   setCockpit(on) { if (!this.onFoot && this.cur.setCockpit) this.cur.setCockpit(on); }
   setPassengers(n, s) { this.auto.setPassengers(n, s); }

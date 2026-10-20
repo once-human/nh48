@@ -3,6 +3,7 @@
 // figures (top speed, 0–60 feel, braking, turning circle), slowed by load, footpaths and potholes.
 import * as THREE from 'three';
 import { buildScooter, buildBike, buildCycle, buildCar, buildBus, buildTempo, buildAuto, PAINTS } from './models.js';
+import { buildCarCockpit } from './cockpit.js';
 import { clamp, lerp, wrapAngle } from '../core/util.js';
 import { lin } from '../world/geo.js';
 
@@ -29,7 +30,7 @@ function modelFor(type) {
     case 'scooter': case 'scooterP': return buildScooter({ parked: true });
     case 'bike': case 'bikeP': return buildBike({ parked: true });
     case 'cycle': return buildCycle();
-    case 'hatch': case 'sedan': case 'suv': case 'taxi': return buildCar(type);
+    case 'hatch': case 'sedan': case 'suv': case 'taxi': return buildCar(type, { interior: true });
     case 'tempo': return buildTempo();
     case 'auto': return buildAuto({ withWheels: true });
     case 'bus': return buildBus();
@@ -71,6 +72,14 @@ export class Vehicle {
       const g = new THREE.Mesh(m.glass, vmats.glass);
       this.tilt.add(g);
     }
+    // driver's-seat view: cars get a real interior (dashboard, turning wheel, live cluster)
+    if (['hatch', 'sedan', 'suv', 'taxi'].includes(type)) {
+      this.cockpit = buildCarCockpit(type, vmats);
+      this.tilt.add(this.cockpit.group);
+      this.cockpitEye = this.cockpit.eye;
+    } else if (S.two) this.cockpitEye = [S.seat[0] + 0.14, S.seat[1] + 0.74, 0];
+    else if (type === 'bus') this.cockpitEye = [S.L / 2 - 0.85, 2.35, 0.75];
+    else if (type === 'tempo') this.cockpitEye = [1.05, 1.6, 0.32];
     this.headlight = new THREE.SpotLight(0xfff1d0, 0, 55, 0.5, 0.5, 1.3);
     this.headlight.position.set(S.L / 2 - 0.1, 0.8, 0);
     this.headlight.target.position.set(S.L / 2 + 12, 0, 0);
@@ -88,7 +97,7 @@ export class Vehicle {
       gear: 1, rpm: 0.15, shiftT: 0, reverse: false, revT: 0, throttle: 0, brake: 0, prevH: [0, 0], onFootpath: false, load: 0 });
     this.sync();
   }
-  setCockpit() {}
+  setCockpit(on) { this.inCockpit = on; if (this.cockpit) this.cockpit.group.visible = on; }
   get gearCount() { return this.spec.gears.length + 1; }
 
   heightAt(x, z) {
@@ -227,7 +236,7 @@ export class Vehicle {
               o.angry = 6;
               if (T.two && imp > 3.0 && !o.fallen) { o.fallen = 3.5; this.events.push({ type: 'knock', who: 'two', speed: imp, x: o.x, z: o.z }); }
               else if (imp > 1.5) this.events.push({ type: 'hit', who: o.type, speed: imp, x: o.x, z: o.z });
-              traffic.honks.push({ x: o.x, z: o.z, kind: T.honk, n: 3 });
+              if (!(o.honkT > 0)) { o.honkT = 2.5; traffic.honks.push({ x: o.x, z: o.z, kind: T.honk, n: 2 }); }   // once per bump, not every frame of contact
             } else if (imp > 2.2) this.events.push({ type: 'crash', speed: imp, kind: 2, x: o.x, z: o.z });
           }
           return;
@@ -244,6 +253,7 @@ export class Vehicle {
     const idle = this.v === 0 ? Math.sin(performance.now() / 1000 * (this.spec.two ? 70 : 40)) * 0.0015 : 0;
     this.tilt.position.set(0, this.y + idle, 0);
     this.tilt.rotation.set(this.lean, 0, this.pitch, 'YXZ');
+    if (this.inCockpit && this.cockpit) this.cockpit.update(this.steer, Math.abs(this.v) * 3.6, this.gear, this.rpm);
   }
   dispose() {
     this.root.parent?.remove(this.root);
