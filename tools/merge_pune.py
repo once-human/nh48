@@ -44,72 +44,6 @@ def cnode(x, z):
     return coarse_key[k]
 
 base = dict(landmarks=[], areas=[], flyovers=[], metro=[], mstations=[], buses=[], places=[], pois=[])
-# ---------------------------------------------------------------- local shops where the data is thin
-# Overture lists thousands of businesses in the old city and a handful in Akurdi, Loni or Wagholi, which
-# have just as many shops in real life. Where a tile has few, the ground floors facing its main roads get
-# the everyday trades of any Pune neighbourhood (kirana, medical, amruttulya, vada pav, salon, mobile
-# repair...) with ordinary invented names. Real places are never moved or renamed.
-LOCAL = [
-    (18, 'grocery', 'किराणा', ['Kirana Stores', 'General Stores', 'Provision Stores', 'Super Market', 'Kirana & General']),
-    (10, 'pharmacy', 'मेडिकल', ['Medical', 'Medical & General Stores', 'Chemists', 'Medicals']),
-    (10, 'food', 'अमृततुल्य', ['Amruttulya', 'Tea House', 'Tea Centre']),
-    (10, 'food', 'वडापाव', ['Vada Pav Centre', 'Misal House', 'Snacks Centre', 'Wadapav & Misal']),
-    (7, 'food', 'हॉटेल', ['Pure Veg', 'Family Restaurant', 'Biryani House', 'Thali Bhojanalay']),
-    (8, 'salon', 'सलून', ['Hair Salon', "Men's Parlour", 'Beauty Parlour', 'Hair Cutting Saloon']),
-    (7, 'mobile', 'मोबाईल', ['Mobile Shoppee', 'Mobile Repairing', 'Mobile Gallery']),
-    (6, 'hardware', 'हार्डवेअर', ['Hardware & Paints', 'Electricals', 'Hardware & Sanitary']),
-    (4, 'sweets', 'स्वीट्स', ['Sweets', 'Sweet Mart', 'Dairy & Sweets']),
-    (5, 'bakery', 'बेकरी', ['Bakery', 'Bakers', 'Cake Shop']),
-    (7, 'clothes', 'कपडे', ['Collection', 'Garments', 'Matching Centre', 'Readymade Centre']),
-    (6, 'generic', 'दुकान', ['Xerox & Stationery', 'Enterprises', 'Traders', 'Gift Centre']),
-]
-LOCAL_W = sum(w for w, *_ in LOCAL)
-PREFIX = ['Shree', 'Om Sai', 'Jai Malhar', 'Mauli', 'Gajanan', 'Swami Samarth', 'Ganesh', 'Laxmi', 'Durga', 'Siddhivinayak',
-          'Navkar', 'Royal', 'New', 'Shivshakti', 'Sai', 'Datta', 'Vitthal', 'Ambika', 'Jay Bhavani', 'Tulja Bhavani', 'Yashoda',
-          'Krishna', 'Balaji', 'Mahalaxmi', 'Omkar', 'Shivam', 'Samruddhi', 'Parshwa', 'Matoshree', 'Shubham', 'Kalyani', 'Swaraj']
-SHOP_STYLES = {0, 1, 2, 9}
-def hsh(*a):
-    h = 2166136261
-    for c in repr(a).encode(): h = ((h ^ c) * 16777619) & 0xffffffff
-    return h
-def densify(M):
-    B, shops, names = M['buildings'], M.setdefault('shops', []), M.setdefault('shopNames', [])
-    cap = int(0.14 * len(B)) - len(shops)           # about as many as the old city has per building
-    if not B or cap <= 0: return 0
-    has = {s[0] for s in shops}
-    cand = []                                       # (hash, building, edge, slots) for street walls without shops
-    for bi, b in enumerate(B):
-        if bi in has or b[3] not in SHOP_STYLES: continue
-        r, fl = b[1], b[5]
-        for ei in range(min(len(r) // 2, len(fl))):
-            f = fl[ei]
-            if f not in '12': continue
-            ax, az, bx, bz = r[2 * ei], r[2 * ei + 1], r[(2 * ei + 2) % len(r)], r[(2 * ei + 3) % len(r)]
-            L = math.hypot(bx - ax, bz - az) / 100
-            if L <= 2.6: continue
-            # main-road walls first, then side streets
-            cand.append(((0 if f == '2' else 1), hsh('e', bi, ei), bi, ei, max(1, int(L // 3.6)), ax, az, bx, bz))
-    cand.sort()
-    added = 0
-    for _, _, bi, ei, ns, ax, az, bx, bz in cand:
-        if added >= cap: break
-        put = 0
-        for k in range(ns):
-            h = hsh('s', bi, ei, k)
-            if h % 100 > 80: continue
-            x = h % LOCAL_W
-            for w, cat, mr, kinds in LOCAL:
-                if x < w: break
-                x -= w
-            nm = f"{PREFIX[(h >> 8) % len(PREFIX)]} {kinds[(h >> 16) % len(kinds)]}"
-            names.append([nm, mr, cat, ''])
-            shops.append([bi, ei, k, len(names) - 1, 0])
-            M.setdefault('pins', []).append([nm, mr, cat, int(ax + (bx - ax) * (k + 0.5) / ns), int(az + (bz - az) * (k + 0.5) / ns), 0])
-            put += 1; added += 1
-        fl = B[bi][5]
-        if put * 2 >= ns: B[bi][5] = fl[:ei] + '3' + fl[ei + 1:]      # mostly shops: the open-shutter front
-    return added
-
 SUB = 4                                          # 4 km bake tiles -> 4 x 4 streamed pieces of 1 km
 def split(T, rect, ti, tj, vis, CH, NCX, act_meta):
     w, h = (rect[2] - rect[0]) / SUB, (rect[3] - rect[1]) / SUB
@@ -184,8 +118,6 @@ files = sorted(glob.glob(os.path.join(SRC, 't_*.json')))
 for f in files:
     i, j = map(int, re.findall(r't_(\d+)_(\d+)\.json', f)[0])
     M = json.load(open(f))
-    nloc = densify(M)
-    if nloc: print(f"tile {i},{j}: {nloc} local shops added", flush=True)
     if meta is None: meta = dict(M['meta']); meta.pop('tile', None); meta.pop('play', None)
     rect = M['meta']['tile']                       # cm
     vis, CH, NCX = meta['vis'], meta['chunk'] * 100, meta['ncx']
@@ -258,12 +190,7 @@ for f in files:
         with gzip.open(os.path.join(OUT, f't_{si}_{sj}.json.gz'), 'wb', 9) as fh: fh.write(s)
         tiles.append([si, sj, sr, len(s)])
     print(f'tile {i},{j}', 'buildings', len(B), 'pins', len(T['pins']), flush=True)
-# every shop and place in Pune for the map and its search, loaded in the background once you're playing
-allpins = []
-for fz in glob.glob(os.path.join(OUT, 't_*.json.gz')):
-    allpins += json.load(gzip.open(fz)).get('pins', [])
-with gzip.open(os.path.join(OUT, 'pins.json.gz'), 'wb', 9) as fh: fh.write(json.dumps([p[:5] for p in allpins], separators=(',', ':'), ensure_ascii=False).encode())
-print('pins', len(allpins))
+# (every real place for the map's search: tools/bake_allplaces.py writes data/pune/pins.json.gz)
 out = dict(meta={**meta, 'outline': [[round(v, 5) for v in p] for p in outline], 'tiles': tiles, 'tileSize': 1000, 'activity': act_meta},
            names=names, coarse=dict(nodes=coarse_nodes, edges=coarse_edges), cwater=cwater, districts=['deccan', 'peth', 'camp', 'kp', 'station', 'residential', 'riverside'],
            landmarks=base['landmarks'], areas=base['areas'], flyovers=base['flyovers'], metro=base['metro'], mstations=base['mstations'], buses=base['buses'], places=base['places'], pois=base['pois'], street=1)

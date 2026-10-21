@@ -232,10 +232,11 @@ export class Game {
       if (this.crowd) for (const s of this.crowd.pool) { s.H.holder.visible = true; at(s.H.holder); for (const o of s.H.parts) o.visible = true; shown.push(s); }
       // every kind you can take, with its driver's-seat interior showing (that view compiles too)
       for (const t of ['sedan', 'hatch', 'suv', 'taxi', 'scooter', 'bike', 'cycle', 'auto', 'bus', 'tempo']) { const v = new Vehicle(this.W, this.scene, this.vmats, t); if (v.cockpit) v.cockpit.group.visible = true; at(v.root); tmp.push(v); }
+      const pv = this.player.human && { vis: this.player.human.holder.visible, pos: this.player.human.holder.position.clone() };
       if (this.player.human) { this.player.human.holder.visible = true; at(this.player.human.holder); }
       await R.compileAsync(this.scene, cam);       // in parallel on the GPU driver where it can
       R.render(this.scene, cam);
-      if (this.player.human) this.player.human.holder.visible = false;
+      if (pv) { this.player.human.holder.visible = pv.vis; this.player.human.holder.position.copy(pv.pos); }   // back as it was (at the wheel, or wherever)
     } catch (e) { console.warn('prewarm', e); }
     for (const s of shown) { s.H.holder.visible = false; if (kit) kit.applyLook(s.H, s.H.look); }
     for (const v of tmp) v.dispose();

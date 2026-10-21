@@ -103,7 +103,7 @@ export class Pilot {
     else {
       this.cur.update(dt, inp, traffic);
       for (const e of this.cur.events) this.events.push(e);
-      if (this.riderShown) this.placeRider();
+      if (this.riderShown) { this.placeRider(); if (this.human && !this.cockpitOn && !this.human.holder.visible) this.human.holder.visible = true; }
       else if (this.human) this.human.holder.visible = false;     // never left standing on the road
     }
     if (this.onFoot && this.human && !this.human.holder.visible) this.human.holder.visible = true;
@@ -430,7 +430,13 @@ export class Pilot {
     this.scene.add(this.human.holder);
     if (old) { this.human.holder.visible = old.holder.visible; this.human.holder.position.copy(old.holder.position); this.human.holder.rotation.copy(old.holder.rotation); this.scene.remove(old.holder); old.dispose(); }
     else this.human.holder.visible = false;
-    if (this.riderShown) this.showRider(this.riderShown, this.seat); else this.human.play('idle');
+    if (this.riderShown) this.showRider(this.riderShown, this.seat);
+    else if (!this.onFoot && this.cur) {
+      // already in a vehicle when the body arrived (a resumed game starts at the wheel): sit in it
+      const veh = this.cur, S = veh === this.auto ? specOf('auto') : veh.spec;
+      const seat = seatFor(veh, S, veh === this.auto || veh.type === 'auto');
+      if (seat) { this.showRider(veh, seat); this.human.holder.visible = !this.cockpitOn; if (veh === this.auto) this.auto.driver.visible = false; }
+    } else this.human.play('idle');
   }
   addDropped(veh, traffic) {
     const S = veh === this.auto ? specOf('auto') : veh.spec;

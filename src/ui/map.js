@@ -125,9 +125,9 @@ export class CityMap {
     const seen = this.pinSeen || (this.pinSeen = new Set());
     for (const q of pins) {
       const c = q[2], id = q[0] + '@' + q[3] + ',' + q[4];
-      if (c === 'police' || seen.has(id)) continue;
+      if (seen.has(id)) continue;
       seen.add(id);
-      const p = { n: q[0], mr: q[1], c: FOOD.has(c) ? 'food' : (SHOPC[c] || (c === 'service' ? 'service' : 'shop')), sub: c, x: q[3] / 100, z: q[4] / 100 };
+      const p = { n: q[0], mr: q[1], c: CATS[c] ? c : FOOD.has(c) ? 'food' : (SHOPC[c] || 'shop'), sub: c, x: q[3] / 100, z: q[4] / 100 };
       this.places.push(p);
       const k = this.key(p.x, p.z); if (!this.pgrid.has(k)) this.pgrid.set(k, []); this.pgrid.get(k).push(p);
     }
