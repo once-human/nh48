@@ -649,6 +649,13 @@ export class Interiors {
       for (const s of R.seats) if (s.sofa && rng.chance(0.6)) { s.used = true; const q = make(s.x, s.z, s.yaw, rng.pick(['sit', 'sit_talk']), rng.chance(0.5)); name(q); }
     }
     if (R.lifters) for (let i = 0; i < R.lifters; i++) make(R.O.x - 4 + i * 2.6, R.O.z + 3.8, Math.PI / 2, rng.pick(['crouch', 'push', 'idle']), rng.chance(0.3));
+    // everyone who isn't staff has a name and is someone you could talk to (young, out, up for it)
+    const staff = R.people.length;
+    R.peds.forEach((q, k) => {
+      if (k < staff || q.police) return;
+      if (!q.name) name(q);
+      if (q.name && /^(kaka|ajoba|kaku|aaji|aunty)$/.test(q.persona)) q.persona = q.female ? rng.pick(['collegegirl', 'kpgirl']) : rng.pick(['collegeboy', 'kpguy']);
+    });
     ppl.rng = pplRng;
     // what happened the last time you were in (same crowd): who walked off, who you got along with
     for (const p of R.peds) { const m = p.name && this._mem[p.name]; if (m) { p.walkedOff = m.walkedOff; p.interest = m.interest; p.approached = m.approached; } }
@@ -656,20 +663,29 @@ export class Interiors {
   }
   addPerson(x, z, yaw, anim, female) { if (!this.cur || !this._make) return null; const p = this._make(x, z, yaw, anim, !!female); this.markHearts(this.cur.R); return p; }
   // a small heart over the people who'd be up for a chat (the other gender from you, not walked off)
+  // a heart over everyone you could talk to: pink for someone new, blue for someone you're talking to or
+  // seeing, black for your partner (and bigger over the one you're here to meet)
+  heartTex(fill, line) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d');
+    x.fillStyle = fill; x.strokeStyle = line; x.lineWidth = 4;
+    x.beginPath(); x.moveTo(32, 54); x.bezierCurveTo(4, 34, 8, 8, 32, 20); x.bezierCurveTo(56, 8, 60, 34, 32, 54); x.closePath(); x.stroke(); x.fill();
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.SpriteMaterial({ map: t, depthTest: true, transparent: true, toneMapped: false });
+  }
+  heartKind(p) {
+    const D = this.g.date, ct = D && p.name && (D.contacts || []).find(c => c.name === p.name && !c.done);
+    if (ct && ct.partner) return 'partner';
+    if (ct || p.dateWith || (p.interest || 0) > 0) return 'seeing';
+    return 'new';
+  }
   markHearts(R) {
     const G = this.g;
-    if (!this.heartMat) {
-      const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d');
-      x.fillStyle = '#ff5c7a'; x.strokeStyle = '#2a0a12'; x.lineWidth = 4;
-      x.beginPath(); x.moveTo(32, 54); x.bezierCurveTo(4, 34, 8, 8, 32, 20); x.bezierCurveTo(56, 8, 60, 34, 32, 54); x.closePath(); x.stroke(); x.fill();
-      const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
-      this.heartMat = new THREE.SpriteMaterial({ map: t, depthTest: true, transparent: true, toneMapped: false });
-    }
+    if (!this.heartMats) this.heartMats = { new: this.heartTex('#ff5c7a', '#2a0a12'), seeing: this.heartTex('#3d8bff', '#06142e'), partner: this.heartTex('#111114', '#f4f1ea') };
     for (const m of R.hearts || []) G.scene.remove(m);
     R.hearts = [];
     for (const p of R.peds) {
       if (!p.name || !(p.dateWith || G.date && G.date.eligible(p))) continue;
-      const m = new THREE.Sprite(this.heartMat); m.scale.setScalar(p.dateWith ? 0.34 : 0.22);
+      const m = new THREE.Sprite(this.heartMats[this.heartKind(p)]); m.scale.setScalar(p.dateWith ? 0.34 : 0.22);
       m.position.set(p.x, FLOOR + (/sit/.test(p.anim) ? 1.55 : 2.05), p.z); m.userData.p = p;
       G.scene.add(m); R.hearts.push(m);
     }
@@ -724,7 +740,10 @@ export class Interiors {
       case 'talk':
         if (C.dancing) this.dance(false);
         // a date: sit down next to them first, then talk
-        if (s.p.dateWith && s.p.dateSeat && !C.seat) { s.p.dateSeat.used = false; this.sit(s.p.dateSeat); }
+        if (s.p.dateWith && !C.seat) {
+          const seat = s.p.dateSeat || C.R.seats.filter(q => !q.used && !q.salon && Math.hypot(q.x - s.p.x, q.z - s.p.z) < 1.8).sort((a, b) => Math.hypot(a.x - s.p.x, a.z - s.p.z) - Math.hypot(b.x - s.p.x, b.z - s.p.z))[0];
+          if (seat) { seat.used = false; this.sit(seat); }
+        }
         G.date && G.date.talk(s.p, C); return;
     }
   }
@@ -735,6 +754,9 @@ export class Interiors {
     P.foot.x = seat.x; P.foot.z = seat.z; P.foot.yaw = seat.yaw; P.foot.vx = P.foot.vz = 0;
     P.seated = true;
     P.human.play('sit', { fade: 0.45 });
+    // the chat panel pauses your own update, so put you in the chair now rather than when it closes
+    const H = P.human;
+    if (H && H.holder) { H.holder.position.x = seat.x; H.holder.position.z = seat.z; H.holder.rotation.set(0, -seat.yaw, 0); H.mixer.update(0.6); }
     void salon;
   }
   stand() {
@@ -859,7 +881,7 @@ export class Interiors {
     this.approachTick(dt);
     // the floor pulses with the beat
     if (R.ball) R.ball.rotation.y += dt * 0.8;
-    if (R.hearts) { const t = performance.now() / 1000; for (const m of R.hearts) { const p = m.userData.p; m.visible = !p.walkedOff && !(G.date && G.date.cur && G.date.cur.p === p); m.position.x = p.x; m.position.z = p.z; m.position.y += Math.sin(t * 3 + p.id) * 0.002; } }
+    if (R.hearts) { const t = performance.now() / 1000; for (const m of R.hearts) { const p = m.userData.p; m.visible = !p.walkedOff && !(G.date && G.date.cur && G.date.cur.p === p); if ((this._hk = (this._hk || 0) + 1) % 30 === 0) m.material = this.heartMats[this.heartKind(p)]; m.position.x = p.x; m.position.z = p.z; m.position.y += Math.sin(t * 3 + p.id) * 0.002; } }
     if (R.dyn.length) {
       const t = performance.now() / 1000, beat = (t * 124 / 60) % 1;
       R.dyn.forEach((g, i) => { if (g === R.ball) return; const h = ((i * 0.13 + t * 0.1) % 1); const v = (beat < 0.25 ? 1 : 0.35) * (((i + Math.floor(t * 2.07)) % 3) ? 0.5 : 1); g.material.color.setHSL(h, 0.9, 0.12 + v * 0.35); });
