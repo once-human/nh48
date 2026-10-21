@@ -1559,7 +1559,7 @@ ground_layers.append(('bridge_sw', chunked_polys(bridge_sw)))
 
 # kerb lines: road boundary that is not over water and not on the outer edge
 kerb_src = fix(unary_union([ROAD, MEDIANS])).boundary
-kerb_src = kerb_src.difference(RIVER.buffer(0.3)).difference(VIS.exterior.buffer(0.5))
+kerb_src = kerb_src.difference(RIVER.buffer(0.3)).difference(VIS.boundary.buffer(0.5))
 ROAD_M = fix(unary_union([ROAD, MEDIANS])); shapely.prepare(ROAD_M)
 def orient_left(lines, region, inside_is_left=True, probe=0.35):
     out = []
