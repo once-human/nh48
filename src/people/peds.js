@@ -686,6 +686,20 @@ export class People {
         break;
       }
     }
+    // talking to themselves as they pass: the price of kothimbir, a late cab, a deadline
+    this.mutterT = (this.mutterT ?? 9) - dt;
+    if (this.mutterT <= 0) {
+      this.mutterT = this.rng.range(8, 18);
+      if (Math.abs(P.v) < 7) {
+        let best = null, bd = 9;
+        for (const p of this.list) {
+          if (p.pax || p.cop || p.hidden || p.kid || p.mode === 'fight' || p.fleeing || p.fallen > 0 || p.venue) continue;
+          const d = Math.hypot(p.x - P.x, p.z - P.z);
+          if (d < bd && d > 1.2) { bd = d; best = p; }
+        }
+        if (best) this.speakAs('mutter', best, 0.8, 5);
+      }
+    }
     if (this.chatT <= 0) {
       this.chatT = this.rng.range(14, 32);
       if (Math.abs(P.v) > 6) return;
