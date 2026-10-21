@@ -12,7 +12,7 @@ import { guideHTML } from './guide.js';
 import { BUSINESSES as BIZ } from './hustle.js';
 import { levelOf } from './date.js';
 
-const TABS = [['bag', 'Bag', 'झोळी'], ['me', 'Me', 'मी'], ['wear', 'Wardrobe', 'कपडे'], ['own', 'Owned', 'माझं'], ['near', 'Nearby', 'जवळ'], ['ppl', 'People', 'लोक'], ['guide', 'Guide', 'माहिती']];
+const TABS = [['bag', 'Bag', 'झोळी'], ['me', 'Me', 'मी'], ['wear', 'Wardrobe', 'कपडे'], ['own', 'Owned', 'माझं'], ['near', 'Nearby', 'जवळ'], ['ppl', 'Phone', 'फोन'], ['guide', 'Guide', 'माहिती']];
 const GROUPS = [['food', 'Food'], ['night', 'Night'], ['look', 'Look'], ['health', 'Health'], ['money', 'Money'], ['things', 'Shops'], ['vehicle', 'Vehicles'], ['place', 'Places'], ['homes', 'Homes for sale']];
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -120,16 +120,28 @@ export class Bag {
       for (const v of s.vehicles) { const w = this.whereVeh(v); h += this.row('scooter', `${cap(v.type)} · ${v.plate}`, w ? 'Parked. Tap to find it' : 'In storage. Bring it out at one of your homes', w ? 'Find' : '', w ? 'wp' : null, `v:${v.id}`); }
       if (!s.vehicles.length) h += `<p class="jh-empty">Showrooms (Honda, Bajaj, Maruti and the rest) sell everything from a cycle to an SUV.</p>`;
     } else if (this.tab === 'ppl') {
+      // your handset: a keypad phone to start with (texts and calls); apps need a smartphone
+      h += `<div class="jh-read"><span>${s.phone ? 'Smartphone' : 'Keypad phone'}</span><b>${s.phone ? 'Calls, texts, Zwiggy, offers' : 'Calls and texts'}</b></div>`;
+      if (!s.phone) h += `<p class="jh-empty">Zwiggy orders, parcel runs and race invites need a smartphone: any mobile shop has one.</p>`;
       const cs = (s.contacts || []).slice().sort((a, b) => (b.partner - a.partner) || b.aff - a.aff);
-      if (!cs.length) h += `<p class="jh-empty">Nobody in your phone yet. In a club or a café, people with a small heart over them are up for a chat. Get them talking, then ask for their number.</p>`;
-      const pend = G.date.pending;
-      for (const c of cs) {
-        const hearts = Math.max(0, Math.min(5, Math.round(c.aff / 20)));
-        const lvl = levelOf(c), days = Math.max(0, Math.floor(((G.clock || 0) - (c.lastSeen || 0)) / 24));
-        const note = { html: `${esc(lvl)} ${heartsI(hearts)} · met at ${esc(c.met)}${days >= 2 ? ` · not seen in ${days} days` : ''}${c.done ? ' · blocked you' : c.upset ? ' · upset with you' : ''}` };
-        h += this.row(c.partner ? 'health' : 'phone', c.name, note, pend && pend.ct === c ? 'On the way' : 'Ask to meet', pend && pend.ct === c ? null : 'meet', c.name, c.partner ? 'partner' : '');
+      const pend = G.date.pending, sel = this.contactSel && cs.find(c => c.name === this.contactSel);
+      if (sel) {
+        // one contact open: call, ask to meet, back
+        const c = sel, hearts = Math.max(0, Math.min(5, Math.round(c.aff / 20)));
+        h += `<div class="jh-sub">${esc(c.name)}</div>`;
+        h += `<p class="jh-empty">${esc(levelOf(c))} ${heartsI(hearts)} · met at ${esc(c.met)}${c.done ? ' · blocked you' : c.upset ? ' · upset with you' : ''}</p>`;
+        h += this.row('phone', `Call ${c.name}`, c.calledDay === Math.floor((G.clock || 0) / 24) ? 'You spoke today' : 'Hear how they are', 'Call', c.done ? null : 'call', c.name);
+        h += this.row('pin', 'Ask to meet', 'They pick a café nearby and wait a few hours', pend && pend.ct === c ? 'On the way' : 'Text', pend && pend.ct === c || c.done ? null : 'meet', c.name);
+        h += this.row('home', 'Back to contacts', '', '', 'contacts', '');
+      } else {
+        if (!cs.length) h += `<p class="jh-empty">Nobody in your phone yet. In a club or a café, people with a small heart over them are up for a chat. Get them talking, then ask for their number.</p>`;
+        for (const c of cs) {
+          const hearts = Math.max(0, Math.min(5, Math.round(c.aff / 20)));
+          const lvl = levelOf(c), days = Math.max(0, Math.floor(((G.clock || 0) - (c.lastSeen || 0)) / 24));
+          const note = { html: `${esc(lvl)} ${heartsI(hearts)} · met at ${esc(c.met)}${days >= 2 ? ` · not seen in ${days} days` : ''}${c.done ? ' · blocked you' : c.upset ? ' · upset with you' : ''}` };
+          h += this.row(c.partner ? 'health' : 'phone', c.name, note, pend && pend.ct === c ? 'On the way' : 'Open', 'contact', c.name, c.partner ? 'partner' : '');
+        }
       }
-      if (cs.length) h += `<p class="jh-empty">They pick a café nearby. Be there within a few hours. Bring a gajra, sweets or a book if you have one.</p>`;
     } else if (this.tab === 'guide') {
       h += `<div class="guide">${guideHTML()}</div>`;
     } else if (this.tab === 'near') {
@@ -173,6 +185,9 @@ export class Bag {
       return;
     }
     if (a === 'meet') { const c = (L.s.contacts || []).find(q => q.name === arg); if (c && G.date.askToMeet(c)) this.close(); return; }
+    if (a === 'contact') { this.contactSel = arg; this.render(); return; }
+    if (a === 'contacts') { this.contactSel = null; this.render(); return; }
+    if (a === 'call') { const c = (L.s.contacts || []).find(q => q.name === arg); if (c) { this.close(); G.date.call(c); } return; }
     if (a === 'goto') { const x = this.nearList && this.nearList[+arg]; if (x) { G.setWaypoint({ x: x.x, z: x.z, name: x.name }); this.close(); } }
   }
 }

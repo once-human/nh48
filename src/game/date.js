@@ -103,6 +103,23 @@ export class Dates {
     const m = this.text(ct, key, vars);
     this.g.hud.sms(ct.name, m.t, '', [m.en, hint].filter(Boolean).join(' · '));
   }
+  // a phone call: they pick up (or don't), say something in their own voice, and it warms things a little
+  call(ct) {
+    const G = this.g, L = this.life;
+    if (ct.done) { G.hud.toast(`${ct.name} has blocked you`, 'The call doesn’t go through', 'bad', 2.4); return; }
+    const day = Math.floor((G.clock || 0) / 24), h = G.hour;
+    const busy = (h > 1 && h < 7.5) || this.rng.next() < (ct.upset ? 0.55 : ct.partner ? 0.1 : 0.25);
+    G.hud.sms(ct.name, 'Calling…', '', 'Keypad or not, it rings');
+    G.later(2.2, () => {
+      if (busy) { G.hud.sms(ct.name, h > 1 && h < 7.5 ? 'No answer. They’re asleep.' : 'No answer.', '', 'Try later, or text to meet'); return; }
+      const cm = castByName(ct.name, ct.female);
+      const p = { name: ct.name, female: ct.female, cast: cm ? cm.name : undefined, prof: { lang: ct.lang || 'en', vibe: ct.vibe || 'chill', likes: ct.likes || [], job: ct.job ?? 0, area: ct.area ?? 0, picky: 0.4, known: {}, asked: {} } };
+      const key = ct.upset ? 'upset' : ct.partner ? 'partner_miss' : ct.aff > 40 ? 'date_day' : 'date_hi';
+      const m = this.line(p, key);
+      G.hud.sms(ct.name, m.t, '', [m.en, 'On a call'].filter(Boolean).join(' · '));
+      if (ct.calledDay !== day) { ct.calledDay = day; ct.aff = Math.min(100, ct.aff + (ct.upset ? 1 : 3)); ct.missed = false; L.change('mood', 0.05); L.save(); }
+    });
+  }
   stage(c) { const v = c.mode === 'date' ? c.contact.aff : c.interest; return c.mode === 'date' ? (c.contact.partner ? 'partner' : 'date') : v < 25 ? 'knowing' : v < 55 ? 'better' : 'spark'; }
 
   // ---------------------------------------------------------------- a conversation
