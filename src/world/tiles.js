@@ -117,6 +117,7 @@ export class TileManager {
     W.activity.addCells(D.activity || [], tag);
     for (const s of D.stalls) { s.tag = tag; M.stalls.push(s); }
     for (const p of D.pins || []) { p.tag = tag; M.pins.push(p); }
+    if (W.cityMap && W.cityMap.addPins) W.cityMap.addPins(D.pins || []);
     yield;
     // chunks built before the data arrived get rebuilt, the map redraws here
     this.refresh(rect);

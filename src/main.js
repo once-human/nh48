@@ -37,8 +37,9 @@ export const QUALITY = {
 const params = new URLSearchParams(location.search);
 const EXPO = +(params.get('expo') || 1.0);
 export const TEST = params.has('test');
-// all of Pune, streamed in 4 km tiles (?city=pune while it's being finished)
-const PUNE = params.get('city') === 'pune';
+// all of Pune, streamed in 4 km tiles: the default whenever the build carries the tiles (?city=classic for the
+// old central map)
+let PUNE = params.get('city') === 'pune';
 
 function gpuClass() {
   try {
@@ -113,6 +114,7 @@ async function main() {
   let manifest = {};
   try { manifest = JSON.parse(document.getElementById('manifest').textContent); } catch (e) { /* dev */ }
   const loader = new Loader((f) => { shownF = Math.max(shownF, f * 0.6); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
+  if (!params.has('city') && manifest['assets/pune/base.json.gz']) PUNE = true;
   if (PUNE) ASSETS.map = 'assets/pune/base.json.gz';
   for (const v of Object.values(ASSETS)) for (const u of typeof v === 'string' ? [v] : Object.values(v)) loader.expect(u, manifest[u] || 1e6);
   const sndUrl = (n) => `assets/snd/${n}.mp3`;

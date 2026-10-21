@@ -77,6 +77,33 @@ export class CityMap {
       let a = Math.atan2(t[3], t[2]); if (a > Math.PI / 2) a -= Math.PI; else if (a < -Math.PI / 2) a += Math.PI;
       return { n: nm[0], mr: nm[1], c: 'street', x: t[0], z: t[1], rank: e.rank, a, len: e.len };
     }).sort((a, b) => b.rank - a.rank || b.len - a.len);
+    // all of Pune (streamed): the city's outline, its rivers and its main roads are always drawn, whether or not
+    // the detailed tile there is loaded; the detail goes on top where it is
+    if (M.coarse) {
+      const bbf = (r) => { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; for (let k = 0; k < r.length; k += 2) { const x = r[k], z = r[k + 1]; if (x < a) a = x; if (x > c) c = x; if (z < b) b = z; if (z > d) d = z; } return [a, b, c, d]; };
+      const m = (q) => Float32Array.from(q, v => v / 100);
+      const N = M.coarse.nodes;
+      const edges = M.coarse.edges.map(e => {
+        const pts = e[5] && e[5].length >= 4 ? m(e[5]) : m([N[e[0]][0], N[e[0]][1], N[e[1]][0], N[e[1]][1]]);
+        return { pts, rank: e[2], name: e[4], bb: bbf(pts) };
+      }).sort((a, b) => a.rank - b.rank);
+      const water = (M.cwater || []).map(r => { const q = m(r); return { r: q, bb: bbf(q) }; });
+      const ol = (M.meta.outlineXZ || []).flatMap(([x, z]) => [x / 100, z / 100]);
+      this.coarse = { edges, water, outline: ol.length ? ol : null };
+      // street names from the main roads, for labels and search before you've been there
+      const nm = M.names || [], have = new Set(this.streets.map(s => s.n)), longest = new Map();
+      for (const e of edges) {
+        const n = nm[e.name]; if (!n || !n[0] || have.has(n[0])) continue;
+        const L = Math.hypot(e.bb[2] - e.bb[0], e.bb[3] - e.bb[1]), o = longest.get(n[0]);
+        if (!o || L > o.L) longest.set(n[0], { e, n, L });
+      }
+      for (const { e, n, L } of longest.values()) {
+        const p = e.pts, k = (p.length >> 2) << 1, a0 = Math.atan2(p[Math.min(p.length - 1, k + 3)] - p[k + 1], p[Math.min(p.length - 2, k + 2)] - p[k]);
+        let a = a0; if (a > Math.PI / 2) a -= Math.PI; else if (a < -Math.PI / 2) a += Math.PI;
+        this.streets.push({ n: n[0], mr: n[1], c: 'street', x: p[k], z: p[k + 1], rank: e.rank, a, len: L });
+      }
+      this.streets.sort((a, b) => b.rank - a.rank || b.len - a.len);
+    }
     this.chunks = I.chunks;
     this.res = Math.min(2, Math.max(1, Math.round(window.devicePixelRatio || 1)));   // tile pixels per CSS pixel
     this.cap = 160;
@@ -86,6 +113,18 @@ export class CityMap {
   warm(z = 0) {
     const S = this.tileSize(z), nx = Math.ceil((this.x1 - this.x0) / S), ny = Math.ceil((this.z1 - this.z0) / S);
     for (let ty = 0; ty < ny; ty++) for (let tx = 0; tx < nx; tx++) { const k = z + '/' + tx + '/' + ty; if (!this.cache.has(k)) this.cache.set(k, { c: this.renderTile(z, tx, ty), u: 1e12 }); }
+  }
+  // a tile streamed in: its shops and places join the map (and stay, once you've been near them)
+  addPins(pins) {
+    const seen = this.pinSeen || (this.pinSeen = new Set());
+    for (const q of pins) {
+      const c = q[2], id = q[0] + '@' + q[3] + ',' + q[4];
+      if (c === 'police' || seen.has(id)) continue;
+      seen.add(id);
+      const p = { n: q[0], mr: q[1], c: FOOD.has(c) ? 'food' : (SHOPC[c] || (c === 'service' ? 'service' : 'shop')), sub: c, x: q[3] / 100, z: q[4] / 100 };
+      this.places.push(p);
+      const k = this.key(p.x, p.z); if (!this.pgrid.has(k)) this.pgrid.set(k, []); this.pgrid.get(k).push(p);
+    }
   }
   key(x, z) { return Math.floor(x / this.pcell) + ',' + Math.floor(z / this.pcell); }
   placesNear(x, z, r) {
@@ -165,6 +204,24 @@ export class CityMap {
     const Ps = [];
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) Ps.push(this.prep(i + j * I.ncx));
     const ring = (r) => { x.moveTo(r[0], r[1]); for (let q = 2; q < r.length; q += 2) x.lineTo(r[q], r[q + 1]); x.closePath(); };
+    const CO = this.coarse;
+    if (CO) {
+      // outside the city: dark
+      if (CO.outline) { x.beginPath(); x.rect(wx0 - 10, wz0 - 10, S + 20, S + 20); ring(CO.outline); x.fillStyle = COL.bg; x.fill('evenodd'); }
+      x.beginPath(); let anyW = false;
+      for (const w of CO.water) if (hit(w.bb)) { ring(w.r); anyW = true; }
+      if (anyW) { x.fillStyle = COL.water; x.fill(); }
+      x.lineCap = 'round'; x.lineJoin = 'round';
+      for (const e of CO.edges) {
+        if (!hit(e.bb) || (z < 1 && e.rank < 4)) continue;
+        const minPx = e.rank >= 5 ? 3.4 : e.rank >= 4 ? 2.6 : 1.7;
+        x.lineWidth = Math.max(e.rank >= 5 ? 14 : e.rank >= 4 ? 10 : 7, minPx / ppm);
+        x.strokeStyle = e.rank >= 5 ? COL.arterial : e.rank >= 4 ? COL.main : COL.road;
+        const p = e.pts; x.beginPath(); x.moveTo(p[0], p[1]); for (let q = 2; q < p.length; q += 2) x.lineTo(p[q], p[q + 1]); x.stroke();
+      }
+      // the city limit
+      if (CO.outline) { x.beginPath(); ring(CO.outline); x.strokeStyle = 'rgba(255,178,36,.55)'; x.lineWidth = Math.max(2, 2 / ppm); x.setLineDash([12 / ppm, 8 / ppm]); x.stroke(); x.setLineDash([]); }
+    }
     // ground: parks, plazas, medians
     for (const kind of ['grass', 'scrub', 'soil', 'median', 'plaza', 'pavers']) {
       x.beginPath(); let any = false;

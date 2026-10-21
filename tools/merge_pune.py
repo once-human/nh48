@@ -43,6 +43,7 @@ def cnode(x, z):
     return coarse_key[k]
 
 base = dict(landmarks=[], areas=[], flyovers=[], metro=[], mstations=[], buses=[], places=[], pois=[])
+cwater = []                                       # every river and lake, simplified, for the city map
 seen = {k: set() for k in base}
 meta = None; tiles = []; act_meta = None
 files = sorted(glob.glob(os.path.join(SRC, 't_*.json')))
@@ -71,6 +72,13 @@ for f in files:
     for k in ('water', 'kerbs', 'banks', 'lakebanks', 'rails'):
         T[k] = [x for x in M.get(k, []) if ci_in(x[0])]
     T['ground'] = [[kind, [p for p in polys if ci_in(p[0])]] for kind, polys in M.get('ground', [])]
+    for x in T['water']:
+        for r in x[1]:
+            if len(r) < 6: continue
+            xs, zs = r[0::2], r[1::2]
+            if (max(xs) - min(xs)) * (max(zs) - min(zs)) < 400 * 400: continue     # under ~4 m across: skip
+            q = rdp(r + r[:2], 250)[:-2]
+            if len(q) >= 6: cwater.append(q)
     # buildings: keep the tile's own, and remember where each old index went (shops point at buildings)
     bmap, B = {}, []
     for bi, b in enumerate(M['buildings']):
@@ -113,7 +121,7 @@ for f in files:
     tiles.append([i, j, rect, len(s)])
     print(f'tile {i},{j}', len(s) // 1024, 'KB', 'buildings', len(B), 'pins', len(T['pins']), 'activity', len(T.get('activity', [])), flush=True)
 out = dict(meta={**meta, 'outline': [[round(v, 5) for v in p] for p in outline], 'tiles': tiles, 'tileSize': 4000, 'activity': act_meta},
-           names=names, coarse=dict(nodes=coarse_nodes, edges=coarse_edges), districts=['deccan', 'peth', 'camp', 'kp', 'station', 'residential', 'riverside'],
+           names=names, coarse=dict(nodes=coarse_nodes, edges=coarse_edges), cwater=cwater, districts=['deccan', 'peth', 'camp', 'kp', 'station', 'residential', 'riverside'],
            landmarks=base['landmarks'], areas=base['areas'], flyovers=base['flyovers'], metro=base['metro'], mstations=base['mstations'], buses=base['buses'], places=base['places'], pois=base['pois'], street=1)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False).encode()
 with gzip.open(os.path.join(OUT, 'base.json.gz'), 'wb', 9) as fh: fh.write(s)
