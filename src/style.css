@@ -1113,8 +1113,12 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .ttl-wipe b { font: 800 15px var(--font-ui); text-transform: uppercase; letter-spacing: .06em; color: #ff8a80; }
 .ttl-wipe span { font-size: 13px; color: var(--tx2); line-height: 1.5; }
 .ttl-wipe > div { display: flex; gap: 8px; margin-top: 4px; }
-.pk-gnote small { display: block; color: var(--mut, #9a9a9a); font-size: 12px; line-height: 1.35; max-width: 34ch; }
 /* key chips on the light (paper) panels: dark chip, light letter, so 1–8 / ↑↓ / Enter / F read */
 .shop[data-ui=menu] .kbd { background: #2a2116 !important; color: #f3ead4 !important; box-shadow: none !important; }
 .shop[data-ui=teller] .kbd { background: #14233b !important; color: #fff !important; box-shadow: none !important; }
 .shop[data-ui=clinic] .kbd { background: #12302a !important; color: #fff !important; box-shadow: none !important; }
+.pk-info { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; border-radius: 50%; border: 1px solid currentColor; font: 600 10px/1 var(--ui, sans-serif); opacity: .55; cursor: help; vertical-align: 1px; text-transform: none; letter-spacing: 0; }
+.pk-info:hover { opacity: 1; }
+.pk-tip { position: absolute; left: 22px; top: 50%; transform: translateY(-50%); width: 260px; padding: 10px 12px; background: #0e0f12; border: 1px solid rgba(255,178,36,.35); color: #e9e6df; font: 400 12px/1.45 var(--ui, sans-serif); white-space: normal; text-align: left; pointer-events: none; opacity: 0; transition: opacity .12s; z-index: 5; }
+.pk-tip b { color: var(--acc, #ffb224); font-weight: 600; }
+.pk-info:hover .pk-tip { opacity: 1; }

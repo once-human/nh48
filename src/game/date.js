@@ -436,7 +436,7 @@ export class Dates {
       case 'ask': {
         const yes = this.rng.next() < 0.35 + (ct.aff - 70) / 40 + L.charm * 0.3;
         line = this.line(p, yes ? 'partner_yes' : 'partner_no');
-        if (yes) { ct.partner = true; ct.aff = Math.max(ct.aff, 80); L.change('respect', 3); L.change('mood', 0.25); how = 'You’re together'; G.hud.flash(`You and ${ct.name}`, 'Partners. Mood and confidence up every day, and they’ve got your back'); }
+        if (yes) { ct.partner = true; G.later(0.1, () => G.interiors && G.interiors.recolourHearts && G.interiors.recolourHearts()); ct.aff = Math.max(ct.aff, 80); L.change('respect', 3); L.change('mood', 0.25); how = 'You’re together'; G.hud.flash(`You and ${ct.name}`, 'Partners. Mood and confidence up every day, and they’ve got your back'); }
         else { ct.aff -= 6; how = 'Not yet. Give it time'; }
         break;
       }
@@ -568,6 +568,10 @@ export class Dates {
       const ct = c.contact;
       if (bye) this.say(this.line(c.p, 'date_bye'));
       ct.dateNow = false; c.p.walkedOff = true; ct.lastSeen = G.clock || 0; ct.missed = false;
+      // the date's over: you get up, and they head out
+      const I = G.interiors, p = c.p;
+      if (I && I.cur && I.cur.seat && !I.cur.eating) setTimeout(() => { if (I.cur && I.cur.seat && !I.cur.eating) I.stand(); }, bye ? 1400 : 200);
+      if (I && I.cur) setTimeout(() => { const R = I.cur && I.cur.R; if (R && R.peds.includes(p)) { G.people.remove(p); R.peds.splice(R.peds.indexOf(p), 1); if (p.dateSeat) p.dateSeat.used = false; I.markHearts(R); } }, bye ? 2200 : 600);
       if (ct.aff > 30 && !ct.upset) G.later(this.rng.range(30, 90), () => this.sms(ct, 't_afterdate'));
     }
     if (c.mode === 'meet' && c.p.interest === undefined) c.p.interest = c.interest;
