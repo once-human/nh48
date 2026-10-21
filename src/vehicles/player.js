@@ -87,7 +87,7 @@ export class PlayerAuto {
       };
       paint();
       const tex = new THREE.CanvasTexture(c);
-      tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+      tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 16;
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { paint(); tex.needsUpdate = true; });
       const st = new THREE.Mesh(new THREE.PlaneGeometry(0.98, 0.2), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, metalness: 0, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.08 }));
       st.position.set(-1.452, 1.1, 0);

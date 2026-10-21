@@ -20,11 +20,11 @@ import { HumanKit } from './people/humans.js';
 import { AnimalKit } from './people/animals.js';
 
 export const QUALITY = {
-  low: { name: 'low', pixelRatio: 0.8, shadows: false, shadowSize: 0, msaa: false, texMax: 512, boardRes: 0.5, signScale: 0.5,
+  low: { name: 'low', pixelRatio: 1.0, shadows: false, shadowSize: 0, msaa: false, texMax: 512, boardRes: 1, signScale: 1,
     streamRadius: 360, streamBudget: 3, grassRange: 22, grassCap: 2200, treeNearRange: 28, treeMidRange: 100, treeFarRange: 600, treeNearCap: 100, treeMidCap: 700, treeFarCap: 5000, leafCell: 256, impostorCell: 128, propRange: 110, far: 1400, traffic: 70, peds: 110 },
-  med: { name: 'med', pixelRatio: 1.0, shadows: true, shadowSize: 2048, msaa: true, texMax: 1024, boardRes: 1, signScale: 1,
+  med: { name: 'med', pixelRatio: 1.5, shadows: true, shadowSize: 2048, msaa: true, texMax: 1024, boardRes: 1, signScale: 1,
     streamRadius: 520, streamBudget: 4, grassRange: 34, grassCap: 5000, treeNearRange: 42, treeMidRange: 150, treeFarRange: 900, treeNearCap: 200, treeMidCap: 1400, treeFarCap: 9000, leafCell: 512, impostorCell: 256, propRange: 170, far: 2200, traffic: 130, peds: 190 },
-  high: { name: 'high', pixelRatio: 1.25, shadows: true, shadowSize: 2048, msaa: true, texMax: 1024, boardRes: 1, signScale: 1,
+  high: { name: 'high', pixelRatio: 2, shadows: true, shadowSize: 2048, msaa: true, texMax: 1024, boardRes: 1, signScale: 1,
     streamRadius: 720, streamBudget: 5, grassRange: 46, grassCap: 9000, treeNearRange: 80, treeMidRange: 240, treeFarRange: 1200, treeNearCap: 500, treeMidCap: 2800, treeFarCap: 14000, leafCell: 512, impostorCell: 256, propRange: 240, far: 3000, traffic: 170, peds: 260 },
 };
 

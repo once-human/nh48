@@ -698,17 +698,19 @@ export class Game {
       if (fps < 45) p.slow++; else p.slow = 0;
       if (fps > 57) p.fast++; else p.fast = 0;
       const maxPr = Math.min(window.devicePixelRatio || 1, this.QUALITY[this.qualityName].pixelRatio);
-      // never below 0.75: at 0.6 text (number plates, boards, the auto's sticker) smeared while driving
-      if (p.slow >= 1 && p.pr > 0.75) { p.pr = Math.max(0.75, p.pr - (fps < 30 ? 0.15 : 0.08)); this.applyPixelRatio(p.pr); p.slow = 0; }
+      // never below the screen's own resolution (1.0): below that every sign, plate and shop board
+      // smears. Slow machines lose shadows, grass and range instead (the preset step below).
+      const floor = Math.min(1, window.devicePixelRatio || 1);
+      if (p.slow >= 1 && p.pr > floor) { p.pr = Math.max(floor, p.pr - (fps < 30 ? 0.15 : 0.08)); this.applyPixelRatio(p.pr); p.slow = 0; }
       else if (p.fast >= 3 && p.pr < maxPr) { p.pr = Math.min(maxPr, p.pr + 0.08); this.applyPixelRatio(p.pr); p.fast = 0; }
       // still struggling at the lowest resolution: step the graphics preset down once per level
       // (only when the player hasn't picked a preset themselves)
-      p.floor = (p.pr <= 0.76 && fps < 30) ? (p.floor || 0) + 1 : 0;
+      p.floor = (p.pr <= Math.min(1, window.devicePixelRatio || 1) + 0.01 && fps < 30) ? (p.floor || 0) + 1 : 0;
       if (p.floor >= 2 && !this.userQuality && this.qualityName !== 'low') {
         p.floor = 0;
         const next = this.qualityName === 'high' ? 'med' : 'low';
         this.setQuality(next, true);
-        p.pr = Math.min(window.devicePixelRatio || 1, this.QUALITY[next].pixelRatio, 0.85);
+        p.pr = Math.min(window.devicePixelRatio || 1, this.QUALITY[next].pixelRatio);
         this.applyPixelRatio(p.pr);
         this.hud.toast('Graphics lowered', 'Switched to ' + (next === 'med' ? 'Medium' : 'Low') + ' for smoother driving · change it in the menu', 'info', 3);
       }

@@ -300,7 +300,7 @@ export function makeSignAtlas(scale = 1) {
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 16;              // clamped to what the GPU supports; keeps signs readable at an angle
   tex.generateMipmaps = true;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   out.tex = tex;

@@ -244,7 +244,7 @@ export class Boards {
     });
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 8;
+    tex.anisotropy = 16;
     tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter;
     this.tex = tex;
     this.canvas = cv;
@@ -279,7 +279,7 @@ export class Boards {
       out.map.set(s, { local: true, u0: (cx * bw + 1) / cv.width, u1: ((cx + 1) * bw - 1) / cv.width, v0: 1 - ((cy + 1) * bh - 1) / cv.height, v1: 1 - (cy * bh + 1) / cv.height });
     }
     const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 16;
     tex.onUpdate = () => { cv.width = cv.height = 1; };      // the GPU copy is all we need
     out.tex = tex;
     return out;
@@ -301,7 +301,7 @@ export class NearBoards {
     const cv = document.createElement('canvas');
     cv.width = NCW * NCOLS; cv.height = NCH * NROWS;
     const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 16;
     tex.onUpdate = () => { cv.width = cv.height = 1; };
     this.tex = tex;
     this.scratch = document.createElement('canvas');
