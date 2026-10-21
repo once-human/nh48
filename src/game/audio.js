@@ -80,6 +80,13 @@ export class Audio {
     src.start(0, Math.random() * b.duration);
     return { src, g };
   }
+  // a sound that arrived after the start (they download once you're at the title): decode it now, and
+  // start the ambient loops once theirs are in
+  addRaw(name, ab) {
+    this.raw[name] = ab;
+    if (!this.ctx || name.startsWith('v_')) return;
+    this.ctx.decodeAudioData(ab.slice(0)).then(b => { this.buf[name] = b; if (/^amb_/.test(name) && this.loops) { const k = { amb_street: 'street', amb_traffic: 'traffic', amb_auto_ride: 'ride' }[name]; if (k && !this.loops[k]) this.loops[k] = this.loop(name, 0); } }).catch(() => {});
+  }
   startLoops() {
     this.loops.street = this.loop('amb_street', 0);
     this.loops.traffic = this.loop('amb_traffic', 0);

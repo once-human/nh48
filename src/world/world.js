@@ -78,7 +78,7 @@ export async function buildWorld(M, T, renderer, scene, quality, progress) {
   W.collision.addSeg(pl.x0, pl.z0, pl.x1, pl.z0, 3); W.collision.addSeg(pl.x1, pl.z0, pl.x1, pl.z1, 3);
   W.collision.addSeg(pl.x1, pl.z1, pl.x0, pl.z1, 3); W.collision.addSeg(pl.x0, pl.z1, pl.x0, pl.z0, 3);
   await progress('Growing the trees', 0.3);
-  W.trees = new TreeField(W, scene, renderer, quality, { bark: T.bark, barkN: T.barkN, palm: T.palm });
+  W.trees = new TreeField(W, scene, renderer, quality, { bark: T.bark, barkN: T.barkN, palm: T.palm, leaves: T.leaves });
   W.grass = new GrassField(W, scene, quality);
   buildGlobalProps(W);
   await progress('Raising the skyline', 0.4);

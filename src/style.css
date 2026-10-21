@@ -1126,3 +1126,6 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .pk-tip { position: absolute; left: 22px; top: 50%; transform: translateY(-50%); width: 260px; padding: 10px 12px; background: #0e0f12; border: 1px solid rgba(255,178,36,.35); color: #e9e6df; font: 400 12px/1.45 var(--ui, sans-serif); white-space: normal; text-align: left; pointer-events: none; opacity: 0; transition: opacity .12s; z-index: 5; }
 .pk-tip b { color: var(--acc, #ffb224); font-weight: 600; }
 .pk-info:hover .pk-tip { opacity: 1; }
+/* the city fades in once its shaders are ready (the title is already up) */
+#gl { transition: opacity .5s ease; }
+#gl.warming { opacity: 0; }

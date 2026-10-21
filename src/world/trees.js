@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { Tree } from '../../node_modules/@dgreenheck/ez-tree/src/lib/tree.js';
 import TreeOptions from '../../node_modules/@dgreenheck/ez-tree/src/lib/options.js';
-import { LEAF, makeLeafAtlas } from '../gfx/foliage.js';
+import { LEAF, makeLeafAtlas, leafAtlasFrom } from '../gfx/foliage.js';
 import { U } from '../gfx/materials.js';
 import { hash1 } from '../core/util.js';
 
@@ -375,7 +375,8 @@ function billboardMaterial(imp, n, sizes, inner = 0) {
 // ---------------------------------------------------------------- field
 // archetypes + materials + impostors (shared by the field and the tree lab view)
 export function createTreeKit(renderer, quality, tex) {
-  const atlas = makeLeafAtlas(quality.leafCell || 512);
+  // half size to start (a quarter of the pixels to paint): the full one replaces it once you're playing
+  const atlas = tex.leaves ? leafAtlasFrom(tex.leaves) : makeLeafAtlas(Math.min(256, quality.leafCell || 512));
   const barkMap = tex.bark, palmMap = tex.palm;
   const mats = { leafMap: atlas.tex, barkMap, palmMap };
   const arch = [];
@@ -442,6 +443,15 @@ export class TreeField {
     this.nearR = quality.treeNearRange || 55; this.midR = quality.treeMidRange || 170; this.farR = quality.treeFarRange || 900;
     this.m4 = new THREE.Matrix4(); this.q4 = new THREE.Quaternion(); this.v3 = new THREE.Vector3(); this.s3 = new THREE.Vector3(); this.e3 = new THREE.Euler();
     this.lastX = 1e9; this.lastZ = 1e9;
+  }
+  // the leaves at full resolution (same layout, so just a new picture on the same material)
+  sharpenLeaves() {
+    const cell = this.q.leafCell || 512;
+    if (cell <= 256 || this._sharp) return;
+    this._sharp = true;
+    const A = makeLeafAtlas(cell), old = this.leafMat.map;
+    this.leafMat.map = A.tex; this.leafMat.needsUpdate = true;
+    if (old && old !== A.tex) old.dispose();
   }
   addTile(T, tag) {
     const W = this.W;

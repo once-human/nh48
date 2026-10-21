@@ -209,15 +209,20 @@ export class Game {
     this.releaseMouse = () => { if (locked()) { this._unlockOk = true; document.exitPointerLock(); } };
     window.addEventListener('pointermove', (e) => { if (drag) { this.rig.drag(e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; } });
     window.addEventListener('pointerup', () => { drag = null; });
-    this.prewarm();
+    // shaders compile in the background (the driver does it off the main thread where it can): the title
+    // screen comes up now, the city fades in behind it when they're done
+    this.warming = this.prewarm().catch(() => {}).finally(() => { this._warmDone = true; });
     if (this.test.play) this.startPlay(this.test.play === 'shift');
     if (this.resumed) { this.startPlay(false); this.hud.toast('Recovered', 'Your graphics driver reset, so the game reloaded where you were.', 'info', 4); }
   }
   // compile every shader the game will need now, behind the loading screen, instead of the first
   // time someone new walks up or you take a vehicle (that compile was the freeze)
-  prewarm() {
+  async prewarm() {
     const R = this.renderer, cam = this.camera, kit = this.W.kit;
     const shown = [], tmp = [];
+    // the sky's reflection map first: every material's shader depends on it, and compiling before it
+    // existed meant compiling the whole scene twice
+    if (this.sky && !this.sky.envRT) this.sky.update(this.hour, cam.position, 0);
     try {
       // in front of the camera, really rendered once (behind the loading screen): that also builds
       // the shadow and skinning variants that compile() alone skips
@@ -228,7 +233,7 @@ export class Game {
       // every kind you can take, with its driver's-seat interior showing (that view compiles too)
       for (const t of ['sedan', 'hatch', 'suv', 'taxi', 'scooter', 'bike', 'cycle', 'auto', 'bus', 'tempo']) { const v = new Vehicle(this.W, this.scene, this.vmats, t); if (v.cockpit) v.cockpit.group.visible = true; at(v.root); tmp.push(v); }
       if (this.player.human) { this.player.human.holder.visible = true; at(this.player.human.holder); }
-      R.compile(this.scene, cam);
+      await R.compileAsync(this.scene, cam);       // in parallel on the GPU driver where it can
       R.render(this.scene, cam);
       if (this.player.human) this.player.human.holder.visible = false;
     } catch (e) { console.warn('prewarm', e); }
@@ -298,6 +303,7 @@ export class Game {
     this.hud.showPicker(() => this.startPlay(false));
   }
   startPlay(shift) {
+    if (this.warming && !this._warmDone) { this.warming.then(() => this.startPlay(shift)); return; }   // Start before the city's ready: in a moment
     // drop focus from the menu button so Space (handbrake) can't press it again
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     this.state = 'play';

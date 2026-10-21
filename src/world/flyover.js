@@ -122,16 +122,28 @@ export class Flyovers {
   update(x, z) {
     if (!this.parts || Math.hypot(x - this.lastX, z - this.lastZ) < 25) return;
     this.lastX = x; this.lastZ = z;
-    for (const p of this.parts) { const d = Math.hypot(p.x - x, p.z - z); p.mesh.visible = d < 1700; p.mesh.castShadow = d < 500; }
+    for (const p of this.parts) {
+      const d = Math.hypot(p.x - x, p.z - z);
+      if (!p.mesh && d < 1700) {
+        const c = new ColorBuilder();
+        for (const [g, m, col] of p.ops) c.addGeo(g, m, col);
+        p.ops = null;
+        p.mesh = new THREE.Mesh(c.build(), this.mat); p.mesh.receiveShadow = true;
+        this.scene.add(p.mesh);
+      }
+      if (p.mesh) { p.mesh.visible = d < 1700; p.mesh.castShadow = d < 500; }
+    }
   }
   piersNear(x, z) { return this.pgrid.get(Math.floor(x / CELL) + ',' + Math.floor(z / CELL)) || []; }
 
   build(scene, mats) {
     // one mesh per 400 m cell, not one for the whole city: only what's near the camera draws (all of Pune's
     // flyovers as a single mesh was 1.6 million triangles every frame, twice with shadows)
+    // (and each piece's mesh is only built when you first come near it: the start doesn't pay for all of Pune)
     const cbs = new Map(), BIN = 400;
     let cb = null;
-    const at = (x, z) => { const k = Math.floor(x / BIN) + ',' + Math.floor(z / BIN); let c = cbs.get(k); if (!c) cbs.set(k, c = new ColorBuilder()); cb = c; };
+    const rec = () => { const ops = []; return { ops, addGeo: (g, m, col) => ops.push([g, m.clone(), col]) }; };
+    const at = (x, z) => { const k = Math.floor(x / BIN) + ',' + Math.floor(z / BIN); let c = cbs.get(k); if (!c) cbs.set(k, c = rec()); cb = c; };
     const quad = (a, b, c, d, col) => cb.quad ? cb.quad(a, b, c, d, col) : null;
     const box = new THREE.BoxGeometry(1, 1, 1);
     const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
@@ -195,12 +207,10 @@ export class Flyovers {
       }
     }
     this.parts = [];
+    this.scene = scene; this.mat = mats.prop;
     for (const [k, c] of cbs) {
       const [i, j] = k.split(',').map(Number);
-      const mesh = new THREE.Mesh(c.build(), mats.prop);
-      mesh.castShadow = true; mesh.receiveShadow = true; mesh.visible = false;
-      scene.add(mesh);
-      this.parts.push({ mesh, x: (i + 0.5) * BIN, z: (j + 0.5) * BIN });
+      this.parts.push({ ops: c.ops, mesh: null, x: (i + 0.5) * BIN, z: (j + 0.5) * BIN });
     }
     this.lastX = 1e9; this.lastZ = 1e9;
     void quad; void CRASH;

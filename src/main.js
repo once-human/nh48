@@ -1,7 +1,7 @@
 // NH48, entry point. Stage 1 boot: renderer + post-processing, asset loading with honest progress,
 // the streamed PBR city, and a free camera for checking the world. Gameplay plugs in on top.
 import * as THREE from 'three';
-import { Loader, stripToArray, bitmapTexture } from './core/assets.js';
+import { Loader, stripToArray, bitmapTexture, upgradeArray } from './core/assets.js';
 import { buildWorld, updateWorldMaterials } from './world/world.js';
 import { updateProps } from './world/propsChunk.js';
 import { Sky } from './gfx/sky.js';
@@ -67,8 +67,10 @@ function pickQuality() {
 
 const ASSETS = {
   map: 'assets/map.gz.txt',
-  gAlb: 'assets/tex/ground_alb.webp', gNrm: 'assets/tex/ground_nrm.webp', gArm: 'assets/tex/ground_arm.webp',
-  wAlb: 'assets/tex/wall_alb.webp', wNrm: 'assets/tex/wall_nrm.webp', wArm: 'assets/tex/wall_arm.webp',
+  // the ground and wall textures start small (a quarter size, 0.2 MB) and are swapped for the sharp ones once
+  // you're playing
+  gAlb: 'assets/tex/ground_alb_lo.webp', gNrm: 'assets/tex/ground_nrm_lo.webp', gArm: 'assets/tex/ground_arm_lo.webp',
+  wAlb: 'assets/tex/wall_alb_lo.webp', wNrm: 'assets/tex/wall_nrm_lo.webp', wArm: 'assets/tex/wall_arm_lo.webp',
   bark: 'assets/tex/bark_brown_02_diff.webp', barkN: 'assets/tex/bark_brown_02_nor.webp', palm: 'assets/tex/palm_bark_diff.webp',
   // models ship gzipped
   peopleM: 'assets/people/people_m.glb.gz', peopleF: 'assets/people/people_f.glb.gz',
@@ -121,17 +123,19 @@ async function main() {
   if (PUNE) ASSETS.map = 'assets/pune/base.json.gz';
   for (const v of Object.values(ASSETS)) for (const u of typeof v === 'string' ? [v] : Object.values(v)) loader.expect(u, manifest[u] || 1e6);
   const sndUrl = (n) => `assets/snd/${n}.mp3`;
-  for (const n of SOUNDS) loader.expect(sndUrl(n), manifest[sndUrl(n)] || 5e4);
   loader.expect('assets/voices_pk.mp3', manifest['assets/voices_pk.mp3'] || 1e5);
   const VOICE_BIN = 'assets/voices.mp3';
   await progress('Downloading Pune', 0.01);
   const sounds = {};
-  const sndJob = Promise.all([...SOUNDS.map(async (n) => {
-    try { const b = await loader.bytes(sndUrl(n)); sounds[n] = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); } catch (e) { /* plays without it */ }
-  }), (async () => {
+  const sndJob = Promise.all([(async () => {
     // the character screen's lines (a few KB) come with the game, so the menu speaks from the start
     try { const b = await loader.bytes('assets/voices_pk.mp3'), idx = manifest.__voices || {}; for (const [id, [off, len, pk]] of Object.entries(idx)) if (pk === 3) sounds['v_' + id] = b.buffer.slice(b.byteOffset + off, b.byteOffset + off + len); } catch (e) { /* silent */ }
   })()]);
+  // the leaves, painted ahead of time (saves painting them here, the slowest part of the old load)
+  const leavesJob = params.has('noleafcache') ? Promise.resolve(null) : loader.bytes('assets/tex/leaves_256.rgba.gz').then(async (b) => {
+    const u = new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+    const [w, h] = new Uint32Array(u.buffer, 0, 2); return { w, h, data: u.subarray(8) };
+  }).catch(() => null);
   const [M, gAlb, gNrm, gArm, wAlb, wNrm, wArm, bark, barkN, palm] = await Promise.all([
     PUNE ? loader.bytes(ASSETS.map).then(async (b) => cityFromBase(JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text()))) : loader.json(ASSETS.map), loader.bitmap(ASSETS.gAlb), loader.bitmap(ASSETS.gNrm), loader.bitmap(ASSETS.gArm),
     loader.bitmap(ASSETS.wAlb), loader.bitmap(ASSETS.wNrm), loader.bitmap(ASSETS.wArm),
@@ -151,6 +155,7 @@ async function main() {
     groundAlb: stripToArray(gAlb, { srgb: true, maxSize: tm, anisotropy: 8 }), groundNrm: stripToArray(gNrm, { maxSize: tm, anisotropy: 8 }), groundArm: stripToArray(gArm, { maxSize: tm }),
     wallAlb: stripToArray(wAlb, { srgb: true, maxSize: tm }), wallNrm: stripToArray(wNrm, { maxSize: tm }), wallArm: stripToArray(wArm, { maxSize: tm }),
     bark: bitmapTexture(bark), barkN: bitmapTexture(barkN, { srgb: false }), palm: bitmapTexture(palm),
+    leaves: await leavesJob,
   };
   for (const b of [gAlb, gNrm, gArm, wAlb, wNrm, wArm]) b.close?.();
   if (params.get('lab') === 'people' && kit) return runPeopleLab(renderer, quality, kit, params, animalKit);
@@ -171,7 +176,7 @@ async function main() {
     try { const r = JSON.parse(sessionStorage.getItem('nh48_resume') || 'null'); if (r) { sx = r.x; sz = r.z; } } catch (e) { /* none */ }
     W.tiles = new TileManager(W);
     await progress('Loading this part of Pune', 0.83);
-    await W.tiles.warm(sx, sz, 700, (k, n) => { shownF = Math.max(shownF, 0.83 + 0.03 * k / n); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
+    await W.tiles.warm(sx, sz, 450, (k, n) => { shownF = Math.max(shownF, 0.83 + 0.03 * k / n); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
   }
   if (params.has('fly')) return runFly({ W, renderer, scene, camera, sky, post, quality, progress });
 
@@ -208,11 +213,14 @@ async function main() {
   // warm the chunks around the start before the first frame
   await progress('Building the streets', 0.86);
   const sx = player.x, sz = player.z;
-  W.streamer.warm(sx, sz, Math.min(260, quality.streamRadius), (k, n) => { shownF = Math.max(shownF, 0.86 + 0.1 * k / n); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
+  W.streamer.warm(sx, sz, Math.min(170, quality.streamRadius), (k, n) => { shownF = Math.max(shownF, 0.86 + 0.1 * k / n); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
   updateProps(W, sx, sz); W.fly?.update?.(sx, sz);
   sky.update(game.hour, game.focus(), 0);
-  await progress('Compiling shaders', 0.98);
-  await renderer.compileAsync(scene, camera);
+  // shaders: compiled in the background while you're on the title screen; the city shows once they're in
+  let compiled = TEST;
+  const compileJob = Promise.all([game.warming, renderer.compileAsync(scene, camera)]).catch(() => {}).then(() => { compiled = true; document.getElementById('gl')?.classList.remove('warming'); });
+  if (TEST) await compileJob;
+  else document.getElementById('gl')?.classList.add('warming');
   const onResize = () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -222,6 +230,18 @@ async function main() {
   onResize();
   await progress('Ready', 1);
   document.getElementById('loading').classList.add('done');
+  // the map, sharp everywhere: the 2 km pictures of all of Pune, then the 1 km ones around you
+  if (W.tiles && W.cityMap) setTimeout(() => { const P = game.player; W.cityMap.prefetch(1, P.x, P.z); W.cityMap.prefetch(2, P.x, P.z, 5000); }, 12000);
+  setTimeout(() => { try { W.trees.sharpenLeaves(); } catch (e) { /* keep the soft ones */ } }, 2500);
+  // after the first frame: the sounds, then the sharp ground and wall textures (one at a time, so the first
+  // seconds of play aren't fighting them for the network)
+  (async () => {
+    const bg = new Loader(() => {});
+    await Promise.all(SOUNDS.map(async (n) => { try { const b = await bg.bytes(sndUrl(n)); game.audio.addRaw(n, b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)); } catch (e) { /* plays without it */ } }));
+    for (const [k, url] of [['groundAlb', 'ground_alb'], ['groundNrm', 'ground_nrm'], ['groundArm', 'ground_arm'], ['wallAlb', 'wall_alb'], ['wallNrm', 'wall_nrm'], ['wallArm', 'wall_arm']]) {
+      try { const b = await bg.bitmap(`assets/tex/${url}.webp`); upgradeArray(T[k], b, { maxSize: quality.texMax }); b.close?.(); } catch (e) { /* stays soft */ }
+    }
+  })();
 
   const frustum = new THREE.Frustum(), pv = new THREE.Matrix4();
   const sphere = new THREE.Sphere(new THREE.Vector3(), 12);
@@ -274,7 +294,7 @@ async function main() {
     if (propT <= 0) { updateProps(W, camera.position.x, camera.position.z); W.fly?.update?.(camera.position.x, camera.position.z); propT = 0.2; }
     const t1 = performance.now();
     // the map covers the screen, and while paused the last frame just sits there (blurred by CSS): no rendering at all
-    if (game.state !== 'map' && !(game.state === 'pause' && !game.livePause && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);
+    if (compiled && game.state !== 'map' && !(game.state === 'pause' && !game.livePause && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);
     const t2 = performance.now();
     perf.n++; perf.upd += t1 - t0; perf.rnd += t2 - t1; perf.worst = Math.max(perf.worst, t1 - t0);
     if (!perfBox.hidden) {

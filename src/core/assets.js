@@ -86,6 +86,14 @@ export class Loader {
 // Vertically stacked square layers -> DataArrayTexture (rows flipped per layer so v runs bottom-up
 // like a normal texture, which keeps OpenGL-convention normal maps correct).
 const _cv = typeof OffscreenCanvas !== 'undefined' ? (w, h) => new OffscreenCanvas(w, h) : (w, h) => Object.assign(document.createElement('canvas'), { width: w, height: h });
+// swap a texture array for a sharper version of itself (same layers), after the game has started
+export function upgradeArray(tex, bmp, opts = {}) {
+  const fresh = stripToArray(bmp, { srgb: tex.colorSpace === THREE.SRGBColorSpace, anisotropy: tex.anisotropy, ...opts });
+  if (fresh.image.width <= tex.image.width) return;
+  tex.dispose();
+  tex.image = fresh.image;
+  tex.needsUpdate = true;
+}
 export function stripToArray(bmp, { srgb = false, anisotropy = 4, maxSize = 4096 } = {}) {
   const layers = Math.round(bmp.height / bmp.width);
   const size = Math.min(bmp.width, maxSize);

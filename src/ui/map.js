@@ -288,6 +288,19 @@ export class CityMap {
       }
     }
   }
+  // quietly fetch a whole level's pictures (or those within r of x, z), a few at a time, so the map is sharp
+  // wherever you look before you look there
+  prefetch(L, x, z, r = 1e9) {
+    if (!this.raster) return;
+    const m = this.raster.levels[L][1], todo = [];
+    const a0 = Math.max(0, Math.floor((Math.max(this.x0, x - r) - this.x0) / m)), a1 = Math.floor((Math.min(this.x1, x + r) - this.x0) / m);
+    const b0 = Math.max(0, Math.floor((Math.max(this.z0, z - r) - this.z0) / m)), b1 = Math.floor((Math.min(this.z1, z + r) - this.z0) / m);
+    for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) todo.push([Math.hypot(this.x0 + (a + 0.5) * m - x, this.z0 + (b + 0.5) * m - z), a, b]);
+    todo.sort((p, q) => p[0] - q[0]);
+    let i = 0;
+    const next = () => { if (i >= todo.length) return; const [, a, b] = todo[i++]; const o = this.rimg(L, a, b); if (o.ok || o.bad) next(); else { o.im.addEventListener('load', next, { once: true }); o.im.addEventListener('error', next, { once: true }); } };
+    for (let k = 0; k < 4; k++) next();
+  }
   // has the city streamed in anywhere under this map tile?
   loadedAt(wx0, wz0, S) {
     const I = this.W.index, cs = I.size;

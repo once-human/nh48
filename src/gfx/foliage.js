@@ -144,6 +144,13 @@ const DRAW = {
     spread: [0.3, 1.6], size: [0.12, 0.16], ratio: 0.14, shape: 'lance', h: 115, s: 0.45, l: 0.22, alt: { p: 0.08, h: 18, s: 0.45, l: 0.35 } }); },
 };
 
+// the atlas painted ahead of time (tools/bake_leaves.mjs): raw RGBA, rows already flipped and bled
+export function leafAtlasFrom(pre) {
+  const tex = new THREE.DataTexture(pre.data, pre.w, pre.h, THREE.RGBAFormat, THREE.UnsignedByteType);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.anisotropy = 4; tex.needsUpdate = true;
+  return { tex, uv: (i) => ({ u0: (i % COLS) / COLS, v0: 1 - (Math.floor(i / COLS) + 1) / ROWS, su: 1 / COLS, sv: 1 / ROWS }) };
+}
 export function makeLeafAtlas(cell = 512) {
   const cv = document.createElement('canvas');
   cv.width = COLS * cell; cv.height = ROWS * cell;
