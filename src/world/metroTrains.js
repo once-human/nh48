@@ -32,7 +32,7 @@ export class MetroTrains {
   constructor(W, scene, M) {
     this.trains = []; this.scene = scene;
     // join the OSM ways into continuous lines (ends within 10 m)
-    const ways = (M.metro || []).filter(m => !m[0]).map(m => cmRing(m[1])).filter(p => p.length >= 4);
+    const ways = (M.metro || []).filter(m => !m[0]).map(m => Array.from(cmRing(m[1]))).filter(p => p.length >= 4);
     const chains = [];
     const used = new Set();
     const end = (p, last) => last ? [p[p.length - 2], p[p.length - 1]] : [p[0], p[1]];
