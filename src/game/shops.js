@@ -195,28 +195,76 @@ const AREA_MUL = { polished: 1.55, camp: 1.15, college: 0.92, peth: 0.88, statio
 
 // clothes anyone can buy (top / bottom colours, sleeve, kurta, saree)
 // [id, name, note, price, look patch, who it's cut for: M men's, W women's, U unisex] (anyone can wear anything)
+// [id, name, note, base price, patch, who]. A patch can set: top, bottom (colours), cut [sleeve, hem, neck, kind
+// 0 western / 1 kurta / 2 saree / 3 skirt or dress], pat (1 stripes, 2 checks, 4 print, 5 open jacket over patCol,
+// 6 colour block), patCol, hem (skirt length, 0.06 floor to 0.75 mini), denim, hat, hatCol, shades.
+// The more distinctive the piece, the more it costs.
+const T = (sleeve, neck = 0.4) => [sleeve, 1, neck, 0];
 export const CLOTHES = [
-  ['shirt_white', 'Linen shirt, white', 'Full sleeves, crisp', 1290, { top: 0xf2f0ea, cut: [0.95, 1, 0.5, 0] }, 'M'],
-  ['shirt_blue', 'Oxford shirt, sky blue', 'Full sleeves', 1190, { top: 0x8fb3d9, cut: [0.95, 1, 0.5, 0] }, 'M'],
-  ['shirt_check', 'Checked shirt, maroon', 'Weekend flannel', 1090, { top: 0x7a2e3a, cut: [0.95, 1, 0.5, 0] }, 'M'],
-  ['tee_black', 'T-shirt, black', 'Half sleeves', 499, { top: 0x1f2024, cut: [0.38, 1, 0.3, 0] }, 'U'],
-  ['tee_red', 'T-shirt, red', 'Half sleeves', 499, { top: 0xbf3f3a, cut: [0.38, 1, 0.3, 0] }, 'U'],
-  ['tee_mustard', 'T-shirt, mustard', 'Half sleeves', 549, { top: 0xe0b23a, cut: [0.38, 1, 0.3, 0] }, 'U'],
-  ['hoodie_grey', 'Hoodie, grey', 'For the two cold weeks in December', 1799, { top: 0x7d8085, cut: [1, 1, 0.2, 0] }, 'U'],
-  ['polo_green', 'Polo, bottle green', 'Half sleeves', 899, { top: 0x2f5d45, cut: [0.4, 1, 0.6, 0] }, 'U'],
-  ['top_floral', 'Top, floral', 'Short sleeves, light cotton', 899, { top: 0xe5989b, cut: [0.3, 1, 0.7, 0] }, 'W'],
-  ['top_white', 'Top, white linen', 'Sleeveless', 799, { top: 0xf4f1ea, cut: [0.05, 1, 0.8, 0] }, 'W'],
-  ['jeans_blue', 'Jeans, indigo', 'Slim fit', 1599, { bottom: 0x2c3e66 }, 'U'],
-  ['jeans_black', 'Jeans, black', 'Slim fit', 1599, { bottom: 0x1b1c1f }, 'U'],
-  ['track_navy', 'Track pants, navy', 'Morning walk on Vetal hill', 699, { bottom: 0x1d2a4a }, 'U'],
-  ['chinos_khaki', 'Chinos, khaki', 'Office-ready', 1399, { bottom: 0x9c8a66 }, 'M'],
-  ['kurta_white', 'Kurta pyjama, white', 'Cotton, for Ganpati and weddings', 1499, { top: 0xf4f1ea, bottom: 0xf4f1ea, cut: [0.95, 0.55, 0.7, 1] }, 'M'],
-  ['kurta_saffron', 'Kurta, saffron', 'With white pyjama', 1699, { top: 0xf28f3b, bottom: 0xf4f1ea, cut: [0.95, 0.55, 0.7, 1] }, 'M'],
-  ['kurti_teal', 'Kurti and salwar, teal', 'Everyday cotton', 1299, { top: 0x2e86ab, bottom: 0xf4f1ea, cut: [0.45, 0.55, 0.8, 1] }, 'W'],
-  ['kurti_pink', 'Kurti and salwar, rani pink', 'Festive', 1599, { top: 0xd1495b, bottom: 0x2f2f33, cut: [0.85, 0.55, 0.8, 1] }, 'W'],
-  ['saree_paithani', 'Paithani saree, purple and gold', 'The real thing (well, almost)', 8999, { top: 0x7b2cbf, bottom: 0x6a24a6, cut: [0.3, 1, 0.9, 2] }, 'W'],
-  ['saree_nauvari', 'Nauvari saree, green', 'Nine yards, Maharashtrian style', 4999, { top: 0x386641, bottom: 0x2f5636, cut: [0.3, 1, 0.9, 2] }, 'W'],
-  ['saree_red', 'Cotton saree, red', 'Everyday', 1999, { top: 0xc1121f, bottom: 0xa50f1a, cut: [0.3, 1, 0.9, 2] }, 'W'],
+  // the basics
+  ['tee_white', 'Basic tee, white', 'The one everyone owns', 399, { top: 0xf4f2ee, cut: T(0.38, 0.3), pat: 0 }, 'U'],
+  ['tee_black', 'Basic tee, black', 'Goes with everything', 449, { top: 0x1f2024, cut: T(0.38, 0.3), pat: 0 }, 'U'],
+  ['tee_grey', 'Basic tee, heather grey', 'Soft cotton', 449, { top: 0x8e9093, cut: T(0.38, 0.3), pat: 0 }, 'U'],
+  ['tee_red', 'T-shirt, red', 'Half sleeves', 499, { top: 0xbf3f3a, cut: T(0.38, 0.3), pat: 0 }, 'U'],
+  ['tee_mustard', 'T-shirt, mustard', 'Half sleeves', 549, { top: 0xe0b23a, cut: T(0.38, 0.3), pat: 0 }, 'U'],
+  ['jeans_blue', 'Jeans, indigo', 'Slim fit', 1599, { bottom: 0x2c3e66, denim: true, cutW: 0 }, 'U'],
+  ['jeans_black', 'Jeans, black', 'Slim fit', 1599, { bottom: 0x1b1c1f, denim: true, cutW: 0 }, 'U'],
+  ['track_navy', 'Track pants, navy', 'Morning walk on Vetal hill', 699, { bottom: 0x1d2a4a, denim: false, cutW: 0 }, 'U'],
+  // shirts and knits
+  ['shirt_white', 'Linen shirt, white', 'Full sleeves, crisp', 1290, { top: 0xf2f0ea, cut: T(0.95, 0.5), pat: 0 }, 'M'],
+  ['shirt_blue', 'Oxford shirt, sky blue', 'Full sleeves', 1190, { top: 0x8fb3d9, cut: T(0.95, 0.5), pat: 0 }, 'M'],
+  ['shirt_check', 'Flannel shirt, red and black check', 'Weekend in Mulshi', 1690, { top: 0x9c1f26, cut: T(0.95, 0.5), pat: 2, patCol: 0x141414 }, 'U'],
+  ['shirt_check_blue', 'Flannel shirt, blue check', 'Soft brushed cotton', 1690, { top: 0x2f4f7a, cut: T(0.95, 0.5), pat: 2, patCol: 0xe9e6dd }, 'U'],
+  ['tee_breton', 'Breton stripe tee', 'Navy and white, very French', 1290, { top: 0xf2efe8, cut: T(0.8, 0.3), pat: 1, patCol: 0x1d2a4a }, 'U'],
+  ['tee_stripe_black', 'Striped tee, black and white', 'Bold stripes', 1190, { top: 0xf2efe8, cut: T(0.38, 0.3), pat: 1, patCol: 0x16161a }, 'U'],
+  ['polo_green', 'Polo, bottle green', 'Half sleeves', 899, { top: 0x2f5d45, cut: T(0.4, 0.6), pat: 0 }, 'U'],
+  ['hoodie_grey', 'Hoodie, grey', 'For the two cold weeks in December', 1799, { top: 0x7d8085, cut: T(1, 0.2), pat: 0 }, 'U'],
+  ['hoodie_black', 'Oversized hoodie, black', 'Streetwear, Koregaon Park approved', 2490, { top: 0x18181b, cut: T(1, 0.2), pat: 0 }, 'U'],
+  ['tee_graphic', 'Graphic print tee', 'Loud, in a good way', 1490, { top: 0x2b2d42, cut: T(0.38, 0.3), pat: 4, patCol: 0xffb224 }, 'U'],
+  ['top_floral', 'Top, floral print', 'Short sleeves, light cotton', 999, { top: 0xe5989b, cut: T(0.3, 0.7), pat: 4, patCol: 0xf4f1ea }, 'W'],
+  ['top_polka', 'Polka dot top, black', 'White dots, a little retro', 1490, { top: 0x16161a, cut: T(0.3, 0.7), pat: 4, patCol: 0xf4f1ea }, 'W'],
+  ['top_white', 'Top, white linen', 'Sleeveless', 799, { top: 0xf4f1ea, cut: T(0.05, 0.8), pat: 0 }, 'W'],
+  ['top_cami_black', 'Camisole, black', 'Sleeveless, satin', 1290, { top: 0x141416, cut: T(0.0, 0.9), pat: 0 }, 'W'],
+  ['top_block', 'Colour-block top, cream and rust', 'Statement shoulders', 1890, { top: 0xc8553d, cut: T(0.4, 0.6), pat: 6, patCol: 0xf2e6cf }, 'W'],
+  // jackets: an open jacket over a tee or shirt
+  ['jkt_denim', 'Denim jacket over a white tee', 'The classic', 3490, { top: 0x3e5f8a, cut: T(0.95, 0.4), pat: 5, patCol: 0xf4f2ee }, 'U'],
+  ['jkt_bomber', 'Bomber jacket, olive', 'Over a black tee', 3990, { top: 0x4b5320, cut: T(0.95, 0.4), pat: 5, patCol: 0x1f2024 }, 'U'],
+  ['jkt_varsity', 'Varsity jacket, maroon', 'Cream sleeves and yoke', 5490, { top: 0x6e1423, cut: T(0.95, 0.4), pat: 6, patCol: 0xf2e6cf }, 'U'],
+  ['blazer_navy', 'Blazer, navy', 'Over a white shirt, for the office on Baner Road', 7990, { top: 0x1d2a4a, cut: T(0.98, 0.6), pat: 5, patCol: 0xf2f0ea }, 'M'],
+  ['blazer_beige', 'Blazer, camel', 'Over a white camisole', 6990, { top: 0xb08a5a, cut: T(0.98, 0.6), pat: 5, patCol: 0xf4f1ea }, 'W'],
+  ['jkt_leather', 'Leather jacket, black', 'Real leather, real attitude', 12990, { top: 0x101012, cut: T(0.98, 0.5), pat: 5, patCol: 0x8e9093 }, 'U'],
+  ['suit_charcoal', 'Designer suit, charcoal', 'Jacket and trousers, white shirt. For weddings and boardrooms', 24990, { top: 0x2b2d31, bottom: 0x2b2d31, cut: T(0.98, 0.6), pat: 5, patCol: 0xf4f2ee, denim: false, cutW: 0 }, 'M'],
+  // trousers
+  ['jeans_light', 'Jeans, light wash', 'Faded just right', 1990, { bottom: 0x6b85a8, denim: true, cutW: 0 }, 'U'],
+  ['chinos_khaki', 'Chinos, khaki', 'Office-ready', 1399, { bottom: 0x9c8a66, denim: false, cutW: 0 }, 'M'],
+  ['cargo_olive', 'Cargo pants, olive', 'All the pockets', 1790, { bottom: 0x4b5320, denim: false, cutW: 0 }, 'U'],
+  ['joggers_black', 'Joggers, black', 'Comfy, slim', 1290, { bottom: 0x16161a, denim: false, cutW: 0 }, 'U'],
+  ['trousers_white', 'Trousers, white', 'Summer linen', 2490, { bottom: 0xf2f0ea, denim: false, cutW: 0 }, 'U'],
+  // skirts and dresses
+  ['skirt_denim', 'Denim mini skirt', 'With anything', 1490, { bottom: 0x3e5f8a, cutW: 3, hem: 0.7, denim: true }, 'W'],
+  ['skirt_black', 'Black mini skirt', 'A party staple', 1290, { bottom: 0x16161a, cutW: 3, hem: 0.72, denim: false }, 'W'],
+  ['skirt_pleated', 'Pleated midi skirt, sage', 'Below the knee, flowy', 1990, { bottom: 0x8fa98a, cutW: 3, hem: 0.42, denim: false }, 'W'],
+  ['skirt_satin', 'Satin slip skirt, champagne', 'Midi length, a little shine', 2990, { bottom: 0xd8c3a5, cutW: 3, hem: 0.38, denim: false }, 'W'],
+  ['dress_lbd', 'Little black dress', 'Sleeveless, above the knee', 3990, { top: 0x141416, bottom: 0x141416, cut: [0.0, 1, 0.8, 3], hem: 0.66, pat: 0, denim: false }, 'W'],
+  ['dress_sun', 'Floral sundress', 'Pink with white flowers, for Sunday brunch', 2990, { top: 0xe58fa5, bottom: 0xe58fa5, cut: [0.1, 1, 0.8, 3], hem: 0.5, pat: 4, patCol: 0xf4f1ea, denim: false }, 'W'],
+  ['dress_wrap', 'Wrap dress, emerald', 'Midi, three-quarter sleeves', 4490, { top: 0x14614a, bottom: 0x14614a, cut: [0.7, 1, 0.9, 3], hem: 0.42, pat: 0, denim: false }, 'W'],
+  ['dress_sequin', 'Sequin party dress, silver', 'For the big night at a club', 18990, { top: 0xc9ccd3, bottom: 0xc9ccd3, cut: [0.0, 1, 0.9, 3], hem: 0.68, pat: 4, patCol: 0xf4f6fa, denim: false }, 'W'],
+  ['gown_red', 'Evening gown, red', 'Floor-length. Heads will turn', 24990, { top: 0xa3122a, bottom: 0xa3122a, cut: [0.0, 1, 0.9, 3], hem: 0.07, pat: 0, denim: false }, 'W'],
+  // accessories
+  ['cap_black', 'Baseball cap, black', 'Brim forward, always', 699, { hat: true, hatCol: 0x18181b }, 'U'],
+  ['cap_white', 'Baseball cap, white', 'Clean', 699, { hat: true, hatCol: 0xeeeeee }, 'U'],
+  ['shades_aviator', 'Aviator sunglasses', 'Gold-ish frames', 2490, { shades: true }, 'U'],
+  ['shades_designer', 'Designer sunglasses', 'The logo is tiny, the price isn’t', 8990, { shades: true }, 'U'],
+  ['no_cap', 'Take off the cap', '', 0, { hat: false }, 'U'],
+  ['no_shades', 'Take off the sunglasses', '', 0, { shades: false }, 'U'],
+  // traditional
+  ['kurta_white', 'Kurta pyjama, white', 'Cotton, for Ganpati and weddings', 1499, { top: 0xf4f1ea, bottom: 0xf4f1ea, cut: [0.95, 0.55, 0.7, 1], pat: 0, denim: false }, 'M'],
+  ['kurta_saffron', 'Kurta, saffron', 'With white pyjama', 1699, { top: 0xf28f3b, bottom: 0xf4f1ea, cut: [0.95, 0.55, 0.7, 1], pat: 0, denim: false }, 'M'],
+  ['kurti_teal', 'Kurti and salwar, teal', 'Everyday cotton', 1299, { top: 0x2e86ab, bottom: 0xf4f1ea, cut: [0.45, 0.55, 0.8, 1], pat: 0, denim: false }, 'W'],
+  ['kurti_pink', 'Kurti and salwar, rani pink', 'Festive', 1599, { top: 0xd1495b, bottom: 0x2f2f33, cut: [0.85, 0.55, 0.8, 1], pat: 0, denim: false }, 'W'],
+  ['saree_paithani', 'Paithani saree, purple and gold', 'The real thing (well, almost)', 8999, { top: 0x7b2cbf, bottom: 0x6a24a6, cut: [0.3, 1, 0.9, 2], pat: 0, denim: false }, 'W'],
+  ['saree_nauvari', 'Nauvari saree, green', 'Nine yards, Maharashtrian style', 4999, { top: 0x386641, bottom: 0x2f5636, cut: [0.3, 1, 0.9, 2], pat: 0, denim: false }, 'W'],
+  ['saree_red', 'Cotton saree, red', 'Everyday', 1999, { top: 0xc1121f, bottom: 0xa50f1a, cut: [0.3, 1, 0.9, 2], pat: 0, denim: false }, 'W'],
 ];
 export const SHOES = [
   ['kolhapuri', 'Kolhapuri chappal', 'Hand-made leather', 899, 0x8a5a2b],
@@ -599,6 +647,7 @@ export class Shops {
     if (patch.cut) look.cut = new THREE.Vector4(...patch.cut);
     if (patch.style) look.style = patch.style;
     if (patch.beard !== undefined) look.beard = patch.beard;
+    applyWear(look, patch);
     this.g.W.kit.applyLook(P.human, look);
     L.s.look = lookToJSON(look);
     L.save();
@@ -740,11 +789,27 @@ function parodyFuel(n, k) {
 }
 export function lookToJSON(L) {
   const h = (c) => '#' + c.clone().convertLinearToSRGB().getHexString();
-  return { top: h(L.top), bottom: h(L.bottom), shoe: h(L.shoe), hair: h(L.hair), cut: [L.cut.x, L.cut.y, L.cut.z, L.cut.w], style: L.style, beard: !!L.beard };
+  return { top: h(L.top), bottom: h(L.bottom), shoe: h(L.shoe), hair: h(L.hair), cut: [L.cut.x, L.cut.y, L.cut.z, L.cut.w], style: L.style, beard: !!L.beard,
+    pat: L.pat || 0, patCol: L.patCol ? h(L.patCol) : null, hem: L.hem || 0, denim: !!L.denim, hat: !!L.hat, hatCol: L.hatCol ? h(L.hatCol) : null, shades: !!L.shades };
 }
 export function lookFromJSON(L, j) {
   if (!j) return L;
   const c = (h) => new THREE.Color(h).convertSRGBToLinear();
   L.top = c(j.top); L.bottom = c(j.bottom); L.shoe = c(j.shoe); L.hair = c(j.hair); L.cut = new THREE.Vector4(...j.cut); L.style = j.style; L.beard = j.beard;
+  L.pat = j.pat || 0; L.patCol = j.patCol ? c(j.patCol) : null; L.hem = j.hem || 0; L.denim = !!j.denim; L.hat = !!j.hat; L.hatCol = j.hatCol ? c(j.hatCol) : null; L.shades = !!j.shades;
   return L;
+}
+
+// the newer clothing fields: patterns, jackets, skirts and dresses, denim, caps, sunglasses
+export function applyWear(L, p) {
+  const c = (h) => new THREE.Color(h).convertSRGBToLinear();
+  if (p.top !== undefined) { L.pat = p.pat || 0; L.patCol = p.patCol !== undefined ? c(p.patCol) : null; }
+  if (p.pat !== undefined) L.pat = p.pat;
+  if (p.patCol !== undefined) L.patCol = c(p.patCol);
+  if (p.denim !== undefined) L.denim = p.denim;
+  if (p.hem !== undefined) L.hem = p.hem;
+  if (p.cutW !== undefined) { L.cut = L.cut.clone(); L.cut.w = p.cutW; if (p.cutW !== 1) L.cut.y = 1; }
+  if (p.hat !== undefined) L.hat = p.hat;
+  if (p.hatCol !== undefined) L.hatCol = c(p.hatCol);
+  if (p.shades !== undefined) L.shades = p.shades;
 }

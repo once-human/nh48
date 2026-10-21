@@ -3,7 +3,7 @@
 // out and you're back in what you came in with. Labelled Men's / Women's / Unisex; anyone can
 // wear anything, and the street will react (people/areas.js, life.style).
 import * as THREE from 'three';
-import { CLOTHES, SHOES, fmt } from './shops.js';
+import { CLOTHES, SHOES, fmt, applyWear } from './shops.js';
 import { TIER_MUL } from './brands.js';
 import { KbNav } from '../ui/kbnav.js';
 
@@ -62,11 +62,11 @@ export class Trial {
   }
   build() {
     const L = this.life, P = this.g.player, mul = this.g.shops.priceMul(this.ctx.x, this.ctx.z) * (this.ctx.tier === 'brand' ? 1.35 : this.ctx.tier === 'ethnic' ? 1.2 : this.ctx.tier === 'premium' ? TIER_MUL.premium : this.ctx.tier === 'local' ? TIER_MUL.local : 1);
-    const ethnic = (p) => p.cut && p.cut[3] >= 1;
+    const ethnic = (p) => p.cut && (p.cut[3] === 1 || p.cut[3] === 2);
     this.items = [];
     if (this.mode === 'clothes') {
       for (const [id, name, note, base, patch, who] of CLOTHES) {
-        const kind = ethnic(patch) ? 'ethnic' : patch.top !== undefined ? 'tops' : 'bottoms';
+        const kind = ethnic(patch) ? 'ethnic' : patch.top !== undefined ? 'tops' : patch.bottom !== undefined ? 'bottoms' : 'extras';
         if (this.sub && kind !== this.sub) continue;
         if (this.ctx.tier === 'ethnic' && kind !== 'ethnic') continue;
         this.items.push({ id, name, note, price: r10(base * mul), patch, who, swatch: patch.top ?? patch.bottom, own: L.s.wardrobe.includes(id) });
@@ -130,7 +130,7 @@ export class Trial {
     if (G.interiors && G.interiors.cur && G.interiors.cur.seat) G.interiors.stand();
   }
 }
-function cloneLook(L) { return { ...L, top: L.top.clone(), bottom: L.bottom.clone(), shoe: L.shoe.clone(), hair: L.hair.clone(), skin: L.skin.clone(), cut: L.cut.clone() }; }
+function cloneLook(L) { return { ...L, top: L.top.clone(), bottom: L.bottom.clone(), shoe: L.shoe.clone(), hair: L.hair.clone(), skin: L.skin.clone(), cut: L.cut.clone(), patCol: L.patCol ? L.patCol.clone() : null, hatCol: L.hatCol ? L.hatCol.clone() : null }; }
 function applyPatch(L, p) {
   const c = (h) => new THREE.Color(h).convertSRGBToLinear();
   if (p.top !== undefined) L.top = c(p.top);
@@ -140,4 +140,5 @@ function applyPatch(L, p) {
   if (p.cut) L.cut = new THREE.Vector4(...p.cut);
   if (p.style) L.style = p.style;
   if (p.beard !== undefined) L.beard = p.beard;
+  applyWear(L, p);
 }

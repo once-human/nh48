@@ -108,7 +108,8 @@ for lid, voice, lang, tts in jobs:
     if only and lid not in only and not any(lid.startswith(o) for o in only): continue
     if os.path.exists(os.path.join(OUT, lid + '.mp3')) and not os.environ.get('FORCE'): continue
     tmp = tempfile.mktemp(suffix='.wav')
-    if voice.startswith('mr'): piper(tts, int(voice[2:]), tmp)
+    if voice.startswith('mr') and _MR == 'mr0': piper(tts, int(voice[2:]), tmp)
+    elif voice.startswith('mr'): kokoro(tts, ['hf_alpha', 'hf_beta'][int(voice[2:]) % 2], 'hi', tmp)
     else: kokoro(tts, voice, lang, tmp)
     out = os.path.join(OUT, lid + '.mp3')
     # trim silence at both ends, gentle compression + loudness so lines sit above the street noise

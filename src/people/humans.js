@@ -38,11 +38,11 @@ function patchBody(mat) {
   mat.onBeforeCompile = (sh) => {
     const u = mat.userData;
     Object.assign(sh.uniforms, { uTop: { value: u.top }, uBottom: { value: u.bottom }, uSkin: { value: u.skin }, uShoe: { value: u.shoe },
-      uCut: { value: u.cut }, uBindM: { value: u.bindM }, uBody: { value: u.body }, uArms: { value: u.arms } });
+      uCut: { value: u.cut }, uBindM: { value: u.bindM }, uBody: { value: u.body }, uArms: { value: u.arms }, uStyle: { value: u.style } });
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vBind; uniform mat4 uBindM;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBind = (uBindM * vec4(position, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vBind; uniform vec3 uTop, uBottom, uSkin, uShoe; uniform vec4 uCut, uBody, uArms;`)
+      varying vec3 vBind; uniform vec3 uTop, uBottom, uSkin, uShoe; uniform vec4 uCut, uBody, uArms, uStyle;`)
       .replace('#include <map_fragment>', `
       vec3 tex = texture2D(map, vMapUv).rgb;
       // uBody: hip, neck, arm height, ankle; uArms: shoulder x, wrist x
@@ -68,7 +68,8 @@ function patchBody(mat) {
         if (p.z > 0.0 && p.y > neck - 0.07 - uCut.z * 0.05 && ax < (p.y - (neck - 0.07 - uCut.z * 0.05)) * 0.9 + 0.012) { col = skin; cloth = 0.0; }
       } else {
         col = p.y > uCut.y * hip ? uTop : uBottom; cloth = 1.0;
-        if (uCut.w > 1.5 && p.y < uCut.y * hip) col = mix(uBottom, uTop, step(0.5, fract(p.y * 3.0)) * 0.12);   // saree pleats
+        if (uCut.w > 1.5 && uCut.w < 2.5 && p.y < uCut.y * hip) col = mix(uBottom, uTop, step(0.5, fract(p.y * 3.0)) * 0.12);   // saree pleats
+        if (uCut.w > 2.5 && p.y < uStyle.y * hip) { col = skin; cloth = 0.0; }                                                // below a skirt's hem: legs
         if (p.y < uBody.w) col = uShoe;
         if (p.y > hip - 0.03 && p.y < hip + 0.01 && uCut.y > 0.9) col *= 0.45;    // belt
       }
@@ -76,13 +77,46 @@ function patchBody(mat) {
       // a 2-4 cm band at each edge stays painted so no gap opens at a hem or cuff
       bool torsoIn = !arm && p.y > hip + 0.03 && p.y < neck - 0.045;
       bool armIn = arm && (ax - uArms.x) / (uArms.y - uArms.x) < uCut.x - 0.07;
-      bool legIn = p.y < hip - 0.03 && p.y > uBody.w + 0.03 && uCut.w < 1.5;
+      bool legIn = p.y < hip - 0.03 && p.y > uBody.w + 0.03 && (uCut.w < 1.5 || (uCut.w > 2.5 && p.y > uStyle.y * hip + 0.03));
       bool footIn = p.y < uBody.w - 0.015;
       if (torsoIn || armIn || legIn || footIn) discard;
       if (cloth > 0.5) col *= 0.92;
       diffuseColor.rgb *= col;`);
   };
-  mat.customProgramCacheKey = () => 'nh-people-ubc';
+  mat.customProgramCacheKey = () => 'nh-people-ubc2';
+  return mat;
+}
+
+// the cloth shells get their fabric from where they sit on the body (bind pose), not UVs: stripes,
+// checks, denim, a print, an open jacket over a tee, colour blocks; a skirt is the long shell cut at its hem
+// uStyle: x pattern (0 plain, 1 stripes, 2 checks, 3 denim, 4 dots, 5 open jacket, 6 colour block), y hem (x hip height)
+function patchCloth(mat, which) {
+  mat.onBeforeCompile = (sh) => {
+    const u = mat.userData;
+    Object.assign(sh.uniforms, { uStyle: { value: u.style }, uPat: { value: u.pat }, uWhich: { value: which }, uBindM: { value: u.bindM } });
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vP; uniform mat4 uBindM;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvP = (uBindM * vec4(position, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+      varying vec3 vP; uniform vec4 uStyle; uniform vec3 uPat; uniform float uWhich;
+      float h21(vec2 q) { return fract(sin(dot(q, vec2(127.1, 311.7))) * 43758.5453); }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      vec3 p = vP; float pt = uStyle.x;
+      // the long shell as a skirt: nothing below the hem
+      if (uWhich > 1.5 && uStyle.y > 0.01 && p.y < uStyle.y * 0.95) discard;
+      if (uWhich < 0.5) {
+        if (pt > 0.5 && pt < 1.5) diffuseColor.rgb = mix(diffuseColor.rgb, uPat, step(0.5, fract(p.y * 16.0)));
+        else if (pt > 1.5 && pt < 2.5) { float a = step(0.5, fract(p.x * 11.0)), b = step(0.5, fract(p.y * 11.0)); diffuseColor.rgb = mix(diffuseColor.rgb, uPat, (a + b) * 0.33); }
+        else if (pt > 3.5 && pt < 4.5) { vec2 g = fract(vec2(p.x + p.z, p.y) * 22.0) - 0.5; diffuseColor.rgb = mix(diffuseColor.rgb, uPat, step(length(g), 0.17)); }
+        else if (pt > 4.5 && pt < 5.5) { float inner = step(abs(p.x), 0.065) * step(0.0, p.z) * step(p.y, 1.47); diffuseColor.rgb = mix(diffuseColor.rgb, uPat, inner); if (abs(abs(p.x) - 0.07) < 0.008 && p.z > 0.0) diffuseColor.rgb *= 0.55; }
+        else if (pt > 5.5) diffuseColor.rgb = mix(diffuseColor.rgb, uPat, step(1.22, p.y));
+      } else if (pt > 2.5 && pt < 3.5 || uStyle.z > 0.5) {
+        // denim: a twill grain and a lighter wash down the front of the thighs
+        float n = h21(floor(vec2(p.x * 260.0 + p.y * 260.0, p.y * 90.0)));
+        diffuseColor.rgb *= 0.9 + n * 0.16;
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.35, smoothstep(0.03, 0.12, p.z) * smoothstep(0.45, 0.75, p.y) * 0.5);
+      }`);
+  };
+  mat.customProgramCacheKey = () => 'nh-cloth-' + which;
   return mat;
 }
 
@@ -196,7 +230,8 @@ export class HumanKit {
     const root = skeletonClone(g.scene);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.78, metalness: 0, map: this.maps[k] || null });
     const B = BODY[k];
-    mat.userData = { top: look.top.clone(), bottom: look.bottom.clone(), skin: look.skin.clone(), shoe: look.shoe.clone(), cut: look.cut.clone(),
+    const style = new THREE.Vector4(), pat = new THREE.Color();
+    mat.userData = { top: look.top.clone(), bottom: look.bottom.clone(), skin: look.skin.clone(), shoe: look.shoe.clone(), cut: look.cut.clone(), style,
       bindM: this.bindM[k] || new THREE.Matrix4(), body: new THREE.Vector4(B.hip, B.neck, B.armY, 0.085), arms: new THREE.Vector4(B.shoulder, B.wrist, 0, 0) };
     if (mat.map) patchBody(mat);
     const acc = this.accMat.clone();
@@ -205,6 +240,8 @@ export class HumanKit {
     const topMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
     const botMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
     const shoeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0 });
+    const skirtMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
+    for (const [m, w] of [[topMat, 0], [botMat, 1], [skirtMat, 2]]) { m.userData = { style, pat, bindM: this.bindM[k] || new THREE.Matrix4() }; patchCloth(m, w); }
     let body = null; const parts = [];
     root.traverse((o) => {
       if (!o.isSkinnedMesh) return;
@@ -212,7 +249,7 @@ export class HumanKit {
       if (o.name.startsWith('body')) { o.material = mat; body = o; }
       else if (o.name.startsWith('eyes')) { o.castShadow = false; }
       else if (o.name.startsWith('hair') || o.name.startsWith('face')) { o.material = hairMat; o.castShadow = false; parts.push(o); }
-      else if (o.name.startsWith('cloth')) { o.material = o.name === 'cloth_pants' ? botMat : o.name === 'cloth_shoes' ? shoeMat : topMat; o.castShadow = o.name !== 'cloth_shoes'; parts.push(o); }
+      else if (o.name.startsWith('cloth')) { o.material = o.name === 'cloth_pants' ? botMat : o.name === 'cloth_shoes' ? shoeMat : o.name === 'cloth_saree' ? skirtMat : topMat; o.castShadow = o.name !== 'cloth_shoes'; parts.push(o); }
       else { o.material = acc; parts.push(o); }
     });
     const holder = new THREE.Group();
@@ -220,13 +257,13 @@ export class HumanKit {
     root.scale.setScalar(look.scale);
     holder.add(root);
     const mixer = new THREE.AnimationMixer(root);
-    const H = { holder, root, mixer, mat, acc, hairMat, topMat, botMat, shoeMat, body, parts, actions: {}, cur: null, look };
+    const H = { holder, root, mixer, mat, acc, hairMat, topMat, botMat, shoeMat, skirtMat, style, pat, body, parts, actions: {}, cur: null, look };
     // ponytail, plait, glasses and bindi ride on the head bone
     const head = root.getObjectByName('Head'), X = head && this.extras(k);
     if (X) {
       H.xtra = {};
       for (const [n, geo] of Object.entries(X.geo)) {
-        const m = new THREE.Mesh(geo, n === 'glasses' ? this.glassMat : n === 'bindi' ? this.bindiMat : hairMat);
+        const m = new THREE.Mesh(geo, n === 'glasses' || n === 'lens' ? this.glassMat : n === 'bindi' ? this.bindiMat : n === 'cap' ? new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 }) : hairMat);
         m.matrixAutoUpdate = false; m.matrix.copy(X.local); m.castShadow = false; m.visible = false;
         head.add(m); H.xtra[n] = m;
       }
@@ -251,7 +288,7 @@ export class HumanKit {
       return a;
     };
     H.setAcc = (name) => { H.look = Object.assign({}, H.look, { acc: name }); this.applyLook(H, H.look, true); };
-    H.dispose = () => { mat.dispose(); acc.dispose(); hairMat.dispose(); topMat.dispose(); botMat.dispose(); mixer.stopAllAction(); };
+    H.dispose = () => { mat.dispose(); acc.dispose(); hairMat.dispose(); topMat.dispose(); botMat.dispose(); skirtMat.dispose(); mixer.stopAllAction(); };
     return H;
   }
   // geometry for the head-bone extras, built once per body in the rig's rest pose and carried into the
@@ -298,9 +335,17 @@ export class HumanKit {
     const armR = armL.clone(); armR.translate(ew, 0, 0);
     const glasses = merge([rim(cx - ew * 0.26), rim(cx + ew * 0.26), br, armL, armR]);
     const bindi = new THREE.CircleGeometry(0.0055, 12); bindi.translate(cx, ey + 0.038, ez - 0.004);
+    // sunglasses: dark lenses in the same rims
+    const lensL = new THREE.CircleGeometry(ew * 0.16, 16); lensL.translate(cx - ew * 0.26, ey, ez + 0.013);
+    const lensR = new THREE.CircleGeometry(ew * 0.16, 16); lensR.translate(cx + ew * 0.26, ey, ez + 0.013);
+    const lens = merge([lensL, lensR]);
+    // a baseball cap: a crown over the hair and a brim out front
+    const crown = new THREE.SphereGeometry(0.105, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2); crown.scale(1, 0.75, 1.08); crown.translate(cx, top - 0.06, (cap.min.z + cap.max.z) / 2);
+    const brim = new THREE.CylinderGeometry(0.085, 0.085, 0.008, 18, 1, false, -Math.PI / 2, Math.PI); brim.scale(1, 1, 0.9); brim.translate(cx, top - 0.06, (cap.min.z + cap.max.z) / 2 + 0.07);
+    const capG = merge([crown, brim]);
     // rest pose -> Head bone space
     const toHead = new THREE.Matrix4().copy(head.matrixWorld).invert();
-    return (this._xtra[k] = { geo: { pony, braid, glasses, bindi }, local: toHead });
+    return (this._xtra[k] = { geo: { pony, braid, glasses, bindi, lens, cap: capG }, local: toHead });
   }
   // dress a body (also used when the crowd hands a pooled body to someone else)
   applyLook(H, look, accOnly = false) {
@@ -309,6 +354,9 @@ export class HumanKit {
       u.top.copy(look.top); u.bottom.copy(look.bottom); u.skin.copy(look.skin); u.shoe.copy(look.shoe); u.cut.copy(look.cut);
       H.hairMat.color.copy(look.hair).multiplyScalar(1.8);
       H.topMat.color.copy(look.top); H.botMat.color.copy(look.bottom); H.shoeMat.color.copy(look.shoe);
+      // a saree's shell is the saree's colour; a skirt's is the skirt's
+      if (H.skirtMat) H.skirtMat.color.copy(look.cut.w > 2.5 ? look.bottom : look.top);
+      if (H.style) { H.style.set(look.pat || 0, look.cut.w > 2.5 ? look.hem || 0.62 : 0, look.denim ? 1 : 0, 0); H.pat.copy(look.patCol || look.top); }
       H.root.scale.setScalar(look.scale);
       H.look = look;
     }
@@ -332,7 +380,9 @@ export class HumanKit {
     if (H.xtra) {
       H.xtra.pony.visible = !helmet && look.style === 'pony';
       H.xtra.braid.visible = !helmet && look.style === 'braid';
-      H.xtra.glasses.visible = !!look.glasses && !helmet;
+      H.xtra.glasses.visible = (!!look.glasses || !!look.shades) && !helmet;
+      if (H.xtra.lens) H.xtra.lens.visible = !!look.shades && !helmet;
+      if (H.xtra.cap) { H.xtra.cap.visible = !!look.hat && !helmet && !cap; if (look.hat) H.xtra.cap.material.color.copy(look.hatCol || look.top); }
       H.xtra.bindi.visible = !!look.bindi && !!look.female;
     }
     if (helmet) H.acc.color.copy(look.helmetCol || new THREE.Color(0x1b1d22));
