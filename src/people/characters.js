@@ -14,12 +14,13 @@ export const SKINS = [
 // hair is black, one style each; the choice is what you wear
 export const HAIRS = { m: [{ id: 'part', name: 'Side parting', style: 'hair_simpleparted' }], f: [{ id: 'long', name: 'Long', style: 'hair_long' }] };
 export const HAIR_COLS = [{ id: 'black', name: 'Black', hex: 0x0d0b0a }];
+// the starter is plain western: a white tee, blue jeans and white sneakers. Fancier things are bought in the shops.
 export const OUTFITS = {
-  m: [{ id: 'casual', name: 'Casual', sub: 'Tee and jeans', top: 0x1e7a6d, bottom: 0x2c3e66, shoe: 0xeeeeee, cut: [0.38, 1, 0.4, 0] },
-    { id: 'western', name: 'Western', sub: 'Shirt and chinos', top: 0xf2f0ea, bottom: 0x23324d, shoe: 0x5a3a24, cut: [0.92, 1, 0.6, 0] },
+  m: [{ id: 'casual', name: 'Basic', sub: 'White tee, blue jeans', top: 0xf4f2ee, bottom: 0x2c3e66, shoe: 0xf2f2f2, cut: [0.38, 1, 0.3, 0], denim: true },
+    { id: 'western', name: 'Western', sub: 'Denim jacket, black jeans', top: 0x3e5f8a, bottom: 0x1b1c1f, shoe: 0x1d1a18, cut: [0.95, 1, 0.4, 0], pat: 5, patCol: 0xf4f2ee, denim: true },
     { id: 'trad', name: 'Traditional', sub: 'Kurta pyjama', top: 0xe0ac3c, bottom: 0xf1ece0, shoe: 0x3b2a1f, cut: [0.88, 0.55, 0.8, 1] }],
-  f: [{ id: 'casual', name: 'Casual', sub: 'Top and jeans', top: 0xd4486a, bottom: 0x2c3e66, shoe: 0xeeeeee, cut: [0.38, 1, 0.5, 0] },
-    { id: 'western', name: 'Western', sub: 'Shirt and trousers', top: 0x16161a, bottom: 0xe9dccb, shoe: 0x1d1a18, cut: [0.92, 1, 0.5, 0] },
+  f: [{ id: 'casual', name: 'Basic', sub: 'White tee, blue jeans', top: 0xf4f2ee, bottom: 0x2c3e66, shoe: 0xf2f2f2, cut: [0.38, 1, 0.3, 0], denim: true },
+    { id: 'western', name: 'Western', sub: 'Black tee, denim mini skirt', top: 0x16161a, bottom: 0x3e5f8a, shoe: 0xf2f2f2, cut: [0.3, 1, 0.3, 3], hem: 0.7, denim: true },
     { id: 'trad', name: 'Traditional', sub: 'Saree', top: 0xa3122a, bottom: 0x8a0f24, shoe: 0x3b2a1f, cut: [0.3, 1, 0.9, 2] }],
 };
 export const DEFAULT = { female: false, name: '', hair: 'part', hairCol: 'black', outfit: 'casual', skin: 'wheatish' };
@@ -48,6 +49,7 @@ export function lookOf(ch) {
   return {
     female: ch.female, skin: c(sk.hex), top: c(O.top), bottom: c(O.bottom), shoe: c(O.shoe),
     cut: new THREE.Vector4(...O.cut), hair: c(hc.hex), style: H.style, beard: !!H.beard,
+    pat: O.pat || 0, patCol: O.patCol !== undefined ? c(O.patCol) : null, hem: O.hem || 0, denim: !!O.denim,
     scale: ch.female ? 0.95 : 0.98, acc: null, player: true,
   };
 }
