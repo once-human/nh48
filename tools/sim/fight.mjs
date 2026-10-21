@@ -2,7 +2,7 @@
 import puppeteer from 'puppeteer-core';
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--window-size=800,450'], protocolTimeout: 600000 });
 const page = await browser.newPage(); await page.setViewport({ width: 800, height: 450 });
-const logs = []; page.on('pageerror', e => logs.push('ERR ' + e.message)); page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') logs.push(m.text()); });
+const logs = []; page.on('pageerror', e => logs.push('ERR ' + e.message)); page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') logs.push(m.text()); }); page.on('response', r => { if (r.status() >= 400) logs.push('404 ' + r.url()); });
 await page.goto('http://127.0.0.1:8848/test.html?test&play=1&q=low&frames=1', { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction('window.__shotReady === true || window.__error', { timeout: 400000, polling: 500 });
 const r = await page.evaluate(async () => {
@@ -16,7 +16,7 @@ const r = await page.evaluate(async () => {
   const key = (code) => { window.dispatchEvent(new KeyboardEvent('keydown', { code })); window.dispatchEvent(new KeyboardEvent('keyup', { code })); };
   const log = [];
   for (let i = 0; i < 40; i++) {
-    if (i % 4 === 0) key('KeyE');
+    if (i % 4 === 0) key('KeyX');
     await frame();
     log.push([P.act && P.act.name, per.mode, Math.round(per.hp ?? -1), Math.round(P.hp)].join(','));
   }

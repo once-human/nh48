@@ -1,4 +1,4 @@
-// NH48 — entry point. Stage 1 boot: renderer + post-processing, asset loading with honest progress,
+// NH48, entry point. Stage 1 boot: renderer + post-processing, asset loading with honest progress,
 // the streamed PBR city, and a free camera for checking the world. Gameplay plugs in on top.
 import * as THREE from 'three';
 import { Loader, stripToArray, bitmapTexture } from './core/assets.js';
@@ -86,7 +86,7 @@ async function main() {
     try { ctxGame?.saveResume(); } catch (err) { /* ignore */ }
     const m = document.getElementById('ld-msg'), ld = document.getElementById('loading');
     if (ld) { ld.classList.remove('done'); ld.hidden = false; }
-    if (m) m.textContent = 'Graphics driver reset — reloading where you were…';
+    if (m) m.textContent = 'Graphics driver reset, reloading where you were…';
     setTimeout(() => location.reload(), 1200);
   });
   const scene = new THREE.Scene();
@@ -207,7 +207,7 @@ async function main() {
     last = now;
     if (TEST) dt = 1 / 30;
     renderer.info.reset();
-    // tests can simulate several frames per rendered frame (?simx=4) — software GL is slow
+    // tests can simulate several frames per rendered frame (?simx=4), software GL is slow
     const simx = TEST ? Math.max(1, parseInt(params.get('simx') || '1')) : 1;
     let simDone = false;
     for (let k = 0; k < simx; k++) {

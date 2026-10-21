@@ -1,5 +1,5 @@
 {
-  "_": "Passenger voices, index-aligned with the L table in rides.js. [male text, female text or null] — read by tools/make_voices.py into assets/voice/p_<kind><i>_<m|f>.mp3",
+  "_": "Passenger voices, index-aligned with the L table in rides.js. [male text, female text or null], read by tools/make_voices.py into assets/voice/p_<kind><i>_<m|f>.mp3",
   "call":     [["ऑटो!", null], ["काका, रिक्षा!", null], ["ओ दादा, ऑटो!", null]],
   "board":    [["चला.", null], ["थँक यू दादा.", null], ["हां, चलो.", null]],
   "crash":    [["अरे बाबा! हळू चालवा!", null], ["काय करता काका?!", null], ["आई गं!", null], ["भाई, जान लेना है क्या?", null]],

@@ -238,8 +238,16 @@ export class Rides {
     const fare = Math.round(c.fare);
     const onTime = c.elapsed <= c.limit;
     const mood = clamp(c.mood + (onTime ? 0.1 : -0.15), 0, 1.1);
-    const tip = mood > 0.85 ? Math.round(fare * (onTime ? 0.2 : 0.1) / 5) * 5 + 5 : mood > 0.6 ? 5 : 0;
     const stars = clamp(Math.round(1 + mood * 4.2), 1, 5);
+    let tip = mood > 0.85 ? Math.round(fare * (onTime ? 0.2 : 0.1) / 5) * 5 + 5 : mood > 0.6 ? 5 : 0;
+    // a speaker, leopard seat covers, a box of bakarwadi offered on the way: it all adds up
+    const L = g.life, U = L ? L.s.upg : {};
+    if (tip) tip = Math.round(tip * (1 + (U.speaker ? 0.15 : 0) + (U.seat ? 0.05 : 0)) / 5) * 5;
+    if (L && mood > 0.5) {
+      const gift = ['shrewsbury', 'barfi', 'bakarwadi', 'gajra'].find(id => L.has(id));
+      if (gift) { L.take(gift); const extra = { shrewsbury: 45, barfi: 50, bakarwadi: 40, gajra: 20 }[gift]; tip += extra; g.hud.toast('You offered them something sweet', `+₹${extra} on the tip, and a smile`, 'good', 2.6); }
+      L.change('respect', stars >= 5 ? 0.5 : 0); L.change('mood', 0.02);
+    }
     g.stats.money += fare + tip;
     g.stats.rides += 1;
     g.stats.starSum += stars;

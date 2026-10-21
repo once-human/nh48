@@ -33,7 +33,7 @@ export const PATYA = [
   ['सुट्टे पैसे', 'आणावेत.'],
   ['गेटसमोर गाडी लावल्यास', 'टायर पंक्चर केले जाईल.'],
   ['कुत्र्यापासून', 'सावधान!'],
-  ['येथे थुंकू नये.', '— आज्ञेवरून'],
+  ['येथे थुंकू नये.', 'आज्ञेवरून'],
   ['मोबाईलवर बोलत', 'आत येऊ नये.'],
   ['कृपया शांतता राखा.', 'परीक्षा चालू आहे.'],
 ];
@@ -49,7 +49,7 @@ export const BANNERS = [
 ];
 export const ADS = [
   ['स्वप्नातलं घर', '2 & 3 BHK • Sahyadri Heights • Possession 2027', 0],
-  ['Gurukul Academy', 'MPSC • UPSC 2027 batch — admissions open', 1],
+  ['Gurukul Academy', 'MPSC • UPSC 2027 batch, admissions open', 1],
   ['लक्ष्मी सिल्क', 'Wedding Sarees • Paithani • Since 1962', 2],
   ['Chakka Masale', 'चवीला पुणेरी • Kanda Lasun Masala', 3],
   ['Vahini Chai', 'Pune cha chaha. Kadak.', 4],

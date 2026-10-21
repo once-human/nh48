@@ -309,7 +309,7 @@ export function* buildBuildingsChunk(W, C, group) {
           const y1 = BASE + gh - 0.1, y0 = y1 - h;
           const o = 0.1;
           const x0 = ax + tx * t0 + nx * o, z0 = az + tz * t0 + nz * o, x1 = ax + tx * t1 + nx * o, z1 = az + tz * t1 + nz * o;
-          C.doors.push({ x: (x0 + x1) / 2 + nx * 0.25, z: (z0 + z1) / 2 + nz * 0.25, nx, nz, n: 0 });
+          C.doors.push({ x: (x0 + x1) / 2 + nx * 0.25, z: (z0 + z1) / 2 + nz * 0.25, nx, nz, n: 0, shop: sh ? sh[3] : -1 });
           const ltr = (tx * nz - tz * nx) > 0;
           (board.local ? ob : sb).quad([x0, y0, z0], [x1, y0, z1], [x1, y1, z1], [x0, y1, z0], [nx, 0, nz], ltr ? board.u0 : board.u1, board.v0, ltr ? board.u1 : board.u0, board.v1);
           if (sh) nearRecs.push({ s: sh, x0, y0, z0, x1, y1, z1, nx, nz, ltr, mx: (x0 + x1) / 2, mz: (z0 + z1) / 2 });

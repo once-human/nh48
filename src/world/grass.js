@@ -1,5 +1,5 @@
-// Grass and weeds near the camera (the Slow Roads trick): open ground — parks, verges, scrub,
-// bare soil, medians — gets little alpha-cut tufts scattered when its chunk is built, and one
+// Grass and weeds near the camera (the Slow Roads trick): open ground, parks, verges, scrub,
+// bare soil, medians, gets little alpha-cut tufts scattered when its chunk is built, and one
 // instanced mesh shows the ones within a few tens of metres, swaying in the wind and shrinking
 // to nothing at the edge of the radius so they never pop. Far away the ground texture does the work.
 import * as THREE from 'three';

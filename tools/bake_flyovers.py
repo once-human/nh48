@@ -65,10 +65,23 @@ for k, w in D['ways'].items():
     ln = LineString([P[n] for n in nds])
     if not ln.intersects(VIS): continue
     if ln.intersects(RIVER): continue
-    if ln.length <= 120 and not named: continue
+    # (short pieces are kept for now; dropped below unless they join a longer flyover)
     if t.get('oneway') == '-1': nds = nds[::-1]
     wd, ow = width_of(t)
-    fly.append(dict(nodes=nds, w=wd, ow=ow, H=6.5 + 3.0 * max(0, layer - 1), name=t.get('name', '')))
+    fly.append(dict(nodes=nds, w=wd, ow=ow, H=6.5 + 3.0 * max(0, layer - 1), name=t.get('name', ''), L=ln.length, named=named))
+# a short bridge on its own is a culvert or a nalla crossing (drawn at ground level); but a short
+# piece joining longer flyover segments is part of the flyover and must be kept, or the deck ends
+# in mid-air where it was missing
+keep = [f for f in fly if f['L'] > 120 or f['named']]
+kn = set(n for f in keep for n in f['nodes'])
+changed = True
+while changed:
+    changed = False
+    for f in fly:
+        if f in keep: continue
+        if f['nodes'][0] in kn or f['nodes'][-1] in kn:
+            keep.append(f); kn.update(f['nodes']); changed = True
+fly = keep
 print('flyover ways', len(fly), collections.Counter(f['name'] for f in fly).most_common(8))
 
 # which flyover ends touch the ordinary road network (ramp down there)
@@ -88,7 +101,7 @@ def name_id(en):
         if n[0] == en: return i
     names.append([en, '']); return len(names) - 1
 
-RAMP = 110.0
+RAMP = 160.0     # Pune flyover approaches climb ~6.5 m at about 4%: 150-170 m
 # distance along the flyover network from the nearest ramp foot, so a ramp that is split into
 # several OSM pieces still climbs smoothly across them
 import heapq
@@ -98,9 +111,13 @@ for f in fly:
     for a, b in zip(nd, nd[1:]):
         l = math.dist(P[a], P[b]); adj[a].append((b, l)); adj[b].append((a, l))
 feet = set()
+# every loose end of the flyover network comes down to the road: where it meets a ground road, or
+# simply where the mapped bridge stops (a real deck never just ends in the air)
+deg = collections.Counter()
+for a, lst in adj.items(): deg[a] = len(lst)
 for f in fly:
     for n in (f['nodes'][0], f['nodes'][-1]):
-        if n in ground_nodes and fly_nodes[n] == 1 and VIS.buffer(-5).contains(Point(P[n])): feet.add(n)
+        if (n in ground_nodes and fly_nodes[n] == 1) or deg[n] == 1: feet.add(n)
 dist = {n: 0.0 for n in feet}; pq = [(0.0, n) for n in feet]
 while pq:
     d0, a = heapq.heappop(pq)

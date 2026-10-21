@@ -1,5 +1,5 @@
-// Tree lab (?lab=trees): every species in a row — near LOD in front, mid LOD behind, impostors at
-// the back — under the real sky and post stack. Used for tuning the species by eye.
+// Tree lab (?lab=trees): every species in a row, near LOD in front, mid LOD behind, impostors at
+// the back, under the real sky and post stack. Used for tuning the species by eye.
 import * as THREE from 'three';
 import { createTreeKit } from './world/trees.js';
 import { Sky } from './gfx/sky.js';
@@ -65,7 +65,7 @@ export function runTreeLab(renderer, quality, T, params) {
 }
 
 // People lab (?lab=people[&anim=walk]): a line-up of random Pune looks, front row facing the
-// camera, back row facing away — for checking clothing paint, faces, accessories, orientation.
+// camera, back row facing away, for checking clothing paint, faces, accessories, orientation.
 export function runPeopleLab(renderer, quality, kit, params, animals) {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 500);
@@ -117,7 +117,7 @@ export function runPeopleLab(renderer, quality, kit, params, animals) {
   requestAnimationFrame(loop);
 }
 
-// vehicle lineup: ?lab=cars&at=x,z,y,yaw,pitch — every traffic model plus the player's auto
+// vehicle lineup: ?lab=cars&at=x,z,y,yaw,pitch, every traffic model plus the player's auto
 export function runCarLab(renderer, quality, params) {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 500);

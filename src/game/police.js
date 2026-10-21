@@ -1,8 +1,8 @@
 // Police: Pune traffic rules and what happens when you break them.
-//  · Mostly e-challans — signal cameras, speed cameras, helmet cameras. They arrive later as an SMS
+//  · Mostly e-challans, signal cameras, speed cameras, helmet cameras. They arrive later as an SMS
 //    and pile up as pending dues (like the real thing), which you pay from the pause menu.
 //  · Sometimes the traffic police at a junction wave you over. Stop, and you get a conversation:
-//    pay, plead, argue or offer "chai-pani" — each with odds that depend on the officer, on whether
+//    pay, plead, argue or offer "chai-pani", each with odds that depend on the officer, on whether
 //    you were actually right, and on your record. Drive off and the challan doubles.
 //  · Theft is different: beat marshals on motorcycles come looking (heat 1–3), chase you through
 //    the streets and, if they catch you, it's the chowki.
@@ -32,6 +32,10 @@ export const FINES = {
   theft:     { amt: 5000, name: 'Vehicle theft', law: 'BNS s.303' },
   bribe:     { amt: 5000, name: 'Attempt to bribe a public servant', law: 'Prevention of Corruption Act s.8' },
   noparking: { amt: 500, name: 'No parking (towed)', law: 'MV Act s.177' },
+  obstruct:  { amt: 500, name: 'Obstructing a public servant', law: 'BNS s.221' },
+  assault:   { amt: 10000, name: 'Assaulting a public servant', law: 'BNS s.121' },
+  drunk:     { amt: 10000, name: 'Drunk driving', law: 'MV Act s.185' },
+  nuisance:  { amt: 1200, name: 'Public nuisance / brawling', law: 'Maharashtra Police Act s.110' },
 };
 const TOW = { two: 200, three: 200, four: 400, fine: 500 };   // towing charges + no-parking fine
 const SPEED_LIMIT = 50;                                         // km/h on city arterials
@@ -147,9 +151,9 @@ export class Police {
     const delay = 5 + this.rng.next() * 9;
     this.later(delay, () => {
       const H = this.g.hud;
-      if (stolen) { H.sms('MahaTraffic', `E-challan ${fmtRupees(amt)} for ${FINES[kind].name.toLowerCase()} at ${where} was sent to ${plate} — the vehicle’s real owner.`, '', 'Not your problem. Very much theirs.'); return; }
+      if (stolen) { H.sms('MahaTraffic', `E-challan ${fmtRupees(amt)} for ${FINES[kind].name.toLowerCase()} at ${where} was sent to ${plate}, the vehicle’s real owner.`, '', 'Not your problem. Very much theirs.'); return; }
       this.addDue(kind, amt, where);
-      H.sms('MahaTraffic', `E-challan issued to ${plate}: ${FINES[kind].name}, ${where} (${how}).`, fmtRupees(amt), 'Pending — pay from the menu');
+      H.sms('MahaTraffic', `E-challan issued to ${plate}: ${FINES[kind].name}, ${where} (${how}).`, fmtRupees(amt), 'Pending, pay from the menu');
       this.g.audio.fine();
     });
   }
@@ -243,7 +247,7 @@ export class Police {
   honked() {
     if (!this.zone || this.stop) return;
     const P = this.g.player;
-    this.offence('horn', P.x, P.z, { copRange: 70, stopChance: 0.9, missed: ['Silence zone', 'Hospital nearby — no honking here'] });
+    this.offence('horn', P.x, P.z, { copRange: 70, stopChance: 0.9, missed: ['Silence zone', 'Hospital nearby, no honking here'] });
   }
 
   // ---------------------------------------------------------------- traffic stops
@@ -265,7 +269,7 @@ export class Police {
       if (ped) { ped.yaw = Math.atan2(P.z - ped.z, P.x - ped.x); ped.anim = 'wave'; }
       s.whistleT -= dt;
       if (s.whistleT <= 0 && d < 70) { s.whistleT = 2.6; G.audio.whistle(); }
-      G.hud.prompt('!', d < 18 ? 'Stop here — the officer is walking over' : 'Traffic police waving you over — stop next to him', 0.3);
+      G.hud.prompt('!', d < 18 ? 'Stop here, the officer is walking over' : 'Traffic police waving you over, stop next to him', 0.3);
       if (d < 18 && Math.abs(P.v) < 0.8) { s.phase = 'approach'; P.busy = 999; }
       else if (d > 65 || s.t > 16) {
         // drove off: the number is noted, the challan grows (and if it's stolen, word gets out)
@@ -438,7 +442,7 @@ export class Police {
   // ---------------------------------------------------------------- theft, heat, beat marshals
   onEvent(ev) {
     const G = this.g, P = G.player;
-    if (ev.type === 'carjack') this.raiseHeat(this.copSeeing(ev.x, ev.z, 70) ? 2 : 1, 'Vehicle theft — the owner is calling it in');
+    if (ev.type === 'carjack') this.raiseHeat(this.copSeeing(ev.x, ev.z, 70) ? 2 : 1, 'Vehicle theft, the owner is calling it in');
     if (ev.type === 'stoleParked' && this.rng.next() < 0.4) this.later(18 + this.rng.next() * 25, () => { if (P.cur === ev.veh && !P.onFoot) this.raiseHeat(1, 'The owner reported their ' + ev.name + ' stolen'); });
     if (ev.type === 'pedHit' && !P.onFoot) {
       const cop = this.copSeeing(P.x, P.z, 50);
@@ -480,7 +484,7 @@ export class Police {
       const need = 25 + this.heat * 12;
       if (this.unseenT > need) {
         this.heat--; this.unseenT = 0;
-        if (this.heat === 0) { G.hud.toast('You lost them', 'The police have given up — for now', 'meter', 3); this.say('m_lost', null, true); }
+        if (this.heat === 0) { G.hud.toast('You lost them', 'The police have given up, for now', 'meter', 3); this.say('m_lost', null, true); }
         else G.hud.toast('Fewer police looking', '', 'info', 2);
       }
       G.hud.setHeat(this.heat, seen, this.heat ? 1 - this.unseenT / need : 0);
@@ -574,7 +578,7 @@ export class Police {
     this.charge('noparking', fee, 'Towing + no-parking fine');
     d.towed = null; this.towedAt = null;
     this.g.audio.cash();
-    this.g.hud.toast(`Paid ${fmtRupees(fee)} — auto released`, 'Park on the side lanes next time', 'meter', 3);
+    this.g.hud.toast(`Paid ${fmtRupees(fee)}, auto released`, 'Park on the side lanes next time', 'meter', 3);
     return true;
   }
 
@@ -592,7 +596,9 @@ export class Police {
       vol = clamp(14 / (d + 8), 0.25, 1);
       pan = clamp((-dx * Math.sin(P.th) + dz * Math.cos(P.th)) / (d || 1), -1, 1) * 0.6;
     }
-    if (pri === undefined) pri = id.startsWith('s_') ? (/_(fall|hit|fight|flee|carjack_\w+)\d+$/.test(id) ? 1 : 0) : 2;
+    // street chatter waits its turn; reactions don't talk over each other; police get through
+    if (pri === undefined) pri = id.startsWith('s_') ? (/_(fall|hit|fight|flee|carjack_\w+)\d+$/.test(id) ? 1 : 0)
+      : /^(sh|f)\d/.test(id) ? 1 : /^(d|h|c|b)\d/.test(id) ? 0 : 2;
     if (!G.audio.voice(id, vol, pan, radio, pri)) return null;
     G.hud.say(L[0] === 'Traffic police' && who && who.name ? who.name : L[0], L[4], L[5], 4.2);
     return id;

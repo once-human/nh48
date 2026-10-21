@@ -32,6 +32,8 @@ KEEP = {
     'roll': 'Roll',
     # fighting
     'cross': 'Punch_Cross', 'hook': 'Melee_Hook', 'hit_head': 'Hit_Head', 'block': 'Sword_Block',
+    # water
+    'swim': 'Swim_Fwd_Loop', 'swim_idle': 'Swim_Idle_Loop',
 }
 HAIRS = {'m': ['Hair_SimpleParted', 'Hair_Buzzed', 'Hair_Beard'],
          'f': ['Hair_Long', 'Hair_Buns', 'Hair_BuzzedFemale']}
@@ -276,7 +278,7 @@ def clothes(arm, body, g):
     out.append(shell_from_body(body, 'cloth_shoes', lambda p: p.z < L['ankle'] + 0.015, push=0.012, smooth=6))
     out.append(shell_from_body(body, 'cloth_pants', lambda p: L['ankle'] < p.z < hip + 0.05 and abs(p.x) < 0.3, push=0.012, smooth=12))
     out.append(skirt(arm, body, 'cloth_kurta', hip + 0.02, L['knee'], 0.06, g))
-    if g == 'f': out.append(skirt(arm, body, 'cloth_saree', hip + 0.06, L['ankle'] + 0.01, 0.05, g))
+    out.append(skirt(arm, body, 'cloth_saree', hip + 0.06, L['ankle'] + 0.01, 0.05, g))    # men can wear one too
     return out
 
 def build(g):

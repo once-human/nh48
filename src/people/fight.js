@@ -1,4 +1,4 @@
-// Street fights. E throws a punch (keep pressing: jab, cross, hook), Q rolls out of the way.
+// Street fights. Left click throws a punch (keep clicking: jab, cross, hook), Ctrl rolls out of the way.
 // Whoever you hit decides by who they are (people/areas.js personas): a dada or a delivery bhaiya
 // squares up and hits back, a kaku threatens you with her chappal and shouts for help, an aaji
 // just runs. People around stop to watch (phones out) or get away; a tough friend may join in;
@@ -39,17 +39,25 @@ export class Brawl {
     if (this.active > 0) { this.active += dt; if (this.active > 12) this.active = 0; }
     this.heatT -= dt;
     // health comes back on its own once nobody has hit you for a while
-    if (P.hurtT > 6 && P.hp < 100 && !P.ko) P.hp = Math.min(100, P.hp + dt * 7);
-    if (!P.onFoot) { P.act = null; this.queued = false; return; }
+    const max = P.hpMax ? P.hpMax() : 100;
+    if (P.hurtT > 6 && P.hp < max && !P.ko) P.hp = Math.min(max, P.hp + dt * 7);
+    if (!P.onFoot) {
+      P.act = null; this.queued = false;
+      // on a two-wheeler you can still throw a punch sideways at the rider (or walker) next to you
+      if (this.rideT > 0) { this.rideT -= dt; if (this.rideT <= 0 && P.riderShown) P.human.play('drive', { fade: 0.15 }); }
+      if ((input.took('Mouse0') || input.took('KeyX')) && P.spec && P.spec.two && !(this.rideT > 0)) this.ridePunch();
+      return;
+    }
     const F = P.foot, H = P.human;
     this.comboT -= dt;
     if (P.ko) return;
     const busyDown = P.downT > 0 || F.climb || F.air;
-    if (input.took('KeyE') && !busyDown) {
+    // left mouse button punches (E opens the backpack), Ctrl rolls
+    if ((input.took('Mouse0') || input.took('KeyX')) && !busyDown) {
       if (P.act && P.act.kind === 'atk') { if (P.act.t > P.act.dur * 0.35) this.queued = true; }
       else if (!P.act) this.attack();
     }
-    if (input.took('KeyQ') && !busyDown && !(P.act && P.act.kind === 'roll')) this.roll(input);
+    if ((input.took('ControlLeft') || input.took('ControlRight')) && !busyDown && !(P.act && P.act.kind === 'roll')) this.roll(input);
     const A = P.act;
     if (!A) return;
     A.t += dt;
@@ -90,10 +98,30 @@ export class Brawl {
       const s = d * (1.6 - c) * (p.foe ? 0.5 : 1);
       if (s < bs) { bs = s; best = p; }
     }
+    if (best) return best;
+    // nobody to hit: a vehicle in front of you (a rider gets knocked off, a car gets a dent)
+    return this.vehicleAt(F.x + fx * 0.8, F.z + fz * 0.8, 1.2);
+  }
+  vehicleAt(x, z, r) {
+    const P = this.P, T = this.g.traffic;
+    let best = null, bd = r;
+    if (T) T.near(x, z, 6, (o) => {
+      if (!o.T || o.isPlayer || o.parked) return;
+      const d = P.distToBox(x, z, o.x, o.z, o.hx, o.hz, o.T.L, o.T.W);
+      if (d < bd) { bd = d; best = { veh: o, traffic: true, x: o.x, z: o.z }; }
+    });
+    for (const dd of P.dropped) {
+      const v = dd.veh, S = v === P.auto ? null : v.spec;
+      if (!S) continue;
+      const d = P.distToBox(x, z, v.x, v.z, Math.cos(v.th), Math.sin(v.th), S.L, S.W);
+      if (d < bd) { bd = d; best = { veh: v, traffic: false, x: v.x, z: v.z }; }
+    }
     return best;
   }
   attack() {
     const P = this.P;
+    const S = this.g.strays, F0 = P.foot;
+    if (S && !this.pickTarget()) { const a = S.near(F0.x + Math.cos(F0.yaw) * 0.9, F0.z + Math.sin(F0.yaw) * 0.9, 1.5); if (a && a.kind === 'cow') { S.namaskar(a); return; } }
     if (this.comboT <= 0) this.combo = 0;
     const name = COMBO[this.combo % COMBO.length];
     this.combo = (this.combo + 1) % COMBO.length; this.comboT = 0.9;
@@ -116,24 +144,89 @@ export class Brawl {
     const P = this.P, F = P.foot, M = A.M;
     const fx = Math.cos(F.yaw), fz = Math.sin(F.yaw);
     let q = A.target;
-    if (q) {
+    if (q && !q.veh) {
       const dx = q.x - F.x, dz = q.z - F.z, d = Math.hypot(dx, dz);
       if (d > M.reach + 0.25 || (dx * fx + dz * fz) < 0.2 * d || q.hidden) q = null;
     }
-    if (!q) return;          // whiff
+    if (q && q.veh) { this.hitVehicle(q, M); return; }
+    if (!q) {
+      // an animal in front of you: a dog gets kicked (or a pack scatters), a cow gets a namaskar
+      const S = this.g.strays;
+      if (S) { if (S.scare(F.x + fx, F.z + fz)) return; const a = S.near(F.x + fx * 0.9, F.z + fz * 0.9, 1.3); if (a) S.struck(a); }
+      return;
+    }
     const crit = q.foe !== this.P && !q.angryAtYou;   // a sucker punch on someone not expecting it
-    const dmg = M.dmg * (crit ? 1.35 : 1) * this.rng.range(0.85, 1.15);
+    const dmg = M.dmg * (crit ? 1.35 : 1) * this.rng.range(0.85, 1.15) * (this.g.life ? this.g.life.punchMul : 1);
     this.people.hurt(q, dmg, F.x, F.z, M, true);
     this.g.audio.punch?.(M.dmg / 20);
     this.g.rig?.shake?.(0.08 + M.dmg / 200);
     this.started(q);
+  }
+  // punching a vehicle: a rider goes over (and gets up angry), a car takes a small dent and its
+  // driver may well get out to settle it
+  hitVehicle(q, M) {
+    const G = this.g, P = this.P, o = q.veh, ppl = this.people;
+    G.audio.thud?.(0.35);
+    G.life?.change('karma', -1);
+    if (!q.traffic) { o.dmg = Math.min(1, (o.dmg || 0) + 0.015); return; }
+    const two = o.T.two;
+    o.dmg = Math.min(1, (o.dmg || 0) + (two ? 0.02 : 0.012));
+    if (two) { o.fallen = 3.5; o.v = 0; this.bail(o, M, true); return; }
+    o.hits = (o.hits || 0) + 1; o.v = Math.min(o.v, 0.5);
+    if (o.hits === 1 && this.rng.next() < 0.6) { G.audio.horn?.('car', 0.7, 0, 2); return; }
+    this.bail(o, M, false);
+  }
+  // the driver or rider gets out and becomes one of the people on the street
+  bail(o, M, knocked) {
+    const G = this.g, P = this.P, ppl = this.people, kit = G.W.kit;
+    if (!kit) return;
+    const look = kit.randomLook(this.rng, { female: this.rng.chance(o.T.two ? 0.15 : 0.25), helmet: o.T.two && o.type !== 'cycle', avoid: P.look });
+    if (o.colB) look.top = look.top.setRGB(o.colB[0], o.colB[1], o.colB[2]);
+    const side = o.T.two ? -1 : 1;
+    const x = o.x + (-o.hz) * (o.T.W / 2 + 0.6) * side, z = o.z + o.hx * (o.T.W / 2 + 0.6) * side;
+    const persona = o.type === 'auto' ? this.rng.pick(['kaka', 'dada', 'bhaiya']) : ppl.pickPersona(look.female, x, z);
+    const p = ppl.spawnAt(look, x, z, persona);
+    if (!p) return;
+    // a car or auto stays where it stopped: anyone could take it now
+    if (!o.T.two || knocked) {
+      const T = G.traffic, idx = T.list.indexOf(o);
+      if (idx >= 0) {
+        const v = new (G.debugSave.Vehicle)(G.W, G.scene, G.vmats, o.type, o.col);
+        v.reset(o.x, o.z, Math.atan2(o.hz, o.hx)); v.y = G.W.surf.height(o.x, o.z);
+        v.plate = P.randomPlate(); v.stolen = true; v.dmg = o.dmg || 0; v.helmet = false;
+        T.despawn(idx); P.addDropped(v, T);
+      }
+    }
+    p.grudge = 40; p.wait = 0.4;
+    if (knocked) { p.fallen = 1.6; }
+    ppl.hurt(p, M.dmg * 0.4, P.x, P.z, null, true);
+    this.started(p);
+  }
+  ridePunch() {
+    const P = this.P, H = P.human, v = P.cur;
+    this.rideT = 0.45;
+    H.play('punch', { once: true, fade: 0.05, speed: 1.6, restart: true });
+    this.g.audio.whoosh?.(0.5);
+    // whoever is alongside, left or right
+    const hx = Math.cos(v.th), hz = Math.sin(v.th);
+    let best = null, bd = 1.9;
+    for (const p of this.people.list) {
+      if (p.hidden || p.pax || p.kid) continue;
+      const dx = p.x - v.x, dz = p.z - v.z, along = dx * hx + dz * hz, lat = Math.abs(-dx * hz + dz * hx);
+      if (Math.abs(along) < 1.2 && lat < bd) { bd = lat; best = p; }
+    }
+    const veh = best ? null : (this.vehicleAt(v.x - hz * 1.1, v.z + hx * 1.1, 1.1) || this.vehicleAt(v.x + hz * 1.1, v.z - hx * 1.1, 1.1));
+    setTimeout(() => {
+      if (best) { this.people.hurt(best, MOVES.punch.dmg * (this.g.life ? this.g.life.punchMul : 1), v.x, v.z, MOVES.cross, true); this.g.audio.punch?.(0.6); this.started(best); }
+      else if (veh) this.hitVehicle(veh, MOVES.cross);
+    }, 180);
   }
   // a fight starts (or carries on) with q: everyone around reacts, and maybe the police
   started(q) {
     const G = this.g, first = !this.active;
     this.active = 0.01;
     if (q.cop) { if (this.heatT <= 0) { this.heatT = 25; G.police.raiseHeat(2, 'Assaulting a police officer'); } }
-    else if (this.heatT <= 0 && G.police.copSeeing && G.police.copSeeing(q.x, q.z, 40)) { this.heatT = 40; G.police.raiseHeat(1, 'Assault — a cop saw you'); }
+    else if (this.heatT <= 0 && G.police.copSeeing && G.police.copSeeing(q.x, q.z, 40)) { this.heatT = 40; G.police.raiseHeat(1, 'Assault, a cop saw you'); }
     if (first) this.witnesses(q);
   }
   witnesses(q) {
@@ -158,6 +251,13 @@ export class Brawl {
   // someone hits you
   hurtPlayer(dmg, sx, sz) {
     const P = this.P, F = P.foot, G = this.g;
+    if (!P.onFoot && P.spec && P.spec.two && !P.ko) {
+      // hit on your scooter: it hurts, and sometimes you go over
+      P.hp = Math.max(1, P.hp - dmg); P.hurtT = 0; this.active = 0.01;
+      G.audio.punch?.(dmg / 14); G.rig?.shake?.(0.2); G.hud.hurt?.();
+      if (this.rng.next() < 0.35 || P.hp < 15) { P.exit(G.traffic, true); P.downT = 2.4; P.human.play('knockback', { once: true, fade: 0.06 }); }
+      return true;
+    }
     if (!P.onFoot || P.ko || P.downT > 0) return false;
     if (P.act && P.act.iframe) return false;
     P.hp = Math.max(0, P.hp - dmg); P.hurtT = 0;
@@ -176,7 +276,17 @@ export class Brawl {
   knockOut() {
     const P = this.P, G = this.g;
     P.ko = true; P.act = null; P.downT = 7;
+    if (G.life) { G.life.s.tally.knockedOut++; G.life.change('respect', -3); G.life.change('mood', -0.15); }
     P.human.play('death', { once: true, fade: 0.1 });
+    // beaten by a cop: you're arrested, not robbed
+    const cop = this.people.list.find(p => p.foe === P && p.cop);
+    if (cop) {
+      G.police.say('cop_arrest', cop);
+      for (const p of this.people.list) if (p.foe === P) this.people.endFight(p, true);
+      G.later?.(3.5, () => { P.ko = false; P.downT = 0; P.hp = 60; this.active = 0; G.police.arrest('Assaulting a police officer', true); });
+      G.life?.change('respect', -4);
+      return;
+    }
     G.hud.flash?.('Knocked out', 'Pune doesn’t forget');
     // everyone who was fighting you wanders off, pleased with themselves
     for (const p of this.people.list) if (p.foe === P) { this.people.endFight(p, true); }
@@ -193,10 +303,13 @@ export class Brawl {
   stepPed(p, dt) {
     const P = this.P, ppl = this.people;
     p.fightT += dt;
+    // a cop in a fight radios for backup (beat marshals come for you)
+    if (p.cop && p.backupT !== undefined && (p.backupT -= dt) <= 0) { p.backupT = undefined; this.g.police.say('cop_backup', null, true); this.g.police.raiseHeat(1, 'Assaulting a police officer, backup called'); }
     if (p.stun > 0) { p.stun -= dt; p.v = 0; return; }
     const tx = P.x, tz = P.z, dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
     // done: you drove off, ran away, it's gone on too long, or they've had enough
-    if (!P.onFoot || P.ko || d > 24 || p.fightT > 50) { ppl.endFight(p, P.ko); return; }
+    const onTwo = !P.onFoot && P.spec && P.spec.two;
+    if ((!P.onFoot && !onTwo) || P.ko || d > 24 || p.fightT > 50) { ppl.endFight(p, P.ko); return; }
     if (p.hp < p.hp0 * 0.3 && !p.cop && !p.lastStand) { ppl.speakAs('flee', p, 0.8, 3); ppl.endFight(p); ppl.flee(p, tx, tz, 30); return; }
     const yaw = Math.atan2(dz, dx);
     p.yaw += wrapAngle(yaw - p.yaw) * Math.min(1, dt * 7);

@@ -68,7 +68,7 @@ const POOLS = {
 const DIST_POOL = ['deccan', 'peth', 'camp', 'kp', 'station', 'residential', 'riverside'];
 const ADS = [
   ['Swapnatla Ghar', 'स्वप्नातलं घर', '2 & 3 BHK • Sahyadri Heights • Possession 2027', 0],
-  ['Gurukul Academy', 'गुरुकुल अकॅडमी', 'MPSC • UPSC 2027 batch — admissions open', 1],
+  ['Gurukul Academy', 'गुरुकुल अकॅडमी', 'MPSC • UPSC 2027 batch, admissions open', 1],
   ['Laxmi Silk', 'लक्ष्मी सिल्क', 'Wedding Sarees • Paithani • Since 1962', 2],
   ['Chakka Masale', 'चक्का मसाले', 'चवीला पुणेरी • Kanda Lasun Masala', 3],
   ['Swoggy', 'स्वॉगी', 'Food in 15 min. Even in Pune traffic.', 4],

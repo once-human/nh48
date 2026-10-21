@@ -14,6 +14,9 @@ export class Input {
       this.keys.add(e.code);
       this.pressed.add(e.code);
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+      // Ctrl is the roll key: stop Ctrl+S / D / A / F etc. doing browser things mid-fight (the browser
+      // still owns Ctrl+W / T / N, which no page can block)
+      if (e.ctrlKey && e.code.startsWith('Key') && !['KeyC', 'KeyV', 'KeyX', 'KeyR'].includes(e.code)) e.preventDefault();
     });
     window.addEventListener('keyup', (e) => { this.keys.delete(e.code); });
     window.addEventListener('blur', () => this.keys.clear());

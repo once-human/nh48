@@ -12,7 +12,7 @@ export const PROGRESS_KEYS = ['nh48_save', 'nh48_stats', 'nh48_police', 'nh48_li
 const r2 = (v) => Math.round(v * 100) / 100;
 function vehOf(v, auto) {
   if (!v) return null;
-  return { type: v === auto ? 'auto' : v.type, col: v.paint, plate: v.plate || null, stolen: !!v.stolen, helmet: !!v.helmet, x: r2(v.x), z: r2(v.z), th: r2(v.th), owned: v.owned || null };
+  return { type: v === auto ? 'auto' : v.type, col: v.paint, plate: v.plate || null, stolen: !!v.stolen, helmet: !!v.helmet, x: r2(v.x), z: r2(v.z), th: r2(v.th), owned: v.owned || null, fuel: v.fuel ?? null, dmg: v.dmg ?? 0 };
 }
 
 export function snapshot(G) {
@@ -58,6 +58,7 @@ export function restore(G, s, Vehicle) {
     const v = new Vehicle(G.W, G.scene, G.vmats, o.type, o.col);
     v.reset(o.x, o.z, o.th); v.y = G.W.surf.height(o.x, o.z);
     v.plate = o.plate || P.randomPlate(); v.stolen = o.stolen; v.helmet = o.helmet; v.owned = o.owned || null;
+    if (o.fuel !== null && o.fuel !== undefined) v.fuel = o.fuel; v.dmg = o.dmg || 0;
     return v;
   };
   if (s.mode !== 'auto') {

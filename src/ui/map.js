@@ -606,10 +606,11 @@ export class MapScreen {
     }
     this.visiblePlaces = vis;
     // ride and police markers
-    for (const m of [...(g.rides ? g.rides.markers() : []), ...(g.police ? g.police.markers() : [])]) {
+    for (const m of [...(g.rides ? g.rides.markers() : []), ...(g.police ? g.police.markers() : []), ...(g.props ? g.props.markers() : [])]) {
       const [X, Y] = T(m.x, m.z);
-      drawPin(x, X, Y, m.kind === 'pax' ? '#33d17a' : m.kind === 'cop' ? '#5aa2ff' : m.kind === 'marshal' ? '#ff4b3e' : '#f2b705', m.kind === 'tow' ? 'A' : null, m.kind === 'tow' ? 8 : 6);
-      if (m.label) { x.textAlign = 'left'; x.textBaseline = 'middle'; } if (m.label) text(m.label, X + 11, Y, '700 11px Inter, system-ui, sans-serif', '#f2b705');
+      const prop = m.kind === 'prop', pc = prop ? (m.owned ? '#33d17a' : '#c58cff') : null;
+      drawPin(x, X, Y, prop ? pc : m.kind === 'pax' ? '#33d17a' : m.kind === 'cop' ? '#5aa2ff' : m.kind === 'marshal' ? '#ff4b3e' : '#f2b705', m.kind === 'tow' ? 'A' : prop ? (m.owned ? 'H' : '₹') : null, m.kind === 'tow' || prop ? 8 : 6);
+      if (m.label) { x.textAlign = 'left'; x.textBaseline = 'middle'; } if (m.label) text(m.label, X + 11, Y, '700 11px Inter, system-ui, sans-serif', pc || '#f2b705');
     }
     // waypoint + selection
     if (g.waypoint) { const [X, Y] = T(g.waypoint.x, g.waypoint.z); drawFlag(x, X, Y); }

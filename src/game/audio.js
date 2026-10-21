@@ -94,6 +94,8 @@ export class Audio {
     if (!this.ctx) return true;
     const now = this.ctx.currentTime, busy = this.curVoice && now < this.voiceEnd - 0.15;
     if (busy && (pri === 0 || (pri < 2 && pri <= this.voicePri))) return false;
+    // after someone has spoken, a breath of quiet before the next bit of idle chatter
+    if (pri === 0 && this.voiceEnd && now < this.voiceEnd + 2.5) return false;
     if (this.curVoice) { try { this.curVoice.g.gain.setTargetAtTime(0, now, 0.04); this.curVoice.src.stop(now + 0.15); } catch (e) { /* already stopped */ } }
     const v = this.play('v_' + id, { vol: 0.95 * vol, pan, filter: radio ? { type: 'bandpass', f: 1500, q: 0.9 } : undefined });
     if (!v) return false;

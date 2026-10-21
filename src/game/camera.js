@@ -143,5 +143,12 @@ export class CameraRig {
       this.cam.rotateZ((Math.random() - 0.5) * a * 0.04);
       this.shakeAmp *= Math.exp(-dt * 6);
     }
+    // a few drinks in: the world sways gently
+    if (this.drunk > 0.05) {
+      this.swayT = (this.swayT || 0) + dt;
+      const k = Math.min(1, this.drunk);
+      this.cam.rotateZ(Math.sin(this.swayT * 0.9) * 0.035 * k);
+      this.cam.rotateX(Math.sin(this.swayT * 0.63 + 1) * 0.015 * k);
+    }
   }
 }

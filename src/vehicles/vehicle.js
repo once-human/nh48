@@ -144,7 +144,8 @@ export class Vehicle {
       if (brk < 0.1) a = -v * 2;
     } else {
       const load = 1 + this.load * 0.1;
-      let eng = thr * S.acc / load * Math.max(0, 1 - Math.pow(Math.max(0, v) / S.vTop, 3));
+      const vTop = S.vTop * (this.powerMul ?? 1);
+      let eng = thr * S.acc * Math.min(1.1, this.powerMul ?? 1) / load * Math.max(0, 1 - Math.pow(Math.max(0, v) / vTop, 3));
       if (this.shiftT > 0) { this.shiftT -= dt; eng *= 0.3; }
       a = eng - brk * S.brake * Math.sign(v || 1);
       if (v < 0) a += brk * S.brake * 2;

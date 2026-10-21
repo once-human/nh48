@@ -1,4 +1,4 @@
-// The player's auto-rickshaw: arcade physics tuned to feel like a Bajaj RE — slow to pick up,
+// The player's auto-rickshaw: arcade physics tuned to feel like a Bajaj RE, slow to pick up,
 // turns on a coin, lifts a rear wheel if you corner too hard, and tips over if you insist.
 import * as THREE from 'three';
 import { flyResolve, flyTrack, flyHeight } from '../world/flyover.js';
@@ -9,7 +9,8 @@ import { clamp, lerp, wrapAngle, RNG } from '../core/util.js';
 const WB = 2.0, TRACK = 1.16, R_WHEEL = 0.21;
 const V_TOP = 18.6;            // ~67 km/h flat out; ~55–60 in practice (drag), less with passengers
 const GEARS = [0, 4.8, 9.4, 13.8, 99];
-const LIFT = 4.6, TIP = 8.2;   // lateral acceleration (m/s^2) for wheel lift / tip over
+const LIFT = 4.6, TIP = 8.2;
+const STICKERS = ['आई तुझा आशीर्वाद', 'बाबांची कृपा', 'हॉर्न ओके प्लीज', 'पुणे तिथे काय उणे', 'जय महाराष्ट्र', 'सद्गुरू कृपा', 'मी पुणेकर'];   // lateral acceleration (m/s^2) for wheel lift / tip over
 
 export class PlayerAuto {
   constructor(W, scene, mats) {
@@ -77,7 +78,7 @@ export class PlayerAuto {
     {
       const c = document.createElement('canvas'); c.width = 1024; c.height = 208;
       const x = c.getContext('2d');
-      const T = 'आई तुझा आशीर्वाद';
+      let T = 'आई तुझा आशीर्वाद';
       const paint = () => {
         x.fillStyle = '#0c0b0a'; x.fillRect(0, 0, 1024, 208);
         x.fillStyle = '#F2C230'; x.textAlign = 'center'; x.textBaseline = 'middle';
@@ -89,6 +90,8 @@ export class PlayerAuto {
       const tex = new THREE.CanvasTexture(c);
       tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 16;
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { paint(); tex.needsUpdate = true; });
+      // a new sticker from the garage
+      this.setSticker = (i) => { const t = STICKERS[i] || STICKERS[0]; if (t === T) return; T = t; paint(); tex.needsUpdate = true; };
       const st = new THREE.Mesh(new THREE.PlaneGeometry(0.98, 0.2), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, metalness: 0, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.08 }));
       st.position.set(-1.452, 1.1, 0);
       st.rotation.y = -Math.PI / 2;
@@ -179,7 +182,8 @@ export class PlayerAuto {
     } else {
       // torque falls off towards the top of 4th; passengers and luggage make it slower to pull
       const load = 1 + (this.load || 0) * 0.12;
-      let eng = thr * 2.35 / load * Math.max(0, 1 - Math.pow(Math.max(0, v) / V_TOP, 3));
+      const vTop = V_TOP * (this.powerMul ?? 1);          // garage tune, fuel and damage (game.vehicleWear)
+      let eng = thr * 2.35 * Math.min(1.1, this.powerMul ?? 1) / load * Math.max(0, 1 - Math.pow(Math.max(0, v) / vTop, 3));
       if (this.shiftT > 0) { this.shiftT -= dt; eng *= 0.25; }
       a = eng - brk * 6.2 * Math.sign(v || 1);
       if (v < 0) a += brk * 6.2 * 2;     // brake while rolling back

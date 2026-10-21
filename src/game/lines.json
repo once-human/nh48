@@ -102,7 +102,7 @@
     "mr",
     "जास्त शहाणपणा नको. सगळा दंड भरा, पेंडिंग पण.",
     "Jaast shahanpana nako. Sagla dand bhara, pending pan.",
-    "Don’t get smart. Pay the whole fine — the pending ones too."
+    "Don’t get smart. Pay the whole fine, the pending ones too."
   ],
   "r_bribe_ok": [
     "Traffic police",
@@ -134,7 +134,7 @@
     "mr",
     "सगळं ठीक आहे. जा, सावकाश चालवा.",
     "Sagla theek aahe. Ja, saavkash chalva.",
-    "All in order. Go on — drive carefully."
+    "All in order. Go on, drive carefully."
   ],
   "r_suspended": [
     "Traffic police",
@@ -158,7 +158,7 @@
     "mr",
     "ही गाडी तुमची नाही. चला, चौकीत चला.",
     "Hi gaadi tumchi nahi. Chala, chowkit chala.",
-    "This vehicle isn’t yours. Come on — to the chowki."
+    "This vehicle isn’t yours. Come on, to the chowki."
   ],
   "m_spot": [
     "Beat marshal",
@@ -639,5 +639,101 @@
     "रिश्वत? अब तो अंदर जाओगे.",
     "Rishwat? Ab to andar jaaoge.",
     "A bribe? Now you're going inside."
+  ],
+  "cop_push": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "ए! धक्का कशाला देतोस? नीट चाल.",
+    "Ae! Dhakka kashala detos? Neet chaal.",
+    "Hey! Why are you shoving? Walk properly."
+  ],
+  "cop_push.1": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "अरे, दिसत नाही का? पोलीस आहे मी.",
+    "Arre, disat naahi ka? Police aahe mi.",
+    "Can’t you see? I’m the police."
+  ],
+  "cop_warn": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "शेवटचं सांगतो. पुन्हा हात लावलास तर आत टाकीन.",
+    "Shevatcha saangto. Punha haat laavlas tar aat taakeen.",
+    "Last warning. Touch me again and you’re going inside."
+  ],
+  "cop_fine": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "सरकारी कामात अडथळा? पाचशे रुपये दंड. चल.",
+    "Sarkari kaamat adthala? Paachshe rupaye dand. Chal.",
+    "Obstructing official duty? Five hundred rupees fine. Move."
+  ],
+  "cop_fight": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "आता बघ! चल चौकीत!",
+    "Aata bagh! Chal chowkeet!",
+    "Now you’ll see! You’re coming to the chowki!"
+  ],
+  "cop_fight.1": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "पोलिसावर हात? थांब तुला!",
+    "Polisaavar haat? Thaamb tula!",
+    "You raise your hand at the police? Wait till I get you!"
+  ],
+  "cop_backup": [
+    "Police radio",
+    "hm_psi",
+    "mr",
+    "कंट्रोल, कंट्रोल, बॅकअप पाठवा. एक जण पोलिसाला मारतोय.",
+    "Control, control, backup paathva. Ek jan polisaala maartoy.",
+    "Control, send backup. Someone’s assaulting an officer."
+  ],
+  "cop_arrest": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "झालं? चल आता. हातकडी.",
+    "Jhaala? Chal aata. Haatkadi.",
+    "Done? Come along now. Handcuffs."
+  ],
+  "cop_ran": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "पळाला... पण चेहरा लक्षात ठेवलाय.",
+    "Palaala... pan chehra lakshaat thevlay.",
+    "He ran... but I’ve got his face."
+  ],
+  "cop_greet": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "नमस्कार. सांभाळून जा.",
+    "Namaskaar. Saambhaalun ja.",
+    "Namaskar. Go carefully."
+  ],
+  "cop_greet.1": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "काय, सगळं ठीक? चला.",
+    "Kaay, sagla theek? Chala.",
+    "All good? Carry on."
+  ],
+  "cop_odd": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "काय हा अवतार? बरं, जा.",
+    "Kaay ha avtaar? Bara, ja.",
+    "What’s this get-up? Fine, go on."
   ]
 }

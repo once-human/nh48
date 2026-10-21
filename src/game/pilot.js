@@ -1,11 +1,13 @@
 // The player: on foot or driving. Walk, jog or sprint around the city, take your own auto, any
 // parked scooter/bike/car, or pull a driver out of their vehicle (they won't be happy). The rest
-// of the game talks to this object as "the player" — it forwards to whatever you're driving.
+// of the game talks to this object as "the player", it forwards to whatever you're driving.
 import * as THREE from 'three';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { flyResolve } from '../world/flyover.js';
 import { clamp, damp, dampAngle, wrapAngle, RNG } from '../core/util.js';
 import { lookFor, savedCharacter } from '../people/characters.js';
+import { WATER_Y } from '../world/groundChunk.js';
+const SWIM_Y = WATER_Y - 1.0;      // holder height while swimming: head and shoulders above the water
 
 const WALK = 1.55, JOG = 3.4, SPRINT = 6.2;
 // where you sit (vehicle-local: x forward, y up, z to the right; Indian cars are right-hand drive)
@@ -108,7 +110,9 @@ export class Pilot {
     this.offerT -= dt;
     if (this.offerT <= 0) { this.offerT = 0.15; this.offer = this.findOffer(traffic); }
     if (input.took('KeyF') && this.busy <= 0) {
-      if (this.onFoot && this.offer) this.enter(this.offer, traffic);
+      // a vehicle right next to you wins; otherwise the shop / pump / home you're at
+      if (!(this.onFoot && this.offer) && this.useHook && this.useHook()) { /* walked in */ }
+      else if (this.onFoot && this.offer) this.enter(this.offer, traffic);
       else if (!this.onFoot) this.exit(traffic);
     }
   }
@@ -120,7 +124,7 @@ export class Pilot {
     const len = Math.hypot(fw, sd) || 1;
     fw /= len; sd /= len;
     const run = k('ShiftLeft', 'ShiftRight');
-    const target = (fw || sd) ? (run ? SPRINT : k('AltLeft') ? WALK : JOG) : 0;
+    const target = (fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0;
     const cy = camYaw ?? F.yaw;
     const dx = Math.cos(cy) * fw - Math.sin(cy) * sd, dz = Math.sin(cy) * fw + Math.cos(cy) * sd;
     // throwing a punch, flinching or lying on the road: you don't walk (a roll carries you)
@@ -135,7 +139,12 @@ export class Pilot {
     const FLY = this.W.fly;
     const groundY = () => (F.deck >= 0 && FLY ? FLY.heightOn(F.deck, F.x, F.z) : this.W.surf.height(F.x, F.z));
     if (F.climb) { this.stepClimb(dt); return; }
-    if (input.took('Space') && !F.air && !this.downT && !A) {
+    // in the river: swim, and climb out wherever you reach the bank
+    if (F.swim && !F.climb && (fw || sd)) {
+      const ax = F.x + Math.cos(F.yaw) * 0.8, az = F.z + Math.sin(F.yaw) * 0.8;
+      if (!this.W.surf.isWater(ax, az) && !this.W.surf.inBuilding(ax, az)) { this.startClimb(Math.cos(F.yaw), Math.sin(F.yaw), this.W.surf.height(ax, az)); return; }
+    }
+    if (input.took('Space') && !F.air && !this.downT && !A && !F.swim) {
       const fx = Math.cos(F.yaw), fz = Math.sin(F.yaw);
       const wall = this.W.collision.resolve(F.x + fx * 0.45, F.z + fz * 0.45, 0.32);
       if (wall && wall.kind === 5 && (fx * -wall.nx + fz * -wall.nz) > 0.5) this.startClimb(-wall.nx, -wall.nz);
@@ -147,7 +156,7 @@ export class Pilot {
     // walls, poles, parked vehicles, trees (in the air you clear scooters, stalls and bollards)
     for (let it = 0; it < 2; it++) {
       const res = flyResolve({ W: this.W, deck: F.deck ?? -1 }, F.x, F.z, 0.3);
-      if (res && !(F.air && res.kind === 2 && F.y - groundY() > 0.55)) { F.x += res.nx * res.depth; F.z += res.nz * res.depth; }
+      if (res && !(F.air && res.kind === 2 && F.y - groundY() > 0.55) && !(F.swim && res.kind === 4)) { F.x += res.nx * res.depth; F.z += res.nz * res.depth; }
     }
     // traffic: get shoved / knocked down
     if (traffic) traffic.near(F.x, F.z, 6, (o) => {
@@ -171,13 +180,18 @@ export class Pilot {
     // footpath height
     const FL = this.W.fly;
     F.deck = FL ? FL.track(F.x, F.z, F.deck ?? -1, F.y) : -1;
-    const gy = F.deck >= 0 ? FL.heightOn(F.deck, F.x, F.z) : this.W.surf.height(F.x, F.z);
+    const wet = F.deck < 0 && this.W.surf.isWater(F.x, F.z);
+    const gy = wet ? SWIM_Y : F.deck >= 0 ? FL.heightOn(F.deck, F.x, F.z) : this.W.surf.height(F.x, F.z);
+    // stepped off the bank: you drop into the river
+    if (wet && !F.swim && !F.air && F.y > gy + 0.3) { F.air = true; F.vy = 0.5; F.splash = true; }
+    F.swim = wet && !F.air;
     if (F.air) {
       F.vy -= 9.8 * dt; F.y += F.vy * dt;
       if (F.y <= gy && F.vy < 0) {
         F.y = gy; F.air = false;
-        this.landT = 0.35; this.human.play('jump_land', { once: true, fade: 0.06 });
-        if (F.vy < -7.5) { this.downT = 2.2; this.human.play('knockback', { once: true, fade: 0.08 }); this.events.push({ type: 'gotHit', speed: -F.vy, who: 'fall' }); }
+        if (wet) { this.landT = 0; F.vy = 0; F.swim = true; this.audio?.thud?.(0.5); this.audio?.whoosh?.(1); this.events.push({ type: 'splash' }); }
+        else this.landT = 0.35, this.human.play('jump_land', { once: true, fade: 0.06 });
+        if (F.vy < -7.5 && !wet) { this.downT = 2.2; this.human.play('knockback', { once: true, fade: 0.08 }); this.events.push({ type: 'gotHit', speed: -F.vy, who: 'fall' }); }
         F.vy = 0;
       }
     } else F.y = damp(F.y, gy, 18, dt);
@@ -188,6 +202,8 @@ export class Pilot {
       F.vx *= 0.9; F.vz *= 0.9;
       if (this.downT < 1.4 && this.human.cur !== this.human.actions.getup) this.human.play('getup', { once: true, fade: 0.2 });
       if (this.downT <= 0) { this.downT = 0; this.ko = false; this.human.play('idle'); }
+    } else if (F.swim) {
+      this.human.play(F.v > 0.3 ? 'swim' : 'swim_idle', { fade: 0.25, speed: F.v > 0.3 ? clamp(F.v / 1.3, 0.7, 1.5) : 1 });
     } else if (this.act) {
       // a punch, a roll or a flinch (people/fight.js plays the clip)
     } else if (F.air) {
@@ -206,9 +222,10 @@ export class Pilot {
   }
 
   // over a compound wall: hands on top, swing up (0.9 s), over and drop down the other side
-  startClimb(nx, nz) {
+  startClimb(nx, nz, topY) {
     const F = this.foot;
-    F.climb = { t: 0, x0: F.x, z0: F.z, y0: F.y, nx, nz, top: F.y + 1.8 };
+    F.climb = { t: 0, x0: F.x, z0: F.z, y0: F.y, nx, nz, top: topY !== undefined ? topY : F.y + 1.8 };
+    F.swim = false;
     F.vx = F.vz = 0; F.v = 0;
     F.yaw = Math.atan2(nz, nx);
     this.human.play('climb', { once: true, fade: 0.1, speed: 1.15 });
@@ -217,7 +234,7 @@ export class Pilot {
   stepClimb(dt) {
     const F = this.foot, C = F.climb, H = this.human;
     C.t += dt;
-    const T1 = 0.85, T2 = 1.25;
+    const T1 = 0.85 * Math.max(1, (C.top - C.y0) / 1.8), T2 = T1 + 0.4;
     if (C.t < T1) {           // up the face of the wall
       const u = C.t / T1, e = u * u * (3 - 2 * u);
       F.y = C.y0 + (C.top - C.y0) * e;
@@ -401,9 +418,10 @@ export class Pilot {
     const d = { veh, st };
     if (traffic && traffic.statics) { traffic.statics.push(st); traffic.staticsT = 0; }
     this.dropped.push(d);
-    // keep at most a few abandoned vehicles around
-    while (this.dropped.filter(q => q.veh !== this.auto).length > 4) {
-      const old = this.dropped.find(q => q.veh !== this.auto);
+    // keep at most a few abandoned vehicles around (yours, bought or rented, always stay)
+    const spare = (q) => q.veh !== this.auto && !q.veh.owned;
+    while (this.dropped.filter(spare).length > 4) {
+      const old = this.dropped.find(spare);
       this.removeDropped(old, traffic);
       old.veh.dispose();
     }

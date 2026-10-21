@@ -1,5 +1,5 @@
 // Trees: eight Pune street-tree species grown at load with ez-tree (MIT) using our own leaf atlas,
-// three levels of detail — full branches + leaf cards near, a lighter build in the middle distance,
+// three levels of detail, full branches + leaf cards near, a lighter build in the middle distance,
 // and camera-facing impostors (albedo + normal rendered at load) out to the horizon. All instanced.
 import * as THREE from 'three';
 import { Tree } from '../../node_modules/@dgreenheck/ez-tree/src/lib/tree.js';

@@ -137,7 +137,7 @@ export class People {
     this.kit = W.kit;
     this.stallsUsed = new Map();   // stall index → people standing there
     this.lineT = 0;                // voice cooldown
-    this.say = null;               // (lineId, source) — set by the game
+    this.say = null;               // (lineId, source), set by the game
     this.spawnAnimals();
   }
   speak(ids, src, chance = 1) {
@@ -150,7 +150,8 @@ export class People {
     if (!this.say || !p || this.lineT > 0 || this.rng.next() > chance) return false;
     let per = p.persona;
     if (!per || !STREET[per]) per = p.persona = this.pickPersona(p.female, p.x, p.z);
-    const arr = STREET[per][scenario] || (scenario.startsWith('carjack') ? STREET[per].carjack_two || STREET[per].fall : STREET[per].dodge);
+    // no line for this moment: stay quiet rather than say something that doesn't fit
+    const arr = STREET[per][scenario] || (scenario.startsWith('carjack') ? STREET[per].carjack_two : null);
     if (!arr || !arr.length) return false;
     // don't repeat the last line this persona said
     let i = Math.floor(this.rng.next() * arr.length);
@@ -217,7 +218,7 @@ export class People {
   make(e, s, side, opts = {}) {
     const r = this.rng;
     const female = opts.female ?? r.chance(0.42);
-    const kid = !opts.pax && !opts.adult && r.chance(0.08);
+    const kid = false;            // (the bodies are adult-proportioned: scaled down they looked like tiny aunties)
     const p = {
       e, s, side, dir: r.chance(0.5) ? 1 : -1, female, scale: kid ? 0.68 : r.range(0.94, 1.06),
       speed: kid ? 1.5 : r.range(1.05, 1.5), phase: r.range(0, 6.28), x: 0, z: 0, hx: 1, hz: 0, yaw: 0,
@@ -350,6 +351,7 @@ export class People {
     if (p.ctl) { if (p.v > 0) p.phase += dt * p.v * 4.2; return; }     // driven by someone else (police stop)
     if (p.react > 0) p.react -= dt;
     if (p.bumpT > 0) p.bumpT -= dt;
+    if (p.shoveT > 0) p.shoveT -= dt;
     if (p.mode === 'inside') {
       p.wait -= dt; p.v = 0;
       if (p.wait <= 0) {
@@ -370,7 +372,10 @@ export class People {
         } else if (p.mode === 'fight') p.stun = 0.2;
         else {
           p.angry = 4;
-          if (Math.hypot(p.x - player.x, p.z - player.z) < 30) { this.lineT = 0; this.speakAs('fall', p); }
+          // what they say depends on what knocked them over: you on foot, or something you were driving
+          const sc = p.fallBy === 'foot' ? 'shoved' : 'fall'; p.fallBy = null;
+          if (Math.hypot(p.x - player.x, p.z - player.z) < 30) { this.lineT = 0; this.speakAs(sc, p); }
+          if (sc === 'shoved') p.grudge = 20;
         }
       }
       return;
@@ -495,6 +500,7 @@ export class People {
     p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
   }
   stepAnimal(a, dt, px, pz, player) {
+    if (a.free) return;                       // following you, chasing you, running away (people/strays.js)
     // animals far away jump to a new spot near the player now and then, so there are always some around
     if (Math.abs(a.x - px) > 260 || Math.abs(a.z - pz) > 260) { if (this.relocate(a, px, pz)) return; }
     a.rest -= dt;
@@ -503,7 +509,7 @@ export class People {
     // street dogs chase two-wheelers (and bark at everything else)
     if (a.kind === 'dog' && player && !player.onFoot) {
       const d = Math.hypot(a.x - px, a.z - pz), v = Math.abs(player.v);
-      if (!(a.chase > 0) && d < 14 && v > 2.5 && v < 11 && player.spec && player.spec.two && this.rng.next() < dt * 0.5) { a.chase = 5 + this.rng.next() * 3; this.events.push({ type: 'dogChase', x: a.x, z: a.z }); }
+      if (!(a.chase > 0) && d < 14 && v > 2.5 && v < 11 && player.spec && player.spec.two && this.rng.next() < dt * (this.act && (this.act._h > 22 || this.act._h < 5.5) ? 1.4 : 0.5)) { a.chase = 5 + this.rng.next() * 3; this.events.push({ type: 'dogChase', x: a.x, z: a.z }); }
       if (a.chase > 0) {
         a.chase -= dt;
         this.g.at(a.e, clamp(a.s, 0, a.e.len), TMP);
@@ -527,7 +533,8 @@ export class People {
       if (e.rank < 2 || e.rank > 4 || e.len < 30) continue;
       this.g.at(e, e.len / 2, TMP);
       const d = Math.hypot(TMP[0] - px, TMP[1] - pz);
-      if (d < 90 || d > 220) continue;
+      const night = this.act && (this.act._h > 22 || this.act._h < 5.5);
+      if (d < (night && a.kind === 'dog' ? 45 : 90) || d > 220) continue;
       a.e = e; a.s = this.rng.range(5, e.len - 5);
       a.lat = a.cow ? a.side * (e.w / 2 - 1.0) : a.kind === 'cat' ? a.side * (e.w / 2 + Math.max(0.5, e.sw - 0.35)) : a.side * (e.w / 2 + Math.max(0.6, e.sw * 0.5));
       this.placeAnimal(a);
@@ -618,6 +625,17 @@ export class People {
     }
     return best;
   }
+  // walking into a traffic cop: a telling-off, a warning, a ₹500 fine, then he's had enough
+  copShoved(p, P) {
+    p.bumpT = 2.5; p.react = 2.2; p.reactAt = { x: P.x, z: P.z }; p.reactAnim = 'no';
+    p.shoves = (p.shoveT > 0 ? p.shoves || 0 : 0) + 1; p.shoveT = 90;
+    const pol = this.brawl && this.brawl.g.police;
+    if (p.shoves === 1) this.say && this.say('cop_push', p);
+    else if (p.shoves === 2) this.say && this.say('cop_warn', p);
+    else if (p.shoves === 3) { this.say && this.say('cop_fine', p); if (pol) pol.charge('obstruct', 500, 'Obstructing a public servant'); }
+    else { this.startFight(p, P); this.say && this.say('cop_fight', p); if (pol) pol.raiseHeat(1, 'Shoving a traffic cop'); }
+    if (this.brawl) this.brawl.g.events?.push?.({ type: 'copShoved', n: p.shoves });
+  }
   // ---------------------------------------------------------------- fights (see fight.js)
   // someone gets hit (by you, usually)
   hurt(p, dmg, sx, sz, M, byPlayer) {
@@ -635,15 +653,24 @@ export class People {
       // out cold
       p.ko = true; p.fallen = this.rng.range(6, 9); p.v = 0; p.stun = 0;
       this.events.push({ type: 'pedKO', p, x: p.x, z: p.z });
+      const L = byPlayer && this.brawl && this.brawl.g.life;
+      if (L) {
+        // beating someone who fought back earns street cred; beating someone who didn't costs karma
+        if (p.mode === 'fight') { L.s.tally.fightsWon++; L.change('respect', p.cop ? 6 : 3); }
+        else L.change('karma', OLD.has(p.persona) || p.female ? -10 : -5);
+      }
       return;
     }
     if (M && M.down && this.rng.next() < M.down + (p.hp < p.hp0 * 0.4 ? 0.3 : 0)) { p.fallen = 2.2; p.v = 0; }
     else { p.stun = 0.34; p.act = { kind: 'hurt', clip: this.rng.chance(0.5) ? 'hit_head' : 'hit', speed: 1, t: 0, dur: 0.34 }; p.actId = (p.actId || 0) + 1; }
     if (!byPlayer) return;
+    if (p.mode !== 'fight' && this.brawl && this.brawl.g.life) this.brawl.g.life.change('karma', -1);
     if (p.mode !== 'fight' && !p.fleeing) {
       // first blow: fight back, or run and shout
-      const tough = p.beaten ? 0 : p.cop ? 1 : (TOUGH[p.persona] || 0.05) + (p.grudge > 0 ? 0.2 : 0) + (p.angry > 0 ? 0.1 : 0);
-      if (this.rng.next() < tough) { this.startFight(p, this.brawl.P); this.lineT = 0; this.speakAs(this.rng.chance(0.5) ? 'fight' : 'hit', p, 1, 3); }
+      const resp = this.brawl && this.brawl.g.life ? this.brawl.g.life.s.respect : 0;
+      const tough = p.beaten ? 0 : p.cop ? 1 : ((TOUGH[p.persona] || 0.05) + (p.grudge > 0 ? 0.2 : 0) + (p.angry > 0 ? 0.1 : 0)) * (resp > 40 ? 0.55 : resp > 20 ? 0.8 : 1);
+      if (p.cop) { this.startFight(p, this.brawl.P); this.say && this.say('cop_fight', p); p.backupT = 4; }
+      else if (this.rng.next() < tough) { this.startFight(p, this.brawl.P); this.lineT = 0; this.speakAs(this.rng.chance(0.5) ? 'fight' : 'hit', p, 1, 3); }
       else { this.lineT = 0; this.speakAs(this.rng.chance(0.6) ? 'flee' : 'hit', p, 1, 3); this.flee(p, sx, sz, 28); }
     } else if (this.rng.next() < 0.18) this.speakAs('hit', p, 1, 3);
   }
@@ -682,7 +709,13 @@ export class People {
         const dx = p.x - P.x, dz = p.z - P.z;
         if (Math.abs(dx) > 2.4 || Math.abs(dz) > 2.4 || Math.hypot(dx, dz) > 2.2) continue;
         p.greeted = true;
-        if (this.rng.next() < 0.3 && this.speakAs('greet', p, 1, 6)) { p.react = 2.4; p.reactAt = { x: P.x, z: P.z }; p.reactAnim = 'talk'; }
+        // how they read you: a respected local, trouble, an unusual outfit, a drunk, well turned out
+        const how = this.reaction ? this.reaction() : null;
+        const sc = how && STREET[p.persona] && STREET[p.persona][how] ? how : 'greet';
+        if (this.rng.next() < (sc === 'greet' ? 0.3 : 0.5) && this.speakAs(sc, p, 1, 6)) {
+          p.react = 2.4; p.reactAt = { x: P.x, z: P.z }; p.reactAnim = sc === 'scared' || sc === 'odd' ? 'no' : sc === 'respect' ? 'wave' : 'talk';
+          if (sc === 'scared') setTimeout(() => this.flee(p, P.x, P.z, 18), 900);
+        }
         break;
       }
     }
@@ -768,9 +801,10 @@ export class People {
       const push = 0.62 - d;
       if (p.mode === 'walk' || p.mode === 'cross') { p.dodgeX += dx / d * push; p.dodgeZ += dz / d * push; }
       else { p.x += dx / d * push; p.z += dz / d * push; }
+      if (p.cop && P.v > 1.2 && !(p.bumpT > 0) && p.mode !== 'fight') { this.copShoved(p, P); continue; }
       if (P.v > 2.4 && !(p.bumpT > 0)) {
         p.bumpT = 3; p.react = 1.4; p.reactAt = { x: P.x, z: P.z }; p.reactAnim = 'hit';
-        if (P.v > 5.2 && !p.cop) { p.fallen = 2.4; this.events.push({ type: 'pedBumped', p, x: p.x, z: p.z }); }
+        if (P.v > 5.2 && !p.cop) { p.fallen = 2.4; p.fallBy = 'foot'; this.events.push({ type: 'pedBumped', p, x: p.x, z: p.z }); }
         else this.speakAs('bump', p, 0.6);
       }
     }
@@ -808,12 +842,12 @@ export class People {
     for (const c of cops) {
       const near = this.g.nearest(c.x, c.z, 40);
       if (!near) continue;
-      const p = this.make(near.e, near.s, near.side || 1, { female: false, mode: 'fixed' });
+      const p = this.make(near.e, near.s, near.side || 1, { female: false, mode: 'fixed', adult: true });
       p.fixed = true; p.x = c.x; p.z = c.z; p.cop = true; p.post = { x: c.x, z: c.z };
       if (this.kit) { p.look = this.kit.randomLook(new RNG(p.id), { role: 'police' }); p.idle = 'arms_folded'; }
       c.ped = p;
       p.shirt = [0.42, 0.36, 0.2].map(v => v); p.lower = [0.4, 0.34, 0.2]; p.skin = [0.32, 0.2, 0.13];
-      p.yaw = Math.atan2(near.e.pts[1] - c.z, near.e.pts[0] - c.x);
+      p.yaw = c.fx !== undefined ? Math.atan2(c.fz - c.z, c.fx - c.x) : Math.atan2(near.e.pts[1] - c.z, near.e.pts[0] - c.x);
       p.onRoad = false;
     }
   }

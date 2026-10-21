@@ -197,7 +197,7 @@ export function buildAuto(opts = {}) {
     b.addGeo(G.cyl8, M(0.98, 1.25, s * 0.62, 0.01, 0.3, 0.01, s * 0.6, 0, 0), BLACK);
     b.addGeo(G.cyl12, M(1.0, 1.38, s * 0.72, 0.07, 0.02, 0.05, 0, 0, Math.PI / 2), [0.2, 0.2, 0.22]);
   }
-  // canopy: one rounded canvas hood over a frame — roof, rear wall and rear quarter panels; the sides
+  // canopy: one rounded canvas hood over a frame, roof, rear wall and rear quarter panels; the sides
   // are open over the passenger bench and the driver (inside faces are drawn too)
   const roofY = 1.66;
   loft(b, [

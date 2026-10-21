@@ -285,6 +285,60 @@
         "Vaachva! Konitari polisanna bolva!",
         "Help! Someone call the police!"
       ]
+    ],
+    "odd": [
+      [
+        "हे काय घातलंय? काय दिवस आलेत!",
+        "He kaay ghaatlay? Kaay divas aalet!",
+        "What is he wearing? What times we live in!"
+      ]
+    ],
+    "nice": [
+      [
+        "वा! एकदम टापटीप.",
+        "Waa! Ekdam taaptip.",
+        "Well! Very smart."
+      ]
+    ],
+    "respect": [
+      [
+        "नमस्कार भाऊ! कसं काय?",
+        "Namaskaar bhau! Kasa kaay?",
+        "Namaskar brother! How are you?"
+      ]
+    ],
+    "scared": [
+      [
+        "हा तोच ना? लांब राहा.",
+        "Ha toch na? Laamb raha.",
+        "Isn't that the guy? Stay away."
+      ]
+    ],
+    "kind": [
+      [
+        "पुण्याचं काम केलंस, बाळा.",
+        "Punyacha kaam kelas, baala.",
+        "That was a good deed, child."
+      ]
+    ],
+    "drunk": [
+      [
+        "दिवसाढवळ्या? लाज वाटू दे.",
+        "Divasaadhavlya? Laaj vaatu de.",
+        "In broad daylight? Have some shame."
+      ]
+    ],
+    "shoved": [
+      [
+        "अरे! पाडलंस मला! चालताना डोळे कुठे असतात?",
+        "Arre! Paadlas mala! Chaaltaana dole kuthe astaat?",
+        "Hey! You knocked me over! Where are your eyes when you walk?"
+      ],
+      [
+        "पळतोय कशाला? मॅरेथॉन आहे का?",
+        "Paltoy kashaala? Marathon aahe ka?",
+        "Why are you running? Is this a marathon?"
+      ]
     ]
   },
   "ajoba": {
@@ -434,6 +488,55 @@
         "अरे देवा! वाचवा रे कोणीतरी!",
         "Arre deva! Vaachva re konitari!",
         "Oh God! Somebody help!"
+      ]
+    ],
+    "odd": [
+      [
+        "आमच्या काळी असं नव्हतं.",
+        "Aamchya kaali asa navhta.",
+        "It wasn't like this in our day."
+      ]
+    ],
+    "nice": [
+      [
+        "छान दिसतोयस. आई खूष असेल.",
+        "Chhaan distoyas. Aai khush asel.",
+        "You look nice. Your mother must be happy."
+      ]
+    ],
+    "respect": [
+      [
+        "या, या. सुखी राहा.",
+        "Ya, ya. Sukhi raha.",
+        "Come, come. Be happy."
+      ]
+    ],
+    "scared": [
+      [
+        "देवा... बरं, मी जातो.",
+        "Deva... bara, mi jaato.",
+        "God... well, I'll be going."
+      ]
+    ],
+    "kind": [
+      [
+        "गाईला चारा दिलास? आशीर्वाद आहे.",
+        "Gaaila chaara dilaas? Aashirvaad aahe.",
+        "You fed the cow? You have my blessings."
+      ]
+    ],
+    "drunk": [
+      [
+        "पिऊन फिरतोय. शिव शिव.",
+        "Piun phirtoy. Shiv shiv.",
+        "Wandering around drunk. Shiva, Shiva."
+      ]
+    ],
+    "shoved": [
+      [
+        "अरे बाबा, म्हातारा माणूस आहे मी!",
+        "Arre baaba, mhaatara maanus aahe mi!",
+        "Son, I'm an old man!"
       ]
     ]
   },
@@ -597,6 +700,60 @@
         "Jaau de, nako bhaandan.",
         "Forget it, I don't want a fight."
       ]
+    ],
+    "odd": [
+      [
+        "भाऊ, हा कोणता फॅशन ट्रेंड?",
+        "Bhau, ha konta fashion trend?",
+        "Bro, what fashion trend is this?"
+      ]
+    ],
+    "nice": [
+      [
+        "कडक, भाऊ! एकदम कडक!",
+        "Kadak, bhau! Ekdam kadak!",
+        "Sharp, bro! Really sharp!"
+      ]
+    ],
+    "respect": [
+      [
+        "काय भाऊ, आपलाच एरिया आहे!",
+        "Kaay bhau, aaplach area aahe!",
+        "Hey bro, it's our area after all!"
+      ]
+    ],
+    "scared": [
+      [
+        "नको नको, मला काही नको.",
+        "Nako nako, mala kaahi nako.",
+        "No no, I don't want any trouble."
+      ]
+    ],
+    "kind": [
+      [
+        "कुत्र्याला बिस्किट? भारी माणूस.",
+        "Kutryaala biscuit? Bhaari maanus.",
+        "Biscuits for the dog? Good man."
+      ]
+    ],
+    "drunk": [
+      [
+        "भाऊ, जरा जास्त झाली का?",
+        "Bhau, jara jaasta jhaali ka?",
+        "Bro, had a bit too much?"
+      ]
+    ],
+    "shoved": [
+      [
+        "ए! धक्का देऊन पाडतोस? थांब!",
+        "Ae! Dhakka deun paadtos? Thaamb!",
+        "Hey! Shoving me over? Wait!"
+      ],
+      [
+        "भाऊ, रस्ता काय तुझ्या बापाचा?",
+        "Bhau, rasta kaay tujhya baapaacha?",
+        "Bro, does the street belong to your father?"
+      ]
     ]
   },
   "bhaiya": {
@@ -749,6 +906,55 @@
         "Bachao! Bachao!",
         "Help! Help!"
       ]
+    ],
+    "odd": [
+      [
+        "अरे भाई, ये क्या पहन लिया?",
+        "Arre bhai, ye kya pehen liya?",
+        "Brother, what have you put on?"
+      ]
+    ],
+    "nice": [
+      [
+        "क्या बात है, हीरो लग रहे हो!",
+        "Kya baat hai, hero lag rahe ho!",
+        "Look at you, like a film hero!"
+      ]
+    ],
+    "respect": [
+      [
+        "सलाम भाई! सब बढ़िया?",
+        "Salaam bhai! Sab badhiya?",
+        "Salaam brother! All good?"
+      ]
+    ],
+    "scared": [
+      [
+        "भाई, मैं तो बस जा रहा था.",
+        "Bhai, main toh bas ja raha tha.",
+        "Brother, I was just leaving."
+      ]
+    ],
+    "kind": [
+      [
+        "जानवरों को खिलाया? बहुत अच्छा.",
+        "Jaanwaron ko khilaaya? Bahut achha.",
+        "You fed the animals? Very good."
+      ]
+    ],
+    "drunk": [
+      [
+        "भाई, संभल के. पी के गाड़ी मत चलाना.",
+        "Bhai, sambhal ke. Pee ke gaadi mat chalaana.",
+        "Careful, brother. Don't drive drunk."
+      ]
+    ],
+    "shoved": [
+      [
+        "अरे भाई, गिरा दिया मुझे!",
+        "Arre bhai, gira diya mujhe!",
+        "Brother, you knocked me down!"
+      ]
     ]
   },
   "collegeboy": {
@@ -899,6 +1105,55 @@
         "Bro, main nahin lad raha!",
         "Bro, I'm not fighting!"
       ]
+    ],
+    "odd": [
+      [
+        "भाई, ये लुक तो वायरल होगा!",
+        "Bhai, ye look toh viral hoga!",
+        "Bro, this look is going viral!"
+      ]
+    ],
+    "nice": [
+      [
+        "फिट है भाई! इंस्टा पे डाल!",
+        "Fit hai bhai! Insta pe daal!",
+        "Fit, bro! Put it on Insta!"
+      ]
+    ],
+    "respect": [
+      [
+        "ओ भाई! लेजेंड आ गया!",
+        "O bhai! Legend aa gaya!",
+        "Oh bro! The legend's here!"
+      ]
+    ],
+    "scared": [
+      [
+        "ये वही है जिसने मारा था... निकल.",
+        "Ye wahi hai jisne maara tha... nikal.",
+        "That's the guy who beat someone up... let's go."
+      ]
+    ],
+    "kind": [
+      [
+        "दिल जीत लिया भाई.",
+        "Dil jeet liya bhai.",
+        "You won my heart, bro."
+      ]
+    ],
+    "drunk": [
+      [
+        "भाई टल्ली है, हाहा.",
+        "Bhai talli hai, haha.",
+        "Bro's wasted, haha."
+      ]
+    ],
+    "shoved": [
+      [
+        "भाई, धक्का क्यों मारा? पागल है?",
+        "Bhai, dhakka kyon maara? Paagal hai?",
+        "Bro, why'd you shove me? Are you mad?"
+      ]
     ]
   },
   "kaku": {
@@ -1044,6 +1299,55 @@
         "Vaachva! Ha maanus veda aahe!",
         "Help! This man is mad!"
       ]
+    ],
+    "odd": [
+      [
+        "अगं बाई! हा काय प्रकार?",
+        "Aga bai! Ha kaay prakaar?",
+        "Oh my! What's all this?"
+      ]
+    ],
+    "nice": [
+      [
+        "किती छान दिसतोयस!",
+        "Kiti chhaan distoyas!",
+        "You look so nice!"
+      ]
+    ],
+    "respect": [
+      [
+        "नमस्कार! घरी सगळे बरे ना?",
+        "Namaskaar! Ghari sagle bare na?",
+        "Namaskar! All well at home?"
+      ]
+    ],
+    "scared": [
+      [
+        "चल गं, इथून चल पटकन.",
+        "Chal ga, ithun chal patkan.",
+        "Come on, let's get out of here quickly."
+      ]
+    ],
+    "kind": [
+      [
+        "गुणी मुलगा आहे.",
+        "Guni mulga aahe.",
+        "Such a good boy."
+      ]
+    ],
+    "drunk": [
+      [
+        "शी! दारूचा वास.",
+        "Shee! Daarucha vaas.",
+        "Ugh! He smells of drink."
+      ]
+    ],
+    "shoved": [
+      [
+        "अगं बाई! धक्का मारून पाडलं!",
+        "Aga bai! Dhakka maarun paadla!",
+        "Oh my! He shoved me right over!"
+      ]
     ]
   },
   "aaji": {
@@ -1142,6 +1446,48 @@
         "वाचवा रे! कोणीतरी या!",
         "Vaachva re! Konitari ya!",
         "Help! Someone come!"
+      ]
+    ],
+    "odd": [
+      [
+        "देवा रे, काय कपडे हे.",
+        "Deva re, kaay kapde he.",
+        "Oh God, what clothes are these."
+      ]
+    ],
+    "nice": [
+      [
+        "दृष्ट लागेल, बाळा.",
+        "Drusht laagel, baala.",
+        "You'll attract the evil eye, child."
+      ]
+    ],
+    "respect": [
+      [
+        "सुखी राहा, बाळा.",
+        "Sukhi raha, baala.",
+        "Be happy, child."
+      ]
+    ],
+    "scared": [
+      [
+        "रामा... लांब जा.",
+        "Raama... laamb ja.",
+        "Rama... go away."
+      ]
+    ],
+    "kind": [
+      [
+        "गाईची सेवा केलीस. देव भलं करो.",
+        "Gaaichi seva kelis. Dev bhala karo.",
+        "You served the cow. God bless you."
+      ]
+    ],
+    "shoved": [
+      [
+        "अरे देवा... कोणी उचला रे मला.",
+        "Arre deva... koni uchla re mala.",
+        "Oh God... someone help me up."
       ]
     ]
   },
@@ -1268,6 +1614,55 @@
         "Police! Police!",
         "Police! Police!"
       ]
+    ],
+    "odd": [
+      [
+        "वेगळाच स्टाईल आहे, हं.",
+        "Veglaach style aahe, hm.",
+        "That's a different style, hm."
+      ]
+    ],
+    "nice": [
+      [
+        "छान ड्रेसिंग!",
+        "Chhaan dressing!",
+        "Nice outfit!"
+      ]
+    ],
+    "respect": [
+      [
+        "हाय! कसा आहेस?",
+        "Hi! Kasa aahes?",
+        "Hi! How are you?"
+      ]
+    ],
+    "scared": [
+      [
+        "याच्यापासून लांबच राहायचं.",
+        "Yaachyaapaasun laambach raahaaycha.",
+        "Better stay away from him."
+      ]
+    ],
+    "kind": [
+      [
+        "अरे वा, किती गोड!",
+        "Arre waa, kiti god!",
+        "Oh wow, how sweet!"
+      ]
+    ],
+    "drunk": [
+      [
+        "पिऊन आलाय वाटतं.",
+        "Piun aalay vaatta.",
+        "Looks like he's been drinking."
+      ]
+    ],
+    "shoved": [
+      [
+        "धक्का देऊन पळतोय? सॉरी तरी बोल!",
+        "Dhakka deun paltoy? Sorry tari bol!",
+        "Shove and run? At least say sorry!"
+      ]
     ]
   },
   "aunty": {
@@ -1375,6 +1770,55 @@
         "बचाओ! पुलिस बुलाओ!",
         "Bachao! Police bulao!",
         "Help! Call the police!"
+      ]
+    ],
+    "odd": [
+      [
+        "हाय राम, ये क्या पहना है?",
+        "Haay Ram, ye kya pehna hai?",
+        "Oh Ram, what is he wearing?"
+      ]
+    ],
+    "nice": [
+      [
+        "बड़ा स्मार्ट लग रहा है बेटा.",
+        "Bada smart lag raha hai beta.",
+        "You look very smart, son."
+      ]
+    ],
+    "respect": [
+      [
+        "जीते रहो बेटा.",
+        "Jeete raho beta.",
+        "Bless you, son."
+      ]
+    ],
+    "scared": [
+      [
+        "चलो चलो, यहाँ से चलो.",
+        "Chalo chalo, yahaan se chalo.",
+        "Come on, let's go from here."
+      ]
+    ],
+    "kind": [
+      [
+        "अच्छे घर का लड़का है.",
+        "Achhe ghar ka ladka hai.",
+        "He's from a good family."
+      ]
+    ],
+    "drunk": [
+      [
+        "शराबी! दूर रहो.",
+        "Sharaabi! Door raho.",
+        "Drunkard! Stay away."
+      ]
+    ],
+    "shoved": [
+      [
+        "हाय राम! गिरा दिया!",
+        "Haay Ram! Gira diya!",
+        "Oh Ram! He knocked me down!"
       ]
     ]
   },
@@ -1488,6 +1932,55 @@
         "हेल्प! कोई हेल्प करो!",
         "Help! Koi help karo!",
         "Help! Somebody help!"
+      ]
+    ],
+    "odd": [
+      [
+        "ओएमजी, ये बोल्ड है!",
+        "OMG, ye bold hai!",
+        "OMG, that's bold!"
+      ]
+    ],
+    "nice": [
+      [
+        "क्यूट आउटफिट यार!",
+        "Cute outfit yaar!",
+        "Cute outfit!"
+      ]
+    ],
+    "respect": [
+      [
+        "हाय! तुम वही ऑटो वाले हो ना?",
+        "Hi! Tum wahi auto waale ho na?",
+        "Hi! Aren't you that auto guy?"
+      ]
+    ],
+    "scared": [
+      [
+        "यार, ये डरावना है, चलो.",
+        "Yaar, ye daraawna hai, chalo.",
+        "This guy's scary, let's go."
+      ]
+    ],
+    "kind": [
+      [
+        "आww, डॉगी को खिला रहा है!",
+        "Aww, doggy ko khila raha hai!",
+        "Aww, he's feeding the doggy!"
+      ]
+    ],
+    "drunk": [
+      [
+        "इउ, ये टल्ली है.",
+        "Eww, ye talli hai.",
+        "Eww, he's wasted."
+      ]
+    ],
+    "shoved": [
+      [
+        "ओ हेलो! धक्का क्यों दिया?",
+        "O hello! Dhakka kyon diya?",
+        "Hello! Why did you push me?"
       ]
     ]
   },
@@ -1644,6 +2137,55 @@
         "Nope, not doing this. Bye!",
         "Nope, not doing this. Bye!"
       ]
+    ],
+    "odd": [
+      [
+        "Okay, that's a look. Respect, I guess.",
+        "Okay, that's a look. Respect, I guess.",
+        "Okay, that's a look. Respect, I guess."
+      ]
+    ],
+    "nice": [
+      [
+        "Nice fit, man. Where'd you get that?",
+        "Nice fit, man. Where'd you get that?",
+        "Nice fit, man. Where'd you get that?"
+      ]
+    ],
+    "respect": [
+      [
+        "Hey! Good to see you around, man.",
+        "Hey! Good to see you around, man.",
+        "Hey! Good to see you around, man."
+      ]
+    ],
+    "scared": [
+      [
+        "Dude, that's the guy from the fight. Walk.",
+        "Dude, that's the guy from the fight. Walk.",
+        "Dude, that's the guy from the fight. Walk."
+      ]
+    ],
+    "kind": [
+      [
+        "Feeding the strays? That's wholesome.",
+        "Feeding the strays? That's wholesome.",
+        "Feeding the strays? That's wholesome."
+      ]
+    ],
+    "drunk": [
+      [
+        "Bro, you good? Drink some water.",
+        "Bro, you good? Drink some water.",
+        "Bro, you good? Drink some water."
+      ]
+    ],
+    "shoved": [
+      [
+        "Dude! You just knocked me over!",
+        "Dude! You just knocked me over!",
+        "Dude! You just knocked me over!"
+      ]
     ]
   },
   "kpgirl": {
@@ -1768,6 +2310,55 @@
         "Help! Someone call the police!",
         "Help! Someone call the police!",
         "Help! Someone call the police!"
+      ]
+    ],
+    "odd": [
+      [
+        "Honestly? I kind of love it.",
+        "Honestly? I kind of love it.",
+        "Honestly? I kind of love it."
+      ]
+    ],
+    "nice": [
+      [
+        "Okay, you're dressed well. Noted.",
+        "Okay, you're dressed well. Noted.",
+        "Okay, you're dressed well. Noted."
+      ]
+    ],
+    "respect": [
+      [
+        "Hey! Love seeing you here.",
+        "Hey! Love seeing you here.",
+        "Hey! Love seeing you here."
+      ]
+    ],
+    "scared": [
+      [
+        "Please don't come near me.",
+        "Please don't come near me.",
+        "Please don't come near me."
+      ]
+    ],
+    "kind": [
+      [
+        "Aww, you fed the dog. Cute.",
+        "Aww, you fed the dog. Cute.",
+        "Aww, you fed the dog. Cute."
+      ]
+    ],
+    "drunk": [
+      [
+        "Someone get this guy an Uber.",
+        "Someone get this guy an Uber.",
+        "Someone get this guy an Uber."
+      ]
+    ],
+    "shoved": [
+      [
+        "Did you seriously just push me?",
+        "Did you seriously just push me?",
+        "Did you seriously just push me?"
       ]
     ]
   }

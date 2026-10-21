@@ -12,6 +12,13 @@ import { Police } from './police.js';
 import { Crowd } from '../people/crowd.js';
 import { Brawl } from '../people/fight.js';
 import * as Save from './save.js';
+import { Life } from './life.js';
+import { Shops, lookFromJSON, DEALER } from './shops.js';
+import { Props } from './props.js';
+import { Gigs } from './gigs.js';
+import { Club } from './club.js';
+import { Bag } from './bag.js';
+import { Strays } from '../people/strays.js';
 import { Fauna } from '../people/animals.js';
 import { Vehicle } from '../vehicles/vehicle.js';
 
@@ -105,7 +112,27 @@ export class Game {
     const parked = buildParked(W, this.scene, this.vmats, this.quality);
     W.instSets.push(...parked.sets);
     this.traffic.setStatics(parked.statics);
+    // you as a person (hunger, respect...), the shops, property, deliveries, nights out, the backpack
+    this.life = new Life(this);
+    this.shops = new Shops(this);
+    this.props = new Props(this);
+    this.gigs = new Gigs(this);
+    this.club = new Club(this);
+    this.bag = new Bag(this);
+    this.strays = new Strays(this);
+    this.people.reaction = () => this.life.reaction();
+    player.hpMax = () => this.life.hpMax;
+    player.sprintMul = () => this.life.sprintMul;
+    player.useHook = () => this.shops.tryUse();
+    this.origLook = player.look ? { ...player.look, top: player.look.top.clone(), bottom: player.look.bottom.clone(), shoe: player.look.shoe.clone(), hair: player.look.hair.clone(), cut: player.look.cut.clone() } : null;
+    if (this.life.s.look && player.look) { lookFromJSON(player.look, this.life.s.look); W.kit.applyLook(player.human, player.look); }
+    // a new character from the picker starts with their own clothes
+    const setLook = player.setLook.bind(player);
+    player.setLook = (look) => { setLook(look); if (this.life) { this.life.s.look = null; this.life.save(); } this.origLook = { ...look }; };
     if (this.saved) { try { Save.restore(this, this.saved, Vehicle); } catch (e) { console.warn('restore', e); } }
+    if (this.life.s.autoFuel !== undefined) player.auto.fuel = this.life.s.autoFuel;
+    if (this.life.s.autoDmg !== undefined) player.auto.dmg = this.life.s.autoDmg;
+    this.applyUpgrades();
     // keep it saved: every few seconds while playing, and whenever the tab goes away
     const persist = () => { if (this.state === 'play' || this.state === 'pause' || this.state === 'map') { Save.save(this); this.saveStats(); } };
     this.debugSave = { Save, Vehicle };
@@ -122,13 +149,21 @@ export class Game {
       if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;     // typing in the map search
       if (e.code === 'Escape' || e.code === 'KeyP') { if (this.state === 'play' || this.state === 'pause') this.togglePause(); }
       if (e.code === 'KeyM' && (this.state === 'play' || this.state === 'map')) this.toggleMap();
+      if (e.code === 'KeyE' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.bag.show('bag'); }
+      if (e.code === 'Tab' && this.state === 'play') { e.preventDefault(); this.bag.show('me'); }
       if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space') && !(this.hud.pickerOpen)) this.begin();
     });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'play') this.togglePause(true); });
     // drag on the canvas orbits the camera a little
     const cv = this.renderer.domElement;
     let drag = null;
-    cv.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse' && e.button === 0) drag = { x: e.clientX, y: e.clientY }; });
+    // on foot a left click is a punch (people/fight.js); dragging with either button still orbits
+    cv.addEventListener('contextmenu', (e) => e.preventDefault());
+    cv.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      if (e.button === 0 && this.state === 'play' && this.player.onFoot) this.input.pressed.add('Mouse0');
+      if (e.button === 0 || e.button === 2) drag = { x: e.clientX, y: e.clientY };
+    });
     window.addEventListener('pointermove', (e) => { if (drag) { this.rig.drag(e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; } });
     window.addEventListener('pointerup', () => { drag = null; });
     this.prewarm();
@@ -156,6 +191,29 @@ export class Game {
     } catch (e) { console.warn('prewarm', e); }
     for (const s of shown) { s.H.holder.visible = false; if (kit) kit.applyLook(s.H, s.H.look); }
     for (const v of tmp) v.dispose();
+  }
+  // fuel burns as you drive (a full tank lasts ~25 km in an auto, more on a scooter), crashes dent
+  // the engine (never an explosion: Indian vehicles are tougher than that), and both slow you down
+  vehicleWear(dt) {
+    const P = this.player;
+    if (P.onFoot) return;
+    const v = P.cur, S = P.spec || {};
+    if (v.fuel === undefined) v.fuel = v === P.auto ? 1 : 0.35 + Math.random() * 0.6;
+    if (v.dmg === undefined) v.dmg = 0;
+    const range = v === P.auto ? 25000 : S.two ? (S.name === 'Bicycle' ? 1e12 : 32000) : 45000;
+    const was = v.fuel;
+    v.fuel = Math.max(0, v.fuel - Math.abs(v.v) * dt / range * (0.6 + (v.throttle || 0) * 0.6));
+    if (was > 0.12 && v.fuel <= 0.12) this.hud.toast('Fuel low', `Under 12%. Nearest pump: ${this.nearestPump()}`, 'warn', 4);
+    if (was > 0 && v.fuel <= 0) this.hud.toast('Out of fuel', 'The engine coughs. You can crawl to a pump', 'bad', 4);
+    const fuelMul = v.fuel > 0 ? 1 : 0.22;
+    v.powerMul = (v.tune || 1) * fuelMul * (1 - Math.min(0.8, v.dmg) * 0.4);
+    if (v === P.auto) { this.life.s.autoFuel = Math.round(v.fuel * 1000) / 1000; this.life.s.autoDmg = Math.round(v.dmg * 1000) / 1000; }
+  }
+  nearestPump() {
+    const P = this.player;
+    let best = null, bd = 1e9;
+    for (const p of this.shops.places) if (p.kind === 'fuel') { const d = Math.hypot(p.x - P.x, p.z - P.z); if (d < bd) { bd = d; best = p; } }
+    return best ? `${best.name}, ${bd > 950 ? (bd / 1000).toFixed(1) + ' km' : Math.round(bd / 10) * 10 + ' m'}` : 'see the map';
   }
   // run fn after t seconds of game time
   later(t, fn) { (this.delayed || (this.delayed = [])).push({ t, fn }); }
@@ -195,7 +253,7 @@ export class Game {
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     this.state = 'play';
     this.audio.start();
-    if (shift && this.police.suspended) { shift = false; this.hud.toast('Licence suspended', 'No fares until it’s back — free roam only. Pay pending challans from the menu.', 'bad', 4); }
+    if (shift && this.police.suspended) { shift = false; this.hud.toast('Licence suspended', 'No fares until it’s back, free roam only. Pay pending challans from the menu.', 'bad', 4); }
     this.rides.setEnabled(shift);
     this.hud.setPlaying(true);
     this.rig.inited = false;
@@ -296,7 +354,7 @@ export class Game {
     this.waypoint = wp;
     if (!wp && this.beacon) this.beacon.visible = false;
     this.nav = wp ? { pts: null, left: Math.hypot(wp.x - this.player.x, wp.z - this.player.z), t: 0 } : null;
-    if (wp) this.hud.toast('Waypoint set', wp.name || '', 'info', 2.5);
+    if (wp && !wp.gig) this.hud.toast('Waypoint set', wp.name || '', 'info', 2.5);
     if (this.hud.mapScreen && this.hud.mapScreen.sel) this.hud.mapScreen.renderCard();
   }
   updateNav(dt) {
@@ -305,7 +363,7 @@ export class Game {
     const P = this.player, d = Math.hypot(wp.x - P.x, wp.z - P.z);
     this.beacon.visible = true; this.beacon.position.set(wp.x, 0, wp.z);
     this.beacon.material.uniforms.uA.value = Math.min(1, Math.max(0.15, (d - 20) / 120)) * 0.55;
-    if (d < 28) { this.hud.toast('Arrived', wp.name || '', 'good', 3); this.setWaypoint(null); return; }
+    if (d < 28 && !wp.gig) { this.hud.toast('Arrived', wp.name || '', 'good', 3); this.setWaypoint(null); return; }
     nav.t -= dt;
     if (nav.t > 0) return;
     nav.t = 1.5;
@@ -344,6 +402,22 @@ export class Game {
     this.renderer.setPixelRatio(pr);
     if (this.post) this.post.setSize(window.innerWidth, window.innerHeight); else this.renderer.setSize(window.innerWidth, window.innerHeight, false);
   }
+  // sleep at home or a lodge: wake at 7 AM rested
+  sleep() {
+    const L = this.life, P = this.player;
+    const to = 7, h = this.hour, dh = ((to - h) + 24) % 24 || 24;
+    this.hour = to; this.clock += dh;
+    L.apply({ energy: 1, mood: 0.1, hunger: -0.15, thirst: -0.2 }); L.s.drunk = 0;
+    P.hp = L.hpMax;
+    this.hud.flash('Good morning', `You slept ${Math.round(dh)} hours. 7:00 AM, fully rested.`);
+  }
+  // what you've done to your auto at the garage
+  applyUpgrades() {
+    const U = this.life.s.upg, A = this.player.auto;
+    A.tune = 1 + (U.engine || 0) * 0.08;
+    if (A.setSticker) A.setSticker(U.sticker || 0);
+  }
+  baseLook() { return this.origLook; }
   // Start over: wipe all progress (with the warning shown in the pause menu) and reload fresh
   resetAll() {
     this.state = 'resetting';
@@ -358,6 +432,10 @@ export class Game {
   objective() {
     const r = this.rides, P = this.player;
     if (P.tipped) return { main: 'Auto tipped over!', sub: 'Hold on… getting it back on three wheels', urgent: true };
+    const gj = this.gigs && this.gigs.objective();
+    if (gj && !(r.current)) return gj;
+    const veh = !P.onFoot ? P.cur : null;
+    if (veh && veh.fuel !== undefined && veh.fuel <= 0) return { main: 'Out of fuel', sub: 'Crawl to a pump (on the map), or call roadside help from the backpack', urgent: true };
     // free roam: a short hint at the start, then a clean screen
     if (!r.enabled) return this.t - (this.playT0 || 0) < 6 ? { main: 'Free roam', sub: 'Esc for menu · M for map' } : { main: '', sub: '' };
     const c = r.current;
@@ -447,13 +525,14 @@ export class Game {
     for (const ev of evs) {
       if (ev.type === 'crash') {
         this.rig.shake(Math.min(0.5, ev.speed * 0.06)); this.audio.crash(Math.min(1, ev.speed / 8));
-        if (ev.kind === 3) this.hud.toast('End of the shift area', 'Turn back — the map ends here', 'warn', 2);
+        if (!P.onFoot && ev.speed > 3) { const v = P.cur; v.dmg = Math.min(1, (v.dmg || 0) + (ev.speed - 3) * 0.006); if (v.dmg > 0.6 && !this._dmgWarn) { this._dmgWarn = true; this.hud.toast('Your vehicle is badly damaged', 'It’s slower now. Any garage can fix it', 'warn', 3.4); } if (v.dmg < 0.3) this._dmgWarn = false; }
+        if (ev.kind === 3) this.hud.toast('End of the shift area', 'Turn back, the map ends here', 'warn', 2);
       }
       if (ev.type === 'scrape') this.audio.thud(0.15);
       if (ev.type === 'bark' || ev.type === 'dogChase') { const d = Math.hypot(ev.x - P.x, ev.z - P.z); if (d < 60) this.audio.bark(Math.min(0.9, 12 / (d + 6))); }
-      if (ev.type === 'dogChase' && (this._dogT || 0) < this.t) { this._dogT = this.t + 30; this.hud.toast('A street dog is chasing you', 'Classic. Keep going — it’ll give up.', 'info', 2.4); }
+      if (ev.type === 'dogChase' && (this._dogT || 0) < this.t) { this._dogT = this.t + 30; this.hud.toast('A street dog is chasing you', 'Classic. Keep going, it’ll give up.', 'info', 2.4); }
       if (ev.type === 'bump') { this.rig.shake(Math.min(0.25, ev.strength * 0.03)); this.audio.thud(Math.min(0.6, ev.strength * 0.12)); }
-      if (ev.type === 'tip') { this.rig.shake(0.5); this.audio.crash(0.8); this.hud.toast('Auto tipped over!', 'Corner slower — autos lift a wheel easily', 'warn', 3); }
+      if (ev.type === 'tip') { this.rig.shake(0.5); this.audio.crash(0.8); this.hud.toast('Auto tipped over!', 'Corner slower, autos lift a wheel easily', 'warn', 3); }
       if (ev.type === 'hit') { this.audio.crash(Math.min(1, ev.speed / 6)); }
       if (ev.type === 'knock') { this.audio.crash(0.7); this.hud.toast('You knocked over a two-wheeler', 'They’re fine. Very, very angry, but fine.', 'warn', 2.6); }
       if (ev.type === 'pedHit') { this.audio.thud(0.4); this.hud.toast('Watch the pedestrians!', 'They’re fine, just furious', 'warn', 2.4); this.stats.money = Math.max(0, this.stats.money - 50); }
@@ -461,7 +540,9 @@ export class Game {
       if (ev.type === 'recovered') this.hud.toast('Back on three wheels', '', 'info', 1.6);
       if ((ev.type === 'jump' && this.rng.chance(0.3)) || ev.type === 'climb') this.people.onStunt(P);
       if (ev.type === 'gotHit') { this.audio.thud(0.6); this.rig.shake(0.4); this.hud.toast('Knocked down', 'Traffic doesn\u2019t stop for pedestrians here. Stay on the footpath.', 'bad', 3); }
-      if (ev.type === 'carjack') { this.audio.crash(0.2); }
+      if (ev.type === 'carjack') { this.audio.crash(0.2); this.life.change('karma', -3); }
+      if (ev.type === 'stoleParked') this.life.change('karma', -2);
+      if (ev.type === 'pedHit') this.life.change('karma', -2);
       if (ev.type === 'exit' && this.state === 'play' && (this._parkHintT || 0) < this.t && this.W.surf.isRoad(P.cur.x, P.cur.z)) {
         const near = this.W.graph.nearest(P.cur.x, P.cur.z, 12);
         if (near && near.e.rank >= 4) { this._parkHintT = this.t + 120; this.hud.toast('No parking on main roads', 'Pune’s tow vans are quick. Side lanes are safer.', 'warn', 3.2); }
@@ -498,6 +579,19 @@ export class Game {
       this.rides.update(dt);
       this.police.update(dt);
       this.tickTimers(dt);
+      this.life.update(dt);
+      this.shops.update(dt);
+      this.gigs.update(dt, this.input);
+      this.strays.update(dt);
+      this.rig.drunk = this.life.s.drunk;
+      // driving drunk: the next cop who sees you pulls you over (₹10,000, MV Act s.185)
+      if (!P.onFoot && this.life.s.drunk > 0.45 && Math.abs(P.v) > 3 && !this.police.stop && (this._drunkChk = (this._drunkChk || 0) - dt) <= 0) {
+        this._drunkChk = 6;
+        if (this.police.copSeeing(P.x, P.z, 35) && this.rng.chance(0.6)) this.police.offence('drunk', P.x, P.z, { how: 'breathalyser', missed: ['Driving after drinks', 'Lucky. Nobody stopped you.'], stopChance: 0.85 });
+      }
+      // a rental goes back at the end of its day
+      for (const d of P.dropped) if (d.veh.owned && d.veh.owned.rental && this.clock > d.veh.owned.until && d.veh !== P.cur) { P.removeDropped(d, this.traffic); d.veh.dispose(); this.hud.toast('Rental returned', 'The travels picked up their scooter', 'info', 2.6); break; }
+      this.vehicleWear(dt);
       if (this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);
       this.rig.lookBack = this.input.key('KeyB');
       if (this.input.took('KeyR') && P.tipped === 0 && !P.onFoot) this.backOnRoad();
@@ -510,7 +604,9 @@ export class Game {
       const horn = this.input.state.horn && !P.onFoot;
       this.audio.playerHorn(horn, S ? S.honk : 'auto');
       if (horn) { this.hornScare(); this.police.honked(); if ((this._pedHornT = (this._pedHornT || 0) - dt) <= 0) { this._pedHornT = 0.5; this.people.onHorn(P); } }
+      const sl = this.shops.near && this.shops.label();
       if (P.offer && P.onFoot) this.hud.prompt(P.offer.key, P.offer.label, 0.3);
+      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);
       else if (!P.onFoot && Math.abs(P.v) < 1 && this.state === 'play') this.hud.prompt('F', P.inAuto ? 'Get out of the auto' : 'Get off', 0.3);
       this.playHonks();
       this.audio.updateAmbient(Math.min(1, this.traffic.list.length / 100), this.sky.state ? this.sky.state.night : 0, P.inAuto ? Math.abs(P.v) : 0);
@@ -536,7 +632,7 @@ export class Game {
     this.people.render(P.x, P.z);
     if (this.crowd) this.crowd.update(dt, this.camera.position.x, this.camera.position.z);
     if (this.fauna) this.fauna.update(Math.min(dt, 0.05), this.camera.position.x, this.camera.position.z);
-    if (this.state === 'play' || this.state === 'pause' || this.state === 'map') this.hud.update(dt);
+    if (this.state === 'play' || this.state === 'pause' || this.state === 'map' || this.state === 'shop') this.hud.update(dt);
     this.input.endFrame();
     this.sanity();
   }
@@ -620,7 +716,7 @@ export class Game {
         if (P.v > 3 && !P.onFoot) {
           if (st === 'r') pol.offence('signal', nd.x, nd.z, { camChance: 0.2, how: 'signal camera', missed: ['Jumped a red light', 'Nobody saw. This time.'] });
           else if (st === 'a') {
-            // strict officers stop you for amber too — and then you can argue, and be right
+            // strict officers stop you for amber too, and then you can argue, and be right
             const cop = pol.copSeeing(nd.x, nd.z, 40);
             if (cop && cop.mood < 0.3) pol.offence('signal', nd.x, nd.z, { amber: true, stopChance: 1 });
           }
@@ -683,10 +779,22 @@ export class Game {
     this.cops = [];
     const heads = this.W.signalHeads || [];
     const used = new Set();
+    const S = this.W.surf, C = this.W.collision, G = this.W.graph;
     for (const h of heads) {
-      if (used.has(h.node) || this.rng.next() > 0.3) continue;
+      // one in five signalised junctions, and only the busier ones (not every signal has a cop)
+      if (used.has(h.node) || this.rng.next() > 0.2) continue;
+      const nd = G.nodes[h.node];
+      if (nd && (nd.out.length + nd.inc.length) < 3) continue;
       used.add(h.node);
-      this.cops.push({ x: h.x, z: h.z });
+      // beside the signal pole on the footpath, never inside it or out in the traffic
+      let best = null;
+      for (let k = 0; k < 12 && !best; k++) {
+        const a = Math.atan2(-h.dz, -h.dx) + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.55, r = k < 6 ? 1.1 : 1.6;
+        const x = h.x + Math.cos(a) * r, z = h.z + Math.sin(a) * r;
+        if (!S.isRoad(x, z) && !C.resolve(x, z, 0.35) && !S.inBuilding(x, z)) best = { x, z };
+      }
+      if (!best) continue;
+      this.cops.push({ x: best.x, z: best.z, fx: nd ? nd.x : h.x + h.dx * 8, fz: nd ? nd.z : h.z + h.dz * 8 });
     }
     this.people.addCops(this.cops, heads);
   }
