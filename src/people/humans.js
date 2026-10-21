@@ -156,8 +156,8 @@ export class HumanKit {
       o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true;
       if (o.name.startsWith('body')) { o.material = mat; body = o; }
       else if (o.name.startsWith('eyes')) { o.castShadow = false; }
-      else if (o.name.startsWith('hair') || o.name.startsWith('face')) { o.material = hairMat; parts.push(o); }
-      else if (o.name.startsWith('cloth')) { o.material = o.name === 'cloth_pants' ? botMat : o.name === 'cloth_shoes' ? shoeMat : topMat; parts.push(o); }
+      else if (o.name.startsWith('hair') || o.name.startsWith('face')) { o.material = hairMat; o.castShadow = false; parts.push(o); }
+      else if (o.name.startsWith('cloth')) { o.material = o.name === 'cloth_pants' ? botMat : o.name === 'cloth_shoes' ? shoeMat : topMat; o.castShadow = o.name !== 'cloth_shoes'; parts.push(o); }
       else { o.material = acc; parts.push(o); }
     });
     const holder = new THREE.Group();

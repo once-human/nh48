@@ -13,6 +13,8 @@ export class Crowd {
     this.cap = quality.name === 'low' ? 7 : quality.name === 'med' ? 12 : 18;
     this.pool = [];
     this.t = 0;
+    // build the pool up front: creating a skinned body mid-game is a visible hitch
+    if (kit) { for (let i = 0; i < Math.ceil(this.cap * 0.65); i++) this.makeSkin(false); for (let i = 0; i < Math.ceil(this.cap * 0.45); i++) this.makeSkin(true); }
   }
   setQuality(q) { this.cap = q.name === 'low' ? 7 : q.name === 'med' ? 12 : 18; }
   makeSkin(female) {
