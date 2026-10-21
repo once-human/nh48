@@ -339,7 +339,7 @@ export class Game {
   }
   togglePause(force) {
     const to = force !== undefined ? force : this.state !== 'pause';
-    if (to && this.state === 'play') { this._pausedAt = performance.now(); this.state = 'pause'; this.hud.pause.hidden = false; this.hud.syncPause(); this.audio.updateEngine(0, 0, false); this.audio.playerHorn(false); this.audio.hush(true); }
+    if (to && this.state === 'play') { this._pausedAt = performance.now(); this.state = 'pause'; this.hud.setLockHint?.(false); this.hud.pause.hidden = false; this.hud.syncPause(); this.audio.updateEngine(0, 0, false); this.audio.playerHorn(false); this.audio.hush(true); }
     else if (!to && this.state === 'pause') {
       this.state = 'play'; this.hud.pause.hidden = true; this.audio.hush(false);
       if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();

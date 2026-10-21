@@ -19,6 +19,8 @@ export function loadSettings() {
   const st = safeStorage();
   let s = {};
   try { s = JSON.parse(st && st.getItem(KEY) || '{}') || {}; } catch (e) { s = {}; }
+  // mouse feel, crowds, traffic and police strictness are fixed now (tuned, not player settings)
+  for (const k of ['sens', 'invertY', 'crowd', 'traffic', 'police']) delete s[k];
   return { ...DEFAULTS, ...s };
 }
 export function saveSettings(s) {
@@ -41,20 +43,15 @@ export function settingsHTML() {
   const range = (id, min, max, step) => `<input type="range" data-set="${id}" min="${min}" max="${max}" step="${step}">`;
   return `<div class="sec settings"><div class="cap">Settings</div>
     <div class="set-grid">
-      <label>Mouse sensitivity</label>${range('sens', 0.3, 2.5, 0.05)}
-      <label>Invert mouse up/down</label>${seg('invertY', [['false', 'Off'], ['true', 'On']])}
       <label>Field of view</label>${range('fov', -10, 20, 1)}
       <label>Voices</label>${range('voiceVol', 0, 1.5, 0.05)}
       <label>Club music</label>${range('musicVol', 0, 1.5, 0.05)}
       <label>Subtitles</label>${seg('subs', [['both', 'With English'], ['line', 'Line only'], ['off', 'Off']])}
       <label>HUD</label>${seg('hud', [['full', 'Full'], ['minimal', 'Minimal']])}
-      <label>Crowds</label>${seg('crowd', [['0.5', 'Light'], ['1', 'Normal'], ['1.4', 'Busy']])}
-      <label>Traffic</label>${seg('traffic', [['0.5', 'Light'], ['1', 'Normal'], ['1.4', 'Pune rush hour']])}
-      <label>Police</label>${seg('police', [['relaxed', 'Relaxed'], ['normal', 'Normal'], ['strict', 'Strict']])}
       <label>Clock</label>${seg('clock24', [['false', '12 hour'], ['true', '24 hour']])}
       <label>Full screen</label>${seg('fullscreen', [['true', 'On start'], ['false', 'Never']])}
     </div>
-    <div class="note">Saved on this device. Crowds and traffic above Normal cost frame rate.</div></div>`;
+    <div class="note">Saved on this device.</div></div>`;
 }
 export function bindSettings(root, G) {
   const parse = (k, v) => typeof DEFAULTS[k] === 'boolean' ? v === 'true' : typeof DEFAULTS[k] === 'number' ? parseFloat(v) : v;

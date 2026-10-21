@@ -56,8 +56,9 @@ export class Bag {
     this.el.hidden = false; this.msg('');
     this.render();
     this.el.classList.remove('in'); void this.el.offsetWidth; this.el.classList.add('in');
+    G.releaseMouse?.();          // the jhola and status are pointer menus
   }
-  close() { this.open = false; this.el.hidden = true; if (this.g.state === 'shop') this.g.state = 'play'; this.life.save(); }
+  close() { this.open = false; this.el.hidden = true; if (this.g.state === 'shop') this.g.state = 'play'; this.life.save(); this.g.lockMouse?.(); }
   msg(t, good) { const m = this.el.querySelector('.jh-msg'); m.textContent = t || ''; m.classList.toggle('good', !!good); }
   row(ic, label, note, right, act, arg, cls = '') {
     return `<button class="jh-row ${cls}" ${act ? `data-act="${act}"` : 'disabled'} ${arg !== undefined ? `data-arg="${esc(arg)}"` : ''}>${icon(ic)}<span class="nm"><b>${esc(label)}</b><small>${esc(note || '')}</small></span><span class="go">${esc(right || '')}</span></button>`;
