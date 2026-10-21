@@ -161,7 +161,7 @@ export class Dates {
     if (this.cur || p.walkedOff) return false;
     this.profile(p);
     const tpl = room.R.tpl, dancing = !!room.dancing;
-    this.cur = { p, room, mode: 'meet', approach: true, contact: null, club: tpl === 'club', interest: Math.max(p.interest ?? 0, Math.round(18 + this.life.charm * 14)), used: {}, turn: 0, q: null, teases: 0 };
+    this.cur = { p, room, mode: 'meet', approach: true, contact: null, club: tpl === 'club' && !room.outside, interest: Math.max(p.interest ?? 0, Math.round(18 + this.life.charm * 14)), used: {}, turn: 0, q: null, teases: 0 };
     G.state = 'shop';
     this.say(this.line(p, dancing ? 'approach_dance' : tpl === 'club' ? 'approach_club' : 'approach_cafe'), `${p.name} came over to you`);
     this.render();
@@ -294,7 +294,7 @@ export class Dates {
         if (Cr && !Cr.dancing) I.dance(true);
         p.anim = p.idle = 'dance'; c.danced = true; c.interest += 10;
         this.say(this.line(p, 'dance_yes'), 'Dancing together');
-      } else this.say(this.line(p, c.club ? 'place_club' : 'place_cafe'), 'They’re into you');
+      } else this.say(this.line(p, c.room.outside ? 'laugh' : c.club ? 'place_club' : 'place_cafe'), 'They’re into you');
       this.render();
       return;
     }
@@ -522,6 +522,7 @@ export class Dates {
     if (G.interiors && G.interiors.approachDone) G.interiors.approachDone(c.p);
     this.cur = null; this.el.hidden = true;
     if (G.state === 'shop') G.state = 'play';
+    if (this.onClose) { const f = this.onClose; this.onClose = null; f(); }
   }
   // ---------------------------------------------------------------- what relationships do, over time
   update(dt) {

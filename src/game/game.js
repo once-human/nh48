@@ -22,6 +22,7 @@ import { Club } from './club.js';
 import { Bag } from './bag.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
+import { StreetApproach } from './approach.js';
 import { Dates } from './date.js';
 import { loadSettings, applySettings } from './settings.js';
 import { Trial } from './trial.js';
@@ -133,6 +134,7 @@ export class Game {
     this.strays = new Strays(this);
     this.interiors = new Interiors(this);
     this.date = new Dates(this);
+    this.approachSt = new StreetApproach(this);
     applySettings(this);
     this.trial = new Trial(this);
     this.people.reaction = () => this.life.reaction();
@@ -728,6 +730,7 @@ export class Game {
       if (!this.interiors.inside) this.checkRoad(dt);
       this.interiors.update(dt);
       this.date.update(dt);
+      this.approachSt.update(dt);
       this.updateNav(dt);
       this.rig.update(dt, P);
       const S = P.spec;
