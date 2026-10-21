@@ -88,11 +88,18 @@ print('flyover ways', len(fly), collections.Counter(f['name'] for f in fly).most
 fly_nodes = collections.Counter()          # how many flyover ways pass through each node
 for f in fly:
     for n in set(f['nodes']): fly_nodes[n] += 1
+# a node is on the ground network if any drivable way that is NOT one of our elevated decks uses
+# it: ordinary roads, and river bridges too (they're at city level, so a deck that ends on one
+# must have come down to meet it; that was the mid-air cliff at Shivaji Road)
+fly_ways = set(id(f) for f in fly)
+fly_node_set = set(n for f in fly for n in f['nodes'])
 ground_nodes = set()
+deck_keys = set(tuple(f['nodes']) for f in fly)
 for w in D['ways'].values():
     t = w.get('tags', {})
     if t.get('highway') not in DRIVE: continue
-    if t.get('bridge') in ('yes', 'viaduct') and t.get('layer', '0') not in ('0', ''): continue
+    nds = [n for n in w['nd'] if n in P]
+    if tuple(nds) in deck_keys or tuple(nds[::-1]) in deck_keys: continue
     for n in w['nd']: ground_nodes.add(n)
 names = M['names']; nidx = {tuple(n): i for i, n in enumerate(names)}
 def name_id(en):
@@ -101,7 +108,7 @@ def name_id(en):
         if n[0] == en: return i
     names.append([en, '']); return len(names) - 1
 
-RAMP = 160.0     # Pune flyover approaches climb ~6.5 m at about 4%: 150-170 m
+RAMP = 220.0     # Pune flyover approaches: ~6.5 m over 200-250 m (about 3% average, IRC urban limit ~4%)
 # distance along the flyover network from the nearest ramp foot, so a ramp that is split into
 # several OSM pieces still climbs smoothly across them
 import heapq
@@ -125,6 +132,20 @@ while pq:
     for b, l in adj[a]:
         if d0 + l < dist.get(b, 1e18): dist[b] = d0 + l; heapq.heappush(pq, (d0 + l, b))
 print('ramp feet', len(feet))
+# how long is each connected deck: OSM tags only the elevated span as a bridge (the approach
+# embankments are ordinary road), so a short span still gets most of its height: its ramps take
+# up to ~38% of its length each instead of flattening it into a hump
+comp, comp_len = {}, collections.Counter()
+for start in adj:
+    if start in comp: continue
+    stack = [start]; comp[start] = start
+    while stack:
+        a = stack.pop()
+        for b, l in adj[a]:
+            if b not in comp: comp[b] = start; stack.append(b)
+for f in fly:
+    nd = f['nodes']
+    comp_len[comp[nd[0]]] += sum(math.dist(P[a], P[b]) for a, b in zip(nd, nd[1:]))
 # where a layer-2 deck meets a layer-1 deck it climbs the extra 3 m over 60 m
 nodeH = collections.defaultdict(list)
 for f in fly:
@@ -156,7 +177,8 @@ for f in fly:
     for i, p in enumerate(dense):
         sp = L * i / (n - 1)
         dd = min(d + abs(sp - sa) for sa, d in nd_d)
-        h = min(H, 0.15 + (H - 0.15) * sm(min(1.0, dd / RAMP)))
+        ramp = max(55.0, min(RAMP, comp_len[comp[f['nodes'][0]]] * 0.38))
+        h = min(H, 0.15 + (H - 0.15) * sm(min(1.0, dd / ramp)))
         for sa, d, hl in nd_s:
             if H > hl: h = min(h, hl + (H - hl) * sm(min(1.0, (d + abs(sp - sa)) / STEP)))
         hs.append(h)
