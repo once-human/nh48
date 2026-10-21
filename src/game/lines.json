@@ -1,61 +1,643 @@
 {
   "_": "id: [speaker, voice, tts language, text read by the voice (Devanagari), subtitle (romanised), English]. Voices: kokoro hm_omega/hm_psi (male), hf_alpha/hf_beta (female); piper mr0..mr8 (Marathi, female).",
-
-  "stop_wave":   ["Traffic police", "hm_omega", "mr", "ओ! इकडे या! साईडला घ्या.", "O! Ikde ya! Side la ghya.", "Hey! Over here! Pull over."],
-  "stop_signal": ["Traffic police", "hm_omega", "mr", "सिग्नल तोडलात ना? लायसन्स दाखवा.", "Signal todlat na? Licence dakhva.", "You jumped the signal, didn’t you? Licence, please."],
-  "stop_helmet": ["Traffic police", "hm_omega", "mr", "हेल्मेट कुठे आहे? लायसन्स दाखवा.", "Helmet kuthe aahe? Licence dakhva.", "Where’s your helmet? Licence, please."],
-  "stop_wrong":  ["Traffic police", "hm_omega", "mr", "वन वे आहे हा! उलट्या दिशेने कुठे चाललात?", "One way aahe ha! Ultya dishene kuthe chaallat?", "This is a one-way! Where are you off to, the wrong way?"],
-  "stop_speed":  ["Traffic police", "hm_omega", "mr", "इतक्या स्पीडमध्ये कुठे चाललात? लायसन्स दाखवा.", "Itkya speed madhe kuthe chaallat? Licence dakhva.", "Where are you going at that speed? Licence, please."],
-  "stop_horn":   ["Traffic police", "hm_omega", "mr", "हॉस्पिटल आहे इथे! हॉर्न का वाजवताय?", "Hospital aahe ithe! Horn ka vajavtay?", "There’s a hospital right here! Why are you honking?"],
-  "stop_check":  ["Traffic police", "hm_omega", "mr", "नाकाबंदी आहे. कागदपत्रं दाखवा.", "Nakabandi aahe. Kagadpatra dakhva.", "Checkpoint. Show me your papers."],
-  "stop_ignored":["Traffic police", "hm_omega", "mr", "अरे! थांबा! नंबर लिहून घेतलाय तुमचा!", "Arre! Thamba! Number lihun ghetlay tumcha!", "Hey! Stop! I’ve taken down your number!"],
-
-  "r_pay":       ["Traffic police", "hm_omega", "mr", "ठीक आहे. पुढच्या वेळी लक्ष ठेवा.", "Theek aahe. Pudhchya veli laksha theva.", "Alright. Be careful next time."],
-  "r_plead_ok":  ["Traffic police", "hm_omega", "mr", "जा. पण पुढच्या वेळी सोडणार नाही.", "Ja. Pan pudhchya veli sodnar nahi.", "Go. But next time I won’t let you off."],
-  "r_plead_no":  ["Traffic police", "hm_omega", "mr", "नियम म्हणजे नियम. दंड भरा.", "Niyam mhanje niyam. Dand bhara.", "Rules are rules. Pay the fine."],
-  "r_argue_ok":  ["Traffic police", "hm_omega", "mr", "बरं बरं, जा. आज मूड चांगला आहे माझा.", "Bara bara, ja. Aaj mood changla aahe maza.", "Fine, fine, go. I’m in a good mood today."],
-  "r_argue_no":  ["Traffic police", "hm_omega", "mr", "जास्त शहाणपणा नको. सगळा दंड भरा, पेंडिंग पण.", "Jaast shahanpana nako. Sagla dand bhara, pending pan.", "Don’t get smart. Pay the whole fine — the pending ones too."],
-  "r_bribe_ok":  ["Traffic police", "hm_omega", "mr", "ठीक आहे… निघा लवकर.", "Theek aahe… nigha lavkar.", "(glances around) …Alright. Get going, quick."],
-  "r_bribe_no":  ["Traffic police", "hm_omega", "mr", "लाच देताय? थांबा तिथेच! चला चौकीत.", "Laach detay? Thamba tithech! Chala chowkit.", "Offering a bribe? Stay right there! You’re coming to the chowki."],
-  "r_bribe_more":["Traffic police", "hm_omega", "mr", "परत आलात? आज पाचशे लागतील.", "Parat aalat? Aaj paachshe lagtil.", "Back again? Today it’ll be five hundred."],
-  "r_clear":     ["Traffic police", "hm_omega", "mr", "सगळं ठीक आहे. जा, सावकाश चालवा.", "Sagla theek aahe. Ja, saavkash chalva.", "All in order. Go on — drive carefully."],
-  "r_suspended": ["Traffic police", "hm_omega", "mr", "लायसन्स सस्पेंड आहे तुमचं! गाडी इथेच ठेवा.", "Licence suspend aahe tumcha! Gaadi ithech theva.", "Your licence is suspended! The vehicle stays here."],
-  "r_dues":      ["Traffic police", "hm_omega", "mr", "तुमच्यावर चालान पेंडिंग आहेत. आधी ते भरा.", "Tumchyavar challan pending aahet. Aadhi te bhara.", "You’ve got challans pending. Clear those first."],
-  "r_stolen":    ["Traffic police", "hm_omega", "mr", "ही गाडी तुमची नाही. चला, चौकीत चला.", "Hi gaadi tumchi nahi. Chala, chowkit chala.", "This vehicle isn’t yours. Come on — to the chowki."],
-
-  "m_spot":      ["Beat marshal", "hm_psi", "mr", "ए! थांब! चोरीची गाडी आहे ती!", "Ae! Thamb! Chorichi gaadi aahe ti!", "Hey! Stop! That’s a stolen vehicle!"],
-  "m_spot2":     ["Beat marshal", "hm_psi", "hi", "रुक जा! भागने से कुछ नहीं होगा!", "Ruk ja! Bhaagne se kuch nahi hoga!", "Stop! Running won’t help you!"],
-  "m_caught":    ["Beat marshal", "hm_psi", "mr", "बस्स झालं. उतर खाली.", "Bass jhala. Utar khali.", "That’s enough. Get down."],
-  "m_lost":      ["Police radio", "hm_psi", "mr", "सर, गाडी सापडली नाही. ओव्हर.", "Sir, gaadi saapadli nahi. Over.", "Sir, we’ve lost the vehicle. Over."],
-
-  "sh1":         ["Driver", "hm_psi", "hi", "अरे, गाड़ी क्यों छीन रहे हो?!", "Arre, gaadi kyon chheen rahe ho?!", "Hey, why are you taking my vehicle?!"],
-  "sh2":         ["Driver", "hm_omega", "mr", "थांबा! माझी गाडी आहे ती!", "Thamba! Maazi gaadi aahe ti!", "Stop! That’s my vehicle!"],
-  "sh3":         ["Driver", "hm_psi", "mr", "पोलिसांना बोलावतो आता!", "Police la bolavto aata!", "I’m calling the police!"],
-  "sh4":         ["Driver", "hf_alpha", "mr", "काय चालू आहे हे?!", "Kay chalu aahe he?!", "What is going on?!"],
-  "sh5":         ["Driver", "hm_omega", "hi", "अबे, उतर नीचे!", "Abey, utar neeche!", "Hey, get down from there!"],
-
-  "d1":          ["Pedestrian", "hm_psi", "mr", "अरे! दिसत नाही का?", "Arre! Disat nahi ka?", "Hey! Can’t you see?"],
-  "d2":          ["Pedestrian", "mr3", "mr", "भाऊ, हळू!", "Bhau, halu!", "Slow down, man!"],
-  "d3":          ["Pedestrian", "hm_omega", "mr", "काय रे!", "Kay re!", "Oi!"],
-  "d4":          ["Pedestrian", "mr5", "mr", "अगं बाई! किती जोरात!", "Aga bai! Kiti jorat!", "Oh my god! So fast!"],
-
-  "h1":          ["Pedestrian", "hm_psi", "mr", "हॉर्न वाजवून काय होणार आहे?", "Horn vajavun kay honar aahe?", "What’s honking going to do?"],
-  "h2":          ["Pedestrian", "mr0", "mr", "दिसत नाही का, लोक चालतायत?", "Disat nahi ka, lok chaltayt?", "Can’t you see people are walking?"],
-  "h3":          ["Pedestrian", "hm_omega", "hi", "हाँ हाँ, सुन लिया!", "Haan haan, sun liya!", "Yes, yes, I heard you!"],
-  "h4":          ["Pedestrian", "mr8", "mr", "काय घाई आहे एवढी?", "Kay ghai aahe evdhi?", "What’s the big hurry?"],
-
-  "f1":          ["Pedestrian", "hm_psi", "mr", "ए! पाडलं मला! डोळे आहेत का?", "Ae! Padla mala! Dole aahet ka?", "Hey! You knocked me down! Got eyes?"],
-  "f2":          ["Pedestrian", "hm_omega", "mr", "थांब तू! बघतोच तुला!", "Thamb tu! Baghtoch tula!", "Wait right there! I’ll show you!"],
-  "f3":          ["Pedestrian", "mr6", "mr", "अगं आई गं! कोण चालवतंय हे?", "Aga aai ga! Kon chalavtay he?", "Oh god! Who’s driving this thing?"],
-
-  "c1":          ["Bystander", "hm_omega", "mr", "अरे, काय झालं? ॲक्सिडेंट झाला का?", "Arre, kay jhala? Accident jhala ka?", "What happened? Was there an accident?"],
-  "c2":          ["Bystander", "hm_psi", "mr", "व्हिडिओ काढ, व्हिडिओ!", "Video kadh, video!", "Film it, film it!"],
-  "c3":          ["Bystander", "mr2", "mr", "पाणी द्या रे त्याला कोणीतरी.", "Paani dya re tyala konitari.", "Someone give him some water."],
-  "c4":          ["Bystander", "hm_omega", "hi", "पकड़ो इसको! भागने मत देना!", "Pakdo isko! Bhaagne mat dena!", "Grab him! Don’t let him get away!"],
-
-  "b1":          ["Pedestrian", "hm_psi", "mr", "धक्का का मारतोयस?", "Dhakka ka maartoys?", "Why are you shoving me?"],
-  "b2":          ["Pedestrian", "mr4", "mr", "सॉरी तरी बोल!", "Sorry tari bol!", "At least say sorry!"],
-  "b3":          ["Pedestrian", "hm_omega", "hi", "देख के चल, भाई!", "Dekh ke chal, bhai!", "Watch where you’re going, man!"],
-
-  "tow":         ["Towing van", "hm_psi", "mr", "नो पार्किंग! उचला रे गाडी.", "No parking! Uchla re gaadi.", "No parking! Lift it, boys."]
+  "stop_wave": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "ओ! इकडे या! साईडला घ्या.",
+    "O! Ikde ya! Side la ghya.",
+    "Hey! Over here! Pull over."
+  ],
+  "stop_signal": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "सिग्नल तोडलात ना? लायसन्स दाखवा.",
+    "Signal todlat na? Licence dakhva.",
+    "You jumped the signal, didn’t you? Licence, please."
+  ],
+  "stop_helmet": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "हेल्मेट कुठे आहे? लायसन्स दाखवा.",
+    "Helmet kuthe aahe? Licence dakhva.",
+    "Where’s your helmet? Licence, please."
+  ],
+  "stop_wrong": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "वन वे आहे हा! उलट्या दिशेने कुठे चाललात?",
+    "One way aahe ha! Ultya dishene kuthe chaallat?",
+    "This is a one-way! Where are you off to, the wrong way?"
+  ],
+  "stop_speed": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "इतक्या स्पीडमध्ये कुठे चाललात? लायसन्स दाखवा.",
+    "Itkya speed madhe kuthe chaallat? Licence dakhva.",
+    "Where are you going at that speed? Licence, please."
+  ],
+  "stop_horn": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "हॉस्पिटल आहे इथे! हॉर्न का वाजवताय?",
+    "Hospital aahe ithe! Horn ka vajavtay?",
+    "There’s a hospital right here! Why are you honking?"
+  ],
+  "stop_check": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "नाकाबंदी आहे. कागदपत्रं दाखवा.",
+    "Nakabandi aahe. Kagadpatra dakhva.",
+    "Checkpoint. Show me your papers."
+  ],
+  "stop_ignored": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "अरे! थांबा! नंबर लिहून घेतलाय तुमचा!",
+    "Arre! Thamba! Number lihun ghetlay tumcha!",
+    "Hey! Stop! I’ve taken down your number!"
+  ],
+  "r_pay": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "ठीक आहे. पुढच्या वेळी लक्ष ठेवा.",
+    "Theek aahe. Pudhchya veli laksha theva.",
+    "Alright. Be careful next time."
+  ],
+  "r_plead_ok": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "जा. पण पुढच्या वेळी सोडणार नाही.",
+    "Ja. Pan pudhchya veli sodnar nahi.",
+    "Go. But next time I won’t let you off."
+  ],
+  "r_plead_no": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "नियम म्हणजे नियम. दंड भरा.",
+    "Niyam mhanje niyam. Dand bhara.",
+    "Rules are rules. Pay the fine."
+  ],
+  "r_argue_ok": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "बरं बरं, जा. आज मूड चांगला आहे माझा.",
+    "Bara bara, ja. Aaj mood changla aahe maza.",
+    "Fine, fine, go. I’m in a good mood today."
+  ],
+  "r_argue_no": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "जास्त शहाणपणा नको. सगळा दंड भरा, पेंडिंग पण.",
+    "Jaast shahanpana nako. Sagla dand bhara, pending pan.",
+    "Don’t get smart. Pay the whole fine — the pending ones too."
+  ],
+  "r_bribe_ok": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "ठीक आहे… निघा लवकर.",
+    "Theek aahe… nigha lavkar.",
+    "(glances around) …Alright. Get going, quick."
+  ],
+  "r_bribe_no": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "लाच देताय? थांबा तिथेच! चला चौकीत.",
+    "Laach detay? Thamba tithech! Chala chowkit.",
+    "Offering a bribe? Stay right there! You’re coming to the chowki."
+  ],
+  "r_bribe_more": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "परत आलात? आज पाचशे लागतील.",
+    "Parat aalat? Aaj paachshe lagtil.",
+    "Back again? Today it’ll be five hundred."
+  ],
+  "r_clear": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "सगळं ठीक आहे. जा, सावकाश चालवा.",
+    "Sagla theek aahe. Ja, saavkash chalva.",
+    "All in order. Go on — drive carefully."
+  ],
+  "r_suspended": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "लायसन्स सस्पेंड आहे तुमचं! गाडी इथेच ठेवा.",
+    "Licence suspend aahe tumcha! Gaadi ithech theva.",
+    "Your licence is suspended! The vehicle stays here."
+  ],
+  "r_dues": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "तुमच्यावर चालान पेंडिंग आहेत. आधी ते भरा.",
+    "Tumchyavar challan pending aahet. Aadhi te bhara.",
+    "You’ve got challans pending. Clear those first."
+  ],
+  "r_stolen": [
+    "Traffic police",
+    "hm_omega",
+    "mr",
+    "ही गाडी तुमची नाही. चला, चौकीत चला.",
+    "Hi gaadi tumchi nahi. Chala, chowkit chala.",
+    "This vehicle isn’t yours. Come on — to the chowki."
+  ],
+  "m_spot": [
+    "Beat marshal",
+    "hm_psi",
+    "mr",
+    "ए! थांब! चोरीची गाडी आहे ती!",
+    "Ae! Thamb! Chorichi gaadi aahe ti!",
+    "Hey! Stop! That’s a stolen vehicle!"
+  ],
+  "m_spot2": [
+    "Beat marshal",
+    "hm_psi",
+    "hi",
+    "रुक जा! भागने से कुछ नहीं होगा!",
+    "Ruk ja! Bhaagne se kuch nahi hoga!",
+    "Stop! Running won’t help you!"
+  ],
+  "m_caught": [
+    "Beat marshal",
+    "hm_psi",
+    "mr",
+    "बस्स झालं. उतर खाली.",
+    "Bass jhala. Utar khali.",
+    "That’s enough. Get down."
+  ],
+  "m_lost": [
+    "Police radio",
+    "hm_psi",
+    "mr",
+    "सर, गाडी सापडली नाही. ओव्हर.",
+    "Sir, gaadi saapadli nahi. Over.",
+    "Sir, we’ve lost the vehicle. Over."
+  ],
+  "sh1": [
+    "Driver",
+    "hm_psi",
+    "hi",
+    "अरे, गाड़ी क्यों छीन रहे हो?!",
+    "Arre, gaadi kyon chheen rahe ho?!",
+    "Hey, why are you taking my vehicle?!"
+  ],
+  "sh2": [
+    "Driver",
+    "hm_omega",
+    "mr",
+    "थांबा! माझी गाडी आहे ती!",
+    "Thamba! Maazi gaadi aahe ti!",
+    "Stop! That’s my vehicle!"
+  ],
+  "sh3": [
+    "Driver",
+    "hm_psi",
+    "mr",
+    "पोलिसांना बोलावतो आता!",
+    "Police la bolavto aata!",
+    "I’m calling the police!"
+  ],
+  "sh4": [
+    "Driver",
+    "hf_alpha",
+    "mr",
+    "काय चालू आहे हे?!",
+    "Kay chalu aahe he?!",
+    "What is going on?!"
+  ],
+  "sh5": [
+    "Driver",
+    "hm_omega",
+    "hi",
+    "अबे, उतर नीचे!",
+    "Abey, utar neeche!",
+    "Hey, get down from there!"
+  ],
+  "d1": [
+    "Pedestrian",
+    "hm_psi",
+    "mr",
+    "अरे! दिसत नाही का?",
+    "Arre! Disat nahi ka?",
+    "Hey! Can’t you see?"
+  ],
+  "d2": [
+    "Pedestrian",
+    "mr3",
+    "mr",
+    "भाऊ, हळू!",
+    "Bhau, halu!",
+    "Slow down, man!"
+  ],
+  "d3": [
+    "Pedestrian",
+    "hm_omega",
+    "mr",
+    "काय रे!",
+    "Kay re!",
+    "Oi!"
+  ],
+  "d4": [
+    "Pedestrian",
+    "mr5",
+    "mr",
+    "अगं बाई! किती जोरात!",
+    "Aga bai! Kiti jorat!",
+    "Oh my god! So fast!"
+  ],
+  "h1": [
+    "Pedestrian",
+    "hm_psi",
+    "mr",
+    "हॉर्न वाजवून काय होणार आहे?",
+    "Horn vajavun kay honar aahe?",
+    "What’s honking going to do?"
+  ],
+  "h2": [
+    "Pedestrian",
+    "mr0",
+    "mr",
+    "दिसत नाही का, लोक चालतायत?",
+    "Disat nahi ka, lok chaltayt?",
+    "Can’t you see people are walking?"
+  ],
+  "h3": [
+    "Pedestrian",
+    "hm_omega",
+    "hi",
+    "हाँ हाँ, सुन लिया!",
+    "Haan haan, sun liya!",
+    "Yes, yes, I heard you!"
+  ],
+  "h4": [
+    "Pedestrian",
+    "mr8",
+    "mr",
+    "काय घाई आहे एवढी?",
+    "Kay ghai aahe evdhi?",
+    "What’s the big hurry?"
+  ],
+  "f1": [
+    "Pedestrian",
+    "hm_psi",
+    "mr",
+    "ए! पाडलं मला! डोळे आहेत का?",
+    "Ae! Padla mala! Dole aahet ka?",
+    "Hey! You knocked me down! Got eyes?"
+  ],
+  "f2": [
+    "Pedestrian",
+    "hm_omega",
+    "mr",
+    "थांब तू! बघतोच तुला!",
+    "Thamb tu! Baghtoch tula!",
+    "Wait right there! I’ll show you!"
+  ],
+  "f3": [
+    "Pedestrian",
+    "mr6",
+    "mr",
+    "अगं आई गं! कोण चालवतंय हे?",
+    "Aga aai ga! Kon chalavtay he?",
+    "Oh god! Who’s driving this thing?"
+  ],
+  "c1": [
+    "Bystander",
+    "hm_omega",
+    "mr",
+    "अरे, काय झालं? ॲक्सिडेंट झाला का?",
+    "Arre, kay jhala? Accident jhala ka?",
+    "What happened? Was there an accident?"
+  ],
+  "c2": [
+    "Bystander",
+    "hm_psi",
+    "mr",
+    "व्हिडिओ काढ, व्हिडिओ!",
+    "Video kadh, video!",
+    "Film it, film it!"
+  ],
+  "c3": [
+    "Bystander",
+    "mr2",
+    "mr",
+    "पाणी द्या रे त्याला कोणीतरी.",
+    "Paani dya re tyala konitari.",
+    "Someone give him some water."
+  ],
+  "c4": [
+    "Bystander",
+    "hm_omega",
+    "hi",
+    "पकड़ो इसको! भागने मत देना!",
+    "Pakdo isko! Bhaagne mat dena!",
+    "Grab him! Don’t let him get away!"
+  ],
+  "b1": [
+    "Pedestrian",
+    "hm_psi",
+    "mr",
+    "धक्का का मारतोयस?",
+    "Dhakka ka maartoys?",
+    "Why are you shoving me?"
+  ],
+  "b2": [
+    "Pedestrian",
+    "mr4",
+    "mr",
+    "सॉरी तरी बोल!",
+    "Sorry tari bol!",
+    "At least say sorry!"
+  ],
+  "b3": [
+    "Pedestrian",
+    "hm_omega",
+    "hi",
+    "देख के चल, भाई!",
+    "Dekh ke chal, bhai!",
+    "Watch where you’re going, man!"
+  ],
+  "tow": [
+    "Towing van",
+    "hm_psi",
+    "mr",
+    "नो पार्किंग! उचला रे गाडी.",
+    "No parking! Uchla re gaadi.",
+    "No parking! Lift it, boys."
+  ],
+  "stop_wave.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "ए भाऊ! थांबा जरा, बाजूला घ्या.",
+    "Ae bhau! Thamba jara, baajula ghya.",
+    "Hey! Stop there, pull over."
+  ],
+  "stop_wave.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "रुको! साइड में लगाओ गाड़ी.",
+    "Ruko! Side mein lagao gaadi.",
+    "Stop! Pull over to the side."
+  ],
+  "stop_signal.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "लाल दिवा दिसला नाही का? कागदपत्रं काढा.",
+    "Laal diva disla naahi ka? Kaagadpatra kaadha.",
+    "Didn't you see the red light? Papers out."
+  ],
+  "stop_signal.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "सिग्नल लाल था, भाई साहब. लाइसेंस दिखाओ.",
+    "Signal laal tha, bhai saab. Licence dikhao.",
+    "The signal was red, sir. Show me your licence."
+  ],
+  "stop_helmet.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "डोकं एकच आहे ना? हेल्मेट घाला!",
+    "Doka ekach aahe na? Helmet ghaala!",
+    "You've only got one head, right? Wear a helmet!"
+  ],
+  "stop_helmet.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "हेल्मेट घर पे भूल आए क्या?",
+    "Helmet ghar pe bhool aaye kya?",
+    "Forgot your helmet at home, did you?"
+  ],
+  "stop_wrong.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "उलटं कुठे निघालात? हा रस्ता एकेरी आहे.",
+    "Ulta kuthe nighaalat? Ha rasta ekeri aahe.",
+    "Where are you going the wrong way? This street is one-way."
+  ],
+  "stop_wrong.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "रॉन्ग साइड! चलान बनेगा.",
+    "Wrong side! Challan banega.",
+    "Wrong side! That's a challan."
+  ],
+  "stop_speed.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "हा हायवे नाही, शहर आहे. हळू चालवा.",
+    "Ha highway naahi, shahar aahe. Halu chaalva.",
+    "This isn't a highway, it's the city. Drive slowly."
+  ],
+  "stop_speed.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "इतनी जल्दी किस बात की है?",
+    "Itni jaldi kis baat ki hai?",
+    "What's the big rush?"
+  ],
+  "stop_horn.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "इथे सायलेन्स झोन आहे, पाटी वाचली नाही का?",
+    "Ithe silence zone aahe, paati vaachli naahi ka?",
+    "This is a silence zone, didn't you read the board?"
+  ],
+  "stop_horn.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "अस्पताल है यहाँ! हॉर्न बंद करो.",
+    "Aspataal hai yahaan! Horn band karo.",
+    "There's a hospital here! Stop honking."
+  ],
+  "stop_check.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "चेकिंग चालू आहे. लायसन्स, आरसी दाखवा.",
+    "Checking chaalu aahe. Licence, RC daakhva.",
+    "Routine check. Licence and RC, please."
+  ],
+  "stop_check.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "नाकाबंदी है. कागज़ात दिखाइए.",
+    "Naakaabandi hai. Kaagzaat dikhaaiye.",
+    "Checkpoint. Papers, please."
+  ],
+  "stop_ignored.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "पळतोस काय? गाडीचा नंबर आहे माझ्याकडे!",
+    "Paltos kaay? Gaadicha number aahe maazhyakade!",
+    "Running away? I've got your number!"
+  ],
+  "stop_ignored.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "भाग के कहाँ जाओगे? नंबर नोट हो गया!",
+    "Bhaag ke kahaan jaaoge? Number note ho gaya!",
+    "Where will you run to? Your number's noted!"
+  ],
+  "r_pay.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "पावती घ्या. पुन्हा असं नको.",
+    "Paavti ghya. Punha asa nako.",
+    "Here's your receipt. Don't do it again."
+  ],
+  "r_pay.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "ठीक है, जाइए. ध्यान से चलाना.",
+    "Theek hai, jaaiye. Dhyaan se chalaana.",
+    "Alright, go. Drive carefully."
+  ],
+  "r_plead_ok.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "चला, आज सोडतो. पण शेवटची वेळ.",
+    "Chala, aaj sodto. Pan shevatchi vel.",
+    "Alright, I'll let you off today. Last time, though."
+  ],
+  "r_plead_ok.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "अच्छा, इस बार छोड़ रहा हूँ.",
+    "Achha, is baar chhod raha hoon.",
+    "Fine, I'm letting you go this time."
+  ],
+  "r_plead_no.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "रोज हीच कहाणी ऐकतो मी. दंड भरा.",
+    "Roj hich kahaani aikto mi. Dand bhara.",
+    "I hear the same story every day. Pay the fine."
+  ],
+  "r_plead_no.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "माफ़ी नहीं, चलान.",
+    "Maafi nahin, challan.",
+    "No excuses. Challan."
+  ],
+  "r_argue_ok.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "बरोबर आहे तुमचं. जा तुम्ही.",
+    "Barobar aahe tumcha. Ja tumhi.",
+    "You're right. Off you go."
+  ],
+  "r_argue_ok.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "ठीक है, ठीक है, निकलो.",
+    "Theek hai, theek hai, niklo.",
+    "OK, OK, get going."
+  ],
+  "r_argue_no.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "मला कायदा शिकवू नका. दंड भरा.",
+    "Mala kaayda shikvu naka. Dand bhara.",
+    "Don't teach me the law. Pay the fine."
+  ],
+  "r_argue_no.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "ज़्यादा बहस मत करो, सब भरना पड़ेगा.",
+    "Zyaada behas mat karo, sab bharna padega.",
+    "Don't argue. You'll have to pay it all."
+  ],
+  "r_clear.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "सगळं बरोबर आहे. जा.",
+    "Sagla barobar aahe. Ja.",
+    "Everything's in order. Go."
+  ],
+  "r_clear.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "सब ठीक है, जाइए.",
+    "Sab theek hai, jaaiye.",
+    "All fine, carry on."
+  ],
+  "r_bribe_ok.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "कोणी बघितलं नाही ना? निघा.",
+    "Koni baghitla naahi na? Nigha.",
+    "Nobody saw, right? Go."
+  ],
+  "r_bribe_ok.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "ठीक है... चलो, निकलो.",
+    "Theek hai... chalo, niklo.",
+    "Alright... go on, get out of here."
+  ],
+  "r_bribe_no.1": [
+    "Traffic police",
+    "hm_psi",
+    "mr",
+    "पैसे देताय मला? चला चौकीत!",
+    "Paise detay mala? Chala chowkit!",
+    "You're offering me money? To the chowki!"
+  ],
+  "r_bribe_no.2": [
+    "Traffic police",
+    "hm_omega",
+    "hi",
+    "रिश्वत? अब तो अंदर जाओगे.",
+    "Rishwat? Ab to andar jaaoge.",
+    "A bribe? Now you're going inside."
+  ]
 }

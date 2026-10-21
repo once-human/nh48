@@ -12,6 +12,12 @@ import * as THREE from 'three';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { clamp, wrapAngle, RNG, safeStorage, fmtRupees } from '../core/util.js';
 import LINES from './lines.json';
+import STREET from './street_lines.json';
+// street people's lines, flattened to the same shape as lines.json: [label, voice, lang, text, roman, english]
+for (const [pid, P] of Object.entries(STREET._personas)) {
+  for (const [sc, arr] of Object.entries(STREET[pid] || {})) arr.forEach(([deva, roman, en], i) => { LINES[`s_${pid}_${sc}${i}`] = [P.label, P.voice, P.lang, deva, roman, en]; });
+}
+export { STREET };
 
 export const FINES = {
   signal:    { amt: 500, repeat: 1500, name: 'Jumping a red signal', law: 'MV Act s.177/184' },
@@ -309,8 +315,7 @@ export class Police {
     // what the officer finds once he looks at you
     if (stolen && s.kind !== 'theft') { s.kind = 'theft'; s.fine = FINES.theft.amt; }
     else if (this.suspended && s.kind !== 'theft') { s.found = 'suspended'; if (s.kind === 'check') { s.kind = 'suspended'; s.fine = 0; } }
-    const line = STOP_LINE[s.kind] || 'stop_check';
-    this.say(line, cop);
+    const line = this.say(STOP_LINE[s.kind] || 'stop_check', cop) || 'stop_check';
     const dues = this.duesTotal;
     const total = s.fine + (s.found === 'suspended' ? FINES.suspended.amt : 0);
     s.total = total;
@@ -409,7 +414,7 @@ export class Police {
       if (s.cop.ped) s.phase = 'leave'; else this.stop = null;
       return;
     }
-    if (line) this.say(line, cop);
+    if (line) line = this.say(line, cop) || line;
     s.phase = 'result'; s.t = 0;
     G.hud.stopResult(res, sub, kind, LINES[line] ? LINES[line][4] : '', LINES[line] ? LINES[line][5] : '');
     this.save(); G.saveStats();
@@ -575,6 +580,8 @@ export class Police {
 
   // ---------------------------------------------------------------- voices
   say(id, who, radio = false) {
+    // police lines have variants (id, id.1, id.2): pick one so the same stop doesn't sound canned
+    if (LINES[id + '.1']) { const n = LINES[id + '.2'] ? 3 : 2, k = Math.floor(this.rng.next() * n); if (k) id = id + '.' + k; }
     const L = LINES[id];
     if (!L) return;
     const G = this.g, P = G.player;
@@ -587,6 +594,7 @@ export class Police {
     }
     G.audio.voice(id, vol, pan, radio);
     G.hud.say(L[0] === 'Traffic police' && who && who.name ? who.name : L[0], L[4], L[5], 4.2);
+    return id;
   }
   markers() {
     const out = [];

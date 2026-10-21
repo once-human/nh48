@@ -443,7 +443,8 @@ export class Pilot {
     H.holder.position.set(x, this.W.surf.height(x, z), z);
     this.scene.add(H.holder);
     H.play('no', { fade: 0.1 });
-    if (this.speak) this.speak(this.rng.pick(['sh1', 'sh2', 'sh3', 'sh4', 'sh5']), { x, z });
+    if (this.speakAs) this.speakAs('carjack', { x, z, female: look.female, persona: look.female ? this.rng.pick(['kaku', 'tai', 'aunty', 'collegegirl']) : this.rng.pick(['kaka', 'dada', 'bhaiya', 'collegeboy']) });
+    else if (this.speak) this.speak(this.rng.pick(['sh1', 'sh2', 'sh3', 'sh4', 'sh5']), { x, z });
     else { const [line, tr] = this.rng.pick(SHOUTS); this.hud?.say('Driver', line, tr, 3.6); }
     this.npcs.push({ H, x, z, t: 0, yaw: Math.atan2(this.foot.z - z, this.foot.x - x) });
   }

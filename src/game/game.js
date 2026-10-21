@@ -89,6 +89,7 @@ export class Game {
     this.police = new Police(this);
     player.onRelease = (d) => this.police.release(d);
     player.speak = (id, src) => this.police.say(id, src);
+    player.speakAs = (sc, who) => { this.people.lineT = 0; return this.people.speakAs(sc, who, 1, 4); };
     this.people.say = (id, src) => this.police.say(id, src);
     this.buildLightPools();
     const parked = buildParked(W, this.scene, this.vmats, this.quality);
@@ -368,8 +369,9 @@ export class Game {
       if (ev.type === 'hit') { this.audio.crash(Math.min(1, ev.speed / 6)); }
       if (ev.type === 'knock') { this.audio.crash(0.7); this.hud.toast('You knocked over a two-wheeler', 'They’re fine. Very, very angry, but fine.', 'warn', 2.6); }
       if (ev.type === 'pedHit') { this.audio.thud(0.4); this.hud.toast('Watch the pedestrians!', 'They’re fine, just furious', 'warn', 2.4); this.stats.money = Math.max(0, this.stats.money - 50); }
-      if (ev.type === 'dodge') { if (this.rng.chance(0.35) && (this._dodgeT || 0) < this.t) { this._dodgeT = this.t + 4; this.police.say(this.rng.pick(['d1', 'd2', 'd3', 'd4']), ev); } }
+      if (ev.type === 'dodge') { if (this.rng.chance(0.35) && (this._dodgeT || 0) < this.t) { this._dodgeT = this.t + 4; if (!(ev.p && this.people.speakAs('dodge', ev.p, 1, 4))) this.police.say(this.rng.pick(['d1', 'd2', 'd3', 'd4']), ev); } }
       if (ev.type === 'recovered') this.hud.toast('Back on three wheels', '', 'info', 1.6);
+      if ((ev.type === 'jump' && this.rng.chance(0.3)) || ev.type === 'climb') this.people.onStunt(P);
       if (ev.type === 'gotHit') { this.audio.thud(0.6); this.rig.shake(0.4); this.hud.toast('Knocked down', 'Traffic doesn\u2019t stop for pedestrians here. Stay on the footpath.', 'bad', 3); }
       if (ev.type === 'carjack') { this.audio.crash(0.2); }
       if (ev.type === 'exit' && this.state === 'play' && (this._parkHintT || 0) < this.t && this.W.surf.isRoad(P.cur.x, P.cur.z)) {

@@ -5,6 +5,12 @@
 import * as THREE from 'three';
 import { ColorBuilder, lin } from '../world/geo.js';
 import { RNG, clamp, lerp, wrapAngle } from '../core/util.js';
+import STREET from '../game/street_lines.json';
+// who someone is decides how they talk: a Marathi kaka, a Hindi-speaking delivery bhaiya, a
+// Hinglish college kid, a kaku with her vegetables, an aaji... (src/game/street_lines.json)
+const PERSONA_M = ['kaka', 'ajoba', 'dada', 'bhaiya', 'collegeboy'], PERSONA_F = ['kaku', 'aaji', 'tai', 'aunty', 'collegegirl'];
+const PERSONA_W = { kaka: 3, ajoba: 1.2, dada: 3, bhaiya: 2, collegeboy: 2, kaku: 3, aaji: 1.2, tai: 3, aunty: 1.6, collegegirl: 2 };
+const OLD = new Set(['ajoba', 'aaji']);
 
 const SKINS = [[0.78, 0.6, 0.47], [0.69, 0.5, 0.37], [0.6, 0.43, 0.31], [0.52, 0.36, 0.26], [0.45, 0.31, 0.22], [0.82, 0.66, 0.53]];
 const SHIRTS = [[0.95, 0.95, 0.93], [0.42, 0.6, 0.85], [0.85, 0.3, 0.28], [0.2, 0.24, 0.36], [0.95, 0.84, 0.48], [0.3, 0.55, 0.36], [0.62, 0.22, 0.52],
@@ -133,6 +139,39 @@ export class People {
     this.lineT = 5;
     this.say(ids[Math.floor(this.rng.next() * ids.length)], src);
   }
+  // a line for this situation in this person's own voice (the speaker is always the one who talks)
+  speakAs(scenario, p, chance = 1, cool = 5) {
+    if (!this.say || !p || this.lineT > 0 || this.rng.next() > chance) return false;
+    let per = p.persona;
+    if (!per || !STREET[per]) per = p.persona = this.pickPersona(p.female, p.x, p.z);
+    const arr = STREET[per][scenario] || STREET[per][scenario === 'carjack' ? 'fall' : 'dodge'];
+    if (!arr || !arr.length) return false;
+    // don't repeat the last line this persona said
+    let i = Math.floor(this.rng.next() * arr.length);
+    const key = per + scenario;
+    this.lastLine = this.lastLine || {};
+    if (arr.length > 1 && this.lastLine[key] === i) i = (i + 1) % arr.length;
+    this.lastLine[key] = i;
+    this.lineT = cool;
+    this.say(`s_${per}_${scenario}${i}`, p);
+    return true;
+  }
+  // more college kids round the colleges and cafes, more kakas and aajis in the peths
+  pickPersona(female, x, z) {
+    const list = female ? PERSONA_F : PERSONA_M;
+    const o = {}; const a = this.act ? this.act.at(x, z, o) : 0;
+    const c = this.act && this.act.map.get(Math.floor(x / this.act.cell) + ',' + Math.floor(z / this.act.cell));
+    const edu = c ? c.v[this.act.cls.indexOf('edu')] || 0 : 0, peth = c && c.peth;
+    let tot = 0; const w = list.map(id => {
+      let v = PERSONA_W[id];
+      if (/college/.test(id)) v *= 1 + Math.min(3, edu / 8) + (o.night || 0) * 2;
+      if (peth && (id === 'kaka' || id === 'kaku' || OLD.has(id))) v *= 1.8;
+      tot += v; return v;
+    });
+    let r = this.rng.next() * tot;
+    for (let k = 0; k < list.length; k++) { r -= w[k]; if (r <= 0) return list[k]; }
+    return list[0];
+  }
 
   // ---------------------------------------------------------------- spawning
   sidewalkLat(e, side) {
@@ -185,6 +224,15 @@ export class People {
       p.skin = [p.look.skin.r, p.look.skin.g, p.look.skin.b];
     }
     p.idle = r.pick(['idle', 'idle', 'phone', 'talk', 'arms_folded']);
+    if (!kid && !opts.pax) {
+      this.g.at(e, s, TMP); p.persona = this.pickPersona(female, TMP[0], TMP[1]);
+      // they look their age: grey hair for the old, beards on some kakas, jeans on the college crowd
+      if (p.look) {
+        if (OLD.has(p.persona)) { p.look.hair = new THREE.Color(r.pick([0xb8b2aa, 0xd6d2cc, 0x8e8984])).convertSRGBToLinear(); p.look.scale *= 0.97; p.speed *= 0.75; if (!female) p.look.beard = r.chance(0.4); }
+        else if (p.persona === 'kaka') p.look.beard = r.chance(0.45);
+        else if (/college/.test(p.persona)) p.look.beard = !female && r.chance(0.2);
+      }
+    }
     p.latT = p.lat;
     if (p.mode === 'stand') p.wait = r.range(20, 80);
     this.place(p);
@@ -278,6 +326,7 @@ export class People {
       if (p && this.rng.chance(0.18 + 0.55 * this.nightHere)) { p.mode = 'stand'; p.wait = this.rng.range(15, 90) * (1 + this.nightHere * 2); }
     }
     if ((this.venueT = (this.venueT || 0) - dt) <= 0) { this.venueT = 0.7; this.venueCrowds(px, pz, avoidView); }
+    this.talkTick(dt, player);
     const pv = Math.abs(player.v);
     const phx = Math.cos(player.th), phz = Math.sin(player.th);
     this.lineT -= dt;
@@ -304,7 +353,7 @@ export class People {
       p.fallen -= dt;
       if (p.fallen <= 0) {
         p.wave = 0; p.angry = 4;
-        if (Math.hypot(p.x - player.x, p.z - player.z) < 30) { this.lineT = 0; this.speak(['f1', 'f2', 'f3'], p); }
+        if (Math.hypot(p.x - player.x, p.z - player.z) < 30) { this.lineT = 0; this.speakAs('fall', p); }
       }
       return;
     }
@@ -537,6 +586,42 @@ export class People {
     }
     return best;
   }
+  // ---------------------------------------------------------------- talk
+  // people say hello when you walk past slowly, and you overhear the ones standing around
+  talkTick(dt, P) {
+    this.chatT = (this.chatT ?? 12) - dt;
+    if (P.onFoot && P.v < 2.6) {
+      for (const p of this.list) {
+        if (p.greeted || p.pax || p.cop || p.hidden || p.fallen > 0 || p.ctl || p.kid) continue;
+        const dx = p.x - P.x, dz = p.z - P.z;
+        if (Math.abs(dx) > 2.4 || Math.abs(dz) > 2.4 || Math.hypot(dx, dz) > 2.2) continue;
+        p.greeted = true;
+        if (this.rng.next() < 0.3 && this.speakAs('greet', p, 1, 6)) { p.react = 2.4; p.reactAt = { x: P.x, z: P.z }; p.reactAnim = 'talk'; }
+        break;
+      }
+    }
+    if (this.chatT <= 0) {
+      this.chatT = this.rng.range(14, 32);
+      if (Math.abs(P.v) > 6) return;
+      let best = null, bd = 16;
+      for (const p of this.list) {
+        if (p.pax || p.cop || p.hidden || p.kid || !(p.mode === 'stand' || p.venue)) continue;
+        const d = Math.hypot(p.x - P.x, p.z - P.z);
+        if (d < bd && d > 2) { bd = d; best = p; }
+      }
+      if (best) this.speakAs('chat', best, 1, 7);
+    }
+  }
+  // you jumped or climbed a wall in front of people
+  onStunt(P) {
+    let best = null, bd = 13;
+    for (const p of this.list) {
+      if (p.pax || p.cop || p.hidden || p.kid || p.fallen > 0) continue;
+      const d = Math.hypot(p.x - P.x, p.z - P.z);
+      if (d < bd) { bd = d; best = p; }
+    }
+    if (best && this.speakAs('stunt', best, 0.7, 6)) { best.react = 2.2; best.reactAt = { x: P.x, z: P.z }; best.reactAnim = 'no'; }
+  }
   // ---------------------------------------------------------------- reactions
   // the player honked: people ahead stop and glare; crossers hurry
   onHorn(P) {
@@ -551,7 +636,7 @@ export class People {
       if (p.mode === 'cross') { p.hurry = true; p.speed = Math.max(p.speed, 1.9); }
       if (!(p.react > 0)) { p.react = 2.2; p.reactAt = { x: P.x, z: P.z }; p.reactAnim = 'no'; any = p; }
     }
-    if (any) this.speak(['h1', 'h2', 'h3', 'h4'], any, 0.35);
+    if (any) this.speakAs('honk', any, 0.4);
   }
   // something happened at (x, z): people nearby come and stand around, some filming it
   gather(x, z, n = 5) {
@@ -570,7 +655,7 @@ export class People {
         q.anim = this.rng.pick(['arms_folded', 'phone', 'phone', 'talk', 'idle']);
       }, true);
     });
-    if (c.length) setTimeout(() => this.speak(['c1', 'c2', 'c3', 'c4'], c[0][1], 0.9), 1600);
+    if (c.length) setTimeout(() => this.speakAs('crowd', c[0][1], 0.9), 1600);
   }
   // you, on foot, walking into people
   bumpPlayer(P) {
@@ -586,7 +671,7 @@ export class People {
       if (P.v > 2.4 && !(p.bumpT > 0)) {
         p.bumpT = 3; p.react = 1.4; p.reactAt = { x: P.x, z: P.z }; p.reactAnim = 'hit';
         if (P.v > 5.2 && !p.cop) { p.fallen = 2.4; this.events.push({ type: 'pedBumped', p, x: p.x, z: p.z }); }
-        else this.speak(['b1', 'b2', 'b3'], p, 0.6);
+        else this.speakAs('bump', p, 0.6);
       }
     }
   }

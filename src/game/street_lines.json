@@ -1,0 +1,387 @@
+{
+  "_": "Street people by persona. Each line: [text read by the voice (Devanagari), subtitle (romanised), English]. Voice ids: s_<persona>_<scenario><index>. Personas carry the voice: Kokoro hm_omega/hm_psi (men), hf_alpha/hf_beta (women), Piper mr0..mr8 (Marathi women); pitch/tempo shape age.",
+  "_personas": {
+    "kaka":        { "label": "Kaka",         "female": false, "age": "uncle", "voice": "hm_omega", "lang": "mr", "pitch": 0.94, "tempo": 0.95 },
+    "ajoba":       { "label": "Ajoba",        "female": false, "age": "old",   "voice": "hm_omega", "lang": "mr", "pitch": 0.89, "tempo": 0.86 },
+    "dada":        { "label": "Dada",         "female": false, "age": "young", "voice": "hm_psi",   "lang": "mr", "pitch": 1.0,  "tempo": 1.06 },
+    "bhaiya":      { "label": "Bhaiya",       "female": false, "age": "adult", "voice": "hm_psi",   "lang": "hi", "pitch": 0.97, "tempo": 1.0 },
+    "collegeboy":  { "label": "College guy",  "female": false, "age": "young", "voice": "hm_omega", "lang": "hi", "pitch": 1.05, "tempo": 1.08 },
+    "kaku":        { "label": "Kaku",         "female": true,  "age": "aunty", "voice": "mr2",      "lang": "mr", "pitch": 0.93, "tempo": 0.96 },
+    "aaji":        { "label": "Aaji",         "female": true,  "age": "old",   "voice": "mr6",      "lang": "mr", "pitch": 0.87, "tempo": 0.86 },
+    "tai":         { "label": "Tai",          "female": true,  "age": "young", "voice": "mr0",      "lang": "mr", "pitch": 1.0,  "tempo": 1.02 },
+    "aunty":       { "label": "Aunty",        "female": true,  "age": "aunty", "voice": "hf_alpha", "lang": "hi", "pitch": 0.93, "tempo": 0.95 },
+    "collegegirl": { "label": "College girl", "female": true,  "age": "young", "voice": "hf_beta",  "lang": "hi", "pitch": 1.04, "tempo": 1.07 }
+  },
+
+  "kaka": {
+    "dodge": [
+      ["अरे अरे! गाडी आहे की विमान?", "Arre arre! Gaadi aahe ki vimaan?", "Hey, hey! Is that a vehicle or a plane?"],
+      ["डोळे उघडे ठेवून चालव रे!", "Dole ughde thevun chalav re!", "Drive with your eyes open!"],
+      ["सावकाश रे बाबा, घरी कोणीतरी वाट बघतंय.", "Saavkash re baba, ghari konitari vaat baghtay.", "Slowly, son. Someone's waiting for you at home."]
+    ],
+    "honk": [
+      ["हॉर्न वाजवून रस्ता मोठा होणार आहे का?", "Horn vajavun rasta motha honar aahe ka?", "Will honking make the road any wider?"],
+      ["ऐकू येतंय रे, बहिरा नाहीये मी.", "Aiku yetay re, bahira naahiye mi.", "I can hear you. I'm not deaf."],
+      ["थांब जरा, कुठे आग लागलीये?", "Thamb jara, kuthe aag laagliye?", "Hold on. Where's the fire?"]
+    ],
+    "fall": [
+      ["आई गं! कंबर गेली माझी!", "Aai ga! Kambar geli maazi!", "Ow! My back's gone!"],
+      ["थांब! नंबर लिहून घेतो तुझा!", "Thamb! Number lihun gheto tuza!", "Stop! I'm taking down your number!"],
+      ["अरे, माणूस आहे मी, खांब नाही!", "Arre, maanus aahe mi, khaamb naahi!", "I'm a person, not a lamp post!"]
+    ],
+    "bump": [
+      ["धक्का कशाला मारतोस? जागा आहे ना!", "Dhakka kashala maartos? Jaaga aahe na!", "Why shove? There's room!"],
+      ["अरे, सॉरी तरी म्हण की.", "Arre, sorry tari mhan ki.", "At least say sorry."]
+    ],
+    "crowd": [
+      ["काय झालं? कोणाला लागलं का?", "Kaay jhaala? Konala laagla ka?", "What happened? Is anyone hurt?"],
+      ["पोलिसांना फोन करा रे कोणीतरी.", "Polisanna phone kara re konitari.", "Someone call the police."]
+    ],
+    "carjack": [
+      ["अरे! माझी गाडी! चोर! चोर!", "Arre! Maazi gaadi! Chor! Chor!", "Hey! My vehicle! Thief! Thief!"],
+      ["थांब रे! अजून हप्ते बाकी आहेत तिचे!", "Thamb re! Ajun hapte baaki aahet tiche!", "Stop! I'm still paying the instalments on it!"]
+    ],
+    "greet": [
+      ["काय, कसं काय?", "Kaay, kasa kaay?", "So, how's it going?"],
+      ["नमस्कार. आज गर्दी फार आहे, नाही?", "Namaskar. Aaj gardi phaar aahe, naahi?", "Hello. Big crowd today, isn't it?"]
+    ],
+    "stunt": [
+      ["हे काय सर्कस चाललीये का?", "He kaay circus chaaliye ka?", "What is this, a circus?"],
+      ["पडशील रे, हात-पाय मोडून घेशील.", "Padshil re, haat-paay modun gheshil.", "You'll fall and break your arms and legs."]
+    ],
+    "chat": [
+      ["पेट्रोल परत महाग झालं, ऐकलं का?", "Petrol parat mahaag jhaala, aikla ka?", "Petrol's gone up again, did you hear?"],
+      ["आमच्या सोसायटीत दोन दिवस पाणीच आलं नाही.", "Aamchya society-t don divas paanich aala naahi.", "No water in our society for two days."],
+      ["मेट्रो झाली, पण ट्रॅफिक तसंच आहे.", "Metro jhaali, pan traffic tasach aahe.", "The metro's here, but the traffic's the same."],
+      ["संध्याकाळी बाकरवडी आणायचीये, घरी संपली.", "Sandhyakali bakarwadi aanaychiye, ghari sampli.", "Need to buy bakarwadi this evening, we're out at home."]
+    ]
+  },
+
+  "ajoba": {
+    "dodge": [
+      ["आमच्या वेळी लोक सायकल पण नीट चालवायचे.", "Aamchya veli lok cycle pan neet chaalvaayche.", "In my day people rode even bicycles properly."],
+      ["वेग कमी कर, यमराजाला काही घाई नाहीये.", "Veg kami kar, Yamrajala kaahi ghaai naahiye.", "Slow down. Yama isn't in any hurry."]
+    ],
+    "honk": [
+      ["हॉर्न फुकट आहे म्हणून वाजवतोस का?", "Horn phukat aahe mhanun vaajavtos ka?", "Honking because it's free, are you?"],
+      ["शांतता! इथे माणसं राहतात.", "Shaantata! Ithe maansa raahtaat.", "Quiet! People live here."]
+    ],
+    "fall": [
+      ["अरे देवा! या वयात हेच बघायचं राहिलं होतं.", "Arre deva! Ya vayaat hech baghaycha raahila hota.", "Oh God! At my age, this was all that was left to see."],
+      ["आधी उचल मला, मग पळ.", "Aadhi uchal mala, mag pal.", "Pick me up first, then run."]
+    ],
+    "bump": [
+      ["रांगेत चला, हे पुणं आहे.", "Raangeta chala, he Puna aahe.", "Walk in line. This is Pune."],
+      ["धक्काबुक्की करायला ही मुंबईची लोकल नाही.", "Dhakkabukki karayla hi Mumbaichi local naahi.", "This isn't a Mumbai local train for shoving."]
+    ],
+    "crowd": [
+      ["आजकालची पिढी! काही खरं नाही.", "Aajkaalchi pidhi! Kaahi khara naahi.", "Today's generation! Hopeless."],
+      ["उगीच बघत उभे राहू नका, पाणी आणा कोणीतरी.", "Ugich baghat ubhe raahu naka, paani aana konitari.", "Don't just stand there staring. Someone bring water."]
+    ],
+    "carjack": [
+      ["अरे चोरा! माझी गाडी! पोलीस कुठे आहेत?", "Arre chora! Maazi gaadi! Police kuthe aahet?", "You thief! My vehicle! Where are the police?"]
+    ],
+    "greet": [
+      ["काय रे, जेवलास का?", "Kaay re, jevlaas ka?", "Well, have you eaten?"],
+      ["दुपारी एक ते चार झोपेची वेळ, लक्षात ठेव.", "Dupaari ek te chaar jhopechi vel, lakshaat thev.", "One to four in the afternoon is nap time. Remember that."]
+    ],
+    "stunt": [
+      ["माकडासारख्या उड्या मारू नकोस.", "Maakdaasarkhya udya maaru nakos.", "Stop jumping around like a monkey."],
+      ["भिंतीवरून नाही, दारातून ये!", "Bhintivarun naahi, daaratun ye!", "Not over the wall. Come in through the gate!"]
+    ],
+    "chat": [
+      ["दुपारी एक ते चार दुकान बंद, हा नियम आहे.", "Dupaari ek te chaar dukaan band, ha niyam aahe.", "Shop shuts from one to four. That's the rule."],
+      ["पूर्वी इथे सगळी शेतं होती.", "Poorvi ithe sagli sheta hoti.", "All of this used to be fields."],
+      ["हल्ली कोणी पत्र लिहीत नाही.", "Halli koni patra lihit naahi.", "Nobody writes letters any more."]
+    ]
+  },
+
+  "dada": {
+    "dodge": [
+      ["ए भावा! हळू की!", "Ae bhaava! Halu ki!", "Hey, bro! Slow down!"],
+      ["काय रे, रेस लावलीये का?", "Kaay re, race laavliye ka?", "What, are you racing someone?"]
+    ],
+    "honk": [
+      ["हो रे, ऐकलं! जा पुढे.", "Ho re, aikla! Ja pudhe.", "Yeah, heard you! Go on."],
+      ["हॉर्न नको वाजवू, डोकं दुखतंय.", "Horn nako vaajavu, doka dukhtay.", "Don't honk, my head hurts."]
+    ],
+    "fall": [
+      ["ए! पाडलं मला! थांब तिथेच!", "Ae! Paadla mala! Thamb tithech!", "Hey! You knocked me down! Stay right there!"],
+      ["भाऊ, नवीन फोन होता माझा!", "Bhau, navin phone hota maaza!", "Bro, that was my new phone!"]
+    ],
+    "bump": [
+      ["काय रे, दिसत नाही का?", "Kaay re, disat naahi ka?", "What, can't you see?"],
+      ["भिडायचंय का?", "Bhidaaychay ka?", "Looking for a fight?"]
+    ],
+    "crowd": [
+      ["व्हिडिओ काढ, व्हिडिओ! इन्स्टावर टाकू.", "Video kaadh, video! Insta-var taaku.", "Film it, film it! We'll put it on Insta."],
+      ["अरे, ॲक्सिडेंट झाला वाटतं.", "Arre, accident jhaala vaatta.", "Looks like there's been an accident."]
+    ],
+    "carjack": [
+      ["ए! माझी बाईक! थांब!", "Ae! Maazi bike! Thamb!", "Hey! My bike! Stop!"],
+      ["थांब रे! पोलिसांना कॉल करतोय मी.", "Thamb re! Polisanna call kartoy mi.", "Stop! I'm calling the cops."]
+    ],
+    "greet": [
+      ["काय भाऊ, काय चाललंय?", "Kaay bhau, kaay chaallay?", "What's up, bro?"],
+      ["चहा घ्यायचा का? अमृततुल्य इथेच आहे.", "Chaha ghyaycha ka? Amruttulya ithech aahe.", "Want some chai? There's an amruttulya right here."]
+    ],
+    "stunt": [
+      ["भारी रे! परत कर, व्हिडिओ काढतो.", "Bhaari re! Parat kar, video kaadhto.", "Awesome! Do it again, I'll film it."],
+      ["पार्कूर? पुण्यात?", "Parkour? Punyaat?", "Parkour? In Pune?"]
+    ],
+    "chat": [
+      ["आज संध्याकाळी मॅच आहे, कट्ट्यावर भेटू.", "Aaj sandhyakali match aahe, kattyavar bhetu.", "Match tonight, see you at the katta."],
+      ["एफसी रोडला नवीन कॅफे उघडलाय.", "FC Road-la navin cafe ughdlay.", "A new café's opened on FC Road."],
+      ["बॉसने परत शनिवारी बोलावलंय.", "Boss-ne parat shanivaari bolaavlay.", "The boss called me in on Saturday again."],
+      ["मिसळ खायला जायचं का?", "Misal khaayla jaaycha ka?", "Want to go get misal?"]
+    ]
+  },
+
+  "bhaiya": {
+    "dodge": [
+      ["अरे भाई! मार दोगे क्या?", "Arre bhai! Maar doge kya?", "Hey, brother! Trying to kill me?"],
+      ["देख के चलाओ, साहब!", "Dekh ke chalao, saab!", "Watch how you drive, sir!"]
+    ],
+    "honk": [
+      ["हाँ हाँ, जा रहा हूँ!", "Haan haan, ja raha hoon!", "Yes, yes, I'm moving!"],
+      ["इतना हॉर्न क्यों बजा रहे हो?", "Itna horn kyon baja rahe ho?", "Why all the honking?"]
+    ],
+    "fall": [
+      ["हाय राम! पैर गया मेरा!", "Haay Ram! Pair gaya mera!", "Oh God! My leg!"],
+      ["भाई, डिलीवरी लेट हो जाएगी अब!", "Bhai, delivery late ho jaayegi ab!", "Brother, now the delivery's going to be late!"]
+    ],
+    "bump": [
+      ["धक्का मत दो, भाई.", "Dhakka mat do, bhai.", "Don't push, brother."],
+      ["आराम से, भाई, आराम से.", "Aaraam se, bhai, aaraam se.", "Easy, brother, easy."]
+    ],
+    "crowd": [
+      ["अरे कोई एम्बुलेंस बुलाओ!", "Arre koi ambulance bulao!", "Someone call an ambulance!"],
+      ["क्या हुआ? कौन था?", "Kya hua? Kaun tha?", "What happened? Who was it?"]
+    ],
+    "carjack": [
+      ["अरे! मेरी गाड़ी! पकड़ो उसे!", "Arre! Meri gaadi! Pakdo use!", "Hey! My vehicle! Grab him!"],
+      ["साहब, मेरी रोज़ी-रोटी है वो!", "Saab, meri rozi-roti hai woh!", "Sir, that's how I make a living!"]
+    ],
+    "greet": [
+      ["राम राम, भाई.", "Ram Ram, bhai.", "Ram Ram, brother."],
+      ["ये पता किधर है, मालूम है?", "Ye pata kidhar hai, maaloom hai?", "Do you know where this address is?"]
+    ],
+    "stunt": [
+      ["वाह भाई, फिल्मी स्टाइल!", "Waah bhai, filmy style!", "Wow, brother, just like the movies!"]
+    ],
+    "chat": [
+      ["आज बारह डिलीवरी हो गईं.", "Aaj baarah delivery ho gayin.", "Twelve deliveries done today."],
+      ["गाँव में बारिश अच्छी हुई है.", "Gaon mein baarish achhi hui hai.", "It's rained well back in the village."],
+      ["पुणे में किराया बहुत बढ़ गया है.", "Pune mein kiraaya bahut badh gaya hai.", "Rent in Pune has really gone up."]
+    ]
+  },
+
+  "collegeboy": {
+    "dodge": [
+      ["ब्रो, व्हाट द हेल! स्लो डाउन!", "Bro, what the hell! Slow down!", "Bro, what the hell! Slow down!"],
+      ["भाई, जान लेगा क्या?", "Bhai, jaan lega kya?", "Bro, you trying to kill me?"]
+    ],
+    "honk": [
+      ["चिल कर ना, ब्रो.", "Chill kar na, bro.", "Chill, bro."],
+      ["ओके ओके, साइड दे रहा हूँ.", "Okay okay, side de raha hoon.", "OK, OK, I'm moving aside."]
+    ],
+    "fall": [
+      ["भाई! बैग में लैपटॉप है मेरा!", "Bhai! Bag mein laptop hai mera!", "Bro! My laptop's in that bag!"],
+      ["सीरियसली? ये भी होना था आज?", "Seriously? Ye bhi hona tha aaj?", "Seriously? This too, today?"]
+    ],
+    "bump": [
+      ["ओए, आराम से!", "Oye, aaraam se!", "Oi, easy!"],
+      ["भाई, थोड़ा स्पेस दे.", "Bhai, thoda space de.", "Bro, give me some space."]
+    ],
+    "crowd": [
+      ["रुक, स्टोरी पे डालता हूँ.", "Ruk, story pe daalta hoon.", "Wait, I'm putting this on my story."],
+      ["किसी को लगी तो नहीं?", "Kisi ko lagi to nahin?", "Nobody's hurt, right?"]
+    ],
+    "carjack": [
+      ["ब्रो! वो मेरी बाइक है! ईएमआई चल रही है!", "Bro! Woh meri bike hai! EMI chal rahi hai!", "Bro! That's my bike! I'm still paying the EMI!"]
+    ],
+    "greet": [
+      ["हाय! एफसी रोड किधर है?", "Hi! FC Road kidhar hai?", "Hi! Which way's FC Road?"],
+      ["सप, ब्रो?", "Sup, bro?", "Sup, bro?"]
+    ],
+    "stunt": [
+      ["भाई, ये तो रील मटेरियल है!", "Bhai, ye to reel material hai!", "Bro, that's reel material!"]
+    ],
+    "chat": [
+      ["कल सबमिशन है और मैंने शुरू भी नहीं किया.", "Kal submission hai aur maine shuru bhi nahin kiya.", "Submission's tomorrow and I haven't even started."],
+      ["इंटर्नशिप का कॉल आया, बाणेर में.", "Internship ka call aaya, Baner mein.", "Got a call for an internship, in Baner."],
+      ["वीकेंड पे सिंहगड चलें?", "Weekend pe Sinhagad chalein?", "Sinhagad this weekend?"],
+      ["यार, मेस में फिर से वही खाना.", "Yaar, mess mein phir se wahi khaana.", "Man, same food in the mess again."]
+    ]
+  },
+
+  "kaku": {
+    "dodge": [
+      ["अगं बाई! किती जोरात!", "Aga bai! Kiti joraat!", "Oh my! So fast!"],
+      ["सावकाश रे! लहान मुलं आहेत इथे.", "Saavkash re! Lahaan mula aahet ithe.", "Slowly! There are little kids here."]
+    ],
+    "honk": [
+      ["काय घाई आहे एवढी?", "Kaay ghaai aahe evdhi?", "What's the big hurry?"],
+      ["हॉर्न वाजवून काही होणार नाही, पुढे बघ.", "Horn vaajavun kaahi honaar naahi, pudhe bagh.", "Honking won't help. Look ahead."]
+    ],
+    "fall": [
+      ["अगं आई गं! भाजी सांडली सगळी!", "Aga aai ga! Bhaaji saandli sagli!", "Oh, Mother! All my vegetables are on the road!"],
+      ["कोण चालवतंय हे? घरी आई-बाप नाहीत का?", "Kon chaalavtay he? Ghari aai-baap naahit ka?", "Who's driving this? Don't you have parents at home?"]
+    ],
+    "bump": [
+      ["जरा बघून चाल ना.", "Jara baghun chaal na.", "Watch where you're walking."],
+      ["धक्का का मारतोस? पिशवी पडली ना!", "Dhakka ka maartos? Pishvi padli na!", "Why push? Now my bag's fallen!"]
+    ],
+    "crowd": [
+      ["अरे देवा, पाणी द्या रे त्याला.", "Arre deva, paani dya re tyala.", "Oh God, someone give him water."],
+      ["मी बघितलं, तो फार जोरात होता.", "Mi baghitla, to phaar joraat hota.", "I saw it. He was going way too fast."]
+    ],
+    "carjack": [
+      ["अहो! माझी स्कूटी! कोणीतरी थांबवा त्याला!", "Aho! Maazi scooty! Konitari thaambva tyala!", "Hey! My scooty! Someone stop him!"]
+    ],
+    "greet": [
+      ["काय रे बाळा, कुठे चाललास?", "Kaay re baala, kuthe chaallas?", "Where are you off to, dear?"],
+      ["मंडईत आज मटार स्वस्त आहे.", "Mandait aaj mataar swasta aahe.", "Peas are cheap at the market today."]
+    ],
+    "stunt": [
+      ["अरे पडशील! तुझ्या आईला सांगेन मी.", "Arre padshil! Tujhya aaila saangen mi.", "You'll fall! I'm telling your mother."]
+    ],
+    "chat": [
+      ["कुकरच्या चार शिट्ट्या झाल्या तरी डाळ शिजली नाही.", "Kukarchya chaar shittya jhaalya tari daal shijli naahi.", "Four whistles from the cooker and the dal still isn't done."],
+      ["मंडईत कोथिंबीर पन्नास रुपये जुडी!", "Mandait kothimbir pannaas rupaye judi!", "Fifty rupees a bunch for coriander at the market!"],
+      ["संध्याकाळी भिशीला जायचंय.", "Sandhyakali bhishila jaaychay.", "I've got my kitty-party this evening."]
+    ]
+  },
+
+  "aaji": {
+    "dodge": [
+      ["अरे देवा! हळू रे बाळा.", "Arre deva! Halu re baala.", "Oh God! Slowly, child."]
+    ],
+    "honk": [
+      ["हो रे बाबा, जाते, जाते.", "Ho re baaba, jaate, jaate.", "Yes, yes, I'm going, I'm going."]
+    ],
+    "fall": [
+      ["आई गं! हाड मोडलं माझं!", "Aai ga! Haad modla maaza!", "Ow! I've broken a bone!"],
+      ["देव तुझं भलं करो... पण हळू चालव.", "Dev tuza bhala karo... pan halu chaalav.", "God bless you... but drive slowly."]
+    ],
+    "bump": [
+      ["अरे, म्हातारी माणसं आहोत, जरा जपून.", "Arre, mhaatari maansa aahot, jara japun.", "We're old people, careful now."]
+    ],
+    "crowd": [
+      ["राम राम! काय हे आजकाल.", "Ram Ram! Kaay he aajkaal.", "Ram Ram! What's the world coming to."]
+    ],
+    "carjack": [
+      ["अरे, कोणीतरी पकडा त्याला!", "Arre, konitari pakda tyala!", "Someone catch him!"]
+    ],
+    "greet": [
+      ["जेवलास का रे बाळा?", "Jevlaas ka re baala?", "Have you eaten, child?"],
+      ["छान दिसतोस हो.", "Chhaan distos ho.", "You look nice, dear."]
+    ],
+    "stunt": [
+      ["भिंतीवर कशाला चढतोस? खाली ये!", "Bhintivar kashaala chadhtos? Khaali ye!", "Why are you climbing the wall? Come down!"]
+    ],
+    "chat": [
+      ["आमच्या वेळी पुणं किती शांत होतं.", "Aamchya veli Puna kiti shaant hota.", "Pune was so peaceful in our day."],
+      ["सूनबाईंनी आज पुरणपोळी केलीये.", "Soonbaainni aaj puranpoli keliye.", "My daughter-in-law made puran poli today."]
+    ]
+  },
+
+  "tai": {
+    "dodge": [
+      ["अरे! लक्ष कुठे आहे?", "Arre! Laksha kuthe aahe?", "Hey! Where's your attention?"],
+      ["दिसत नाही का, माणसं चालतायत?", "Disat naahi ka, maansa chaaltaayat?", "Can't you see people are walking?"]
+    ],
+    "honk": [
+      ["हो, ऐकलं, थांब जरा.", "Ho, aikla, thamb jara.", "Yes, I heard. Wait a second."]
+    ],
+    "fall": [
+      ["आई गं! थांब तू, नंबर घेतलाय मी.", "Aai ga! Thamb tu, number ghetlay mi.", "Ow! Wait right there, I've got your number."],
+      ["माझी पर्स! अरे देवा!", "Maazi purse! Arre deva!", "My purse! Oh God!"]
+    ],
+    "bump": [
+      ["सॉरी तरी बोल!", "Sorry tari bol!", "At least say sorry!"]
+    ],
+    "crowd": [
+      ["मी ॲम्ब्युलन्सला फोन करते.", "Mi ambulance-la phone karte.", "I'll call an ambulance."]
+    ],
+    "carjack": [
+      ["ए! माझी स्कूटी! चोर!", "Ae! Maazi scooty! Chor!", "Hey! My scooty! Thief!"]
+    ],
+    "greet": [
+      ["हाय! इथे जवळ एटीएम कुठे आहे?", "Hi! Ithe javal ATM kuthe aahe?", "Hi! Is there an ATM near here?"]
+    ],
+    "stunt": [
+      ["हे काय, फिल्मचं शूटिंग चाललंय का?", "He kaay, filmcha shooting chaallay ka?", "What is this, a film shoot?"]
+    ],
+    "chat": [
+      ["ऑफिसला उशीर झाला, कॅब मिळतच नव्हती.", "Office-la ushir jhaala, cab milatach navhti.", "I'm late for the office, couldn't get a cab."],
+      ["शनिवारवाड्याचा लाईट शो बघायला जाऊया.", "Shaniwarwadyacha light show baghayla jaauya.", "Let's go see the light show at Shaniwar Wada."],
+      ["हा पाऊस कधी थांबणार?", "Ha paaus kadhi thaambnaar?", "When is this rain going to stop?"]
+    ]
+  },
+
+  "aunty": {
+    "dodge": [
+      ["हाय राम! धीरे चलाओ!", "Haay Ram! Dheere chalao!", "Oh God! Drive slowly!"]
+    ],
+    "honk": [
+      ["बेटा, हॉर्न से कुछ नहीं होगा.", "Beta, horn se kuch nahin hoga.", "Son, honking won't do a thing."]
+    ],
+    "fall": [
+      ["हाय! मेरी कमर!", "Haay! Meri kamar!", "Ow! My back!"],
+      ["तुम्हारे माँ-बाप ने यही सिखाया है?", "Tumhaare maa-baap ne yahi sikhaaya hai?", "Is this what your parents taught you?"]
+    ],
+    "bump": [
+      ["देख के, बेटा.", "Dekh ke, beta.", "Careful, son."]
+    ],
+    "crowd": [
+      ["अरे कोई पानी लाओ!", "Arre koi paani lao!", "Someone bring water!"]
+    ],
+    "carjack": [
+      ["अरे मेरी गाड़ी! पुलिस! पुलिस!", "Arre meri gaadi! Police! Police!", "My vehicle! Police! Police!"]
+    ],
+    "greet": [
+      ["बेटा, मार्केट किस तरफ़ है?", "Beta, market kis taraf hai?", "Son, which way is the market?"]
+    ],
+    "stunt": [
+      ["गिर जाओगे बेटा, नीचे उतरो!", "Gir jaaoge beta, neeche utro!", "You'll fall, son! Come down!"]
+    ],
+    "chat": [
+      ["आजकल सब्ज़ी कितनी महँगी हो गई है.", "Aajkal sabzi kitni mehngi ho gayi hai.", "Vegetables have got so expensive these days."],
+      ["मेरा बेटा बैंगलोर में जॉब करता है.", "Mera beta Bangalore mein job karta hai.", "My son works in Bangalore."]
+    ]
+  },
+
+  "collegegirl": {
+    "dodge": [
+      ["ओ माय गॉड! पागल है क्या?", "Oh my God! Paagal hai kya?", "Oh my God! Are you crazy?"],
+      ["हेलो! यहाँ लोग चल रहे हैं!", "Hello! Yahaan log chal rahe hain!", "Hello! People are walking here!"]
+    ],
+    "honk": [
+      ["रिलैक्स, यार.", "Relax, yaar.", "Relax, man."]
+    ],
+    "fall": [
+      ["मेरा फोन! स्क्रीन क्रैक हो गई!", "Mera phone! Screen crack ho gayi!", "My phone! The screen's cracked!"]
+    ],
+    "bump": [
+      ["एक्सक्यूज़ मी?!", "Excuse me?!", "Excuse me?!"]
+    ],
+    "crowd": [
+      ["किसी ने नंबर नोट किया?", "Kisi ne number note kiya?", "Did anyone get the number?"]
+    ],
+    "carjack": [
+      ["हे! वो मेरी स्कूटी है!", "Hey! Woh meri scooty hai!", "Hey! That's my scooty!"]
+    ],
+    "greet": [
+      ["हाय, ये कैफ़े ओपन है क्या?", "Hi, ye café open hai kya?", "Hi, is this café open?"]
+    ],
+    "stunt": [
+      ["वाओ, ओके, इम्प्रेसिव.", "Wow, okay, impressive.", "Wow. OK. Impressive."]
+    ],
+    "chat": [
+      ["आज की क्लास बंक करते हैं.", "Aaj ki class bunk karte hain.", "Let's bunk today's class."],
+      ["यार, कोरेगांव पार्क में नया ब्रंच प्लेस खुला है.", "Yaar, Koregaon Park mein naya brunch place khula hai.", "There's a new brunch place in Koregaon Park."],
+      ["मम्मी का फिर से कॉल आ रहा है.", "Mummy ka phir se call aa raha hai.", "Mum's calling again."]
+    ]
+  }
+}
