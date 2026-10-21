@@ -105,7 +105,7 @@ export class Game {
       if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;     // typing in the map search
       if (e.code === 'Escape' || e.code === 'KeyP') { if (this.state === 'play' || this.state === 'pause') this.togglePause(); }
       if (e.code === 'KeyM' && (this.state === 'play' || this.state === 'map')) this.toggleMap();
-      if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space') && !(this.hud.pickerOpen)) this.start();
+      if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space') && !(this.hud.pickerOpen)) this.begin();
     });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'play') this.togglePause(true); });
     // drag on the canvas orbits the camera a little
@@ -139,7 +139,7 @@ export class Game {
 
   // ---------------------------------------------------------------- state changes
   // Start: pick who you are the first time, then you're in your auto (the shift runs while you drive it)
-  start() {
+  begin() {
     if (!this.hud.hasCharacter || this.hud.hasCharacter()) return this.startPlay(false);
     this.hud.showPicker(() => this.startPlay(false));
   }

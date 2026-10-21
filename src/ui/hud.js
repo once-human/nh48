@@ -127,7 +127,7 @@ export class HUD {
       </div>`;
     this.root.appendChild(t);
     this.title = t;
-    t.querySelector('#t-roam').onclick = () => this.game.start();
+    t.querySelector('#t-roam').onclick = () => this.game.begin();
     t.querySelector('#t-who').onclick = () => this.showPicker(() => this.syncTitle());
     this.drawCityArt(t.querySelector('#c-pune'));
     this.syncTitle();
