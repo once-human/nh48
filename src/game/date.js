@@ -85,7 +85,7 @@ export class Dates {
     if (q.id === 'number') return this.askNumber();
     if (q.cost) { if (!G.shops.spend(q.cost)) return; L.drunk = Math.min(1.2, L.drunk + 0.15); }
     // how it lands
-    let chance = 0.45 + (st.score - 0.6) * 0.6 + (L.mood - 0.5) * 0.3 + L.respect / 300 + (L.karma > 20 ? 0.05 : 0) - (L.drunk > 0.6 ? 0.25 : 0) - (c.used[q.id] ? 0.3 : 0);
+    let chance = 0.2 + this.life.charm * 0.6 + (L.karma > 20 ? 0.05 : 0) - (c.used[q.id] ? 0.3 : 0);
     if (q.id === 'compliment' && st.odd) chance += 0.05;           // a bold outfit is a conversation starter
     if (q.cost) chance += 0.15;
     const r = this.rng.next();

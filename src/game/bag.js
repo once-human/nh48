@@ -74,7 +74,7 @@ export class Bag {
       const P = G.player, st = L.style(), re = L.reaction(), hp = (P.hp ?? 100) / L.hpMax;
       const ring = (ic, label, v, note) => {
         const c = 2 * Math.PI * 22, low = v < 0.25;
-        return `<div class="jh-ring${low ? ' low' : ''}"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="22" class="bg"/><circle cx="26" cy="26" r="22" class="fg" stroke-dasharray="${(c * Math.max(0, Math.min(1, v))).toFixed(1)} ${c.toFixed(1)}"/></svg>${icon(ic)}<b>${label}</b><small>${esc(note)}</small></div>`;
+        return `<div class="jh-ring${low ? ' low' : ''}"><svg class="rg" viewBox="0 0 52 52"><circle cx="26" cy="26" r="22" class="bg"/><circle cx="26" cy="26" r="22" class="fg" stroke-dasharray="${(c * Math.max(0, Math.min(1, v))).toFixed(1)} ${c.toFixed(1)}"/></svg>${icon(ic)}<b>${label}</b><small>${esc(note)}</small></div>`;
       };
       const scale = (label, v, lo, hi) => `<div class="jh-scale"><div class="lab"><b>${label}</b><span>${v > 25 ? hi[0] : v < -15 ? lo[0] : 'Nobody special'}</span></div><div class="bar"><i style="left:${50 + v / 2}%"></i></div><div class="ends"><span>${lo[1]}</span><span>${hi[1]}</span></div></div>`;
       h += `<div class="jh-rings">

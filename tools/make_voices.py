@@ -56,6 +56,14 @@ for pid, P in street['_personas'].items():
             lid = f'q_{pid}_{kind}{i}'
             jobs.append((lid, P['voice'], P['lang'], deva)); shape[lid] = (P['pitch'], P['tempo'])
 
+# shopkeepers: one voice per kind of shop
+shopl = json.load(open(os.path.join(ROOT, 'src/game/shop_lines.json')))
+for kind, (voice, lang, tempo) in shopl['_voice'].items():
+    for sc, arr in shopl.get(kind, {}).items():
+        for i, (deva, roman, en) in enumerate(arr):
+            lid = f'k_{kind}_{sc}{i}'
+            jobs.append((lid, voice, lang, deva)); shape[lid] = (1.0, tempo)
+
 def af_for(lid): return lid
 for lid, voice, lang, tts in jobs:
     if only and lid not in only and not any(lid.startswith(o) for o in only): continue

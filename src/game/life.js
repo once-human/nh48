@@ -94,6 +94,7 @@ export class Life {
     else if (kind === 'peth' || kind === 'colony') score = kurta || saree ? 0.9 : 0.65;
     else if (kind === 'college') score = western ? 0.85 : 0.55;
     if ((this.s.upg.shoes || 0) > 0) score += 0.05;
+    if (this.s.shades && (kind === 'polished' || kind === 'college')) score += this.s.shades === 'premium' ? 0.1 : 0.06;
     return { score: clamp(score, 0, 1), odd };
   }
   // how a stranger reads you: 'respect' greeting, 'scared', 'odd' look, 'nice' look, or nothing
@@ -115,6 +116,7 @@ export class Life {
     s.thirst = clamp(s.thirst - DECAY.thirst * h * busy * (G.hour > 11 && G.hour < 17 ? 1.25 : 1), 0, 1);
     s.energy = clamp(s.energy - DECAY.energy * h * (G.hour > 23 || G.hour < 5 ? 1.5 : 1), 0, 1);
     s.drunk = Math.max(0, s.drunk - h * 0.35);
+    if (s.charmBoost) s.charmBoost = Math.max(0, s.charmBoost - h * 0.004);     // a facial or a whitening wears off over days
     if (P.onFoot && P.foot.swim) { s.energy = clamp(s.energy - h * 0.25, 0, 1); s.thirst = Math.min(1, s.thirst + h * 0.02); }
     s.mood = clamp(s.mood + (0.6 - s.mood) * h * 0.08 - (s.hunger < 0.2 ? h * 0.05 : 0), 0, 1);
     // empty stomach or dry throat: health slowly goes (never all at once)
@@ -139,6 +141,13 @@ export class Life {
   warn(k, v, title, sub) {
     if (v < 0.2 && !this.warned[k]) { this.warned[k] = true; this.g.hud.toast(title, sub, 'warn', 4); }
     if (v > 0.35) this.warned[k] = false;
+  }
+  // charm: how you come across when you talk to someone (dates, tips, a better price). A clean
+  // smile, good skin, the right clothes, a good mood; a drink or two loosens you up, more is a mess.
+  get charm() {
+    const s = this.s, st = this.style(), d = s.drunk;
+    const drink = d > 0.15 && d < 0.5 ? 0.12 : d >= 0.7 ? -0.22 : 0;
+    return clamp(0.35 + (st.score - 0.6) * 0.5 + (s.mood - 0.5) * 0.25 + (s.charmBoost || 0) + drink + Math.max(0, s.respect) / 400, 0, 1);
   }
   // tiredness, hunger and drink as gameplay
   get sprintMul() { const s = this.s; return (s.energy < 0.15 ? 0.75 : 1) * (s.hunger < 0.08 ? 0.85 : 1) * (s.drunk > 0.6 ? 0.85 : 1); }

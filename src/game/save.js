@@ -18,10 +18,13 @@ function vehOf(v, auto) {
 export function snapshot(G) {
   const P = G.player, A = P.auto;
   const d = P.dropped.find(q => q.veh === A);
+  // inside a shop the save remembers its door, not the room (rooms sit far outside the city)
+  const I = G.interiors && G.interiors.cur;
+  const foot = I ? { x: r2(I.door.x), z: r2(I.door.z), yaw: r2(I.door.yaw + Math.PI) } : { x: r2(P.foot.x), z: r2(P.foot.z), yaw: r2(P.foot.yaw) };
   return {
     v: 1, t: Date.now(), hour: r2(G.hour), clock: r2(G.clock || 0),
     mode: P.mode,
-    foot: { x: r2(P.foot.x), z: r2(P.foot.z), yaw: r2(P.foot.yaw) },
+    foot,
     veh: P.mode === 'veh' ? vehOf(P.cur, A) : null,
     auto: { x: r2(A.x), z: r2(A.z), th: r2(A.th), towed: d && d.towed ? d.towed : null, towedAt: G.police.towedAt || null },
     dropped: P.dropped.filter(q => q.veh !== A).map(q => vehOf(q.veh, A)),
@@ -43,6 +46,8 @@ export function load() {
 // where to build the world first (before anything else exists)
 export function startPoint(s) {
   if (!s) return null;
+  // an old save made inside a shop room: come back at your auto instead
+  if (s.foot && Math.abs(s.foot.x) > 30000) { s.foot = { x: s.auto.x + 2, z: s.auto.z + 2, yaw: s.auto.th }; }
   if (s.mode === 'foot') return { x: s.foot.x, z: s.foot.z, th: s.foot.yaw };
   if (s.mode === 'veh' && s.veh) return { x: s.veh.x, z: s.veh.z, th: s.veh.th };
   return { x: s.auto.x, z: s.auto.z, th: s.auto.th };

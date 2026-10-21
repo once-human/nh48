@@ -16,7 +16,12 @@ import * as THREE from 'three';
 import { clamp, RNG } from '../core/util.js';
 import { ITEMS, describe } from './life.js';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
+import { tierOf, TIER_MUL, TIER_LABEL, servicesFor } from './brands.js';
+import SHOPL from './shop_lines.json';
 
+// each kind of shop gets its own look of buying screen (style.css .shop[data-ui=...])
+const UI_OF = { tapri: 'menu', misal: 'menu', thali: 'menu', biryani: 'menu', southindian: 'menu', chinese: 'menu', fastfood: 'fast', food: 'menu', cafe: 'cafe', bakery: 'cafe', sweets: 'menu', juice: 'menu', icecream: 'cafe',
+  bar: 'neon', bank: 'teller', jeweller: 'gold', clinic: 'clinic', pharmacy: 'clinic', optician: 'clinic', dealer: 'dealer', garage: 'garage', fuel: 'garage', chowki: 'chowki', property: 'gold', estate: 'gold' };
 const r10 = (v) => Math.max(10, Math.round(v / 10) * 10);
 export const fmt = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
 const col = (h) => new THREE.Color(h).convertSRGBToLinear();
@@ -160,23 +165,29 @@ export const AREA_FOOD = { polished: ['pasta', 'burger', 'coldcoffee', 'sandwich
 const AREA_MUL = { polished: 1.55, camp: 1.15, college: 0.92, peth: 0.88, station: 0.92, colony: 1.05, city: 1 };
 
 // clothes anyone can buy (top / bottom colours, sleeve, kurta, saree)
+// [id, name, note, price, look patch, who it's cut for: M men's, W women's, U unisex] (anyone can wear anything)
 export const CLOTHES = [
-  ['shirt_white', 'Linen shirt, white', 'Full sleeves, crisp', 1290, { top: 0xf2f0ea, cut: [0.95, 1, 0.5, 0] }],
-  ['shirt_blue', 'Oxford shirt, sky blue', 'Full sleeves', 1190, { top: 0x8fb3d9, cut: [0.95, 1, 0.5, 0] }],
-  ['tee_black', 'T-shirt, black', 'Half sleeves', 499, { top: 0x1f2024, cut: [0.38, 1, 0.3, 0] }],
-  ['tee_red', 'T-shirt, red', 'Half sleeves', 499, { top: 0xbf3f3a, cut: [0.38, 1, 0.3, 0] }],
-  ['tee_mustard', 'T-shirt, mustard', 'Half sleeves', 549, { top: 0xe0b23a, cut: [0.38, 1, 0.3, 0] }],
-  ['polo_green', 'Polo, bottle green', 'Half sleeves', 899, { top: 0x2f5d45, cut: [0.4, 1, 0.6, 0] }],
-  ['jeans_blue', 'Jeans, indigo', 'Slim fit', 1599, { bottom: 0x2c3e66 }],
-  ['jeans_black', 'Jeans, black', 'Slim fit', 1599, { bottom: 0x1b1c1f }],
-  ['chinos_khaki', 'Chinos, khaki', 'Office-ready', 1399, { bottom: 0x9c8a66 }],
-  ['kurta_white', 'Kurta pyjama, white', 'Cotton, for Ganpati and weddings', 1499, { top: 0xf4f1ea, bottom: 0xf4f1ea, cut: [0.95, 0.55, 0.7, 1] }],
-  ['kurta_saffron', 'Kurta, saffron', 'With white pyjama', 1699, { top: 0xf28f3b, bottom: 0xf4f1ea, cut: [0.95, 0.55, 0.7, 1] }],
-  ['kurti_teal', 'Kurti and salwar, teal', 'Everyday cotton', 1299, { top: 0x2e86ab, bottom: 0xf4f1ea, cut: [0.45, 0.55, 0.8, 1] }],
-  ['kurti_pink', 'Kurti and salwar, rani pink', 'Festive', 1599, { top: 0xd1495b, bottom: 0x2f2f33, cut: [0.85, 0.55, 0.8, 1] }],
-  ['saree_paithani', 'Paithani saree, purple and gold', 'The real thing (well, almost)', 8999, { top: 0x7b2cbf, bottom: 0x6a24a6, cut: [0.3, 1, 0.9, 2] }],
-  ['saree_nauvari', 'Nauvari saree, green', 'Nine yards, Maharashtrian style', 4999, { top: 0x386641, bottom: 0x2f5636, cut: [0.3, 1, 0.9, 2] }],
-  ['saree_red', 'Cotton saree, red', 'Everyday', 1999, { top: 0xc1121f, bottom: 0xa50f1a, cut: [0.3, 1, 0.9, 2] }],
+  ['shirt_white', 'Linen shirt, white', 'Full sleeves, crisp', 1290, { top: 0xf2f0ea, cut: [0.95, 1, 0.5, 0] }, 'M'],
+  ['shirt_blue', 'Oxford shirt, sky blue', 'Full sleeves', 1190, { top: 0x8fb3d9, cut: [0.95, 1, 0.5, 0] }, 'M'],
+  ['shirt_check', 'Checked shirt, maroon', 'Weekend flannel', 1090, { top: 0x7a2e3a, cut: [0.95, 1, 0.5, 0] }, 'M'],
+  ['tee_black', 'T-shirt, black', 'Half sleeves', 499, { top: 0x1f2024, cut: [0.38, 1, 0.3, 0] }, 'U'],
+  ['tee_red', 'T-shirt, red', 'Half sleeves', 499, { top: 0xbf3f3a, cut: [0.38, 1, 0.3, 0] }, 'U'],
+  ['tee_mustard', 'T-shirt, mustard', 'Half sleeves', 549, { top: 0xe0b23a, cut: [0.38, 1, 0.3, 0] }, 'U'],
+  ['hoodie_grey', 'Hoodie, grey', 'For the two cold weeks in December', 1799, { top: 0x7d8085, cut: [1, 1, 0.2, 0] }, 'U'],
+  ['polo_green', 'Polo, bottle green', 'Half sleeves', 899, { top: 0x2f5d45, cut: [0.4, 1, 0.6, 0] }, 'U'],
+  ['top_floral', 'Top, floral', 'Short sleeves, light cotton', 899, { top: 0xe5989b, cut: [0.3, 1, 0.7, 0] }, 'W'],
+  ['top_white', 'Top, white linen', 'Sleeveless', 799, { top: 0xf4f1ea, cut: [0.05, 1, 0.8, 0] }, 'W'],
+  ['jeans_blue', 'Jeans, indigo', 'Slim fit', 1599, { bottom: 0x2c3e66 }, 'U'],
+  ['jeans_black', 'Jeans, black', 'Slim fit', 1599, { bottom: 0x1b1c1f }, 'U'],
+  ['track_navy', 'Track pants, navy', 'Morning walk on Vetal hill', 699, { bottom: 0x1d2a4a }, 'U'],
+  ['chinos_khaki', 'Chinos, khaki', 'Office-ready', 1399, { bottom: 0x9c8a66 }, 'M'],
+  ['kurta_white', 'Kurta pyjama, white', 'Cotton, for Ganpati and weddings', 1499, { top: 0xf4f1ea, bottom: 0xf4f1ea, cut: [0.95, 0.55, 0.7, 1] }, 'M'],
+  ['kurta_saffron', 'Kurta, saffron', 'With white pyjama', 1699, { top: 0xf28f3b, bottom: 0xf4f1ea, cut: [0.95, 0.55, 0.7, 1] }, 'M'],
+  ['kurti_teal', 'Kurti and salwar, teal', 'Everyday cotton', 1299, { top: 0x2e86ab, bottom: 0xf4f1ea, cut: [0.45, 0.55, 0.8, 1] }, 'W'],
+  ['kurti_pink', 'Kurti and salwar, rani pink', 'Festive', 1599, { top: 0xd1495b, bottom: 0x2f2f33, cut: [0.85, 0.55, 0.8, 1] }, 'W'],
+  ['saree_paithani', 'Paithani saree, purple and gold', 'The real thing (well, almost)', 8999, { top: 0x7b2cbf, bottom: 0x6a24a6, cut: [0.3, 1, 0.9, 2] }, 'W'],
+  ['saree_nauvari', 'Nauvari saree, green', 'Nine yards, Maharashtrian style', 4999, { top: 0x386641, bottom: 0x2f5636, cut: [0.3, 1, 0.9, 2] }, 'W'],
+  ['saree_red', 'Cotton saree, red', 'Everyday', 1999, { top: 0xc1121f, bottom: 0xa50f1a, cut: [0.3, 1, 0.9, 2] }, 'W'],
 ];
 export const SHOES = [
   ['kolhapuri', 'Kolhapuri chappal', 'Hand-made leather', 899, 0x8a5a2b],
@@ -218,12 +229,14 @@ export class Shops {
     if (!n) return null;
     const kind = kindOf(n[0], n[2]);
     if (!kind) return null;
-    return { name: n[0], mr: n[1], cat: n[2], kind, x: door.x, z: door.z, door };
+    return { name: n[0], mr: n[1], cat: n[2], kind, x: door.x, z: door.z, door, tier: tierOf(kind, n[0], n[3]) };
   }
-  priceMul(x, z) {
+  priceMul(x, z, tier) {
     const a = this.g.people.areas.at(x, z);
     const k = this.life.s.karma > 30 ? 0.95 : 1;
-    return (AREA_MUL[a ? a.kind : 'city'] || 1) * k;
+    // charm gets you a better price (a smile, a bit of chat), the brand on the board a worse one
+    const c = 1 - Math.max(0, this.life.charm - 0.5) * 0.12;
+    return (AREA_MUL[a ? a.kind : 'city'] || 1) * k * c * (tier ? TIER_MUL[tier] || 1 : 1);
   }
   // nearest thing you could walk into
   scan() {
@@ -257,6 +270,7 @@ export class Shops {
   // F pressed: walk in (returns true if it took the key)
   tryUse() {
     if (!this.near || this.open) return false;
+    this.scanT = 0;                  // look again next frame: what's in front of you has changed
     if (this.near.kind === 'animal') { this.g.strays.interact(this.near.a); this.scanT = 0.5; return true; }
     const I = this.g.interiors;
     if (this.near.kind === 'ispot') { I.use(this.near.s); this.scanT = 0.3; return true; }
@@ -281,7 +295,9 @@ export class Shops {
 
   // ---------------------------------------------------------------- what's on offer
   items(ctx) {
-    const G = this.g, L = this.life, P = G.player, k = ctx.kind, mul = this.priceMul(ctx.x, ctx.z);
+    const G = this.g, L = this.life, P = this.g.player, k = ctx.kind;
+    const tierPrices = ['barber', 'gym'].includes(k) || ctx.tier === 'chain' || ctx.tier === 'premium';
+    const mul = this.priceMul(ctx.x, ctx.z, tierPrices && !['clinic', 'optician'].includes(k) ? ctx.tier : null);
     const out = [];
     const area = G.people.areas.at(ctx.x, ctx.z), ak = area ? area.kind : 'city';
     const pay = (price, fn) => () => { if (!this.spend(price)) return false; return fn(); };
@@ -321,23 +337,23 @@ export class Shops {
         break;
       }
       case 'barber': this.barber(out, mul); break;
-      case 'clothes': this.clothes(out, mul, ctx.sub); break;
+      case 'clothes': this.clothes(out, mul * (ctx.tier === 'brand' ? 1.35 : ctx.tier === 'ethnic' ? 1.2 : 1), ctx.sub, ctx.tier); break;
       case 'shoes': for (const [id, name, note, base, hex] of SHOES) { const price = r10(base * mul); const own = L.s.wardrobe.includes('shoe_' + id);
         out.push({ label: name, note: own ? 'Yours, wear them' : note, price: own ? 0 : price, tag: own ? 'owned' : '', act: () => { if (!own && !this.spend(price)) return false; if (!own) L.s.wardrobe.push('shoe_' + id); this.wear({ shoe: hex }); L.s.upg.shoes = 1; return `Wearing ${name.toLowerCase()}`; } }); }
         break;
-      case 'optician': { const price = r10(1400 * mul); out.push({ label: 'Eye test and frames', note: 'You see the signboards better. Probably', price, act: pay(price, () => { L.change('mood', 0.04); return 'New glasses. Everything is sharper'; }) }); break; }
+      case 'optician': case 'clinic': {
+        const tier = ctx.tier || tierOf(k, ctx.name, '');
+        const area = this.priceMul(ctx.x, ctx.z) * (k === 'clinic' ? TIER_MUL[tier] || 1 : 1);
+        for (const [label, note, base, fx] of servicesFor(k, tier, G)) { const price = base ? r10(base * area) : 0; out.push({ label, note, price, act: () => { if (price && !this.spend(price)) return false; return fx(); } }); }
+        break;
+      }
       case 'pharmacy':
         for (const [id, base] of [['medkit', 220], ['painkiller', 40], ['ors', 25], ['water', 20]]) { const price = r10(base * mul); out.push({ label: ITEMS[id].name, note: ITEMS[id].note || describe(ITEMS[id].use), price, act: pay(price, () => { L.add(id); return `${ITEMS[id].name}, in your bag`; }) }); }
         break;
-      case 'clinic': {
-        const price = r10((ctx.cat === 'clinic' ? 500 : 900) * mul);
-        out.push({ label: 'See the doctor', note: 'Patched up: full health', price, act: pay(price, () => { P.hp = L.hpMax; return 'Full health. Avoid fights, he says'; }) });
-        out.push({ label: 'Glucose drip', note: 'Food, water and energy topped up', price: r10(700 * mul), act: pay(r10(700 * mul), () => { L.apply({ hunger: 0.4, thirst: 0.6, energy: 0.3 }); return 'Feeling human again'; }) });
-        break;
-      }
       case 'gym': {
         const price = r10(250 * mul);
-        out.push({ label: 'Day pass: workout', note: `+3 max health, harder punches (now ${L.hpMax})`, price, disabled: L.s.energy < 0.2 ? 'Too tired' : L.s.fitness >= 40 ? 'Peak fitness' : '', act: pay(price, () => { L.change('fitness', 3); L.apply({ energy: -0.15, hunger: -0.08, thirst: -0.1, mood: 0.05 }); return `Workout done. Max health ${L.hpMax}`; }) });
+        const gain = ctx.tier === 'premium' ? 4 : 3;
+        out.push({ label: ctx.tier === 'premium' ? 'Session with a trainer' : 'Day pass: workout', note: `+${gain} max health, harder punches (now ${L.hpMax})`, price, disabled: L.s.energy < 0.2 ? 'Too tired' : L.s.fitness >= 40 ? 'Peak fitness' : '', act: pay(price, () => { L.change('fitness', gain); L.apply({ energy: -0.15, hunger: -0.08, thirst: -0.1, mood: 0.05 }); if (G.interiors && G.interiors.cur) { G.player.human.play('crouch', { restart: true }); G.player.act = { kind: 'hurt', t: 0, dur: 2.5 }; } return `Workout done. Max health ${L.hpMax}`; }) });
         out.push({ label: 'Protein shake', note: 'Chocolate, allegedly', price: r10(180 * mul), act: pay(r10(180 * mul), () => { L.apply({ hunger: 0.2, thirst: 0.15 }); return 'Gains'; }) });
         break;
       }
@@ -390,6 +406,17 @@ export class Shops {
   }
   isClub(ctx) { const a = this.g.people.areas.at(ctx.x, ctx.z); return /club|lounge|social|brew|pub/i.test(ctx.name) || (a && a.kind === 'polished'); }
   hello(kind) { return HELLO[kind] ? this.rng.pick(HELLO[kind]) : null; }
+  // the keeper says it out loud (shop_lines.json), never the same line twice in a row
+  speak(kind, sc) {
+    const arr = SHOPL[kind] && SHOPL[kind][sc];
+    if (!arr || !arr.length) return;
+    this.lastLine = this.lastLine || {};
+    let i = this.rng.int(0, arr.length - 1);
+    if (arr.length > 1 && this.lastLine[kind + sc] === i) i = (i + 1) % arr.length;
+    this.lastLine[kind + sc] = i;
+    const [, roman, en] = arr[i];
+    if (this.g.audio.voice('k_' + kind + '_' + sc + i, 1, 0, false, 1)) this.g.hud.say(kind === 'bar' ? 'Bartender' : kind === 'chowki' ? 'Havaldar' : kind === 'bank' ? 'Cashier' : 'Shopkeeper', roman, roman === en ? '' : en, 3.2);
+  }
   gigItem(out, ctx) {
     const G = this.g;
     if (!G.gigs || G.gigs.job || (G.rides && G.rides.current)) return;
@@ -401,15 +428,24 @@ export class Shops {
     if (fem) { H('Long, blow-dried', 'Salon finish', 700, { style: 'hair_long' }); H('Juda (bun)', 'Neat, for the heat', 350, { style: 'hair_buns' }); H('Pixie cut', 'Short and bold', 600, { style: 'hair_buzzedfemale' }); }
     else { H('Regular cutting', 'Side parting, a bit of oil', 150, { style: 'hair_simpleparted' }); H('Army cut', 'Short all over', 120, { style: 'hair_buzzed' });
       H(look.beard ? 'Clean shave' : 'Grow a beard (well, a trim)', look.beard ? 'Razor and alum' : 'Shaped and lined', 90, { beard: !look.beard }); }
+    if (this.ctx && this.ctx.tier === 'premium') {
+      const kp = r10(4500 * mul / 1.9); out.push({ label: 'Keratin treatment', note: 'Silky for weeks: charm up', price: kp, act: () => { if (!this.spend(kp)) return false; L.s.charmBoost = Math.min(0.25, (L.s.charmBoost || 0) + 0.07); return 'Your hair has never looked like this'; } });
+    }
     H('Hair colour: burgundy', 'A touch of red', 550, { hair: 0x4a1a1a });
     H('Hair colour: natural black', 'Back to basics', 400, { hair: 0x0d0b0a });
     const c = r10(180 * mul); out.push({ label: 'Champi (head massage)', note: 'Ten minutes of bliss: +energy, +mood', price: c, act: () => { if (!this.spend(c)) return false; L.apply({ energy: 0.15, mood: 0.1 }); return 'Bliss'; } });
   }
-  clothes(out, mul, sub) {
+  clothes(out, mul, sub, tier) {
     const L = this.life;
     const kindOfC = (p) => p.cut && p.cut[3] >= 1 ? 'ethnic' : p.top !== undefined ? 'tops' : 'bottoms';
-    for (const [id, name, note, base, patch] of CLOTHES) {
+    const WHO = { M: 'Men’s', W: 'Women’s', U: 'Unisex' };
+    for (const [id, name, note0, base, patch, who] of CLOTHES) {
       if (sub && kindOfC(patch) !== sub) continue;
+      // what this kind of store stocks
+      if (tier === 'women' && who === 'M') continue;
+      if (tier === 'men' && who === 'W') continue;
+      if (tier === 'ethnic' && kindOfC(patch) !== 'ethnic') continue;
+      const note = `${WHO[who]} · ${note0}`;
       const own = L.s.wardrobe.includes(id), price = r10(base * mul);
       out.push({ label: name, note: own ? 'In your wardrobe, wear it' : note, price: own ? 0 : price, tag: own ? 'owned' : '', act: () => {
         if (!own && !this.spend(price)) return false;
@@ -582,11 +618,14 @@ export class Shops {
   }
   show(ctx) {
     const G = this.g;
+    if (G.trial && !ctx.list && ['clothes', 'shoes', 'barber'].includes(ctx.kind)) { G.trial.show(ctx, ctx.kind === 'barber' ? 'salon' : ctx.kind === 'shoes' ? 'shoes' : 'clothes', ctx.sub); return; }
     this.ctx = ctx; this.open = true;
     G.state = 'shop'; G.audio.updateEngine?.(0, 0, false);
     const K = ctx.kind === 'property' ? ['Property', 'मालमत्ता'] : KIND_INFO[ctx.kind];
-    this.el.querySelector('.sh-k').textContent = `${K[0]} · ${K[1]}`;
+    const tl = ctx.tier && ['optician', 'clinic', 'barber', 'gym', 'clothes'].includes(ctx.kind) ? TIER_LABEL[ctx.tier] : null;
+    this.el.querySelector('.sh-k').textContent = `${tl || K[0]} · ${K[1]}`;
     this.el.querySelector('.sh-t').textContent = ctx.name;
+    this.el.dataset.ui = UI_OF[ctx.kind] || 'list';
     this.el.querySelector('.sh-mr').textContent = ctx.mr && ctx.mr !== K[1] ? ctx.mr : '';
     const hello = HELLO[ctx.kind] ? HELLO[ctx.kind][0] : ctx.prop ? [ctx.prop.blurb, ''] : ['', ''];
     this.el.querySelector('.sh-say b').textContent = hello[0] ? `“${hello[0]}”` : '';
@@ -619,6 +658,7 @@ export class Shops {
     if (!it || it.disabled || !it.act) return;
     const r = it.act();
     if (r === false) return;
+    if (this.ctx && it.price && ['menu', 'cafe', 'fast', 'neon'].includes(UI_OF[this.ctx.kind])) this.speak(this.ctx.kind, 'order');
     if (!this.open) return;
     if (r) this.msg(r, true);
     this.render();

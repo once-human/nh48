@@ -229,7 +229,7 @@ export class Interiors {
   // ---------------------------------------------------------------- going in and out
   enter(ctx) {
     const G = this.g, P = G.player, tpl = this.templateOf(ctx.kind);
-    if (!tpl || !P.onFoot) return false;
+    if (!tpl || !P.onFoot || this.cur || P.x > SLOT0 - 1000) return false;      // never from inside another room
     const R = this.room(tpl);
     this.cur = { R, ctx, door: { x: P.x, z: P.z, yaw: P.th }, plate: null, seat: null, dancing: false, talk: null };
     R.group.visible = true;
@@ -244,8 +244,7 @@ export class Interiors {
     if (G.crowd) { this.capWas = G.crowd.cap; G.crowd.cap = Math.max(G.crowd.cap, 14); }
     G.audio.duck?.(0.2, 2);
     if (tpl === 'club') G.club.beat(true);
-    const hello = G.shops.hello(ctx.kind);
-    if (hello) G.hud.say(tpl === 'club' ? 'Bouncer' : 'Keeper', hello[0], hello[1], 3.5);
+    G.shops.speak(ctx.kind, 'hello');
     return true;
   }
   exit() {
@@ -259,6 +258,7 @@ export class Interiors {
     if (C.R.tpl === 'club') G.club.beat(false);
     // back out of the door, facing the street
     const d = C.door, back = d.yaw + Math.PI;
+    if (d.x > SLOT0 - 1000) { const sp = G.safeDrop(C.ctx.x, C.ctx.z); if (sp) { d.x = sp.x; d.z = sp.z; } }
     P.teleportFoot(d.x + Math.cos(back) * 0.6, d.z + Math.sin(back) * 0.6, back, G.traffic);
     G.rig.footMode = false; G.rig.update(0.016, P); G.rig.footYaw = back;
     G.camera.far = G.farWas || G.camera.far; G.camera.far = G.quality.far || 2200; G.camera.updateProjectionMatrix();
@@ -335,11 +335,13 @@ export class Interiors {
     const G = this.g, C = this.cur, P = G.player, ctx = C.ctx;
     switch (s.kind) {
       case 'exit': this.exit(); return;
-      case 'counter': case 'bar': G.shops.show({ ...ctx, kind: C.R.tpl === 'boutique' ? 'shoes' : ctx.kind, inside: true, spot: s.kind }); return;
+      case 'counter': case 'bar':
+        if (C.R.tpl === 'boutique') { G.trial.show({ ...ctx, inside: true }, 'shoes'); return; }
+        G.shops.show({ ...ctx, inside: true, spot: s.kind }); G.shops.speak(ctx.kind, 'hello'); return;
       case 'atm': G.shops.show({ ...ctx, kind: 'bank', inside: true, atm: true }); return;
-      case 'rack': G.shops.show({ ...ctx, kind: 'clothes', inside: true, sub: s.sub }); return;
+      case 'rack': G.trial.show({ ...ctx, kind: 'clothes', inside: true }, 'clothes', s.sub); return;
       case 'mirror': { const st = G.life.style(); G.hud.toast(st.odd ? 'Bold. Very bold.' : st.score > 0.85 ? 'Looking sharp' : 'Not bad', st.odd ? 'People will talk. Let them.' : st.score > 0.85 ? 'This suits the area' : 'Something more local might fit in better here', 'info', 3); P.human.play('yes', { once: true, restart: true }); P.act = { kind: 'hurt', t: 0, dur: 1 }; return; }
-      case 'chair': { const seat = C.R.seats.find(q => q.salon && Math.hypot(q.x - s.x, q.z - (s.z + 1)) < 1.6) || C.R.seats.find(q => q.salon); this.sit(seat, true); G.shops.show({ ...ctx, kind: 'barber', inside: true }); return; }
+      case 'chair': { const seat = C.R.seats.find(q => q.salon && Math.hypot(q.x - s.x, q.z - (s.z + 1)) < 1.6) || C.R.seats.find(q => q.salon); this.sit(seat, true); G.trial.show({ ...ctx, kind: 'barber', inside: true }, 'salon'); return; }
       case 'seat': this.sit(s.seat); if (C.plate) this.eat(); return;
       case 'stand': if (!C.eating) this.stand(); return;
       case 'dance': this.dance(true); return;

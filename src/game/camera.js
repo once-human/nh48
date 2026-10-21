@@ -29,9 +29,11 @@ export class CameraRig {
     if (!this.footMode) { this.footMode = true; this.footYaw = p.th; this.footPitch = 0.22; this.pos.set(p.x - Math.cos(p.th) * 3.5, p.y + 2.2, p.z - Math.sin(p.th) * 3.5); }
     if (this.orbitT > 0) this.orbitT -= dt;
     else if (Math.abs(p.v) > 1.0) this.footYaw = dampAngle(this.footYaw, p.th, 0.9, dt);
-    const yaw = this.footYaw + (this.lookBack ? Math.PI : 0), pitch = this.footPitch;
-    const dist = 3.6 + Math.min(1.2, Math.abs(p.v) * 0.12);
-    const tx = p.x, tz = p.z, ty = p.y + 1.5;
+    // trying something on: the camera comes round to face you, close up
+    const pv = this.preview;
+    const yaw = pv ? p.th + Math.PI + 0.35 : this.footYaw + (this.lookBack ? Math.PI : 0), pitch = pv ? 0.08 : this.footPitch;
+    const dist = pv ? 2.3 : 3.6 + Math.min(1.2, Math.abs(p.v) * 0.12);
+    const tx = p.x, tz = p.z, ty = p.y + (pv ? 1.15 : 1.5);
     let cx = tx - Math.cos(yaw) * dist * Math.cos(pitch), cz = tz - Math.sin(yaw) * dist * Math.cos(pitch);
     const tw = this.W.collision.ray(tx, tz, cx, cz), tv = this.vehicleRay(tx, tz, cx, cz);
     const t = Math.min(tw, tv);
@@ -41,7 +43,7 @@ export class CameraRig {
     cam.position.copy(this.pos);
     cam.up.set(0, 1, 0);
     // look slightly to the right of the head, over the shoulder
-    this.look.set(tx + Math.sin(yaw) * -0.35, ty, tz + Math.cos(yaw) * 0.35);
+    if (pv) this.look.set(tx, ty, tz); else this.look.set(tx + Math.sin(yaw) * -0.35, ty, tz + Math.cos(yaw) * 0.35);
     cam.lookAt(this.look);
     this.setFov(dt, 58 + Math.abs(p.v) * 0.8);
     this.applyShake(dt);

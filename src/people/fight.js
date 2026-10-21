@@ -148,6 +148,7 @@ export class Brawl {
       const dx = q.x - F.x, dz = q.z - F.z, d = Math.hypot(dx, dz);
       if (d > M.reach + 0.25 || (dx * fx + dz * fz) < 0.2 * d || q.hidden) q = null;
     }
+    if (q && !q.veh && this.g.life && this.g.life.s.drunk > 0.6 && this.rng.next() < 0.35) q = null;     // too drunk to aim
     if (q && q.veh) { this.hitVehicle(q, M); return; }
     if (!q) {
       // an animal in front of you: a dog gets kicked (or a pack scatters), a cow gets a namaskar

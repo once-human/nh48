@@ -126,7 +126,10 @@ export class Pilot {
     const run = k('ShiftLeft', 'ShiftRight');
     const target = (fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0;
     const cy = camYaw ?? F.yaw;
-    const dx = Math.cos(cy) * fw - Math.sin(cy) * sd, dz = Math.sin(cy) * fw + Math.cos(cy) * sd;
+    let dx = Math.cos(cy) * fw - Math.sin(cy) * sd, dz = Math.sin(cy) * fw + Math.cos(cy) * sd;
+    // drunk: you can't quite walk straight
+    const dk = this.drunk ? this.drunk() : 0;
+    if (dk > 0.45 && (fw || sd)) { this._stag = (this._stag || 0) + dt; const w = Math.sin(this._stag * 1.7) * Math.sin(this._stag * 0.61) * (dk - 0.45) * 1.6; const c = Math.cos(w), s0 = Math.sin(w); const nx = dx * c - dz * s0; dz = dx * s0 + dz * c; dx = nx; }
     // throwing a punch, flinching or lying on the road: you don't walk (a roll carries you)
     const A = this.act, held = this.ko || this.downT > 0 || this.seated || (A && A.kind !== 'roll');
     const tvx = held ? 0 : dx * target, tvz = held ? 0 : dz * target;

@@ -610,6 +610,17 @@ export class HUD {
     this.$('h-area').textContent = 'Inside'; this.mm.hidden = true;
   }
   leavePlace() { this.inPlace = false; this.mm.hidden = false; this.areaT = 0; this.lastStreet = null; }
+  setLockHint(on) {
+    if (!this.lockEl) { this.lockEl = el('div', 'h lockhint', 'Click to take control of the camera · Esc for the menu'); this.root.appendChild(this.lockEl); }
+    if (this.lockEl.hidden === on) this.lockEl.hidden = !on;
+  }
+  // low health: the screen edges go red and pulse with your heartbeat
+  lowHealth(f) {
+    if (!this.lowEl) { this.lowEl = el('div', 'lowhp'); this.root.appendChild(this.lowEl); }
+    const k = Math.max(0, Math.min(1, (0.45 - f) / 0.4));
+    if (Math.abs((this._lowK || 0) - k) > 0.02) { this._lowK = k; this.lowEl.style.opacity = k.toFixed(2); this.lowEl.classList.toggle('beat', k > 0.45); }
+    if (k > 0.45 && (this._hbT = (this._hbT || 0) - 1 / 60) <= 0) { this._hbT = 0.85 - k * 0.25; this.game.audio.heartbeat?.(k); }
+  }
   hurt() { const H = this.hurtEl; H.classList.remove('go'); void H.offsetWidth; H.classList.add('go'); }
   flash(title, sub) {
     const F = this.flashEl;
@@ -627,7 +638,8 @@ export class HUD {
     x.setTransform(1, 0, 0, 1, 0, 0);
     x.fillStyle = '#101216'; x.fillRect(0, 0, S, S);
     const k = S / 216;                 // canvas px per css px
-    const sc = this.mmScale * k * (1 - Math.min(0.45, Math.abs(p.v) / 32));     // canvas px per metre, zooms out with speed
+    // canvas px per metre: zooms out with speed, and shows more once you've got your eyes sorted
+    const sc = this.mmScale * k * (1 - Math.min(0.45, Math.abs(p.v) / 32)) * (g.life && g.life.s.glasses ? 0.78 : 1);
     const rot = -p.th - Math.PI / 2;
     const cy = r + 34 * k;             // player sits below centre: more road ahead
     x.save(); x.translate(r, cy);

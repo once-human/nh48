@@ -23,7 +23,9 @@ export class Input {
     this.gpPrev = {};
   }
   key(...codes) { return codes.some(c => this.keys.has(c)); }
-  took(code) { return this.pressed.has(code); }
+  // a key press is handled once, even when several simulation steps run in one frame (pressing F
+  // at a shop door used to walk you in twice, and the second time remembered the inside as the door)
+  took(code) { if (!this.pressed.has(code)) return false; this.pressed.delete(code); return true; }
   poll(dt) {
     const k = this.key.bind(this);
     let thr = k('KeyW', 'ArrowUp') ? 1 : 0;

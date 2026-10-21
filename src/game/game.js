@@ -21,6 +21,7 @@ import { Bag } from './bag.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { Dates } from './date.js';
+import { Trial } from './trial.js';
 import { Fauna } from '../people/animals.js';
 import { Vehicle } from '../vehicles/vehicle.js';
 
@@ -124,9 +125,11 @@ export class Game {
     this.strays = new Strays(this);
     this.interiors = new Interiors(this);
     this.date = new Dates(this);
+    this.trial = new Trial(this);
     this.people.reaction = () => this.life.reaction();
     player.hpMax = () => this.life.hpMax;
     player.sprintMul = () => this.life.sprintMul;
+    player.drunk = () => this.life.s.drunk;
     player.useHook = () => this.shops.tryUse();
     this.origLook = player.look ? { ...player.look, top: player.look.top.clone(), bottom: player.look.bottom.clone(), shoe: player.look.shoe.clone(), hair: player.look.hair.clone(), cut: player.look.cut.clone() } : null;
     if (this.life.s.look && player.look) { lookFromJSON(player.look, this.life.s.look); W.kit.applyLook(player.human, player.look); }
@@ -151,7 +154,8 @@ export class Game {
     window.addEventListener('keydown', (e) => {
       const ae = document.activeElement;
       if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;     // typing in the map search
-      if (e.code === 'Escape' || e.code === 'KeyP') { if (this.state === 'play' || this.state === 'pause') this.togglePause(); }
+      // (Esc that just released the mouse already opened the pause menu: don't close it again)
+      if (e.code === 'Escape' || e.code === 'KeyP') { if ((this.state === 'play' || this.state === 'pause') && performance.now() - (this._pausedAt || 0) > 300) this.togglePause(); }
       if (e.code === 'KeyM' && (this.state === 'play' || this.state === 'map')) this.toggleMap();
       if (e.code === 'KeyE' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.bag.show('bag'); }
       if (e.code === 'Tab' && this.state === 'play') { e.preventDefault(); this.bag.show('me'); }
@@ -161,13 +165,24 @@ export class Game {
     // drag on the canvas orbits the camera a little
     const cv = this.renderer.domElement;
     let drag = null;
-    // on foot a left click is a punch (people/fight.js); dragging with either button still orbits
+    // the mouse belongs to the game while you play: click once to capture it, then moving it turns
+    // the camera and a click is a punch. Esc (or any menu) gives the cursor back.
     cv.addEventListener('contextmenu', (e) => e.preventDefault());
+    const locked = () => document.pointerLockElement === cv;
     cv.addEventListener('pointerdown', (e) => {
-      if (e.pointerType !== 'mouse') return;
-      if (e.button === 0 && this.state === 'play' && this.player.onFoot) this.input.pressed.add('Mouse0');
-      if (e.button === 0 || e.button === 2) drag = { x: e.clientX, y: e.clientY };
+      if (e.pointerType !== 'mouse') { drag = { x: e.clientX, y: e.clientY }; return; }
+      if (this.state === 'play' && !locked() && cv.requestPointerLock) { try { const r = cv.requestPointerLock({ unadjustedMovement: true }); if (r && r.catch) r.catch(() => cv.requestPointerLock()); } catch (err) { cv.requestPointerLock(); } return; }
+      if (locked() && e.button === 0 && this.state === 'play') this.input.pressed.add('Mouse0');
+      if (!locked() && (e.button === 0 || e.button === 2)) drag = { x: e.clientX, y: e.clientY };
     });
+    document.addEventListener('mousemove', (e) => { if (locked() && this.state === 'play') this.rig.drag(e.movementX * 0.8, e.movementY * 0.8); });
+    document.addEventListener('pointerlockchange', () => {
+      this.hud.setLockHint?.(this.state === 'play' && !locked());
+      // Esc released the mouse during play: that's a pause, like any game
+      if (!locked() && this.state === 'play' && !this._unlockOk) this.togglePause(true);
+      this._unlockOk = false;
+    });
+    this.releaseMouse = () => { if (locked()) { this._unlockOk = true; document.exitPointerLock(); } };
     window.addEventListener('pointermove', (e) => { if (drag) { this.rig.drag(e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; } });
     window.addEventListener('pointerup', () => { drag = null; });
     this.prewarm();
@@ -282,16 +297,16 @@ export class Game {
   }
   togglePause(force) {
     const to = force !== undefined ? force : this.state !== 'pause';
-    if (to && this.state === 'play') { this.state = 'pause'; this.hud.pause.hidden = false; this.hud.syncPause(); this.audio.updateEngine(0, 0, false); this.audio.playerHorn(false); }
+    if (to && this.state === 'play') { this._pausedAt = performance.now(); this.state = 'pause'; this.hud.pause.hidden = false; this.hud.syncPause(); this.audio.updateEngine(0, 0, false); this.audio.playerHorn(false); this.audio.hush(true); }
     else if (!to && this.state === 'pause') {
-      this.state = 'play'; this.hud.pause.hidden = true;
+      this.state = 'play'; this.hud.pause.hidden = true; this.audio.hush(false);
       if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     }
   }
   toggleMap(force) {
     const to = force !== undefined ? force : this.hud.bigmap.hidden;
-    if (to && this.state === 'play') { this.state = 'map'; this.hud.mapScreen.open(); this.audio.updateEngine(0, 0, false); }
-    else if (!to && this.state === 'map') { this.state = 'play'; this.hud.mapScreen.close(); }
+    if (to && this.state === 'play') { this.state = 'map'; this.hud.mapScreen.open(); this.audio.updateEngine(0, 0, false); this.audio.hush(true); }
+    else if (!to && this.state === 'map') { this.state = 'play'; this.hud.mapScreen.close(); this.audio.hush(false); }
   }
   // take a rickshaw: someone else's auto drives you there (the ride is skipped). Pune RTA meter:
   // ₹26 for the first 1.5 km, ₹17 a km after, by road (~1.3x the straight line), never more than ₹200.
@@ -512,6 +527,9 @@ export class Game {
     }
     // a police stop holds you in place
     if (this.police.holding()) { inp.throttle = 0; inp.brake = Math.abs(this.player.v) > 0.5 ? 1 : 0; inp.steer = 0; inp.handbrake = true; inp.horn = false; }
+    // a few drinks in, the steering wanders
+    const dr = this.life ? this.life.s.drunk : 0;
+    if (dr > 0.4 && !this.player.onFoot) { this._wob = (this._wob || 0) + dt; inp.steer = Math.max(-1, Math.min(1, inp.steer + Math.sin(this._wob * 1.3) * Math.sin(this._wob * 0.37) * (dr - 0.4) * 0.6)); }
     if (this.state === 'play') this.brawl.update(dt, this.input);
     this.player.update(dt, inp, this.traffic, this.input, this.rig.footMode ? this.rig.footYaw : undefined);
     this.t += dt;
@@ -604,6 +622,11 @@ export class Game {
   frame(dt) {
     const P = this.player;
     if (this.state === 'play') { this.hour = (this.hour + dt * this.timeScale) % 24; this.clock += dt * this.timeScale; }
+    // menus get the cursor; play gets the mouse back on the next click
+    if (this.state !== 'play' && document.pointerLockElement && this.releaseMouse) this.releaseMouse();
+    if ((this._lhT = (this._lhT || 0) - dt) <= 0) { this._lhT = 0.5; this.hud.setLockHint?.(this.state === 'play' && !document.pointerLockElement && !this.params.has('test')); }
+    // never left floating outside the city (a room you didn't get out of properly, an old save)
+    if (this.state === 'play' && this.player.onFoot && !this.interiors.inside && Math.abs(this.player.x) > 30000) { const A = this.player.auto, sp = this.safeDrop(A.x, A.z); if (sp) this.player.teleportFoot(sp.x, sp.z, sp.th, this.traffic); this.rig.footMode = false; }
     const live = this.state === 'play' || this.state === 'title';
     if (live) {
       this.W.activity.setHour(this.hour);
@@ -631,6 +654,8 @@ export class Game {
       this.gigs.update(dt, this.input);
       this.strays.update(dt);
       this.rig.drunk = this.life.s.drunk;
+      if (this.post) this.post.drunk = this.interiors.inside && this.interiors.cur.R.tpl === 'club' ? Math.min(this.life.s.drunk, 0.5) : this.life.s.drunk;
+      this.hud.lowHealth?.((P.hp ?? 100) / this.life.hpMax);
       // driving drunk: the next cop who sees you pulls you over (₹10,000, MV Act s.185)
       if (!P.onFoot && this.life.s.drunk > 0.45 && Math.abs(P.v) > 3 && !this.police.stop && (this._drunkChk = (this._drunkChk || 0) - dt) <= 0) {
         this._drunkChk = 6;

@@ -84,6 +84,12 @@ export class Audio {
     this.loops.traffic = this.loop('amb_traffic', 0);
     this.loops.ride = this.loop('amb_auto_ride', 0);
   }
+  // pause / map: everything goes quiet (sirens, engines, voices), and comes back after
+  hush(on) {
+    if (!this.ctx) return;
+    if (on && this.ctx.state === 'running') this.ctx.suspend();
+    else if (!on && this.ctx.state === 'suspended') this.ctx.resume();
+  }
   setLoop(name, v, tc = 0.4) { const l = this.loops[name]; if (l) l.g.gain.setTargetAtTime(v, this.ctx.currentTime, tc); }
 
   // ---------------------------------------------------------------- voices (TTS lines, see lines.json)
@@ -295,6 +301,17 @@ export class Audio {
     const og = ctx.createGain(); o.connect(og).connect(this.master);
     this.env(og, t, 0.002, clamp(0.2 + strength * 0.35, 0.1, 0.7), 0.01, 0.12);
     o.start(t); o.stop(t + 0.2);
+  }
+  // lub-dub, when you're nearly out
+  heartbeat(k = 0.7) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    for (const [dt, f] of [[0, 62], [0.16, 54]]) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.setValueAtTime(f, t + dt); o.frequency.exponentialRampToValueAtTime(34, t + dt + 0.12);
+      o.connect(g).connect(this.master); this.env(g, t + dt, 0.004, 0.25 + k * 0.35, 0.02, 0.12);
+      o.start(t + dt); o.stop(t + dt + 0.2);
+    }
   }
   // a swing through the air
   whoosh(strength = 0.5) {
