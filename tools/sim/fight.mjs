@@ -1,6 +1,6 @@
 // quick fight check: get out, punch the nearest person a few times, let them hit back
 import puppeteer from 'puppeteer-core';
-const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--window-size=800,450'], protocolTimeout: 600000 });
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--window-size=800,450'], protocolTimeout: 600000 });
 const page = await browser.newPage(); await page.setViewport({ width: 800, height: 450 });
 const logs = []; page.on('pageerror', e => logs.push('ERR ' + e.message)); page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') logs.push(m.text()); }); page.on('response', r => { if (r.status() >= 400) logs.push('404 ' + r.url()); });
 await page.goto('http://127.0.0.1:8848/test.html?test&play=1&q=low&frames=1', { waitUntil: 'load', timeout: 300000 });

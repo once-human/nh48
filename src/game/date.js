@@ -22,6 +22,7 @@
 // nakabandis, sends food when you're starving, and one day might say it first. Disappear for days
 // and they get upset (you'll have to make up); get someone else's number and it may reach them.
 import { RNG } from '../core/util.js';
+import { castAs, castByName } from '../people/cast.js';
 import { fmt } from './shops.js';
 import EN from './date/en.json';
 import HI from './date/hi.json';
@@ -394,7 +395,7 @@ export class Dates {
     if (!seat) return;
     seat.used = true;
     const p = G.interiors.addPerson(seat.x, seat.z, seat.yaw, 'sit_talk', d.ct.female);
-    if (p) { p.name = d.ct.name; p.interest = 60; p.prof = { lang: d.ct.lang || 'en', vibe: d.ct.vibe || 'chill', likes: d.ct.likes, job: d.ct.job ?? 0, area: d.ct.area ?? 0, picky: 0.4, known: { job: true, likes: true, area: true, vibe: true }, asked: { ask_job: 1, ask_area: 1, ask_fun: 1 } }; p.dateWith = true; d.ct.dateNow = true; }
+    if (p) { const cm = castByName(d.ct.name, d.ct.female); if (cm) { castAs(p, cm, G.W.kit); G.interiors.markHearts?.(G.interiors.cur.R); } p.name = d.ct.name; p.interest = 60; p.prof = { lang: d.ct.lang || 'en', vibe: d.ct.vibe || 'chill', likes: d.ct.likes, job: d.ct.job ?? 0, area: d.ct.area ?? 0, picky: 0.4, known: { job: true, likes: true, area: true, vibe: true }, asked: { ask_job: 1, ask_area: 1, ask_fun: 1 } }; p.dateWith = true; d.ct.dateNow = true; }
     G.hud.toast(`${d.ct.name} is here`, 'At a table. Go and say hi (F)', 'good', 3);
   }
   close(bye) {

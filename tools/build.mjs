@@ -20,6 +20,13 @@ const IMPORTS = {
   postprocessing: `https://cdn.jsdelivr.net/npm/postprocessing@${V.pp}/build/index.js`,
   n8ao: `https://cdn.jsdelivr.net/npm/n8ao@${V.n8ao}/dist/N8AO.js`,
 };
+// NH_LOCAL=1: serve the libraries from node_modules (for tests where the CDN can't be reached)
+if (process.env.NH_LOCAL) {
+  IMPORTS.three = './nm/three/build/three.module.js';
+  IMPORTS['three/addons/'] = IMPORTS['three/examples/jsm/'] = './nm/three/examples/jsm/';
+  IMPORTS.postprocessing = './nm/postprocessing/build/index.js';
+  IMPORTS.n8ao = './nm/n8ao/dist/N8AO.js';
+}
 const res = await esbuild.build({
   entryPoints: [path.join(root, 'src/main.js')],
   bundle: true, format: 'esm', minify: !dev, sourcemap: false, write: false, legalComments: 'none',

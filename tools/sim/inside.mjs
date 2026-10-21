@@ -1,7 +1,7 @@
 // walk into a shop of a given kind and screenshot the room
 import puppeteer from 'puppeteer-core';
 const [, , out, kind, hour] = process.argv;
-const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'], protocolTimeout: 600000 });
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'], protocolTimeout: 600000 });
 const page = await browser.newPage(); await page.setViewport({ width: 1100, height: 650 });
 const logs = []; page.on('pageerror', e => logs.push('ERR ' + e.message + ' ' + (e.stack || '').split('\n').slice(1, 3).join(' ')));
 await page.goto(`http://127.0.0.1:8848/test.html?test&play=1&q=low&frames=1&hour=${hour || 13}`, { waitUntil: 'load', timeout: 300000 });

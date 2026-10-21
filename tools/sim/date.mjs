@@ -1,7 +1,7 @@
 // walk into a club at night, talk to someone, get their number, meet at a café, ask them out
 import puppeteer from 'puppeteer-core';
 const [, , out] = process.argv;
-const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'], protocolTimeout: 600000 });
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'], protocolTimeout: 600000 });
 const page = await browser.newPage(); await page.setViewport({ width: 1100, height: 650 });
 const logs = []; page.on('pageerror', e => logs.push('ERR ' + e.message + ' ' + (e.stack || '').split('\n').slice(1, 3).join(' ')));
 await page.goto('http://127.0.0.1:8848/test.html?test&play=1&q=low&frames=1&hour=23', { waitUntil: 'load', timeout: 300000 });
@@ -16,7 +16,7 @@ const r = await page.evaluate(async () => {
   for (let i = 0; i < 6; i++) await frame();
   const R = g.interiors.cur.R;
   o.style = R.style; o.size = [R.W, R.D]; o.peds = R.peds.length; o.hearts = R.hearts.length;
-  const p = R.peds.find(q => D.eligible(q) && q.name);
+  const p = R.peds.find(q => D.eligible(q) && q.name && q.dancer) || R.peds.find(q => D.eligible(q) && q.name);
   o.who = p && [p.name, p.female, P.look.female];
   // stand next to them: does F offer the chat?
   P.foot.x = p.x + 1.5; P.foot.z = p.z;

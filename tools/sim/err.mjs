@@ -1,5 +1,5 @@
 import puppeteer from 'puppeteer-core';
-const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const page = await browser.newPage();
 page.on('pageerror', e => console.log('ERR', e.message, (e.stack || '').split('\n').slice(0, 4).join(' | ')));
 page.on('console', m => { if (m.type() === 'error') console.log('CONSOLE', m.text()); });

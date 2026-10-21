@@ -17,6 +17,7 @@
 import * as THREE from 'three';
 import { ColorBuilder } from './geo.js';
 import { RNG } from '../core/util.js';
+import { castAs, pickCast, castByName } from '../people/cast.js';
 import { F, MENUS, AREA_FOOD } from '../game/shops.js';
 import { Vehicle } from '../vehicles/vehicle.js';
 import { tierOf } from '../game/brands.js';
@@ -590,6 +591,9 @@ export class Interiors {
       R.peds.push(p);
       return p;
     };
+    const taken = new Set(G.date && G.date.pending ? [G.date.pending.ct.name] : []);
+    const name = (q) => { const c = pickCast(rng, q.female, taken, R.tpl); if (c) { taken.add(c.name); castAs(q, c, kit); } return q; };
+    this._name = name;
     for (const k of R.people) make(k.x, k.z, k.yaw, k.anim, k.role === 'teller' ? rng.chance(0.6) : rng.chance(0.25), { police: R.tpl === 'chowki' && k.role === 'keeper' });
     for (const s of R.seats) s.used = false;
     // customers at tables, eating and chatting
@@ -601,11 +605,11 @@ export class Interiors {
         const s = free.splice(rng.int(0, free.length - 1), 1)[0];
         s.used = true; const q = make(s.x, s.z, s.yaw, s.wait ? rng.pick(['sit', 'sit', 'phone']) : rng.pick(['sit', 'sit_talk']), rng.chance(0.4));
         if (q.anim === 'phone') q.anim = q.idle = 'sit';
-        if (/cafe|eatery/.test(R.tpl) && rng.chance(0.5)) q.name = rng.pick(q.female ? FEM : MALE);
+        if (/cafe|eatery/.test(R.tpl) && rng.chance(0.5)) name(q);
       } else if (stand.length) {
         const [x, z] = stand.splice(rng.int(0, stand.length - 1), 1)[0];
         const q = make(x + rng.range(-0.3, 0.3), z + rng.range(-0.3, 0.3), rng.range(0, 6.28), rng.pick(['idle', 'phone', 'idle']), rng.chance(0.45));
-        if (/cafe|eatery/.test(R.tpl) && rng.chance(0.4)) q.name = rng.pick(q.female ? FEM : MALE);
+        if (/cafe|eatery/.test(R.tpl) && rng.chance(0.4)) name(q);
       }
     }
     // a full dance floor (busier late), people at the bar
@@ -613,10 +617,10 @@ export class Interiors {
       const n = Math.round(R.dancers * (G.hour > 22 || G.hour < 2 ? 1.3 : 0.8));
       for (let i = 0; i < n; i++) {
         const F0 = R.floor, p = make(F0.x + rng.range(-F0.w / 2 + 0.6, F0.w / 2 - 0.6), F0.z + rng.range(-F0.d / 2 + 0.6, F0.d / 2 - 0.6), rng.range(0, 6.28), 'dance', rng.chance(0.5));
-        p.dancer = true; p.name = rng.pick(p.female ? FEM : MALE);
+        p.dancer = true; name(p);
       }
-      for (let i = 0; i < 5; i++) { const q = make(R.O.x - R.W / 2 + 2.6, R.O.z + R.D / 2 - 3 + i * 1.3, Math.PI, rng.pick(['drink', 'talk', 'idle']), rng.chance(0.45)); q.name = rng.pick(q.female ? FEM : MALE); q.atBar = true; }
-      for (const s of R.seats) if (s.sofa && rng.chance(0.6)) { s.used = true; const q = make(s.x, s.z, s.yaw, rng.pick(['sit', 'sit_talk']), rng.chance(0.5)); q.name = rng.pick(q.female ? FEM : MALE); }
+      for (let i = 0; i < 5; i++) { const q = make(R.O.x - R.W / 2 + 2.6, R.O.z + R.D / 2 - 3 + i * 1.3, Math.PI, rng.pick(['drink', 'talk', 'idle']), rng.chance(0.45)); name(q); q.atBar = true; }
+      for (const s of R.seats) if (s.sofa && rng.chance(0.6)) { s.used = true; const q = make(s.x, s.z, s.yaw, rng.pick(['sit', 'sit_talk']), rng.chance(0.5)); name(q); }
     }
     if (R.lifters) for (let i = 0; i < R.lifters; i++) make(R.O.x - 4 + i * 2.6, R.O.z + 3.8, Math.PI / 2, rng.pick(['crouch', 'push', 'idle']), rng.chance(0.3));
     this.markHearts(R);
@@ -659,11 +663,14 @@ export class Interiors {
     for (const s of C.R.spots) { const d = Math.hypot(s.x - x, s.z - z); if (d < s.r && d < bd) { bd = d; best = s; } }
     // a free seat at a table (to eat what you ordered), or someone to talk to
     if (!best && C.R.seats.length) for (const s of C.R.seats) { if (s.used || s.salon) continue; const d = Math.hypot(s.x - x, s.z - z); if (d < 1.1 && d < bd) { bd = d; best = { kind: 'seat', seat: s, label: C.plate ? `Sit down and eat your ${C.plate.name.toLowerCase()}` : 'Sit down' }; } }
-    if (!best && C.R.peds) { const D = this.g.date; for (const p of C.R.peds) { if (!p.name || p.walkedOff || !(p.dateWith || D && D.eligible(p))) continue; const d = Math.hypot(p.x - x, p.z - z); if (d < 2.4 && d < bd) { bd = d; best = { kind: 'talk', p, label: p.dateWith ? `Join ${p.name}` : `Talk to ${p.name}` }; } } }
+    // someone close by beats a big area spot (the dance floor covers the whole floor, so it used to hide everyone on it)
+    let talk = null, td = 1e9;
+    if (C.R.peds && !C.seat) { const D = this.g.date; for (const p of C.R.peds) { if (!p.name || p.walkedOff || !(p.dateWith || D && D.eligible(p))) continue; const d = Math.hypot(p.x - x, p.z - z); if (d < 2.4 && d < td) { td = d; talk = { kind: 'talk', p, label: p.dateWith ? `Join ${p.name}` : `Talk to ${p.name}` }; } } }
+    if (talk && (!best || td < bd || (best.r >= 3 && td < 1.9))) best = talk;
     if (best && C.ctx.kind === 'optician' && (best.kind === 'rack' || best.kind === 'counter')) best = { ...best, kind: 'counter', label: best.kind === 'rack' ? 'Try on frames' : 'Eye test and glasses' };
     if (best && C.ctx.kind === 'shoes' && best.kind === 'rack') best = { ...best, kind: 'counter', label: 'Try on shoes' };
     if (C.seat) best = { kind: 'stand', label: C.eating ? 'Eating…' : 'Get up' };
-    if (C.dancing) best = { kind: 'undance', label: 'Stop dancing' };
+    if (C.dancing && !(talk && td < 1.9)) best = { kind: 'undance', label: 'Stop dancing' };
     return best;
   }
   label(s) { return s.label; }
@@ -684,7 +691,7 @@ export class Interiors {
       case 'undance': this.dance(false); return;
       case 'workout': G.shops.show({ ...ctx, kind: 'gym', inside: true }); return;
       case 'vehicle': G.shops.show({ ...ctx, kind: 'dealer', inside: true }); return;
-      case 'talk': G.date && G.date.talk(s.p, C); return;
+      case 'talk': if (C.dancing) this.dance(false); G.date && G.date.talk(s.p, C); return;
     }
   }
   sit(seat, salon) {
@@ -764,5 +771,3 @@ export class Interiors {
   }
 }
 const UNIT = new THREE.BoxGeometry(1, 1, 1);
-const FEM = ['Riya', 'Ananya', 'Sanika', 'Tanvi', 'Ishita', 'Mrunmayi', 'Aditi', 'Shreya', 'Kavya', 'Pooja', 'Zoya', 'Neha'];
-const MALE = ['Arjun', 'Kabir', 'Rohan', 'Omkar', 'Siddhant', 'Aditya', 'Varun', 'Nikhil', 'Yash', 'Aman', 'Rahul', 'Dev'];

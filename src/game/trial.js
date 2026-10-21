@@ -10,7 +10,7 @@ import { KbNav } from '../ui/kbnav.js';
 const WHO = { M: 'Men’s', W: 'Women’s', U: 'Unisex' };
 const r10 = (v) => Math.max(10, Math.round(v / 10) * 10);
 const HAIR_M = [['hair_simpleparted', 'Side parting', 150], ['hair_buzzed', 'Army cut', 120]];
-const HAIR_F = [['hair_long', 'Long, blow-dried', 700], ['hair_buns', 'Juda (bun)', 350], ['hair_buzzedfemale', 'Pixie cut', 600]];
+const HAIR_F = [['hair_long', 'Long, blow-dried', 700], ['hair_buns', 'Juda (bun)', 350], ['pony', 'Ponytail', 250], ['braid', 'Choti (plait)', 300], ['hair_buzzedfemale', 'Pixie cut', 600]];
 const COLOURS = [[0x0d0b0a, 'Natural black', 400], [0x2a1a12, 'Dark brown', 650], [0x4a1a1a, 'Burgundy', 750], [0x6b4a2a, 'Caramel highlights', 1200]];
 
 export class Trial {

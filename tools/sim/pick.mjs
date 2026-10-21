@@ -1,6 +1,6 @@
 import puppeteer from 'puppeteer-core';
 const out = process.argv[2];
-const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--window-size=1280,720'], protocolTimeout: 900000 });
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--window-size=1280,720'], protocolTimeout: 900000 });
 const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 720 });
 const logs = []; page.on('pageerror', e => logs.push('ERR ' + e.message)); page.on('console', m => { if (/error|warn/i.test(m.type())) logs.push(m.text().slice(0, 300)); });
 await page.goto('http://127.0.0.1:8848/test.html?test&q=low&frames=1', { waitUntil: 'load', timeout: 300000 });

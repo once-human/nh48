@@ -4,7 +4,7 @@ import puppeteer from 'puppeteer-core';
 import fs from 'node:fs';
 const [outDir, ...views] = process.argv.slice(2);
 fs.mkdirSync(outDir, { recursive: true });
-const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new',
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', headless: 'new',
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--window-size=1280,720'], protocolTimeout: 1800000 });
 const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 720 });
 const logs = []; page.on('pageerror', e => logs.push('ERR ' + e.message));

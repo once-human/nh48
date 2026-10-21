@@ -3,7 +3,7 @@
 import puppeteer from 'puppeteer-core';
 const [url, out, w = '1280', h = '720', waitMs = '60000', evalJs = ''] = process.argv.slice(2);
 const browser = await puppeteer.launch({
-  executablePath: '/usr/bin/google-chrome',
+  executablePath: process.env.CHROME || '/opt/pw-browsers/chromium',
   headless: 'new',
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist',
          '--enable-webgl', '--autoplay-policy=no-user-gesture-required', '--disable-dev-shm-usage', `--window-size=${w},${h}`,

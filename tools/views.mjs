@@ -6,7 +6,7 @@ const [outDir, query, ...views] = process.argv.slice(2);
 fs.mkdirSync(outDir, { recursive: true });
 const W = +(process.env.W || 1280), H = +(process.env.H || 720);
 const browser = await puppeteer.launch({
-  executablePath: '/usr/bin/google-chrome', headless: 'new',
+  executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', headless: 'new',
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl',
     '--disable-dev-shm-usage', `--window-size=${W},${H}`, ...(process.env.HTTPS_PROXY ? [`--proxy-server=${process.env.HTTPS_PROXY}`] : [])],
   protocolTimeout: 900000,

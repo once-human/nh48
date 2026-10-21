@@ -1,6 +1,6 @@
 // one load, many quick checks: rooms, police charges, menus, fares, guide
 import puppeteer from 'puppeteer-core';
-const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'], protocolTimeout: 90000 });
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'], protocolTimeout: 90000 });
 const page = await browser.newPage(); await page.setViewport({ width: 1100, height: 650 });
 const errs = []; page.on('console', m => { if (m.text().startsWith('step')) console.log(m.text()); }); page.on('pageerror', e => errs.push('ERR ' + e.message + ' ' + (e.stack || '').split('\n').slice(1, 3).join(' | ')));
 await page.goto('http://127.0.0.1:8848/test.html?test&play=1&q=low&frames=1&hour=20', { waitUntil: 'load', timeout: 60000 });

@@ -15,7 +15,7 @@ import { TOUGH, HP } from './fight.js';
 const PERSONA_M = ['kaka', 'ajoba', 'dada', 'bhaiya', 'collegeboy', 'kpguy'], PERSONA_F = ['kaku', 'aaji', 'tai', 'aunty', 'collegegirl', 'kpgirl'];
 const OLD = new Set(['ajoba', 'aaji']);
 // what they wear follows who they are: the KP crowd and students in western clothes, aajis in sarees
-const DRESS = { kpguy: 'modern', kpgirl: 'modern', collegeboy: 'modern', collegegirl: 'modern', aaji: 'traditional', kaku: 'traditional', ajoba: 'traditional' };
+const DRESS = { kpguy: 'modern', kpgirl: 'western', collegeboy: 'modern', collegegirl: 'modern', aaji: 'traditional', kaku: 'traditional', ajoba: 'traditional' };
 
 
 const SKINS = [[0.78, 0.6, 0.47], [0.69, 0.5, 0.37], [0.6, 0.43, 0.31], [0.52, 0.36, 0.26], [0.45, 0.31, 0.22], [0.82, 0.66, 0.53]];

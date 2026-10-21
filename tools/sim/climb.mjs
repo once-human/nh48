@@ -1,7 +1,7 @@
 // on-foot jump + climb check: node tools/sim/climb.mjs out x z yaw
 import puppeteer from 'puppeteer-core';
 const [out, x, z, yaw] = process.argv.slice(2);
-const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--window-size=960,540'], protocolTimeout: 900000 });
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--window-size=960,540'], protocolTimeout: 900000 });
 const page = await browser.newPage(); await page.setViewport({ width: 960, height: 540 });
 const logs = []; page.on('pageerror', e => logs.push('ERR ' + e.message));
 await page.goto('http://127.0.0.1:8848/test.html?test&play=1&q=low&frames=1&simx=2', { waitUntil: 'load', timeout: 300000 });

@@ -15,9 +15,17 @@ const PANTS = [0x232a3d, 0x342f2a, 0x7a6c58, 0x1b1c1f, 0x4b5363, 0xd9d2c0, 0x3b4
 const KURTA = [0xe9e2cf, 0xf4d58d, 0xd1495b, 0x2e86ab, 0x7a9e7e, 0xf28f3b, 0x8e5572, 0xffffff, 0x3d405b, 0xc8553d];
 const SALWAR = [0xf4f1ea, 0x2f2f33, 0xd9c7a3, 0x8e5572, 0x3d405b];
 const SAREE = [0xc1121f, 0xf77f00, 0x2a9d8f, 0x7b2cbf, 0xffb703, 0x1d4e89, 0xe5989b, 0x9d0208, 0x386641];
-const HAIR = [0x0d0b0a, 0x15110f, 0x1f1814, 0x2a201a, 0x6b6560, 0xb0aaa2];
+// black and near-black for most, then browns, henna and highlights; the last two are grey (elders)
+export const HAIR = [0x0d0b0a, 0x15110f, 0x1f1814, 0x2a201a, 0x3b2a20, 0x4a2f22, 0x5c2a1e, 0x6e4a2e, 0x6b6560, 0xb0aaa2];
+const HAIR_W = [3, 3, 2.4, 1.6, 1.2, 0.9, 0.5, 0.4, 0, 0];
 const HAIR_M = ['hair_simpleparted', 'hair_simpleparted', 'hair_buzzed'];
-const HAIR_F = ['hair_long', 'hair_long', 'hair_buns', 'hair_buzzedfemale'];
+// women: open long hair, a bun, a ponytail or a plait (the last two are the close-cut cap with a tail on the head bone);
+// the plain short cut is rare now
+const HAIR_F = ['hair_long', 'hair_long', 'hair_long', 'hair_buns', 'hair_buns', 'pony', 'pony', 'braid', 'braid', 'hair_buzzedfemale'];
+// the extra hair styles and what they're built on
+const WEST_TOP = [0xf4f2ee, 0x16161a, 0xe9dccb, 0xf2c6cf, 0xc9b8e3, 0xb7c9a8, 0xb9d2ea, 0x8c1d2c, 0xf0e2a8, 0x6d7f9c];
+const WEST_BOT = [0x3e5f8a, 0x2c4568, 0x16161a, 0xf2f0ea, 0xcbb89a, 0x6b7f99, 0x5a4636];
+const TAIL = { pony: 'hair_buzzedfemale', braid: 'hair_buzzedfemale' };
 const c = (h) => new THREE.Color(h).convertSRGBToLinear();
 
 // bind-pose landmarks (metres, glTF y-up, the body faces +z)
@@ -109,18 +117,29 @@ export class HumanKit {
   randomLook(rng, opts = {}) {
     const female = opts.female ?? rng.chance(0.45);
     const L = { female, skin: c(rng.weighted ? rng.weighted(SKIN, SKIN_W) : rng.pick(SKIN)), shoe: c(rng.pick([0x1d1a18, 0x3b2a1f, 0x555555, 0x8a6a4a, 0xd8d0c0])),
-      hair: c(rng.pick(HAIR.slice(0, rng.chance(0.18) ? 6 : 4))), scale: female ? rng.range(0.9, 0.97) : rng.range(0.93, 1.0), acc: null,
-      style: female ? rng.pick(HAIR_F) : rng.pick(HAIR_M), beard: !female && rng.chance(0.3) };
+      hair: c(rng.chance(0.07) ? rng.pick(HAIR.slice(8)) : rng.weighted ? rng.weighted(HAIR, HAIR_W) : rng.pick(HAIR.slice(0, 6))), scale: female ? rng.range(0.9, 0.97) : rng.range(0.93, 1.0), acc: null,
+      style: female ? rng.pick(HAIR_F) : rng.pick(HAIR_M), beard: !female && rng.chance(0.3),
+      glasses: rng.chance(female ? 0.12 : 0.16), bindi: female && rng.chance(0.3) };
     if (opts.role === 'police') {
       Object.assign(L, { female: false, top: c(0xa08a5c), bottom: c(0x8f7b52), cut: new THREE.Vector4(0.42, 1, 0.6, 0), acc: 'cap_police', style: 'hair_buzzed', shoe: c(0x1a1715) });
       return L;
     }
     // opts.dress: 'modern' (jeans and tops), 'traditional' (saree / kurta), or anything
-    const D = opts.dress;
-    if (female) {
+    let D = opts.dress;
+    if (female && D === 'modern' && rng.chance(0.5)) D = 'western';
+    if (female && D === 'western') {
+      // KP, Viman Nagar, Baner, the college crowd: lighter skin on average, western clothes, open hair or a ponytail, highlights
+      L.skin = c(rng.weighted ? rng.weighted(SKIN, [4, 3, 1.4, 0.6, 0.2, 0.05]) : rng.pick(SKIN.slice(0, 3)));
+      L.top = c(rng.pick(WEST_TOP)); L.bottom = c(rng.pick(WEST_BOT));
+      L.cut = new THREE.Vector4(rng.chance(0.65) ? 0.3 : 0.9, 1, rng.chance(0.4) ? 0.35 : 0.55, 0);
+      L.style = rng.pick(['hair_long', 'hair_long', 'hair_long', 'pony', 'hair_buzzedfemale']);
+      L.hair = c(rng.weighted ? rng.weighted(HAIR.slice(0, 8), [1.5, 1.5, 1.5, 1.6, 1.4, 1.2, 0.7, 0.9]) : rng.pick(HAIR.slice(2, 8)));
+      L.bindi = false; L.glasses = rng.chance(0.15); L.scale = rng.range(0.93, 0.98);
+      L.shoe = c(rng.pick([0xf2f0ea, 0x1d1a18, 0xd8c0a8, 0xe9d6c8]));
+    } else if (female) {
       let s = rng.next();
       if (D === 'modern') s = 0.72 + s * 0.28; else if (D === 'traditional') s *= 0.72;
-      if (s < 0.35) { L.top = c(rng.pick(SAREE)); L.bottom = L.top.clone().multiplyScalar(0.85); L.cut = new THREE.Vector4(0.3, 1, 0.9, 2); L.style = rng.chance(0.6) ? 'hair_buns' : 'hair_long'; }   // saree
+      if (s < 0.35) { L.top = c(rng.pick(SAREE)); L.bottom = L.top.clone().multiplyScalar(0.85); L.cut = new THREE.Vector4(0.3, 1, 0.9, 2); L.style = rng.pick(['hair_buns', 'hair_buns', 'hair_long', 'braid']); L.bindi = rng.chance(0.75); }   // saree
       else if (s < 0.72) { L.top = c(rng.pick(KURTA)); L.bottom = c(rng.pick(SALWAR)); L.cut = new THREE.Vector4(rng.chance(0.5) ? 0.4 : 0.85, 0.55, 0.8, 1); } // kurta + salwar
       else { L.top = c(rng.pick(SHIRT)); L.bottom = c(rng.pick(PANTS)); L.cut = new THREE.Vector4(rng.chance(0.6) ? 0.35 : 0.9, 1, 0.5, 0); }           // jeans + top
     } else {
@@ -170,6 +189,16 @@ export class HumanKit {
     holder.add(root);
     const mixer = new THREE.AnimationMixer(root);
     const H = { holder, root, mixer, mat, acc, hairMat, topMat, botMat, shoeMat, body, parts, actions: {}, cur: null, look };
+    // ponytail, plait, glasses and bindi ride on the head bone
+    const head = root.getObjectByName('Head'), X = head && this.extras(k);
+    if (X) {
+      H.xtra = {};
+      for (const [n, geo] of Object.entries(X.geo)) {
+        const m = new THREE.Mesh(geo, n === 'glasses' ? this.glassMat : n === 'bindi' ? this.bindiMat : hairMat);
+        m.matrixAutoUpdate = false; m.matrix.copy(X.local); m.castShadow = false; m.visible = false;
+        head.add(m); H.xtra[n] = m;
+      }
+    }
     this.applyLook(H, look);
     H.play = (name, { fade = 0.25, speed = 1, once = false, restart = false } = {}) => {
       let a = H.actions[name];
@@ -193,6 +222,54 @@ export class HumanKit {
     H.dispose = () => { mat.dispose(); acc.dispose(); hairMat.dispose(); topMat.dispose(); botMat.dispose(); mixer.stopAllAction(); };
     return H;
   }
+  // geometry for the head-bone extras, built once per body in the rig's rest pose and carried into the
+  // Head bone's space (so they follow every nod and turn)
+  extras(k) {
+    this._xtra = this._xtra || {};
+    if (this._xtra[k] !== undefined) return this._xtra[k];
+    const g = this.src[k], sc = g.scene;
+    sc.updateMatrixWorld(true);
+    const head = sc.getObjectByName('Head');
+    let cap = null, eyes = null;
+    sc.traverse((o) => {
+      if (!o.isSkinnedMesh) return;
+      const b = new THREE.Box3().setFromBufferAttribute(o.geometry.attributes.position).applyMatrix4(o.matrixWorld);
+      if (o.name === (k === 'f' ? 'hair_buzzedfemale' : 'hair_buzzed')) cap = b;
+      else if (o.name.startsWith('eyes')) eyes = b;
+    });
+    if (!head || !cap || !eyes) return (this._xtra[k] = null);
+    this.glassMat = this.glassMat || new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.35, metalness: 0.4 });
+    this.bindiMat = this.bindiMat || new THREE.MeshStandardMaterial({ color: 0xa3101c, roughness: 0.5 });
+    const cx = (cap.min.x + cap.max.x) / 2, top = cap.max.y, back = cap.min.z, H = cap.max.y - cap.min.y;
+    const ey = (eyes.min.y + eyes.max.y) / 2, ez = eyes.max.z, ew = eyes.max.x - eyes.min.x;
+    const merge = (list) => {
+      const pos = [], nrm = [], idx = []; let base = 0;
+      for (const q of list) { const n = q.toNonIndexed ? q : q; const p = n.attributes.position, nn = n.attributes.normal, ix = n.index;
+        for (let i = 0; i < p.count; i++) { pos.push(p.getX(i), p.getY(i), p.getZ(i)); nrm.push(nn.getX(i), nn.getY(i), nn.getZ(i)); }
+        if (ix) for (let i = 0; i < ix.count; i++) idx.push(ix.getX(i) + base); base += p.count; }
+      const out = new THREE.BufferGeometry(); out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); out.setIndex(idx);
+      return out;
+    };
+    // ponytail: a tie at the crown's back, then a tapered fall
+    const tie = new THREE.SphereGeometry(0.034, 10, 8); tie.translate(cx, top - H * 0.32, back + 0.01);
+    const tail = new THREE.CylinderGeometry(0.036, 0.012, 0.26, 10, 4); tail.translate(0, -0.13, 0); tail.rotateX(0.32); tail.translate(cx, top - H * 0.34, back - 0.005);
+    const pony = merge([tie, tail]);
+    // plait: a chain of beads down the back to the shoulder blades, with a tassel
+    const beads = [];
+    for (let i = 0; i < 9; i++) { const r = 0.034 - i * 0.0022, b = new THREE.SphereGeometry(r, 9, 7); b.scale(1, 1.35, 0.9); b.translate(cx + (i % 2 ? 0.006 : -0.006), top - H * 0.55 - i * 0.045, back - 0.012 - Math.min(i, 3) * 0.006); beads.push(b); }
+    const tas = new THREE.ConeGeometry(0.018, 0.06, 8); tas.rotateX(Math.PI); tas.translate(cx, top - H * 0.55 - 9 * 0.045 - 0.01, back - 0.03); beads.push(tas);
+    const braid = merge(beads);
+    // glasses: two rims and a bridge just in front of the eyes
+    const rim = (x) => { const t = new THREE.TorusGeometry(ew * 0.16, 0.0035, 6, 18); t.translate(x, ey, ez + 0.012); return t; };
+    const br = new THREE.BoxGeometry(ew * 0.18, 0.004, 0.004); br.translate(cx, ey + 0.004, ez + 0.012);
+    const armL = new THREE.BoxGeometry(0.004, 0.004, 0.1); armL.translate(cx - ew * 0.5, ey + 0.004, ez - 0.04);
+    const armR = armL.clone(); armR.translate(ew, 0, 0);
+    const glasses = merge([rim(cx - ew * 0.26), rim(cx + ew * 0.26), br, armL, armR]);
+    const bindi = new THREE.CircleGeometry(0.0055, 12); bindi.translate(cx, ey + 0.038, ez - 0.004);
+    // rest pose -> Head bone space
+    const toHead = new THREE.Matrix4().copy(head.matrixWorld).invert();
+    return (this._xtra[k] = { geo: { pony, braid, glasses, bindi }, local: toHead });
+  }
   // dress a body (also used when the crowd hands a pooled body to someone else)
   applyLook(H, look, accOnly = false) {
     if (!accOnly) {
@@ -215,10 +292,16 @@ export class HumanKit {
       else if (n === 'cloth_saree') o.visible = saree;
       else if (n === 'cloth_shoes') o.visible = true;
       else if (n === 'hair_beard') o.visible = !!look.beard;
-      else if (n.startsWith('hair')) o.visible = !helmet && n === (cap ? 'hair_buzzed' : look.style);
+      else if (n.startsWith('hair')) o.visible = !helmet && n === (cap ? 'hair_buzzed' : TAIL[look.style] || look.style);
       else if (n === 'helmet') o.visible = helmet;
       else if (n === 'cap_police') o.visible = cap;
       else o.visible = false;
+    }
+    if (H.xtra) {
+      H.xtra.pony.visible = !helmet && look.style === 'pony';
+      H.xtra.braid.visible = !helmet && look.style === 'braid';
+      H.xtra.glasses.visible = !!look.glasses && !helmet;
+      H.xtra.bindi.visible = !!look.bindi && !!look.female;
     }
     if (helmet) H.acc.color.copy(look.helmetCol || new THREE.Color(0x1b1d22));
     else if (cap) H.acc.color.set(0xf4f4f0);

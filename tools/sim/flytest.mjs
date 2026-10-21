@@ -1,6 +1,6 @@
 import puppeteer from 'puppeteer-core';
 const [x, z, th, secs = '30', out = 'fly.png', steerK = '0'] = process.argv.slice(2);
-const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new',
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', headless: 'new',
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--window-size=960,540'], protocolTimeout: 900000 });
 const page = await browser.newPage(); await page.setViewport({ width: 960, height: 540 });
 const logs = []; page.on('console', m => { const t = m.text(); if (/error|fly|Error/i.test(t)) logs.push(t); }); page.on('pageerror', e => logs.push('ERR ' + e.message));

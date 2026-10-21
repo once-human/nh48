@@ -1,6 +1,6 @@
 // take a car from traffic and time the frames around it (finds what makes getting in heavy)
 import puppeteer from 'puppeteer-core';
-const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--window-size=800,450'], protocolTimeout: 600000 });
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--window-size=800,450'], protocolTimeout: 600000 });
 const page = await browser.newPage(); await page.setViewport({ width: 800, height: 450 });
 const logs = []; page.on('pageerror', e => logs.push('ERR ' + e.message));
 await page.goto('http://127.0.0.1:8848/test.html?test&play=1&q=low&frames=1', { waitUntil: 'load', timeout: 300000 });

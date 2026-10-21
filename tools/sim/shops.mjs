@@ -1,6 +1,6 @@
 // smoke test: every kind of shop renders its menu; buy a few things; open the bag tabs
 import puppeteer from 'puppeteer-core';
-const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--window-size=1100,650'], protocolTimeout: 600000 });
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--window-size=1100,650'], protocolTimeout: 600000 });
 const page = await browser.newPage(); await page.setViewport({ width: 1100, height: 650 });
 const logs = []; page.on('pageerror', e => logs.push('ERR ' + e.message + ' ' + (e.stack || '').split('\n')[1]));
 await page.goto('http://127.0.0.1:8848/test.html?test&play=1&q=low&frames=1', { waitUntil: 'load', timeout: 300000 });
