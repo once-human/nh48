@@ -82,14 +82,19 @@ export class TileManager {
   }
   // somewhere you're about to be (fast travel, a bus, the hospital): the pieces within r of (x, z) fetched and
   // joined right now, behind the black screen, so you arrive in a built street
-  async ensure(x, z, r = 650) {
+  async ensure(x, z, r = 650, onProgress) {
     const need = this.list.filter(T => this.dist(T, x, z) < r);
+    let done = 0; const tick = () => onProgress && onProgress(++done / Math.max(1, need.length * 2));
     while (this.job) { if (this.job.next().done) this.job = null; }
     for (const T of need) if (T.state === 'dropping') { this.dropping = this.dropping.filter(q => q !== T); T.state = 'live'; }
-    await Promise.all(need.map(T => T.state === 'none' ? this.fetch(T) : T.state === 'loading' ? T.pending : null));
-    for (const T of need) if (T.state === 'ready') {
-      this.ready = this.ready.filter(q => q !== T);
-      const it = this.integrate(T); while (!it.next().done) { /* now */ }
+    await Promise.all(need.map(async T => { if (T.state === 'none') await this.fetch(T); else if (T.state === 'loading') await T.pending; tick(); }));
+    for (const T of need) {
+      if (T.state === 'ready') {
+        this.ready = this.ready.filter(q => q !== T);
+        try { const it = this.integrate(T); while (!it.next().done) { /* now */ } } catch (e) { console.warn('tile', T.i, T.j, e); }
+        await new Promise(res => setTimeout(res, 0));        // let the bar move
+      }
+      tick();
     }
   }
   // join a tile to the world, a slice at a time

@@ -81,7 +81,7 @@ export class HUD {
     this.stopEl.hidden = true;
     this.stopEl.setAttribute('role', 'dialog'); this.stopEl.setAttribute('aria-label', 'Police stop');
     this.hurtEl = el('div', 'hurtov');
-    this.flashEl = el('div', 'flashov', '<div class="fl-in"><div class="fl-t"></div><div class="fl-s"></div></div>');
+    this.flashEl = el('div', 'flashov', '<div class="fl-in"><div class="fl-t"></div><div class="fl-s"></div><div class="fl-bar"><i></i></div></div>');
     this.flashEl.hidden = true;
     this.placeEl = el('div', 'h placecard', '<div class="pc-k">Landmark</div><div class="pc-t" id="h-pc-t"></div><div class="pc-mr" lang="mr" id="h-pc-mr"></div><div class="pc-s" id="h-pc-s"></div>');
     this.placeEl.hidden = true;
@@ -749,13 +749,22 @@ export class HUD {
     if (k > 0.45 && (this._hbT = (this._hbT || 0) - 1 / 60) <= 0) { this._hbT = 0.85 - k * 0.25; this.game.audio.heartbeat?.(k); }
   }
   hurt() { const H = this.hurtEl; H.classList.remove('go'); void H.offsetWidth; H.classList.add('go'); }
-  // while the city ahead is fetched and built (fast travel, buses): the same black screen as an arrival, held
-  curtain(on, text = '') {
+  // while the city ahead is fetched and built (fast travel, buses): the same black screen as an arrival, held,
+  // with how far along the trip is ("8.4 of 12 km")
+  curtain(on, text = '', km = 0) {
     const F = this.flashEl;
     if (on) {
-      F.querySelector('.fl-t').textContent = text; F.querySelector('.fl-s').textContent = 'On the way…';
+      this._cuKm = km;
+      F.querySelector('.fl-t').textContent = text; F.querySelector('.fl-s').textContent = km ? `0 of ${km.toFixed(1)} km` : 'On the way…';
+      F.querySelector('.fl-bar i').style.width = '0%';
       clearTimeout(this._flT); F.hidden = false; F.classList.remove('go'); F.classList.add('hold');
     } else F.classList.remove('hold');
+  }
+  curtainProgress(f) {
+    const F = this.flashEl, km = this._cuKm || 0;
+    f = Math.max(0, Math.min(1, f));
+    F.querySelector('.fl-bar i').style.width = Math.round(f * 100) + '%';
+    if (km) F.querySelector('.fl-s').textContent = `${(f * km).toFixed(1)} of ${km.toFixed(1)} km`;
   }
   flash(title, sub) {
     const F = this.flashEl;

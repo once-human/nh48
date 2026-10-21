@@ -61,10 +61,13 @@ const fontDefs = [
   ['Teko', '@fontsource/teko/files/teko-latin-500-normal.woff2', 500, 'normal', LAT],
   ['Teko', '@fontsource/teko/files/teko-latin-600-normal.woff2', 600, 'normal', LAT],
 ];
+// fonts as their own files (cached by the browser, and the page itself arrives ~1.2 MB lighter)
 let fontCss = '';
+const FONT_OUT = path.join(root, 'dist/assets/fonts'); fs.mkdirSync(FONT_OUT, { recursive: true });
 for (const [fam, file, w, st, range] of fontDefs) {
-  const b64 = fs.readFileSync(path.join(NM, file)).toString('base64');
-  fontCss += `@font-face{font-family:'${fam}';font-style:normal;font-weight:${w};font-stretch:${st};font-display:block;src:url(data:font/woff2;base64,${b64}) format('woff2');unicode-range:${range};}\n`;
+  const name = path.basename(file);
+  fs.copyFileSync(path.join(NM, file), path.join(FONT_OUT, name));
+  fontCss += `@font-face{font-family:'${fam}';font-style:normal;font-weight:${w};font-stretch:${st};font-display:swap;src:url(assets/fonts/${name}) format('woff2');unicode-range:${range};}\n`;
 }
 
 // assets
@@ -82,9 +85,10 @@ const copyDir = (from, to) => {
     const s = path.join(from, f), d = path.join(to, f);
     if (fs.statSync(s).isDirectory()) copyDir(s, d);
     else if (f.endsWith('.glb')) {
-      // models ship as gzip+base64 text: the artifact host doesn't serve .glb
-      const out = d + '.gz.txt';
-      if (!fs.existsSync(out) || fs.statSync(out).mtimeMs < fs.statSync(s).mtimeMs) fs.writeFileSync(out, zlib.gzipSync(fs.readFileSync(s), { level: 9 }).toString('base64'));
+      // models ship gzipped (.glb.gz, unpacked in the browser); the old base64 text form was a third bigger
+      const out = d + '.gz';
+      if (!fs.existsSync(out) || fs.statSync(out).mtimeMs < fs.statSync(s).mtimeMs) fs.writeFileSync(out, zlib.gzipSync(fs.readFileSync(s), { level: 9 }));
+      if (fs.existsSync(d + '.gz.txt')) fs.unlinkSync(d + '.gz.txt');
       if (fs.existsSync(d)) fs.unlinkSync(d);
     }
     else if (!fs.existsSync(d) || fs.statSync(d).mtimeMs < fs.statSync(s).mtimeMs) fs.copyFileSync(s, d);

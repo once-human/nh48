@@ -162,6 +162,9 @@ body { margin: 0; font-family: var(--font-ui); font-size: 14px; -webkit-font-smo
 .flashov { position: absolute; inset: 0; display: grid; place-items: center; background: #050506; pointer-events: none; opacity: 0; z-index: 5; }
 .flashov.go { animation: flashov 4.2s ease forwards; }
 .flashov.hold { opacity: 1; transition: opacity .2s ease; }
+.flashov .fl-bar { justify-self: center; width: 220px; height: 3px; margin-top: 10px; background: rgba(255,255,255,.08); display: none; }
+.flashov.hold .fl-bar { display: block; }
+.flashov .fl-bar i { display: block; height: 100%; width: 0; background: var(--acc, #ffb224); transition: width .25s ease; }
 @keyframes flashov { 0% { opacity: 0; } 12% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
 .flashov .fl-in { text-align: center; display: grid; gap: 8px; padding: 0 24px; }
 .flashov .fl-t { font-family: var(--font-display); font-weight: 800; font-stretch: 112%; font-size: clamp(28px, 4vw, 46px); letter-spacing: -0.02em; text-wrap: balance; }

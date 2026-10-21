@@ -249,7 +249,7 @@ export class Streamer {
       if (d > this.radius) continue;
       n++;
       let score = d;
-      if (viewDir && d > 60) score -= (dx * viewDir.x + dz * viewDir.z) / Math.max(1, d + half) * 80;
+      if (viewDir && d > 40) score -= (dx * viewDir.x + dz * viewDir.z) / Math.max(1, d + half) * 160;   // what you're looking at first
       if (score < bs) { bs = score; best = c; }
     }
     this.missing = n;

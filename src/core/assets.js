@@ -55,7 +55,7 @@ export class Loader {
   }
   async bitmap(url) {
     const b = await this.bytes(url);
-    const blob = new Blob([b], { type: url.endsWith('.png') ? 'image/png' : 'image/jpeg' });
+    const blob = new Blob([b], { type: url.endsWith('.png') ? 'image/png' : url.endsWith('.webp') ? 'image/webp' : 'image/jpeg' });
     return await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
   }
   // .gz.txt files are gzip wrapped in base64 (the artifact host only serves web types)

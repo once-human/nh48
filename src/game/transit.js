@@ -139,8 +139,12 @@ export class Transit {
     if (G.fastTravelBlock) { const why = G.fastTravelBlock(); if (why) { this.msg(why); return; } }
     if (G.W.tiles && !this._arriving) {
       if (G.stats.money < fare) { this.msg(`You need ${fmt(fare)}`); return; }
-      this._arriving = true; this.close(); G.hud.curtain(true, what);
-      G.W.tiles.ensure(to.x, to.z).catch(() => {}).then(() => { this.travel(to, fare, minutes, what); this._arriving = false; setTimeout(() => G.hud.curtain(false), 250); });
+      this._arriving = true; this.close();
+      const km = Math.hypot(to.x - P.x, to.z - P.z) * 1.3 / 1000;
+      G.hud.curtain(true, what, km);
+      const go = Promise.race([G.W.tiles.ensure(to.x, to.z, 650, (f) => G.hud.curtainProgress(f)), new Promise(r => setTimeout(r, 15000))]);
+      go.catch(() => {}).then(() => { G.hud.curtainProgress(1); try { this.travel(to, fare, minutes, what); } catch (e) { console.warn('arrive', e); } })
+        .finally(() => { this._arriving = false; setTimeout(() => G.hud.curtain(false), 300); });
       return;
     }
     if (!G.shops.spend(fare)) { this.msg(`You need ${fmt(fare)}`); return; }

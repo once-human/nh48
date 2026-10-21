@@ -170,8 +170,12 @@ export function makeLeafAtlas(cell = 512) {
     for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
       const i = y * w + x;
       if (prev[i]) continue;
-      let r = 0, g = 0, b = 0, n = 0;
-      for (const q of [i - 1, i + 1, i - w, i + w]) if (prev[q]) { r += d[q * 4]; g += d[q * 4 + 1]; b += d[q * 4 + 2]; n++; }
+      // (neighbours inline: an array per texel made this the slowest part of the whole load)
+      let r = 0, g = 0, b = 0, n = 0, q;
+      q = i - 1; if (prev[q]) { r += d[q * 4]; g += d[q * 4 + 1]; b += d[q * 4 + 2]; n++; }
+      q = i + 1; if (prev[q]) { r += d[q * 4]; g += d[q * 4 + 1]; b += d[q * 4 + 2]; n++; }
+      q = i - w; if (prev[q]) { r += d[q * 4]; g += d[q * 4 + 1]; b += d[q * 4 + 2]; n++; }
+      q = i + w; if (prev[q]) { r += d[q * 4]; g += d[q * 4 + 1]; b += d[q * 4 + 2]; n++; }
       if (n) { d[i * 4] = r / n; d[i * 4 + 1] = g / n; d[i * 4 + 2] = b / n; filled[i] = 1; }
     }
   }

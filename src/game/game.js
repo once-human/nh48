@@ -381,8 +381,15 @@ export class Game {
     // all of Pune: the streets over there are fetched and built first, behind a black screen
     if (this.W.tiles && !this._arriving) {
       this._arriving = true; this.toggleMap(false); const was = this.state; this.state = 'shop';
-      this.hud.curtain(true, name ? `Rickshaw to ${name}` : 'Taking a rickshaw');
-      this.W.tiles.ensure(x, z).catch(() => {}).then(() => { this.state = was === 'map' ? 'play' : (was || 'play'); this.fastTravel(x, z, name); this._arriving = false; setTimeout(() => this.hud.curtain(false), 250); });
+      const km = Math.hypot(x - this.player.x, z - this.player.z) * 1.3 / 1000;
+      this.hud.curtain(true, name ? `Rickshaw to ${name}` : 'Taking a rickshaw', km);
+      // never stuck behind the black screen: whatever happens, you arrive (15 s at the most)
+      const go = Promise.race([this.W.tiles.ensure(x, z, 650, (f) => this.hud.curtainProgress(f)), new Promise(r => setTimeout(r, 15000))]);
+      go.catch(() => {}).then(() => {
+        this.hud.curtainProgress(1);
+        this.state = 'play';
+        try { this.fastTravel(x, z, name); } catch (e) { console.warn('arrive', e); }
+      }).finally(() => { this._arriving = false; setTimeout(() => this.hud.curtain(false), 300); });
       return true;
     }
     const spot = this.safeDrop(x, z);
@@ -539,8 +546,13 @@ export class Game {
   baseLook() { return this.origLook; }
   // Start over: wipe all progress (with the warning shown in the pause menu) and reload fresh
   resetAll() {
+    // only your progress goes (settings, quality, downloads stay); and nothing may write it back on the way
+    // out: the wipe runs again first thing on the next load, before anything reads your save
     this.state = 'resetting';
+    try { sessionStorage.setItem('nh48_wipe', '1'); } catch (e) { /* ignore */ }
     Save.wipe();
+    const st = safeStorage();
+    if (st) { const set = st.setItem.bind(st); st.setItem = (k, v) => { if (!Save.PROGRESS_KEYS.includes(k)) set(k, v); }; }
     location.reload();
   }
   saveStats() {

@@ -29,9 +29,9 @@ export const QUALITY = {
   low: { name: 'low', pixelRatio: 1.0, shadows: false, shadowSize: 0, msaa: false, texMax: 512, boardRes: 1, signScale: 1,
     streamRadius: 360, streamBudget: 2, grassRange: 22, grassCap: 2200, treeNearRange: 28, treeMidRange: 100, treeFarRange: 600, treeNearCap: 100, treeMidCap: 700, treeFarCap: 5000, leafCell: 256, impostorCell: 128, propRange: 110, far: 1400, traffic: 70, peds: 110 },
   med: { name: 'med', pixelRatio: 1.5, shadows: true, shadowSize: 2048, msaa: true, texMax: 1024, boardRes: 1, signScale: 1,
-    streamRadius: 520, streamBudget: 2.5, grassRange: 34, grassCap: 5000, treeNearRange: 42, treeMidRange: 150, treeFarRange: 900, treeNearCap: 200, treeMidCap: 1400, treeFarCap: 9000, leafCell: 512, impostorCell: 256, propRange: 170, far: 2200, traffic: 130, peds: 190 },
+    streamRadius: 520, streamBudget: 2.5, grassRange: 42, grassCap: 6500, treeNearRange: 60, treeMidRange: 210, treeFarRange: 1100, treeNearCap: 300, treeMidCap: 2000, treeFarCap: 11000, crowdRange: 60, leafCell: 512, impostorCell: 256, propRange: 170, far: 2200, traffic: 130, peds: 190 },
   high: { name: 'high', pixelRatio: 2, shadows: true, shadowSize: 2048, msaa: true, texMax: 1024, boardRes: 1, signScale: 1,
-    streamRadius: 720, streamBudget: 3, grassRange: 46, grassCap: 9000, treeNearRange: 80, treeMidRange: 240, treeFarRange: 1200, treeNearCap: 500, treeMidCap: 2800, treeFarCap: 14000, leafCell: 512, impostorCell: 256, propRange: 240, far: 3000, traffic: 170, peds: 260 },
+    streamRadius: 720, streamBudget: 3, grassRange: 60, grassCap: 12000, treeNearRange: 110, treeMidRange: 320, treeFarRange: 1500, treeNearCap: 700, treeMidCap: 3800, treeFarCap: 16000, crowdRange: 75, leafCell: 512, impostorCell: 256, propRange: 240, far: 3000, traffic: 170, peds: 260 },
 };
 
 const params = new URLSearchParams(location.search);
@@ -67,17 +67,19 @@ function pickQuality() {
 
 const ASSETS = {
   map: 'assets/map.gz.txt',
-  gAlb: 'assets/tex/ground_alb.jpg', gNrm: 'assets/tex/ground_nrm.jpg', gArm: 'assets/tex/ground_arm.jpg',
-  wAlb: 'assets/tex/wall_alb.jpg', wNrm: 'assets/tex/wall_nrm.jpg', wArm: 'assets/tex/wall_arm.jpg',
-  bark: 'assets/tex/bark_brown_02_diff.jpg', barkN: 'assets/tex/bark_brown_02_nor.jpg', palm: 'assets/tex/palm_bark_diff.jpg',
-  // models ship as gzip+base64 text (the artifact host doesn't serve .glb)
-  peopleM: 'assets/people/people_m.glb.gz.txt', peopleF: 'assets/people/people_f.glb.gz.txt',
-  animals: { dog: 'assets/animals/dog.glb.gz.txt', cat: 'assets/animals/cat.glb.gz.txt', cow: 'assets/animals/cow.glb.gz.txt', kite: 'assets/animals/kite.glb.gz.txt' },
+  gAlb: 'assets/tex/ground_alb.webp', gNrm: 'assets/tex/ground_nrm.webp', gArm: 'assets/tex/ground_arm.webp',
+  wAlb: 'assets/tex/wall_alb.webp', wNrm: 'assets/tex/wall_nrm.webp', wArm: 'assets/tex/wall_arm.webp',
+  bark: 'assets/tex/bark_brown_02_diff.webp', barkN: 'assets/tex/bark_brown_02_nor.webp', palm: 'assets/tex/palm_bark_diff.webp',
+  // models ship gzipped
+  peopleM: 'assets/people/people_m.glb.gz', peopleF: 'assets/people/people_f.glb.gz',
+  animals: { dog: 'assets/animals/dog.glb.gz', cat: 'assets/animals/cat.glb.gz', cow: 'assets/animals/cow.glb.gz', kite: 'assets/animals/kite.glb.gz' },
 };
 const SOUNDS = ['horn_car', 'horn_beep', 'horn_truck', 'horn_truck_short', 'dog_bark', 'dog_bark2', 'crow', 'cow_moo', 'temple_bells',
   'auto_start', 'car_idle', 'diesel_idle', 'amb_street', 'amb_auto_ride', 'amb_traffic'];
 
 async function main() {
+  // Start over asked for a clean slate on this load
+  try { if (sessionStorage.getItem('nh48_wipe')) { Save.wipe(); sessionStorage.removeItem('nh48_wipe'); } } catch (e) { /* ignore */ }
   if (!document.createElement('canvas').getContext('webgl2')) throw new Error('This browser has no WebGL 2. NH48 needs a recent Chrome, Edge, Firefox or Safari.');
   const quality = pickQuality();
   installAtmosphere();
@@ -106,6 +108,7 @@ async function main() {
   let shownF = 0;
   const progress = async (text, f) => {
     if (text && msg) msg.textContent = text;
+    if (text) (window.__boot || (window.__boot = [])).push([text, Math.round(performance.now())]);
     if (f != null) { shownF = Math.max(shownF, f); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; }
     await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
   };
@@ -198,7 +201,7 @@ async function main() {
     if (W.tiles) setTimeout(() => bg.bytes('assets/pune/pins.json.gz').then(async (b) => {
       const list = JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
       W.cityMap && W.cityMap.addPins(list);
-    }).catch(() => { /* the map fills in as you go */ }), 1500);
+    }).catch(() => { /* the map fills in as you go */ }), 9000);
     setTimeout(async () => { await pack(VOICE_BIN, 0); await new Promise(r => setTimeout(r, 8000)); await pack('assets/voices_k.mp3', 1); await pack('assets/voices_d.mp3', 2); }, 4000);
   }
   await game.init(progress);
