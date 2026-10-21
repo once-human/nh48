@@ -1,3 +1,4 @@
+import { icon } from './icons.js';
 // NH48 interface: title (city select), in-game HUD, pause sheet, full map and the phone notice.
 // Desktop first. The HUD sits in the corners with no boxes where text alone reads, location
 // top-left, wallet top-right, map bottom-left, the vehicle bottom-right, prompts and subtitles
@@ -93,11 +94,13 @@ export class HUD {
       <div class="glass prompt" id="h-prompt"><span class="kbd" id="h-prompt-k">F</span><span id="h-prompt-t"></span></div>
       <div class="subt" id="h-sub"><div class="who" id="h-sub-who"></div><div class="line" id="h-sub-line"></div><div class="tr" id="h-sub-tr"></div></div>`);
     this.toastWrap = el('div', 'h toasts');
-    this.nerd = el('div', 'h nerd', 'F3 performance stats · Tab your status · E backpack');
+    // health, food, water, energy: always on screen, just above the minimap
+    this.vit = el('div', 'h vit', ['h:health', 'f:food', 'w:water', 'e:energy'].map(k => { const [c, n] = k.split(':'); return `<span class="v-${c}" title="${n}">${icon(n)}<i><b></b></i></span>`; }).join(''));
+    this.nerd = el('div', 'h nerd', 'E jhola · Tab status · F3 stats');
     this.corner = el('div', 'h corner');
     const mkBtn = (icon, label, fn) => { const b = el('button', 'ibtn', `${ICON[icon]}<span class="sr">${label}</span>`); b.title = label; b.onclick = fn; return b; };
     this.corner.append(mkBtn('pause', 'Pause (Esc)', () => this.game.togglePause()));
-    R.append(this.scrim, this.hurtEl, this.nerd, this.loc, this.wallet, this.placeEl, this.obj, this.mm, this.zoneEl, this.dash, this.lower, this.toastWrap, this.smsWrap, this.stopEl, this.flashEl);
+    R.append(this.scrim, this.hurtEl, this.vit, this.nerd, this.loc, this.wallet, this.placeEl, this.obj, this.mm, this.zoneEl, this.dash, this.lower, this.toastWrap, this.smsWrap, this.stopEl, this.flashEl);
     this.$ = (id) => document.getElementById(id);
     this.$money = this.$('h-money'); this.$speed = this.$('h-speed'); this.$gear = this.$('h-gear'); this.$rpm = this.$('h-rpm');
     this.buildTitle();
@@ -127,8 +130,8 @@ export class HUD {
         <div class="t-foot">
           <span class="keys">
             <span><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> drive / walk</span>
-            <span><span class="kbd">Space</span> handbrake · jump / climb</span><span><span class="kbd">F</span> get in / out · shops · talk</span><span><span class="kbd">Click</span> punch</span><span><span class="kbd">Ctrl</span> roll</span><span><span class="kbd">E</span> backpack</span>
-            <span><span class="kbd">H</span> horn</span><span><span class="kbd">C</span> camera</span><span><span class="kbd">M</span> map</span><span><span class="kbd">Esc</span> pause</span>
+            <span><span class="kbd">Space</span> handbrake · jump / climb</span><span><span class="kbd">F</span> get in / out · shops · talk</span><span><span class="kbd">Click</span> punch</span><span><span class="kbd">C</span> roll</span><span><span class="kbd">E</span> backpack</span>
+            <span><span class="kbd">H</span> horn</span><span><span class="kbd">V</span> camera</span><span><span class="kbd">M</span> map</span><span><span class="kbd">Esc</span> pause</span>
           </span>
           <span>Map data © OpenStreetMap contributors (ODbL), Overture Maps Foundation. Businesses are parodies.</span>
         </div>
@@ -303,15 +306,17 @@ export class HUD {
             <span class="k"><span class="kbd">A</span><span class="kbd">D</span></span><span>Steer</span>
             <span class="k"><span class="kbd">Space</span></span><span>Handbrake · on foot: jump, or climb a wall you face</span>
             <span class="k"><span class="kbd">H</span></span><span>Horn</span>
-            <span class="k"><span class="kbd">C</span><span class="kbd">B</span></span><span>Camera · look back</span>
+            <span class="k"><span class="kbd">V</span><span class="kbd">B</span></span><span>Camera · look back</span>
             <span class="k"><span class="kbd">R</span></span><span>Back on the road</span>
             <span class="k"><span class="kbd">F</span></span><span>Get out · get in or take a vehicle</span>
             <span class="k"><span class="kbd">Shift</span><span class="kbd">Alt</span></span><span>Sprint · walk (on foot)</span>
             <span class="k"><span class="kbd">Click</span><span class="kbd">X</span></span><span>Punch, keep clicking for jab, cross, hook</span>
-            <span class="k"><span class="kbd">Ctrl</span></span><span>Roll out of the way (on foot)</span>
+            <span class="k"><span class="kbd">C</span></span><span>Roll out of the way (on foot)</span>
             <span class="k"><span class="kbd">F</span></span><span>Walk into a shop, café, bar, ATM, petrol pump, your home</span>
             <span class="k"><span class="kbd">E</span></span><span>Backpack: eat, drink, use what you carry</span>
             <span class="k"><span class="kbd">Tab</span></span><span>Your status: health, hunger, energy, respect…</span>
+            <span class="k"><span class="kbd">Y</span></span><span>Accept a delivery order on your phone</span>
+            <span class="k"><span class="kbd">F3</span></span><span>Performance stats (for the curious)</span>
             <span class="k"><span class="kbd">M</span></span><span>Map · click to set a waypoint or take a rickshaw</span>
             <span class="k"><span class="kbd">1</span><span class="kbd">4</span></span><span>Answer the police</span>
           </div></div>
@@ -369,7 +374,7 @@ export class HUD {
   }
 
   setPlaying(on) {
-    for (const e of [this.scrim, this.loc, this.wallet, this.obj, this.mm, this.dash, this.lower, this.toastWrap, this.smsWrap, this.nerd]) e.hidden = !on;
+    for (const e of [this.scrim, this.loc, this.wallet, this.obj, this.mm, this.dash, this.lower, this.toastWrap, this.smsWrap, this.nerd, this.vit]) e.hidden = !on;
     if (!on) { this.zoneEl.hidden = true; this.stopEl.hidden = true; }
     if (on) this.root.appendChild(this.corner); else this.corner.remove();
     this.title.hidden = on;
@@ -427,23 +432,22 @@ export class HUD {
       const dm = this.$('h-dmg'), dmg = v.dmg || 0;
       dm.hidden = dmg < 0.08; if (dmg >= 0.08) dm.textContent = `Body ${Math.round((1 - dmg) * 100)}%`;
     }
-    // food, water, energy: only when one is getting low
+    // the vitals strip
     if (g.life && (this._vitT = (this._vitT || 0) - dt) <= 0) {
-      this._vitT = 0.5;
-      const L = g.life.s, ve = this.$('h-vit');
-      const low = [['Food', L.hunger], ['Water', L.thirst], ['Energy', L.energy]].filter(x => x[1] < 0.3);
-      ve.hidden = !low.length;
-      if (low.length) ve.innerHTML = low.map(([n, v]) => `<span class="low">${n} ${Math.round(v * 100)}%</span>`).join('');
+      this._vitT = 0.25;
+      const L = g.life.s, vals = [(p.hp ?? 100) / g.life.hpMax, L.hunger, L.thirst, L.energy];
+      this.vit.querySelectorAll('span').forEach((sp, i) => { const v = Math.max(0, Math.min(1, vals[i])); sp.querySelector('b').style.width = Math.round(v * 100) + '%'; sp.classList.toggle('low', v < 0.2); });
+      this.vit.hidden = !!this.inPlace && false;
     }
     // health: on foot, while hurt or in a fight
     const hp = p.hp ?? 100, hpEl = this.$('h-hp');
     const hpMax = g.life ? g.life.hpMax : 100;
     const showHp = (p.onFoot || (p.spec && p.spec.two)) && (hp < hpMax - 0.5 || (g.brawl && g.brawl.active > 0));
-    if (hpEl.hidden === showHp) hpEl.hidden = !showHp;
-    if (showHp) { hpEl.firstElementChild.style.width = Math.round(hp / hpMax * 100) + '%'; hpEl.classList.toggle('low', hp < 30); }
+    if (!hpEl.hidden) hpEl.hidden = true;
+    if (false && showHp) { hpEl.firstElementChild.style.width = Math.round(hp / hpMax * 100) + '%'; hpEl.classList.toggle('low', hp < 30); }
     // area name (nearest suburb within ~900 m, else the district)
     this.areaT -= dt;
-    if (this.areaT <= 0) {
+    if (this.areaT <= 0 && !this.inPlace) {
       this.areaT = 1;
       let best = null, bd = 900 * 900;
       for (const s of this.suburbs) { const d = (s.x - p.x) ** 2 + (s.z - p.z) ** 2; if (d < bd) { bd = d; best = s; } }
@@ -599,6 +603,13 @@ export class HUD {
     this.placeEl.hidden = false; void this.placeEl.offsetWidth; this.placeEl.classList.add('show');
     this.pcT = 6;
   }
+  // inside a shop: the location card names the place; the minimap would only show empty fields
+  enterPlace(ctx) {
+    this.inPlace = true;
+    this.$('h-street').textContent = ctx.name; this.$('h-street-mr').textContent = ctx.mr || '';
+    this.$('h-area').textContent = 'Inside'; this.mm.hidden = true;
+  }
+  leavePlace() { this.inPlace = false; this.mm.hidden = false; this.areaT = 0; this.lastStreet = null; }
   hurt() { const H = this.hurtEl; H.classList.remove('go'); void H.offsetWidth; H.classList.add('go'); }
   flash(title, sub) {
     const F = this.flashEl;

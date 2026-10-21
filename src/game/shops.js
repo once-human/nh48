@@ -83,7 +83,7 @@ const HELLO = {
 
 // ---------------------------------------------------------------- menus
 // food item: [name, note, price, effects, carry (item id into the bag instead of eating now)]
-const F = {
+export const F = {
   chai: ['Cutting chai', 'Half a glass, extra sugar', 15, { thirst: 0.12, energy: 0.1 }],
   fullchai: ['Full chai', 'Strong, with ginger', 25, { thirst: 0.2, energy: 0.15 }],
   bunmaska: ['Bun maska', 'Soft bun, a slab of butter', 35, { hunger: 0.15 }],
@@ -139,7 +139,7 @@ const F = {
   water: ['Water bottle', 'One litre, goes in your bag', 20, {}, ['water', 1]],
   maggi: ['Cheese Maggi', 'Hostel-night classic', 70, { hunger: 0.25, mood: 0.04 }],
 };
-const MENUS = {
+export const MENUS = {
   tapri: ['chai', 'fullchai', 'bunmaska', 'vadapav', 'bhaji', 'water'],
   misal: ['misal', 'misalx', 'vadapav', 'cheesevp', 'vpparcel', 'poha', 'taak', 'chai'],
   thali: ['thali', 'nonvegthali', 'puranpoli', 'sabudana', 'taak', 'water'],
@@ -155,12 +155,12 @@ const MENUS = {
   bar: ['beer', 'cocktail', 'mocktail', 'nachos', 'water'],
 };
 // a plain "hotel" (Pune for restaurant) serves what its neighbourhood eats
-const AREA_FOOD = { polished: ['pasta', 'burger', 'coldcoffee', 'sandwich', 'brownie', 'water'], peth: ['thali', 'misal', 'poha', 'sabudana', 'taak', 'chai'],
+export const AREA_FOOD = { polished: ['pasta', 'burger', 'coldcoffee', 'sandwich', 'brownie', 'water'], peth: ['thali', 'misal', 'poha', 'sabudana', 'taak', 'chai'],
   station: ['biryani', 'thali', 'vadapav', 'chai', 'water'], college: ['vadapav', 'maggi', 'spdp', 'coldcoffee', 'chai', 'water'], camp: ['biryani', 'kebab', 'mawacake', 'chai', 'cola'] };
 const AREA_MUL = { polished: 1.55, camp: 1.15, college: 0.92, peth: 0.88, station: 0.92, colony: 1.05, city: 1 };
 
 // clothes anyone can buy (top / bottom colours, sleeve, kurta, saree)
-const CLOTHES = [
+export const CLOTHES = [
   ['shirt_white', 'Linen shirt, white', 'Full sleeves, crisp', 1290, { top: 0xf2f0ea, cut: [0.95, 1, 0.5, 0] }],
   ['shirt_blue', 'Oxford shirt, sky blue', 'Full sleeves', 1190, { top: 0x8fb3d9, cut: [0.95, 1, 0.5, 0] }],
   ['tee_black', 'T-shirt, black', 'Half sleeves', 499, { top: 0x1f2024, cut: [0.38, 1, 0.3, 0] }],
@@ -178,7 +178,7 @@ const CLOTHES = [
   ['saree_nauvari', 'Nauvari saree, green', 'Nine yards, Maharashtrian style', 4999, { top: 0x386641, bottom: 0x2f5636, cut: [0.3, 1, 0.9, 2] }],
   ['saree_red', 'Cotton saree, red', 'Everyday', 1999, { top: 0xc1121f, bottom: 0xa50f1a, cut: [0.3, 1, 0.9, 2] }],
 ];
-const SHOES = [
+export const SHOES = [
   ['kolhapuri', 'Kolhapuri chappal', 'Hand-made leather', 899, 0x8a5a2b],
   ['sneakers', 'White sneakers', 'Stay white for one day', 2799, 0xe8e6e0],
   ['formals', 'Formal shoes, black', 'Polished', 2199, 0x15120f],
@@ -227,7 +227,8 @@ export class Shops {
   }
   // nearest thing you could walk into
   scan() {
-    const P = this.g.player, st = this.g.W.streamer;
+    const P = this.g.player, st = this.g.W.streamer, I = this.g.interiors;
+    if (I && I.inside) { const sp = I.near(P.x, P.z); this.near = sp ? { kind: 'ispot', s: sp, name: sp.label } : null; return; }
     let best = null, bd = P.onFoot ? 2.6 : 0;
     if (P.onFoot) for (const c of st.built) {
       if (!c.doors || Math.abs(c.cx - P.x) > 120 || Math.abs(c.cz - P.z) > 120) continue;
@@ -257,6 +258,13 @@ export class Shops {
   tryUse() {
     if (!this.near || this.open) return false;
     if (this.near.kind === 'animal') { this.g.strays.interact(this.near.a); this.scanT = 0.5; return true; }
+    const I = this.g.interiors;
+    if (this.near.kind === 'ispot') { I.use(this.near.s); this.scanT = 0.3; return true; }
+    // a storefront with a room behind it: walk in (a club at night wants its cover charge first)
+    if (I && I.templateOf(this.near.kind) && this.near.door) {
+      const club = this.near.kind === 'bar' && this.isClub(this.near) && (this.g.hour >= 20.5 || this.g.hour < 1.5);
+      if (!club) { const ctx = this.near; if (I.enter(ctx)) { this.g.date && this.g.date.onEnter(I.cur.R, ctx); return true; } }
+    }
     this.show(this.near);
     return true;
   }
@@ -265,6 +273,8 @@ export class Shops {
     if (!n) return null;
     if (n.kind === 'property') return this.g.props.label(n.prop);
     if (n.kind === 'animal') return this.g.strays.label(n.a);
+    if (n.kind === 'ispot') return n.s.label;
+    if (this.g.interiors && this.g.interiors.templateOf(n.kind) && n.door) return `Go into ${n.name} · ${KIND_INFO[n.kind][0]}`;
     const K = KIND_INFO[n.kind];
     return `${n.name} · ${K ? K[0] : ''}`;
   }
@@ -275,11 +285,16 @@ export class Shops {
     const out = [];
     const area = G.people.areas.at(ctx.x, ctx.z), ak = area ? area.kind : 'city';
     const pay = (price, fn) => () => { if (!this.spend(price)) return false; return fn(); };
+    const dineIn = !!(ctx.inside && ctx.spot === 'counter' && G.interiors && G.interiors.cur && G.interiors.cur.R.seats.length);
+    if (dineIn) out.push({ label: ctx.parcel ? 'Parcel: on' : 'Parcel: off', note: ctx.parcel ? 'Everything gets packed for your bag' : 'You eat here at a table. Switch to take it with you', price: 0, tag: 'job', act: () => { ctx.parcel = !ctx.parcel; return ctx.parcel ? 'Packing it to go' : 'Eating here'; } });
     const food = (id) => {
       const [name, note, base, eff, carry] = F[id];
       const price = r10(base * mul);
       out.push({ label: name, note, price, act: pay(price, () => {
         if (carry) { L.add(carry[0], carry[1]); return `${name}, in your bag`; }
+        if (dineIn && ctx.parcel && !eff.drunk) { L.add('tiffin'); return `${name} packed, in your bag`; }
+        if (dineIn) return G.interiors.serve(name, eff);
+        if (ctx.inside && G.interiors && G.interiors.cur) { G.player.human.play('drink', { once: true, restart: true }); G.player.act = { kind: 'hurt', t: 0, dur: 1.4 }; }
         L.apply(eff); L.s.tally.meals++;
         return `${name}: ${describe(eff)}`;
       }) });
@@ -295,17 +310,18 @@ export class Shops {
         this.gigItem(out, ctx);
         break;
       case 'bar': {
-        const club = /club|lounge|social|brew|pub/i.test(ctx.name) || ak === 'polished';
+        const club = this.isClub(ctx);
+        if (ctx.inside) { for (const id of MENUS.bar) food(id); break; }
         if (club && night) {
           const cover = r10(1500 * mul / 1.3);
-          out.push({ label: 'Cover charge, on the dance floor', note: 'Includes one drink. Dance off the day', price: cover, act: pay(cover, () => { this.close(); G.club && G.club.enter(ctx); return ''; }) });
+          out.push({ label: 'Cover charge, on the dance floor', note: 'Includes one drink. Dance off the day', price: cover, act: pay(cover, () => { this.close(); G.interiors.enter(ctx); return ''; }) });
         } else if (club) out.push({ label: 'Club night', note: 'Opens at 8:30 PM, come back later', price: 0, disabled: 'Opens 8:30 PM' });
         for (const id of MENUS.bar) food(id);
         if (G.hour >= 1.5 && G.hour < 11) { out.length = 0; out.push({ label: 'Closed', note: 'Last call was at 1:30 AM. Pune rules.', price: 0, disabled: 'Closed' }); }
         break;
       }
       case 'barber': this.barber(out, mul); break;
-      case 'clothes': this.clothes(out, mul); break;
+      case 'clothes': this.clothes(out, mul, ctx.sub); break;
       case 'shoes': for (const [id, name, note, base, hex] of SHOES) { const price = r10(base * mul); const own = L.s.wardrobe.includes('shoe_' + id);
         out.push({ label: name, note: own ? 'Yours, wear them' : note, price: own ? 0 : price, tag: own ? 'owned' : '', act: () => { if (!own && !this.spend(price)) return false; if (!own) L.s.wardrobe.push('shoe_' + id); this.wear({ shoe: hex }); L.s.upg.shoes = 1; return `Wearing ${name.toLowerCase()}`; } }); }
         break;
@@ -372,6 +388,8 @@ export class Shops {
     }
     return out;
   }
+  isClub(ctx) { const a = this.g.people.areas.at(ctx.x, ctx.z); return /club|lounge|social|brew|pub/i.test(ctx.name) || (a && a.kind === 'polished'); }
+  hello(kind) { return HELLO[kind] ? this.rng.pick(HELLO[kind]) : null; }
   gigItem(out, ctx) {
     const G = this.g;
     if (!G.gigs || G.gigs.job || (G.rides && G.rides.current)) return;
@@ -387,9 +405,11 @@ export class Shops {
     H('Hair colour: natural black', 'Back to basics', 400, { hair: 0x0d0b0a });
     const c = r10(180 * mul); out.push({ label: 'Champi (head massage)', note: 'Ten minutes of bliss: +energy, +mood', price: c, act: () => { if (!this.spend(c)) return false; L.apply({ energy: 0.15, mood: 0.1 }); return 'Bliss'; } });
   }
-  clothes(out, mul) {
+  clothes(out, mul, sub) {
     const L = this.life;
+    const kindOfC = (p) => p.cut && p.cut[3] >= 1 ? 'ethnic' : p.top !== undefined ? 'tops' : 'bottoms';
     for (const [id, name, note, base, patch] of CLOTHES) {
+      if (sub && kindOfC(patch) !== sub) continue;
       const own = L.s.wardrobe.includes(id), price = r10(base * mul);
       out.push({ label: name, note: own ? 'In your wardrobe, wear it' : note, price: own ? 0 : price, tag: own ? 'owned' : '', act: () => {
         if (!own && !this.spend(price)) return false;

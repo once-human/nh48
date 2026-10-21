@@ -58,7 +58,7 @@ export class Input {
       if (gp.buttons[1]?.pressed) hand = true;
       if (gp.buttons[0]?.pressed) horn = true;
       const edge = (i, code) => { const p = !!gp.buttons[i]?.pressed; if (p && !this.gpPrev[i]) this.pressed.add(code); this.gpPrev[i] = p; };
-      edge(3, 'KeyC'); edge(9, 'Escape'); edge(8, 'KeyM'); edge(2, 'KeyR');
+      edge(3, 'KeyV'); edge(9, 'Escape'); edge(8, 'KeyM'); edge(2, 'KeyR');
       break;
     }
     if (!this.enabled) { thr = 0; brk = 0; steer = 0; hand = false; horn = false; }

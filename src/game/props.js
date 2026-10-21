@@ -1,24 +1,24 @@
-// Six places you can buy, priced like the real thing for their street (late-2026 guesses from
-// listing prices per square foot; treat them as ballpark): a chai tapri licence on FC Road up to a
-// bungalow on Boat Club Road. Each pays rent every game day (scaled so a home pays for itself in a
+// Six homes you can buy, priced like the real thing for their street (late-2026 guesses from
+// listing prices per square foot; treat them as ballpark): a 1 RK in Sadashiv Peth up to a
+// bungalow on Boat Club Road. Live in one (sleep, wardrobe, your vehicles kept there) or rent it out. Each pays rent every game day (scaled so a home pays for itself in a
 // couple of weeks of play, not thirty years), and the homes are somewhere to sleep, change clothes
 // and keep your vehicles. They show on the map (house pins) and in the backpack's "Own" tab, with
 // a For Sale board on the street. Buy at the place itself, or from any estate agent.
 import { fmt } from './shops.js';
 
 export const PROPERTIES = [
-  { id: 'tapri', name: 'Chai tapri licence, FC Road', area: 'Deccan Gymkhana', price: 450000, rent: 1500, home: false, sqft: 40,
-    blurb: 'A corner stall outside a college gate. Students, cutting chai, cash every day.' },
-  { id: 'rk', name: '1 RK, Sadashiv Peth', area: 'Sadashiv Peth', price: 2800000, rent: 3000, home: true, sqft: 260,
-    blurb: 'One room and a kitchen in an old wada lane. Temple bells at six.' },
-  { id: 'gala', name: 'Shop gala, Laxmi Road', area: 'Budhwar Peth', price: 6500000, rent: 15000, home: false, sqft: 180,
-    blurb: 'A ground-floor shop on Pune’s busiest shopping street. Rent it to a saree shop.' },
-  { id: '2bhk', name: '2 BHK, Model Colony', area: 'Model Colony', price: 14500000, rent: 13000, home: true, sqft: 950,
+  { id: 'rk', name: '1 RK, Sadashiv Peth', kind: 'Studio', area: 'Sadashiv Peth', price: 2800000, rent: 3000, sqft: 260,
+    blurb: 'One room and a kitchen in an old wada lane. Temple bells at six, the best misal two lanes away.' },
+  { id: '1bhk', name: '1 BHK flat, Erandwane', kind: 'Flat', area: 'Erandwane', price: 6800000, rent: 6500, sqft: 560,
+    blurb: 'Second floor of a 90s society. A balcony, a gas pipeline, a watchman who knows everyone.' },
+  { id: '2bhk', name: '2 BHK flat, Model Colony', kind: 'Flat', area: 'Model Colony', price: 14500000, rent: 13000, sqft: 950,
     blurb: 'Third floor, lift, covered parking, a balcony over a gulmohar.' },
-  { id: '3bhk', name: '3 BHK, Koregaon Park Lane 6', area: 'Koregaon Park', price: 32000000, rent: 28000, home: true, sqft: 1650,
-    blurb: 'Leafy lane, cafés downstairs, a society gym. KP living.' },
-  { id: 'bungalow', name: 'Bungalow, Boat Club Road', area: 'Boat Club Road', price: 120000000, rent: 100000, home: true, sqft: 4800,
-    blurb: 'Old-money Pune: a garden, a gate, a watchman and a mango tree.' },
+  { id: '3bhk', name: '3 BHK flat, Koregaon Park', kind: 'Flat', area: 'Koregaon Park', price: 32000000, rent: 28000, sqft: 1650,
+    blurb: 'Leafy lane, cafés downstairs, a society gym and a pool nobody uses.' },
+  { id: 'rowhouse', name: 'Row house, Prabhat Road', kind: 'House', area: 'Prabhat Road', price: 52000000, rent: 42000, sqft: 2400,
+    blurb: 'Three floors, a terrace, a little garden in front. Old Pune money on a quiet lane.' },
+  { id: 'bungalow', name: 'Bungalow, Boat Club Road', kind: 'Bungalow', area: 'Boat Club Road', price: 120000000, rent: 100000, sqft: 4800,
+    blurb: 'A garden, a gate, a watchman and a mango tree. The address people lower their voice for.' },
 ];
 
 export class Props {
@@ -42,28 +42,32 @@ export class Props {
     for (const p of this.list) { const d = Math.hypot(p.x - x, p.z - z); if (d < bd) { bd = d; best = p; } }
     return best;
   }
-  label(p) { return this.owned(p) ? `${p.name} · yours` : `For sale: ${p.name} · ${fmt(p.price)}`; }
+  label(p) { return this.owned(p) ? `Your home · ${p.name}` : `For sale: ${p.name} · ${fmt(p.price)}`; }
   // at the place itself
   items(out, p) {
     const G = this.g, L = this.life;
     if (!this.owned(p)) {
-      out.push({ label: `Buy it, ${fmt(p.price)}`, note: `${p.sqft} sq ft · rent ${fmt(p.rent)} a day${p.home ? ' · a home: sleep, wardrobe, garage' : ''}. Cash and bank together`, price: p.price, act: () => this.buy(p) });
+      out.push({ label: `Buy it for ${fmt(p.price)}`, note: `${p.kind} · ${p.sqft} sq ft · stamp duty and registration included. Cash and bank together`, price: p.price, act: () => this.buy(p) });
+      out.push({ label: 'Look around', note: p.blurb, price: 0, disabled: ' ' });
       return;
     }
-    if (p.home) {
-      out.push({ label: 'Sleep till morning', note: 'Full energy and health, wake at 7 AM', price: 0, act: () => { G.shops.close(); G.sleep(); return ''; } });
-      out.push({ label: 'Have a home-cooked meal', note: 'Varan bhaat, toop, limbu. Free', price: 0, act: () => { L.apply({ hunger: 0.6, thirst: 0.3, mood: 0.06 }); return 'Aai would approve'; } });
-      out.push({ label: 'Wardrobe', note: `${L.s.wardrobe.filter(w => !w.startsWith('shoe_')).length} outfits, open your backpack (E) to change`, price: 0, act: () => { G.shops.close(); G.bag && G.bag.show('wear'); return ''; } });
+    const rented = this.rentedOut(p);
+    if (!rented) {
+      out.push({ label: 'Sleep till morning', note: 'Full energy and health, wake at 7 AM. Saves you a lodge', price: 0, act: () => { G.shops.close(); G.sleep(); return ''; } });
+      out.push({ label: 'Cook at home', note: 'Varan bhaat, toop, limbu. Costs you ₹60 in groceries', price: 60, act: () => { if (!G.shops.spend(60)) return false; L.apply({ hunger: 0.7, thirst: 0.3, mood: 0.06 }); return 'Aai would approve'; } });
+      out.push({ label: 'Wardrobe', note: 'Change into anything you own', price: 0, act: () => { G.shops.close(); G.bag && G.bag.show('wear'); return ''; } });
       const missing = L.s.vehicles.filter(v => !G.player.dropped.some(d => d.veh.owned && d.veh.owned.id === v.id) && !(G.player.cur && G.player.cur.owned && G.player.cur.owned.id === v.id));
       for (const v of missing) out.push({ label: `Bring out your ${v.type}`, note: 'From the parking downstairs', price: 0, act: () => { G.shops.respawnOwned(v, p); return 'It’s outside'; } });
-    }
-    out.push({ label: `Sell it, ${fmt(Math.round(p.price * 0.92))}`, note: 'A buyer is ready; the broker keeps 8%', price: 0, act: () => this.sell(p) });
+      out.push({ label: `Rent it out for ${fmt(p.rent)} a day`, note: 'Tenants move in. You can’t sleep here while they do', price: 0, act: () => { L.s.rented = (L.s.rented || []).concat([p.id]); L.save(); return 'Tenants found. Rent goes to your bank every morning'; } });
+    } else out.push({ label: 'Ask the tenants to leave', note: `They pay ${fmt(p.rent)} a day. Move back in yourself`, price: 0, act: () => { L.s.rented = (L.s.rented || []).filter(q => q !== p.id); L.save(); return 'They’ll be out by tonight. It’s yours again'; } });
+    out.push({ label: `Sell it for ${fmt(Math.round(p.price * 0.92))}`, note: 'A buyer is ready; the broker keeps 8%', price: 0, act: () => this.sell(p) });
   }
+  rentedOut(p) { return (this.life.s.rented || []).includes(p.id); }
   // at an estate agent: everything on the market
   agentItems(out) {
     for (const p of this.list) {
       const own = this.owned(p);
-      out.push({ label: p.name, note: own ? 'Yours' : `${fmt(p.price)} · ${p.sqft} sq ft · rent ${fmt(p.rent)}/day, tap to see it on the map`, price: 0, tag: own ? 'owned' : '',
+      out.push({ label: p.name, note: own ? 'Yours' : `${p.kind} · ${fmt(p.price)} · ${p.sqft} sq ft. Shows it on your map`, price: 0, tag: own ? 'owned' : '',
         act: () => { this.g.setWaypoint({ x: p.x, z: p.z, name: p.name }); return `Waypoint set: ${p.name}. The For Sale board is on the footpath`; } });
     }
   }
@@ -71,7 +75,7 @@ export class Props {
     const G = this.g, L = this.life;
     if (!G.shops.spend(p.price, true)) return false;
     L.s.props.push(p.id); L.change('respect', 6 + Math.round(Math.log10(p.price) - 5) * 3); L.save();
-    G.hud.flash(p.name, 'It’s yours. Rent arrives every morning.');
+    G.hud.flash(p.name, 'It’s yours. Sleep here, keep your clothes and vehicles here, or rent it out.');
     return `Bought. Welcome home`;
   }
   sell(p) {
@@ -83,7 +87,7 @@ export class Props {
   payRent() {
     const G = this.g, L = this.life;
     let tot = 0;
-    for (const p of this.list) if (this.owned(p)) tot += p.rent;
+    for (const p of this.list) if (this.owned(p) && this.rentedOut(p)) tot += p.rent;
     if (L.s.bank > 0) { const int = Math.round(L.s.bank * 0.004); L.s.bank += int; if (int) G.hud.sms('Bank', `Interest credited: ${fmt(int)}`, fmt(int), `Balance ${fmt(L.s.bank)}`); }
     if (!tot) return;
     L.s.bank += tot; L.s.tally.rentEarned += tot; L.save();

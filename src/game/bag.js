@@ -1,32 +1,39 @@
-// The backpack (E): what you carry, how you're doing, what you wear, what you own, and what's
-// around you. "Nearby" is how you find things: every real shop, café, bar, ATM, pump and chowki
-// within walking distance, grouped by what they do, with a tap to set a waypoint. Tab opens "Me".
+// The jhola (E): what you carry, how you're doing, what you wear, what you own, and what's around.
+// "Nearby" is how you find things: every real shop, café, bar, ATM, pump and chowki within walking
+// distance, grouped by what they do, plus the homes for sale; tap one and it's on your map.
+// Tab opens straight to "Me".
 import { ITEMS, describe } from './life.js';
 import { KIND_INFO, fmt, lookFromJSON } from './shops.js';
 import { PROPERTIES } from './props.js';
+import { icon, ITEM_ICON } from '../ui/icons.js';
 
-const TABS = [['bag', 'Bag'], ['me', 'Me'], ['wear', 'Wardrobe'], ['own', 'Owned'], ['near', 'Nearby']];
-const GROUPS = [['food', 'Food & drink'], ['night', 'Night'], ['look', 'Look'], ['health', 'Health'], ['money', 'Money'], ['things', 'Shopping'], ['vehicle', 'Vehicles'], ['place', 'Places']];
+const TABS = [['bag', 'Bag', 'झोळी'], ['me', 'Me', 'मी'], ['wear', 'Wardrobe', 'कपडे'], ['own', 'Owned', 'माझं'], ['near', 'Nearby', 'जवळ']];
+const GROUPS = [['food', 'Food'], ['night', 'Night'], ['look', 'Look'], ['health', 'Health'], ['money', 'Money'], ['things', 'Shops'], ['vehicle', 'Vehicles'], ['place', 'Places'], ['homes', 'Homes for sale']];
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const dist = (d) => d < 1000 ? `${Math.round(d / 10) * 10} m` : `${(d / 1000).toFixed(1)} km`;
 
 export class Bag {
   constructor(G) {
     this.g = G; this.tab = 'bag'; this.group = 'food';
     const el = document.createElement('div');
-    el.className = 'bag glass'; el.hidden = true;
+    el.className = 'jhola'; el.hidden = true;
     el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Backpack');
-    el.innerHTML = `<div class="bg-tabs" role="tablist">${TABS.map(([k, l]) => `<button role="tab" data-t="${k}">${l}</button>`).join('')}</div>
-      <div class="bg-body"></div><div class="sh-msg" aria-live="polite"></div>
-      <div class="sh-foot"><span class="sh-wallet"></span><span><span class="kbd">E</span> close</span></div>`;
+    el.innerHTML = `<div class="jh-top"><div class="jh-title"><b>Jhola</b><span lang="mr">झोळी</span></div><div class="jh-money"></div></div>
+      <div class="jh-tabs" role="tablist">${TABS.map(([k, l, m]) => `<button role="tab" data-t="${k}"><b>${l}</b><span lang="mr">${m}</span></button>`).join('')}</div>
+      <div class="jh-body"></div><div class="jh-msg" aria-live="polite"></div>
+      <div class="jh-foot"><span><span class="kbd">E</span> close</span><span><span class="kbd">Tab</span> me</span></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
     el.addEventListener('click', (e) => {
-      const t = e.target.closest('[data-t]'); if (t) { this.tab = t.dataset.t; this.render(); return; }
+      const t = e.target.closest('[data-t]'); if (t) { this.tab = t.dataset.t; this.msg(''); this.render(); return; }
       const g = e.target.closest('[data-g]'); if (g) { this.group = g.dataset.g; this.render(); return; }
       const b = e.target.closest('[data-act]'); if (b && !b.disabled) this.act(b.dataset.act, b.dataset.arg);
     });
     window.addEventListener('keydown', (e) => {
       if (!this.open) return;
       if (e.code === 'Escape' || e.code === 'KeyE' || (e.code === 'Tab' && this.tab === 'me')) { e.preventDefault(); e.stopImmediatePropagation(); this.close(); }
+      else if (e.code === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); this.tab = 'me'; this.render(); }
     }, true);
   }
   get life() { return this.g.life; }
@@ -38,67 +45,79 @@ export class Bag {
     G.audio.updateEngine?.(0, 0, false);
     this.el.hidden = false; this.msg('');
     this.render();
+    this.el.classList.remove('in'); void this.el.offsetWidth; this.el.classList.add('in');
   }
   close() { this.open = false; this.el.hidden = true; if (this.g.state === 'shop') this.g.state = 'play'; this.life.save(); }
-  msg(t) { this.el.querySelector('.sh-msg').textContent = t || ''; }
+  msg(t, good) { const m = this.el.querySelector('.jh-msg'); m.textContent = t || ''; m.classList.toggle('good', !!good); }
+  row(ic, label, note, right, act, arg, cls = '') {
+    return `<button class="jh-row ${cls}" ${act ? `data-act="${act}"` : 'disabled'} ${arg !== undefined ? `data-arg="${esc(arg)}"` : ''}>${icon(ic)}<span class="nm"><b>${esc(label)}</b><small>${esc(note || '')}</small></span><span class="go">${esc(right || '')}</span></button>`;
+  }
   render() {
     const G = this.g, L = this.life, s = L.s;
-    this.el.querySelectorAll('.bg-tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.t === this.tab));
-    const B = this.el.querySelector('.bg-body');
+    this.el.querySelectorAll('.jh-tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.t === this.tab));
+    this.el.querySelector('.jh-money').innerHTML = `<span><small>Cash</small><b>${fmt(G.stats.money)}</b></span>${s.bank ? `<span><small>Bank</small><b>${fmt(s.bank)}</b></span>` : ''}${s.gold ? `<span><small>Gold</small><b>${s.gold} g</b></span>` : ''}`;
+    const B = this.el.querySelector('.jh-body');
     let h = '';
-    const row = (label, note, right, act, arg, dis) => `<button class="sh-item" ${act ? `data-act="${act}"` : ''} ${arg !== undefined ? `data-arg="${arg}"` : ''} ${dis || !act ? 'disabled' : ''}><span class="n"></span><span class="nm"><b>${esc(label)}</b><small>${esc(note || '')}</small></span><span class="pr">${esc(right || '')}</span></button>`;
     if (this.tab === 'bag') {
       const ids = Object.keys(s.inv).filter(k => s.inv[k] > 0 && ITEMS[k]);
-      if (!ids.length) h += `<p class="bg-empty">Empty. Kirana shops sell water, Parle-G and bananas; food places do parcels.</p>`;
-      for (const id of ids) { const it = ITEMS[id]; h += row(`${it.icon} ${it.name} ×${s.inv[id]}`, it.note || describe(it.use), it.scratch ? 'Scratch' : it.use ? 'Use' : '', 'use', id); }
-      if (s.vehicles.length) h += `<div class="bg-sub">Keys</div>` + s.vehicles.map(v => row(`🔑 ${cap(v.type)} · ${v.plate}`, 'Owned, see the Owned tab', '', null)).join('');
-      if (s.gold) h += row(`🪙 Gold, ${s.gold} g`, `Worth about ${fmt(s.gold * G.shops.goldRate() * 0.97)} at a jeweller`, '', null);
+      if (!ids.length) h += `<p class="jh-empty">Nothing in here. A kirana sells water, Parle-G and bananas; any eatery will pack you a parcel.</p>`;
+      else {
+        h += '<div class="jh-grid">';
+        for (const id of ids) {
+          const it = ITEMS[id];
+          h += `<button class="jh-item" data-act="use" data-arg="${id}" title="${esc(it.note || describe(it.use))}">${icon(ITEM_ICON[id] || 'parcel')}<b>${esc(it.name)}</b><small>${esc(it.scratch ? 'Scratch it' : it.feed ? (it.feed === 'dog' ? 'Eat, or feed a dog' : 'Eat, or feed a cow') : describe(it.use))}</small><i>${s.inv[id]}</i></button>`;
+        }
+        h += '</div>';
+      }
+      if (s.vehicles.length) h += `<div class="jh-sub">Keys</div>` + s.vehicles.map(v => this.row('key', `${cap(v.type)}`, v.plate, '', null)).join('');
     } else if (this.tab === 'me') {
-      const P = G.player, st = L.style(), re = L.reaction();
-      const bar = (label, v, note, warn) => `<div class="bg-meter${warn ? ' warn' : ''}"><span>${label}</span><i><b style="width:${Math.round(Math.max(0, Math.min(1, v)) * 100)}%"></b></i><small>${esc(note)}</small></div>`;
-      const sgn = (v) => `<div class="bg-meter sgn"><i><b style="left:${v < 0 ? 50 + v / 2 : 50}%;width:${Math.abs(v) / 2}%" class="${v < 0 ? 'neg' : ''}"></b></i></div>`;
-      h += `<div class="bg-meters">
-        ${bar('Health', (P.hp ?? 100) / L.hpMax, `${Math.round(P.hp ?? 100)} / ${L.hpMax}`, (P.hp ?? 100) < 30)}
-        ${bar('Food', s.hunger, s.hunger < 0.2 ? 'Hungry, eat something' : s.hunger > 0.8 ? 'Full' : 'Fine', s.hunger < 0.2)}
-        ${bar('Water', s.thirst, s.thirst < 0.2 ? 'Thirsty' : 'Fine', s.thirst < 0.2)}
-        ${bar('Energy', s.energy, s.energy < 0.2 ? 'Exhausted, sleep or chai' : 'Fine', s.energy < 0.2)}
-        ${bar('Mood', s.mood, s.mood > 0.75 ? 'Great' : s.mood < 0.3 ? 'Low' : 'Okay')}
-        ${bar('Style here', st.score, st.odd ? 'Turning heads (and tongues)' : st.score > 0.85 ? 'You fit right in' : 'Could dress for the area better')}
-        ${bar('Fitness', s.fitness / 40, `+${Math.round(s.fitness)} max health · hit ${Math.round((L.punchMul - 1) * 100)}% harder`)}
-        <div class="bg-two"><div><span>Respect</span>${sgn(s.respect)}<small>${s.respect > 25 ? 'People know you' : s.respect < -10 ? 'People laugh at you' : 'Nobody special yet'} (${Math.round(s.respect)})</small></div>
-        <div><span>Karma</span>${sgn(s.karma)}<small>${s.karma > 20 ? 'Aajis bless you' : s.karma < -20 ? 'People cross the road' : 'Neutral'} (${Math.round(s.karma)})</small></div></div>
-        ${s.drunk > 0.2 ? `<p class="bg-warn">${s.drunk > 0.6 ? 'Drunk' : 'Tipsy'}: driving now is a ₹10,000 fine if stopped.</p>` : ''}
-        <p class="bg-read">How Pune reads you: <b>${{ respect: 'respected local', scared: 'trouble, keep away', odd: 'that one in the unusual outfit', drunk: 'had a few', nice: 'well turned out' }[re] || 'just another Punekar'}</b></p></div>`;
-      h += `<div class="bg-sub">Record</div><div class="bg-facts">
-        <span>Cash</span><b>${fmt(G.stats.money)}</b><span>Bank</span><b>${fmt(s.bank)}</b>
-        <span>Rides</span><b>${G.stats.rides}${G.stats.rides ? ` · ★ ${G.stats.rating.toFixed(1)}` : ''}</b><span>Deliveries</span><b>${s.tally.deliveries}</b>
-        <span>Fights won</span><b>${s.tally.fightsWon}</b><span>Knocked out</span><b>${s.tally.knockedOut}</b>
-        <span>Strays fed</span><b>${s.tally.fed}</b><span>Rent earned</span><b>${fmt(s.tally.rentEarned)}</b>
-        <span>Challans due</span><b>${fmt(G.police.duesTotal)}</b><span>Wanted</span><b>${G.police.heat ? '★'.repeat(G.police.heat) : 'No'}</b></div>`;
+      const P = G.player, st = L.style(), re = L.reaction(), hp = (P.hp ?? 100) / L.hpMax;
+      const ring = (ic, label, v, note) => {
+        const c = 2 * Math.PI * 22, low = v < 0.25;
+        return `<div class="jh-ring${low ? ' low' : ''}"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="22" class="bg"/><circle cx="26" cy="26" r="22" class="fg" stroke-dasharray="${(c * Math.max(0, Math.min(1, v))).toFixed(1)} ${c.toFixed(1)}"/></svg>${icon(ic)}<b>${label}</b><small>${esc(note)}</small></div>`;
+      };
+      const scale = (label, v, lo, hi) => `<div class="jh-scale"><div class="lab"><b>${label}</b><span>${v > 25 ? hi[0] : v < -15 ? lo[0] : 'Nobody special'}</span></div><div class="bar"><i style="left:${50 + v / 2}%"></i></div><div class="ends"><span>${lo[1]}</span><span>${hi[1]}</span></div></div>`;
+      h += `<div class="jh-rings">
+        ${ring('health', 'Health', hp, `${Math.round(P.hp ?? 100)} / ${L.hpMax}`)}
+        ${ring('food', 'Food', s.hunger, s.hunger < 0.2 ? 'Hungry' : s.hunger > 0.8 ? 'Full' : `${Math.round(s.hunger * 100)}%`)}
+        ${ring('water', 'Water', s.thirst, s.thirst < 0.2 ? 'Thirsty' : `${Math.round(s.thirst * 100)}%`)}
+        ${ring('energy', 'Energy', s.energy, s.energy < 0.2 ? 'Exhausted' : `${Math.round(s.energy * 100)}%`)}
+        ${ring('mood', 'Mood', s.mood, s.mood > 0.75 ? 'Great' : s.mood < 0.3 ? 'Low' : 'Okay')}</div>
+        <div class="jh-read"><span>How Pune sees you</span><b>${{ respect: 'A respected local', scared: 'Trouble. Keep away', odd: 'The one in the unusual outfit', drunk: 'Had a few', nice: 'Well turned out' }[re] || 'Just another Punekar'}</b></div>
+        <div class="jh-scales">${scale('Respect', s.respect, ['People laugh at you', 'Nobody'], ['People know you', 'Respected'])}${scale('Karma', s.karma, ['People cross the road', 'Bad'], ['Aajis bless you', 'Good'])}</div>
+        <div class="jh-chips"><span><small>Style here</small><b>${st.odd ? 'Bold' : st.score > 0.85 ? 'Spot on' : st.score > 0.65 ? 'Fine' : 'Off'}</b></span><span><small>Fitness</small><b>+${Math.round(s.fitness)} health</b></span><span><small>Drink</small><b>${s.drunk > 0.6 ? 'Drunk' : s.drunk > 0.2 ? 'Tipsy' : 'Sober'}</b></span><span><small>Wanted</small><b>${G.police.heat ? '★'.repeat(G.police.heat) : 'No'}</b></span></div>
+        <div class="jh-sub">Record</div>
+        <div class="jh-stats">${[['Rides', `${G.stats.rides}${G.stats.rides ? ` · ★ ${G.stats.rating.toFixed(1)}` : ''}`], ['Deliveries', s.tally.deliveries], ['Fights won', s.tally.fightsWon], ['Knocked out', s.tally.knockedOut], ['Strays fed', s.tally.fed], ['Meals', s.tally.meals], ['Rent earned', fmt(s.tally.rentEarned)], ['Challans due', fmt(G.police.duesTotal)]].map(([a, b]) => `<span><small>${a}</small><b>${b}</b></span>`).join('')}</div>`;
     } else if (this.tab === 'wear') {
-      const own = s.wardrobe;
-      if (!own.length) h += `<p class="bg-empty">Nothing bought yet. Any clothes shop on the map sells shirts, kurtas, sarees, anyone can wear anything.</p>`;
-      h += row('Your original outfit', 'What you started in', 'Wear', 'wear', '__orig');
-      for (const id of own) if (!id.startsWith('shoe_')) h += row(cap(id.replace(/_/g, ' ')), 'Bought', 'Wear', 'wear', id);
+      const own = s.wardrobe.filter(w => !w.startsWith('shoe_'));
+      h += this.row('shirt', 'What you started in', 'Your own clothes', 'Wear', 'wear', '__orig');
+      for (const id of own) h += this.row('shirt', cap(id.replace(/_/g, ' ')), 'Bought', 'Wear', 'wear', id);
+      for (const id of s.wardrobe.filter(w => w.startsWith('shoe_'))) h += this.row('shirt', cap(id.slice(5).replace(/_/g, ' ')), 'Footwear', 'Wear', 'wear', id);
+      if (!own.length) h += `<p class="jh-empty">Nothing bought yet. Any clothes shop sells shirts, kurtas and sarees, and anyone can wear anything.</p>`;
     } else if (this.tab === 'own') {
-      h += `<div class="bg-sub">Property</div>`;
-      for (const p of G.props.list) { const mine = G.props.owned(p); h += row(`${mine ? '🏠' : '🪧'} ${p.name}`, mine ? `Yours · rent ${fmt(p.rent)} a day` : `${fmt(p.price)} · ${p.sqft} sq ft · rent ${fmt(p.rent)}/day`, 'Show', 'wp', `p:${p.id}`); }
-      h += `<div class="bg-sub">Vehicles</div>`;
-      if (!s.vehicles.length) h += `<p class="bg-empty">None yet besides your auto. Showrooms (Honda, Bajaj, Maruti...) sell scooters to SUVs.</p>`;
-      for (const v of s.vehicles) h += row(`${cap(v.type)} · ${v.plate}`, this.whereVeh(v) ? 'Parked, tap to find it' : 'In storage: “bring it out” at one of your homes', this.whereVeh(v) ? 'Find' : '', this.whereVeh(v) ? 'wp' : null, `v:${v.id}`);
-      h += row('Your auto', G.police.towedAt ? `Towed to ${G.police.towedAt.name}` : 'Your living', 'Find', 'wp', 'auto');
+      const homes = G.props.list.filter(p => G.props.owned(p));
+      h += `<div class="jh-sub">Homes</div>`;
+      if (!homes.length) h += `<p class="jh-empty">You don’t own a home yet. Six are for sale, from a 1 RK in Sadashiv Peth to a Boat Club Road bungalow. They’re on your map as house pins, and under Nearby, Homes for sale.</p>`;
+      for (const p of homes) h += this.row('home', p.name, G.props.rentedOut(p) ? `Rented out · ${fmt(p.rent)} a day` : 'You live here: sleep, change, keep your vehicles', 'Show', 'wp', `p:${p.id}`);
+      h += `<div class="jh-sub">Vehicles</div>`;
+      h += this.row('auto', 'Your auto', G.police.towedAt ? `Towed to ${G.police.towedAt.name}` : `Fuel ${Math.round((G.player.auto.fuel ?? 1) * 100)}% · body ${Math.round((1 - (G.player.auto.dmg || 0)) * 100)}%`, 'Find', 'wp', 'auto');
+      for (const v of s.vehicles) { const w = this.whereVeh(v); h += this.row('scooter', `${cap(v.type)} · ${v.plate}`, w ? 'Parked. Tap to find it' : 'In storage. Bring it out at one of your homes', w ? 'Find' : '', w ? 'wp' : null, `v:${v.id}`); }
+      if (!s.vehicles.length) h += `<p class="jh-empty">Showrooms (Honda, Bajaj, Maruti and the rest) sell everything from a cycle to an SUV.</p>`;
     } else if (this.tab === 'near') {
-      h += `<div class="bg-chips">${GROUPS.map(([k, l]) => `<button data-g="${k}" aria-pressed="${k === this.group}">${l}</button>`).join('')}</div>`;
-      const P = G.player, list = G.shops.nearby(P.x, P.z, 900).filter(x => (KIND_INFO[x.kind] || [])[2] === this.group).slice(0, 40);
-      if (this.group === 'place') for (const p of G.props.list) list.push({ name: p.name, kind: 'estate', x: p.x, z: p.z, d: Math.hypot(p.x - P.x, p.z - P.z), prop: true });
+      h += `<div class="jh-chips sel">${GROUPS.map(([k, l]) => `<button data-g="${k}" aria-pressed="${k === this.group}">${l}</button>`).join('')}</div>`;
+      const P = G.player;
+      let list;
+      if (this.group === 'homes') list = G.props.list.map(p => ({ name: p.name, note: `${p.kind} · ${fmt(p.price)} · ${p.sqft} sq ft${G.props.owned(p) ? ' · yours' : ''}`, x: p.x, z: p.z, d: Math.hypot(p.x - P.x, p.z - P.z), ic: 'home' }));
+      else list = G.shops.nearby(P.x, P.z, 900).filter(x => (KIND_INFO[x.kind] || [])[2] === this.group).slice(0, 40).map(x => ({ name: x.name, note: `${KIND_INFO[x.kind][0]}${x.mr ? ' · ' + x.mr : ''}`, x: x.x, z: x.z, d: x.d, ic: 'pin' }));
       list.sort((a, b) => a.d - b.d);
-      if (!list.length) h += `<p class="bg-empty">Nothing of this kind close by. Try the map (M) and search.</p>`;
-      list.forEach((x, i) => { G._nearCache = G._nearCache || []; G._nearCache[i] = x; h += row(x.name, x.prop ? 'Property for sale' : `${KIND_INFO[x.kind][0]}${x.mr ? ' · ' + x.mr : ''}`, x.d < 1000 ? `${Math.round(x.d)} m` : `${(x.d / 1000).toFixed(1)} km`, 'goto', i); });
+      this.nearList = list;
+      if (!list.length) h += `<p class="jh-empty">Nothing like that close by. Search the map (M).</p>`;
+      list.forEach((x, i) => { h += this.row(x.ic, x.name, x.note, dist(x.d), 'goto', i); });
     }
     B.innerHTML = h;
-    this.el.querySelector('.sh-wallet').textContent = `Cash ${fmt(G.stats.money)}${s.bank ? ` · Bank ${fmt(s.bank)}` : ''}`;
   }
   whereVeh(v) {
+    if (!v) return null;
     const P = this.g.player;
     const d = P.dropped.find(q => q.veh.owned && q.veh.owned.id === v.id);
     return d ? d.veh : P.cur && P.cur.owned && P.cur.owned.id === v.id ? P.cur : null;
@@ -107,13 +126,13 @@ export class Bag {
     const G = this.g, L = this.life;
     if (a === 'use') {
       const it = ITEMS[arg];
-      if (it && it.feed && G.strays) { const a = G.strays.near(G.player.x, G.player.z, 2.5); if (a && a.kind === it.feed) { this.close(); G.strays.interact(a); return; } }
-      this.msg(L.use(arg)); this.render(); return;
+      if (it && it.feed && G.strays) { const an = G.strays.near(G.player.x, G.player.z, 2.5); if (an && an.kind === it.feed) { this.close(); G.strays.interact(an); return; } }
+      this.msg(L.use(arg), true); this.render(); return;
     }
     if (a === 'wear') {
       const P = G.player;
-      if (arg === '__orig') { L.s.look = null; const base = G.baseLook(); Object.assign(P.look, base); G.W.kit.applyLook(P.human, P.look); this.msg('Back in your own clothes'); return; }
-      G.shops.wearById(arg); this.msg('Changed'); return;
+      if (arg === '__orig') { L.s.look = null; const base = G.baseLook(); if (base) { Object.assign(P.look, base); G.W.kit.applyLook(P.human, P.look); } this.msg('Back in your own clothes', true); return; }
+      G.shops.wearById(arg); this.msg('Changed', true); return;
     }
     if (a === 'wp') {
       let t = null;
@@ -123,9 +142,7 @@ export class Bag {
       if (t) { G.setWaypoint({ x: t.x, z: t.z, name: t.name || 'Waypoint' }); this.close(); }
       return;
     }
-    if (a === 'goto') { const x = G._nearCache && G._nearCache[+arg]; if (x) { G.setWaypoint({ x: x.x, z: x.z, name: x.name }); this.close(); } }
+    if (a === 'goto') { const x = this.nearList && this.nearList[+arg]; if (x) { G.setWaypoint({ x: x.x, z: x.z, name: x.name }); this.close(); } }
   }
 }
-const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 export { PROPERTIES, lookFromJSON };

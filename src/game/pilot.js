@@ -128,7 +128,7 @@ export class Pilot {
     const cy = camYaw ?? F.yaw;
     const dx = Math.cos(cy) * fw - Math.sin(cy) * sd, dz = Math.sin(cy) * fw + Math.cos(cy) * sd;
     // throwing a punch, flinching or lying on the road: you don't walk (a roll carries you)
-    const A = this.act, held = this.ko || this.downT > 0 || (A && A.kind !== 'roll');
+    const A = this.act, held = this.ko || this.downT > 0 || this.seated || (A && A.kind !== 'roll');
     const tvx = held ? 0 : dx * target, tvz = held ? 0 : dz * target;
     const acc = target > F.v ? 10 : 14;
     if (A && A.kind === 'roll') { F.vx = A.vx; F.vz = A.vz; }
@@ -202,6 +202,8 @@ export class Pilot {
       F.vx *= 0.9; F.vz *= 0.9;
       if (this.downT < 1.4 && this.human.cur !== this.human.actions.getup) this.human.play('getup', { once: true, fade: 0.2 });
       if (this.downT <= 0) { this.downT = 0; this.ko = false; this.human.play('idle'); }
+    } else if (this.seated) {
+      // sitting at a table, in a salon chair, or dancing (world/interiors.js chose the clip)
     } else if (F.swim) {
       this.human.play(F.v > 0.3 ? 'swim' : 'swim_idle', { fade: 0.25, speed: F.v > 0.3 ? clamp(F.v / 1.3, 0.7, 1.5) : 1 });
     } else if (this.act) {

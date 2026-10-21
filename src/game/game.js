@@ -19,6 +19,8 @@ import { Gigs } from './gigs.js';
 import { Club } from './club.js';
 import { Bag } from './bag.js';
 import { Strays } from '../people/strays.js';
+import { Interiors } from '../world/interiors.js';
+import { Dates } from './date.js';
 import { Fauna } from '../people/animals.js';
 import { Vehicle } from '../vehicles/vehicle.js';
 
@@ -120,6 +122,8 @@ export class Game {
     this.club = new Club(this);
     this.bag = new Bag(this);
     this.strays = new Strays(this);
+    this.interiors = new Interiors(this);
+    this.date = new Dates(this);
     this.people.reaction = () => this.life.reaction();
     player.hpMax = () => this.life.hpMax;
     player.sprintMul = () => this.life.sprintMul;
@@ -240,7 +244,13 @@ export class Game {
     const lat = e.oneway ? e.w / 2 - 1.8 : 1.8;
     return { x: t[0] + t[3] * lat, z: t[1] - t[2] * lat, th: Math.atan2(t[3], t[2]) };
   }
-  focus() { return this.state === 'title' ? this.camera.position : this.player.root.position; }
+  // where the world streams around: you, or the shop door while you're inside it
+  focus() {
+    if (this.state === 'title') return this.camera.position;
+    const I = this.interiors && this.interiors.cur;
+    if (I) { this._door = this._door || new THREE.Vector3(); return this._door.set(I.door.x, 0, I.door.z); }
+    return this.player.root.position;
+  }
 
   // ---------------------------------------------------------------- state changes
   // Start: pick who you are the first time, then you're in your auto (the shift runs while you drive it)
@@ -402,6 +412,40 @@ export class Game {
     this.renderer.setPixelRatio(pr);
     if (this.post) this.post.setSize(window.innerWidth, window.innerHeight); else this.renderer.setSize(window.innerWidth, window.innerHeight, false);
   }
+  // passed out (beaten, starved, dehydrated, run over): you wake up in the nearest hospital with a bill
+  blackout(cause, robbed = 0) {
+    const P = this.player, L = this.life;
+    if (this._blacking) return;
+    this._blacking = true;
+    P.ko = true; P.downT = 4;
+    if (P.human) P.human.play('death', { once: true, fade: 0.1 });
+    if (this.interiors.inside) this.interiors.exit();
+    if (!P.onFoot) P.exit(this.traffic, true);
+    const why = { beaten: 'You were beaten unconscious', hunger: 'You collapsed from hunger', thirst: 'You collapsed from dehydration', hit: 'You were run over' }[cause] || 'You passed out';
+    this.hud.flash('बेशुद्ध · Out cold', why);
+    this.audio.thud(0.6);
+    this.later(3.2, () => {
+      // the nearest hospital: a government one costs little, a private one a lot
+      let best = null, bd = 1e12;
+      for (const p of this.W.M.places || []) if (p[2] === 'hospital') { const x = p[3] / 100, z = p[4] / 100, d = (x - P.x) ** 2 + (z - P.z) ** 2; if (d < bd) { bd = d; best = { name: p[0], x, z }; } }
+      const govt = best && /sassoon|kamala nehru|government|municipal|civil|ESI|cantonment/i.test(best.name);
+      const bill = (govt ? 600 : 3500) + (cause === 'beaten' || cause === 'hit' ? 1500 : 0);
+      const spot = best ? this.safeDrop(best.x, best.z) : null;
+      if (spot) P.teleportFoot(spot.x, spot.z, spot.th, this.traffic);
+      const fromCash = Math.min(this.stats.money, bill), rest = bill - fromCash;
+      this.stats.money -= fromCash;
+      const fromBank = Math.min(L.s.bank, rest); L.s.bank -= fromBank;
+      this.saveStats();
+      const hours = 6; this.hour = (this.hour + hours) % 24; this.clock += hours;
+      P.ko = false; P.downT = 0; P.hp = L.hpMax * 0.7; P.hurtT = 0;
+      L.s.hunger = Math.max(L.s.hunger, 0.5); L.s.thirst = Math.max(L.s.thirst, 0.55); L.s.energy = Math.max(L.s.energy, 0.5); L.s.drunk = 0;
+      L.s.tally.knockedOut++; L.change('mood', -0.1);
+      if (P.human) P.human.play('idle', { fade: 0.3 });
+      this.rig.footMode = false;
+      this.hud.toast(`Discharged from ${best ? best.name : 'hospital'}`, `Hospital bill ₹${bill.toLocaleString('en-IN')}${fromBank ? ' (part from your bank)' : ''}${robbed ? ` · ₹${robbed} was taken from your wallet` : ''} · ${hours} hours later`, 'bad', 6);
+      this._blacking = false;
+    });
+  }
   // sleep at home or a lodge: wake at 7 AM rested
   sleep() {
     const L = this.life, P = this.player;
@@ -539,7 +583,7 @@ export class Game {
       if (ev.type === 'dodge') { if (this.rng.chance(0.35) && (this._dodgeT || 0) < this.t) { this._dodgeT = this.t + 4; if (!(ev.p && this.people.speakAs('dodge', ev.p, 1, 4))) this.police.say(this.rng.pick(['d1', 'd2', 'd3', 'd4']), ev); } }
       if (ev.type === 'recovered') this.hud.toast('Back on three wheels', '', 'info', 1.6);
       if ((ev.type === 'jump' && this.rng.chance(0.3)) || ev.type === 'climb') this.people.onStunt(P);
-      if (ev.type === 'gotHit') { this.audio.thud(0.6); this.rig.shake(0.4); this.hud.toast('Knocked down', 'Traffic doesn\u2019t stop for pedestrians here. Stay on the footpath.', 'bad', 3); }
+      if (ev.type === 'gotHit') { P.hp = (P.hp ?? 100) - Math.min(60, 10 + (ev.speed || 4) * 4); if (P.hp <= 0) { this.blackout('hit'); continue; } this.audio.thud(0.6); this.rig.shake(0.4); this.hud.toast('Knocked down', 'Traffic doesn\u2019t stop for pedestrians here. Stay on the footpath.', 'bad', 3); }
       if (ev.type === 'carjack') { this.audio.crash(0.2); this.life.change('karma', -3); }
       if (ev.type === 'stoleParked') this.life.change('karma', -2);
       if (ev.type === 'pedHit') this.life.change('karma', -2);
@@ -565,8 +609,11 @@ export class Game {
       this.W.activity.setHour(this.hour);
       this.traffic.hour = this.hour;
       this.traffic.cam.copy(this.camera.position);
-      this.traffic.update(Math.min(dt, 0.05), P.x, P.z, this.inView);
-      this.people.update(Math.min(dt, 0.05), P, this.inView);
+      // inside a shop the street outside waits for you (the room has its own people)
+      if (!this.interiors.inside) {
+        this.traffic.update(Math.min(dt, 0.05), P.x, P.z, this.inView);
+        this.people.update(Math.min(dt, 0.05), P, this.inView);
+      }
     }
     if (this.state === 'play') {
       // the shift is on whenever you're driving an auto (yours or one you took), off when you get out
@@ -592,10 +639,11 @@ export class Game {
       // a rental goes back at the end of its day
       for (const d of P.dropped) if (d.veh.owned && d.veh.owned.rental && this.clock > d.veh.owned.until && d.veh !== P.cur) { P.removeDropped(d, this.traffic); d.veh.dispose(); this.hud.toast('Rental returned', 'The travels picked up their scooter', 'info', 2.6); break; }
       this.vehicleWear(dt);
-      if (this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);
+      if (this.input.took('KeyV')) this.rig.setMode(this.rig.mode + 1);
       this.rig.lookBack = this.input.key('KeyB');
       if (this.input.took('KeyR') && P.tipped === 0 && !P.onFoot) this.backOnRoad();
-      this.checkRoad(dt);
+      if (!this.interiors.inside) this.checkRoad(dt);
+      this.interiors.update(dt);
       this.updateNav(dt);
       this.rig.update(dt, P);
       const S = P.spec;

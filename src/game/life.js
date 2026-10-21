@@ -18,23 +18,24 @@ const DECAY = { hunger: 1 / 30, thirst: 1 / 24, energy: 1 / 30 };
 
 // things you can carry: name, what it does when you use it
 export const ITEMS = {
-  water: { name: 'Water bottle', icon: '💧', use: { thirst: 0.45 }, note: 'Bisleri-style, 1 litre' },
-  vadapav: { name: 'Vada pav (parcel)', icon: '🍔', use: { hunger: 0.3, mood: 0.03 }, note: 'Still warm' },
-  biscuit: { name: 'Parle-G', icon: '🍪', use: { hunger: 0.08 }, note: 'Or feed a street dog (F near one)', feed: 'dog' },
-  banana: { name: 'Bananas', icon: '🍌', use: { hunger: 0.15 }, note: 'Or feed a cow (F near one)', feed: 'cow' },
-  chikki: { name: 'Lonavala chikki', icon: '🥜', use: { hunger: 0.12, energy: 0.05 } },
-  medkit: { name: 'First-aid kit', icon: '🩹', use: { hp: 60 }, note: 'Used automatically if you’re about to be knocked out' },
-  painkiller: { name: 'Painkiller strip', icon: '💊', use: { hp: 25 } },
-  ors: { name: 'ORS sachet', icon: '🧂', use: { thirst: 0.35, hp: 8 } },
-  energy: { name: 'Energy drink', icon: '⚡', use: { energy: 0.35, thirst: 0.15 } },
-  coldcoffee: { name: 'Cold coffee (to go)', icon: '🥤', use: { energy: 0.2, thirst: 0.2, mood: 0.03 } },
-  bakarwadi: { name: 'Bakarwadi box', icon: '🎁', gift: 40, use: { hunger: 0.15, mood: 0.05 }, note: 'Offer it to a passenger: a bigger tip' },
-  barfi: { name: 'Amba barfi box', icon: '🎁', gift: 50, use: { hunger: 0.12, mood: 0.06 }, note: 'A gift passengers love' },
-  shrewsbury: { name: 'Shrewsbury biscuits', icon: '🎁', gift: 45, use: { hunger: 0.15, mood: 0.05 }, note: 'The Pune gift. Passengers tip more' },
-  gajra: { name: 'Mogra gajra', icon: '🌼', gift: 20, use: { mood: 0.08 }, note: 'Smells of summer evenings' },
-  book: { name: 'Paperback novel', icon: '📖', use: { mood: 0.08, energy: -0.02 } },
-  lottery: { name: 'Lottery ticket', icon: '🎟', note: 'Scratch it from the bag', scratch: true },
-  beer: { name: 'Beer (pint)', icon: '🍺', use: { drunk: 0.3, thirst: 0.1, mood: 0.05 } },
+  water: { name: 'Water bottle', use: { thirst: 0.45 }, note: 'Bisleri-style, 1 litre' },
+  tiffin: { name: 'Parcel meal', use: { hunger: 0.45, mood: 0.03 }, note: 'Packed from a restaurant' },
+  vadapav: { name: 'Vada pav (parcel)', use: { hunger: 0.3, mood: 0.03 }, note: 'Still warm' },
+  biscuit: { name: 'Parle-G', use: { hunger: 0.08 }, note: 'Or feed a street dog (F near one)', feed: 'dog' },
+  banana: { name: 'Bananas', use: { hunger: 0.15 }, note: 'Or feed a cow (F near one)', feed: 'cow' },
+  chikki: { name: 'Lonavala chikki', use: { hunger: 0.12, energy: 0.05 } },
+  medkit: { name: 'First-aid kit', use: { hp: 60 }, note: 'Used automatically if you’re about to be knocked out' },
+  painkiller: { name: 'Painkiller strip', use: { hp: 25 } },
+  ors: { name: 'ORS sachet', use: { thirst: 0.35, hp: 8 } },
+  energy: { name: 'Energy drink', use: { energy: 0.35, thirst: 0.15 } },
+  coldcoffee: { name: 'Cold coffee (to go)', use: { energy: 0.2, thirst: 0.2, mood: 0.03 } },
+  bakarwadi: { name: 'Bakarwadi box', gift: 40, use: { hunger: 0.15, mood: 0.05 }, note: 'Offer it to a passenger: a bigger tip' },
+  barfi: { name: 'Amba barfi box', gift: 50, use: { hunger: 0.12, mood: 0.06 }, note: 'A gift passengers love' },
+  shrewsbury: { name: 'Shrewsbury biscuits', gift: 45, use: { hunger: 0.15, mood: 0.05 }, note: 'The Pune gift. Passengers tip more' },
+  gajra: { name: 'Mogra gajra', gift: 20, use: { mood: 0.08 }, note: 'Smells of summer evenings' },
+  book: { name: 'Paperback novel', use: { mood: 0.08, energy: -0.02 } },
+  lottery: { name: 'Lottery ticket', note: 'Scratch it from the bag', scratch: true },
+  beer: { name: 'Beer (pint)', use: { drunk: 0.3, thirst: 0.1, mood: 0.05 } },
 };
 
 export class Life {
@@ -117,7 +118,13 @@ export class Life {
     if (P.onFoot && P.foot.swim) { s.energy = clamp(s.energy - h * 0.25, 0, 1); s.thirst = Math.min(1, s.thirst + h * 0.02); }
     s.mood = clamp(s.mood + (0.6 - s.mood) * h * 0.08 - (s.hunger < 0.2 ? h * 0.05 : 0), 0, 1);
     // empty stomach or dry throat: health slowly goes (never all at once)
-    if ((s.hunger < 0.08 || s.thirst < 0.08) && P.hp > 25) P.hp -= dt * 0.25;
+    // an empty stomach or a dry throat wears your health down; at zero you pass out (hospital)
+    if (s.hunger < 0.08 || s.thirst < 0.08) {
+      const starving = s.hunger <= 0 || s.thirst <= 0;
+      P.hp -= dt * (starving ? 0.7 : 0.18);
+      if (P.hp <= 0 && !P.ko && G.blackout) G.blackout(s.thirst <= 0 ? 'thirst' : 'hunger');
+      else if (P.hp < 1) P.hp = 1;
+    }
     this.warn('hunger', s.hunger, 'Pet bhuk lagli', 'You’re getting hungry, a vada pav or a thali would do it (F at any food place, or E for your bag)');
     this.warn('thirst', s.thirst, 'Ghasa korda padla', 'You’re thirsty, water, a chai, a juice');
     this.warn('energy', s.energy, 'Thakla aahes', 'You’re tired, sleep at your home or a lodge, or a strong chai');

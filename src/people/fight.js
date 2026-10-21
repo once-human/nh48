@@ -1,4 +1,4 @@
-// Street fights. Left click throws a punch (keep clicking: jab, cross, hook), Ctrl rolls out of the way.
+// Street fights. Left click throws a punch (keep clicking: jab, cross, hook), C rolls out of the way.
 // Whoever you hit decides by who they are (people/areas.js personas): a dada or a delivery bhaiya
 // squares up and hits back, a kaku threatens you with her chappal and shouts for help, an aaji
 // just runs. People around stop to watch (phones out) or get away; a tough friend may join in;
@@ -52,12 +52,12 @@ export class Brawl {
     this.comboT -= dt;
     if (P.ko) return;
     const busyDown = P.downT > 0 || F.climb || F.air;
-    // left mouse button punches (E opens the backpack), Ctrl rolls
+    // left mouse button punches (E opens the backpack), C rolls
     if ((input.took('Mouse0') || input.took('KeyX')) && !busyDown) {
       if (P.act && P.act.kind === 'atk') { if (P.act.t > P.act.dur * 0.35) this.queued = true; }
       else if (!P.act) this.attack();
     }
-    if ((input.took('ControlLeft') || input.took('ControlRight')) && !busyDown && !(P.act && P.act.kind === 'roll')) this.roll(input);
+    if (input.took('KeyC') && !busyDown && !(P.act && P.act.kind === 'roll')) this.roll(input);
     const A = P.act;
     if (!A) return;
     A.t += dt;
@@ -290,13 +290,10 @@ export class Brawl {
     G.hud.flash?.('Knocked out', 'Pune doesn’t forget');
     // everyone who was fighting you wanders off, pleased with themselves
     for (const p of this.people.list) if (p.foe === P) { this.people.endFight(p, true); }
-    G.later?.(6.2, () => {
-      P.ko = false; P.hp = 45; P.hurtT = 0;
-      const lost = Math.min(G.stats.money, Math.round(this.rng.range(150, 600) / 10) * 10);
-      G.stats.money -= lost; G.saveStats?.();
-      G.hud.toast('You come round on the footpath', lost ? `Someone helped themselves to ₹${lost} from your wallet` : 'Your wallet was empty anyway', 'bad', 4.5);
-      this.active = 0;
-    });
+    // someone takes your cash while you're down, then you wake up in hospital
+    const lost = Math.min(G.stats.money, Math.round(this.rng.range(150, 600) / 10) * 10);
+    G.stats.money -= lost; G.saveStats?.();
+    G.later?.(2.6, () => { this.active = 0; G.blackout ? G.blackout('beaten', lost) : (P.ko = false, P.hp = 45); });
   }
 
   // ---------------------------------------------------------------- the people (called from People.step)
