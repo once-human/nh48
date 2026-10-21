@@ -400,7 +400,7 @@ export class MapScreen {
       else if (e.key === '+' || e.key === '=') this.zoomAt(1.5);
       else if (e.key === '-' || e.key === '_') this.zoomAt(1 / 1.5);
       else if (e.code === 'Space') { e.preventDefault(); this.centerOnMe(); }
-      else if (e.code === 'Escape' && this.sel) this.select(null);
+      else if (e.code === 'Escape') { if (this.sel) this.select(null); else { e.stopImmediatePropagation(); this.g.toggleMap(false); } }   // Esc: clear the pick, then close
     });
   }
   pickAt(sx, sy, r = 14) {
