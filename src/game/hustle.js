@@ -126,6 +126,8 @@ export class Hustle {
     return null;
   }
   ping() {
+    // parcel runs and race invites come through apps: a keypad phone doesn't get them
+    if (!this.g.life.s.phone) return;
     const G = this.g, P = G.player, h = G.hour;
     if (this.job || this.race || this.offer) return;
     if (h >= 23 || h < 3) {

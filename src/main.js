@@ -234,7 +234,8 @@ async function main() {
     }
     U.uTime.value += dt;
     const focus = game.focus();
-    sky.update(game.hour, focus, dt);
+    // indoors the light is the room's own, not the time of day outside (a club stays dark)
+    sky.update(game.lightHour ? game.lightHour() : game.hour, focus, dt);
     renderer.toneMappingExposure *= EXPO;
     U.uShopsOpen.value = game.hour > 22.8 || game.hour < 8.5 ? 0.25 : 1;
     updateWorldMaterials(W);

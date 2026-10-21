@@ -65,6 +65,34 @@ export const KIND_INFO = {
   dealer: ['Vehicle showroom', 'शोरूम', 'vehicle'], garage: ['Garage', 'गॅरेज', 'vehicle'], fuel: ['Petrol & CNG', 'पेट्रोल पंप', 'vehicle'], travel: ['Travels', 'ट्रॅव्हल्स', 'vehicle'],
   chowki: ['Police chowki', 'पोलीस चौकी', 'place'], lodge: ['Lodge', 'लॉज', 'place'], estate: ['Estate agent', 'इस्टेट', 'place'],
 };
+// opening hours, Pune style: [opens, closes] (hours, may run past midnight), and the share of places of
+// that kind that stay open late into the night (a 24-hour chemist, a biryani place till 2). Around 40% of
+// the city is open after 11 PM: a little livelier than the real thing, it's a game
+const HOURS = {
+  tapri: [6, 23, 0.45], misal: [7, 22.5, 0.2], thali: [11, 22.5, 0.15], biryani: [12, 23.5, 0.6], southindian: [7, 22, 0.15], chinese: [12, 23.5, 0.5],
+  fastfood: [11, 23.5, 0.55], food: [11, 23.5, 0.45], cafe: [9, 23, 0.45], bakery: [7, 22, 0.2], sweets: [8, 22, 0.1], juice: [11, 23.5, 0.4], icecream: [11, 23.5, 0.45],
+  bar: [18, 25.5, 1], barber: [9, 21.5, 0.05], clothes: [10.5, 21.5, 0.08], shoes: [10.5, 21.5, 0.05], optician: [10.5, 21, 0], pharmacy: [8, 23, 0.5],
+  clinic: [9, 21, 0.25], gym: [5.5, 22, 0.15], jeweller: [10.5, 20.5, 0], kirana: [7, 22, 0.3], mobile: [10.5, 21.5, 0.1],
+  electronics: [10.5, 21, 0], books: [10, 21, 0], florist: [7, 21.5, 0.2], paan: [10, 24, 0.7], dealer: [10, 20, 0], garage: [9, 20.5, 0.1],
+  fuel: [6, 23, 0.7], travel: [9, 21, 0.1], estate: [10, 20, 0],
+};
+const ALWAYS = new Set(['chowki', 'lodge', 'hospital']);
+const hhmm = (h) => { h = ((h % 24) + 24) % 24; const H = Math.floor(h), M = Math.round((h - H) * 60); return `${H % 12 || 12}${M ? ':' + String(M).padStart(2, '0') : ''} ${H < 12 ? 'AM' : 'PM'}`; };
+// is this place open at this hour? {open, opens}. A place that stays open late does so every night.
+export function openNow(ctx, hour) {
+  if (!ctx || ALWAYS.has(ctx.kind) || ctx.atm) return { open: true };
+  const H = HOURS[ctx.kind];
+  if (!H) return { open: true };
+  const [o, c, late] = H;
+  const seed = Math.abs(Math.sin((ctx.x || 0) * 12.9898 + (ctx.z || 0) * 78.233) * 43758.5453) % 1;
+  const lateOne = seed < late;
+  const close = lateOne ? (ctx.kind === 'pharmacy' || ctx.kind === 'fuel' || ctx.kind === 'paan' ? 30 : Math.max(c, 26)) : c;   // 30 = round the clock
+  if (close >= 30) return { open: true };
+  const h = hour < 6 ? hour + 24 : hour;
+  const open = h >= o && h < close;
+  return { open, opens: hhmm(o) };
+}
+
 // what the keeper says when you walk in: [roman, English]
 const HELLO = {
   tapri: [['Bola, cutting ki full?', 'Cutting or a full glass?']], misal: [['Kiti tikhat? Kat extra?', 'How spicy? Extra kat?']],
@@ -278,6 +306,9 @@ export class Shops {
     if (this.near.kind === 'metro' || this.near.kind === 'bus') { this.g.transit.show(this.near); return true; }
     const I = this.g.interiors;
     if (this.near.kind === 'ispot') { I.use(this.near.s); this.scanT = 0.3; return true; }
+    // shut for the night (or not open yet): the shutter's down
+    const oh = this.near.door && openNow(this.near, this.g.hour);
+    if (oh && !oh.open) { this.g.hud.toast(`${this.near.name} is closed`, `Opens at ${oh.opens}`, 'info', 2.4); this.scanT = 0.6; return true; }
     // a storefront with a room behind it: walk in (a club at night wants its cover charge first)
     if (I && I.templateOf(this.near.kind) && this.near.door) {
       const club = this.near.kind === 'bar' && this.isClub(this.near) && (this.g.hour >= 20.5 || this.g.hour < 1.5);
@@ -293,6 +324,8 @@ export class Shops {
     if (n.kind === 'animal') return this.g.strays.label(n.a);
     if (n.kind === 'metro' || n.kind === 'bus') return this.g.transit.label(n);
     if (n.kind === 'ispot') return n.s.label;
+    const oh = n.door && openNow(n, this.g.hour);
+    if (oh && !oh.open) return `${n.name} · Closed, opens ${oh.opens}`;
     if (this.g.interiors && this.g.interiors.templateOf(n.kind) && n.door) return `Go into ${n.name} · ${KIND_INFO[n.kind][0]}`;
     const K = KIND_INFO[n.kind];
     return `${n.name} · ${K ? K[0] : ''}`;

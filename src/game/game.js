@@ -337,6 +337,11 @@ export class Game {
     if (this.transit && this.transit.open) this.transit.close();
     if (this.state === 'shop') this.state = 'play';
   }
+  lightHour() {
+    const I = this.interiors;
+    if (I && I.inside) return I.cur.R.tpl === 'club' ? 22.6 : 12.5;
+    return this.hour;
+  }
   togglePause(force) {
     const to = force !== undefined ? force : this.state !== 'pause';
     if (to && this.state === 'play') { this._pausedAt = performance.now(); this.state = 'pause'; this.pauseFrames = 0; this.renderer.domElement.classList.add('paused'); this.hud.setLockHint?.(false); this.hud.pause.hidden = false; this.hud.syncPause(); this.audio.updateEngine(0, 0, false); this.audio.playerHorn(false); this.audio.hush(true); }

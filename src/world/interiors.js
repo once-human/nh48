@@ -199,7 +199,8 @@ export class Interiors {
       }
     }
     const R = { tpl, style, layout: lay, O, W, D, H, spots: [], seats: [], people: [], dyn: [], props: [], browse: [] };
-    const spot = (x, z, r, kind, label, extra) => R.spots.push({ x: O.x + x, z: O.z + z, r, kind, label, ...extra });
+    // a generous reach: you shouldn't have to stand on an exact spot to use something (nearest wins)
+    const spot = (x, z, r, kind, label, extra) => R.spots.push({ x: O.x + x, z: O.z + z, r: kind === 'exit' ? r : Math.max(r * 1.3, 1.4), kind, label, ...extra });
     spot(0, 0.6, 1.2, 'exit', 'Go back outside');
     const counter = (x, z, w, d, col, glass) => { box(B, x, 0.5, z, w, 1.0, d, col); box(B, x, 1.02, z, w + 0.08, 0.05, d + 0.08, style === 'luxe' ? 0xe8e4dc : style === 'minimal' ? 0xf7f6f2 : 0x3b3b3e); if (glass) box(GL, x, 0.75, z - d / 2 - 0.01, w * 0.94, 0.4, 0.02, 0xfff1d6); solid(x, z, w, d); };
     const legC = S.steel ? 0xb8bcc2 : S.legs || 0x4a3626, chairC = S.steel ? 0xc8ccd2 : S.chair || 0x6b4a2e;
@@ -369,12 +370,12 @@ export class Interiors {
         if (wallRack) {
           box(B, x, 1.6, z, 0.04, 0.04, along, 0x8e9093);
           for (let k = 0; k < 8; k++) garment(x, z - along / 2 + 0.2 + k * 0.31, sub, COLS[(k * 3 + Math.round(z)) % COLS.length], false);
-          solid(x, z, 0.6, along, 2); spot(x + (x < 0 ? 1.1 : -1.1), z, 1.1, 'rack', lbl, { sub });
+          solid(x, z, 0.6, along, 2); spot(x + (x < 0 ? 0.9 : -0.9), z, 1.7, 'rack', lbl, { sub });
           this.sign(R, lbl, x + (x < 0 ? 0.05 : -0.05), 2.35, z, x < 0 ? Math.PI / 2 : -Math.PI / 2, 2.2, accent);
         } else {
           box(B, x, 1.6, z, along, 0.04, 0.04, 0x8e9093); for (const e of [-1, 1]) box(B, x + e * along / 2, 0.8, z, 0.04, 1.6, 0.04, 0x8e9093);
           for (let k = 0; k < 7; k++) garment(x - 0.9 + k * 0.3, z, sub, COLS[(k * 3 + Math.round(x)) % COLS.length], true);
-          C.addCircle(O.x + x, O.z + z, 1.0, 2); spot(x, z - 1.2, 1.1, 'rack', lbl, { sub }); browse(x + 1.4, z - 1.0);
+          C.addCircle(O.x + x, O.z + z, 1.0, 2); spot(x, z, 2.1, 'rack', lbl, { sub }); browse(x + 1.4, z - 1.0);
           box(B, x, 2.0, z, 0.03, 0.8, 0.03, 0x8e9093);
           this.sign(R, lbl, x, 2.55, z - 0.02, Math.PI, 2.0, accent);
         }
@@ -495,7 +496,11 @@ export class Interiors {
     g.fillStyle = '#f4f2ee'; g.font = '700 46px Archivo, Inter, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(text.toUpperCase().replace(' AND ', ' & '), 256, 52, 490);
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 112 / 512), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, toneMapped: false }));
+    // two faces back to back, so it reads the right way round from either side of the rack
+    const geo = new THREE.PlaneGeometry(w, w * 112 / 512), mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+    const m = new THREE.Group();
+    const a = new THREE.Mesh(geo, mat), b = new THREE.Mesh(geo, mat); b.rotation.y = Math.PI;
+    m.add(a, b);
     m.position.set(R.O.x + x, FLOOR + y, R.O.z + z); m.rotation.y = ry;
     (R.signs || (R.signs = [])).push(m);
     return m;
@@ -666,11 +671,12 @@ export class Interiors {
     if (!best && C.R.seats.length) for (const s of C.R.seats) { if (s.used || s.salon) continue; const d = Math.hypot(s.x - x, s.z - z); if (d < 1.1 && d < bd) { bd = d; best = { kind: 'seat', seat: s, label: C.plate ? `Sit down and eat your ${C.plate.name.toLowerCase()}` : 'Sit down' }; } }
     // someone close by beats a big area spot (the dance floor covers the whole floor, so it used to hide everyone on it)
     let talk = null, td = 1e9;
-    if (C.R.peds && !C.seat) { const D = this.g.date; for (const p of C.R.peds) { if (!p.name || p.walkedOff || !(p.dateWith || D && D.eligible(p))) continue; const d = Math.hypot(p.x - x, p.z - z); if (d < 2.4 && d < td) { td = d; talk = { kind: 'talk', p, label: p.dateWith ? `Join ${p.name}` : `Talk to ${p.name}` }; } } }
+    // (sitting down, only the person you're on a date with: you're at their table)
+    if (C.R.peds) { const D = this.g.date; for (const p of C.R.peds) { if (!p.name || p.walkedOff || !(p.dateWith || D && D.eligible(p)) || (C.seat && !p.dateWith)) continue; const d = Math.hypot(p.x - x, p.z - z); if (d < 2.4 && d < td) { td = d; talk = { kind: 'talk', p, label: p.dateWith ? (C.seat ? `Talk to ${p.name}` : `Sit with ${p.name}`) : `Talk to ${p.name}` }; } } }
     if (talk && (!best || td < bd || (best.r >= 3 && td < 1.9))) best = talk;
     if (best && C.ctx.kind === 'optician' && (best.kind === 'rack' || best.kind === 'counter')) best = { ...best, kind: 'counter', label: best.kind === 'rack' ? 'Try on frames' : 'Eye test and glasses' };
     if (best && C.ctx.kind === 'shoes' && best.kind === 'rack') best = { ...best, kind: 'counter', label: 'Try on shoes' };
-    if (C.seat) best = { kind: 'stand', label: C.eating ? 'Eating…' : 'Get up' };
+    if (C.seat) best = talk && talk.p.dateWith && !C.eating ? talk : { kind: 'stand', label: C.eating ? 'Eating…' : 'Get up' };
     if (C.dancing && !(talk && td < 1.9)) best = { kind: 'undance', label: 'Stop dancing' };
     return best;
   }
@@ -692,7 +698,11 @@ export class Interiors {
       case 'undance': this.dance(false); return;
       case 'workout': G.shops.show({ ...ctx, kind: 'gym', inside: true }); return;
       case 'vehicle': G.shops.show({ ...ctx, kind: 'dealer', inside: true }); return;
-      case 'talk': if (C.dancing) this.dance(false); G.date && G.date.talk(s.p, C); return;
+      case 'talk':
+        if (C.dancing) this.dance(false);
+        // a date: sit down next to them first, then talk
+        if (s.p.dateWith && s.p.dateSeat && !C.seat) { s.p.dateSeat.used = false; this.sit(s.p.dateSeat); }
+        G.date && G.date.talk(s.p, C); return;
     }
   }
   sit(seat, salon) {

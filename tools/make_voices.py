@@ -2,24 +2,38 @@
 #   Kokoro-82M (Apache-2.0) Hindi voices hm_omega / hm_psi / hf_alpha / hf_beta, through kokoro-onnx
 #   Piper mr_IN-google-medium (dataset: OpenSLR 64, CC BY-SA 4.0), speakers mr0..mr8
 # usage: python3 tools/make_voices.py [only_id ...]
-import json, os, subprocess, sys, tempfile
+import json, os, re, subprocess, sys, tempfile
 import soundfile as sf
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELS = '/home/claude/assets_src/piper'
-OUT = os.path.join(ROOT, 'assets', 'voice')
+OUT = os.environ.get('NH_VOICE_OUT') or os.path.join(ROOT, 'assets', 'voice')
 os.makedirs(OUT, exist_ok=True)
 lines = {k: v for k, v in json.load(open(os.path.join(ROOT, 'src/game/lines.json'))).items() if not k.startswith('_')}
 only = set(sys.argv[1:])
 
 kok = None
+# what a person says, not the punctuation: no quote marks, ellipses as pauses, "mm/hmm" as a real hum,
+# dashes as commas, nothing a TTS would spell out letter by letter
+def speakable(t):
+    t = t.replace('\u2019', "'").replace('\u2018', "'")
+    t = re.sub(r'[\u201c\u201d"\u00ab\u00bb]', '', t)
+    t = re.sub(r'\.{2,}|\u2026', ', ', t)
+    t = re.sub(r'\b[Mm]+[Hh]?[Mm]+\b|\b[Hh]m+\b', 'hmm', t)
+    t = re.sub(r'\s*[\u2014\u2013-]{1,2}\s*', ', ', t)
+    t = re.sub(r'[*_~#()\[\]{}<>|/\\]', ' ', t)
+    t = re.sub(r'\s*,(\s*,)+', ',', t)
+    t = re.sub(r'\s*,\s*([?!.])', r'\1', t)
+    return re.sub(r'\s+', ' ', t).strip(' ,')
+
 def kokoro(text, voice, lang, path):
+    text = speakable(text)
     global kok
     if kok is None:
         from kokoro_onnx import Kokoro
         kok = Kokoro(os.path.join(MODELS, 'kokoro-v1.0.onnx'), os.path.join(MODELS, 'voices-v1.0.bin'))
     try:
-        s, sr = kok.create(text, voice=voice, speed=1.05, lang=lang)
+        s, sr = kok.create(text, voice=voice, speed=0.97, lang=lang)
     except Exception as e:
         print('  lang', lang, 'failed, using hi:', e)
         s, sr = kok.create(text, voice=voice, speed=1.05, lang='hi')
@@ -27,7 +41,7 @@ def kokoro(text, voice, lang, path):
 
 def piper(text, spk, path):
     subprocess.run([sys.executable, '-m', 'piper', '-m', os.path.join(MODELS, 'mr_IN-google-medium.onnx'), '-s', str(spk), '-f', path],
-                   input=text.encode(), check=True, capture_output=True)
+                   input=speakable(text).encode(), check=True, capture_output=True)
 
 # passenger lines: male voices alternate between the two Kokoro men, female between Piper speakers
 jobs = [(lid, voice, lang, tts) for lid, (who, voice, lang, tts, roman, en) in lines.items()]
@@ -68,10 +82,11 @@ for kind, (voice, lang, tempo) in shopl['_voice'].items():
 # {woman|man} picks the gendered form
 import re
 def gform(t, f): return re.sub(r'\{([^{}|]*)\|([^{}|]*)\}', lambda m: m.group(1) if f else m.group(2), t)
-# Hindi and Marathi date lines are written romanised (Hinglish style), so they're read with English phonemes
-# in the Indian voices; that's what sounds natural for them
-DV = {'f': {'en': ('hf_beta', 'en-us', 1.04), 'hi': ('hf_beta', 'en-us', 1.04), 'mr': ('hf_alpha', 'en-us', 1.0)},
-      'm': {'en': ('hm_psi', 'en-us', 1.02), 'hi': ('hm_omega', 'en-us', 1.0), 'mr': ('hm_psi', 'en-us', 1.0)}}
+# date lines: the first form is the real script (Devanagari for Hindi and Marathi), read in the speaker's
+# own language; Marathi falls back to the Hindi phonemizer when the Piper Marathi model isn't installed
+_MR = 'mr0' if os.path.exists(os.path.join(MODELS, 'mr_IN-google-medium.onnx')) else 'hf_alpha'
+DV = {'f': {'en': ('hf_beta', 'en-us', 1.0), 'hi': ('hf_beta', 'hi', 0.98), 'mr': (_MR, 'hi' if _MR == 'hf_alpha' else 'mr', 0.96)},
+      'm': {'en': ('hm_psi', 'en-us', 1.0), 'hi': ('hm_omega', 'hi', 0.98), 'mr': ('hm_psi', 'hi', 0.96)}}
 for lang in ('en', 'hi', 'mr'):
     dl = json.load(open(os.path.join(ROOT, f'src/game/date/{lang}.json')))
     for key, arr in dl.items():
@@ -105,6 +120,6 @@ for lid, voice, lang, tts in jobs:
         pre = f'asetrate={sr}*{p_},aresample=24000,atempo={max(0.5, min(2.0, t_ / p_)):.4f},'
     af = (pre + 'silenceremove=start_periods=1:start_threshold=-45dB,areverse,silenceremove=start_periods=1:start_threshold=-45dB,areverse,'
           'highpass=f=90,acompressor=threshold=-20dB:ratio=3:attack=5:release=80,loudnorm=I=-16:TP=-1.5:LRA=7,apad=pad_dur=0.08')
-    subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', tmp, '-af', af, '-ac', '1', '-ar', '24000', '-b:a', '32k', out], check=True)
+    subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', tmp, '-af', af, '-ac', '1', '-ar', '24000', '-b:a', '48k', out], check=True)
     os.remove(tmp)
     print(lid, voice, os.path.getsize(out), 'bytes')

@@ -44,7 +44,7 @@ const SHOPS = [
   ]],
   ['Things', [
     ['Kirana', 'Water, biscuits, bananas, lottery tickets.'],
-    ['Mobile shop', 'A smartphone (needed for Zwiggy deliveries), recharges.'],
+    ['Mobile shop', 'You start with a keypad phone (calls and texts). A smartphone adds Zwiggy orders, parcel runs and race invites.'],
     ['Electronics', 'Gadgets that change things, on EMI.'],
     ['Bookshop', 'A book: mood, and a good gift.'],
     ['Florist', 'Gajra (a gift), a marigold garland for your auto (karma).'],
