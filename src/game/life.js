@@ -151,7 +151,8 @@ export class Life {
   }
   // tiredness, hunger and drink as gameplay
   get sprintMul() { const s = this.s; return (s.energy < 0.15 ? 0.75 : 1) * (s.hunger < 0.08 ? 0.85 : 1) * (s.drunk > 0.6 ? 0.85 : 1); }
-  get punchMul() { return 1 + this.s.fitness / 80; }
+  // a man hits harder (built stronger), and the gym adds to anyone
+  get punchMul() { return (this.g && this.g.player && this.g.player.look && !this.g.player.look.female ? 1.35 : 1) + this.s.fitness / 80; }
 }
 
 function describe(eff) {

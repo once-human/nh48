@@ -19,6 +19,7 @@ import { ITEMS, describe } from './life.js';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { tierOf, TIER_MUL, TIER_LABEL, servicesFor } from './brands.js';
 import SHOPL from './shop_lines.json';
+import { venueKey, nightOf } from '../world/interiors.js';
 
 // each kind of shop gets its own look of buying screen (style.css .shop[data-ui=...])
 const UI_OF = { tapri: 'menu', misal: 'menu', thali: 'menu', biryani: 'menu', southindian: 'menu', chinese: 'menu', fastfood: 'fast', food: 'menu', cafe: 'cafe', bakery: 'cafe', sweets: 'menu', juice: 'menu', icecream: 'cafe',
@@ -359,7 +360,8 @@ export class Shops {
     if (oh && !oh.open) { this.g.hud.toast(`${this.near.name} is closed`, `Opens at ${oh.opens}`, 'info', 2.4); this.scanT = 0.6; return true; }
     // a storefront with a room behind it: walk in (a club at night wants its cover charge first)
     if (I && I.templateOf(this.near.kind) && this.near.door) {
-      const club = this.near.kind === 'bar' && this.isClub(this.near) && (this.g.hour >= 20.5 || this.g.hour < 1.5);
+      const covers = this.g.life.s.covers || {};
+      const club = this.near.kind === 'bar' && this.isClub(this.near) && (this.g.hour >= 20.5 || this.g.hour < 1.5) && covers[venueKey(this.near)] !== nightOf(this.g);
       if (!club) { const ctx = this.near; if (I.enter(ctx)) { this.g.date && this.g.date.onEnter(I.cur.R, ctx); return true; } }
     }
     this.show(this.near);
@@ -416,7 +418,7 @@ export class Shops {
         if (ctx.inside) { for (const id of MENUS.bar) food(id); break; }
         if (club && night) {
           const cover = r10(1500 * mul / 1.3);
-          out.push({ label: 'Cover charge, on the dance floor', note: 'Includes one drink. Dance off the day', price: cover, act: pay(cover, () => { this.close(); G.interiors.enter(ctx); return ''; }) });
+          out.push({ label: 'Cover charge, on the dance floor', note: 'Includes one drink. Dance off the day', price: cover, act: pay(cover, () => { const cv = G.life.s.covers || (G.life.s.covers = {}); for (const k in cv) if (cv[k] < nightOf(G) - 1) delete cv[k]; cv[venueKey(ctx)] = nightOf(G); this.close(); if (G.interiors.enter(ctx)) G.date && G.date.onEnter(G.interiors.cur.R, ctx); return ''; }) });
         } else if (club) out.push({ label: 'Club night', note: 'Opens at 8:30 PM, come back later', price: 0, disabled: 'Opens 8:30 PM' });
         for (const id of MENUS.bar) food(id);
         if (G.hour >= 1.5 && G.hour < 11) { out.length = 0; out.push({ label: 'Closed', note: 'Last call was at 1:30 AM. Pune rules.', price: 0, disabled: 'Closed' }); }

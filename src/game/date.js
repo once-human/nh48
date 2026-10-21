@@ -154,6 +154,20 @@ export class Dates {
     this.render();
     this.el.hidden = false;
   }
+  // they come to you: someone walked over (more often if you're a woman, at a club, late, dancing, looking good).
+  // You can talk, dance with them, smile and wave them off, or turn them down flat
+  approach(p, room) {
+    const G = this.g;
+    if (this.cur || p.walkedOff) return false;
+    this.profile(p);
+    const tpl = room.R.tpl, dancing = !!room.dancing;
+    this.cur = { p, room, mode: 'meet', approach: true, contact: null, club: tpl === 'club', interest: Math.max(p.interest ?? 0, Math.round(18 + this.life.charm * 14)), used: {}, turn: 0, q: null, teases: 0 };
+    G.state = 'shop';
+    this.say(this.line(p, dancing ? 'approach_dance' : tpl === 'club' ? 'approach_club' : 'approach_cafe'), `${p.name} came over to you`);
+    this.render();
+    this.el.hidden = false;
+    return true;
+  }
   say(l, how) {
     const B = this.el;
     B.querySelector('.tk-line').textContent = l && l.t ? `“${l.t}”` : '';
@@ -164,6 +178,13 @@ export class Dates {
   options() {
     const c = this.cur, P = this.profile(c.p), L = this.life, G = this.g, o = [];
     if (c.q) return this.answers(c.q);
+    if (c.approach) {
+      const dancing = c.room && c.room.dancing;
+      const a = [{ id: 'ap_talk', label: 'Talk to them' }];
+      if (c.club) a.push({ id: 'ap_dance', label: dancing ? 'Dance with them' : 'Take them to the dance floor' });
+      a.push({ id: 'ap_smile', label: dancing ? 'Smile and keep dancing' : 'Smile, say you’re good for now' }, { id: 'ap_no', label: 'Not interested' });
+      return a;
+    }
     if (c.mode === 'date') {
       const ct = c.contact;
       if (ct.upset) return [
@@ -263,6 +284,20 @@ export class Dates {
     const G = this.g, c = this.cur, q = this.opts && this.opts[i];
     if (!c || !q || (q.min && (c.mode === 'date' ? c.contact.aff : c.interest) < q.min)) return;
     if (c.q) return this.answer(q);
+    if (c.approach) {
+      const p = c.p;
+      c.approach = false;
+      if (q.id === 'ap_smile') { p.interest = c.interest - 6; this.say(this.line(p, 'approach_ignore'), 'They head back'); this.el.querySelector('.tk-opts').innerHTML = ''; setTimeout(() => { if (this.cur === c) this.close(false, true); }, 1500); return; }
+      if (q.id === 'ap_no') { p.walkedOff = true; p.interest = 0; this.say(this.line(p, 'approach_reject'), 'They walk off'); this.el.querySelector('.tk-opts').innerHTML = ''; setTimeout(() => { if (this.cur === c) this.close(false, true); }, 1500); return; }
+      if (q.id === 'ap_dance') {
+        const I = G.interiors, Cr = I && I.cur;
+        if (Cr && !Cr.dancing) I.dance(true);
+        p.anim = p.idle = 'dance'; c.danced = true; c.interest += 10;
+        this.say(this.line(p, 'dance_yes'), 'Dancing together');
+      } else this.say(this.line(p, c.club ? 'place_club' : 'place_cafe'), 'They’re into you');
+      this.render();
+      return;
+    }
     if (q.id === 'bye') return this.close(true);
     if (q.cost && G.stats.money < q.cost) return;
     if (c.mode === 'date') return this.datePick(q);
@@ -435,6 +470,16 @@ export class Dates {
     G.setWaypoint({ x: place.x, z: place.z, name: `Meet ${ct.name}: ${place.name}` });
     return true;
   }
+  // they text first: a place near you, then it's a date like any other
+  invite(ct) {
+    const G = this.g, P = G.player;
+    const places = G.shops.nearby(P.x, P.z, 1400).filter(s => ['cafe', 'icecream', 'juice', 'bakery'].includes(s.kind));
+    if (!places.length) return;
+    const place = places[Math.min(places.length - 1, this.rng.int(0, 3))];
+    this.pending = { ct, place, until: (G.clock || 0) + 2, gone: (G.clock || 0) + 3.5 };
+    this.sms(ct, 't_askout', 'They asked you out. On your map', { place: place.name });
+    G.setWaypoint({ x: place.x, z: place.z, name: `Meet ${ct.name}: ${place.name}` });
+  }
   // walked into the place with a date pending: they're at a table (late: they say so; very late: gone)
   onEnter(R, ctx) {
     const d = this.pending, G = this.g;
@@ -463,7 +508,7 @@ export class Dates {
     if (p) { const cm = castByName(d.ct.name, d.ct.female); if (cm) { castAs(p, cm, G.W.kit); G.interiors.markHearts?.(G.interiors.cur.R); } p.name = d.ct.name; p.interest = 60; p.prof = { lang: d.ct.lang || 'en', vibe: d.ct.vibe || 'chill', likes: d.ct.likes, job: d.ct.job ?? 0, area: d.ct.area ?? 0, picky: 0.4, known: { job: true, likes: true, area: true, vibe: true }, asked: { ask_job: 1, ask_area: 1, ask_fun: 1 } }; p.dateWith = true; d.ct.dateNow = true; }
     G.hud.toast(`${d.ct.name} is here`, 'At a table. Go and say hi (F)', 'good', 3);
   }
-  close(bye) {
+  close(bye, keepDancing) {
     const G = this.g, c = this.cur;
     if (!c) return;
     if (c.mode === 'date') {
@@ -472,7 +517,9 @@ export class Dates {
       ct.dateNow = false; c.p.walkedOff = true; ct.lastSeen = G.clock || 0; ct.missed = false;
       if (ct.aff > 30 && !ct.upset) G.later(this.rng.range(30, 90), () => this.sms(ct, 't_afterdate'));
     }
-    if (G.interiors && G.interiors.cur && G.interiors.cur.dancing) G.interiors.dance(false);
+    if (c.mode === 'meet' && c.p.interest === undefined) c.p.interest = c.interest;
+    if (!keepDancing && !c.danced && G.interiors && G.interiors.cur && G.interiors.cur.dancing) G.interiors.dance(false);
+    if (G.interiors && G.interiors.approachDone) G.interiors.approachDone(c.p);
     this.cur = null; this.el.hidden = true;
     if (G.state === 'shop') G.state = 'play';
   }
@@ -494,6 +541,9 @@ export class Dates {
         if ((!ct.tipT || now - ct.tipT > 30) && this.rng.next() < 0.08) { ct.tipT = now; this.sms(ct, 't_tip'); }
         if (days > 4 && !ct.upset) { ct.upset = true; this.sms(ct, 't_angry', 'They’re upset. Meet them and make it right'); }
       }
+      // they ask you out: far more often when you're a woman
+      if (!ct.done && !ct.upset && ct.aff >= 12 && !this.pending && !(ct.askT && now - ct.askT < 8) && hour > 10 && hour < 23 &&
+          this.rng.next() < (this.g.player.look.female ? 0.05 : 0.012) * (0.5 + ct.aff / 60)) { ct.askT = now; this.invite(ct); }
       if (days > 2.5 && !ct.missed) { ct.missed = true; this.sms(ct, 't_miss', 'Ask to meet from Jhola → People'); }
       if (days > 5) { ct.aff = Math.max(0, ct.aff - 0.6); if (ct.partner && ct.aff < 25) { ct.partner = false; ct.upset = false; this.sms(ct, 't_breakup', 'You broke up'); L.change('mood', -0.3); } }
       if (days < 1) ct.missed = false;

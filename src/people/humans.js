@@ -258,6 +258,12 @@ export class HumanKit {
     holder.add(root);
     const mixer = new THREE.AnimationMixer(root);
     const H = { holder, root, mixer, mat, acc, hairMat, topMat, botMat, shoeMat, skirtMat, style, pat, body, parts, actions: {}, cur: null, look };
+    // a built man (the player, as a man): a deeper chest, bigger arms and legs. The clips key bone scale, so it goes on
+    // after every mixer step; the neck undoes the chest so the head stays the head
+    const BULK = [['spine_03', 1.12, 1.1], ['neck_01', 1 / 1.12, 1 / 1.1], ['upperarm_l', 1.14, 1.14], ['upperarm_r', 1.14, 1.14], ['thigh_l', 1.07, 1.07], ['thigh_r', 1.07, 1.07]]
+      .map(([n, x, z]) => [root.getObjectByName(n), x, z]).filter(b => b[0]);
+    const step = mixer.update.bind(mixer);
+    mixer.update = (dt) => { const r = step(dt); if (H.look && H.look.player && !H.look.female) for (const [b, x, z] of BULK) b.scale.set(x, 1, z); return r; };
     // ponytail, plait, glasses and bindi ride on the head bone
     const head = root.getObjectByName('Head'), X = head && this.extras(k);
     if (X) {
