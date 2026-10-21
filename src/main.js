@@ -18,8 +18,12 @@ import { Game } from './game/game.js';
 import { Pilot } from './game/pilot.js';
 import { HumanKit } from './people/humans.js';
 import { AnimalKit } from './people/animals.js';
+import { MetroTrains } from './world/metroTrains.js';
 
 export const QUALITY = {
+  // for old laptops and office PCs: 75% resolution, no shadows or grass, a shorter view, thinner crowds
+  lite: { name: 'lite', pixelRatio: 0.75, shadows: false, shadowSize: 0, msaa: false, texMax: 512, boardRes: 1, signScale: 1,
+    streamRadius: 260, streamBudget: 2, grassRange: 0, grassCap: 0, treeNearRange: 18, treeMidRange: 70, treeFarRange: 380, treeNearCap: 60, treeMidCap: 400, treeFarCap: 2500, leafCell: 256, impostorCell: 128, propRange: 80, far: 1000, traffic: 40, peds: 60 },
   low: { name: 'low', pixelRatio: 1.0, shadows: false, shadowSize: 0, msaa: false, texMax: 512, boardRes: 1, signScale: 1,
     streamRadius: 360, streamBudget: 3, grassRange: 22, grassCap: 2200, treeNearRange: 28, treeMidRange: 100, treeFarRange: 600, treeNearCap: 100, treeMidCap: 700, treeFarCap: 5000, leafCell: 256, impostorCell: 128, propRange: 110, far: 1400, traffic: 70, peds: 110 },
   med: { name: 'med', pixelRatio: 1.5, shadows: true, shadowSize: 2048, msaa: true, texMax: 1024, boardRes: 1, signScale: 1,
@@ -51,7 +55,8 @@ function pickQuality() {
   const q = params.get('q');
   if (q && QUALITY[q]) return { ...QUALITY[q] };
   try { const s = localStorage.getItem('nh48_quality'); if (s && QUALITY[s]) return { ...QUALITY[s] }; } catch (e) { /* storage blocked */ }
-  if (GPU === 'soft' || GPU === 'weak') return { ...QUALITY.low };
+  if (GPU === 'soft') return { ...QUALITY.lite };
+  if (GPU === 'weak') return { ...QUALITY.low };
   return { ...QUALITY.med };
 }
 
@@ -155,6 +160,7 @@ async function main() {
   if (params.has('fly')) return runFly({ W, renderer, scene, camera, sky, post, quality, progress });
 
   // ---- gameplay
+  try { W.trains = new MetroTrains(W, scene, M); } catch (e) { console.warn('metro trains', e); }
   const vmats = vehicleMaterials();
   for (const m of Object.values(vmats)) sky.reflective(m);
   const auto = new PlayerAuto(W, scene, vmats);
@@ -237,10 +243,12 @@ async function main() {
     camera.getWorldDirection(fwd);
     W.streamer.update(focus.x, focus.z, fwd);
     W.nearBoards.update(camera.position.x, camera.position.z, dt);
+    W.trains?.update(dt, camera.position);
     propT -= dt;
     if (propT <= 0) { updateProps(W, camera.position.x, camera.position.z); propT = 0.2; }
     const t1 = performance.now();
-    if (game.state !== 'map') post.render(dt);      // the map covers the screen: give its frames the whole budget
+    // the map covers the screen, and while paused the last frame just sits there (blurred by CSS): no rendering at all
+    if (game.state !== 'map' && !(game.state === 'pause' && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);
     const t2 = performance.now();
     perf.n++; perf.upd += t1 - t0; perf.rnd += t2 - t1; perf.worst = Math.max(perf.worst, t1 - t0);
     if (!perfBox.hidden) {

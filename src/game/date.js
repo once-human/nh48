@@ -21,6 +21,7 @@
 // mood every day and your confidence (charm), texts you good mornings and tips, warns you about
 // nakabandis, sends food when you're starving, and one day might say it first. Disappear for days
 // and they get upset (you'll have to make up); get someone else's number and it may reach them.
+import { hearts } from '../ui/icons.js';
 import { RNG } from '../core/util.js';
 import { castAs, castByName } from '../people/cast.js';
 import { fmt } from './shops.js';
@@ -216,7 +217,7 @@ export class Dates {
     const st = this.stage(c);
     this.el.querySelector('.tk-k').textContent = c.q ? 'They ask you' : (st === 'date' ? `On a date · ${levelOf(c.contact)}` : { knowing: 'Getting to know them', better: 'Getting along', spark: 'Sparks', partner: 'Your partner' }[st]);
     this.el.querySelector('.tk-name').textContent = c.p.name;
-    this.el.querySelector('.tk-hearts').textContent = '♥'.repeat(h) + '♡'.repeat(5 - h);
+    this.el.querySelector('.tk-hearts').innerHTML = hearts(h);
     const bits = [LANG_LABEL[P.lang]];
     if (P.known.job) bits.push(JOBS[P.job]);
     if (P.known.area) bits.push(AREAS[P.area]);

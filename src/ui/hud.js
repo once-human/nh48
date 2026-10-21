@@ -7,7 +7,7 @@ import { settingsHTML, bindSettings, syncSettings } from '../game/settings.js';
 import * as THREE from 'three';
 import { fmtRupees, isTouch } from '../core/util.js';
 import { MapScreen, CATS, drawPin, drawArrow, drawFlag, fmtDist } from './map.js';
-import { SKINS, HAIRS, HAIR_COLS, OUTFITS, lookOf, normalise, savedCharacter, saveCharacter } from '../people/characters.js';
+import { SKINS, OUTFITS, lookOf, normalise, savedCharacter, saveCharacter } from '../people/characters.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 const STONE = '<svg viewBox="0 0 40 52" aria-hidden="true"><path d="M4 22a16 16 0 0 1 32 0v26H4z" fill="#F4F1EA"/><path d="M4 22a16 16 0 0 1 32 0z" fill="#F2B705"/><rect x="4" y="44" width="32" height="4" fill="#C9C4B8"/></svg>';
@@ -29,6 +29,19 @@ function clock(h, h24) {
   if (h24) return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
   const ap = hh >= 12 ? 'PM' : 'AM';
   return `${((hh + 11) % 12) + 1}:${String(mm).padStart(2, '0')} ${ap}`;
+}
+
+// every option row in a game menu is a ‹ value › picker: the arrows (or a click on the row) step through it
+const CHEV = (d) => `<svg viewBox="0 0 24 24"><path d="${d ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'}" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+function arrowSegs(root) {
+  root.querySelectorAll('.seg').forEach(sg => {
+    if (sg._step) return;
+    const step = (d) => { const bs = [...sg.querySelectorAll('button')], k = bs.findIndex(b => b.classList.contains('on')); bs[(Math.max(0, k) + d + bs.length) % bs.length].click(); };
+    const L = el('i', 'pz-arr l', CHEV(0)), R = el('i', 'pz-arr r', CHEV(1));
+    L.onclick = () => step(-1); R.onclick = () => step(1);
+    sg.prepend(L); sg.append(R); sg._step = step;
+    sg.closest('.row')?.addEventListener('click', (e) => { if (e.target === sg.closest('.row') || e.target.closest('.rl')) step(1); });
+  });
 }
 
 export class HUD {
@@ -126,48 +139,41 @@ export class HUD {
   buildTitle() {
     const t = el('div', 'ov title');
     t.innerHTML = `
-      <div class="t-col">
-        <div class="t-brand">${STONE}<span class="t-word">NH48</span><span class="t-ed">Pune</span></div>
-        <div class="t-hero">
-          <div class="t-kicker"><span lang="mr">पुणे</span> · Deccan to Koregaon Park</div>
-          <h1>The city is <em>open</em>.</h1>
-          <p>Every real street, every real shop (with a wink), the Mills at midnight and the peths at noon. Your auto is waiting. Drive it, fill it, or leave it and walk.</p>
+      <div class="pz ttl">
+        <div class="pz-l">
+          <div class="ttl-brand">${STONE}<b>NH48</b><span>Pune <span lang="mr">पुणे</span></span></div>
+          <div class="pz-head"><span class="pz-k">Deccan to Koregaon Park</span><b>The city<br>is <em>open</em></b></div>
+          <nav class="pz-menu">
+            <button class="pz-i sel" id="t-roam">Start</button>
+            <button class="pz-i" id="t-who">New character</button>
+          </nav>
+          <div class="t-stats" id="t-stats"></div>
         </div>
-        <div class="t-start">
-          <button class="btn primary t-go" id="t-roam">Start <span class="kbd">↵</span></button>
-          <button class="t-who" id="t-who" hidden><span class="t-who-sw"></span><span class="t-who-t"><b></b><small>Change character</small></span></button>
-        </div>
-        <div class="t-stats" id="t-stats"></div>
-        <div class="t-cities"><span class="on"><canvas width="240" height="96" id="c-pune"></canvas><b>Pune</b><i>Live</i></span><span><b>Bengaluru</b><i>Later</i></span><span><b>Mumbai</b><i>Later</i></span></div>
-        <div class="t-foot">
-          <span class="keys">
-            <span><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> drive / walk</span>
-            <span><span class="kbd">Space</span> handbrake · jump / climb</span><span><span class="kbd">F</span> get in / out · shops · talk</span><span><span class="kbd">Click</span> punch</span><span><span class="kbd">C</span> roll</span><span><span class="kbd">E</span> backpack</span>
-            <span><span class="kbd">H</span> horn</span><span><span class="kbd">C</span> camera (driving)</span><span><span class="kbd">M</span> map</span><span><span class="kbd">Esc</span> pause</span>
-          </span>
-          <span>Map data © OpenStreetMap contributors (ODbL), Overture Maps Foundation. Businesses are parodies.</span>
-        </div>
+        <div class="pz-r"></div>
+        <div class="pz-keys"><span class="ttl-fine">Map data © OpenStreetMap contributors, Overture Maps Foundation. Every business is a parody.</span><span><span class="kbd">W</span><span class="kbd">S</span> Select</span><span><span class="kbd">Enter</span> Go</span></div>
       </div>`;
     this.root.appendChild(t);
     this.title = t;
     t.querySelector('#t-roam').onclick = () => this.game.begin();
     t.querySelector('#t-who').onclick = () => this.showPicker(() => this.syncTitle());
-    this.drawCityArt(t.querySelector('#c-pune'));
+    const items = [...t.querySelectorAll('.pz-i')];
+    const sel = (k) => { this.tSel = (k + items.length) % items.length; items.forEach((b, i) => b.classList.toggle('sel', i === this.tSel)); };
+    items.forEach((b, i) => b.addEventListener('mouseenter', () => sel(i)));
+    window.addEventListener('keydown', (e) => {
+      if (t.hidden || this.pickerOpen) return;
+      if (e.code === 'KeyW' || e.code === 'ArrowUp') { e.preventDefault(); sel((this.tSel || 0) - 1); }
+      else if (e.code === 'KeyS' || e.code === 'ArrowDown') { e.preventDefault(); sel((this.tSel || 0) + 1); }
+      else if (e.code === 'Enter') { e.preventDefault(); items[this.tSel || 0].click(); }
+    });
     this.syncTitle();
   }
   syncTitle() {
     const t = this.title; if (!t) return;
     const sv = savedCharacter();
-    const who = t.querySelector('#t-who');
-    who.hidden = !sv;
-    if (sv) {
-      const o = OUTFITS[sv.female ? 'f' : 'm'].find(x => x.id === sv.outfit) || OUTFITS.m[0];
-      who.querySelector('b').textContent = `Playing as ${sv.name}`;
-      who.querySelector('.t-who-sw').style.background = '#' + o.top.toString(16).padStart(6, '0');
-      t.querySelector('#t-roam').firstChild.textContent = 'Start ';
-    }
+    t.querySelector('#t-roam').textContent = sv ? `Continue as ${sv.name}` : 'Start';
+    t.querySelector('#t-who').textContent = sv ? 'Change character' : 'New character';
     const S = this.game.stats;
-    t.querySelector('#t-stats').innerHTML = S ? `<span><b>${fmtRupees(S.money)}</b> in your pocket</span><span><b>${S.rides || 0}</b> rides done</span>${S.rating ? `<span><b>${S.rating.toFixed(1)}★</b> rating</span>` : ''}` : '';
+    t.querySelector('#t-stats').innerHTML = S && sv ? `<span><b>${fmtRupees(S.money)}</b> cash</span><span><b>${S.rides || 0}</b> rides</span>${S.rating ? `<span><b>${S.rating.toFixed(1)}</b> rating</span>` : ''}` : '';
   }
   hasCharacter() { return !!savedCharacter(); }
   // ---------------------------------------------------------------- character picker
@@ -184,31 +190,48 @@ export class HUD {
   buildPicker() {
     const m = el('div', 'ov picker');
     m.innerHTML = `
-      <div class="pk-l">
-        <div class="pk-h"><span class="t-ed">Who are you?</span><h2>Make your character</h2><p>Nobody else in the city looks like you. Change it any time from the menu.</p></div>
-        <label class="pk-f"><span>Name</span><input id="pk-name" maxlength="18" autocomplete="off" spellcheck="false" placeholder="Your name"></label>
-        <div class="pk-f"><span>You are</span><div class="seg wide pk-g"><button data-g="m">A man</button><button data-g="f">A woman</button></div></div>
-        <div class="pk-f"><span>Hair</span><div class="pk-chips" id="pk-hair"></div></div>
-        <div class="pk-f"><span>Hair colour</span><div class="pk-sw" id="pk-hc"></div></div>
-        <div class="pk-f"><span>Clothes</span><div class="pk-chips" id="pk-out"></div></div>
-        <div class="pk-f"><span>Skin tone</span><div class="pk-sw" id="pk-skin"></div></div>
-        <div class="pk-go"><button class="btn primary" id="pk-ok">Play</button><button class="btn" id="pk-x">Back</button></div>
-      </div>
-      <div class="pk-r"><canvas class="pk-cv"></canvas><div class="pk-name"></div><div class="pk-say"></div><div class="pk-hint">Drag to turn</div></div>`;
+      <div class="pz pk">
+        <div class="pz-l">
+          <div class="pz-head"><span class="pz-k">New character</span><b>Who are you?</b></div>
+          <div class="pk-form">
+            <div class="gt">Name</div>
+            <input id="pk-name" class="pk-in" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Your name">
+            <div class="group"><div class="row"><div class="rl">You are</div><div class="rc"><div class="seg" id="pk-g"><button data-g="m">A man</button><button data-g="f">A woman</button></div></div></div>
+              <div class="row"><div class="rl">Skin tone</div><div class="rc"><div class="seg" id="pk-skin"></div></div></div></div>
+            <div class="gt">What you wear</div>
+            <div class="pk-outs" id="pk-out"></div>
+          </div>
+          <div class="pk-go"><button class="btn primary big" id="pk-ok">Play</button><button class="btn big" id="pk-x">Back</button></div>
+        </div>
+        <div class="pz-r pk-r"><canvas class="pk-cv"></canvas><div class="pk-name"></div><div class="pk-say"></div></div>
+        <div class="pz-keys"><span><span class="kbd">A</span><span class="kbd">D</span> Change</span><span>Drag the character to turn</span><span><span class="kbd">Enter</span> Play</span><span><span class="kbd">Esc</span> Back</span></div>
+      </div>`;
     this.root.appendChild(m);
     const P = this.picker = { el: m, cv: m.querySelector('.pk-cv'), yaw: 0.35, run: false };
     const nameIn = m.querySelector('#pk-name');
-    nameIn.addEventListener('keydown', e => e.stopPropagation(), true);
-    nameIn.oninput = () => { P.sel.name = nameIn.value.replace(/[^\p{L}\p{M} .'-]/gu, '').slice(0, 18); this.renderPicker(true); };
-    m.querySelectorAll('.pk-g button').forEach(b => b.onclick = () => {
+    nameIn.addEventListener('keydown', e => { e.stopPropagation(); if (e.code === 'Enter') m.querySelector('#pk-ok').click(); }, true);
+    nameIn.oninput = () => { P.sel.name = nameIn.value.replace(/[^\p{L}\p{M} .'-]/gu, '').slice(0, 16); this.renderPicker(true); };
+    m.querySelector('#pk-skin').innerHTML = SKINS.map(s => `<button data-v="${s.id}">${s.name}</button>`).join('');
+    m.querySelectorAll('#pk-g button').forEach(b => b.onclick = () => {
       const f = b.dataset.g === 'f';
       if (f === P.sel.female) return;
       const wasDefault = !P.sel.name || P.sel.name === (P.sel.female ? 'Ananya' : 'Aarav');
-      P.sel.female = f; P.sel.hair = ''; P.sel.outfit = '';
+      P.sel.female = f; P.sel.hair = '';
       if (wasDefault) { P.sel.name = f ? 'Ananya' : 'Aarav'; nameIn.value = P.sel.name; }
       P.sel = normalise(P.sel);
       this.renderPicker(); this.pickerVoice();
     });
+    m.querySelectorAll('#pk-skin button').forEach(b => b.onclick = () => { P.sel.skin = b.dataset.v; this.renderPicker(); });
+    arrowSegs(m);
+    window.addEventListener('keydown', (e) => {
+      if (m.hidden || document.activeElement === nameIn) return;
+      if (e.code === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); this.closePicker(); }
+      else if (e.code === 'Enter') { e.preventDefault(); m.querySelector('#pk-ok').click(); }
+      else if (e.code === 'KeyA' || e.code === 'KeyD' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+        const outs = OUTFITS[P.sel.female ? 'f' : 'm'], k = outs.findIndex(o => o.id === P.sel.outfit), d = e.code === 'KeyA' || e.code === 'ArrowLeft' ? -1 : 1;
+        P.sel.outfit = outs[(k + d + outs.length) % outs.length].id; this.renderPicker();
+      }
+    }, true);
     m.querySelector('#pk-ok').onclick = () => {
       if (!P.sel.name.trim()) { nameIn.focus(); nameIn.classList.add('bad'); return; }
       P.sel.name = P.sel.name.trim();
@@ -216,6 +239,7 @@ export class HUD {
       this.game.player.setLook(lookOf(P.sel));
       this.game.playerName = P.sel.name;
       this.closePicker(); if (P.done) P.done();
+      this.syncTitle();
     };
     m.querySelector('#pk-x').onclick = () => this.closePicker();
     let drag = null;
@@ -263,29 +287,24 @@ export class HUD {
     m.querySelector('.pk-name').textContent = S.name.trim();
     m.querySelector('#pk-name').classList.remove('bad');
     if (nameOnly) return;
-    m.querySelectorAll('.pk-g button').forEach(b => b.classList.toggle('on', (b.dataset.g === 'f') === !!S.female));
-    const chips = (id, list, key) => {
-      const box = m.querySelector(id); box.innerHTML = '';
-      for (const it of list) { const b = el('button', 'pk-chip' + (it.id === S[key] ? ' on' : ''), it.name); b.onclick = () => { S[key] = it.id; this.renderPicker(); }; box.appendChild(b); }
-    };
-    const sw = (id, list, key) => {
-      const box = m.querySelector(id); box.innerHTML = '';
-      for (const it of list) { const b = el('button', 'pk-s' + (it.id === S[key] ? ' on' : ''), `<i style="background:#${it.hex.toString(16).padStart(6, '0')}"></i>${it.name}`); b.onclick = () => { S[key] = it.id; this.renderPicker(); }; box.appendChild(b); }
-    };
-    chips('#pk-hair', HAIRS[g], 'hair'); chips('#pk-out', OUTFITS[g], 'outfit');
-    sw('#pk-hc', HAIR_COLS, 'hairCol'); sw('#pk-skin', SKINS, 'skin');
+    m.querySelectorAll('#pk-g button').forEach(b => b.classList.toggle('on', (b.dataset.g === 'f') === !!S.female));
+    m.querySelectorAll('#pk-skin button').forEach(b => b.classList.toggle('on', b.dataset.v === S.skin));
+    const box = m.querySelector('#pk-out'); box.innerHTML = '';
+    for (const o of OUTFITS[g]) {
+      const b = el('button', 'pk-o' + (o.id === S.outfit ? ' on' : ''), `<i style="--a:#${o.top.toString(16).padStart(6, '0')};--b:#${o.bottom.toString(16).padStart(6, '0')}"></i><b>${o.name}</b><small>${o.sub}</small>`);
+      b.onclick = () => { S.outfit = o.id; this.renderPicker(); };
+      box.appendChild(b);
+    }
     const key = [S.female, S.hair, S.hairCol, S.outfit, S.skin].join('/');
     const kit = this.game.W.kit;
     if (kit && key !== P.key) {
-      const gChanged = !P.H || !!P.H.look.female !== !!S.female;
       P.key = key;
-      if (gChanged) {
-        if (P.H) { P.scene.remove(P.H.holder); P.H.dispose(); }
-        P.H = kit.create(lookOf(S));
-        P.H.holder.traverse(o => { o.frustumCulled = false; });
-        P.scene.add(P.H.holder);
-        P.H.play('idle', { fade: 0 });
-      } else kit.applyLook(P.H, lookOf(S));
+      // a fresh body for every change: cheap here, and the clothes always match the choice
+      if (P.H) { P.scene.remove(P.H.holder); P.H.dispose(); }
+      P.H = kit.create(lookOf(S));
+      P.H.holder.traverse(o => { o.frustumCulled = false; });
+      P.scene.add(P.H.holder);
+      P.H.play('idle', { fade: 0 });
     }
   }
   closePicker() {
@@ -338,14 +357,7 @@ export class HUD {
   pauseMenu(p) {
     const items = [...p.querySelectorAll('.pz-i')];
     items.forEach((b, i) => { b.addEventListener('mouseenter', () => this.pauseSel(i)); if (b.dataset.pane) b.onclick = () => this.pauseSel(i); });
-    // every option row becomes a ◀ value ▶ picker
-    p.querySelectorAll('.pz-r .seg').forEach(sg => {
-      const step = (d) => { const bs = [...sg.querySelectorAll('button')], k = bs.findIndex(b => b.classList.contains('on')); bs[(Math.max(0, k) + d + bs.length) % bs.length].click(); };
-      const L = el('i', 'pz-arr l', '‹'), R = el('i', 'pz-arr r', '›');
-      L.onclick = () => step(-1); R.onclick = () => step(1);
-      sg.prepend(L); sg.append(R); sg._step = step;
-      sg.closest('.row')?.addEventListener('click', (e) => { if (e.target === sg.closest('.row') || e.target.closest('.rl')) step(1); });
-    });
+    arrowSegs(p.querySelector('.pz-r'));
     window.addEventListener('keydown', (e) => {
       if (p.hidden || this.pickerOpen) return;
       const c = e.code;
@@ -381,7 +393,7 @@ export class HUD {
             <div class="gt">World</div>
             <div class="group"><div class="row"><div class="rl">Time of day</div><div class="rc"><div class="seg" id="p-time"><button data-h="8.5">Morning</button><button data-h="13">Noon</button><button data-h="17.85">Sunset</button><button data-h="21.5">Night</button></div></div></div></div>
             <div class="gt">Picture</div>
-            <div class="group"><div class="row"><div class="rl">Graphics<small id="p-qnote"></small></div><div class="rc"><div class="seg" id="p-q"><button data-q="low">Low</button><button data-q="med">Medium</button><button data-q="high">High</button></div></div></div></div>
+            <div class="group"><div class="row"><div class="rl">Graphics<small id="p-qnote"></small></div><div class="rc"><div class="seg" id="p-q"><button data-q="lite">Lite</button><button data-q="low">Low</button><button data-q="med">Medium</button><button data-q="high">High</button></div></div></div></div>
             ${settingsHTML('av')}
             <div class="gt">Sound</div>
             <div class="group"><div class="row"><div class="rl">Master volume</div><div class="rc"><input type="range" id="p-vol" min="0" max="1" step="0.05"></div></div></div>
@@ -428,18 +440,22 @@ export class HUD {
     vol.oninput = () => this.game.audio.setVolume(parseFloat(vol.value));
   }
   syncPause() {
-    const pw = this.pause && this.pause.querySelector('#p-who'); if (pw) { const sv = savedCharacter(); pw.textContent = sv ? sv.name : 'Paused'; }
+    const pw = this.pause && this.pause.querySelector('#p-who'), sv = savedCharacter();
+    if (pw) { pw.textContent = sv ? sv.name : 'Paused'; this.pause.querySelector('.pz-k').textContent = sv ? 'Paused' : 'NH48 · Pune'; }
     const g = this.game;
     const area = this.$('h-area')?.textContent || 'Pune', street = this.$('h-street')?.textContent || '';
     this.pause.querySelector('#p-meta').innerHTML = `<span>${street || area}</span><span>${this.$('h-clock')?.textContent || ''}</span><span>${fmtRupees(g.stats?.money ?? 0)}</span>`;
     const bd = this.pause.querySelector('#p-ch-badge'), dues = g.police ? g.police.duesTotal : 0; bd.hidden = !dues; bd.textContent = dues ? fmtRupees(dues) : '';
     if (this.pzSel == null || !this.pause.classList.contains('has-pane')) this.pauseSel(0);
-    this.pause.querySelectorAll('#p-q button').forEach(b => b.classList.toggle('on', b.dataset.q === g.qualityName));
+    const qn = g.qualityName || (g.quality && g.quality.name) || 'med';
+    this.pause.querySelectorAll('#p-q button').forEach(b => b.classList.toggle('on', b.dataset.q === qn));
     this.pause.querySelector('#p-vol').value = g.audio.volume;
     syncSettings(this.pause, g);
     this.pause.querySelector('#p-qnote').textContent = g.qualityNote || '';
     const h = g.hour;
-    this.pause.querySelectorAll('#p-time button').forEach(b => b.classList.toggle('on', Math.abs(parseFloat(b.dataset.h) - h) < 1.5));
+    // the picker always shows something: the preset nearest the clock
+    let nb = null, nd = 99; this.pause.querySelectorAll('#p-time button').forEach(b => { const d = Math.abs(parseFloat(b.dataset.h) - h); if (d < nd) { nd = d; nb = b; } });
+    this.pause.querySelectorAll('#p-time button').forEach(b => b.classList.toggle('on', b === nb));
     const pol = g.police;
     if (pol) {
       const tot = pol.duesTotal;
@@ -491,7 +507,7 @@ export class HUD {
       if (this.$money.textContent && this.$money.textContent !== '0') { this.$money.parentElement.classList.remove('flash'); void this.$money.offsetWidth; this.$money.parentElement.classList.add('flash'); }
       this.$money.textContent = money;
     }
-    this.$('h-rides').textContent = g.stats.rides ? `${g.stats.rides} ${g.stats.rides === 1 ? 'ride' : 'rides'} · ★ ${g.stats.rating.toFixed(1)}` : '';
+    this.$('h-rides').textContent = g.stats.rides ? `${g.stats.rides} ${g.stats.rides === 1 ? 'ride' : 'rides'} · ${g.stats.rating.toFixed(1)} rating` : '';
     this.$('h-clock').textContent = clock(g.hour, g.settings && g.settings.clock24);
     if (this.pcT > 0) { this.pcT -= dt; if (this.pcT <= 0) this.placeEl.classList.remove('show'); if (this.pcT < -0.5) this.placeEl.hidden = true; }
     // fare meter only on a shift
@@ -769,7 +785,7 @@ export class HUD {
         const f = lim / Math.max(Math.abs(X - r), Math.abs(Y - r)); X = r + (X - r) * f; Y = r + (Y - r) * f;
       }
       if (m.kind === 'wp') { if (edge) drawPin(x, X, Y, '#5fd0ff', null, 6 * k); else { x.save(); x.scale(k, k); drawFlag(x, X / k, Y / k); x.restore(); } continue; }
-      drawPin(x, X, Y, markColor(m), m.kind === 'tow' ? 'A' : null, (m.kind === 'marshal' ? 6 : 7) * k);
+      drawPin(x, X, Y, markColor(m), m.kind === 'tow' ? 'auto' : null, (m.kind === 'marshal' ? 6 : 7) * k);
     }
     drawArrow(x, r, cy, 0, k);
     const n = this.mm.querySelector('.mm-n');

@@ -12,11 +12,32 @@ const COL = {
 };
 // map categories: label, colour, glyph
 export const CATS = {
-  landmark: ['Landmarks', '#f2b705', '★'], police: ['Police', '#5aa2ff', 'P'], hospital: ['Health', '#ff5a4f', '+'],
-  food: ['Food & drink', '#ffb020', '●'], shop: ['Shops', '#7fd1ff', '●'], bank: ['Banks', '#4dd0c8', '₹'], fuel: ['Fuel', '#a08cff', 'F'],
-  transit: ['Transit', '#33d17a', 'T'], park: ['Parks', '#5bbf6a', '♣'], temple: ['Temples', '#ff9f43', 'ॐ'], college: ['Colleges', '#c08cff', 'C'],
-  cinema: ['Theatres', '#ff6ec7', '▶'], service: ['Offices & services', '#9aa0aa', '●'],
+  landmark: ['Landmarks', '#f2b705', 'star'], police: ['Police', '#5aa2ff', 'shield'], hospital: ['Health', '#ff5a4f', 'cross'],
+  food: ['Food & drink', '#ffb020', 'food'], shop: ['Shops', '#7fd1ff', 'bag'], bank: ['Banks', '#4dd0c8', 'bank'], fuel: ['Fuel', '#a08cff', 'fuel'],
+  transit: ['Transit', '#33d17a', 'bus'], park: ['Parks', '#5bbf6a', 'tree'], temple: ['Temples', '#ff9f43', 'temple'], college: ['Colleges', '#c08cff', 'cap'],
+  cinema: ['Theatres', '#ff6ec7', 'film'], service: ['Offices & services', '#9aa0aa', 'building'],
 };
+// one filled icon set (24 x 24) for every pin on the map and minimap
+const ICON_PATHS = {
+  star: 'M12 2.6l2.8 5.9 6.5.8-4.8 4.5 1.2 6.4L12 17.1l-5.7 3.1 1.2-6.4-4.8-4.5 6.5-.8z',
+  shield: 'M12 2 4 5.2v6.3c0 4.8 3.3 9 8 10.5 4.7-1.5 8-5.7 8-10.5V5.2z',
+  cross: 'M9 3h6v6h6v6h-6v6H9v-6H3V9h6z',
+  food: 'M7 2v8a2.5 2.5 0 0 0 2 2.4V22h2.5v-9.6A2.5 2.5 0 0 0 13.5 10V2h-1.7v7h-1.2V2H9.4v7H8.2V2zm9.5 0c-2 0-3 3-3 6.8 0 1.9 1 3 2.2 3.4V22h2.6V2z',
+  bag: 'M5 8h14l-1.1 13.2a1 1 0 0 1-1 .8H7.1a1 1 0 0 1-1-.8zM8.5 8V6.5a3.5 3.5 0 0 1 7 0V8h-2.2V6.5a1.3 1.3 0 0 0-2.6 0V8z',
+  bank: 'M12 2 2 7.2V9.5h20V7.2zM4 11h3v7H4zm6.5 0h3v7h-3zM17 11h3v7h-3zM2 19.5h20V22H2z',
+  fuel: 'M4 3h10v18H4zm2.2 2.2v5h5.6v-5zM15 7.2l1.5-1.4 3.5 3.5v8.9a2 2 0 0 1-4 0V14h-1v-2.4h3.4v6.6h.2V10.2z',
+  bus: 'M6 2h12a3 3 0 0 1 3 3v12.5h-1.2V21h-3.3v-3.5h-9V21H4.2v-3.5H3V5a3 3 0 0 1 3-3zm-.3 3.5v6h12.6v-6zM7 13.4a1.6 1.6 0 1 0 .01 0zm10 0a1.6 1.6 0 1 0 .01 0z',
+  tree: 'M12 1.8 4.5 12.5h4L4 19h7v3.2h2V19h7l-4.5-6.5h4z',
+  temple: 'M12 1l1.8 3.4H16l-1 3h2.6l-1 3H20V22h-5.6v-5a2.4 2.4 0 0 0-4.8 0v5H4V10.4h3.4l-1-3H9l-1-3h2.2z',
+  cap: 'M12 3 .8 9 12 15l9.2-4.9V16h2V9zM5 13.3V17c0 1.8 3.1 3.3 7 3.3s7-1.5 7-3.3v-3.7l-7 3.8z',
+  film: 'M3 4h18v16H3zm5.4 3.6v8.8l7.6-4.4z',
+  building: 'M3 22V3h12v6h6v13zM6 6v2.4h2.4V6zm4 0v2.4h2.4V6zm-4 4.3v2.4h2.4v-2.4zm4 0v2.4h2.4v-2.4zm7 1.1v2.4h2.2v-2.4zm-11 3v2.4h2.4v-2.4zm4 0v2.4h2.4v-2.4zm7 1.1v2.4h2.2v-2.4z',
+  auto: 'M2.5 16.5V10a6 6 0 0 1 6-6h6.8l4.4 5.5H22v7h-2.2a2.8 2.8 0 0 1-5.5 0H8.2a2.8 2.8 0 0 1-5.5 0zM9 6.2v3.6h7.4l-2.9-3.6z',
+  home: 'M12 2.6 1.8 11.2h3V21.5h5.4v-6.2h3.6v6.2h5.4V11.2h3z',
+  rupee: 'M6 3h12v2.2h-4.1c.6.6 1 1.3 1.2 2H18v2.2h-2.9a5.2 5.2 0 0 1-4.6 4.4L16.3 21h-3l-5.6-7.6v-1.8h2.2a3 3 0 0 0 2.8-2.2H6V7.2h6.6A3 3 0 0 0 9.9 5.2H6z',
+};
+const ICON2D = {};
+const iconPath = (n) => ICON2D[n] || (ICON_PATHS[n] ? (ICON2D[n] = new Path2D(ICON_PATHS[n])) : null);
 const FOOD = new Set(['food', 'cafe', 'bar', 'icecream', 'sweets', 'bakery']);
 const SHOPC = { bank: 'bank', atm: 'bank', police: 'police', clinic: 'hospital' };
 
@@ -232,9 +253,10 @@ export class CityMap {
 export function drawPin(x, X, Y, col, glyph, size = 9, ring = '#0a0b0d') {
   x.fillStyle = col; x.strokeStyle = ring; x.lineWidth = 2;
   x.beginPath(); x.arc(X, Y, size, 0, Math.PI * 2); x.fill(); x.stroke();
-  if (glyph && glyph !== '●') {
-    x.fillStyle = '#0a0b0d'; x.font = `800 ${Math.round(size * 1.15)}px Inter, Mukta, system-ui, sans-serif`;
-    x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(glyph, X, Y + 0.5);
+  const ip = glyph && iconPath(glyph);
+  if (ip) {
+    const k = size * 1.25 / 24;
+    x.save(); x.translate(X - 12 * k, Y - 12 * k); x.scale(k, k); x.fillStyle = '#0a0b0d'; x.fill(ip, 'evenodd'); x.restore();
   }
 }
 export function drawArrow(x, X, Y, ang, s = 1) {
@@ -609,7 +631,7 @@ export class MapScreen {
     for (const m of [...(g.rides ? g.rides.markers() : []), ...(g.police ? g.police.markers() : []), ...(g.props ? g.props.markers() : [])]) {
       const [X, Y] = T(m.x, m.z);
       const prop = m.kind === 'prop', pc = prop ? (m.owned ? '#33d17a' : '#c58cff') : null;
-      drawPin(x, X, Y, prop ? pc : m.kind === 'pax' ? '#33d17a' : m.kind === 'cop' ? '#5aa2ff' : m.kind === 'marshal' ? '#ff4b3e' : '#f2b705', m.kind === 'tow' ? 'A' : prop ? (m.owned ? 'H' : '₹') : null, m.kind === 'tow' || prop ? 8 : 6);
+      drawPin(x, X, Y, prop ? pc : m.kind === 'pax' ? '#33d17a' : m.kind === 'cop' ? '#5aa2ff' : m.kind === 'marshal' ? '#ff4b3e' : '#f2b705', m.kind === 'tow' ? 'auto' : prop ? (m.owned ? 'home' : 'rupee') : null, m.kind === 'tow' || prop ? 8 : 6);
       if (m.label) { x.textAlign = 'left'; x.textBaseline = 'middle'; } if (m.label) text(m.label, X + 11, Y, '700 11px Inter, system-ui, sans-serif', pc || '#f2b705');
     }
     // waypoint + selection

@@ -154,6 +154,8 @@ export function buildGlobalProps(W) {
       const cx = (ax + bx) / 2, cz = (az + bz) / 2, hl = Math.min(70, L / 2 + 5), hw = 11;
       const tx0 = cx + dx * (hl - 9) + nx * (hw + 3.2), tz0 = cz + dz * (hl - 9) + nz * (hw + 3.2);
       collision.addRing([[-5, -3], [5, -3], [5, 3], [-5, 3]].flatMap(([a, b]) => [tx0 + dx * a + nx * b, tz0 + dz * a + nz * b]), 0);
+      const ca = Math.min(38, hl * 0.6);
+      for (const a of [-ca * 0.7, 0, ca * 0.7]) collision.addCircle(cx + dx * a, cz + dz * a, 1.1, 2);
     }
     for (const g of c.mgates) {
       const ang = hash1(g.x * 3.1 + g.z) * Math.PI, ux = Math.cos(ang), uz = Math.sin(ang), vx = -uz, vz = ux;
@@ -307,7 +309,14 @@ export function* buildPropsChunk(W, C, group) {
     gb.poly([[ax + nx * bw, az + nz * bw, bx + nx * bw, bz + nz * bw, bx - nx * bw, bz - nz * bw, ax - nx * bw, az - nz * bw]], bot, GL.concrete, 0.6, true);
     gb.poly([[ax + nx * hw, az + nz * hw, bx + nx * hw, bz + nz * hw, bx - nx * hw, bz - nz * hw, ax - nx * hw, az - nz * hw]], top + 0.02, GL.concrete, 0.75);
   }
-  // metro stations: concourse + glazed platform level on the viaduct
+  // metro stations, built like Pune's elevated ones: a concourse slung under the viaduct on columns in the
+  // median, open side platforms at track level with a parapet, a pitched canopy on posts, and a stair tower
+  // down to the footpath
+  const gq = (a, b, c, d, n, layer, shade, both) => {
+    const v = [a, b, c, d].map(q => gb.v(q[0], q[1], q[2], n[0], n[1], n[2], q[3] || 0, q[4] || 0, layer, shade));
+    gb.i.push(v[0], v[1], v[2], v[0], v[2], v[3]);
+    if (both) { const w = [a, b, c, d].map(q => gb.v(q[0], q[1], q[2], -n[0], -n[1], -n[2], q[3] || 0, q[4] || 0, layer, shade * 0.8)); gb.i.push(w[0], w[2], w[1], w[0], w[3], w[2]); }
+  };
   for (const st of C.mstations) {
     const p = st.pts;
     const L = polyLength(p);
@@ -316,21 +325,47 @@ export function* buildPropsChunk(W, C, group) {
     const dx = (bx - ax) / L, dz = (bz - az) / L, nx = dz, nz = -dx;
     const cx = (ax + bx) / 2, cz = (az + bz) / 2;
     const hl = Math.min(70, L / 2 + 5), hw = 11;
-    const corners = [[-hl, -hw], [hl, -hw], [hl, hw], [-hl, hw]].map(([a, b]) => [cx + dx * a + nx * b, cz + dz * a + nz * b]);
+    const P = (a, b) => [cx + dx * a + nx * b, cz + dz * a + nz * b];
     const tint = [0.92, 0.92, 0.94];
     const seed = Math.floor(hash1(cx) * 255);
-    for (let k = 0; k < 4; k++) {
-      const [x0, z0] = corners[k], [x1, z1] = corners[(k + 1) % 4];
-      const l = Math.hypot(x1 - x0, z1 - z0);
-      let ox = (z1 - z0) / l, oz = -(x1 - x0) / l;
-      if (ox * ((x0 + x1) / 2 - cx) + oz * ((z0 + z1) / 2 - cz) < 0) { ox = -ox; oz = -oz; }
-      const tx = (x1 - x0) / l, tz = (z1 - z0) / l;
-      fb.wall(x0, z0, x1, z1, 8.5, 11.0, ox, oz, 0, { eu: 0, eL: l, tint, style: 1, layer: WL.cladding, flags: 6, seed, tx, tz, top: 11 });
-      fb.wall(x0, z0, x1, z1, 13.6, 18.5, ox, oz, 0, { eu: 0, eL: l, tint, style: 9, layer: WL.concrete, flags: 0, seed, tx, tz, top: 18.5 });
+    // a box from (a0..a1 along, b0..b1 across, y0..y1), facade walls on the four sides
+    const box = (a0, a1, b0, b1, y0, y1, style, layer, flags) => {
+      const co = [P(a0, b0), P(a1, b0), P(a1, b1), P(a0, b1)], mx = (co[0][0] + co[2][0]) / 2, mz = (co[0][1] + co[2][1]) / 2;
+      for (let k = 0; k < 4; k++) {
+        const [x0, z0] = co[k], [x1, z1] = co[(k + 1) % 4], l = Math.hypot(x1 - x0, z1 - z0);
+        let ox = (z1 - z0) / l, oz = -(x1 - x0) / l;
+        if (ox * ((x0 + x1) / 2 - mx) + oz * ((z0 + z1) / 2 - mz) < 0) { ox = -ox; oz = -oz; }
+        fb.wall(x0, z0, x1, z1, y0, y1, ox, oz, 0, { eu: 0, eL: l, tint, style, layer, flags, seed, tx: (x1 - x0) / l, tz: (z1 - z0) / l, top: y1 });
+      }
+      gb.poly([co.flat()], y1, GL.concrete, 0.85);
+      gb.poly([co.flat()], y0, GL.concrete, 0.5, true);
+    };
+    // the concourse under the tracks, on three columns in the median
+    const ca = Math.min(38, hl * 0.6);
+    box(-ca, ca, -9, 9, 7.4, 10.9, 1, WL.cladding, 6);
+    for (const a of [-ca * 0.7, 0, ca * 0.7]) box(a - 0.8, a + 0.8, -0.8, 0.8, 0, 7.4, 3, WL.plaster, 2);
+    // side platforms at track level, with a parapet on the outer edge
+    for (const sd of [1, -1]) {
+      const b0 = 2.6 * sd, b1 = 7.4 * sd;
+      const ring = [P(-hl, b0), P(hl, b0), P(hl, b1), P(-hl, b1)].flat();
+      gb.poly([ring], 12.78, GL.concrete, 0.9);
+      gb.poly([ring], 12.0, GL.concrete, 0.45, true);
+      const [ox0, oz0] = P(-hl, b1), [ox1, oz1] = P(hl, b1), n = [nx * sd, 0, nz * sd];
+      gq([ox0, 12.0, oz0], [ox1, 12.0, oz1], [ox1, 13.85, oz1], [ox0, 13.85, oz0], n, GL.concrete, 0.8, true);
+      for (const a of [-hl, hl]) { const [x0, z0] = P(a, b0), [x1, z1] = P(a, b1); gq([x0, 12.0, z0], [x1, 12.0, z1], [x1, 12.78, z1], [x0, 12.78, z0], [dx * Math.sign(a), 0, dz * Math.sign(a)], GL.concrete, 0.7, true); }
+      // canopy posts along the parapet
+      for (let a = -hl + 6; a <= hl - 6; a += 15) box(a - 0.18, a + 0.18, b1 - 0.4 * sd - 0.18, b1 - 0.4 * sd + 0.18, 12.78, 17.15, 3, WL.plaster, 2);
     }
-    const ring = corners.flat();
-    gb.poly([ring], 18.5, GL.concrete, 0.85);
-    gb.poly([ring], 8.5, GL.concrete, 0.5, true);
+    // the canopy: two pitched planes over both platforms
+    const ra = hl - 3;
+    for (const sd of [1, -1]) {
+      const [x0, z0] = P(-ra, 0), [x1, z1] = P(ra, 0), [x2, z2] = P(ra, 8.4 * sd), [x3, z3] = P(-ra, 8.4 * sd);
+      const ny = 0.99, n = [nx * sd * 0.14, ny, nz * sd * 0.14];
+      if (sd > 0) gq([x0, 18.1, z0], [x1, 18.1, z1], [x2, 17.0, z2], [x3, 17.0, z3], n, GL.concrete, 0.95, true);
+      else gq([x0, 18.1, z0], [x3, 17.0, z3], [x2, 17.0, z2], [x1, 18.1, z1], n, GL.concrete, 0.95, true);
+      const [ex0, ez0] = P(-ra, 8.4 * sd), [ex1, ez1] = P(ra, 8.4 * sd);
+      gq([ex0, 16.7, ez0], [ex1, 16.7, ez1], [ex1, 17.0, ez1], [ex0, 17.0, ez0], [nx * sd, 0, nz * sd], GL.concrete, 0.8, true);
+    }
     // a stair and escalator tower down to the footpath at one end, on the station's side of the road
     { const tx0 = cx + dx * (hl - 9) + nx * (hw + 3.2), tz0 = cz + dz * (hl - 9) + nz * (hw + 3.2);
       const tc = [[-5, -3], [5, -3], [5, 3], [-5, 3]].map(([a, b]) => [tx0 + dx * a + nx * b, tz0 + dz * a + nz * b]);
@@ -341,12 +376,16 @@ export function* buildPropsChunk(W, C, group) {
         fb.wall(x0, z0, x1, z1, 0, 11.0, ox, oz, 0, { eu: 0, eL: l, tint, style: 1, layer: WL.cladding, flags: 6, seed, tx: (x1 - x0) / l, tz: (z1 - z0) / l, top: 11 });
       }
       gb.poly([tc.flat()], 11.0, GL.concrete, 0.8);
+      // a bridge from the tower into the concourse
+      const [bx0, bz0] = P(Math.min(ca - 1, hl - 12), 9), [bx1, bz1] = P(Math.min(ca - 1, hl - 12) + 6, 9), [bx2, bz2] = P(Math.min(ca - 1, hl - 12) + 6, hw + 0.2), [bx3, bz3] = P(Math.min(ca - 1, hl - 12), hw + 0.2);
+      gb.poly([[bx0, bz0, bx1, bz1, bx2, bz2, bx3, bz3]], 10.9, GL.concrete, 0.8);
     }
+    // the Metro sign along both canopy edges
     const s = signs.metro;
     for (const side of [1, -1]) {
-      const fx = cx + nx * (hw + 0.05) * side, fz = cz + nz * (hw + 0.05) * side;
+      const [fx, fz] = P(0, (8.45) * side);
       const ltr = (dx * nz * side - dz * nx * side) > 0;
-      sb.quad([fx - dx * 9, 18.6, fz - dz * 9], [fx + dx * 9, 18.6, fz + dz * 9], [fx + dx * 9, 20.1, fz + dz * 9], [fx - dx * 9, 20.1, fz - dz * 9],
+      sb.quad([fx - dx * 9, 15.4, fz - dz * 9], [fx + dx * 9, 15.4, fz + dz * 9], [fx + dx * 9, 16.65, fz + dz * 9], [fx - dx * 9, 16.65, fz - dz * 9],
         [nx * side, 0, nz * side], ltr ? s.u0 : s.u1, s.v0, ltr ? s.u1 : s.u0, s.v1);
     }
   }

@@ -2,6 +2,7 @@
 // "Nearby" is how you find things: every real shop, café, bar, ATM, pump and chowki within walking
 // distance, grouped by what they do, plus the homes for sale; tap one and it's on your map.
 // Tab opens straight to "Me".
+import { stars, hearts as heartsI } from '../ui/icons.js';
 import { ITEMS, describe } from './life.js';
 import { KIND_INFO, fmt, lookFromJSON } from './shops.js';
 import { PROPERTIES } from './props.js';
@@ -96,9 +97,9 @@ export class Bag {
         ${ring('mood', 'Mood', s.mood, s.mood > 0.75 ? 'Great' : s.mood < 0.3 ? 'Low' : 'Okay')}</div>
         <div class="jh-read"><span>How Pune sees you</span><b>${{ respect: 'A respected local', scared: 'Trouble. Keep away', odd: 'The one in the unusual outfit', drunk: 'Had a few', nice: 'Well turned out' }[re] || 'Just another Punekar'}</b></div>
         <div class="jh-scales">${scale('Respect', s.respect, ['People laugh at you', 'Nobody'], ['People know you', 'Respected'])}${scale('Karma', s.karma, ['People cross the road', 'Bad'], ['Aajis bless you', 'Good'])}</div>
-        <div class="jh-chips"><span><small>Style here</small><b>${st.odd ? 'Bold' : st.score > 0.85 ? 'Spot on' : st.score > 0.65 ? 'Fine' : 'Off'}</b></span><span><small>Fitness</small><b>+${Math.round(s.fitness)} health</b></span><span><small>Drink</small><b>${s.drunk > 0.6 ? 'Drunk' : s.drunk > 0.2 ? 'Tipsy' : 'Sober'}</b></span><span><small>Wanted</small><b>${G.police.heat ? '★'.repeat(G.police.heat) : 'No'}</b></span></div>
+        <div class="jh-chips"><span><small>Style here</small><b>${st.odd ? 'Bold' : st.score > 0.85 ? 'Spot on' : st.score > 0.65 ? 'Fine' : 'Off'}</b></span><span><small>Fitness</small><b>+${Math.round(s.fitness)} health</b></span><span><small>Drink</small><b>${s.drunk > 0.6 ? 'Drunk' : s.drunk > 0.2 ? 'Tipsy' : 'Sober'}</b></span><span><small>Wanted</small><b>${G.police.heat ? stars(G.police.heat, 3) : 'No'}</b></span></div>
         <div class="jh-sub">Record</div>
-        <div class="jh-stats">${[['Rides', `${G.stats.rides}${G.stats.rides ? ` · ★ ${G.stats.rating.toFixed(1)}` : ''}`], ['Deliveries', s.tally.deliveries], ['Fights won', s.tally.fightsWon], ['Knocked out', s.tally.knockedOut], ['Strays fed', s.tally.fed], ['Meals', s.tally.meals], ['Rent earned', fmt(s.tally.rentEarned)], ['Challans due', fmt(G.police.duesTotal)]].map(([a, b]) => `<span><small>${a}</small><b>${b}</b></span>`).join('')}</div>`;
+        <div class="jh-stats">${[['Rides', `${G.stats.rides}${G.stats.rides ? ` · ${G.stats.rating.toFixed(1)} rated` : ''}`], ['Deliveries', s.tally.deliveries], ['Fights won', s.tally.fightsWon], ['Knocked out', s.tally.knockedOut], ['Strays fed', s.tally.fed], ['Meals', s.tally.meals], ['Rent earned', fmt(s.tally.rentEarned)], ['Challans due', fmt(G.police.duesTotal)]].map(([a, b]) => `<span><small>${a}</small><b>${b}</b></span>`).join('')}</div>`;
     } else if (this.tab === 'wear') {
       const own = s.wardrobe.filter(w => !w.startsWith('shoe_'));
       h += this.row('shirt', 'What you started in', 'Your own clothes', 'Wear', 'wear', '__orig');
@@ -125,7 +126,7 @@ export class Bag {
       for (const c of cs) {
         const hearts = Math.max(0, Math.min(5, Math.round(c.aff / 20)));
         const lvl = levelOf(c), days = Math.max(0, Math.floor(((G.clock || 0) - (c.lastSeen || 0)) / 24));
-        const note = `${lvl} · ${'♥'.repeat(hearts)}${'♡'.repeat(5 - hearts)} · met at ${c.met}${days >= 2 ? ` · not seen in ${days} days` : ''}`;
+        const note = `${lvl} · ${heartsI(hearts)} · met at ${c.met}${days >= 2 ? ` · not seen in ${days} days` : ''}`;
         h += this.row(c.partner ? 'health' : 'phone', c.name, note, pend && pend.ct === c ? 'On the way' : 'Ask to meet', pend && pend.ct === c ? null : 'meet', c.name, c.partner ? 'partner' : '');
       }
       if (cs.length) h += `<p class="jh-empty">They pick a café nearby. Be there within a few hours. Bring a gajra, sweets or a book if you have one.</p>`;

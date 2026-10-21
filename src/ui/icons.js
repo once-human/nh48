@@ -35,3 +35,13 @@ export function icon(name, cls = '') {
 // which icon each backpack item uses
 export const ITEM_ICON = { water: 'bottle', tiffin: 'parcel', vadapav: 'parcel', biscuit: 'biscuit', banana: 'banana', chikki: 'chikki', medkit: 'medkit', painkiller: 'pill', ors: 'pill',
   energy: 'can', coldcoffee: 'cup', bakarwadi: 'gift', barfi: 'gift', shrewsbury: 'gift', gajra: 'flower', book: 'book', lottery: 'ticket', beer: 'mug' };
+
+// small inline icons for text: rating stars and hearts (never font glyphs)
+const svg = (d, cls) => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+const STAR_D = 'M12 2.6l2.8 5.9 6.5.8-4.8 4.5 1.2 6.4L12 17.1l-5.7 3.1 1.2-6.4-4.8-4.5 6.5-.8z';
+const HEART_D = 'M12 20.6 4.3 13.2A5 5 0 0 1 12 6.6a5 5 0 0 1 7.7 6.6Z';
+export const STAR = svg(STAR_D, 'star');
+export const HEART = svg(HEART_D, 'heart');
+export const HEART_OFF = svg(HEART_D, 'heart off');
+export const stars = (n, of = 5) => `<span class="icos">${STAR.repeat(n)}${svg(STAR_D, 'star off').repeat(of - n)}</span>`;
+export const hearts = (n, of = 5) => `<span class="icos">${HEART.repeat(n)}${HEART_OFF.repeat(of - n)}</span>`;

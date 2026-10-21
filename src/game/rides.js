@@ -255,7 +255,7 @@ export class Rides {
     g.stats.starSum += stars;
     g.stats.rating = g.stats.starSum / g.stats.rides;
     g.audio.cash();
-    g.hud.toast(`+₹${fare}${tip ? ` · ₹${tip} tip` : ''}`, '★'.repeat(stars) + '☆'.repeat(5 - stars) + `  ${(c.dist / 1000).toFixed(1)} km`, 'money', 3.4);
+    g.hud.toast(`+₹${fare}${tip ? ` · ₹${tip} tip` : ''}`, `Rated ${stars} of 5 · ${(c.dist / 1000).toFixed(1)} km`, 'money', 3.4);
     const kind = mood > 0.8 ? 'happy' : mood > 0.45 ? 'meh' : 'angry';
     this.speak(c, kind, -1, 3.5);
     g.player.setPassengers(0);

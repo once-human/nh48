@@ -339,9 +339,10 @@ export class Game {
   }
   togglePause(force) {
     const to = force !== undefined ? force : this.state !== 'pause';
-    if (to && this.state === 'play') { this._pausedAt = performance.now(); this.state = 'pause'; this.hud.setLockHint?.(false); this.hud.pause.hidden = false; this.hud.syncPause(); this.audio.updateEngine(0, 0, false); this.audio.playerHorn(false); this.audio.hush(true); }
+    if (to && this.state === 'play') { this._pausedAt = performance.now(); this.state = 'pause'; this.pauseFrames = 0; this.renderer.domElement.classList.add('paused'); this.hud.setLockHint?.(false); this.hud.pause.hidden = false; this.hud.syncPause(); this.audio.updateEngine(0, 0, false); this.audio.playerHorn(false); this.audio.hush(true); }
     else if (!to && this.state === 'pause') {
-      this.state = 'play'; this.hud.pause.hidden = true; this.audio.hush(false);
+      this.state = 'play'; this.hud.pause.hidden = true; this.audio.hush(false); this.renderer.domElement.classList.remove('paused');
+      try { this.lockMouse?.(); } catch (e) { /* the next click takes the mouse */ }
       if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     }
   }
@@ -952,19 +953,19 @@ export class Game {
       const maxPr = Math.min(window.devicePixelRatio || 1, this.QUALITY[this.qualityName].pixelRatio);
       // never below the screen's own resolution (1.0): below that every sign, plate and shop board
       // smears. Slow machines lose shadows, grass and range instead (the preset step below).
-      const floor = Math.min(1, window.devicePixelRatio || 1);
+      const floor = this.qualityName === 'lite' ? 0.6 : Math.min(1, window.devicePixelRatio || 1);
       if (p.slow >= 1 && p.pr > floor) { p.pr = Math.max(floor, p.pr - (fps < 30 ? 0.15 : 0.08)); this.applyPixelRatio(p.pr); p.slow = 0; }
       else if (p.fast >= 3 && p.pr < maxPr) { p.pr = Math.min(maxPr, p.pr + 0.08); this.applyPixelRatio(p.pr); p.fast = 0; }
       // still struggling at the lowest resolution: step the graphics preset down once per level
       // (only when the player hasn't picked a preset themselves)
-      p.floor = (p.pr <= Math.min(1, window.devicePixelRatio || 1) + 0.01 && fps < 30) ? (p.floor || 0) + 1 : 0;
-      if (p.floor >= 2 && !this.userQuality && this.qualityName !== 'low') {
+      p.floor = (p.pr <= floor + 0.01 && fps < 30) ? (p.floor || 0) + 1 : 0;
+      if (p.floor >= 2 && !this.userQuality && this.qualityName !== 'lite') {
         p.floor = 0;
-        const next = this.qualityName === 'high' ? 'med' : 'low';
+        const next = { high: 'med', med: 'low', low: 'lite' }[this.qualityName] || 'lite';
         this.setQuality(next, true);
         p.pr = Math.min(window.devicePixelRatio || 1, this.QUALITY[next].pixelRatio);
         this.applyPixelRatio(p.pr);
-        this.hud.toast('Graphics lowered', 'Switched to ' + (next === 'med' ? 'Medium' : 'Low') + ' for smoother driving · change it in the menu', 'info', 3);
+        this.hud.toast('Graphics lowered', 'Switched to ' + ({ med: 'Medium', low: 'Low', lite: 'Lite' }[next]) + ' for smoother driving · change it in the menu', 'info', 3);
       }
     }
   }
