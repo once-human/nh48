@@ -4,19 +4,19 @@
 import * as THREE from 'three';
 import { clamp, RNG } from '../core/util.js';
 
-const RANGE = 34;            // metres from the camera
+const RANGE = 48;            // metres from the camera
 const NAT = { walk: 1.25, jog: 3.0 };
 
 export class Crowd {
   constructor(people, kit, scene, W, quality) {
     this.people = people; this.kit = kit; this.scene = scene; this.W = W;
-    this.cap = quality.name === 'low' ? 7 : quality.name === 'med' ? 12 : 18;
+    this.cap = quality.name === 'lite' ? 8 : quality.name === 'low' ? 12 : quality.name === 'med' ? 20 : 30;
     this.pool = [];
     this.t = 0;
     // build the pool up front: creating a skinned body mid-game is a visible hitch
     if (kit) { for (let i = 0; i < Math.ceil(this.cap * 0.65); i++) this.makeSkin(false); for (let i = 0; i < Math.ceil(this.cap * 0.45); i++) this.makeSkin(true); }
   }
-  setQuality(q) { this.cap = q.name === 'low' ? 7 : q.name === 'med' ? 12 : 18; }
+  setQuality(q) { this.cap = q.name === 'lite' ? 8 : q.name === 'low' ? 12 : q.name === 'med' ? 20 : 30; }
   makeSkin(female) {
     const kit = this.kit;
     const look = kit.randomLook(new RNG(this.pool.length + 1), { female });
@@ -46,7 +46,9 @@ export class Crowd {
       if (p.hidden || !p.look) continue;
       const d = Math.hypot(p.x - cx, p.z - cz);
       const r = p.cop || p.ctl ? RANGE + 14 : RANGE;
-      if (d < r) cand.push([d - (p.cop || p.ctl ? 12 : 0), p]);
+      // the people you can actually see come first; behind the camera only the very close
+      const seen = !this.inView || d < 6 || this.inView(p.x, p.z);
+      if (d < r) cand.push([d - (p.cop || p.ctl ? 12 : 0) + (seen ? 0 : 30), p]);
     }
     cand.sort((a, b) => a[0] - b[0]);
     const want = new Set(cand.slice(0, this.cap).map(c => c[1]));

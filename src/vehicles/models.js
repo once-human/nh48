@@ -334,7 +334,7 @@ export function buildBike(opts = {}) {
   wheel(b, 0.78, R, 0, R, 0.09); wheel(b, -0.6, R, 0, R, 0.11);
   return { body: b.build(), glass: gl.build(), dims: { L: 2.0, W: 0.75, H: 1.75, wb: 1.3 } };
 }
-export function buildCycle() {
+export function buildCycle(opts = {}) {
   const b = newB(true), gl = newB(false);
   const R = 0.34;
   const c = [0.1, 0.1, 0.12];
@@ -343,7 +343,7 @@ export function buildCycle() {
   b.addGeo(G.cyl8, M(0.35, 0.55, 0, 0.022, 0.6, 0.022, 0, 0, -0.35), c, 0, 1);
   box(b, -0.38, 0.86, -0.08, -0.15, 0.9, 0.08, [0.1, 0.08, 0.06]);
   box(b, 0.42, 0.98, -0.3, 0.46, 1.0, 0.3, CHROME);
-  addRider(b, -0.28, 0.92, 0, { lean: 0.22, inst: true, handX: 0.44, handY: 1.0, handW: 0.28, footX: 0.05, footY: 0.32 });
+  if (!opts.parked) addRider(b, -0.28, 0.92, 0, { lean: 0.22, inst: true, handX: 0.44, handY: 1.0, handW: 0.28, footX: 0.05, footY: 0.32 });
   for (const x of [0.5, -0.5]) {
     b.addGeo(new THREE.TorusGeometry(R, 0.025, 3, 12), M(x, R, 0), TYRE);
   }

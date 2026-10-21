@@ -190,6 +190,12 @@ for f in files:
         with gzip.open(os.path.join(OUT, f't_{si}_{sj}.json.gz'), 'wb', 9) as fh: fh.write(s)
         tiles.append([si, sj, sr, len(s)])
     print(f'tile {i},{j}', 'buildings', len(B), 'pins', len(T['pins']), flush=True)
+# every shop and place in Pune for the map and its search, loaded in the background once you're playing
+allpins = []
+for fz in glob.glob(os.path.join(OUT, 't_*.json.gz')):
+    allpins += json.load(gzip.open(fz)).get('pins', [])
+with gzip.open(os.path.join(OUT, 'pins.json.gz'), 'wb', 9) as fh: fh.write(json.dumps([p[:5] for p in allpins], separators=(',', ':'), ensure_ascii=False).encode())
+print('pins', len(allpins))
 out = dict(meta={**meta, 'outline': [[round(v, 5) for v in p] for p in outline], 'tiles': tiles, 'tileSize': 1000, 'activity': act_meta},
            names=names, coarse=dict(nodes=coarse_nodes, edges=coarse_edges), cwater=cwater, districts=['deccan', 'peth', 'camp', 'kp', 'station', 'residential', 'riverside'],
            landmarks=base['landmarks'], areas=base['areas'], flyovers=base['flyovers'], metro=base['metro'], mstations=base['mstations'], buses=base['buses'], places=base['places'], pois=base['pois'], street=1)

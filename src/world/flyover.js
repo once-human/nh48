@@ -118,10 +118,20 @@ export class Flyovers {
     }
     return null;
   }
+  // only the flyovers within sight draw (and only the close ones cast shadows)
+  update(x, z) {
+    if (!this.parts || Math.hypot(x - this.lastX, z - this.lastZ) < 25) return;
+    this.lastX = x; this.lastZ = z;
+    for (const p of this.parts) { const d = Math.hypot(p.x - x, p.z - z); p.mesh.visible = d < 1700; p.mesh.castShadow = d < 500; }
+  }
   piersNear(x, z) { return this.pgrid.get(Math.floor(x / CELL) + ',' + Math.floor(z / CELL)) || []; }
 
   build(scene, mats) {
-    const cb = new ColorBuilder();
+    // one mesh per 400 m cell, not one for the whole city: only what's near the camera draws (all of Pune's
+    // flyovers as a single mesh was 1.6 million triangles every frame, twice with shadows)
+    const cbs = new Map(), BIN = 400;
+    let cb = null;
+    const at = (x, z) => { const k = Math.floor(x / BIN) + ',' + Math.floor(z / BIN); let c = cbs.get(k); if (!c) cbs.set(k, c = new ColorBuilder()); cb = c; };
     const quad = (a, b, c, d, col) => cb.quad ? cb.quad(a, b, c, d, col) : null;
     const box = new THREE.BoxGeometry(1, 1, 1);
     const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
@@ -134,6 +144,7 @@ export class Flyovers {
         const ha = H[i], hb = H[i + 1];
         const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 1e-6;
         const mx = (ax + bx) / 2, mz = (az + bz) / 2, mh = (ha + hb) / 2;
+        at(mx, mz);
         const ry = Math.atan2(-dz, dx), pitch = Math.atan2(hb - ha, L);
         // deck slab: a box per 5 m piece, top at the road surface
         Q.setFromEuler(new THREE.Euler(0, ry, pitch, 'YXZ'));
@@ -171,6 +182,7 @@ export class Flyovers {
         acc = 0;
         const h = H[i];
         if (h < 4.6) continue;
+        at(ax, az);
         const ry = Math.atan2(-(bz - az), bx - ax);
         const pw = Math.min(3.2, dk.w * 0.35);
         put(ax, (h - DECK_T) / 2, az, 1.3, h - DECK_T, pw, ry, CONCRETE);
@@ -182,10 +194,15 @@ export class Flyovers {
         this.pgrid.get(key).push(pr);
       }
     }
-    const mesh = new THREE.Mesh(cb.build(), mats.prop);
-    mesh.castShadow = true; mesh.receiveShadow = true;
-    scene.add(mesh);
-    this.mesh = mesh;
+    this.parts = [];
+    for (const [k, c] of cbs) {
+      const [i, j] = k.split(',').map(Number);
+      const mesh = new THREE.Mesh(c.build(), mats.prop);
+      mesh.castShadow = true; mesh.receiveShadow = true; mesh.visible = false;
+      scene.add(mesh);
+      this.parts.push({ mesh, x: (i + 0.5) * BIN, z: (j + 0.5) * BIN });
+    }
+    this.lastX = 1e9; this.lastZ = 1e9;
     void quad; void CRASH;
   }
 }

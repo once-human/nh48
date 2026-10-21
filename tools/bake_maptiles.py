@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """bake_maptiles.py - the city map as pictures: every baked 4 km tile drawn at three zooms into WebP
 images, so the big map and the minimap never draw the city at runtime when zoomed out.
-  r0  0.125 px/m, 500 px = 4 km     r1  0.25 px/m, 500 px = 2 km     r2  0.5 px/m, 500 px = 1 km
+  r0  0.125 px/m, 500 px = 4 km   r1  0.25 px/m, 500 px = 2 km   r2  0.5 px/m, 500 px = 1 km   r3  1 px/m, 1000 px = 1 km
 Out: data/pune/map/r{L}/{tx}_{tz}.webp (tx, tz count from the map's west and north edge, meta.vis).
 Same colours as src/ui/map.js. usage: python3 tools/bake_maptiles.py [--force]"""
 import glob, json, os, re, sys
@@ -13,7 +13,7 @@ FORCE = '--force' in sys.argv
 COL = dict(bg='#101216', land='#14171b', grass='#16241b', soil='#1b1a17', scrub='#15211a', plaza='#1a1c20', median='#1a2219', pavers='#1b1d22',
            water='#0d2433', building='#23272e', landmark='#3a3220', road='#3b3f47', main='#5a5f69', arterial='#6e7480', rail='#2d3037', bridge='#5d626c',
            limit='#a57a1e')
-LEVELS = [(0.125, 4), (0.25, 3), (0.5, 2)]       # px per metre, smallest road rank drawn
+LEVELS = [(0.125, 4, 500), (0.25, 3, 500), (0.5, 2, 500), (1.0, 0, 1000)]   # px per metre, smallest road rank drawn, image size
 IMG, SS = 500, 2                                  # image size, supersampling
 outline = json.load(open(os.path.join(ROOT, 'data/raw/pune/outline.json')))['outline'][0]
 
@@ -23,7 +23,7 @@ for f in sorted(glob.glob(os.path.join(SRC, 't_*_*.json'))):
     M = json.load(open(f)); meta = M['meta']; rect = meta['tile']; vis = meta['vis']
     oxy = [((lon - meta['lon0']) * meta['mlon'] * 100, -(lat - meta['lat0']) * meta['mlat'] * 100) for lon, lat in outline]
     span = rect[2] - rect[0]                      # cm
-    for L, (ppm, minrank) in enumerate(LEVELS):
+    for L, (ppm, minrank, IMG) in enumerate(LEVELS):
         tm = IMG / ppm * 100                      # cm per image
         n = max(1, int(round(span / tm)))
         tx0, tz0 = int(round((rect[0] - vis[0]) / tm)), int(round((rect[1] - vis[1]) / tm))
@@ -71,6 +71,7 @@ for f in sorted(glob.glob(os.path.join(SRC, 't_*_*.json'))):
                 im.crop((a * IMG, b * IMG, (a + 1) * IMG, (b + 1) * IMG)).save(os.path.join(d, f'{tx0 + a}_{tz0 + b}.webp'), 'WEBP', quality=78, method=4)
     print('map', os.path.basename(f), flush=True)
 
+IMG = 500
 # one picture of the whole city for the first look (loaded with the game): r0 pieces at half size
 r0 = os.path.join(OUT, 'r0')
 fs = [f for f in os.listdir(r0) if f.endswith('.webp')] if os.path.isdir(r0) else []

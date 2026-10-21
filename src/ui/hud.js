@@ -749,12 +749,13 @@ export class HUD {
     if (k > 0.45 && (this._hbT = (this._hbT || 0) - 1 / 60) <= 0) { this._hbT = 0.85 - k * 0.25; this.game.audio.heartbeat?.(k); }
   }
   hurt() { const H = this.hurtEl; H.classList.remove('go'); void H.offsetWidth; H.classList.add('go'); }
-  // a black screen while the city ahead is fetched and built (fast travel, buses, the hospital)
+  // while the city ahead is fetched and built (fast travel, buses): the same black screen as an arrival, held
   curtain(on, text = '') {
-    let C = this.curtainEl;
-    if (!C) { C = this.curtainEl = el('div', 'curtain'); C.innerHTML = '<div class="cu-t"></div><div class="cu-bar"><i></i></div>'; (document.getElementById('hud') || document.body).appendChild(C); }
-    C.querySelector('.cu-t').textContent = text;
-    C.classList.toggle('on', !!on);
+    const F = this.flashEl;
+    if (on) {
+      F.querySelector('.fl-t').textContent = text; F.querySelector('.fl-s').textContent = 'On the way…';
+      clearTimeout(this._flT); F.hidden = false; F.classList.remove('go'); F.classList.add('hold');
+    } else F.classList.remove('hold');
   }
   flash(title, sub) {
     const F = this.flashEl;

@@ -119,12 +119,16 @@ async function main() {
   for (const v of Object.values(ASSETS)) for (const u of typeof v === 'string' ? [v] : Object.values(v)) loader.expect(u, manifest[u] || 1e6);
   const sndUrl = (n) => `assets/snd/${n}.mp3`;
   for (const n of SOUNDS) loader.expect(sndUrl(n), manifest[sndUrl(n)] || 5e4);
+  loader.expect('assets/voices_pk.mp3', manifest['assets/voices_pk.mp3'] || 1e5);
   const VOICE_BIN = 'assets/voices.mp3';
   await progress('Downloading Pune', 0.01);
   const sounds = {};
   const sndJob = Promise.all([...SOUNDS.map(async (n) => {
     try { const b = await loader.bytes(sndUrl(n)); sounds[n] = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); } catch (e) { /* plays without it */ }
-  })]);
+  }), (async () => {
+    // the character screen's lines (a few KB) come with the game, so the menu speaks from the start
+    try { const b = await loader.bytes('assets/voices_pk.mp3'), idx = manifest.__voices || {}; for (const [id, [off, len, pk]] of Object.entries(idx)) if (pk === 3) sounds['v_' + id] = b.buffer.slice(b.byteOffset + off, b.byteOffset + off + len); } catch (e) { /* silent */ }
+  })()]);
   const [M, gAlb, gNrm, gArm, wAlb, wNrm, wArm, bark, barkN, palm] = await Promise.all([
     PUNE ? loader.bytes(ASSETS.map).then(async (b) => cityFromBase(JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text()))) : loader.json(ASSETS.map), loader.bitmap(ASSETS.gAlb), loader.bitmap(ASSETS.gNrm), loader.bitmap(ASSETS.gArm),
     loader.bitmap(ASSETS.wAlb), loader.bitmap(ASSETS.wNrm), loader.bitmap(ASSETS.wArm),
@@ -190,6 +194,11 @@ async function main() {
   {
     const idx = manifest.__voices || {}, bg = new Loader(() => {});
     const pack = (url, k) => bg.bytes(url).then((b) => { for (const [id, [off, len, pk]] of Object.entries(idx)) if ((pk || 0) === k) game.audio.raw['v_' + id] = b.buffer.slice(b.byteOffset + off, b.byteOffset + off + len); }).catch(() => { /* subtitles still show */ });
+    // every shop and place in Pune onto the map (names and spots only, about a megabyte)
+    if (W.tiles) setTimeout(() => bg.bytes('assets/pune/pins.json.gz').then(async (b) => {
+      const list = JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+      W.cityMap && W.cityMap.addPins(list);
+    }).catch(() => { /* the map fills in as you go */ }), 1500);
     setTimeout(async () => { await pack(VOICE_BIN, 0); await new Promise(r => setTimeout(r, 8000)); await pack('assets/voices_k.mp3', 1); await pack('assets/voices_d.mp3', 2); }, 4000);
   }
   await game.init(progress);
@@ -197,7 +206,7 @@ async function main() {
   await progress('Building the streets', 0.86);
   const sx = player.x, sz = player.z;
   W.streamer.warm(sx, sz, Math.min(260, quality.streamRadius), (k, n) => { shownF = Math.max(shownF, 0.86 + 0.1 * k / n); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
-  updateProps(W, sx, sz);
+  updateProps(W, sx, sz); W.fly?.update?.(sx, sz);
   sky.update(game.hour, game.focus(), 0);
   await progress('Compiling shaders', 0.98);
   await renderer.compileAsync(scene, camera);
@@ -259,7 +268,7 @@ async function main() {
     W.nearBoards.update(camera.position.x, camera.position.z, dt);
     W.trains?.update(dt, camera.position);
     propT -= dt;
-    if (propT <= 0) { updateProps(W, camera.position.x, camera.position.z); propT = 0.2; }
+    if (propT <= 0) { updateProps(W, camera.position.x, camera.position.z); W.fly?.update?.(camera.position.x, camera.position.z); propT = 0.2; }
     const t1 = performance.now();
     // the map covers the screen, and while paused the last frame just sits there (blurred by CSS): no rendering at all
     if (game.state !== 'map' && !(game.state === 'pause' && !game.livePause && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);

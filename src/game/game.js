@@ -773,7 +773,7 @@ export class Game {
     P.headlight.intensity = night * 24;
     if (this.lightPools) { this.lightPools.mesh.visible = night > 0.05; this.lightPools.mesh.material.opacity = night * 0.55; }
     this.people.render(P.x, P.z);
-    if (this.crowd) this.crowd.update(dt, this.camera.position.x, this.camera.position.z);
+    if (this.crowd) { this.crowd.inView = this.inView; this.crowd.update(dt, this.camera.position.x, this.camera.position.z); }
     if (this.fauna) this.fauna.update(Math.min(dt, 0.05), this.camera.position.x, this.camera.position.z);
     if (this.state === 'play' || this.state === 'pause' || this.state === 'map' || this.state === 'shop') this.hud.update(dt);
     this.input.endFrame();

@@ -37,7 +37,7 @@ function buildModel(type) {
   switch (type) {
     case 'scooter': case 'scooterP': return buildScooter({ parked: true });
     case 'bike': case 'bikeP': return buildBike({ parked: true });
-    case 'cycle': return buildCycle();
+    case 'cycle': return buildCycle({ parked: true });
     case 'hatch': case 'sedan': case 'suv': case 'taxi': return buildCar(type, { interior: true });
     case 'tempo': return buildTempo();
     case 'auto': return buildAuto({ withWheels: true });
