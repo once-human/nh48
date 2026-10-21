@@ -36,7 +36,7 @@ export class TileManager {
   constructor(W, base) {
     this.W = W; this.base = base; this.game = null;
     this.list = W.M.meta.tiles.map(([i, j, rect, size]) => ({ i, j, tag: 1 + i * 100 + j, rect: rect.map(v => v / 100), size, state: 'none' }));
-    this.ready = []; this.job = null; this.t = 0;
+    this.ready = []; this.dropping = []; this.job = null; this.t = 0;
     // the city's edge: a wall along the outline (the roads that cross it were barricaded in the bake)
     const o = W.M.meta.outlineXZ, C = W.collision;
     for (let k = 0; k < o.length; k++) { const a = o[k], b = o[(k + 1) % o.length]; C.addSeg(a[0] / 100, a[1] / 100, b[0] / 100, b[1] / 100, 3); }
@@ -69,9 +69,10 @@ export class TileManager {
       for (const T of this.list) {
         const d = this.dist(T, x, z);
         if (T.state === 'none' && d < LOAD_R && !(T.retry > performance.now())) this.fetch(T);
-        else if (T.state === 'live' && d > DROP_R) this.drop(T);
+        else if (T.state === 'live' && d > DROP_R) { T.state = 'dropping'; this.dropping.push(T); }
       }
     }
+    if (!this.job && this.dropping.length) this.job = this.dropJob(this.dropping.shift());
     if (!this.job && this.ready.length) this.job = this.integrate(this.ready.shift());
     if (this.job) {
       const t0 = performance.now();
@@ -95,10 +96,11 @@ export class TileManager {
     D.buses = []; D.pois = []; D.places = [];
     W.index.addTile(D, bOff, rect, tag);
     yield;
-    W.surf.addTile(D, tag);
+    W.surf.addTile({ ground: D.ground, water: D.water, buildings: [] }, tag);
+    for (let k = 0; k < D.buildings.length; k += 1500) { yield; W.surf.addTile({ ground: [], water: [], buildings: D.buildings.slice(k, k + 1500) }, tag); }
     yield;
+    for (let k = 0; k < D.buildings.length; k += 500) { tagged(() => { for (const B of D.buildings.slice(k, k + 500)) C.addRing(cmRing(B[1]), 0); }); yield; }
     tagged(() => {
-      for (const B of D.buildings) C.addRing(cmRing(B[1]), 0);
       for (const [, line] of D.banks) C.addLine(cmRing(line), 4);
       for (const [, line] of D.rails) C.addLine(cmRing(line), 4);
     });
@@ -124,17 +126,26 @@ export class TileManager {
     this.refresh(rect);
     T.data = null; T.state = 'live';
   }
-  drop(T) {
+  drop(T) { const it = this.dropJob(T); while (!it.next().done) { /* all at once */ } }
+  // leave a tile behind, a slice per frame
+  *dropJob(T) {
     const W = this.W, M = W.M, tag = T.tag;
     this.refresh(T.rect, true);
+    yield;
     W.graph.removeTile(tag);
+    yield;
     if (this.game && this.game.traffic) this.game.traffic.signals.addNodes(T.nodes || []);
     W.index.removeTile(tag);
+    yield;
     for (let k = 0; k < T.bN; k++) M.buildings[T.bOff + k] = null;
     W.surf.removeTile(tag);
-    W.collision.removeTag(tag);
+    yield;
+    W.collision.removeTag(tag, T.rect);
+    yield;
     W.trees.removeTile(tag);
+    yield;
     removeStreetProps(W, tag);
+    yield;
     W.parked?.removeTile(tag);
     removeGroundTile(W, tag);
     W.activity.removeTag(tag);
@@ -144,12 +155,11 @@ export class TileManager {
   }
   refresh(rect, gone) {
     const W = this.W, I = W.index, st = W.streamer;
-    for (const c of I.chunks) {
-      if (c.cx < rect[0] - 100 || c.cx > rect[2] + 100 || c.cz < rect[1] - 100 || c.cz > rect[3] + 100) continue;
+    for (const c of I.chunksIn(rect, 100)) {
       if (st && c.built) st.disposeChunk(c);
       if (W.cityMap) W.cityMap.prepped.delete(c.ci);
     }
-    if (W.cityMap) W.cityMap.cache.clear();
+    if (W.cityMap) { if (W.cityMap.invalidate) W.cityMap.invalidate(rect); else W.cityMap.cache.clear(); }
     W._propX = undefined;
     if (W.trees) W.trees.lastX = 1e9;
     void gone;

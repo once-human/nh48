@@ -56,11 +56,13 @@ export class Graph {
       if (!E.oneway) { B.out.push({ e: E, dir: -1 }); A.inc.push({ e: E, dir: -1 }); }
       if (this.gridOn) this.gridAdd(E);
     }
+    (this.byTag || (this.byTag = new Map())).set(tag, added);
     return { nodes: nmap, edges: added };
   }
   removeTile(tag) {
     const gone = new Set();
-    for (const e of this.edges) if (e.tag === tag && !e.dead) { e.dead = true; gone.add(e); }
+    for (const e of (this.byTag && this.byTag.get(tag)) || this.edges) if (e.tag === tag && !e.dead) { e.dead = true; gone.add(e); }
+    if (this.byTag) this.byTag.delete(tag);
     if (!gone.size) return;
     for (const e of gone) {
       for (const n of [this.nodes[e.a], this.nodes[e.b]]) {
@@ -320,7 +322,17 @@ export class Surfaces {
 export class Collision {
   // everything added while .tag is set belongs to that tile, and goes when the tile goes
   constructor(cell = 8) { this.cell = cell; this.segs = new Map(); this.circ = new Map(); this.nseg = 0; this.tag = 0; }
-  removeTag(tag) {
+  removeTag(tag, rect) {
+    // within a rect (metres): only the cells under it
+    if (rect) {
+      const c = this.cell, i0 = Math.floor((rect[0] - 60) / c), i1 = Math.floor((rect[2] + 60) / c), j0 = Math.floor((rect[1] - 60) / c), j1 = Math.floor((rect[3] + 60) / c);
+      for (const map of [this.segs, this.circ]) for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+        const k = this.key(i, j), l = map.get(k); if (!l) continue;
+        const kept = l.filter(s => s.tag !== tag);
+        if (!kept.length) map.delete(k); else if (kept.length !== l.length) map.set(k, kept);
+      }
+      return;
+    }
     for (const map of [this.segs, this.circ]) for (const [k, l] of map) {
       const kept = l.filter(s => s.tag !== tag);
       if (!kept.length) map.delete(k); else if (kept.length !== l.length) map.set(k, kept);

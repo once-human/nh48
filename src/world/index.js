@@ -118,13 +118,19 @@ export class WorldIndex {
     const T = this.tileRanges.get(tag);
     if (!T) return;
     const r = T.rect;
-    for (const c of this.chunks) {
+    for (const c of r ? this.chunksIn(r) : this.chunks) {
       if (r && !(c.cx >= r[0] && c.cx < r[2] && c.cz >= r[1] && c.cz < r[3])) continue;
       for (const f of TILE_FIELDS) c[f] = EMPTY;
       c.wires = []; c.extras = (c.extras || []).filter(e => e.kind === 'pier');   // the metro stays
     }
     for (let k = 0; k < T.n; k++) this.shopsByBld.delete(T.off + k);
     this.tileRanges.delete(tag);
+  }
+  // the chunks over a rect (metres), with a margin
+  *chunksIn(r, m = 0) {
+    const i0 = Math.max(0, Math.floor((r[0] - m - this.x0) / this.size)), i1 = Math.min(this.ncx - 1, Math.floor((r[2] + m - this.x0) / this.size));
+    const j0 = Math.max(0, Math.floor((r[1] - m - this.z0) / this.size)), j1 = Math.min(this.ncz - 1, Math.floor((r[3] + m - this.z0) / this.size));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) yield this.chunks[i + j * this.ncx];
   }
   chunkOf(x, z) {
     const i = Math.floor((x - this.x0) / this.size), j = Math.floor((z - this.z0) / this.size);
@@ -194,7 +200,7 @@ export class Streamer {
     const kids = g.children.slice();
     for (const k of kids) k.visible = false;
     this.scene.add(g);
-    this.pendingAdd.push({ c, kids, i: 0 });
+    if (kids.length) this.pendingAdd.push({ c, kids, i: 0 }); else this.W.farGround?.set(c, true);   // an empty chunk (nothing streamed in there yet)
   }
   cancelJob() {
     const { g, disposers } = this.job;

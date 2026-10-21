@@ -104,6 +104,9 @@ export class CityMap {
       }
       this.streets.sort((a, b) => b.rank - a.rank || b.len - a.len);
     }
+    // all of Pune: the zoomed-out map is pictures baked offline (tools/bake_maptiles.py), never drawn at runtime;
+    // closer in, the live drawing goes over them only where the city has streamed in
+    this.raster = M.meta.tiles ? { levels: [[0.125, 4000], [0.25, 2000], [0.5, 1000]], img: new Map() } : null;
     this.chunks = I.chunks;
     this.res = Math.min(2, Math.max(1, Math.round(window.devicePixelRatio || 1)));   // tile pixels per CSS pixel
     this.cap = 160;
@@ -111,6 +114,7 @@ export class CityMap {
   }
   // level-0 tiles for the whole city, drawn once while loading so the map never opens empty
   warm(z = 0) {
+    if (this.raster) return;                 // the baked pictures are the overview
     const S = this.tileSize(z), nx = Math.ceil((this.x1 - this.x0) / S), ny = Math.ceil((this.z1 - this.z0) / S);
     for (let ty = 0; ty < ny; ty++) for (let tx = 0; tx < nx; tx++) { const k = z + '/' + tx + '/' + ty; if (!this.cache.has(k)) this.cache.set(k, { c: this.renderTile(z, tx, ty), u: 1e12 }); }
   }
@@ -194,7 +198,7 @@ export class CityMap {
     const wx0 = this.x0 + tx * S, wz0 = this.z0 + ty * S, wx1 = wx0 + S, wz1 = wz0 + S;
     const c = document.createElement('canvas'); c.width = px; c.height = px;
     const x = c.getContext('2d');
-    x.fillStyle = COL.land; x.fillRect(0, 0, px, px);
+    if (!this.raster) { x.fillStyle = COL.land; x.fillRect(0, 0, px, px); }
     const k = ppm * res;
     x.setTransform(k, 0, 0, k, -wx0 * k, -wz0 * k);
     const I = W.index, cs = I.size, m = 2 / k;
@@ -204,24 +208,6 @@ export class CityMap {
     const Ps = [];
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) Ps.push(this.prep(i + j * I.ncx));
     const ring = (r) => { x.moveTo(r[0], r[1]); for (let q = 2; q < r.length; q += 2) x.lineTo(r[q], r[q + 1]); x.closePath(); };
-    const CO = this.coarse;
-    if (CO) {
-      // outside the city: dark
-      if (CO.outline) { x.beginPath(); x.rect(wx0 - 10, wz0 - 10, S + 20, S + 20); ring(CO.outline); x.fillStyle = COL.bg; x.fill('evenodd'); }
-      x.beginPath(); let anyW = false;
-      for (const w of CO.water) if (hit(w.bb)) { ring(w.r); anyW = true; }
-      if (anyW) { x.fillStyle = COL.water; x.fill(); }
-      x.lineCap = 'round'; x.lineJoin = 'round';
-      for (const e of CO.edges) {
-        if (!hit(e.bb) || (z < 1 && e.rank < 4)) continue;
-        const minPx = e.rank >= 5 ? 3.4 : e.rank >= 4 ? 2.6 : 1.7;
-        x.lineWidth = Math.max(e.rank >= 5 ? 14 : e.rank >= 4 ? 10 : 7, minPx / ppm);
-        x.strokeStyle = e.rank >= 5 ? COL.arterial : e.rank >= 4 ? COL.main : COL.road;
-        const p = e.pts; x.beginPath(); x.moveTo(p[0], p[1]); for (let q = 2; q < p.length; q += 2) x.lineTo(p[q], p[q + 1]); x.stroke();
-      }
-      // the city limit
-      if (CO.outline) { x.beginPath(); ring(CO.outline); x.strokeStyle = 'rgba(255,178,36,.55)'; x.lineWidth = Math.max(2, 2 / ppm); x.setLineDash([12 / ppm, 8 / ppm]); x.stroke(); x.setLineDash([]); }
-    }
     // ground: parks, plazas, medians
     for (const kind of ['grass', 'scrub', 'soil', 'median', 'plaza', 'pavers']) {
       x.beginPath(); let any = false;
@@ -269,6 +255,50 @@ export class CityMap {
     }
     return c;
   }
+  // one baked map picture (level L, image tx, tz): loads once, then stays
+  rimg(L, tx, tz) {
+    const k = L + '/' + tx + '/' + tz, R = this.raster;
+    let o = R.img.get(k);
+    if (!o) {
+      o = { im: new Image(), ok: false };
+      o.im.decoding = 'async';
+      o.im.onload = () => { o.ok = true; };
+      o.im.onerror = () => { o.bad = true; };
+      o.im.src = `assets/pune/map/r${L}/${tx}_${tz}.webp`;
+      R.img.set(k, o);
+    }
+    return o;
+  }
+  drawRaster(ctx, cx, cz, r, devPpm) {
+    const R = this.raster, want = devPpm <= 0.18 ? 0 : devPpm <= 0.36 ? 1 : 2;
+    for (let L = 0; L <= want; L++) {
+      const m = R.levels[L][1];
+      const a0 = Math.floor((cx - r - this.x0) / m), a1 = Math.floor((cx + r - this.x0) / m);
+      const b0 = Math.floor((cz - r - this.z0) / m), b1 = Math.floor((cz + r - this.z0) / m);
+      for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) {
+        if (a < 0 || b < 0) continue;
+        // coarser levels only fill in under a finer picture that hasn't arrived yet
+        if (L < want) { let need = false; const f = m / R.levels[want][1]; for (let q = 0; q < f && !need; q++) for (let w = 0; w < f && !need; w++) { const o = this.rimg(want, a * f + q, b * f + w); need = !o.ok && !o.bad; } if (!need) continue; }
+        const o = this.rimg(L, a, b);
+        if (o.ok) ctx.drawImage(o.im, this.x0 + a * m, this.z0 + b * m, m + 0.5 / devPpm, m + 0.5 / devPpm);
+      }
+    }
+  }
+  // has the city streamed in anywhere under this map tile?
+  loadedAt(wx0, wz0, S) {
+    const I = this.W.index, cs = I.size;
+    const i0 = Math.max(0, Math.floor((wx0 - this.x0) / cs)), i1 = Math.min(I.ncx - 1, Math.floor((wx0 + S - this.x0) / cs));
+    const j0 = Math.max(0, Math.floor((wz0 - this.z0) / cs)), j1 = Math.min(I.ncz - 1, Math.floor((wz0 + S - this.z0) / cs));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const C = this.chunks[i + j * I.ncx]; if (C && ((C.ground && C.ground.length) || (C.bld && C.bld.length))) return true; }
+    return false;
+  }
+  // a part of the city streamed in or out: only the live map tiles over it are redrawn
+  invalidate(rect) {
+    for (const k of [...this.cache.keys()]) {
+      const [z, tx, ty] = k.split('/').map(Number), S = this.tileSize(z), wx = this.x0 + tx * S, wz = this.z0 + ty * S;
+      if (wx < rect[2] + 50 && wx + S > rect[0] - 50 && wz < rect[3] + 50 && wz + S > rect[1] - 50) this.cache.delete(k);
+    }
+  }
   // draw the map into ctx: view centred at (cx,cz) in metres, ppm screen px per metre, rotation rot (rad),
   // ctx already translated to the view centre in screen px; radius = half-diagonal of the view in px
   // lvlPpm: device pixels per metre (picks the level so tile pixels match screen pixels)
@@ -280,6 +310,10 @@ export class CityMap {
     ctx.save();
     ctx.rotate(rot); ctx.scale(ppm, ppm); ctx.translate(-cx, -cz);
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    if (this.raster) {
+      this.drawRaster(ctx, cx, cz, r, lvlPpm / this.res);
+      if (z < 2) { ctx.restore(); return; }
+    }
     // request nearest tiles last so they render first
     const want = [];
     for (let ty = t0y; ty <= t1y; ty++) for (let tx = t0x; tx <= t1x; tx++) {
@@ -290,10 +324,11 @@ export class CityMap {
     this.cap = Math.max(this.cap, Math.min(400, want.length * 2 + 60));
     for (const [, tx, ty] of want) {
       const wx = this.x0 + tx * S, wz = this.z0 + ty * S;
+      if (this.raster && !this.loadedAt(wx, wz, S)) continue;
       const c = this.tile(z, tx, ty);
       if (c) { ctx.drawImage(c, wx, wz, S + 0.5 / ppm, S + 0.5 / ppm); continue; }
       // fall back to a coarser level while this one renders
-      for (let pz = z - 1; pz >= 0; pz--) {
+      for (let pz = z - 1; pz >= (this.raster ? 2 : 0); pz--) {
         const PS = this.tileSize(pz), px = Math.floor((wx + 1e-3 - this.x0) / PS), py = Math.floor((wz + 1e-3 - this.z0) / PS);
         const pc = this.tile(pz, px, py, pz === 0);
         if (!pc) continue;
