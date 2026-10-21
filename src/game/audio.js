@@ -120,7 +120,7 @@ export class Audio {
     }
     this.keepVoice(name);
     if (this.curVoice) { try { this.curVoice.g.gain.setTargetAtTime(0, now, 0.04); this.curVoice.src.stop(now + 0.15); } catch (e) { /* already stopped */ } }
-    const v = this.play('v_' + id, { vol: 0.95 * vol, pan, filter: radio ? { type: 'bandpass', f: 1500, q: 0.9 } : undefined });
+    const v = this.play('v_' + id, { vol: 0.95 * vol * (this.voiceVol ?? 1), pan, filter: radio ? { type: 'bandpass', f: 1500, q: 0.9 } : undefined });
     if (!v) return false;
     this.curVoice = v; this.voicePri = pri; this.voiceEnd = now + v.src.buffer.duration;
     this.duck(radio ? 0.75 : 0.55, Math.min(4, v.src.buffer.duration + 0.3));

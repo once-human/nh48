@@ -3,6 +3,7 @@ import { icon } from './icons.js';
 // Desktop first. The HUD sits in the corners with no boxes where text alone reads, location
 // top-left, wallet top-right, map bottom-left, the vehicle bottom-right, prompts and subtitles
 // bottom-centre, toasts under the objective.
+import { settingsHTML, bindSettings, syncSettings } from '../game/settings.js';
 import * as THREE from 'three';
 import { fmtRupees, isTouch } from '../core/util.js';
 import { MapScreen, CATS, drawPin, drawArrow, drawFlag, fmtDist } from './map.js';
@@ -23,8 +24,9 @@ function markColor(m) {
   if (m.kind === 'marshal') return (performance.now() / 250 | 0) % 2 ? '#ff4b3e' : '#4b7bff';
   return '#f2b705';
 }
-function clock(h) {
+function clock(h, h24) {
   const hh = Math.floor(h) % 24, mm = Math.floor((h % 1) * 60);
+  if (h24) return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
   const ap = hh >= 12 ? 'PM' : 'AM';
   return `${((hh + 11) % 12) + 1}:${String(mm).padStart(2, '0')} ${ap}`;
 }
@@ -301,6 +303,7 @@ export class HUD {
           <div class="seg" id="p-q"><button data-q="low">Low</button><button data-q="med">Medium</button><button data-q="high">High</button></div>
           <div class="note" id="p-qnote"></div></div>
         <div class="sec"><label class="cap" for="p-vol">Sound</label><input type="range" id="p-vol" min="0" max="1" step="0.05"></div>
+        ${settingsHTML()}
         <div class="sec"><div class="cap">Controls</div>
           <div class="keylist">
             <span class="k"><span class="kbd">W</span><span class="kbd">S</span></span><span>Accelerate · brake, hold to reverse</span>
@@ -343,6 +346,7 @@ export class HUD {
     p.querySelectorAll('#p-time button').forEach(b => b.onclick = () => { this.game.setHour(parseFloat(b.dataset.h)); this.syncPause(); });
     p.querySelectorAll('#p-q button').forEach(b => b.onclick = () => { this.game.setQuality(b.dataset.q); this.syncPause(); });
     p.querySelector('#p-ch-pay').onclick = () => { if (this.game.police) this.game.police.payDues(); this.syncPause(); };
+    bindSettings(p, this.game);
     const vol = p.querySelector('#p-vol');
     vol.oninput = () => this.game.audio.setVolume(parseFloat(vol.value));
   }
@@ -350,6 +354,7 @@ export class HUD {
     const g = this.game;
     this.pause.querySelectorAll('#p-q button').forEach(b => b.classList.toggle('on', b.dataset.q === g.qualityName));
     this.pause.querySelector('#p-vol').value = g.audio.volume;
+    syncSettings(this.pause, g);
     this.pause.querySelector('#p-qnote').textContent = g.qualityNote || '';
     const h = g.hour;
     this.pause.querySelectorAll('#p-time button').forEach(b => b.classList.toggle('on', Math.abs(parseFloat(b.dataset.h) - h) < 1.5));
@@ -405,7 +410,7 @@ export class HUD {
       this.$money.textContent = money;
     }
     this.$('h-rides').textContent = g.stats.rides ? `${g.stats.rides} ${g.stats.rides === 1 ? 'ride' : 'rides'} · ★ ${g.stats.rating.toFixed(1)}` : '';
-    this.$('h-clock').textContent = clock(g.hour);
+    this.$('h-clock').textContent = clock(g.hour, g.settings && g.settings.clock24);
     if (this.pcT > 0) { this.pcT -= dt; if (this.pcT <= 0) this.placeEl.classList.remove('show'); if (this.pcT < -0.5) this.placeEl.hidden = true; }
     // fare meter only on a shift
     const shift = g.rides && g.rides.enabled;
@@ -506,6 +511,9 @@ export class HUD {
   }
   // subtitles: speaker, line as spoken, English translation
   say(who, line, tr, life = 4.5) {
+    const subs = this.game.settings ? this.game.settings.subs : 'both';
+    if (subs === 'off') return;
+    if (subs === 'line') tr = '';
     this.$('h-sub-who').textContent = who || '';
     this.$('h-sub-line').textContent = line || '';
     this.$('h-sub-tr').textContent = tr || '';

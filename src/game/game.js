@@ -21,6 +21,7 @@ import { Bag } from './bag.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { Dates } from './date.js';
+import { loadSettings, applySettings } from './settings.js';
 import { Trial } from './trial.js';
 import { Fauna } from '../people/animals.js';
 import { Vehicle } from '../vehicles/vehicle.js';
@@ -74,6 +75,7 @@ export class Game {
     }
     player.reset(start.x, start.z, start.th);
     this.start = start;
+    this.settings = loadSettings();
     this.audio = new Audio(this.sounds);
     // browsers only allow sound after a gesture: start on the first click or key anywhere
     const unlock = () => { this.audio.start(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
@@ -125,6 +127,7 @@ export class Game {
     this.strays = new Strays(this);
     this.interiors = new Interiors(this);
     this.date = new Dates(this);
+    applySettings(this);
     this.trial = new Trial(this);
     this.people.reaction = () => this.life.reaction();
     player.hpMax = () => this.life.hpMax;
@@ -175,7 +178,7 @@ export class Game {
       if (locked() && e.button === 0 && this.state === 'play') this.input.pressed.add('Mouse0');
       if (!locked() && (e.button === 0 || e.button === 2)) drag = { x: e.clientX, y: e.clientY };
     });
-    document.addEventListener('mousemove', (e) => { if (locked() && this.state === 'play') this.rig.drag(e.movementX * 0.8, e.movementY * 0.8); });
+    document.addEventListener('mousemove', (e) => { if (locked() && this.state === 'play') { const s = this.settings.sens; this.rig.drag(e.movementX * 0.8 * s, e.movementY * 0.8 * s * (this.settings.invertY ? -1 : 1)); } });
     document.addEventListener('pointerlockchange', () => {
       this.hud.setLockHint?.(this.state === 'play' && !locked());
       // Esc released the mouse during play: that's a pause, like any game. Esc that closed a shop

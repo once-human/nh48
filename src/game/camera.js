@@ -134,7 +134,7 @@ export class CameraRig {
     return best;
   }
   setFov(dt, f) {
-    this.fov = damp(this.fov, f, 3, dt);
+    this.fov = damp(this.fov, f + (this.fovAdd || 0), 3, dt);
     if (Math.abs(this.cam.fov - this.fov) > 0.05) { this.cam.fov = this.fov; this.cam.updateProjectionMatrix(); }
   }
   applyShake(dt) {

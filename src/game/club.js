@@ -81,7 +81,7 @@ export class Club {
     const A = this.g.audio, ctx = A.ctx;
     if (!ctx) return;
     if (!on) { if (this.loop) { clearInterval(this.loop); this.loop = null; } return; }
-    const out = ctx.createGain(); out.gain.value = 0.35; out.connect(A.master);
+    const out = ctx.createGain(); out.gain.value = 0.35 * (A.musicVol ?? 1); out.connect(A.master);
     let step = 0;
     const tick = () => {
       const t = ctx.currentTime + 0.02, s = step++ % 8;

@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { clamp, wrapAngle, RNG, safeStorage, fmtRupees } from '../core/util.js';
 import LINES from './lines.json';
+import { POLICE_MUL } from './settings.js';
 import STREET from './street_lines.json';
 // street people's lines, flattened to the same shape as lines.json: [label, voice, lang, text, roman, english]
 for (const [pid, P] of Object.entries(STREET._personas)) {
@@ -143,9 +144,10 @@ export class Police {
     this.cool[kind] = kind === 'helmet' ? 90 : 45;
     const quiet = (this.lastChallanT ?? -1e9) > this.g.t - 120;
     const cop = info.cop !== false && this.copSeeing(x, z, info.copRange || 30);
-    if (cop && !quiet && this.rng.next() < (info.stopChance ?? 0.45)) { this.lastChallanT = this.g.t; this.beginStop(cop, kind, info); return; }
+    const pm = POLICE_MUL[this.g.settings?.police] ?? 1;
+    if (cop && !quiet && this.rng.next() < (info.stopChance ?? 0.45) * pm) { this.lastChallanT = this.g.t; this.beginStop(cop, kind, info); return; }
     if (cop && this.rng.next() < 0.6) { this.g.hud.toast('Whistle!', `${cop.name} waved you on. Next time it's a challan.`, 'warn', 2.4); this.g.audio.whistle && this.g.audio.whistle(); return; }
-    if (!quiet && (cop || this.rng.next() < (info.camChance ?? 0))) { this.lastChallanT = this.g.t; this.eChallan(kind, x, z, cop ? 'noted by the traffic police' : info.how || 'caught on camera'); }
+    if (!quiet && (cop || this.rng.next() < (info.camChance ?? 0) * pm)) { this.lastChallanT = this.g.t; this.eChallan(kind, x, z, cop ? 'noted by the traffic police' : info.how || 'caught on camera'); }
     else if (info.missed) this.g.hud.toast(info.missed[0], info.missed[1], 'warn', 2.2);
   }
   eChallan(kind, x, z, how, extra = 0) {

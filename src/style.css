@@ -697,3 +697,12 @@ input[type=range] { width: 100%; accent-color: var(--stone); }
 .shop[data-ui] .sh-item.kb { outline-color: currentColor; }
 .talk .tk-tr { font: 500 12.5px/1.35 var(--font-ui); color: var(--paper-2); font-style: italic; }
 .talk .tk-tr:empty { display: none; }
+
+/* settings */
+.settings .set-grid { display: grid; grid-template-columns: minmax(130px, 38%) 1fr; gap: 10px 14px; align-items: center; }
+.settings .set-grid label { font: 600 13px var(--font-ui); color: var(--paper-2); }
+.settings .set-grid .seg { flex-wrap: wrap; }
+.settings .set-grid input[type=range] { width: 100%; }
+@media (max-width: 520px) { .settings .set-grid { grid-template-columns: 1fr; gap: 4px; } }
+/* minimal HUD: just the minimap, money and what's happening */
+#hud.hud-min .vit, #hud.hud-min .mm-hint, #hud.hud-min .nerd, #hud.hud-min .lockhint { display: none !important; }
