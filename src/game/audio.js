@@ -87,13 +87,21 @@ export class Audio {
   setLoop(name, v, tc = 0.4) { const l = this.loops[name]; if (l) l.g.gain.setTargetAtTime(v, this.ctx.currentTime, tc); }
 
   // ---------------------------------------------------------------- voices (TTS lines, see lines.json)
-  voice(id, vol = 1, pan = 0, radio = false) {
-    if (!this.ctx) return;
-    // one person talks at a time: a new line cuts the previous one short
-    if (this.curVoice) { try { this.curVoice.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.04); this.curVoice.src.stop(this.ctx.currentTime + 0.15); } catch (e) { /* already stopped */ } }
-    this.curVoice = this.play('v_' + id, { vol: 0.95 * vol, pan, filter: radio ? { type: 'bandpass', f: 1500, q: 0.9 } : undefined });
-    this.duck(radio ? 0.75 : 0.55, 1.8);
+  voice(id, vol = 1, pan = 0, radio = false, pri = 2) {
+    // one voice at a time, and not everyone at once: idle chatter (pri 0) waits for silence, a
+    // reaction (pri 1: someone you knocked over, hit, or whose car you took) won't talk over another
+    // reaction, and the police / your passenger (pri 2) always get through
+    if (!this.ctx) return true;
+    const now = this.ctx.currentTime, busy = this.curVoice && now < this.voiceEnd - 0.15;
+    if (busy && (pri === 0 || (pri < 2 && pri <= this.voicePri))) return false;
+    if (this.curVoice) { try { this.curVoice.g.gain.setTargetAtTime(0, now, 0.04); this.curVoice.src.stop(now + 0.15); } catch (e) { /* already stopped */ } }
+    const v = this.play('v_' + id, { vol: 0.95 * vol, pan, filter: radio ? { type: 'bandpass', f: 1500, q: 0.9 } : undefined });
+    if (!v) return false;
+    this.curVoice = v; this.voicePri = pri; this.voiceEnd = now + v.src.buffer.duration;
+    this.duck(radio ? 0.75 : 0.55, Math.min(4, v.src.buffer.duration + 0.3));
+    return true;
   }
+  voiceBusy() { return !!(this.ctx && this.curVoice && this.ctx.currentTime < this.voiceEnd - 0.15); }
   // street ambience dips while someone speaks
   duck(level, sec) {
     if (!this.ctx) return;
@@ -270,6 +278,33 @@ export class Audio {
       o.connect(bp); o.start(t); o.stop(t + dur + 0.05);
     }
     this.env(g, t, 0.01, vol, dur * 0.8, dur * 0.2 + 0.02);
+  }
+  // a punch landing: a short slap of noise and a low knock
+  punch(strength = 0.6) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const src = ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900 + Math.random() * 500; bp.Q.value = 0.9;
+    const g = ctx.createGain();
+    src.connect(bp).connect(g).connect(this.master);
+    this.env(g, t, 0.002, clamp(0.25 + strength * 0.4, 0.1, 0.8), 0.01, 0.07);
+    src.start(t, Math.random()); src.stop(t + 0.15);
+    const o = ctx.createOscillator(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(55, t + 0.12);
+    const og = ctx.createGain(); o.connect(og).connect(this.master);
+    this.env(og, t, 0.002, clamp(0.2 + strength * 0.35, 0.1, 0.7), 0.01, 0.12);
+    o.start(t); o.stop(t + 0.2);
+  }
+  // a swing through the air
+  whoosh(strength = 0.5) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const src = ctx.createBufferSource(); src.buffer = this.noise;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.4;
+    bp.frequency.setValueAtTime(500, t); bp.frequency.exponentialRampToValueAtTime(1800, t + 0.12);
+    const g = ctx.createGain();
+    src.connect(bp).connect(g).connect(this.master);
+    this.env(g, t, 0.03, 0.08 * strength, 0.04, 0.08);
+    src.start(t, Math.random()); src.stop(t + 0.25);
   }
   thud(strength, pan = 0) {
     if (!this.ctx) return;

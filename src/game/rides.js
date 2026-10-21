@@ -271,8 +271,8 @@ export class Rides {
       if (arr.length > 1 && this.last[kind] === k) k = (k + 1) % arr.length;
       this.last[kind] = k;
       const [, roman, en] = arr[k];
+      if (!this.voice(null, 0, c.fem, null, `q_${c.persona}_${kind}${k}`) && kind === 'chat') return;
       this.g.hud.say(c.name, roman, en, life);
-      this.voice(null, 0, c.fem, null, `q_${c.persona}_${kind}${k}`);
       return;
     }
     if (!L[kind]) return;
@@ -286,7 +286,7 @@ export class Rides {
     const A = this.g.audio, P = this.g.player;
     let vol = 0.95, pan = 0;
     if (src) { const d = Math.hypot(src.x - P.x, src.z - P.z); vol = Math.min(1, 14 / (d + 6)); }
-    A.voice(id || `p_${kind}${i}_${fem ? 'f' : 'm'}`, vol, pan);
+    return A.voice(id || `p_${kind}${i}_${fem ? 'f' : 'm'}`, vol, pan, false, /_chat\d+$/.test(id || '') ? 0 : /_(crash|bump|near|footpath|wrong|ped|late)\d+$/.test(id || '') ? 1 : 2);
   }
   onEvent(ev) {
     const c = this.current;

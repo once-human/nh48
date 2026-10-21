@@ -10,6 +10,7 @@ import { People } from '../people/peds.js';
 import { buildParked } from '../traffic/parked.js';
 import { Police } from './police.js';
 import { Crowd } from '../people/crowd.js';
+import { Brawl } from '../people/fight.js';
 import { Fauna } from '../people/animals.js';
 import { Vehicle } from '../vehicles/vehicle.js';
 
@@ -92,6 +93,9 @@ export class Game {
     player.speak = (id, src) => this.police.say(id, src);
     player.speakAs = (sc, who) => { this.people.lineT = 0; return this.people.speakAs(sc, who, 1, 4); };
     this.people.say = (id, src) => this.police.say(id, src);
+    this.brawl = new Brawl(this); this.people.brawl = this.brawl;
+    player.makePed = (look, x, z, per) => this.people.spawnAt(look, x, z, per);
+    player.pickPersona = (f, x, z) => this.people.pickPersona(f, x, z);
     this.buildLightPools();
     const parked = buildParked(W, this.scene, this.vmats, this.quality);
     W.instSets.push(...parked.sets);
@@ -131,7 +135,8 @@ export class Game {
       let k = 0;
       const at = (o) => { o.position.set(cam.position.x + fw.x * 7 + (k % 6 - 3) * 1.2, cam.position.y - 1.6, cam.position.z + fw.z * 7 + Math.floor(k / 6) * 1.2); k++; };
       if (this.crowd) for (const s of this.crowd.pool) { s.H.holder.visible = true; at(s.H.holder); for (const o of s.H.parts) o.visible = true; shown.push(s); }
-      for (const t of ['sedan', 'scooter', 'bike', 'auto', 'bus', 'tempo']) { const v = new Vehicle(this.W, this.scene, this.vmats, t); at(v.root); tmp.push(v); }
+      // every kind you can take, with its driver's-seat interior showing (that view compiles too)
+      for (const t of ['sedan', 'hatch', 'suv', 'taxi', 'scooter', 'bike', 'cycle', 'auto', 'bus', 'tempo']) { const v = new Vehicle(this.W, this.scene, this.vmats, t); if (v.cockpit) v.cockpit.group.visible = true; at(v.root); tmp.push(v); }
       if (this.player.human) { this.player.human.holder.visible = true; at(this.player.human.holder); }
       R.compile(this.scene, cam);
       R.render(this.scene, cam);
@@ -139,6 +144,12 @@ export class Game {
     } catch (e) { console.warn('prewarm', e); }
     for (const s of shown) { s.H.holder.visible = false; if (kit) kit.applyLook(s.H, s.H.look); }
     for (const v of tmp) v.dispose();
+  }
+  // run fn after t seconds of game time
+  later(t, fn) { (this.timers || (this.timers = [])).push({ t, fn }); }
+  tickTimers(dt) {
+    if (!this.timers) return;
+    for (let i = this.timers.length - 1; i >= 0; i--) { const T = this.timers[i]; if ((T.t -= dt) <= 0) { this.timers.splice(i, 1); T.fn(); } }
   }
   saveResume() {
     const P = this.player;
@@ -358,6 +369,7 @@ export class Game {
     }
     // a police stop holds you in place
     if (this.police.holding()) { inp.throttle = 0; inp.brake = Math.abs(this.player.v) > 0.5 ? 1 : 0; inp.steer = 0; inp.handbrake = true; inp.horn = false; }
+    if (this.state === 'play') this.brawl.update(dt, this.input);
     this.player.update(dt, inp, this.traffic, this.input, this.rig.footMode ? this.rig.footYaw : undefined);
     this.t += dt;
     this.handleEvents();
@@ -464,6 +476,7 @@ export class Game {
       }
       this.rides.update(dt);
       this.police.update(dt);
+      this.tickTimers(dt);
       if (this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);
       this.rig.lookBack = this.input.key('KeyB');
       if (this.input.took('KeyR') && P.tipped === 0 && !P.onFoot) this.backOnRoad();

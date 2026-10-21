@@ -36,6 +36,7 @@ export class Pilot {
     this.events = [];
     this.foot = { x: 0, z: 0, y: 0, yaw: 0, v: 0, vx: 0, vz: 0, anim: 'idle', agent: { x: 0, z: 0, hx: 1, hz: 0, v: 0, W: 0.6, L: 0.6, isPlayer: true } };
     this.offer = null; this.offerT = 0; this.busy = 0;
+    this.hp = 100; this.hurtT = 99; this.act = null; this.ko = false;
     if (kit) {
       const sv = savedCharacter();
       this.setLook(lookFor(sv && sv.id, sv && sv.skin));
@@ -122,16 +123,19 @@ export class Pilot {
     const target = (fw || sd) ? (run ? SPRINT : k('AltLeft') ? WALK : JOG) : 0;
     const cy = camYaw ?? F.yaw;
     const dx = Math.cos(cy) * fw - Math.sin(cy) * sd, dz = Math.sin(cy) * fw + Math.cos(cy) * sd;
-    const tvx = dx * target, tvz = dz * target;
+    // throwing a punch, flinching or lying on the road: you don't walk (a roll carries you)
+    const A = this.act, held = this.ko || this.downT > 0 || (A && A.kind !== 'roll');
+    const tvx = held ? 0 : dx * target, tvz = held ? 0 : dz * target;
     const acc = target > F.v ? 10 : 14;
-    F.vx = damp(F.vx, tvx, acc, dt); F.vz = damp(F.vz, tvz, acc, dt);
+    if (A && A.kind === 'roll') { F.vx = A.vx; F.vz = A.vz; }
+    else { F.vx = damp(F.vx, tvx, held ? 20 : acc, dt); F.vz = damp(F.vz, tvz, held ? 20 : acc, dt); }
     F.v = Math.hypot(F.vx, F.vz);
-    if (F.v > 0.2) F.yaw = dampAngle(F.yaw, Math.atan2(F.vz, F.vx), 10, dt);
+    if (F.v > 0.2 && !A) F.yaw = dampAngle(F.yaw, Math.atan2(F.vz, F.vx), 10, dt);
     // jump (Space) or, facing a compound wall, climb over it
     const FLY = this.W.fly;
     const groundY = () => (F.deck >= 0 && FLY ? FLY.heightOn(F.deck, F.x, F.z) : this.W.surf.height(F.x, F.z));
     if (F.climb) { this.stepClimb(dt); return; }
-    if (input.took('Space') && !F.air && !this.downT) {
+    if (input.took('Space') && !F.air && !this.downT && !A) {
       const fx = Math.cos(F.yaw), fz = Math.sin(F.yaw);
       const wall = this.W.collision.resolve(F.x + fx * 0.45, F.z + fz * 0.45, 0.32);
       if (wall && wall.kind === 5 && (fx * -wall.nx + fz * -wall.nz) > 0.5) this.startClimb(-wall.nx, -wall.nz);
@@ -183,7 +187,9 @@ export class Pilot {
       this.downT -= dt;
       F.vx *= 0.9; F.vz *= 0.9;
       if (this.downT < 1.4 && this.human.cur !== this.human.actions.getup) this.human.play('getup', { once: true, fade: 0.2 });
-      if (this.downT <= 0) { this.downT = 0; this.human.play('idle'); }
+      if (this.downT <= 0) { this.downT = 0; this.ko = false; this.human.play('idle'); }
+    } else if (this.act) {
+      // a punch, a roll or a flinch (people/fight.js plays the clip)
     } else if (F.air) {
       if (F.vy < 1.5 && this.human.cur === this.human.actions.jump_start) this.human.play('jump_loop', { fade: 0.15 });
     } else if ((this.landT = (this.landT || 0) - dt) > 0) {
@@ -440,15 +446,26 @@ export class Pilot {
     const look = this.kit.randomLook(this.rng, { female: shown ? false : this.rng.chance(0.25), helmet: two && o.type !== 'cycle', avoid: this.look });
     if (shown && o.colB) look.top = new THREE.Color(o.colB[0], o.colB[1], o.colB[2]);
     if (o.type === 'auto') look.bottom = new THREE.Color(0.62, 0.55, 0.4);                // auto drivers: khaki uniform
-    const H = this.kit.create(look);
-    if (two && o.colC && H.acc) H.acc.color.setRGB(o.colC[0], o.colC[1], o.colC[2]);
     const side = o.T && o.T.two ? -1 : 1;
     const x = o.x + (-o.hz) * (o.T.W / 2 + 0.7) * side, z = o.z + o.hx * (o.T.W / 2 + 0.7) * side;
+    const cls = o.type === 'auto' ? 'auto' : two ? 'two' : 'car';
+    // they become one of the people on the street (a pooled body: no new mesh, no hitch), with a
+    // grudge: come back on foot and they may well square up
+    if (this.makePed) {
+      const persona = cls === 'auto' ? this.rng.pick(['kaka', 'dada', 'bhaiya']) : this.pickPersona ? this.pickPersona(look.female, x, z) : (look.female ? 'tai' : 'dada');
+      const p = this.makePed(look, x, z, persona);
+      if (p) {
+        p.react = 2.6; p.reactAt = { x: o.x, z: o.z }; p.reactAnim = 'no'; p.angry = 3; p.grudge = 40;
+        if (this.speakAs) this.speakAs('carjack_' + cls, p);
+        return;
+      }
+    }
+    const H = this.kit.create(look);
+    if (two && o.colC && H.acc) H.acc.color.setRGB(o.colC[0], o.colC[1], o.colC[2]);
     H.holder.position.set(x, this.W.surf.height(x, z), z);
     this.scene.add(H.holder);
     H.play('no', { fade: 0.1 });
     // what they shout depends on what you took: their scooter, their car, their rickshaw
-    const cls = o.type === 'auto' ? 'auto' : two ? 'two' : 'car';
     const pool = cls === 'auto' ? ['kaka', 'dada', 'bhaiya'] : look.female ? ['kaku', 'tai', 'aunty', 'collegegirl'] : cls === 'car' ? ['kaka', 'ajoba', 'dada', 'bhaiya', 'collegeboy'] : ['kaka', 'ajoba', 'dada', 'bhaiya', 'collegeboy'];
     if (this.speakAs) this.speakAs('carjack_' + cls, { x, z, female: look.female, persona: this.rng.pick(pool) });
     else if (this.speak) this.speak(this.rng.pick(['sh1', 'sh2', 'sh3', 'sh4', 'sh5']), { x, z });

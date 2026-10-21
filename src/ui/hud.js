@@ -54,6 +54,7 @@ export class HUD {
       <div class="sub" id="h-rides"></div>
       <div class="dues" id="h-dues" hidden></div>
       <div class="lic" id="h-lic" hidden></div>
+      <div class="hp" id="h-hp" hidden><i></i></div>
       <div class="heat" id="h-heat" hidden><span class="pips"><i></i><i></i><i></i></span><span id="h-heat-t">Wanted</span></div>`);
     this.zoneEl = el('div', 'h zone', '<i></i><b id="h-zone-t"></b><span id="h-zone-s"></span>');
     this.zoneEl.hidden = true;
@@ -61,6 +62,7 @@ export class HUD {
     this.stopEl = el('div', 'stop glass');
     this.stopEl.hidden = true;
     this.stopEl.setAttribute('role', 'dialog'); this.stopEl.setAttribute('aria-label', 'Police stop');
+    this.hurtEl = el('div', 'hurtov');
     this.flashEl = el('div', 'flashov', '<div class="fl-in"><div class="fl-t"></div><div class="fl-s"></div></div>');
     this.flashEl.hidden = true;
     this.placeEl = el('div', 'h placecard', '<div class="pc-k">Landmark</div><div class="pc-t" id="h-pc-t"></div><div class="pc-mr" lang="mr" id="h-pc-mr"></div><div class="pc-s" id="h-pc-s"></div>');
@@ -89,7 +91,7 @@ export class HUD {
     const mkBtn = (icon, label, fn) => { const b = el('button', 'ibtn', `${ICON[icon]}<span class="sr">${label}</span>`); b.title = label; b.onclick = fn; return b; };
     this.corner.append(mkBtn('cam', 'Camera (C)', () => this.game.rig.setMode(this.game.rig.mode + 1)), mkBtn('map', 'Map (M)', () => this.game.toggleMap()),
       mkBtn('pause', 'Pause (Esc)', () => this.game.togglePause()));
-    R.append(this.scrim, this.loc, this.wallet, this.placeEl, this.obj, this.mm, this.zoneEl, this.dash, this.lower, this.toastWrap, this.smsWrap, this.stopEl, this.flashEl);
+    R.append(this.scrim, this.hurtEl, this.loc, this.wallet, this.placeEl, this.obj, this.mm, this.zoneEl, this.dash, this.lower, this.toastWrap, this.smsWrap, this.stopEl, this.flashEl);
     this.$ = (id) => document.getElementById(id);
     this.$money = this.$('h-money'); this.$speed = this.$('h-speed'); this.$gear = this.$('h-gear'); this.$rpm = this.$('h-rpm');
     this.buildTitle();
@@ -119,7 +121,7 @@ export class HUD {
         <div class="t-foot">
           <span class="keys">
             <span><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> drive / walk</span>
-            <span><span class="kbd">Space</span> handbrake · jump / climb</span><span><span class="kbd">F</span> get in / out</span><span><span class="kbd">H</span> horn</span>
+            <span><span class="kbd">Space</span> handbrake · jump / climb</span><span><span class="kbd">F</span> get in / out · shops</span><span><span class="kbd">E</span> punch</span><span><span class="kbd">Q</span> roll · horn</span>
             <span><span class="kbd">C</span> camera</span><span><span class="kbd">M</span> map</span><span><span class="kbd">Esc</span> pause</span>
           </span>
           <span>Map data © OpenStreetMap contributors (ODbL), Overture Maps Foundation. Businesses are parodies.</span>
@@ -293,16 +295,24 @@ export class HUD {
           <div class="keylist">
             <span class="k"><span class="kbd">W</span><span class="kbd">S</span></span><span>Accelerate · brake, hold to reverse</span>
             <span class="k"><span class="kbd">A</span><span class="kbd">D</span></span><span>Steer</span>
-            <span class="k"><span class="kbd">Space</span></span><span>Handbrake</span>
-            <span class="k"><span class="kbd">H</span></span><span>Horn</span>
+            <span class="k"><span class="kbd">Space</span></span><span>Handbrake · on foot: jump, or climb a wall you face</span>
+            <span class="k"><span class="kbd">H</span><span class="kbd">Q</span></span><span>Horn</span>
             <span class="k"><span class="kbd">C</span><span class="kbd">B</span></span><span>Camera · look back</span>
             <span class="k"><span class="kbd">R</span></span><span>Back on the road</span>
             <span class="k"><span class="kbd">F</span></span><span>Get out · get in or take a vehicle</span>
-            <span class="k"><span class="kbd">Shift</span></span><span>Sprint (on foot)</span>
+            <span class="k"><span class="kbd">Shift</span><span class="kbd">Alt</span></span><span>Sprint · walk (on foot)</span>
+            <span class="k"><span class="kbd">E</span></span><span>Punch — keep pressing for jab, cross, hook</span>
+            <span class="k"><span class="kbd">Q</span></span><span>Roll out of the way (on foot)</span>
+            <span class="k"><span class="kbd">F</span></span><span>Use a shop, stall or ATM you're standing at</span>
+            <span class="k"><span class="kbd">M</span></span><span>Map · click to set a waypoint or take a rickshaw</span>
             <span class="k"><span class="kbd">1</span><span class="kbd">4</span></span><span>Answer the police</span>
           </div></div>
         <button class="btn" id="p-char">Change character</button>
         <button class="btn" id="p-title">Quit to title</button>
+        <div class="sec danger"><div class="cap">Start over</div>
+          <div class="note">Wipes everything: money (back to ₹5,000), your vehicles, outfits, property, fines and where you are.</div>
+          <button class="btn bad" id="p-reset">Start over from scratch</button>
+          <div class="confirm" id="p-reset-c" hidden><b>Sure? This can’t be undone.</b><button class="btn bad" id="p-reset-y">Yes, wipe it</button><button class="btn" id="p-reset-n">Keep playing</button></div></div>
         <div class="fine">Map data © OpenStreetMap contributors (ODbL); buildings and places from Overture Maps Foundation (ODbL, CDLA-Permissive-2.0), including Google Open Buildings and Microsoft footprints. All business names are fictional parodies of real places. People and animals: Quaternius (CC0). Voices: Kokoro-82M (Apache-2.0) and Piper mr_IN, trained on Google’s crowdsourced Marathi speech (OpenSLR 64, CC BY-SA 4.0). Sounds: Freesound (CC0). Fines follow the MV Act as reported for Pune and may be out of date.</div>
       </div>`;
     this.root.appendChild(p);
@@ -312,6 +322,9 @@ export class HUD {
     p.querySelector('#p-map').onclick = () => { this.game.togglePause(false); this.game.toggleMap(true); };
     p.querySelector('#p-title').onclick = () => { this.game.endShift(); this.syncTitle(); };
     p.querySelector('#p-char').onclick = () => this.showPicker();
+    p.querySelector('#p-reset').onclick = () => { p.querySelector('#p-reset-c').hidden = false; p.querySelector('#p-reset').hidden = true; };
+    p.querySelector('#p-reset-n').onclick = () => { p.querySelector('#p-reset-c').hidden = true; p.querySelector('#p-reset').hidden = false; };
+    p.querySelector('#p-reset-y').onclick = () => this.game.resetAll();
     p.querySelectorAll('#p-time button').forEach(b => b.onclick = () => { this.game.setHour(parseFloat(b.dataset.h)); this.syncPause(); });
     p.querySelectorAll('#p-q button').forEach(b => b.onclick = () => { this.game.setQuality(b.dataset.q); this.syncPause(); });
     p.querySelector('#p-ch-pay').onclick = () => { if (this.game.police) this.game.police.payDues(); this.syncPause(); };
@@ -396,6 +409,11 @@ export class HUD {
       }
     }
     this.$('h-lift').classList.toggle('show', p.lift > 0.08 && !p.tipped);
+    // health: on foot, while hurt or in a fight
+    const hp = p.hp ?? 100, hpEl = this.$('h-hp');
+    const showHp = p.onFoot && (hp < 99.5 || (g.brawl && g.brawl.active > 0));
+    if (hpEl.hidden === showHp) hpEl.hidden = !showHp;
+    if (showHp) { hpEl.firstElementChild.style.width = Math.round(hp) + '%'; hpEl.classList.toggle('low', hp < 30); }
     // area name (nearest suburb within ~900 m, else the district)
     this.areaT -= dt;
     if (this.areaT <= 0) {
@@ -554,6 +572,7 @@ export class HUD {
     this.placeEl.hidden = false; void this.placeEl.offsetWidth; this.placeEl.classList.add('show');
     this.pcT = 6;
   }
+  hurt() { const H = this.hurtEl; H.classList.remove('go'); void H.offsetWidth; H.classList.add('go'); }
   flash(title, sub) {
     const F = this.flashEl;
     F.querySelector('.fl-t').textContent = title; F.querySelector('.fl-s').textContent = sub;

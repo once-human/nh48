@@ -66,9 +66,14 @@ export class Vehicle {
     // single-instance InstancedMesh so the shared paintable vehicle material works unchanged
     const body = new THREE.InstancedMesh(m.body, vmats.body, 1);
     body.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(3), 3);
-    body.geometry = body.geometry.clone();
-    body.geometry.setAttribute('aColB', new THREE.InstancedBufferAttribute(new Float32Array([1, 1, 1]), 3));
-    body.geometry.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array([1, 1, 1]), 3));
+    // one GPU copy of each model, shared by every vehicle of that type (a fresh clone per vehicle
+    // was a big upload, and a hitch, every time you took one)
+    if (!m.shared) {
+      m.shared = m.body.clone();
+      m.shared.setAttribute('aColB', new THREE.InstancedBufferAttribute(new Float32Array([1, 1, 1]), 3));
+      m.shared.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array([1, 1, 1]), 3));
+    }
+    body.geometry = m.shared;
     body.setMatrixAt(0, new THREE.Matrix4());
     body.castShadow = true; body.receiveShadow = true; body.frustumCulled = false;
     this.paint = paint || [0.6, 0.6, 0.6];
@@ -273,6 +278,7 @@ export class Vehicle {
   }
   dispose() {
     this.root.parent?.remove(this.root);
-    this.bodyMesh.geometry.dispose();
+    this.bodyMesh.dispose();                   // the model geometry is shared; only the instance goes
+    if (this.cockpit) this.cockpit.group.traverse(o => { if (o.material && o.material.map && o.material.map.isCanvasTexture) o.material.map.dispose(); });
   }
 }

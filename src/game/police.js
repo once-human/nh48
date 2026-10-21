@@ -579,7 +579,7 @@ export class Police {
   }
 
   // ---------------------------------------------------------------- voices
-  say(id, who, radio = false) {
+  say(id, who, radio = false, pri) {
     // police lines have variants (id, id.1, id.2): pick one so the same stop doesn't sound canned
     if (LINES[id + '.1']) { const n = LINES[id + '.2'] ? 3 : 2, k = Math.floor(this.rng.next() * n); if (k) id = id + '.' + k; }
     const L = LINES[id];
@@ -592,7 +592,8 @@ export class Police {
       vol = clamp(14 / (d + 8), 0.25, 1);
       pan = clamp((-dx * Math.sin(P.th) + dz * Math.cos(P.th)) / (d || 1), -1, 1) * 0.6;
     }
-    G.audio.voice(id, vol, pan, radio);
+    if (pri === undefined) pri = id.startsWith('s_') ? (/_(fall|hit|fight|flee|carjack_\w+)\d+$/.test(id) ? 1 : 0) : 2;
+    if (!G.audio.voice(id, vol, pan, radio, pri)) return null;
     G.hud.say(L[0] === 'Traffic police' && who && who.name ? who.name : L[0], L[4], L[5], 4.2);
     return id;
   }

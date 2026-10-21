@@ -85,7 +85,7 @@ export class HumanKit {
     for (const cl of gM.animations) {
       cl.tracks = cl.tracks.filter(t => !t.name.endsWith('.scale'));
       // root-motion clips: the game moves the body itself
-      if (cl.name === 'climb' || cl.name === 'roll') cl.tracks = cl.tracks.filter(t => t.name !== 'root.position');
+      if (['climb', 'roll', 'hook', 'cross', 'punch', 'block'].includes(cl.name)) cl.tracks = cl.tracks.filter(t => t.name !== 'root.position');
       this.clips[cl.name] = cl;
     }
     this.bindM = {}; this.maps = {}; this.hairMat = {}; this.eyeMat = {};
@@ -115,13 +115,17 @@ export class HumanKit {
       Object.assign(L, { female: false, top: c(0xa08a5c), bottom: c(0x8f7b52), cut: new THREE.Vector4(0.42, 1, 0.6, 0), acc: 'cap_police', style: 'hair_buzzed', shoe: c(0x1a1715) });
       return L;
     }
+    // opts.dress: 'modern' (jeans and tops), 'traditional' (saree / kurta), or anything
+    const D = opts.dress;
     if (female) {
-      const s = rng.next();
+      let s = rng.next();
+      if (D === 'modern') s = 0.72 + s * 0.28; else if (D === 'traditional') s *= 0.72;
       if (s < 0.35) { L.top = c(rng.pick(SAREE)); L.bottom = L.top.clone().multiplyScalar(0.85); L.cut = new THREE.Vector4(0.3, 1, 0.9, 2); L.style = rng.chance(0.6) ? 'hair_buns' : 'hair_long'; }   // saree
       else if (s < 0.72) { L.top = c(rng.pick(KURTA)); L.bottom = c(rng.pick(SALWAR)); L.cut = new THREE.Vector4(rng.chance(0.5) ? 0.4 : 0.85, 0.55, 0.8, 1); } // kurta + salwar
       else { L.top = c(rng.pick(SHIRT)); L.bottom = c(rng.pick(PANTS)); L.cut = new THREE.Vector4(rng.chance(0.6) ? 0.35 : 0.9, 1, 0.5, 0); }           // jeans + top
     } else {
-      const s = rng.next();
+      let s = rng.next();
+      if (D === 'modern') s = 0.12 + s * 0.88; else if (D === 'traditional' && s < 0.5) s *= 0.24;
       if (s < 0.12) { L.top = c(rng.pick(KURTA)); L.bottom = c(rng.pick([0xf4f1ea, 0xe8e0cc, 0x2f2f33])); L.cut = new THREE.Vector4(0.9, 0.55, 0.7, 1); }   // kurta pyjama
       else { L.top = c(rng.pick(SHIRT)); L.bottom = c(rng.pick(PANTS)); L.cut = new THREE.Vector4(rng.chance(0.55) ? 0.38 : 0.92, 1, rng.chance(0.5) ? 0.6 : 0.3, 0); }
     }
@@ -167,7 +171,7 @@ export class HumanKit {
     const mixer = new THREE.AnimationMixer(root);
     const H = { holder, root, mixer, mat, acc, hairMat, topMat, botMat, shoeMat, body, parts, actions: {}, cur: null, look };
     this.applyLook(H, look);
-    H.play = (name, { fade = 0.25, speed = 1, once = false } = {}) => {
+    H.play = (name, { fade = 0.25, speed = 1, once = false, restart = false } = {}) => {
       let a = H.actions[name];
       if (!a) {
         const clip = this.clips[name];
@@ -175,7 +179,7 @@ export class HumanKit {
         a = H.actions[name] = mixer.clipAction(clip);
       }
       a.timeScale = speed;
-      if (H.cur === a) return a;
+      if (H.cur === a) { if (restart) { a.reset(); a.play(); } return a; }
       a.reset();
       a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
       a.clampWhenFinished = once;

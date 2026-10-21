@@ -30,6 +30,8 @@ KEEP = {
     # new: jumping and climbing
     'jump_start': 'Jump_Start', 'jump_loop': 'Jump_Loop', 'jump_land': 'Jump_Land', 'climb': 'ClimbUp_1m_RM',
     'roll': 'Roll',
+    # fighting
+    'cross': 'Punch_Cross', 'hook': 'Melee_Hook', 'hit_head': 'Hit_Head', 'block': 'Sword_Block',
 }
 HAIRS = {'m': ['Hair_SimpleParted', 'Hair_Buzzed', 'Hair_Beard'],
          'f': ['Hair_Long', 'Hair_Buns', 'Hair_BuzzedFemale']}

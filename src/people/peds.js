@@ -6,11 +6,17 @@ import * as THREE from 'three';
 import { ColorBuilder, lin } from '../world/geo.js';
 import { RNG, clamp, lerp, wrapAngle } from '../core/util.js';
 import STREET from '../game/street_lines.json';
+import { AreaMap } from './areas.js';
+import { TOUGH, HP } from './fight.js';
 // who someone is decides how they talk: a Marathi kaka, a Hindi-speaking delivery bhaiya, a
 // Hinglish college kid, a kaku with her vegetables, an aaji... (src/game/street_lines.json)
-const PERSONA_M = ['kaka', 'ajoba', 'dada', 'bhaiya', 'collegeboy'], PERSONA_F = ['kaku', 'aaji', 'tai', 'aunty', 'collegegirl'];
-const PERSONA_W = { kaka: 3, ajoba: 1.2, dada: 3, bhaiya: 2, collegeboy: 2, kaku: 3, aaji: 1.2, tai: 3, aunty: 1.6, collegegirl: 2 };
+// how many of each depends on where you are (people/areas.js): Koregaon Park is cafés and English,
+// Pune Station is everybody, the peths are kakas and aajis
+const PERSONA_M = ['kaka', 'ajoba', 'dada', 'bhaiya', 'collegeboy', 'kpguy'], PERSONA_F = ['kaku', 'aaji', 'tai', 'aunty', 'collegegirl', 'kpgirl'];
 const OLD = new Set(['ajoba', 'aaji']);
+// what they wear follows who they are: the KP crowd and students in western clothes, aajis in sarees
+const DRESS = { kpguy: 'modern', kpgirl: 'modern', collegeboy: 'modern', collegegirl: 'modern', aaji: 'traditional', kaku: 'traditional', ajoba: 'traditional' };
+
 
 const SKINS = [[0.78, 0.6, 0.47], [0.69, 0.5, 0.37], [0.6, 0.43, 0.31], [0.52, 0.36, 0.26], [0.45, 0.31, 0.22], [0.82, 0.66, 0.53]];
 const SHIRTS = [[0.95, 0.95, 0.93], [0.42, 0.6, 0.85], [0.85, 0.3, 0.28], [0.2, 0.24, 0.36], [0.95, 0.84, 0.48], [0.3, 0.55, 0.36], [0.62, 0.22, 0.52],
@@ -118,7 +124,7 @@ export class People {
     const P = buildParts();
     // the crowd swells to 1.6x on FC Road at 7 pm or outside the Mills' bars at 11, and thins to a
     // few people on a residential lane at 3 am (world/activity.js)
-    this.act = W.activity; this.target = this.max; this.actT = 0; this.actHere = 10; this.nightHere = 0;
+    this.act = W.activity; this.areas = new AreaMap(W.M); this.target = this.max; this.actT = 0; this.actHere = 10; this.nightHere = 0;
     const cap = this.cap = Math.ceil(this.max * 1.6) + 120;      // + traffic police and passengers
     this.mMale = instMesh(scene, P.male, mat, cap);
     this.mFemale = instMesh(scene, P.female, mat, cap);
@@ -151,21 +157,25 @@ export class People {
     const key = per + scenario;
     this.lastLine = this.lastLine || {};
     if (arr.length > 1 && this.lastLine[key] === i) i = (i + 1) % arr.length;
+    // the audio decides: idle chatter waits until nobody else is talking (see audio.voice)
+    if (!this.say(`s_${per}_${scenario}${i}`, p)) return false;
     this.lastLine[key] = i;
     this.lineT = cool;
-    this.say(`s_${per}_${scenario}${i}`, p);
+    p.saidT = 0;
     return true;
   }
   // more college kids round the colleges and cafes, more kakas and aajis in the peths
   pickPersona(female, x, z) {
-    const list = female ? PERSONA_F : PERSONA_M;
-    const o = {}; const a = this.act ? this.act.at(x, z, o) : 0;
+    const list = female ? PERSONA_F : PERSONA_M, mix = this.areas.mixAt(x, z);
+    const o = {}; if (this.act) this.act.at(x, z, o);
     const c = this.act && this.act.map.get(Math.floor(x / this.act.cell) + ',' + Math.floor(z / this.act.cell));
     const edu = c ? c.v[this.act.cls.indexOf('edu')] || 0 : 0, peth = c && c.peth;
     let tot = 0; const w = list.map(id => {
-      let v = PERSONA_W[id];
-      if (/college/.test(id)) v *= 1 + Math.min(3, edu / 8) + (o.night || 0) * 2;
-      if (peth && (id === 'kaka' || id === 'kaku' || OLD.has(id))) v *= 1.8;
+      let v = mix[id] || 0.5;
+      // a college right here, or a night out, still brings the students; the peth lanes their elders
+      if (/college/.test(id)) v *= 1 + Math.min(2, edu / 10) + (o.night || 0) * 1.5;
+      if (/^kp/.test(id)) v *= 1 + (o.night || 0);
+      if (peth && (id === 'kaka' || id === 'kaku' || OLD.has(id))) v *= 1.3;
       tot += v; return v;
     });
     let r = this.rng.next() * tot;
@@ -207,7 +217,7 @@ export class People {
   make(e, s, side, opts = {}) {
     const r = this.rng;
     const female = opts.female ?? r.chance(0.42);
-    const kid = !opts.pax && r.chance(0.08);
+    const kid = !opts.pax && !opts.adult && r.chance(0.08);
     const p = {
       e, s, side, dir: r.chance(0.5) ? 1 : -1, female, scale: kid ? 0.68 : r.range(0.94, 1.06),
       speed: kid ? 1.5 : r.range(1.05, 1.5), phase: r.range(0, 6.28), x: 0, z: 0, hx: 1, hz: 0, yaw: 0,
@@ -217,15 +227,15 @@ export class People {
     };
     if (female && r.chance(0.5)) p.shirt = p.lower.map(v => v * 0.85);
     // the dressed look used up close; the far figure takes its colours from it
+    if (!kid && !opts.pax) { this.g.at(e, s, TMP); p.persona = this.pickPersona(female, TMP[0], TMP[1]); }
     if (this.kit) {
-      p.look = this.kit.randomLook(new RNG(p.id), { female });
+      p.look = this.kit.randomLook(new RNG(p.id), { female, dress: DRESS[p.persona] });
       p.shirt = [p.look.top.r, p.look.top.g, p.look.top.b];
       p.lower = [p.look.bottom.r, p.look.bottom.g, p.look.bottom.b];
       p.skin = [p.look.skin.r, p.look.skin.g, p.look.skin.b];
     }
     p.idle = r.pick(['idle', 'idle', 'phone', 'talk', 'arms_folded']);
-    if (!kid && !opts.pax) {
-      this.g.at(e, s, TMP); p.persona = this.pickPersona(female, TMP[0], TMP[1]);
+    if (p.persona) {
       // they look their age: grey hair for the old, beards on some kakas, jeans on the college crowd
       if (p.look) {
         if (OLD.has(p.persona)) { p.look.hair = new THREE.Color(r.pick([0xb8b2aa, 0xd6d2cc, 0x8e8984])).convertSRGBToLinear(); p.look.scale *= 0.97; p.speed *= 0.75; if (!female) p.look.beard = r.chance(0.4); }
@@ -352,10 +362,31 @@ export class People {
     if (p.fallen > 0) {
       p.fallen -= dt;
       if (p.fallen <= 0) {
-        p.wave = 0; p.angry = 4;
-        if (Math.hypot(p.x - player.x, p.z - player.z) < 30) { this.lineT = 0; this.speakAs('fall', p); }
+        p.wave = 0;
+        if (p.ko) {
+          // came round after a beating: stagger off, and never pick a fight with you again
+          p.ko = false; p.hp = p.hp0 * 0.5; p.mode = 'walk'; p.foe = null; p.beaten = true;
+          this.speakAs('flee', p, 0.7, 3); this.flee(p, player.x, player.z, 26);
+        } else if (p.mode === 'fight') p.stun = 0.2;
+        else {
+          p.angry = 4;
+          if (Math.hypot(p.x - player.x, p.z - player.z) < 30) { this.lineT = 0; this.speakAs('fall', p); }
+        }
       }
       return;
+    }
+    if (p.mode !== 'fight') {
+      if (p.act) { p.act.t += dt; if (p.act.t >= p.act.dur) p.act = null; }
+      if (p.stun > 0) { p.stun -= dt; p.v = 0; return; }
+    }
+    if (p.mode === 'fight' && this.brawl) return this.brawl.stepPed(p, dt);
+    // the driver you pulled out, or someone you shoved: will square up if you come back on foot
+    if (p.grudge > 0) {
+      p.grudge -= dt;
+      if (player.onFoot && !p.beaten && Math.hypot(p.x - player.x, p.z - player.z) < 7 && this.rng.next() < dt * 2) {
+        if (this.rng.next() < (TOUGH[p.persona] || 0.1) + 0.25) { this.startFight(p, player); this.speakAs('fight', p, 1, 4); return; }
+        p.grudge = 0;
+      }
     }
     if (p.angry > 0) p.angry -= dt;
     // react to the player's auto
@@ -379,6 +410,7 @@ export class People {
     if (p.mode === 'free') return this.stepFree(p, dt);
     if (p.mode === 'watch') {
       p.wait -= dt; p.v = 0;
+      if (p.watch.follow && !p.watch.follow.hidden) { p.watch.x = p.watch.follow.x; p.watch.z = p.watch.follow.z; }
       this.face(p, p.watch.x, p.watch.z, dt);
       if (p.wait <= 0) { p.anim = null; this.backToPath(p); }
       return;
@@ -586,6 +618,60 @@ export class People {
     }
     return best;
   }
+  // ---------------------------------------------------------------- fights (see fight.js)
+  // someone gets hit (by you, usually)
+  hurt(p, dmg, sx, sz, M, byPlayer) {
+    if (p.fallen > 0 && p.ko) return;
+    if (p.hp0 === undefined) { p.hp0 = p.cop ? 130 : HP[p.persona] || 60; p.hp = p.hp0; }
+    p.hp -= dmg;
+    const dx = p.x - sx, dz = p.z - sz, d = Math.hypot(dx, dz) || 1;
+    p.x += dx / d * (M ? M.push : 0.3); p.z += dz / d * (M ? M.push : 0.3);
+    const res = this.W.collision.resolve(p.x, p.z, 0.25);
+    if (res && res.kind !== 3) { p.x += res.nx * res.depth; p.z += res.nz * res.depth; }
+    if (p.anchor) { p.anchor = null; if (p.venue) { p.venue.crowd--; p.venue = null; } }
+    if (p.door) { p.door.n--; p.door = null; }
+    p.act = null; p.anim = null;
+    if (p.hp <= 0) {
+      // out cold
+      p.ko = true; p.fallen = this.rng.range(6, 9); p.v = 0; p.stun = 0;
+      this.events.push({ type: 'pedKO', p, x: p.x, z: p.z });
+      return;
+    }
+    if (M && M.down && this.rng.next() < M.down + (p.hp < p.hp0 * 0.4 ? 0.3 : 0)) { p.fallen = 2.2; p.v = 0; }
+    else { p.stun = 0.34; p.act = { kind: 'hurt', clip: this.rng.chance(0.5) ? 'hit_head' : 'hit', speed: 1, t: 0, dur: 0.34 }; p.actId = (p.actId || 0) + 1; }
+    if (!byPlayer) return;
+    if (p.mode !== 'fight' && !p.fleeing) {
+      // first blow: fight back, or run and shout
+      const tough = p.beaten ? 0 : p.cop ? 1 : (TOUGH[p.persona] || 0.05) + (p.grudge > 0 ? 0.2 : 0) + (p.angry > 0 ? 0.1 : 0);
+      if (this.rng.next() < tough) { this.startFight(p, this.brawl.P); this.lineT = 0; this.speakAs(this.rng.chance(0.5) ? 'fight' : 'hit', p, 1, 3); }
+      else { this.lineT = 0; this.speakAs(this.rng.chance(0.6) ? 'flee' : 'hit', p, 1, 3); this.flee(p, sx, sz, 28); }
+    } else if (this.rng.next() < 0.18) this.speakAs('hit', p, 1, 3);
+  }
+  startFight(p, foe) {
+    if (p.hp0 === undefined) { p.hp0 = p.cop ? 130 : HP[p.persona] || 60; p.hp = p.hp0; }
+    if (p.anchor) { p.anchor = null; if (p.venue) { p.venue.crowd--; p.venue = null; } }
+    p.mode = 'fight'; p.foe = foe; p.fightT = 0; p.atkT = this.rng.range(0.5, 1.1); p.act = null; p.fixedWas = p.fixedWas ?? p.fixed; p.fixed = false;
+    p.anim = null; p.goal = null; p.fleeing = false;
+    if (this.brawl) this.brawl.active = 0.01;
+  }
+  endFight(p, won) {
+    p.foe = null; p.act = null; p.stun = 0;
+    if (p.cop && p.fixedWas) { const post = p.post || { x: p.x, z: p.z }; this.goTo(p, post.x, post.z, (q) => { q.fixed = true; q.mode = 'fixed'; }); return; }
+    if (won) { p.react = 2; p.reactAnim = 'yes'; }
+    this.backToPath(p);
+  }
+  // get away from (x, z), then carry on
+  flee(p, x, z, dist = 25) {
+    if (p.anchor) { p.anchor = null; if (p.venue) { p.venue.crowd--; p.venue = null; } }
+    let a = Math.atan2(p.z - z, p.x - x);
+    let tx = p.x + Math.cos(a) * dist, tz = p.z + Math.sin(a) * dist;
+    // run along the street rather than into a wall
+    const near = this.g.nearest(tx, tz, 40);
+    if (near) { this.g.at(near.e, near.s, TMP); tx = TMP[0]; tz = TMP[1]; }
+    p.fleeing = true; p.anim = null; p.speed = Math.max(p.speed, 1.5);
+    this.goTo(p, tx, tz, (q) => { q.fleeing = false; this.backToPath(q); }, true);
+  }
+
   // ---------------------------------------------------------------- talk
   // people say hello when you walk past slowly, and you overhear the ones standing around
   talkTick(dt, P) {
@@ -709,7 +795,7 @@ export class People {
       const near = this.g.nearest(c.x, c.z, 40);
       if (!near) continue;
       const p = this.make(near.e, near.s, near.side || 1, { female: false, mode: 'fixed' });
-      p.fixed = true; p.x = c.x; p.z = c.z; p.cop = true;
+      p.fixed = true; p.x = c.x; p.z = c.z; p.cop = true; p.post = { x: c.x, z: c.z };
       if (this.kit) { p.look = this.kit.randomLook(new RNG(p.id), { role: 'police' }); p.idle = 'arms_folded'; }
       c.ped = p;
       p.shirt = [0.42, 0.36, 0.2].map(v => v); p.lower = [0.4, 0.34, 0.2]; p.skin = [0.32, 0.2, 0.13];
@@ -718,6 +804,17 @@ export class People {
     }
   }
 
+  // someone specific, right here (the driver you pulled out of their car)
+  spawnAt(look, x, z, persona) {
+    const near = this.g.nearest(x, z, 40);
+    if (!near) return null;
+    const p = this.make(near.e, near.s, near.side || 1, { female: !!look.female, mode: 'watch', adult: true });
+    p.look = look; p.persona = persona; p.female = !!look.female;
+    p.shirt = [look.top.r, look.top.g, look.top.b]; p.lower = [look.bottom.r, look.bottom.g, look.bottom.b]; p.skin = [look.skin.r, look.skin.g, look.skin.b];
+    p.x = x; p.z = z; p.onRoad = true;
+    p.watch = { x, z }; p.wait = 2.8; p.anim = 'no';
+    return p;
+  }
   // passengers for the ride system
   spawnPassenger(e, s, side) {
     const p = this.make(e, s, side, { pax: true, mode: 'stand' });

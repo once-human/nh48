@@ -90,6 +90,24 @@
       "lang": "hi",
       "pitch": 1.04,
       "tempo": 1.07
+    },
+    "kpguy": {
+      "label": "KP guy",
+      "female": false,
+      "age": "young",
+      "voice": "hm_psi",
+      "lang": "en-us",
+      "pitch": 1.0,
+      "tempo": 1.04
+    },
+    "kpgirl": {
+      "label": "KP girl",
+      "female": true,
+      "age": "young",
+      "voice": "hf_beta",
+      "lang": "en-us",
+      "pitch": 1.02,
+      "tempo": 1.04
     }
   },
   "kaka": {
@@ -234,6 +252,39 @@
         "Arre! Maazi rickshaw! Potapaanyacha saadhan aahe te!",
         "Hey! My rickshaw! That's how I feed my family!"
       ]
+    ],
+    "mutter": [
+      [
+        "कोथिंबीर पन्नास रुपये... काय दिवस आलेत.",
+        "Kothimbir pannaas rupaye... kaay divas aalet.",
+        "Fifty rupees for coriander... what times these are."
+      ],
+      [
+        "चष्मा कुठे ठेवला मी?",
+        "Chashma kuthe thevla mi?",
+        "Where did I put my glasses?"
+      ]
+    ],
+    "hit": [
+      [
+        "मारतोस काय? थांब!",
+        "Maartos kaay? Thamb!",
+        "You're hitting me? Wait!"
+      ]
+    ],
+    "fight": [
+      [
+        "ये, बघतो तुला आता!",
+        "Ye, baghto tula aata!",
+        "Come on then, I'll show you!"
+      ]
+    ],
+    "flee": [
+      [
+        "वाचवा! कोणीतरी पोलिसांना बोलवा!",
+        "Vaachva! Konitari polisanna bolva!",
+        "Help! Someone call the police!"
+      ]
     ]
   },
   "ajoba": {
@@ -350,6 +401,39 @@
         "अरे चोरा! माझी गाडी! पोलीस कुठे आहेत?",
         "Arre chora! Maazi gaadi! Police kuthe aahet?",
         "You thief! My car! Where are the police?"
+      ]
+    ],
+    "mutter": [
+      [
+        "हल्लीच्या मुलांना काही कळत नाही.",
+        "Hallichya mulaanna kaahi kalat naahi.",
+        "Kids these days understand nothing."
+      ],
+      [
+        "पेन्शन अजून आली नाही.",
+        "Pension ajun aali naahi.",
+        "The pension still hasn't come."
+      ]
+    ],
+    "hit": [
+      [
+        "अरे! म्हाताऱ्या माणसाला मारतोस?",
+        "Arre! Mhaataryaa maansaala maartos?",
+        "Hitting an old man?"
+      ]
+    ],
+    "fight": [
+      [
+        "काठी आहे माझ्याकडे, लक्षात ठेव!",
+        "Kaathi aahe maazhyakade, lakshaat thev!",
+        "I've got a walking stick, remember that!"
+      ]
+    ],
+    "flee": [
+      [
+        "अरे देवा! वाचवा रे कोणीतरी!",
+        "Arre deva! Vaachva re konitari!",
+        "Oh God! Somebody help!"
       ]
     ]
   },
@@ -480,6 +564,39 @@
         "Ae! Maazi rickshaw! Aaj ek bhaada pan jhaala naahi!",
         "Hey! My rickshaw! I haven't had a single fare today!"
       ]
+    ],
+    "mutter": [
+      [
+        "आज पण ऑफिसला उशीर.",
+        "Aaj pan office-la ushir.",
+        "Late for the office again today."
+      ],
+      [
+        "पेट्रोल संपत आलंय, शिट.",
+        "Petrol sampat aalay, shit.",
+        "Running out of petrol, damn."
+      ]
+    ],
+    "hit": [
+      [
+        "ए! हात लावायचा नाही!",
+        "Ae! Haat laavaaycha naahi!",
+        "Hey! Don't you touch me!"
+      ]
+    ],
+    "fight": [
+      [
+        "ये ना! दाखवतो तुला!",
+        "Ye na! Daakhavto tula!",
+        "Come on! I'll show you!"
+      ]
+    ],
+    "flee": [
+      [
+        "जाऊ दे, नको भांडण.",
+        "Jaau de, nako bhaandan.",
+        "Forget it, I don't want a fight."
+      ]
     ]
   },
   "bhaiya": {
@@ -599,6 +716,39 @@
         "Arre! Mera auto! Kiraaye ka hai woh!",
         "Hey! My auto! I rent it!"
       ]
+    ],
+    "mutter": [
+      [
+        "आज टारगेट पूरा करना है.",
+        "Aaj target poora karna hai.",
+        "Got to hit my target today."
+      ],
+      [
+        "घर पैसे भेजने हैं इस हफ़्ते.",
+        "Ghar paise bhejne hain is hafte.",
+        "Need to send money home this week."
+      ]
+    ],
+    "hit": [
+      [
+        "मारा क्यों, भाई?",
+        "Maara kyon, bhai?",
+        "Why'd you hit me, brother?"
+      ]
+    ],
+    "fight": [
+      [
+        "आ जा, देखता हूँ!",
+        "Aa ja, dekhta hoon!",
+        "Come on, let's see!"
+      ]
+    ],
+    "flee": [
+      [
+        "बचाओ! बचाओ!",
+        "Bachao! Bachao!",
+        "Help! Help!"
+      ]
     ]
   },
   "collegeboy": {
@@ -716,6 +866,39 @@
         "Bro! Woh papa ki car hai! Main mar gaya!",
         "Bro! That's my dad's car! I'm dead!"
       ]
+    ],
+    "mutter": [
+      [
+        "असाइनमेंट... कल... मर गया.",
+        "Assignment... kal... mar gaya.",
+        "Assignment... tomorrow... I'm dead."
+      ],
+      [
+        "वाई-फ़ाई फिर से गया.",
+        "Wi-Fi phir se gaya.",
+        "Wi-Fi's gone again."
+      ]
+    ],
+    "hit": [
+      [
+        "ओए! क्या कर रहा है?",
+        "Oye! Kya kar raha hai?",
+        "Oi! What are you doing?"
+      ]
+    ],
+    "fight": [
+      [
+        "चल, आ जा फिर!",
+        "Chal, aa ja phir!",
+        "Come on then!"
+      ]
+    ],
+    "flee": [
+      [
+        "ब्रो, मैं नहीं लड़ रहा!",
+        "Bro, main nahin lad raha!",
+        "Bro, I'm not fighting!"
+      ]
     ]
   },
   "kaku": {
@@ -828,6 +1011,39 @@
         "Aho! Aamchi gaadi! He ghari kaay mhantil aata!",
         "Hey! Our car! What will my husband say now!"
       ]
+    ],
+    "mutter": [
+      [
+        "कोथिंबीर पन्नास रुपये जुडी! लुटायला बसलेत.",
+        "Kothimbir pannaas rupaye judi! Lutaayla baslet.",
+        "Fifty rupees for coriander! Daylight robbery."
+      ],
+      [
+        "घरी गेल्यावर कुकर लावायचा आहे.",
+        "Ghari gelyaavar kukar laavaaycha aahe.",
+        "Have to put the cooker on when I get home."
+      ]
+    ],
+    "hit": [
+      [
+        "अगं बाई! हात उचलतोस?",
+        "Aga bai! Haat uchaltos?",
+        "Oh my! Raising your hand at me?"
+      ]
+    ],
+    "fight": [
+      [
+        "थांब, चप्पल काढते मी!",
+        "Thamb, chappal kaadhte mi!",
+        "Wait, I'm taking off my slipper!"
+      ]
+    ],
+    "flee": [
+      [
+        "वाचवा! हा माणूस वेडा आहे!",
+        "Vaachva! Ha maanus veda aahe!",
+        "Help! This man is mad!"
+      ]
     ]
   },
   "aaji": {
@@ -900,6 +1116,32 @@
         "सूनबाईंनी आज पुरणपोळी केलीये.",
         "Soonbaainni aaj puranpoli keliye.",
         "My daughter-in-law made puran poli today."
+      ]
+    ],
+    "mutter": [
+      [
+        "देवा, गुडघे फार दुखतात.",
+        "Deva, gudghe phaar dukhtaat.",
+        "God, my knees hurt so much."
+      ],
+      [
+        "संध्याकाळी भजन आहे.",
+        "Sandhyakali bhajan aahe.",
+        "There's bhajan this evening."
+      ]
+    ],
+    "hit": [
+      [
+        "अरे राम! म्हातारीला मारतोस?",
+        "Arre Ram! Mhaatarila maartos?",
+        "Oh Ram! You'd hit an old woman?"
+      ]
+    ],
+    "flee": [
+      [
+        "वाचवा रे! कोणीतरी या!",
+        "Vaachva re! Konitari ya!",
+        "Help! Someone come!"
       ]
     ]
   },
@@ -993,6 +1235,39 @@
         "Ae! Maazi car! Aattach servicing karun aanli hoti!",
         "Hey! My car! I just got it back from servicing!"
       ]
+    ],
+    "mutter": [
+      [
+        "कॅब पुन्हा कॅन्सल झाली.",
+        "Cab punha cancel jhaali.",
+        "The cab got cancelled again."
+      ],
+      [
+        "आज जिम नक्की जायचं.",
+        "Aaj gym nakki jaaycha.",
+        "Definitely going to the gym today."
+      ]
+    ],
+    "hit": [
+      [
+        "हात लावू नकोस!",
+        "Haat laavu nakos!",
+        "Don't you touch me!"
+      ]
+    ],
+    "fight": [
+      [
+        "पुढे ये, बघते तुला!",
+        "Pudhe ye, baghte tula!",
+        "Come closer, I'll deal with you!"
+      ]
+    ],
+    "flee": [
+      [
+        "पोलीस! पोलीस!",
+        "Police! Police!",
+        "Police! Police!"
+      ]
     ]
   },
   "aunty": {
@@ -1074,6 +1349,32 @@
         "हाय राम! मेरी गाड़ी! कोई रोको इसे!",
         "Haay Ram! Meri gaadi! Koi roko ise!",
         "Oh God! My car! Someone stop him!"
+      ]
+    ],
+    "mutter": [
+      [
+        "सब्ज़ी वाले ने फिर से ज़्यादा पैसे लिए.",
+        "Sabzi waale ne phir se zyaada paise liye.",
+        "The vegetable man overcharged me again."
+      ],
+      [
+        "बेटे का फ़ोन क्यों नहीं आया?",
+        "Bete ka phone kyon nahin aaya?",
+        "Why hasn't my son called?"
+      ]
+    ],
+    "hit": [
+      [
+        "हाय! मारा मुझे?",
+        "Haay! Maara mujhe?",
+        "Oh! You hit me?"
+      ]
+    ],
+    "flee": [
+      [
+        "बचाओ! पुलिस बुलाओ!",
+        "Bachao! Police bulao!",
+        "Help! Call the police!"
       ]
     ]
   },
@@ -1161,6 +1462,312 @@
         "ओ माय गॉड! मेरी कार! अभी तो ली थी!",
         "Oh my God! Meri car! Abhi to li thi!",
         "Oh my God! My car! I only just bought it!"
+      ]
+    ],
+    "mutter": [
+      [
+        "ये ऑटो वाले मीटर से नहीं जाते, उफ़.",
+        "Ye auto waale meter se nahin jaate, uff.",
+        "These auto guys never go by the meter, ugh."
+      ],
+      [
+        "कल की डेडलाइन, यार.",
+        "Kal ki deadline, yaar.",
+        "Tomorrow's deadline, man."
+      ]
+    ],
+    "hit": [
+      [
+        "क्या बदतमीज़ी है ये?",
+        "Kya badtameezi hai ye?",
+        "What kind of behaviour is this?"
+      ]
+    ],
+    "flee": [
+      [
+        "हेल्प! कोई हेल्प करो!",
+        "Help! Koi help karo!",
+        "Help! Somebody help!"
+      ]
+    ]
+  },
+  "kpguy": {
+    "dodge": [
+      [
+        "Whoa, whoa! Easy, man!",
+        "Whoa, whoa! Easy, man!",
+        "Whoa, whoa! Easy, man!"
+      ],
+      [
+        "Dude, are you serious right now?",
+        "Dude, are you serious right now?",
+        "Dude, are you serious right now?"
+      ]
+    ],
+    "honk": [
+      [
+        "Yeah, yeah, I heard you. Relax.",
+        "Yeah, yeah, I heard you. Relax.",
+        "Yeah, yeah, I heard you. Relax."
+      ],
+      [
+        "Bro, honking won't teleport you.",
+        "Bro, honking won't teleport you.",
+        "Bro, honking won't teleport you."
+      ]
+    ],
+    "fall": [
+      [
+        "Ow! What the hell, man?",
+        "Ow! What the hell, man?",
+        "Ow! What the hell, man?"
+      ],
+      [
+        "My AirPods! Dude!",
+        "My AirPods! Dude!",
+        "My AirPods! Dude!"
+      ]
+    ],
+    "bump": [
+      [
+        "Excuse me? Watch it.",
+        "Excuse me? Watch it.",
+        "Excuse me? Watch it."
+      ],
+      [
+        "Personal space, bro.",
+        "Personal space, bro.",
+        "Personal space, bro."
+      ]
+    ],
+    "crowd": [
+      [
+        "Is everyone okay? Someone call an ambulance.",
+        "Is everyone okay? Someone call an ambulance.",
+        "Is everyone okay? Someone call an ambulance."
+      ],
+      [
+        "Guys, don't film, help him.",
+        "Guys, don't film, help him.",
+        "Guys, don't film, help him."
+      ]
+    ],
+    "carjack_two": [
+      [
+        "Hey! That's my bike! Stop!",
+        "Hey! That's my bike! Stop!",
+        "Hey! That's my bike! Stop!"
+      ]
+    ],
+    "carjack_car": [
+      [
+        "Hey! That's my car! Somebody stop him!",
+        "Hey! That's my car! Somebody stop him!",
+        "Hey! That's my car! Somebody stop him!"
+      ]
+    ],
+    "greet": [
+      [
+        "Hey, how's it going?",
+        "Hey, how's it going?",
+        "Hey, how's it going?"
+      ],
+      [
+        "Do you know if Lane 7 has parking?",
+        "Do you know if Lane 7 has parking?",
+        "Do you know if Lane 7 has parking?"
+      ]
+    ],
+    "stunt": [
+      [
+        "Okay, parkour guy. Respect.",
+        "Okay, parkour guy. Respect.",
+        "Okay, parkour guy. Respect."
+      ],
+      [
+        "That was actually sick.",
+        "That was actually sick.",
+        "That was actually sick."
+      ]
+    ],
+    "chat": [
+      [
+        "This place does the best cold brew in Pune, trust me.",
+        "This place does the best cold brew in Pune, trust me.",
+        "This place does the best cold brew in Pune, trust me."
+      ],
+      [
+        "Startup's raising a round, so, you know, no sleep.",
+        "Startup's raising a round, so, you know, no sleep.",
+        "Startup's raising a round, so, you know, no sleep."
+      ],
+      [
+        "We should do brunch on Sunday, Lane 5 place.",
+        "We should do brunch on Sunday, Lane 5 place.",
+        "We should do brunch on Sunday, Lane 5 place."
+      ],
+      [
+        "Traffic on North Main Road is insane tonight.",
+        "Traffic on North Main Road is insane tonight.",
+        "Traffic on North Main Road is insane tonight."
+      ]
+    ],
+    "mutter": [
+      [
+        "Where did I park the car...",
+        "Where did I park the car...",
+        "Where did I park the car..."
+      ],
+      [
+        "Twenty minutes late. Great.",
+        "Twenty minutes late. Great.",
+        "Twenty minutes late. Great."
+      ]
+    ],
+    "hit": [
+      [
+        "Ow! Are you crazy?",
+        "Ow! Are you crazy?",
+        "Ow! Are you crazy?"
+      ]
+    ],
+    "fight": [
+      [
+        "Oh, you want to go? Let's go!",
+        "Oh, you want to go? Let's go!",
+        "Oh, you want to go? Let's go!"
+      ]
+    ],
+    "flee": [
+      [
+        "Nope, not doing this. Bye!",
+        "Nope, not doing this. Bye!",
+        "Nope, not doing this. Bye!"
+      ]
+    ]
+  },
+  "kpgirl": {
+    "dodge": [
+      [
+        "Oh my God! Watch it!",
+        "Oh my God! Watch it!",
+        "Oh my God! Watch it!"
+      ],
+      [
+        "Seriously? People are walking here!",
+        "Seriously? People are walking here!",
+        "Seriously? People are walking here!"
+      ]
+    ],
+    "honk": [
+      [
+        "Okay, relax. It's not that deep.",
+        "Okay, relax. It's not that deep.",
+        "Okay, relax. It's not that deep."
+      ]
+    ],
+    "fall": [
+      [
+        "Ow! My heels! Are you blind?",
+        "Ow! My heels! Are you blind?",
+        "Ow! My heels! Are you blind?"
+      ],
+      [
+        "You literally just ran into me!",
+        "You literally just ran into me!",
+        "You literally just ran into me!"
+      ]
+    ],
+    "bump": [
+      [
+        "Um, excuse me?",
+        "Um, excuse me?",
+        "Um, excuse me?"
+      ]
+    ],
+    "crowd": [
+      [
+        "Oh no, is he okay? Someone get water.",
+        "Oh no, is he okay? Someone get water.",
+        "Oh no, is he okay? Someone get water."
+      ]
+    ],
+    "carjack_two": [
+      [
+        "Hey! That's my scooty!",
+        "Hey! That's my scooty!",
+        "Hey! That's my scooty!"
+      ]
+    ],
+    "carjack_car": [
+      [
+        "Excuse me! That's my car! Help!",
+        "Excuse me! That's my car! Help!",
+        "Excuse me! That's my car! Help!"
+      ]
+    ],
+    "greet": [
+      [
+        "Hi! Is this the way to the bakery?",
+        "Hi! Is this the way to the bakery?",
+        "Hi! Is this the way to the bakery?"
+      ]
+    ],
+    "stunt": [
+      [
+        "Wow. Okay. Very dramatic.",
+        "Wow. Okay. Very dramatic.",
+        "Wow. Okay. Very dramatic."
+      ]
+    ],
+    "chat": [
+      [
+        "This café has the cutest interiors, we have to post this.",
+        "This café has the cutest interiors, we have to post this.",
+        "This café has the cutest interiors, we have to post this."
+      ],
+      [
+        "My yoga class got shifted to six again.",
+        "My yoga class got shifted to six again.",
+        "My yoga class got shifted to six again."
+      ],
+      [
+        "Work from home is the only reason I'm sane.",
+        "Work from home is the only reason I'm sane.",
+        "Work from home is the only reason I'm sane."
+      ]
+    ],
+    "mutter": [
+      [
+        "Where is this Uber?",
+        "Where is this Uber?",
+        "Where is this Uber?"
+      ],
+      [
+        "Battery at five percent, of course.",
+        "Battery at five percent, of course.",
+        "Battery at five percent, of course."
+      ]
+    ],
+    "hit": [
+      [
+        "Did you just hit me?!",
+        "Did you just hit me?!",
+        "Did you just hit me?!"
+      ]
+    ],
+    "fight": [
+      [
+        "Don't even think about it!",
+        "Don't even think about it!",
+        "Don't even think about it!"
+      ]
+    ],
+    "flee": [
+      [
+        "Help! Someone call the police!",
+        "Help! Someone call the police!",
+        "Help! Someone call the police!"
       ]
     ]
   }

@@ -65,8 +65,10 @@ export class Crowd {
     }
   }
   animFor(p) {
+    if (p.fallen > 0) return p.ko ? [p.fallen > 1.6 ? 'death' : 'getup', 1, true] : [p.fallen > 1.3 ? 'knockback' : 'getup', 1, true];
+    if (p.act) return [p.act.clip, p.act.speed || 1, true];
+    if (p.mode === 'fight') return p.v > 2.2 ? ['jog', clamp(p.v / NAT.jog, 0.7, 1.4)] : p.v > 0.2 ? ['walk', 1.3] : [p.fightT < 1.6 ? 'no' : 'idle', 1.3];
     if (p.anim) return [p.anim, 1];
-    if (p.fallen > 0) return [p.fallen > 1.3 ? 'knockback' : 'getup', 1, true];
     if (p.react > 0 && p.reactAnim) return [p.reactAnim, 1, p.reactAnim === 'hit'];
     if (p.angry > 0) return ['no', 1];
     if (p.pax) return ['wave', 1];
@@ -81,7 +83,9 @@ export class Crowd {
     H.holder.position.set(p.x, y, p.z);
     H.holder.rotation.set(0, -p.yaw, 0);
     const [name, speed, once] = this.animFor(p);
-    H.play(name, { speed, once, fade: 0.25 });
+    // a new punch or flinch restarts its clip even if the last one was the same
+    const restart = p.actId !== s.actId; s.actId = p.actId;
+    H.play(name, { speed, once, fade: p.act || p.mode === 'fight' ? 0.08 : 0.25, restart: restart && !!p.act });
     // people further away animate at half rate
     s.dtAcc += dt;
     const far = Math.abs(p.x - cx) + Math.abs(p.z - cz) > 30;
