@@ -91,7 +91,7 @@ export class MetroTrains {
       // a train each way for every ~3 km of line
       const n = Math.max(1, Math.round(L / 3000));
       for (let k = 0; k < n; k++) for (const dir of [1, -1]) {
-        const cars = [0, 1, 2].map(() => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.matrixAutoUpdate = false; scene.add(m); return m; });
+        const cars = [0, 1, 2].map(() => { const m = new THREE.Mesh(geo, mat); m.castShadow = false; m.matrixAutoUpdate = false; scene.add(m); return m; });
         this.trains.push({ path, dir, s: (L * (k + (dir > 0 ? 0.15 : 0.6)) / n) % L, v: CRUISE * 0.6, dwell: 0, cars });
       }
     }
@@ -107,7 +107,9 @@ export class MetroTrains {
     return out;
   }
   update(dt, cam) {
-    const tmp = [0, 0, 0, 0], m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), sc = new THREE.Vector3(1, 1, 1), pos = new THREE.Vector3();
+    // scratch objects made once: nothing allocated per frame
+    const S = this._s || (this._s = { tmp: [0, 0, 0, 0], m4: new THREE.Matrix4(), q: new THREE.Quaternion(), up: new THREE.Vector3(0, 1, 0), sc: new THREE.Vector3(1, 1, 1), pos: new THREE.Vector3() });
+    const { tmp, m4, q, up, sc, pos } = S;
     for (const T of this.trains) {
       const P = T.path, len = 3 * CAR + 2 * GAP;
       if (T.dwell > 0) { T.dwell -= dt; if (T.dwell <= 0) T.left = T.s; }

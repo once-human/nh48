@@ -3,7 +3,7 @@
 import puppeteer from 'puppeteer-core';
 const query = process.argv[2] || 'q=low&play=roam';
 const iters = +(process.argv[3] || 200);
-const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new',
+const browser = await puppeteer.launch({ executablePath: '/opt/pw-browsers/chromium', headless: 'new',
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-dev-shm-usage'], protocolTimeout: 900000 });
 const page = await browser.newPage();
 await page.setViewport({ width: 640, height: 360 });

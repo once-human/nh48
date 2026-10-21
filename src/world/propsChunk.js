@@ -178,7 +178,11 @@ export function buildGlobalProps(W) {
 }
 
 export function updateProps(W, cx, cz) {
-  for (const s of W.instSets) s.update(cx, cz);
+  // the instanced street furniture only needs re-culling once the camera has really moved
+  if (W._propX === undefined || Math.hypot(cx - W._propX, cz - W._propZ) >= 6) {
+    W._propX = cx; W._propZ = cz;
+    for (const s of W.instSets) s.update(cx, cz);
+  }
   W.trees?.update(cx, cz);
   W.grass?.update(cx, cz);
 }

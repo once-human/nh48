@@ -7,6 +7,7 @@ import { settingsHTML, bindSettings, syncSettings } from '../game/settings.js';
 import * as THREE from 'three';
 import { fmtRupees, isTouch } from '../core/util.js';
 import { MapScreen, CATS, drawPin, drawArrow, drawFlag, fmtDist } from './map.js';
+import { guideHTML } from '../game/guide.js';
 import { SKINS, OUTFITS, lookOf, normalise, savedCharacter, saveCharacter } from '../people/characters.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
@@ -380,7 +381,7 @@ export class HUD {
           <nav class="pz-menu">
             <button class="pz-i" id="p-resume">Resume</button>
             <button class="pz-i" id="p-map">Map</button>
-            <button class="pz-i" id="p-guide">Guide</button>
+            <button class="pz-i" data-pane="guide">Guide</button>
             <button class="pz-i" data-pane="set">Settings</button>
             <button class="pz-i" data-pane="ctrl">Controls</button>
             <button class="pz-i" data-pane="ch">E-challans<i id="p-ch-badge" hidden></i></button>
@@ -389,6 +390,7 @@ export class HUD {
           </nav>
         </div>
         <div class="pz-r">
+          <section class="pane" data-pane="guide"><h2>Guide</h2><div class="guide">${guideHTML()}</div></section>
           <section class="pane" data-pane="set"><h2>Settings</h2>
             <div class="gt">World</div>
             <div class="group"><div class="row"><div class="rl">Time of day</div><div class="rc"><div class="seg" id="p-time"><button data-h="8.5">Morning</button><button data-h="13">Noon</button><button data-h="17.85">Sunset</button><button data-h="21.5">Night</button></div></div></div></div>
@@ -425,7 +427,6 @@ export class HUD {
     this.pause = p;
     p.addEventListener('click', (e) => { if (e.target === p) this.game.togglePause(false); });
     p.querySelector('#p-resume').onclick = () => { this.game.togglePause(false); this.game.lockMouse?.(); this.game.goFullscreen?.(); };
-    p.querySelector('#p-guide').onclick = () => { this.game.togglePause(false); this.game.bag.show('guide'); this.game.lockMouse?.(); };
     p.querySelector('#p-map').onclick = () => { this.game.togglePause(false); this.game.toggleMap(true); };
     p.querySelector('#p-title').onclick = () => { this.game.endShift(); this.syncTitle(); };
     p.querySelector('#p-char').onclick = () => this.showPicker();
@@ -595,7 +596,7 @@ export class HUD {
     if (this.subT > 0) { this.subT -= dt; if (this.subT <= 0) this.$('h-sub').classList.remove('show'); }
     if (this.promptT > 0) { this.promptT -= dt; if (this.promptT <= 0) this.$('h-prompt').classList.remove('show'); }
     // the minimap at 30 fps on Low and 20 on Lite (weak machines spend the time on the 3D view instead)
-    const mmStep = { lite: 1 / 20, low: 1 / 30 }[g.qualityName] || 0;
+    const mmStep = { lite: 1 / 20, low: 1 / 30, med: 1 / 30 }[g.qualityName] || 0;
     if ((this._mmAcc = (this._mmAcc || 0) + dt) >= mmStep) { this._mmAcc = 0; this.drawMinimap(dt); }
     if (!this.mapScreen.hidden) this.mapScreen.draw(dt);
     else g.city.pump(1.5);

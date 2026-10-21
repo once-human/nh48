@@ -25,11 +25,11 @@ export const QUALITY = {
   lite: { name: 'lite', pixelRatio: 0.75, shadows: false, shadowSize: 0, msaa: false, texMax: 512, boardRes: 1, signScale: 1,
     streamRadius: 260, streamBudget: 2, grassRange: 0, grassCap: 0, treeNearRange: 18, treeMidRange: 70, treeFarRange: 380, treeNearCap: 60, treeMidCap: 400, treeFarCap: 2500, leafCell: 256, impostorCell: 128, propRange: 80, far: 1000, traffic: 40, peds: 60 },
   low: { name: 'low', pixelRatio: 1.0, shadows: false, shadowSize: 0, msaa: false, texMax: 512, boardRes: 1, signScale: 1,
-    streamRadius: 360, streamBudget: 3, grassRange: 22, grassCap: 2200, treeNearRange: 28, treeMidRange: 100, treeFarRange: 600, treeNearCap: 100, treeMidCap: 700, treeFarCap: 5000, leafCell: 256, impostorCell: 128, propRange: 110, far: 1400, traffic: 70, peds: 110 },
+    streamRadius: 360, streamBudget: 2, grassRange: 22, grassCap: 2200, treeNearRange: 28, treeMidRange: 100, treeFarRange: 600, treeNearCap: 100, treeMidCap: 700, treeFarCap: 5000, leafCell: 256, impostorCell: 128, propRange: 110, far: 1400, traffic: 70, peds: 110 },
   med: { name: 'med', pixelRatio: 1.5, shadows: true, shadowSize: 2048, msaa: true, texMax: 1024, boardRes: 1, signScale: 1,
-    streamRadius: 520, streamBudget: 4, grassRange: 34, grassCap: 5000, treeNearRange: 42, treeMidRange: 150, treeFarRange: 900, treeNearCap: 200, treeMidCap: 1400, treeFarCap: 9000, leafCell: 512, impostorCell: 256, propRange: 170, far: 2200, traffic: 130, peds: 190 },
+    streamRadius: 520, streamBudget: 2.5, grassRange: 34, grassCap: 5000, treeNearRange: 42, treeMidRange: 150, treeFarRange: 900, treeNearCap: 200, treeMidCap: 1400, treeFarCap: 9000, leafCell: 512, impostorCell: 256, propRange: 170, far: 2200, traffic: 130, peds: 190 },
   high: { name: 'high', pixelRatio: 2, shadows: true, shadowSize: 2048, msaa: true, texMax: 1024, boardRes: 1, signScale: 1,
-    streamRadius: 720, streamBudget: 5, grassRange: 46, grassCap: 9000, treeNearRange: 80, treeMidRange: 240, treeFarRange: 1200, treeNearCap: 500, treeMidCap: 2800, treeFarCap: 14000, leafCell: 512, impostorCell: 256, propRange: 240, far: 3000, traffic: 170, peds: 260 },
+    streamRadius: 720, streamBudget: 3, grassRange: 46, grassCap: 9000, treeNearRange: 80, treeMidRange: 240, treeFarRange: 1200, treeNearCap: 500, treeMidCap: 2800, treeFarCap: 14000, leafCell: 512, impostorCell: 256, propRange: 240, far: 3000, traffic: 170, peds: 260 },
 };
 
 const params = new URLSearchParams(location.search);
@@ -224,10 +224,11 @@ async function main() {
     const simx = TEST ? Math.max(1, parseInt(params.get('simx') || '1')) : 1;
     let simDone = false;
     for (let k = 0; k < simx; k++) {
-      acc += dt;
-      let steps = 0;
-      while (acc >= STEP && steps < 6) { game.fixed(STEP); acc -= STEP; steps++; }
-      if (steps >= 6) acc = 0;
+      // simulate exactly this frame's time, in equal sub-steps no longer than 1/60 s: a fixed 1/60 step
+      // against a display that doesn't tick at exactly 60 Hz gives some frames no step and some two,
+      // which reads as jitter at speed
+      const nsub = Math.min(6, Math.max(1, Math.ceil(dt / STEP - 1e-3))), h = dt / nsub;
+      for (let s = 0; s < nsub; s++) game.fixed(h);
       game.frame(dt);
       if (k < simx - 1) { frames++; if (game.testDone(frames)) { simDone = true; break; } }
     }
