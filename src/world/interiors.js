@@ -672,6 +672,7 @@ export class Interiors {
     const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
     return new THREE.SpriteMaterial({ map: t, depthTest: true, transparent: true, toneMapped: false });
   }
+  recolourHearts() { const R = this.cur && this.cur.R; if (R && R.hearts && this.heartMats) for (const m of R.hearts) m.material = this.heartMats[this.heartKind(m.userData.p)]; }
   heartKind(p) {
     const D = this.g.date, ct = D && p.name && (D.contacts || []).find(c => c.name === p.name && !c.done);
     if (ct && ct.partner) return 'partner';
@@ -741,7 +742,8 @@ export class Interiors {
         if (C.dancing) this.dance(false);
         // a date: sit down next to them first, then talk
         if (s.p.dateWith && !C.seat) {
-          const seat = s.p.dateSeat || C.R.seats.filter(q => !q.used && !q.salon && Math.hypot(q.x - s.p.x, q.z - s.p.z) < 1.8).sort((a, b) => Math.hypot(a.x - s.p.x, a.z - s.p.z) - Math.hypot(b.x - s.p.x, b.z - s.p.z))[0];
+          const ds = s.p.dateSeat && Math.hypot(s.p.dateSeat.x - s.p.x, s.p.dateSeat.z - s.p.z) < 1.8 ? s.p.dateSeat : null;
+          const seat = ds || C.R.seats.filter(q => !q.used && !q.salon && Math.hypot(q.x - s.p.x, q.z - s.p.z) < 1.8).sort((a, b) => Math.hypot(a.x - s.p.x, a.z - s.p.z) - Math.hypot(b.x - s.p.x, b.z - s.p.z))[0];
           if (seat) { seat.used = false; this.sit(seat); }
         }
         G.date && G.date.talk(s.p, C); return;
@@ -881,7 +883,7 @@ export class Interiors {
     this.approachTick(dt);
     // the floor pulses with the beat
     if (R.ball) R.ball.rotation.y += dt * 0.8;
-    if (R.hearts) { const t = performance.now() / 1000; for (const m of R.hearts) { const p = m.userData.p; m.visible = !p.walkedOff && !(G.date && G.date.cur && G.date.cur.p === p); if ((this._hk = (this._hk || 0) + 1) % 30 === 0) m.material = this.heartMats[this.heartKind(p)]; m.position.x = p.x; m.position.z = p.z; m.position.y += Math.sin(t * 3 + p.id) * 0.002; } }
+    if (R.hearts) { const t = performance.now() / 1000, recolour = (this._hk = (this._hk || 0) + 1) % 20 === 0; for (const m of R.hearts) { const p = m.userData.p; m.visible = !p.walkedOff && !(G.date && G.date.cur && G.date.cur.p === p); if (recolour) m.material = this.heartMats[this.heartKind(p)]; m.position.x = p.x; m.position.z = p.z; m.position.y += Math.sin(t * 3 + p.id) * 0.002; } }
     if (R.dyn.length) {
       const t = performance.now() / 1000, beat = (t * 124 / 60) % 1;
       R.dyn.forEach((g, i) => { if (g === R.ball) return; const h = ((i * 0.13 + t * 0.1) % 1); const v = (beat < 0.25 ? 1 : 0.35) * (((i + Math.floor(t * 2.07)) % 3) ? 0.5 : 1); g.material.color.setHSL(h, 0.9, 0.12 + v * 0.35); });

@@ -194,6 +194,9 @@ export class HUD {
     P.el.hidden = false; this.pickerOpen = true;
     P.el.querySelector('#pk-name').value = P.sel.name;
     this.renderPicker();
+    // only your character speaks in here (the street behind the menu stays quiet)
+    if (this.game.audio) this.game.audio.only = 'pk_';
+    this.pickerVoice();
     P.run = true; P.loop();
   }
   buildPicker() {
@@ -205,8 +208,7 @@ export class HUD {
           <div class="pk-form">
             <div class="gt">Name</div>
             <input id="pk-name" class="pk-in" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Your name">
-            <div class="group"><div class="row"><div class="rl">You are</div><div class="rc"><div class="seg" id="pk-g"><button data-g="m">A man</button><button data-g="f">A woman</button></div></div></div>
-              <div class="row pk-gnote"><div class="rl"></div><div class="rc"><small id="pk-gnote"></small></div></div>
+            <div class="group"><div class="row"><div class="rl">You are <span class="pk-info" tabindex="-1">i<span class="pk-tip"><b>A man</b> is built stronger: broader, and hits harder in a fight. You’ll do most of the asking out.<br><b>A woman</b> gets approached far more, and asked out a lot, clubs especially.</span></span></div><div class="rc"><div class="seg" id="pk-g"><button data-g="m">A man</button><button data-g="f">A woman</button></div></div></div>
               <div class="row"><div class="rl">Skin tone</div><div class="rc"><div class="seg" id="pk-skin"></div></div></div></div>
             <div class="gt">What you wear</div>
             <div class="pk-outs" id="pk-out"></div>
@@ -298,7 +300,6 @@ export class HUD {
     m.querySelector('#pk-name').classList.remove('bad');
     if (nameOnly) return;
     m.querySelectorAll('#pk-g button').forEach(b => b.classList.toggle('on', (b.dataset.g === 'f') === !!S.female));
-    m.querySelector('#pk-gnote').textContent = S.female ? 'People come up to you far more, and you get asked out a lot. Clubs especially.' : 'Built stronger: broader, and you hit harder in a fight. You’ll do most of the asking out.';
     m.querySelectorAll('#pk-skin button').forEach(b => b.classList.toggle('on', b.dataset.v === S.skin));
     const box = m.querySelector('#pk-out'); box.innerHTML = '';
     for (const o of OUTFITS[g]) {
@@ -321,6 +322,7 @@ export class HUD {
   closePicker() {
     const P = this.picker; if (!P) return;
     P.run = false; P.el.hidden = true; this.pickerOpen = false;
+    if (this.game.audio) this.game.audio.only = null;
   }
   drawCityArt(cv) {
     const city = this.game.city;

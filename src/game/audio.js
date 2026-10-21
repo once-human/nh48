@@ -99,6 +99,7 @@ export class Audio {
     // reaction (pri 1: someone you knocked over, hit, or whose car you took) won't talk over another
     // reaction, and the police / your passenger (pri 2) always get through
     if (!this.ctx) return true;
+    if (this.only && !id.startsWith(this.only)) return false;
     const now = this.ctx.currentTime, busy = this.curVoice && now < this.voiceEnd - 0.15;
     if (busy && (pri === 0 || (pri < 2 && pri <= this.voicePri))) return false;
     // after someone has spoken, a breath of quiet before the next bit of idle chatter
