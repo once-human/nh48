@@ -558,7 +558,7 @@ export class Interiors {
     const G = this.g, P = G.player, C = this.cur;
     if (!C) return;
     if (C.seat) this.stand();
-    for (const p of C.R.peds || []) G.people.remove(p);
+    for (const p of C.R.peds || []) { if (p.name && this._mem && !p.dateWith) this._mem[p.name] = { walkedOff: p.walkedOff, interest: p.interest, approached: p.approached }; G.people.remove(p); }
     C.R.peds = [];
     for (const m of C.R.hearts || []) G.scene.remove(m);
     C.R.hearts = [];
@@ -581,7 +581,15 @@ export class Interiors {
 
   // the keeper, customers and dancers: pooled street bodies, dressed for the area
   populate(R, ctx) {
-    const G = this.g, ppl = G.people, kit = G.W.kit, rng = this.rng;
+    const G = this.g, ppl = G.people, kit = G.W.kit;
+    // the same crowd while it's the same crowd: a club keeps its people all night, anywhere else for a couple of
+    // hours. Walk out and back in and it's who you left (and who walked off on you); later on it's new faces
+    const key = venueKey(ctx), slot = R.tpl === 'club' ? 'n' + nightOf(G) : 'h' + Math.floor((G.clock || 0) / 2);
+    let seed = 7; for (const ch of key + slot) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+    const rng = this.rng = new RNG(seed), pplRng = ppl.rng; ppl.rng = rng;
+    this._mem = (this.mem || (this.mem = {}))[key + slot] || (this.mem[key + slot] = {});
+    for (const k of Object.keys(this.mem)) if (k.startsWith(key) && k !== key + slot) delete this.mem[k];
+    let made = 0;
     R.peds = [];
     this._ctx = ctx;
     const make = this._make = (x, z, yaw, anim, female, opts = {}) => {
@@ -591,7 +599,8 @@ export class Interiors {
       p.anim = anim; p.idle = anim; p.onRoad = false;
       p.persona = opts.persona || ppl.pickPersona(female, ctx.x, ctx.z);
       if (kit) {
-        p.look = opts.police ? kit.randomLook(new RNG(p.id), { role: 'police' }) : kit.randomLook(new RNG(p.id), { female, dress: /^kp|college/.test(p.persona) ? 'modern' : undefined });
+        const lr = new RNG(seed + 977 * ++made);
+        p.look = opts.police ? kit.randomLook(lr, { role: 'police' }) : kit.randomLook(lr, { female, dress: /^kp|college/.test(p.persona) ? 'modern' : undefined });
         p.shirt = [p.look.top.r, p.look.top.g, p.look.top.b]; p.lower = [p.look.bottom.r, p.look.bottom.g, p.look.bottom.b]; p.skin = [p.look.skin.r, p.look.skin.g, p.look.skin.b];
       }
       R.peds.push(p);
@@ -629,6 +638,9 @@ export class Interiors {
       for (const s of R.seats) if (s.sofa && rng.chance(0.6)) { s.used = true; const q = make(s.x, s.z, s.yaw, rng.pick(['sit', 'sit_talk']), rng.chance(0.5)); name(q); }
     }
     if (R.lifters) for (let i = 0; i < R.lifters; i++) make(R.O.x - 4 + i * 2.6, R.O.z + 3.8, Math.PI / 2, rng.pick(['crouch', 'push', 'idle']), rng.chance(0.3));
+    ppl.rng = pplRng;
+    // what happened the last time you were in (same crowd): who walked off, who you got along with
+    for (const p of R.peds) { const m = p.name && this._mem[p.name]; if (m) { p.walkedOff = m.walkedOff; p.interest = m.interest; p.approached = m.approached; } }
     this.markHearts(R);
   }
   addPerson(x, z, yaw, anim, female) { if (!this.cur || !this._make) return null; const p = this._make(x, z, yaw, anim, !!female); this.markHearts(this.cur.R); return p; }
@@ -788,13 +800,55 @@ export class Interiors {
     if (on) { P.human.play('dance', { fade: 0.3 }); P.seated = true; G.hud.toast('On the floor', 'Mood up, energy down. F to stop', 'info', 2.2); C.danceT = 0; }
     else { P.human.play('idle', { fade: 0.3 }); P.seated = false; }
   }
+  // people come up to you. Clubs late at night most of all, while you dance, more with charm, and a lot more
+  // if you're a woman. They walk over, then it's your call: talk, dance, smile them off, or turn them down
+  approachTick(dt) {
+    const G = this.g, C = this.cur, D = G.date, P = G.player, R = C.R;
+    if (!D || !R.peds || !/club|cafe|eatery/.test(R.tpl)) return;
+    const A = C.appr;
+    if (A) {
+      const p = A.p, tx = A.phase === 'back' ? A.home.x : P.x, tz = A.phase === 'back' ? A.home.z : P.z;
+      const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz) || 1e-3, stop = A.phase === 'back' ? 0.05 : 0.95;
+      if (A.phase === 'talk') return;
+      if (A.phase === 'walk' && (G.state !== 'play' || C.seat || (A.t += dt) > 20)) { this.approachDone(p); return; }
+      p.yaw = Math.atan2(dz, dx); p.hx = dx / d; p.hz = dz / d;
+      if (d > stop) { const st = Math.min(d - stop, 1.3 * dt); p.x += dx / d * st; p.z += dz / d * st; p.anim = 'walk'; return; }
+      if (A.phase === 'back') { p.yaw = A.home.yaw; p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw); p.anim = A.home.anim; p.idle = A.home.idle; C.appr = null; return; }
+      A.phase = 'talk'; p.anim = p.idle = 'talk';
+      if (!D.approach(p, C)) this.approachDone(p);
+      return;
+    }
+    if ((C.apprCool = (C.apprCool || 0) - dt) > 0) return;
+    if (G.state !== 'play' || C.seat || C.eating || D.cur || R.peds.some(q => q.dateWith)) return;
+    const club = R.tpl === 'club', late = G.hour >= 21 || G.hour < 3;
+    let rate = club ? (late ? 1 / 70 : 1 / 160) : 1 / 480;      // per second, for a man
+    if (P.look.female) rate *= 3.2;
+    if (C.dancing) rate *= 1.8;
+    rate *= 0.4 + G.life.charm * 1.2;
+    if (G.life.s.drunk >= 0.7) rate *= 0.4;
+    if (this.rng.next() > rate * dt) return;
+    const cand = R.peds.filter(q => q.name && !q.approached && !q.walkedOff && D.eligible(q) && !/sit/.test(q.anim) && Math.hypot(q.x - P.x, q.z - P.z) > 2 && Math.hypot(q.x - P.x, q.z - P.z) < 16);
+    if (!cand.length) { C.apprCool = 10; return; }
+    const p = cand[this.rng.int(0, cand.length - 1)];
+    p.approached = true;
+    C.appr = { p, phase: 'walk', t: 0, home: { x: p.x, z: p.z, yaw: p.yaw, anim: p.anim, idle: p.idle } };
+  }
+  // the chat's over: they go back where they were (unless they're dancing with you now)
+  approachDone(p) {
+    const C = this.cur;
+    if (!C || !C.appr || C.appr.p !== p) return;
+    C.apprCool = this.rng.range(20, 45);
+    if (p.anim === 'dance' && C.dancing) { C.appr = null; return; }
+    C.appr.phase = 'back';
+  }
   update(dt) {
     const C = this.cur, G = this.g;
     if (!C) return;
     const R = C.R;
+    this.approachTick(dt);
     // the floor pulses with the beat
     if (R.ball) R.ball.rotation.y += dt * 0.8;
-    if (R.hearts) { const t = performance.now() / 1000; for (const m of R.hearts) { const p = m.userData.p; m.visible = !p.walkedOff && !(G.date && G.date.cur && G.date.cur.p === p); m.position.y += Math.sin(t * 3 + p.id) * 0.002; } }
+    if (R.hearts) { const t = performance.now() / 1000; for (const m of R.hearts) { const p = m.userData.p; m.visible = !p.walkedOff && !(G.date && G.date.cur && G.date.cur.p === p); m.position.x = p.x; m.position.z = p.z; m.position.y += Math.sin(t * 3 + p.id) * 0.002; } }
     if (R.dyn.length) {
       const t = performance.now() / 1000, beat = (t * 124 / 60) % 1;
       R.dyn.forEach((g, i) => { if (g === R.ball) return; const h = ((i * 0.13 + t * 0.1) % 1); const v = (beat < 0.25 ? 1 : 0.35) * (((i + Math.floor(t * 2.07)) % 3) ? 0.5 : 1); g.material.color.setHSL(h, 0.9, 0.12 + v * 0.35); });
@@ -805,7 +859,10 @@ export class Interiors {
       if (G.life.s.energy < 0.08) { this.dance(false); G.hud.toast('You’re spent', 'Sit down, drink some water', 'warn', 2.4); }
     }
     // indoor light: steady, whatever the time outside
-    if (G.sky) { G.sky.hemi.intensity = Math.PI * (R.tpl === 'club' ? 0.75 : 0.95); if (R.tpl === 'club') G.sky.hemi.color.setRGB(0.85, 0.6, 1); else G.sky.hemi.color.setRGB(1, 0.97, 0.92); G.sky.hemi.groundColor.setRGB(0.55, 0.52, 0.5); G.sky.sun.intensity = R.tpl === 'club' ? 0.3 : 1.2; }
+    if (G.sky) { G.sky.hemi.intensity = Math.PI * (R.tpl === 'club' ? 1.05 : 0.95); if (R.tpl === 'club') G.sky.hemi.color.setRGB(0.85, 0.6, 1); else G.sky.hemi.color.setRGB(1, 0.97, 0.92); G.sky.hemi.groundColor.setRGB(0.55, 0.52, 0.5); G.sky.sun.intensity = R.tpl === 'club' ? 0.9 : 1.2; }
   }
 }
 const UNIT = new THREE.BoxGeometry(1, 1, 1);
+// a venue's identity, and which night it is (a night runs noon to noon, so 1 AM is still last night)
+export const venueKey = (ctx) => `${Math.round(ctx.x)},${Math.round(ctx.z)}`;
+export const nightOf = (G) => Math.round(((G.clock || 0) - G.hour) / 24) - (G.hour < 12 ? 1 : 0);

@@ -63,5 +63,10 @@
 "love_notyet": ["That's big. I care about you so much. Give me time to say it back.", "I'm not ready to say it yet. But I'm not going anywhere.", "Don't be upset. I'll say it when I really mean it."],
 "upset": ["You disappeared for three days. Do you know how that felt?", "Who was that you were talking to at the club?", "Sometimes I feel like I'm the only one trying."],
 "makeup": ["Okay. Thank you for saying that. Come here.", "I'm still a little mad. But less.", "Fine. You're forgiven. You're buying dinner, though."],
-"stillupset": ["Sorry isn't enough this time.", "I don't want to talk about it right now."]
+"stillupset": ["Sorry isn't enough this time.", "I don't want to talk about it right now."],
+"approach_club": ["Hi. I've been watching you for a bit. Not in a creepy way, I promise.", "Hey. My friends dared me to come say hi. So, hi.", "Can I stand here? That group behind me is too much.", "You look like the only person here who isn't on their phone.", "Okay, settle something. Is this song good or am I just tipsy?"],
+"approach_dance": ["Okay, you can actually dance. Mind if I join you?", "Hi! You've got moves. Where did you learn that?", "I've been dancing next to you for three songs. Hi.", "This is my song! Dance with me, come on."],
+"approach_cafe": ["Sorry, is anyone sitting here? Everywhere else is full.", "Hi. I think I've seen you around FC Road before.", "Excuse me. What did you order? It looks better than mine."],
+"approach_ignore": ["Oh. Okay. Have a good night.", "Fair enough. Maybe later then."],
+"approach_reject": ["Wow. Okay. Your loss.", "Right. Sorry to bother you."]
 }

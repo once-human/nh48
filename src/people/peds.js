@@ -307,7 +307,7 @@ export class People {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const p = this.list[i];
       if (p.pax || p.fixed) continue;
-      if (Math.hypot(p.x - px, p.z - pz) > 150 || p.dead) { if (p.door) p.door.n--; if (p.venue) p.venue.crowd--; if (p.body) p.body.release(); this.list[i] = this.list[this.list.length - 1]; this.list.pop(); }
+      if (Math.hypot(p.x - px, p.z - pz) > 150 || p.dead) { if (p.door) p.door.n--; if (p.venue) (p.clubber ? p.venue.clubCrowd-- : p.venue.crowd--); if (p.body) p.body.release(); this.list[i] = this.list[this.list.length - 1]; this.list.pop(); }
     }
     // traffic police (fixed) and waiting passengers don't count towards the walking crowd
     if (this.act && (this.actT -= dt) <= 0) {
@@ -325,7 +325,7 @@ export class People {
       for (let i = this.list.length - 1; i >= 0 && walkers > this.target * 1.15; i--) {
         const p = this.list[i];
         if (p.pax || p.fixed || p.body || Math.hypot(p.x - px, p.z - pz) < 70 || (avoidView && avoidView(p.x, p.z))) continue;
-        if (p.door) p.door.n--; if (p.venue) p.venue.crowd--;
+        if (p.door) p.door.n--; if (p.venue) (p.clubber ? p.venue.clubCrowd-- : p.venue.crowd--);
         this.list[i] = this.list[this.list.length - 1]; this.list.pop(); walkers--;
       }
     }
@@ -336,7 +336,7 @@ export class People {
       // outside the bars at night people stand around in groups rather than walk
       if (p && this.rng.chance(0.18 + 0.55 * this.nightHere)) { p.mode = 'stand'; p.wait = this.rng.range(15, 90) * (1 + this.nightHere * 2); }
     }
-    if ((this.venueT = (this.venueT || 0) - dt) <= 0) { this.venueT = 0.7; this.venueCrowds(px, pz, avoidView); }
+    if ((this.venueT = (this.venueT || 0) - dt) <= 0) { this.venueT = 0.7; this.venueCrowds(px, pz, avoidView); this.clubCrowds(px, pz, avoidView); }
     this.talkTick(dt, player);
     const pv = Math.abs(player.v);
     const phx = Math.cos(player.th), phz = Math.sin(player.th);
@@ -432,7 +432,7 @@ export class People {
       if (p.anchor) {
         p.x = p.anchor.x; p.z = p.anchor.z;
         if (p.anchor.fx !== undefined) this.face(p, p.anchor.fx, p.anchor.fz, dt);
-        if (p.wait <= 0) { p.anchor = null; if (p.venue) { p.venue.crowd--; p.venue = null; } this.backToPath(p); }
+        if (p.wait <= 0) { p.anchor = null; if (p.venue) { (p.clubber ? p.venue.clubCrowd-- : p.venue.crowd--); p.venue = null; } this.backToPath(p); }
         return;
       }
       if (p.wait <= 0) p.mode = 'walk';
@@ -612,6 +612,39 @@ export class People {
       p.idle = this.rng.pick(['talk', 'talk', 'phone', 'idle', 'arms_folded']);
     }
   }
+  // a club at night: the pavement out front is packed. Groups smoking, waiting on friends, arguing about where
+  // next, someone on the phone, couples. Up to ~30 people per club, thinning out after 2 AM
+  clubCrowds(px, pz, avoidView) {
+    const h = this.hour ?? 12;
+    if (!this.isClub || !(h >= 21 || h < 2.5)) return;
+    const peak = h >= 23 || h < 1.5 ? 1 : 0.6, st = this.W.streamer;
+    for (const c of st.built) {
+      if (!c.doors || Math.abs(c.cx - px) > 140 || Math.abs(c.cz - pz) > 140) continue;
+      for (const d of c.doors) {
+        if (d.shop < 0 || Math.hypot(d.x - px, d.z - pz) > 110 || !this.isClub(d)) continue;
+        const cap = Math.round(30 * peak);
+        if ((d.clubCrowd || 0) >= cap) continue;
+        const gx = d.x + d.nx * this.rng.range(1.8, 6.5) + d.nz * this.rng.range(-7, 7), gz = d.z + d.nz * this.rng.range(1.8, 6.5) - d.nx * this.rng.range(-7, 7);
+        if ((d.clubCrowd || 0) > 6 && avoidView && avoidView(gx, gz)) continue;
+        const near = this.g.nearest(gx, gz, 90);
+        if (!near) continue;
+        const k = this.rng.int(2, 6);
+        for (let i = 0; i < k; i++) {
+          const a = i / k * Math.PI * 2 + this.rng.range(-0.3, 0.3), rr = this.rng.range(0.45, 0.85);
+          const x = gx + Math.cos(a) * rr, z = gz + Math.sin(a) * rr;
+          const res = this.W.collision.resolve(x, z, 0.25);
+          if (res && res.kind !== 3) continue;
+          const p = this.make(near.e, near.s, near.side || 1, { mode: 'stand', female: this.rng.chance(0.48) });
+          p.persona = this.rng.pick(p.female ? ['kpgirl', 'kpgirl', 'collegegirl'] : ['kpguy', 'kpguy', 'collegeboy']);
+          p.anchor = { x, z, fx: gx, fz: gz }; p.x = x; p.z = z; p.venue = d; p.clubber = true;
+          p.wait = this.rng.range(60, 240);
+          p.idle = this.rng.pick(['talk', 'talk', 'talk', 'phone', 'drink', 'idle', 'arms_folded', 'dance']);
+          d.clubCrowd = (d.clubCrowd || 0) + 1;
+        }
+        return;                       // one group per tick
+      }
+    }
+  }
   doorNear(x, z, r, p) {
     let best = null, bd = r;
     const st = this.W.streamer, half = this.W.index.size * 0.75;
@@ -646,7 +679,7 @@ export class People {
     p.x += dx / d * (M ? M.push : 0.3); p.z += dz / d * (M ? M.push : 0.3);
     const res = this.W.collision.resolve(p.x, p.z, 0.25);
     if (res && res.kind !== 3) { p.x += res.nx * res.depth; p.z += res.nz * res.depth; }
-    if (p.anchor) { p.anchor = null; if (p.venue) { p.venue.crowd--; p.venue = null; } }
+    if (p.anchor) { p.anchor = null; if (p.venue) { (p.clubber ? p.venue.clubCrowd-- : p.venue.crowd--); p.venue = null; } }
     if (p.door) { p.door.n--; p.door = null; }
     p.act = null; p.anim = null;
     if (p.hp <= 0) {
@@ -676,7 +709,7 @@ export class People {
   }
   startFight(p, foe) {
     if (p.hp0 === undefined) { p.hp0 = p.cop ? 130 : HP[p.persona] || 60; p.hp = p.hp0; }
-    if (p.anchor) { p.anchor = null; if (p.venue) { p.venue.crowd--; p.venue = null; } }
+    if (p.anchor) { p.anchor = null; if (p.venue) { (p.clubber ? p.venue.clubCrowd-- : p.venue.crowd--); p.venue = null; } }
     p.mode = 'fight'; p.foe = foe; p.fightT = 0; p.atkT = this.rng.range(0.5, 1.1); p.act = null; p.fixedWas = p.fixedWas ?? p.fixed; p.fixed = false;
     p.anim = null; p.goal = null; p.fleeing = false;
     if (this.brawl) this.brawl.active = 0.01;
@@ -689,7 +722,7 @@ export class People {
   }
   // get away from (x, z), then carry on
   flee(p, x, z, dist = 25) {
-    if (p.anchor) { p.anchor = null; if (p.venue) { p.venue.crowd--; p.venue = null; } }
+    if (p.anchor) { p.anchor = null; if (p.venue) { (p.clubber ? p.venue.clubCrowd-- : p.venue.crowd--); p.venue = null; } }
     let a = Math.atan2(p.z - z, p.x - x);
     let tx = p.x + Math.cos(a) * dist, tz = p.z + Math.sin(a) * dist;
     // run along the street rather than into a wall

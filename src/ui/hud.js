@@ -144,7 +144,7 @@ export class HUD {
         <div class="pz-l">
           <div class="ttl-brand">${STONE}<b>NH48</b><span>Pune <span lang="mr">पुणे</span></span></div>
           <div class="pz-head ttl-head"><span class="pz-k">An open-world game</span><b>Pune</b><span class="ttl-mr" lang="mr">पुणे</span>
-            <p class="ttl-sub">Peths at noon, Koregaon Park at midnight. Drive an auto, chase a date, dodge the challan.</p></div>
+            <p class="ttl-sub">Peths at noon, Koregaon Park at midnight. Drive an auto, chase a date, dodge the challan. Play a man (built stronger) or a woman (asked out far more).</p></div>
           <nav class="pz-menu">
             <button class="pz-i sel" id="t-roam">Start</button>
             <button class="pz-i" id="t-who">New character</button>
@@ -206,6 +206,7 @@ export class HUD {
             <div class="gt">Name</div>
             <input id="pk-name" class="pk-in" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Your name">
             <div class="group"><div class="row"><div class="rl">You are</div><div class="rc"><div class="seg" id="pk-g"><button data-g="m">A man</button><button data-g="f">A woman</button></div></div></div>
+              <div class="row pk-gnote"><div class="rl"></div><div class="rc"><small id="pk-gnote"></small></div></div>
               <div class="row"><div class="rl">Skin tone</div><div class="rc"><div class="seg" id="pk-skin"></div></div></div></div>
             <div class="gt">What you wear</div>
             <div class="pk-outs" id="pk-out"></div>
@@ -297,6 +298,7 @@ export class HUD {
     m.querySelector('#pk-name').classList.remove('bad');
     if (nameOnly) return;
     m.querySelectorAll('#pk-g button').forEach(b => b.classList.toggle('on', (b.dataset.g === 'f') === !!S.female));
+    m.querySelector('#pk-gnote').textContent = S.female ? 'People come up to you far more, and you get asked out a lot. Clubs especially.' : 'Built stronger: broader, and you hit harder in a fight. You’ll do most of the asking out.';
     m.querySelectorAll('#pk-skin button').forEach(b => b.classList.toggle('on', b.dataset.v === S.skin));
     const box = m.querySelector('#pk-out'); box.innerHTML = '';
     for (const o of OUTFITS[g]) {

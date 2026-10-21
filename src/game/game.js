@@ -83,6 +83,8 @@ export class Game {
     const unlock = () => { this.audio.start(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
     window.addEventListener('pointerdown', unlock); window.addEventListener('keydown', unlock);
     this.people = new People(W, this.scene, this.vmats.body, this.quality);
+    // which shop fronts are clubs (they get a crowd out front at night)
+    this.people.isClub = (d) => { if (d.club === undefined) { const inf = d.shop >= 0 && this.shops && this.shops.infoOf(d); d.club = !!(inf && inf.kind === 'bar' && this.shops.isClub(inf)); } return d.club; };
     this.crowd = new Crowd(this.people, W.kit, this.scene, W, this.quality);
     this.fauna = new Fauna(this.people, W.animalKit, this.scene, W);
     this.traffic.peds = this.people;
@@ -339,7 +341,7 @@ export class Game {
   }
   lightHour() {
     const I = this.interiors;
-    if (I && I.inside) return I.cur.R.tpl === 'club' ? 22.6 : 12.5;
+    if (I && I.inside) return 12.5;                // lit inside, whatever the hour outside
     return this.hour;
   }
   togglePause(force) {
@@ -689,6 +691,7 @@ export class Game {
       // inside a shop the street outside waits for you (the room has its own people)
       if (!this.interiors.inside) {
         this.traffic.update(Math.min(dt, 0.05), P.x, P.z, this.inView);
+        this.people.hour = this.hour;
         this.people.update(Math.min(dt, 0.05), P, this.inView);
       }
     }

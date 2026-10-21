@@ -50,7 +50,7 @@ export function lookOf(ch) {
     female: ch.female, skin: c(sk.hex), top: c(O.top), bottom: c(O.bottom), shoe: c(O.shoe),
     cut: new THREE.Vector4(...O.cut), hair: c(hc.hex), style: H.style, beard: !!H.beard,
     pat: O.pat || 0, patCol: O.patCol !== undefined ? c(O.patCol) : null, hem: O.hem || 0, denim: !!O.denim,
-    scale: ch.female ? 0.95 : 0.98, acc: null, player: true,
+    scale: ch.female ? 0.95 : 1.0, acc: null, player: true,
   };
 }
 // kept for older callers: (id, skin) or a saved character object

@@ -11,7 +11,8 @@
 "t_food": ["You haven't eaten, have you. I left a dabba with your watchman. Eat.", "Ordered food for you. No arguments."],
 "t_naka": ["Police checking at the chowk. Wear your helmet.", "Cops on FC Road tonight. Don't do anything stupid."],
 "t_breakup": ["I think we should stop seeing each other. Take care.", "This isn't working. I'm sorry."],
-"t_afterdate": ["Reached home. Tonight was really nice :)", "Still smiling. That's your fault.", "Thanks for tonight. Next one's on me."]
+"t_afterdate": ["Reached home. Tonight was really nice :)", "Still smiling. That's your fault.", "Thanks for tonight. Next one's on me."],
+"t_askout": ["Free tonight? Come to {place}. I’ll be there in a bit.", "Okay I’m bored. {place}, you and me, now?", "I’m at {place}. Come keep me company?"]
 },
 "hi": {
 "t_hi": [["Hii, {name} hoon. {place} {wali|wala} :)", "Hi, it's {name}. From {place} :)"], ["Ghar pahunch {gayi|gaya}. Maza aaya aaj :)", "Got home. Today was fun :)"], ["Toh... 'hi' se accha kya bhejoge? ;)", "So... what are you sending that's better than 'hi'? ;)"]],
@@ -25,7 +26,8 @@
 "t_food": [["Kuch khaaya nahin na? Watchman ke paas dabba rakha hai. Khao.", "You haven't eaten, have you? Left a dabba with your watchman. Eat."], ["Tumhare liye khaana order kiya hai. Koi bahas nahin.", "Ordered food for you. No arguments."]],
 "t_naka": [["Chowk pe police checking hai. Helmet pehenna.", "Police checking at the chowk. Wear your helmet."], ["FC Road pe aaj police hai. Kuch ulta seedha mat karna.", "Cops on FC Road tonight. Don't do anything stupid."]],
 "t_breakup": [["Mujhe lagta hai ab humein milna band karna chahiye. Khayal rakhna.", "I think we should stop seeing each other. Take care."], ["Ye kaam nahin kar raha. Sorry.", "This isn't working. Sorry."]],
-"t_afterdate": [["Ghar pahunch {gayi|gaya}. Aaj bahut accha laga :)", "Got home. Today was really nice :)"], ["Abhi tak muskura {rahi|raha} hoon. Tumhari galti hai.", "Still smiling. Your fault."], ["Aaj ke liye thanks. Agli baar meri treat.", "Thanks for today. Next one's my treat."]]
+"t_afterdate": [["Ghar pahunch {gayi|gaya}. Aaj bahut accha laga :)", "Got home. Today was really nice :)"], ["Abhi tak muskura {rahi|raha} hoon. Tumhari galti hai.", "Still smiling. Your fault."], ["Aaj ke liye thanks. Agli baar meri treat.", "Thanks for today. Next one's my treat."]],
+"t_askout": [["Aaj free ho? {place} aa jao, main thodi der mein pahunch {rahi|raha} hoon.", "Free tonight? Come to {place}, I’ll be there in a bit."], ["Bore ho {rahi|raha} hoon. {place}, tum aur main, abhi?", "I’m bored. {place}, you and me, now?"]]
 },
 "mr": {
 "t_hi": [["Hii, {name} aahe. {place} {madhli|madhla} :)", "Hi, it's {name}, from {place} :)"], ["Ghari {pochle|pochlo}. Aaj maja aali :)", "Got home. Today was fun :)"], ["Mag... 'hi' peksha bhaari kaay paathavnaar? ;)", "So... what are you sending that's better than 'hi'? ;)"]],
@@ -39,6 +41,7 @@
 "t_food": [["Kaahi khaalla naahis na? Watchman kade dabba thevlaay. Khaa.", "You haven't eaten, have you? Left a dabba with your watchman. Eat."], ["Tujhyaasaathi jevan order kelay. Vaad naahi.", "Ordered food for you. No arguments."]],
 "t_naka": [["Chowkaat police checking aahe. Helmet ghaal.", "Police checking at the chowk. Wear your helmet."], ["FC Road la aaj police aahet. Kaahi ulta-seedha karu nakos.", "Cops on FC Road tonight. Don't do anything stupid."]],
 "t_breakup": [["Mala vaatta aapan aata bhetna thaambavaava. Kaalji ghe.", "I think we should stop seeing each other. Take care."], ["He jamat naahiye. Sorry.", "This isn't working. Sorry."]],
-"t_afterdate": [["Ghari {pochle|pochlo}. Aaj khup chhaan vaatla :)", "Got home. Today was really nice :)"], ["Ajun {hastey|hastoy}. Tujhi chuk aahe.", "Still smiling. Your fault."], ["Aajchyaasaathi thanks. Pudhchya veli maajhyakadun.", "Thanks for today. Next one's on me."]]
+"t_afterdate": [["Ghari {pochle|pochlo}. Aaj khup chhaan vaatla :)", "Got home. Today was really nice :)"], ["Ajun {hastey|hastoy}. Tujhi chuk aahe.", "Still smiling. Your fault."], ["Aajchyaasaathi thanks. Pudhchya veli maajhyakadun.", "Thanks for today. Next one's on me."]],
+"t_askout": [["Aaj free aahes ka? {place} la ye, mi thodya velaat pohochte.", "Free today? Come to {place}, I’ll be there soon."], ["Kantaala aalay. {place}, tu aani mi, aatta?", "I’m bored. {place}, you and me, now?"]]
 }
 }
