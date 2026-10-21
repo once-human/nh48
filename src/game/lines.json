@@ -879,5 +879,29 @@
   "पोलिसाचा इशारा न मानल्याबद्दल दंड. आणि आधीचं चलन पण.",
   "Polisaacha ishaara na maanlyaabaddal dand. Aani aadhicha chalan pan.",
   "A fine for ignoring a police signal. And the earlier challan too."
+ ],
+ "spot_pickpocket": [
+  "Beat marshal",
+  "hm_psi",
+  "mr",
+  "थांब! पाकीटमार! पकडा रे त्याला!",
+  "Thaamb! Paakitmaar! Pakda re tyaala!",
+  "Stop! Pickpocket! Grab him!"
+ ],
+ "spot_pickpocket.1": [
+  "Beat marshal",
+  "hm_psi",
+  "hi",
+  "रुक! जेब काटके कहाँ भाग रहा है?",
+  "Ruk! Jeb kaatke kahaan bhaag raha hai?",
+  "Stop! Picked a pocket and running?"
+ ],
+ "caught_pickpocket": [
+  "Beat marshal",
+  "hm_psi",
+  "mr",
+  "लोकांचे खिसे कापतोस? चोरीचा गुन्हा. चल.",
+  "Lokaanche khise kaaptos? Choricha gunha. Chal.",
+  "Picking people’s pockets? That’s theft. Come on."
  ]
 }

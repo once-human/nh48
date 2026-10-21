@@ -16,6 +16,7 @@ import { Life } from './life.js';
 import { Shops, lookFromJSON, DEALER } from './shops.js';
 import { Props } from './props.js';
 import { Gigs } from './gigs.js';
+import { Hustle } from './hustle.js';
 import { Club } from './club.js';
 import { Bag } from './bag.js';
 import { Strays } from '../people/strays.js';
@@ -122,6 +123,7 @@ export class Game {
     this.shops = new Shops(this);
     this.props = new Props(this);
     this.gigs = new Gigs(this);
+    this.hustle = new Hustle(this);
     this.club = new Club(this);
     this.bag = new Bag(this);
     this.strays = new Strays(this);
@@ -528,6 +530,8 @@ export class Game {
   objective() {
     const r = this.rides, P = this.player;
     if (P.tipped) return { main: 'Auto tipped over!', sub: 'Hold on… getting it back on three wheels', urgent: true };
+    const hj = this.hustle && this.hustle.objective();
+    if (hj) return hj;
     const gj = this.gigs && this.gigs.objective();
     if (gj && !(r.current)) return gj;
     const veh = !P.onFoot ? P.cur : null;
@@ -693,6 +697,7 @@ export class Game {
       this.life.update(dt);
       this.shops.update(dt);
       this.gigs.update(dt, this.input);
+      this.hustle.update(dt, this.input);
       this.strays.update(dt);
       this.rig.drunk = this.life.s.drunk;
       if (this.post) this.post.drunk = this.interiors.inside && this.interiors.cur.R.tpl === 'club' ? Math.min(this.life.s.drunk, 0.5) : this.life.s.drunk;

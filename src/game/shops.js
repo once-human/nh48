@@ -386,7 +386,7 @@ export class Shops {
         out.push({ label: 'Soda', note: 'Lemon soda, fizzy', price: r10(30 * mul), act: pay(r10(30 * mul), () => { L.apply({ thirst: 0.25 }); return 'Refreshing'; }) });
         break;
       case 'dealer': this.dealer(out, ctx); break;
-      case 'garage': this.garage(out, ctx, mul); break;
+      case 'garage': this.garage(out, ctx, mul); this.g.hustle && this.g.hustle.garageItems(out, ctx); break;
       case 'fuel': this.fuel(out); break;
       case 'travel':
         out.push({ label: 'Rent a scooter, 24 hours', note: 'Delivered right here, helmet included', price: r10(450 * mul), act: pay(r10(450 * mul), () => { this.spawnOwned('scooter', PAINTS[this.rng.int(0, 5)], ctx, true); return 'Your rental scooter is outside'; }) });
@@ -400,7 +400,7 @@ export class Shops {
         food('chai');
         break;
       }
-      case 'estate': this.g.props.agentItems(out); break;
+      case 'estate': this.g.props.agentItems(out); this.g.hustle && this.g.hustle.agentItems(out); break;
       case 'property': this.g.props.items(out, ctx.prop); break;
     }
     return out;

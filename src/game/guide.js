@@ -71,11 +71,16 @@ const EARN_LEGAL = [
   ['Bank interest', 'A small amount every day on what’s in the bank.'],
   ['Gold', 'Buy when the rate is low, sell when it’s high.'],
   ['Lottery', 'From any kirana. Scratch it in your jhola. Usually nothing.'],
+  ['Own a business', 'Any estate agent sells them: a chai tapri (₹80,000, about ₹700 a day), a vada pav stall, an ironing shop, a xerox and cyber café, an auto fleet on daily rent, a cloud kitchen in Baner, a PG in Viman Nagar, a café in Koregaon Park (₹40 lakh, about ₹12,000 a day). Takings go to your bank every morning; bad days and festival rushes happen.'],
 ];
 const EARN_ILLEGAL = [
   ['Steal a vehicle', 'Walk up to a parked or stopped vehicle and take it (F). Beat marshals come looking (up to three stars); get caught and it’s bail, ₹5,000. The police always know what you did: theft, hitting someone and driving off, beating someone up, laying a hand on a cop, running from custody, each booked under its own section with its own bail.'],
   ['Chai-pani', 'When a traffic cop stops you, a “chai-pani” sometimes makes the challan go away. Sometimes he’s honest, and then it costs more.'],
   ['Skip the challan', 'Drive off when waved over. It doubles, and the number is noted.'],
+  ['Chop shops', 'Some garages buy a stolen vehicle, no questions asked, for about 15% of what it’s worth. Others won’t touch it. The owner may still trace it.'],
+  ['Pickpocketing', 'G next to someone on foot. From behind and in a crowd works best. Get caught and they shout, fight or run, and a cop who hears it books you for theft (BNS s.303).'],
+  ['Parcel runs', 'Late at night “Bhai” texts: pick up a parcel, drop it across town, ₹3,000 to ₹9,000. Y to accept. Get stopped by the police with it and it’s stolen property (BNS s.317), ₹10,000.'],
+  ['Street races', 'After 11 pm an unknown number texts a race. Be at the start in a vehicle, pay the entry, beat the time to the finish and take double. Racing on a public road is MV Act s.189.'],
 ];
 
 const BODY = [
@@ -99,7 +104,7 @@ const PEOPLE = [
 const CONTROLS = [
   ['W A S D', 'Walk or drive'], ['Mouse', 'Look around (the game keeps the mouse; any key or click takes it back)'], ['Click', 'Punch'], ['C', 'On foot: roll. Driving: change camera'], ['Space', 'Handbrake; on foot, jump or climb'], ['Shift / Alt', 'Sprint / walk'], ['X', 'Punch (also)'],
   ['F', 'Interact, enter, get in or out'], ['E', 'Jhola'], ['Tab', 'Your stats'], ['M', 'Map (or tap the minimap)'], ['H', 'Horn'], ['V', 'Camera (anytime)'], ['B', 'Look back'],
-  ['R', 'Back on the road'], ['Y', 'Accept a delivery'], ['1 to 9, W/S, Enter', 'Pick in any menu'], ['Esc or F', 'Close any menu'], ['Esc', 'Pause (the only time you get a cursor)'], ['F3', 'Performance info'],
+  ['R', 'Back on the road'], ['G', 'Pickpocket (on foot, next to someone)'], ['Y', 'Accept an offer on your phone'], ['Y', 'Accept a delivery'], ['1 to 9, W/S, Enter', 'Pick in any menu'], ['Esc or F', 'Close any menu'], ['Esc', 'Pause (the only time you get a cursor)'], ['F3', 'Performance info'],
 ];
 
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

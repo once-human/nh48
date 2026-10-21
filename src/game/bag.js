@@ -8,6 +8,7 @@ import { PROPERTIES } from './props.js';
 import { icon, ITEM_ICON } from '../ui/icons.js';
 import { KbNav } from '../ui/kbnav.js';
 import { guideHTML } from './guide.js';
+import { BUSINESSES as BIZ } from './hustle.js';
 import { levelOf } from './date.js';
 
 const TABS = [['bag', 'Bag', 'झोळी'], ['me', 'Me', 'मी'], ['wear', 'Wardrobe', 'कपडे'], ['own', 'Owned', 'माझं'], ['near', 'Nearby', 'जवळ'], ['ppl', 'People', 'लोक'], ['guide', 'Guide', 'माहिती']];
@@ -108,6 +109,10 @@ export class Bag {
       h += `<div class="jh-sub">Homes</div>`;
       if (!homes.length) h += `<p class="jh-empty">You don’t own a home yet. Six are for sale, from a 1 RK in Sadashiv Peth to a Boat Club Road bungalow. They’re on your map as house pins, and under Nearby, Homes for sale.</p>`;
       for (const p of homes) h += this.row('home', p.name, G.props.rentedOut(p) ? `Rented out · ${fmt(p.rent)} a day` : 'You live here: sleep, change, keep your vehicles', 'Show', 'wp', `p:${p.id}`);
+      const biz = (s.biz || []).map(id => (G.hustle && BIZ.find(b => b.id === id))).filter(Boolean);
+      h += `<div class="jh-sub">Businesses</div>`;
+      if (!biz.length) h += `<p class="jh-empty">No businesses yet. Any estate agent sells a chai tapri, a vada pav stall, an auto fleet, a cloud kitchen, a PG or a café. Takings land in your bank every morning.</p>`;
+      for (const b of biz) h += this.row('coin', b.name, `About ${fmt(b.day)} a day, into your bank`, '', null);
       h += `<div class="jh-sub">Vehicles</div>`;
       h += this.row('auto', 'Your auto', G.police.towedAt ? `Towed to ${G.police.towedAt.name}` : `Fuel ${Math.round((G.player.auto.fuel ?? 1) * 100)}% · body ${Math.round((1 - (G.player.auto.dmg || 0)) * 100)}%`, 'Find', 'wp', 'auto');
       for (const v of s.vehicles) { const w = this.whereVeh(v); h += this.row('scooter', `${cap(v.type)} · ${v.plate}`, w ? 'Parked. Tap to find it' : 'In storage. Bring it out at one of your homes', w ? 'Find' : '', w ? 'wp' : null, `v:${v.id}`); }

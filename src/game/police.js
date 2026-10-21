@@ -40,14 +40,17 @@ export const FINES = {
   hurt:      { amt: 5000, name: 'Voluntarily causing hurt', law: 'BNS s.115' },
   hitrun:    { amt: 5000, name: 'Hit and run: not stopping after hitting someone', law: 'MV Act s.134/187' },
   fled:      { amt: 3000, name: 'Escaping from lawful custody', law: 'BNS s.262' },
+  pickpocket: { amt: 3000, name: 'Pickpocketing (theft)', law: 'BNS s.303' },
+  stolengoods: { amt: 10000, name: 'Carrying stolen property', law: 'BNS s.317' },
+  racing:    { amt: 5000, name: 'Racing on a public road', law: 'MV Act s.189' },
 };
 // what you're wanted for decides what the marshals shout and what you're booked under when caught
-const SERIOUS = new Set(['theft', 'assault', 'hurt', 'hitrun', 'fled']);
-const CHARGE_ORDER = ['assault', 'hitrun', 'theft', 'hurt', 'fled', 'disobey'];
+const SERIOUS = new Set(['theft', 'assault', 'hurt', 'hitrun', 'fled', 'pickpocket']);
+const CHARGE_ORDER = ['assault', 'hitrun', 'theft', 'pickpocket', 'hurt', 'fled', 'disobey'];
 const TOW = { two: 200, three: 200, four: 400, fine: 500 };   // towing charges + no-parking fine
 const SPEED_LIMIT = 50;                                         // km/h on city arterials
 const COP_NAMES = ['Havaldar Shinde', 'Havaldar Jadhav', 'PSI Kulkarni', 'Havaldar Pawar', 'Havaldar Gaikwad', 'ASI Deshmukh', 'Havaldar More', 'PSI Patil', 'Havaldar Sawant', 'Havaldar Kamble'];
-const STOP_LINE = { signal: 'stop_signal', helmet: 'stop_helmet', wrong: 'stop_wrong', speed: 'stop_speed', horn: 'stop_horn', check: 'stop_check', rash: 'stop_speed', suspended: 'stop_check', theft: 'caught_theft', assault: 'caught_assault', hurt: 'caught_hurt', hitrun: 'caught_hitrun', fled: 'caught_fled', disobey: 'caught_disobey' };
+const STOP_LINE = { signal: 'stop_signal', helmet: 'stop_helmet', wrong: 'stop_wrong', speed: 'stop_speed', horn: 'stop_horn', check: 'stop_check', rash: 'stop_speed', suspended: 'stop_check', theft: 'caught_theft', assault: 'caught_assault', hurt: 'caught_hurt', hitrun: 'caught_hitrun', fled: 'caught_fled', disobey: 'caught_disobey', pickpocket: 'caught_pickpocket' };
 
 export class Police {
   constructor(game) {

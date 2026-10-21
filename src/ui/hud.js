@@ -319,7 +319,8 @@ export class HUD {
             <span class="k"><span class="kbd">F</span></span><span>Walk into a shop, café, bar, ATM, petrol pump, your home</span>
             <span class="k"><span class="kbd">E</span></span><span>Backpack: eat, drink, use what you carry</span>
             <span class="k"><span class="kbd">Tab</span></span><span>Your status: health, hunger, energy, respect…</span>
-            <span class="k"><span class="kbd">Y</span></span><span>Accept a delivery order on your phone</span>
+            <span class="k"><span class="kbd">Y</span></span><span>Accept an offer on your phone (delivery, parcel, race)</span>
+            <span class="k"><span class="kbd">G</span></span><span>Pickpocket someone next to you (risky)</span>
             <span class="k"><span class="kbd">F3</span></span><span>Performance stats (for the curious)</span>
             <span class="k"><span class="kbd">M</span></span><span>Map · click to set a waypoint or take a rickshaw</span>
             <span class="k"><span class="kbd">1</span><span class="kbd">4</span></span><span>Answer the police</span>

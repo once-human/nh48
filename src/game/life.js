@@ -135,7 +135,7 @@ export class Life {
     // rent from what you own, once a game day
     const day = Math.floor((G.clock || 0) / 24);
     if (s.lastRentDay < 0) s.lastRentDay = day;
-    if (day > s.lastRentDay && G.props) { s.lastRentDay = day; G.props.payRent(); }
+    if (day > s.lastRentDay && G.props) { s.lastRentDay = day; G.props.payRent(); G.hustle && G.hustle.daily(); }
     if ((this.saveT -= dt) <= 0) { this.saveT = 5; this.save(); }
   }
   warn(k, v, title, sub) {
