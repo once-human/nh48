@@ -5,7 +5,7 @@ import { ColorBuilder } from '../world/geo.js';
 import { loft } from './loft.js';
 import { carSpec } from './models.js';
 
-const DASH = [0.11, 0.105, 0.1], SOFT = [0.2, 0.19, 0.18], WHEEL = [0.07, 0.07, 0.075], METAL = [0.55, 0.56, 0.58];
+const DASH = [0.17, 0.16, 0.15], SOFT = [0.28, 0.26, 0.24], WHEEL = [0.07, 0.07, 0.075], METAL = [0.55, 0.56, 0.58];
 const MATTE = -1;
 const DRIVER_Z = 0.36;          // the driver sits on the right (+z)
 
@@ -108,7 +108,7 @@ export function buildCarCockpit(kind, mats) {
   };
   draw(0, 1, 0.1, 0);
   return {
-    group, eye: [xf0 - 1.12, belt + 0.34, DRIVER_Z],
+    group, eye: [xf0 - 1.2, belt + 0.23, DRIVER_Z],
     update(steer, kmh, gear, rpm, night) {
       spin.rotation.z = steer * 7.5;          // ~15:1 rack: the wheel turns much further than the tyres
       draw(kmh, gear, rpm, night);

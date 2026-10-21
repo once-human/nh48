@@ -321,53 +321,84 @@ export class HUD {
   }
 
   // ---------------------------------------------------------------- pause
+  // the pause menu works like a game's: a list you walk with W/S (or the mouse), Enter opens, A/D change an option
   pausePane(id) {
-    this.pause.querySelectorAll('.side .nav').forEach(b => b.classList.toggle('on', b.dataset.pane === id));
+    this.pause.querySelectorAll('.pz-i').forEach(b => b.classList.toggle('open', !!id && b.dataset.pane === id));
     this.pause.querySelectorAll('.pane').forEach(q => q.classList.toggle('on', q.dataset.pane === id));
-    this.pause.querySelector('.panes').scrollTop = 0;
+    this.pause.classList.toggle('has-pane', !!id);
+    this.pause.querySelector('.pz-r').scrollTop = 0;
+  }
+  pauseSel(k) {
+    const items = [...this.pause.querySelectorAll('.pz-i')];
+    this.pzSel = (k + items.length) % items.length;
+    items.forEach((b, i) => b.classList.toggle('sel', i === this.pzSel));
+    const b = items[this.pzSel];
+    if (b.dataset.pane) this.pausePane(b.dataset.pane); else this.pausePane(null);
+  }
+  pauseMenu(p) {
+    const items = [...p.querySelectorAll('.pz-i')];
+    items.forEach((b, i) => { b.addEventListener('mouseenter', () => this.pauseSel(i)); if (b.dataset.pane) b.onclick = () => this.pauseSel(i); });
+    // every option row becomes a ◀ value ▶ picker
+    p.querySelectorAll('.pz-r .seg').forEach(sg => {
+      const step = (d) => { const bs = [...sg.querySelectorAll('button')], k = bs.findIndex(b => b.classList.contains('on')); bs[(Math.max(0, k) + d + bs.length) % bs.length].click(); };
+      const L = el('i', 'pz-arr l', '‹'), R = el('i', 'pz-arr r', '›');
+      L.onclick = () => step(-1); R.onclick = () => step(1);
+      sg.prepend(L); sg.append(R); sg._step = step;
+      sg.closest('.row')?.addEventListener('click', (e) => { if (e.target === sg.closest('.row') || e.target.closest('.rl')) step(1); });
+    });
+    window.addEventListener('keydown', (e) => {
+      if (p.hidden || this.pickerOpen) return;
+      const c = e.code;
+      if (c === 'KeyW' || c === 'ArrowUp') { e.preventDefault(); this.pauseSel((this.pzSel ?? 0) - 1); }
+      else if (c === 'KeyS' || c === 'ArrowDown') { e.preventDefault(); this.pauseSel((this.pzSel ?? 0) + 1); }
+      else if (c === 'Enter' || c === 'Space') { e.preventDefault(); const b = p.querySelectorAll('.pz-i')[this.pzSel ?? 0]; b && !b.dataset.pane && b.click(); }
+      else if ((c === 'KeyA' || c === 'KeyD' || c === 'ArrowLeft' || c === 'ArrowRight') && p.classList.contains('has-pane')) {
+        const sg = p.querySelector('.pane.on .row:hover .seg') || p.querySelector('.pane.on .seg');
+        if (sg && sg._step) { e.preventDefault(); sg._step(c === 'KeyA' || c === 'ArrowLeft' ? -1 : 1); }
+      }
+    });
   }
   buildPause() {
     const p = el('div', 'ov pause');
     p.hidden = true;
     p.innerHTML = `
-      <div class="sheet two" role="dialog" aria-label="Paused">
-        <nav class="side">
-          <div class="who"><b id="p-who">Paused</b><small>NH48 · Pune <span lang="mr">पुणे</span></small></div>
-          <button class="nav on" data-pane="home"><i style="--c:#ffb224"></i>Home</button>
-          <button class="nav" data-pane="av"><i style="--c:#5e9eff"></i>Display and sound</button>
-          <button class="nav" data-pane="game"><i style="--c:#30d17a"></i>Gameplay</button>
-          <button class="nav" data-pane="ctrl"><i style="--c:#bf8cff"></i>Controls</button>
-          <button class="nav" data-pane="ch"><i style="--c:#ff6159"></i>E-challans</button>
-          <button class="nav" data-pane="me"><i style="--c:#a1a1aa"></i>Character and save</button>
-        </nav>
-        <div class="panes">
-          <section class="pane on" data-pane="home">
-            <h2>Paused</h2>
-            <div class="hero-acts"><button class="btn primary big" id="p-resume">Resume</button><button class="btn big" id="p-map">Map</button><button class="btn big" id="p-guide">Guide</button></div>
-            <div class="gt">Time of day</div>
-            <div class="seg wide" id="p-time"><button data-h="8.5">Morning</button><button data-h="13">Noon</button><button data-h="17.85">Sunset</button><button data-h="21.5">Night</button></div>
-            <div class="note">Esc or Resume puts you straight back in the game.</div>
-          </section>
-          <section class="pane" data-pane="av">
-            <h2>Display and sound</h2>
-            <div class="gt">Graphics</div>
-            <div class="group"><div class="row"><div class="rl">Quality<small id="p-qnote"></small></div><div class="rc"><div class="seg" id="p-q"><button data-q="low">Low</button><button data-q="med">Medium</button><button data-q="high">High</button></div></div></div>
-              <div class="row"><div class="rl">Sound</div><div class="rc"><input type="range" id="p-vol" min="0" max="1" step="0.05"></div></div></div>
-            <div class="gt">Camera and voices</div>
+      <div class="pz" role="dialog" aria-label="Paused">
+        <div class="pz-l">
+          <div class="pz-head"><span class="pz-k">Paused</span><b id="p-who">Paused</b><div class="pz-meta" id="p-meta"></div></div>
+          <nav class="pz-menu">
+            <button class="pz-i" id="p-resume">Resume</button>
+            <button class="pz-i" id="p-map">Map</button>
+            <button class="pz-i" id="p-guide">Guide</button>
+            <button class="pz-i" data-pane="set">Settings</button>
+            <button class="pz-i" data-pane="ctrl">Controls</button>
+            <button class="pz-i" data-pane="ch">E-challans<i id="p-ch-badge" hidden></i></button>
+            <button class="pz-i" data-pane="me">Character</button>
+            <button class="pz-i" id="p-title">Quit to title</button>
+          </nav>
+        </div>
+        <div class="pz-r">
+          <section class="pane" data-pane="set"><h2>Settings</h2>
+            <div class="gt">World</div>
+            <div class="group"><div class="row"><div class="rl">Time of day</div><div class="rc"><div class="seg" id="p-time"><button data-h="8.5">Morning</button><button data-h="13">Noon</button><button data-h="17.85">Sunset</button><button data-h="21.5">Night</button></div></div></div></div>
+            <div class="gt">Picture</div>
+            <div class="group"><div class="row"><div class="rl">Graphics<small id="p-qnote"></small></div><div class="rc"><div class="seg" id="p-q"><button data-q="low">Low</button><button data-q="med">Medium</button><button data-q="high">High</button></div></div></div></div>
             ${settingsHTML('av')}
+            <div class="gt">Sound</div>
+            <div class="group"><div class="row"><div class="rl">Master volume</div><div class="rc"><input type="range" id="p-vol" min="0" max="1" step="0.05"></div></div></div>
+            <div class="gt">Game</div>
+            ${settingsHTML('game')}
           </section>
-          <section class="pane" data-pane="game"><h2>Gameplay</h2>${settingsHTML('game')}</section>
           <section class="pane" data-pane="ctrl"><h2>Controls</h2>
             <div class="gt">Driving</div><div class="group"><div class="row"><div class="rl">Accelerate, brake, hold to reverse</div><div class="rc k"><span class="kbd">W</span><span class="kbd">S</span></div></div><div class="row"><div class="rl">Steer</div><div class="rc k"><span class="kbd">A</span><span class="kbd">D</span></div></div><div class="row"><div class="rl">Handbrake</div><div class="rc k"><span class="kbd">Space</span></div></div><div class="row"><div class="rl">Horn</div><div class="rc k"><span class="kbd">H</span></div></div><div class="row"><div class="rl">Change camera</div><div class="rc k"><span class="kbd">C</span></div></div><div class="row"><div class="rl">Look back</div><div class="rc k"><span class="kbd">B</span></div></div><div class="row"><div class="rl">Back on the road</div><div class="rc k"><span class="kbd">R</span></div></div><div class="row"><div class="rl">Get out</div><div class="rc k"><span class="kbd">F</span></div></div></div><div class="gt">On foot</div><div class="group"><div class="row"><div class="rl">Walk</div><div class="rc k"><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span></div></div><div class="row"><div class="rl">Sprint</div><div class="rc k"><span class="kbd">Shift</span></div></div><div class="row"><div class="rl">Walk slowly</div><div class="rc k"><span class="kbd">Alt</span></div></div><div class="row"><div class="rl">Jump, or climb the wall you face</div><div class="rc k"><span class="kbd">Space</span></div></div><div class="row"><div class="rl">Roll</div><div class="rc k"><span class="kbd">C</span></div></div><div class="row"><div class="rl">Punch (keep clicking: jab, cross, hook)</div><div class="rc k"><span class="kbd">Click</span></div></div><div class="row"><div class="rl">Talk, walk in, get in or take a vehicle</div><div class="rc k"><span class="kbd">F</span></div></div><div class="row"><div class="rl">Pickpocket (risky)</div><div class="rc k"><span class="kbd">G</span></div></div></div><div class="gt">Anytime</div><div class="group"><div class="row"><div class="rl">Jhola: eat, drink, use what you carry</div><div class="rc k"><span class="kbd">E</span></div></div><div class="row"><div class="rl">Your status</div><div class="rc k"><span class="kbd">Tab</span></div></div><div class="row"><div class="rl">Map, waypoints, rickshaw, metro, bus</div><div class="rc k"><span class="kbd">M</span></div></div><div class="row"><div class="rl">Accept an offer on your phone</div><div class="rc k"><span class="kbd">Y</span></div></div><div class="row"><div class="rl">Answer the police</div><div class="rc k"><span class="kbd">1</span><span class="kbd">4</span></div></div><div class="row"><div class="rl">Camera distance</div><div class="rc k"><span class="kbd">V</span></div></div><div class="row"><div class="rl">Close any menu, or pause</div><div class="rc k"><span class="kbd">Esc</span></div></div><div class="row"><div class="rl">Performance stats</div><div class="rc k"><span class="kbd">F3</span></div></div></div>
           </section>
           <section class="pane" data-pane="ch" id="p-ch"><h2>E-challans</h2>
-            <div class="group"><div class="row"><div class="rl"><b class="ch-amt num" id="p-ch-amt">₹0</b><small id="p-ch-note">Nothing pending</small></div><div class="rc"><button class="btn" id="p-ch-pay">Pay all</button></div></div></div>
+            <div class="pz-big"><b class="ch-amt num" id="p-ch-amt">₹0</b><small id="p-ch-note">Nothing pending</small></div>
+            <button class="btn primary" id="p-ch-pay">Pay all</button>
             <ul class="ch-list" id="p-ch-list"></ul>
           </section>
-          <section class="pane" data-pane="me"><h2>Character and save</h2>
+          <section class="pane" data-pane="me"><h2>Character</h2>
             <div class="group">
-              <div class="row"><div class="rl">Character<small>Your look, hair and name</small></div><div class="rc"><button class="btn" id="p-char">Change</button></div></div>
-              <div class="row"><div class="rl">Title screen<small>Your game is saved</small></div><div class="rc"><button class="btn" id="p-title">Quit to title</button></div></div>
+              <div class="row"><div class="rl">Your look, hair and name</div><div class="rc"><button class="btn" id="p-char">Change</button></div></div>
             </div>
             <div class="gt">Start over</div>
             <div class="group danger"><div class="row"><div class="rl">Wipe everything<small>Money back to ₹5,000; vehicles, outfits, property, fines, people and where you are</small></div><div class="rc"><button class="btn bad" id="p-reset">Start over</button></div></div>
@@ -375,8 +406,9 @@ export class HUD {
             <div class="fine">Map data © OpenStreetMap contributors (ODbL); buildings and places from Overture Maps Foundation (ODbL, CDLA-Permissive-2.0), including Google Open Buildings and Microsoft footprints. All business names are fictional parodies of real places. People and animals: Quaternius (CC0). Voices: Kokoro-82M (Apache-2.0) and Piper mr_IN, trained on Google’s crowdsourced Marathi speech (OpenSLR 64, CC BY-SA 4.0). Sounds: Freesound (CC0). Fines follow the MV Act as reported for Pune and may be out of date.</div>
           </section>
         </div>
+        <div class="pz-keys"><span><span class="kbd">W</span><span class="kbd">S</span> Select</span><span><span class="kbd">A</span><span class="kbd">D</span> Change</span><span><span class="kbd">Enter</span> Open</span><span><span class="kbd">Esc</span> Resume</span></div>
       </div>`;
-    p.querySelectorAll('.side .nav').forEach(b => b.onclick = () => this.pausePane(b.dataset.pane));
+    this.pauseMenu(p);
     this.root.appendChild(p);
     this.pause = p;
     p.addEventListener('click', (e) => { if (e.target === p) this.game.togglePause(false); });
@@ -398,6 +430,10 @@ export class HUD {
   syncPause() {
     const pw = this.pause && this.pause.querySelector('#p-who'); if (pw) { const sv = savedCharacter(); pw.textContent = sv ? sv.name : 'Paused'; }
     const g = this.game;
+    const area = this.$('h-area')?.textContent || 'Pune', street = this.$('h-street')?.textContent || '';
+    this.pause.querySelector('#p-meta').innerHTML = `<span>${street || area}</span><span>${this.$('h-clock')?.textContent || ''}</span><span>${fmtRupees(g.stats?.money ?? 0)}</span>`;
+    const bd = this.pause.querySelector('#p-ch-badge'), dues = g.police ? g.police.duesTotal : 0; bd.hidden = !dues; bd.textContent = dues ? fmtRupees(dues) : '';
+    if (this.pzSel == null || !this.pause.classList.contains('has-pane')) this.pauseSel(0);
     this.pause.querySelectorAll('#p-q button').forEach(b => b.classList.toggle('on', b.dataset.q === g.qualityName));
     this.pause.querySelector('#p-vol').value = g.audio.volume;
     syncSettings(this.pause, g);

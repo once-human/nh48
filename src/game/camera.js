@@ -64,7 +64,7 @@ export class CameraRig {
       const m = p.tilt.matrixWorld;
       p.tilt.updateWorldMatrix(true, false);
       const yaw = this.orbit + (this.lookBack ? Math.PI : 0);
-      const pitch = (p.inAuto ? -0.17 : -0.09) + this.pitchOff * 0.6;
+      const pitch = (p.inAuto ? -0.17 : -0.035) + this.pitchOff * 0.6;
       const ex = E[0] - (this.lookBack ? 0.1 : 0), ey = E[1], ez = E[2];
       _eye.set(ex, ey, ez).applyMatrix4(m);
       _tgt.set(ex + Math.cos(yaw) * Math.cos(pitch) * 10, ey + Math.sin(pitch) * 10, ez + Math.sin(yaw) * Math.cos(pitch) * 10).applyMatrix4(m);
