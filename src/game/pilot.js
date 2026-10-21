@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { flyResolve } from '../world/flyover.js';
 import { clamp, damp, dampAngle, wrapAngle, RNG } from '../core/util.js';
-import { lookFor, savedCharacter } from '../people/characters.js';
+import { lookOf, savedCharacter } from '../people/characters.js';
 import { WATER_Y } from '../world/groundChunk.js';
 const SWIM_Y = WATER_Y - 1.0;      // holder height while swimming: head and shoulders above the water
 
@@ -41,7 +41,7 @@ export class Pilot {
     this.hp = 100; this.hurtT = 99; this.act = null; this.ko = false;
     if (kit) {
       const sv = savedCharacter();
-      this.setLook(lookFor(sv && sv.id, sv && sv.skin));
+      this.setLook(lookOf(sv));
     }
     this.parkGrid = null;
   }
@@ -224,6 +224,7 @@ export class Pilot {
     H.holder.position.set(F.x, F.y, F.z);
     H.holder.rotation.set(0, -F.yaw, 0);
     H.mixer.update(dt);
+    if (this.postPose) this.postPose(H, dt);
   }
 
   // over a compound wall: hands on top, swing up (0.9 s), over and drop down the other side

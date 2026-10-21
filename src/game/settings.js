@@ -37,21 +37,21 @@ export function applySettings(G) {
   if (G.audio) { G.audio.voiceVol = s.voiceVol; G.audio.musicVol = s.musicVol; }
 }
 
-// the pause-menu section
-export function settingsHTML() {
+// the pause-menu sections: grouped rows, a label on the left and the control on the right
+export function settingsHTML(part) {
   const seg = (id, opts) => `<div class="seg" data-set="${id}">${opts.map(([v, l]) => `<button data-v="${v}">${l}</button>`).join('')}</div>`;
   const range = (id, min, max, step) => `<input type="range" data-set="${id}" min="${min}" max="${max}" step="${step}">`;
-  return `<div class="sec settings"><div class="cap">Settings</div>
-    <div class="set-grid">
-      <label>Field of view</label>${range('fov', -10, 20, 1)}
-      <label>Voices</label>${range('voiceVol', 0, 1.5, 0.05)}
-      <label>Club music</label>${range('musicVol', 0, 1.5, 0.05)}
-      <label>Subtitles</label>${seg('subs', [['both', 'With English'], ['line', 'Line only'], ['off', 'Off']])}
-      <label>HUD</label>${seg('hud', [['full', 'Full'], ['minimal', 'Minimal']])}
-      <label>Clock</label>${seg('clock24', [['false', '12 hour'], ['true', '24 hour']])}
-      <label>Full screen</label>${seg('fullscreen', [['true', 'On start'], ['false', 'Never']])}
-    </div>
-    <div class="note">Saved on this device.</div></div>`;
+  const row = (l, c, sub) => `<div class="row"><div class="rl">${l}${sub ? `<small>${sub}</small>` : ''}</div><div class="rc">${c}</div></div>`;
+  if (part === 'av') return `<div class="group settings">
+      ${row('Field of view', range('fov', -10, 20, 1), 'Wider shows more of the street')}
+      ${row('Voices', range('voiceVol', 0, 1.5, 0.05))}
+      ${row('Club music', range('musicVol', 0, 1.5, 0.05))}</div>`;
+  return `<div class="group settings">
+      ${row('Subtitles', seg('subs', [['both', 'With English'], ['line', 'Line only'], ['off', 'Off']]))}
+      ${row('HUD', seg('hud', [['full', 'Full'], ['minimal', 'Minimal']]))}
+      ${row('Clock', seg('clock24', [['false', '12 hour'], ['true', '24 hour']]))}
+      ${row('Full screen', seg('fullscreen', [['true', 'On start'], ['false', 'Never']]))}</div>
+    <div class="note">Saved on this device.</div>`;
 }
 export function bindSettings(root, G) {
   const parse = (k, v) => typeof DEFAULTS[k] === 'boolean' ? v === 'true' : typeof DEFAULTS[k] === 'number' ? parseFloat(v) : v;

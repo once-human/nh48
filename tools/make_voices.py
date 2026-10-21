@@ -68,8 +68,10 @@ for kind, (voice, lang, tempo) in shopl['_voice'].items():
 # {woman|man} picks the gendered form
 import re
 def gform(t, f): return re.sub(r'\{([^{}|]*)\|([^{}|]*)\}', lambda m: m.group(1) if f else m.group(2), t)
-DV = {'f': {'en': ('hf_beta', 'en-us', 1.04), 'hi': ('hf_beta', 'hi', 1.04), 'mr': ('mr0', 'mr', 1.0)},
-      'm': {'en': ('hm_psi', 'en-us', 1.02), 'hi': ('hm_omega', 'hi', 1.0), 'mr': ('hm_psi', 'mr', 1.0)}}
+# Hindi and Marathi date lines are written romanised (Hinglish style), so they're read with English phonemes
+# in the Indian voices; that's what sounds natural for them
+DV = {'f': {'en': ('hf_beta', 'en-us', 1.04), 'hi': ('hf_beta', 'en-us', 1.04), 'mr': ('hf_alpha', 'en-us', 1.0)},
+      'm': {'en': ('hm_psi', 'en-us', 1.02), 'hi': ('hm_omega', 'en-us', 1.0), 'mr': ('hm_psi', 'en-us', 1.0)}}
 for lang in ('en', 'hi', 'mr'):
     dl = json.load(open(os.path.join(ROOT, f'src/game/date/{lang}.json')))
     for key, arr in dl.items():
@@ -79,6 +81,12 @@ for lang in ('en', 'hi', 'mr'):
                 text = gform(row[0] if isinstance(row, list) else row, sx == 'f')
                 lid = f'd_{sx}_{lang}_{key}{i}'
                 jobs.append((lid, voice, vl, text)); shape[lid] = (1.0, tempo)
+
+# the character creator: what the new you says when you switch between a man and a woman
+PK = {'pk_f0': 'Okay Pune. Let’s see what you’ve got.', 'pk_f1': 'Chal, the city’s waiting.', 'pk_f2': 'Yeah. This feels like me.', 'pk_f3': 'FC Road, here I come.',
+      'pk_m0': 'Right. Let’s go, Pune.', 'pk_m1': 'Chal bhai, kaam pe chalte hain.', 'pk_m2': 'This one. Definitely this one.', 'pk_m3': 'Koregaon Park tonight? Let’s see.'}
+for lid, text in PK.items():
+    jobs.append((lid, 'hf_beta' if '_f' in lid else 'hm_omega', 'en-us', text)); shape[lid] = (1.0, 1.02)
 
 def af_for(lid): return lid
 for lid, voice, lang, tts in jobs:

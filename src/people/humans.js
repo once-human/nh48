@@ -86,6 +86,38 @@ function patchBody(mat) {
   return mat;
 }
 
+// two-bone IK for an arm, on top of whatever clip is playing: shoulder-elbow-hand reach for a world
+// point, the elbow bending toward 'pole'. w blends from the clip (0) to the reach (1).
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _t = new THREE.Vector3(), _e = new THREE.Vector3(), _q = new THREE.Quaternion(), _pq = new THREE.Quaternion(), _wq = new THREE.Quaternion(), _q0 = new THREE.Quaternion(), _q1 = new THREE.Quaternion();
+function aim(bone, from, to) {
+  // turn bone (in world) so the direction 'from' becomes 'to'
+  _q.setFromUnitVectors(from.clone().normalize(), to.clone().normalize());
+  bone.getWorldQuaternion(_wq); bone.parent.getWorldQuaternion(_pq);
+  bone.quaternion.copy(_pq.invert().multiply(_q.multiply(_wq)));
+  bone.updateMatrixWorld(true);
+}
+export function ikArm(H, side, target, pole, w = 1) {
+  const R = H.root, up = H._ik && H._ik[side] || (H._ik = H._ik || {}, H._ik[side] = [R.getObjectByName('upperarm_' + side), R.getObjectByName('lowerarm_' + side), R.getObjectByName('hand_' + side)]);
+  const [u, l, h] = up;
+  if (!u || !l || !h || w <= 0) return;
+  R.updateMatrixWorld(true);
+  _q0.copy(u.quaternion); _q1.copy(l.quaternion);
+  u.getWorldPosition(_a); l.getWorldPosition(_b); h.getWorldPosition(_c);
+  const l1 = _a.distanceTo(_b), l2 = _b.distanceTo(_c);
+  _t.copy(target).sub(_a);
+  const d = Math.min(l1 + l2 - 1e-3, Math.max(Math.abs(l1 - l2) + 1e-3, _t.length()));
+  _t.setLength(d);
+  // where the elbow goes: along the reach, pushed out toward the pole
+  const cosA = (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
+  const dir = _t.clone().normalize(), side2 = pole.clone().sub(dir.clone().multiplyScalar(pole.dot(dir))).normalize();
+  _e.copy(dir).multiplyScalar(cosA * l1).add(side2.multiplyScalar(sinA * l1)).add(_a);
+  aim(u, _b.clone().sub(_a), _e.clone().sub(_a));
+  l.getWorldPosition(_b); h.getWorldPosition(_c);
+  aim(l, _c.clone().sub(_b), _t.clone().add(_a).sub(_b));
+  if (w < 1) { u.quaternion.slerpQuaternions(_q0, u.quaternion.clone(), w); l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }
+  R.updateMatrixWorld(true);
+}
+
 export class HumanKit {
   constructor(gM, gF) {
     this.src = { m: gM, f: gF };

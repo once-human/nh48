@@ -113,16 +113,21 @@ const CONTROLS = [
 ];
 
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const dl = (rows) => `<dl class="gd-dl">${rows.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join('')}</dl>`;
-const sec = (title, body, open) => `<details class="gd-sec"${open ? ' open' : ''}><summary>${esc(title)}</summary>${body}</details>`;
+// cards in a grid, one topic at a time (chips at the top switch topics; no script needed)
+const cards = (rows) => `<div class="gd-cards">${rows.map(([a, b]) => `<div class="gd-card"><b>${esc(a)}</b><p>${esc(b)}</p></div>`).join('')}</div>`;
+const note = (t) => t ? `<p class="gd-note">${esc(t)}</p>` : '';
 
 export function guideHTML() {
-  let h = `<p class="gd-intro">Everything in NH48 Pune, in one place. Real shops from the map are all over the city; the Nearby tab and the map (M) show what’s around you.</p>`;
-  h += sec('Places and what to do there', SHOPS.map(([g, rows, note]) => `<h4>${esc(g)}</h4>${dl(rows)}${note ? `<p class="gd-note">${esc(note)}</p>` : ''}`).join(''), true);
-  h += sec('Making money', `<h4>Straight</h4>${dl(EARN_LEGAL)}<h4>Not so straight</h4>${dl(EARN_ILLEGAL)}<p class="gd-note">Crime raises your wanted level. Money in the bank is safe; cash on you can be taken when you’re knocked out.</p>`);
-  h += sec('Your body', dl(BODY));
-  h += sec('People and dating', dl(PEOPLE));
-  h += sec('Controls', dl(CONTROLS));
-  return h;
+  const T = [
+    ['Places', SHOPS.map(([g, rows, n]) => `<h4>${esc(g)}</h4>${cards(rows)}${note(n)}`).join('')],
+    ['Money', `<h4>Straight</h4>${cards(EARN_LEGAL)}<h4>Not so straight</h4>${cards(EARN_ILLEGAL)}${note('Crime raises your wanted level. Money in the bank is safe; cash on you can be taken when you’re knocked out.')}`],
+    ['Your body', cards(BODY)],
+    ['People and dating', cards(PEOPLE)],
+    ['Controls', `<div class="gd-keys">${CONTROLS.map(([k, d]) => `<div><span>${k.split(/ (?:or|to|\/) /).map(x => `<span class="kbd">${esc(x)}</span>`).join('')}</span><p>${esc(d)}</p></div>`).join('')}</div>`],
+  ];
+  return `<p class="gd-intro">Everything in NH48 Pune, in one place. Real shops from the map are all over the city; Nearby and the map (M) show what’s around you.</p>
+    ${T.map((_, k) => `<input type="radio" name="gd" id="gd-${k}" class="gd-r"${k ? '' : ' checked'}>`).join('')}
+    <div class="gd-nav">${T.map(([t], k) => `<label for="gd-${k}">${esc(t)}</label>`).join('')}</div>
+    <div class="gd-panes">${T.map(([, b], k) => `<section class="gd-p gd-p${k}">${b}</section>`).join('')}</div>`;
 }
 export { EARN_ILLEGAL, EARN_LEGAL };

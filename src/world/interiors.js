@@ -17,7 +17,8 @@
 import * as THREE from 'three';
 import { ColorBuilder } from './geo.js';
 import { RNG } from '../core/util.js';
-import { castAs, pickCast, castByName } from '../people/cast.js';
+import { castAs, pickCast } from '../people/cast.js';
+import { ikArm } from '../people/humans.js';
 import { F, MENUS, AREA_FOOD } from '../game/shops.js';
 import { Vehicle } from '../vehicles/vehicle.js';
 import { tierOf } from '../game/brands.js';
@@ -700,7 +701,7 @@ export class Interiors {
     seat.used = true; C.seat = seat;
     P.foot.x = seat.x; P.foot.z = seat.z; P.foot.yaw = seat.yaw; P.foot.vx = P.foot.vz = 0;
     P.seated = true;
-    P.human.play('sit', { fade: 0.3 });
+    P.human.play('sit', { fade: 0.45 });
     void salon;
   }
   stand() {
@@ -722,27 +723,54 @@ export class Interiors {
     const G = this.g, C = this.cur, P = G.player;
     if (!C || !C.plate || !C.seat) return;
     const plate = C.plate; C.plate = null; C.eating = true;
-    // a plate on the table in front of you
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.03, 16), new THREE.MeshLambertMaterial({ color: 0xd9dde2 }));
-    const food = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: /chai|coffee|lassi|taak|mastani|juice|cola|beer|cocktail|mocktail|sharbat/i.test(plate.name) ? 0xc8a16a : 0xc9772e }));
+    const drink = /chai|coffee|tea|lassi|taak|mastani|juice|cola|soda|beer|cocktail|mocktail|sharbat|shake|water|whisky|rum|vodka|wine|shot|kokum|neer/i.test(plate.name);
+    // what's on the table: a plate of food, or a glass
     const t = C.seat.table, tx = t.x + (C.seat.x - t.x) * 0.35, tz = t.z + (C.seat.z - t.z) * 0.35;
-    m.position.set(tx, FLOOR + 0.79, tz); food.position.set(tx, FLOOR + 0.8, tz);
-    G.scene.add(m, food);
-    P.human.play('drink', { fade: 0.3 });
-    G.hud.toast(`Eating: ${plate.name}`, 'Take your time', 'info', 2.4);
+    const objs = [];
+    if (!drink) {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.03, 16), new THREE.MeshLambertMaterial({ color: 0xd9dde2 }));
+      const food = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xc9772e }));
+      m.position.set(tx, FLOOR + 0.79, tz); food.position.set(tx, FLOOR + 0.8, tz);
+      objs.push(m, food); G.scene.add(m, food); C._food = food;
+    }
+    // the glass (or the spoonful) travels in your right hand
+    const cup = new THREE.Mesh(drink ? new THREE.CylinderGeometry(0.035, 0.028, 0.1, 12) : new THREE.SphereGeometry(0.02, 8, 6),
+      new THREE.MeshLambertMaterial({ color: drink ? (/beer|whisky|rum|cola|coffee|chai/i.test(plate.name) ? 0x9a5b22 : 0xe8d6a8) : 0xc9772e, transparent: drink, opacity: drink ? 0.85 : 1 }));
+    const hand = P.human.root.getObjectByName('hand_r');
+    if (hand) { hand.add(cup); cup.position.set(0, 0.08, 0.02); cup.scale.setScalar(1 / (P.look.scale || 1)); }
+    P.human.play('sit', { fade: 0.2 });
+    G.hud.toast(`${drink ? 'Drinking' : 'Eating'}: ${plate.name}`, 'Take your time', 'info', 2.4);
+    // the sitting pose stays; the right arm goes table → mouth and back, a sip or a bite every couple of seconds
+    const yaw = C.seat.yaw, fx = Math.cos(yaw), fz = Math.sin(yaw);
+    const head = P.human.root.getObjectByName('Head'), mouth = new THREE.Vector3(), tgt = new THREE.Vector3(), pole = new THREE.Vector3(), rest = new THREE.Vector3(tx, FLOOR + 0.86, tz);
+    let ph = 0;
+    P.postPose = (H, dt) => {
+      ph += dt;
+      if (!head) return;
+      head.getWorldPosition(mouth); mouth.x += fx * 0.1; mouth.z += fz * 0.1; mouth.y -= 0.02;
+      const cyc = (ph % 2.6) / 2.6, lift = cyc < 0.25 ? cyc / 0.25 : cyc < 0.55 ? 1 : cyc < 0.8 ? 1 - (cyc - 0.55) / 0.25 : 0;
+      const e = lift * lift * (3 - 2 * lift);
+      tgt.copy(rest).lerp(mouth, e);
+      if (drink) tgt.y -= 0.02 * (1 - e);
+      pole.set(fz, -0.6, -fx).normalize();       // the elbow out to the side and down
+      ikArm(H, 'r', tgt, pole, Math.min(1, ph * 3));
+      cup.rotation.z = drink ? -e * 0.9 : 0;
+    };
     const steps = 5; let k = 0;
     const tick = setInterval(() => {
       k++;
       const part = {}; for (const [a, v] of Object.entries(plate.eff)) part[a] = v / steps;
       G.life.apply(part);
-      food.scale.setScalar(Math.max(0.05, 1 - k / steps));
+      if (C._food) C._food.scale.setScalar(Math.max(0.05, 1 - k / steps));
       if (k >= steps) {
-        clearInterval(tick); G.scene.remove(m, food); m.geometry.dispose(); food.geometry.dispose();
+        clearInterval(tick); for (const o of objs) { G.scene.remove(o); o.geometry.dispose(); }
+        cup.parent && cup.parent.remove(cup); cup.geometry.dispose(); C._food = null; P.postPose = null;
         C.eating = false; G.life.s.tally.meals++;
-        if (this.cur === C && C.seat) P.human.play('sit', { fade: 0.3 });
-        G.hud.toast('Done', 'Wipe your hands, pay the bill, belch politely', 'good', 2.2);
+        G.hud.toast('Done', drink ? 'Glass empty' : 'Wipe your hands, pay the bill, belch politely', 'good', 2.2);
+        // finished: get up from the table
+        if (this.cur === C && C.seat && !C.dateTable) setTimeout(() => { if (this.cur === C && C.seat && !C.eating) this.stand(); }, 900);
       }
-    }, 1100);
+    }, 1300);
   }
   dance(on) {
     const G = this.g, C = this.cur, P = G.player;

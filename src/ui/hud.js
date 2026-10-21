@@ -7,7 +7,7 @@ import { settingsHTML, bindSettings, syncSettings } from '../game/settings.js';
 import * as THREE from 'three';
 import { fmtRupees, isTouch } from '../core/util.js';
 import { MapScreen, CATS, drawPin, drawArrow, drawFlag, fmtDist } from './map.js';
-import { CHARACTERS, SKINS, lookFor, savedCharacter, saveCharacter } from '../people/characters.js';
+import { SKINS, HAIRS, HAIR_COLS, OUTFITS, lookOf, normalise, savedCharacter, saveCharacter } from '../people/characters.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 const STONE = '<svg viewBox="0 0 40 52" aria-hidden="true"><path d="M4 22a16 16 0 0 1 32 0v26H4z" fill="#F4F1EA"/><path d="M4 22a16 16 0 0 1 32 0z" fill="#F2B705"/><rect x="4" y="44" width="32" height="4" fill="#C9C4B8"/></svg>';
@@ -97,7 +97,17 @@ export class HUD {
       <div class="subt" id="h-sub"><div class="who" id="h-sub-who"></div><div class="line" id="h-sub-line"></div><div class="tr" id="h-sub-tr"></div></div>`);
     this.toastWrap = el('div', 'h toasts');
     // health, food, water, energy: always on screen, just above the minimap
-    this.vit = el('div', 'h vit', ['h:health', 'f:food', 'w:water', 'e:energy'].map(k => { const [c, n] = k.split(':'); return `<span class="v-${c}" title="${n}">${icon(n)}<i><b></b></i></span>`; }).join(''));
+    // the four vitals: rings like an activity watch, a bold glyph in each
+    const VG = {
+      h: '<path d="M12 20.3 4.6 13.2A4.9 4.9 0 0 1 12 6.9a4.9 4.9 0 0 1 7.4 6.3Z"/>',
+      f: '<path d="M7 3v7a2 2 0 0 0 1.5 1.9V21h2v-9.1A2 2 0 0 0 12 10V3h-1.4v6h-1V3H8.4v6h-1V3Zm8.6 0c-1.8 0-2.6 2.7-2.6 6 0 1.6.9 2.7 2 3V21h2V3Z"/>',
+      w: '<path d="M12 2.8s-6.2 7-6.2 11.3a6.2 6.2 0 0 0 12.4 0C18.2 9.8 12 2.8 12 2.8Z"/>',
+      e: '<path d="M13.6 2 5 13.4h6l-1.4 8.6 8.8-11.6h-6.1Z"/>',
+    };
+    const C = 2 * Math.PI * 15;
+    this.vit = el('div', 'h vit', ['h:Health', 'f:Hunger', 'w:Thirst', 'e:Energy'].map(k => { const [c, n] = k.split(':');
+      return `<span class="v-${c}" title="${n}"><svg viewBox="0 0 36 36"><circle class="tr" cx="18" cy="18" r="15"/><circle class="fg" cx="18" cy="18" r="15" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="0"/></svg><svg class="gl" viewBox="0 0 24 24">${VG[c]}</svg></span>`; }).join(''));
+    this.vitC = C;
     this.nerd = el('div', 'h nerd', 'E jhola · Tab status · F3 stats');
     this.corner = el('div', 'h corner');
     const mkBtn = (icon, label, fn) => { const b = el('button', 'ibtn', `${ICON[icon]}<span class="sr">${label}</span>`); b.title = label; b.onclick = fn; return b; };
@@ -151,9 +161,9 @@ export class HUD {
     const who = t.querySelector('#t-who');
     who.hidden = !sv;
     if (sv) {
-      const ch = CHARACTERS.find(x => x.id === sv.id) || CHARACTERS[0];
-      who.querySelector('b').textContent = `Playing as ${ch.name}`;
-      who.querySelector('.t-who-sw').style.background = '#' + ch.top.toString(16).padStart(6, '0');
+      const o = OUTFITS[sv.female ? 'f' : 'm'].find(x => x.id === sv.outfit) || OUTFITS.m[0];
+      who.querySelector('b').textContent = `Playing as ${sv.name}`;
+      who.querySelector('.t-who-sw').style.background = '#' + o.top.toString(16).padStart(6, '0');
       t.querySelector('#t-roam').firstChild.textContent = 'Start ';
     }
     const S = this.game.stats;
@@ -164,10 +174,10 @@ export class HUD {
   showPicker(done) {
     if (!this.picker) this.buildPicker();
     const P = this.picker;
-    const sv = savedCharacter();
-    P.sel = { id: sv ? sv.id : 'aarav', skin: sv ? sv.skin : 'wheatish' };
+    P.sel = normalise(savedCharacter() || {});
     P.done = done;
     P.el.hidden = false; this.pickerOpen = true;
+    P.el.querySelector('#pk-name').value = P.sel.name;
     this.renderPicker();
     P.run = true; P.loop();
   }
@@ -175,22 +185,36 @@ export class HUD {
     const m = el('div', 'ov picker');
     m.innerHTML = `
       <div class="pk-l">
-        <div class="pk-h"><span class="t-ed">Who are you?</span><h2>Pick your character</h2><p>You can change this later from the menu. Nobody else in the city will look like you.</p></div>
-        <div class="pk-tabs" role="tablist"><button data-g="m" role="tab">Male</button><button data-g="f" role="tab">Female</button></div>
-        <div class="pk-cards"></div>
-        <div class="pk-skin"><span>Skin tone</span><div class="pk-sw"></div></div>
-        <div class="pk-go"><button class="btn primary" id="pk-ok">Play as Aarav</button><button class="btn" id="pk-x">Back</button></div>
+        <div class="pk-h"><span class="t-ed">Who are you?</span><h2>Make your character</h2><p>Nobody else in the city looks like you. Change it any time from the menu.</p></div>
+        <label class="pk-f"><span>Name</span><input id="pk-name" maxlength="18" autocomplete="off" spellcheck="false" placeholder="Your name"></label>
+        <div class="pk-f"><span>You are</span><div class="seg wide pk-g"><button data-g="m">A man</button><button data-g="f">A woman</button></div></div>
+        <div class="pk-f"><span>Hair</span><div class="pk-chips" id="pk-hair"></div></div>
+        <div class="pk-f"><span>Hair colour</span><div class="pk-sw" id="pk-hc"></div></div>
+        <div class="pk-f"><span>Clothes</span><div class="pk-chips" id="pk-out"></div></div>
+        <div class="pk-f"><span>Skin tone</span><div class="pk-sw" id="pk-skin"></div></div>
+        <div class="pk-go"><button class="btn primary" id="pk-ok">Play</button><button class="btn" id="pk-x">Back</button></div>
       </div>
-      <div class="pk-r"><canvas class="pk-cv"></canvas><div class="pk-name"></div><div class="pk-hint">Drag to turn</div></div>`;
+      <div class="pk-r"><canvas class="pk-cv"></canvas><div class="pk-name"></div><div class="pk-say"></div><div class="pk-hint">Drag to turn</div></div>`;
     this.root.appendChild(m);
     const P = this.picker = { el: m, cv: m.querySelector('.pk-cv'), yaw: 0.35, run: false };
-    m.querySelectorAll('.pk-tabs button').forEach(b => b.onclick = () => {
-      const g = b.dataset.g; const first = CHARACTERS.find(c => (c.female ? 'f' : 'm') === g);
-      P.sel.id = first.id; this.renderPicker();
+    const nameIn = m.querySelector('#pk-name');
+    nameIn.addEventListener('keydown', e => e.stopPropagation(), true);
+    nameIn.oninput = () => { P.sel.name = nameIn.value.replace(/[^\p{L}\p{M} .'-]/gu, '').slice(0, 18); this.renderPicker(true); };
+    m.querySelectorAll('.pk-g button').forEach(b => b.onclick = () => {
+      const f = b.dataset.g === 'f';
+      if (f === P.sel.female) return;
+      const wasDefault = !P.sel.name || P.sel.name === (P.sel.female ? 'Ananya' : 'Aarav');
+      P.sel.female = f; P.sel.hair = ''; P.sel.outfit = '';
+      if (wasDefault) { P.sel.name = f ? 'Ananya' : 'Aarav'; nameIn.value = P.sel.name; }
+      P.sel = normalise(P.sel);
+      this.renderPicker(); this.pickerVoice();
     });
     m.querySelector('#pk-ok').onclick = () => {
-      saveCharacter(P.sel.id, P.sel.skin);
-      this.game.player.setLook(lookFor(P.sel.id, P.sel.skin));
+      if (!P.sel.name.trim()) { nameIn.focus(); nameIn.classList.add('bad'); return; }
+      P.sel.name = P.sel.name.trim();
+      saveCharacter(P.sel);
+      this.game.player.setLook(lookOf(P.sel));
+      this.game.playerName = P.sel.name;
       this.closePicker(); if (P.done) P.done();
     };
     m.querySelector('#pk-x').onclick = () => this.closePicker();
@@ -222,34 +246,46 @@ export class HUD {
       R.render(scene, cam);
     };
   }
-  renderPicker() {
-    const P = this.picker, m = P.el;
-    const ch = CHARACTERS.find(x => x.id === P.sel.id) || CHARACTERS[0];
-    const g = ch.female ? 'f' : 'm';
-    m.querySelectorAll('.pk-tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.g === g));
-    const cards = m.querySelector('.pk-cards'); cards.innerHTML = '';
-    for (const c of CHARACTERS.filter(c => !!c.female === ch.female)) {
-      const b = el('button', 'pk-card' + (c.id === ch.id ? ' on' : ''), `<span class="pk-dot" style="background:#${c.top.toString(16).padStart(6, '0')}"></span><b>${c.name}</b><small>${c.blurb}</small>`);
-      b.onclick = () => { P.sel.id = c.id; this.renderPicker(); };
-      cards.appendChild(b);
-    }
-    const sw = m.querySelector('.pk-sw'); sw.innerHTML = '';
-    for (const s of SKINS) {
-      const b = el('button', 'pk-s' + (s.id === P.sel.skin ? ' on' : ''), `<i style="background:#${s.hex.toString(16)}"></i>${s.name}`);
-      b.onclick = () => { P.sel.skin = s.id; this.renderPicker(); };
-      sw.appendChild(b);
-    }
-    m.querySelector('#pk-ok').textContent = `Play as ${ch.name}`;
-    m.querySelector('.pk-name').innerHTML = `<b>${ch.name}</b>`;
-    const key = P.sel.id + '/' + P.sel.skin;
+  // switching man / woman: the new you says something
+  pickerVoice() {
+    const P = this.picker, A = this.game.audio, f = P.sel.female;
+    const LINES = f ? [['pk_f0', 'Okay Pune. Let’s see what you’ve got.'], ['pk_f1', 'Chal, the city’s waiting.'], ['pk_f2', 'Yeah. This feels like me.'], ['pk_f3', 'FC Road, here I come.']]
+      : [['pk_m0', 'Right. Let’s go, Pune.'], ['pk_m1', 'Chal bhai, kaam pe chalte hain.'], ['pk_m2', 'This one. Definitely this one.'], ['pk_m3', 'Koregaon Park tonight? Let’s see.']];
+    P.vi = ((P.vi ?? -1) + 1) % LINES.length;
+    const [id, text] = LINES[P.vi];
+    const say = P.el.querySelector('.pk-say'); say.textContent = text; say.classList.remove('on'); void say.offsetWidth; say.classList.add('on');
+    if (A && A.raw && !A.raw['v_' + id]) return;
+    if (A && !A.voice(id, 1, 0, false, 2)) setTimeout(() => A.voice(id, 1, 0, false, 2), 250);
+  }
+  renderPicker(nameOnly) {
+    const P = this.picker, m = P.el, S = P.sel, g = S.female ? 'f' : 'm';
+    m.querySelector('#pk-ok').textContent = S.name.trim() ? `Play as ${S.name.trim()}` : 'Play';
+    m.querySelector('.pk-name').textContent = S.name.trim();
+    m.querySelector('#pk-name').classList.remove('bad');
+    if (nameOnly) return;
+    m.querySelectorAll('.pk-g button').forEach(b => b.classList.toggle('on', (b.dataset.g === 'f') === !!S.female));
+    const chips = (id, list, key) => {
+      const box = m.querySelector(id); box.innerHTML = '';
+      for (const it of list) { const b = el('button', 'pk-chip' + (it.id === S[key] ? ' on' : ''), it.name); b.onclick = () => { S[key] = it.id; this.renderPicker(); }; box.appendChild(b); }
+    };
+    const sw = (id, list, key) => {
+      const box = m.querySelector(id); box.innerHTML = '';
+      for (const it of list) { const b = el('button', 'pk-s' + (it.id === S[key] ? ' on' : ''), `<i style="background:#${it.hex.toString(16).padStart(6, '0')}"></i>${it.name}`); b.onclick = () => { S[key] = it.id; this.renderPicker(); }; box.appendChild(b); }
+    };
+    chips('#pk-hair', HAIRS[g], 'hair'); chips('#pk-out', OUTFITS[g], 'outfit');
+    sw('#pk-hc', HAIR_COLS, 'hairCol'); sw('#pk-skin', SKINS, 'skin');
+    const key = [S.female, S.hair, S.hairCol, S.outfit, S.skin].join('/');
     const kit = this.game.W.kit;
     if (kit && key !== P.key) {
+      const gChanged = !P.H || !!P.H.look.female !== !!S.female;
       P.key = key;
-      if (P.H) { P.scene.remove(P.H.holder); P.H.dispose(); }
-      P.H = kit.create(lookFor(P.sel.id, P.sel.skin));
-      P.H.holder.traverse(o => { o.frustumCulled = false; });
-      P.scene.add(P.H.holder);
-      P.H.play(ch.female ? 'idle' : 'arms_folded'); P.H.play('idle', { fade: 0 });
+      if (gChanged) {
+        if (P.H) { P.scene.remove(P.H.holder); P.H.dispose(); }
+        P.H = kit.create(lookOf(S));
+        P.H.holder.traverse(o => { o.frustumCulled = false; });
+        P.scene.add(P.H.holder);
+        P.H.play('idle', { fade: 0 });
+      } else kit.applyLook(P.H, lookOf(S));
     }
   }
   closePicker() {
@@ -285,54 +321,62 @@ export class HUD {
   }
 
   // ---------------------------------------------------------------- pause
+  pausePane(id) {
+    this.pause.querySelectorAll('.side .nav').forEach(b => b.classList.toggle('on', b.dataset.pane === id));
+    this.pause.querySelectorAll('.pane').forEach(q => q.classList.toggle('on', q.dataset.pane === id));
+    this.pause.querySelector('.panes').scrollTop = 0;
+  }
   buildPause() {
     const p = el('div', 'ov pause');
     p.hidden = true;
     p.innerHTML = `
-      <div class="sheet" role="dialog" aria-label="Paused">
-        <h2>Paused <span lang="mr">थांबा</span></h2>
-        <div class="row2"><button class="btn primary" id="p-resume">Resume</button><button class="btn" id="p-map">Map</button></div>
-        <button class="btn" id="p-guide">Guide: places, money, police, dating</button>
-        <div class="sec" id="p-ch"><div class="cap">E-challans</div>
-          <div class="ch-row"><div><div class="ch-amt num" id="p-ch-amt">₹0</div><div class="note" id="p-ch-note">Nothing pending</div></div>
-          <button class="btn" id="p-ch-pay">Pay all</button></div>
-          <ul class="ch-list" id="p-ch-list"></ul></div>
-        <div class="sec"><div class="cap">Time of day</div>
-          <div class="seg" id="p-time"><button data-h="8.5">Morning</button><button data-h="13">Noon</button><button data-h="17.85">Sunset</button><button data-h="21.5">Night</button></div></div>
-        <div class="sec"><div class="cap">Graphics</div>
-          <div class="seg" id="p-q"><button data-q="low">Low</button><button data-q="med">Medium</button><button data-q="high">High</button></div>
-          <div class="note" id="p-qnote"></div></div>
-        <div class="sec"><label class="cap" for="p-vol">Sound</label><input type="range" id="p-vol" min="0" max="1" step="0.05"></div>
-        ${settingsHTML()}
-        <div class="sec"><div class="cap">Controls</div>
-          <div class="keylist">
-            <span class="k"><span class="kbd">W</span><span class="kbd">S</span></span><span>Accelerate · brake, hold to reverse</span>
-            <span class="k"><span class="kbd">A</span><span class="kbd">D</span></span><span>Steer</span>
-            <span class="k"><span class="kbd">Space</span></span><span>Handbrake · on foot: jump, or climb a wall you face</span>
-            <span class="k"><span class="kbd">H</span></span><span>Horn</span>
-            <span class="k"><span class="kbd">C</span><span class="kbd">V</span><span class="kbd">B</span></span><span>Camera view (C while driving, V anytime) · look back</span>
-            <span class="k"><span class="kbd">R</span></span><span>Back on the road</span>
-            <span class="k"><span class="kbd">F</span></span><span>Get out · get in or take a vehicle</span>
-            <span class="k"><span class="kbd">Shift</span><span class="kbd">Alt</span></span><span>Sprint · walk (on foot)</span>
-            <span class="k"><span class="kbd">Click</span><span class="kbd">X</span></span><span>Punch, keep clicking for jab, cross, hook</span>
-            <span class="k"><span class="kbd">C</span></span><span>Roll out of the way (on foot)</span>
-            <span class="k"><span class="kbd">F</span></span><span>Walk into a shop, café, bar, ATM, petrol pump, your home</span>
-            <span class="k"><span class="kbd">E</span></span><span>Backpack: eat, drink, use what you carry</span>
-            <span class="k"><span class="kbd">Tab</span></span><span>Your status: health, hunger, energy, respect…</span>
-            <span class="k"><span class="kbd">Y</span></span><span>Accept an offer on your phone (delivery, parcel, race)</span>
-            <span class="k"><span class="kbd">G</span></span><span>Pickpocket someone next to you (risky)</span>
-            <span class="k"><span class="kbd">F3</span></span><span>Performance stats (for the curious)</span>
-            <span class="k"><span class="kbd">M</span></span><span>Map · click to set a waypoint or take a rickshaw</span>
-            <span class="k"><span class="kbd">1</span><span class="kbd">4</span></span><span>Answer the police</span>
-          </div></div>
-        <button class="btn" id="p-char">Change character</button>
-        <button class="btn" id="p-title">Quit to title</button>
-        <div class="sec danger"><div class="cap">Start over</div>
-          <div class="note">Wipes everything: money (back to ₹5,000), your vehicles, outfits, property, fines and where you are.</div>
-          <button class="btn bad" id="p-reset">Start over from scratch</button>
-          <div class="confirm" id="p-reset-c" hidden><b>Sure? This can’t be undone.</b><button class="btn bad" id="p-reset-y">Yes, wipe it</button><button class="btn" id="p-reset-n">Keep playing</button></div></div>
-        <div class="fine">Map data © OpenStreetMap contributors (ODbL); buildings and places from Overture Maps Foundation (ODbL, CDLA-Permissive-2.0), including Google Open Buildings and Microsoft footprints. All business names are fictional parodies of real places. People and animals: Quaternius (CC0). Voices: Kokoro-82M (Apache-2.0) and Piper mr_IN, trained on Google’s crowdsourced Marathi speech (OpenSLR 64, CC BY-SA 4.0). Sounds: Freesound (CC0). Fines follow the MV Act as reported for Pune and may be out of date.</div>
+      <div class="sheet two" role="dialog" aria-label="Paused">
+        <nav class="side">
+          <div class="who"><b id="p-who">Paused</b><small>NH48 · Pune <span lang="mr">पुणे</span></small></div>
+          <button class="nav on" data-pane="home"><i style="--c:#ffb224"></i>Home</button>
+          <button class="nav" data-pane="av"><i style="--c:#5e9eff"></i>Display and sound</button>
+          <button class="nav" data-pane="game"><i style="--c:#30d17a"></i>Gameplay</button>
+          <button class="nav" data-pane="ctrl"><i style="--c:#bf8cff"></i>Controls</button>
+          <button class="nav" data-pane="ch"><i style="--c:#ff6159"></i>E-challans</button>
+          <button class="nav" data-pane="me"><i style="--c:#a1a1aa"></i>Character and save</button>
+        </nav>
+        <div class="panes">
+          <section class="pane on" data-pane="home">
+            <h2>Paused</h2>
+            <div class="hero-acts"><button class="btn primary big" id="p-resume">Resume</button><button class="btn big" id="p-map">Map</button><button class="btn big" id="p-guide">Guide</button></div>
+            <div class="gt">Time of day</div>
+            <div class="seg wide" id="p-time"><button data-h="8.5">Morning</button><button data-h="13">Noon</button><button data-h="17.85">Sunset</button><button data-h="21.5">Night</button></div>
+            <div class="note">Esc or Resume puts you straight back in the game.</div>
+          </section>
+          <section class="pane" data-pane="av">
+            <h2>Display and sound</h2>
+            <div class="gt">Graphics</div>
+            <div class="group"><div class="row"><div class="rl">Quality<small id="p-qnote"></small></div><div class="rc"><div class="seg" id="p-q"><button data-q="low">Low</button><button data-q="med">Medium</button><button data-q="high">High</button></div></div></div>
+              <div class="row"><div class="rl">Sound</div><div class="rc"><input type="range" id="p-vol" min="0" max="1" step="0.05"></div></div></div>
+            <div class="gt">Camera and voices</div>
+            ${settingsHTML('av')}
+          </section>
+          <section class="pane" data-pane="game"><h2>Gameplay</h2>${settingsHTML('game')}</section>
+          <section class="pane" data-pane="ctrl"><h2>Controls</h2>
+            <div class="gt">Driving</div><div class="group"><div class="row"><div class="rl">Accelerate, brake, hold to reverse</div><div class="rc k"><span class="kbd">W</span><span class="kbd">S</span></div></div><div class="row"><div class="rl">Steer</div><div class="rc k"><span class="kbd">A</span><span class="kbd">D</span></div></div><div class="row"><div class="rl">Handbrake</div><div class="rc k"><span class="kbd">Space</span></div></div><div class="row"><div class="rl">Horn</div><div class="rc k"><span class="kbd">H</span></div></div><div class="row"><div class="rl">Change camera</div><div class="rc k"><span class="kbd">C</span></div></div><div class="row"><div class="rl">Look back</div><div class="rc k"><span class="kbd">B</span></div></div><div class="row"><div class="rl">Back on the road</div><div class="rc k"><span class="kbd">R</span></div></div><div class="row"><div class="rl">Get out</div><div class="rc k"><span class="kbd">F</span></div></div></div><div class="gt">On foot</div><div class="group"><div class="row"><div class="rl">Walk</div><div class="rc k"><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span></div></div><div class="row"><div class="rl">Sprint</div><div class="rc k"><span class="kbd">Shift</span></div></div><div class="row"><div class="rl">Walk slowly</div><div class="rc k"><span class="kbd">Alt</span></div></div><div class="row"><div class="rl">Jump, or climb the wall you face</div><div class="rc k"><span class="kbd">Space</span></div></div><div class="row"><div class="rl">Roll</div><div class="rc k"><span class="kbd">C</span></div></div><div class="row"><div class="rl">Punch (keep clicking: jab, cross, hook)</div><div class="rc k"><span class="kbd">Click</span></div></div><div class="row"><div class="rl">Talk, walk in, get in or take a vehicle</div><div class="rc k"><span class="kbd">F</span></div></div><div class="row"><div class="rl">Pickpocket (risky)</div><div class="rc k"><span class="kbd">G</span></div></div></div><div class="gt">Anytime</div><div class="group"><div class="row"><div class="rl">Jhola: eat, drink, use what you carry</div><div class="rc k"><span class="kbd">E</span></div></div><div class="row"><div class="rl">Your status</div><div class="rc k"><span class="kbd">Tab</span></div></div><div class="row"><div class="rl">Map, waypoints, rickshaw, metro, bus</div><div class="rc k"><span class="kbd">M</span></div></div><div class="row"><div class="rl">Accept an offer on your phone</div><div class="rc k"><span class="kbd">Y</span></div></div><div class="row"><div class="rl">Answer the police</div><div class="rc k"><span class="kbd">1</span><span class="kbd">4</span></div></div><div class="row"><div class="rl">Camera distance</div><div class="rc k"><span class="kbd">V</span></div></div><div class="row"><div class="rl">Close any menu, or pause</div><div class="rc k"><span class="kbd">Esc</span></div></div><div class="row"><div class="rl">Performance stats</div><div class="rc k"><span class="kbd">F3</span></div></div></div>
+          </section>
+          <section class="pane" data-pane="ch" id="p-ch"><h2>E-challans</h2>
+            <div class="group"><div class="row"><div class="rl"><b class="ch-amt num" id="p-ch-amt">₹0</b><small id="p-ch-note">Nothing pending</small></div><div class="rc"><button class="btn" id="p-ch-pay">Pay all</button></div></div></div>
+            <ul class="ch-list" id="p-ch-list"></ul>
+          </section>
+          <section class="pane" data-pane="me"><h2>Character and save</h2>
+            <div class="group">
+              <div class="row"><div class="rl">Character<small>Your look, hair and name</small></div><div class="rc"><button class="btn" id="p-char">Change</button></div></div>
+              <div class="row"><div class="rl">Title screen<small>Your game is saved</small></div><div class="rc"><button class="btn" id="p-title">Quit to title</button></div></div>
+            </div>
+            <div class="gt">Start over</div>
+            <div class="group danger"><div class="row"><div class="rl">Wipe everything<small>Money back to ₹5,000; vehicles, outfits, property, fines, people and where you are</small></div><div class="rc"><button class="btn bad" id="p-reset">Start over</button></div></div>
+              <div class="confirm" id="p-reset-c" hidden><b>Sure? This can’t be undone.</b><button class="btn bad" id="p-reset-y">Yes, wipe it</button><button class="btn" id="p-reset-n">Keep playing</button></div></div>
+            <div class="fine">Map data © OpenStreetMap contributors (ODbL); buildings and places from Overture Maps Foundation (ODbL, CDLA-Permissive-2.0), including Google Open Buildings and Microsoft footprints. All business names are fictional parodies of real places. People and animals: Quaternius (CC0). Voices: Kokoro-82M (Apache-2.0) and Piper mr_IN, trained on Google’s crowdsourced Marathi speech (OpenSLR 64, CC BY-SA 4.0). Sounds: Freesound (CC0). Fines follow the MV Act as reported for Pune and may be out of date.</div>
+          </section>
+        </div>
       </div>`;
+    p.querySelectorAll('.side .nav').forEach(b => b.onclick = () => this.pausePane(b.dataset.pane));
     this.root.appendChild(p);
     this.pause = p;
     p.addEventListener('click', (e) => { if (e.target === p) this.game.togglePause(false); });
@@ -352,6 +396,7 @@ export class HUD {
     vol.oninput = () => this.game.audio.setVolume(parseFloat(vol.value));
   }
   syncPause() {
+    const pw = this.pause && this.pause.querySelector('#p-who'); if (pw) { const sv = savedCharacter(); pw.textContent = sv ? sv.name : 'Paused'; }
     const g = this.game;
     this.pause.querySelectorAll('#p-q button').forEach(b => b.classList.toggle('on', b.dataset.q === g.qualityName));
     this.pause.querySelector('#p-vol').value = g.audio.volume;
@@ -444,7 +489,7 @@ export class HUD {
     if (g.life && (this._vitT = (this._vitT || 0) - dt) <= 0) {
       this._vitT = 0.25;
       const L = g.life.s, vals = [(p.hp ?? 100) / g.life.hpMax, L.hunger, L.thirst, L.energy];
-      this.vit.querySelectorAll('span').forEach((sp, i) => { const v = Math.max(0, Math.min(1, vals[i])); sp.querySelector('b').style.width = Math.round(v * 100) + '%'; sp.classList.toggle('low', v < 0.2); });
+      this.vit.querySelectorAll(':scope > span').forEach((sp, i) => { const v = Math.max(0, Math.min(1, vals[i])); sp.querySelector('.fg').setAttribute('stroke-dashoffset', (this.vitC * (1 - v)).toFixed(1)); sp.classList.toggle('low', v < 0.2); sp.title = `${['Health', 'Hunger', 'Thirst', 'Energy'][i]} ${Math.round(v * 100)}%`; });
       this.vit.hidden = !!this.inPlace && false;
     }
     // health: on foot, while hurt or in a fight

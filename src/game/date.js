@@ -71,6 +71,12 @@ export class Dates {
   eligible(p) { return !!p && !p.walkedOff && !!p.female !== !!this.g.player.look.female && !OLDER.has(p.persona); }
   profile(p) {
     if (p.prof) return p.prof;
+    // one of the cast: the same person every time (their language, vibe, likes, job, area, how picky)
+    const cm = p.cast && castByName(p.cast, p.female);
+    if (cm) {
+      const a = cm.likes[0], b = cm.likes[1] === a ? (a + 3) % TOPICS.length : cm.likes[1];
+      return (p.prof = { lang: cm.lang, vibe: VIBES[cm.vibe], likes: [TOPICS[a], TOPICS[b]], job: Math.floor(cm.job * JOBS.length), area: Math.floor(cm.area * AREAS.length), picky: cm.picky, known: {}, asked: {} });
+    }
     const r = this.rng, likes = [r.pick(TOPICS)]; let b = r.pick(TOPICS); if (b === likes[0]) b = TOPICS[(TOPICS.indexOf(b) + 3) % TOPICS.length]; likes.push(b);
     let lang = PERSONA_LANG[p.persona] || r.pick(['en', 'hi', 'mr']);
     if (r.next() < 0.25) lang = r.pick(['en', 'hi', 'mr']);
@@ -104,6 +110,12 @@ export class Dates {
     if (p.walkedOff) { G.hud.toast(`${p.name} isn’t interested`, 'Let it go', 'info', 2); return; }
     const P = this.profile(p);
     const contact = this.contacts.find(c => c.name === p.name && c.dateNow);
+    // someone you're seeing is in the same room and sees you chatting up somebody else
+    if (!contact) for (const q of room.R.peds || []) {
+      if (q === p || !q.cast) continue;
+      const ct = this.contacts.find(c => c.name === q.cast && c.aff >= 30);
+      if (ct && Math.hypot(q.x - p.x, q.z - p.z) < 14) { this.caught(ct, 'saw'); q.walkedOff = true; break; }
+    }
     const mode = contact ? 'date' : 'meet';
     const tpl = room.R.tpl;
     this.cur = { p, room, mode, contact, club: tpl === 'club', interest: p.interest ?? 0, used: {}, turn: 0, q: null, teases: 0 };
@@ -325,7 +337,7 @@ export class Dates {
     L.change('mood', 0.12); L.change('respect', 1); L.save();
     this.say(this.line(p, 'number_yes'), `${p.name} is in your phone. Jhola → People to text them`);
     p.walkedOff = true;
-    if (had && this.rng.next() < 0.35) G.later(this.rng.range(40, 120), () => { had.aff = Math.max(0, had.aff - 18); had.upset = true; this.sms(had, 't_jealous', 'They found out'); });
+    if (had && this.rng.next() < 0.35) G.later(this.rng.range(40, 120), () => this.caught(had, 'heard'));
     else G.later(this.rng.range(50, 160), () => this.sms(contact, 't_hi', 'Ask to meet from Jhola → People'));
     setTimeout(() => { if (this.cur === c) this.close(); }, 2000);
   }
@@ -370,9 +382,31 @@ export class Dates {
     this.say(line, how);
     this.render();
   }
+  // found out you're seeing someone else: hurt, angrier the closer you were, and a second time is the end
+  caught(ct, how) {
+    const L = this.life;
+    ct.caught = (ct.caught || 0) + 1;
+    ct.aff = Math.max(0, ct.aff - (ct.partner ? 35 : 22));
+    ct.upset = true;
+    const over = ct.caught >= 2 || (ct.partner && ct.aff < 45) || ct.aff < 15;
+    if (over) {
+      const was = ct.partner; ct.partner = false; ct.done = true; ct.aff = Math.min(ct.aff, 5);
+      this.sms(ct, 't_breakup', was ? 'They found out. You broke up' : 'They found out. They’ve blocked you');
+      L.change('mood', was ? -0.4 : -0.15); L.change('respect', -2);
+    } else this.sms(ct, 't_jealous', how === 'saw' ? `${ct.name} saw you with someone else` : 'They found out about the others');
+    L.save();
+  }
+  // every date with one person while you're seeing others is a chance someone finds out (Pune is small)
+  twoTiming(withCt) {
+    const others = this.contacts.filter(c => c !== withCt && !c.done && (c.partner || c.aff >= 40));
+    if (!others.length) return;
+    const risk = 0.1 + 0.07 * (others.length - 1) + (withCt.partner ? 0 : 0.05);
+    for (const c of others) if (this.rng.next() < risk * (c.partner ? 1.6 : 1)) this.g.later(this.rng.range(30, 200), () => this.caught(c, 'heard'));
+  }
   // ask a contact to meet: they choose a real café or restaurant near you
   askToMeet(ct) {
     const G = this.g, P = G.player;
+    if (ct.done) { this.g.hud.toast(`${ct.name} has blocked you`, 'That’s over', 'bad', 2.6); return false; }
     if (ct.upset && this.rng.next() < 0.5) { this.sms(ct, 't_angry'); return true; }
     const places = G.shops.nearby(P.x, P.z, 1400).filter(s => ['cafe', 'icecream', 'juice', 'bakery'].includes(s.kind) || (ct.aff > 40 && ['biryani', 'thali', 'food', 'southindian'].includes(s.kind)));
     if (!places.length) { G.hud.toast('Nowhere to meet nearby', 'Head somewhere with cafés first', 'warn', 2.6); return false; }
@@ -391,9 +425,19 @@ export class Dates {
     const now = G.clock || 0;
     if (now > d.gone) { d.ct.aff = Math.max(0, d.ct.aff - 12); d.ct.upset = true; this.sms(d.ct, 't_angry', 'You were too late. They left'); return; }
     d.ct.late = now > d.until;
-    const seat = R.seats.find(s => !s.used && !s.salon && !s.wait);
+    // a table to yourselves: whoever was sitting there gets up and goes
+    const tables = new Map();
+    for (const s of R.seats) if (!s.salon && !s.wait && s.table) { const k = s.table.x.toFixed(2) + ',' + s.table.z.toFixed(2); if (!tables.has(k)) tables.set(k, []); tables.get(k).push(s); }
+    let pick = null, best = 1e9;
+    for (const ss of tables.values()) { if (ss.length < 2) continue; const n = ss.filter(s => s.used).length; if (n < best) { best = n; pick = ss; } }
+    const seat = pick ? pick[0] : R.seats.find(s => !s.used && !s.salon && !s.wait);
     if (!seat) return;
+    if (pick) for (const s of pick) {
+      for (const q of (R.peds || []).slice()) if (Math.hypot(q.x - s.x, q.z - s.z) < 0.35) { G.people.remove(q); R.peds.splice(R.peds.indexOf(q), 1); }
+      s.used = s !== pick[1];      // the seat across stays free for you
+    }
     seat.used = true;
+    this.twoTiming(d.ct);
     const p = G.interiors.addPerson(seat.x, seat.z, seat.yaw, 'sit_talk', d.ct.female);
     if (p) { const cm = castByName(d.ct.name, d.ct.female); if (cm) { castAs(p, cm, G.W.kit); G.interiors.markHearts?.(G.interiors.cur.R); } p.name = d.ct.name; p.interest = 60; p.prof = { lang: d.ct.lang || 'en', vibe: d.ct.vibe || 'chill', likes: d.ct.likes, job: d.ct.job ?? 0, area: d.ct.area ?? 0, picky: 0.4, known: { job: true, likes: true, area: true, vibe: true }, asked: { ask_job: 1, ask_area: 1, ask_fun: 1 } }; p.dateWith = true; d.ct.dateNow = true; }
     G.hud.toast(`${d.ct.name} is here`, 'At a table. Go and say hi (F)', 'good', 3);
