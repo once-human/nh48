@@ -6,6 +6,10 @@ import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { flyResolve } from '../world/flyover.js';
 import { clamp, damp, dampAngle, wrapAngle, RNG } from '../core/util.js';
 import { lookOf, savedCharacter } from '../people/characters.js';
+import { ikArm } from '../people/humans.js';
+// handlebar grips in each vehicle's own frame: [forward, up, half width]
+const GRIPS = { auto: [0.72, 1.07, 0.33], scooter: [0.62, 1.0, 0.3], bike: [0.6, 1.08, 0.34], cycle: [0.44, 1.0, 0.28] };
+const _grip = new THREE.Vector3(), _pole = new THREE.Vector3();
 import { WATER_Y } from '../world/groundChunk.js';
 const SWIM_Y = WATER_Y - 1.0;      // holder height while swimming: head and shoulders above the water
 
@@ -404,6 +408,16 @@ export class Pilot {
     H.root.rotation.x = 0;
     H.holder.rotateX(v.lean || 0);
     H.mixer.update(1 / 60);
+    // hands on the handlebar (the grips each model's rider uses), elbows out and down
+    const g = GRIPS[v === this.auto ? 'auto' : v.type];
+    if (g) {
+      const m = v.tilt.matrixWorld;
+      for (const sd of [1, -1]) {
+        _grip.set(g[0], g[1], g[2] * sd).applyMatrix4(m);
+        _pole.set(-0.2, -0.7, sd).transformDirection(m);
+        ikArm(H, sd > 0 ? 'r' : 'l', _grip, _pole, 1);
+      }
+    }
   }
   setAcc(name) { this.human.setAcc(name || null); }
   // become someone else (the character picker): same place, same vehicle, new body

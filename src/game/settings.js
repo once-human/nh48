@@ -31,7 +31,12 @@ export function saveSettings(s) {
 export function applySettings(G) {
   const s = G.settings;
   document.getElementById('hud')?.classList.toggle('hud-min', s.hud === 'minimal');
-  if (G.rig) G.rig.fovAdd = s.fov;
+  if (G.rig) {
+    G.rig.fovAdd = s.fov;
+    // paused, the camera isn't updating: show the new field of view straight away
+    if (G.state === 'pause' && G.camera) { const base = (G.rig.fov || 62) - (G.rig._fovWas ?? 0); G.camera.fov = base + s.fov; G.camera.updateProjectionMatrix(); }
+    G.rig._fovWas = s.fov;
+  }
   if (G.people && G.quality) G.people.max = Math.round(G.quality.peds * s.crowd);
   if (G.traffic && G.quality) G.traffic.max = Math.round(G.quality.traffic * s.traffic);
   if (G.audio) { G.audio.voiceVol = s.voiceVol; G.audio.musicVol = s.musicVol; }

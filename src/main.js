@@ -249,7 +249,7 @@ async function main() {
     if (propT <= 0) { updateProps(W, camera.position.x, camera.position.z); propT = 0.2; }
     const t1 = performance.now();
     // the map covers the screen, and while paused the last frame just sits there (blurred by CSS): no rendering at all
-    if (game.state !== 'map' && !(game.state === 'pause' && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);
+    if (game.state !== 'map' && !(game.state === 'pause' && !game.livePause && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);
     const t2 = performance.now();
     perf.n++; perf.upd += t1 - t0; perf.rnd += t2 - t1; perf.worst = Math.max(perf.worst, t1 - t0);
     if (!perfBox.hidden) {

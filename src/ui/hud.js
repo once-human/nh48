@@ -143,11 +143,15 @@ export class HUD {
       <div class="pz ttl">
         <div class="pz-l">
           <div class="ttl-brand">${STONE}<b>NH48</b><span>Pune <span lang="mr">पुणे</span></span></div>
-          <div class="pz-head"><span class="pz-k">Deccan to Koregaon Park</span><b>The city<br>is <em>open</em></b></div>
+          <div class="pz-head ttl-head"><span class="pz-k">An open-world game</span><b>Pune</b><span class="ttl-mr" lang="mr">पुणे</span>
+            <p class="ttl-sub">Peths at noon, Koregaon Park at midnight. Drive an auto, chase a date, dodge the challan.</p></div>
           <nav class="pz-menu">
             <button class="pz-i sel" id="t-roam">Start</button>
             <button class="pz-i" id="t-who">New character</button>
+            <button class="pz-i" id="t-wipe">Start over</button>
           </nav>
+          <div class="ttl-wipe" id="t-wipe-c" hidden><b>Wipe everything?</b><span>Money, vehicles, outfits, homes, fines, the people in your phone and your character. This can’t be undone.</span>
+            <div><button class="btn bad" id="t-wipe-y">Yes, start over</button><button class="btn" id="t-wipe-n">Keep my game</button></div></div>
           <div class="t-stats" id="t-stats"></div>
         </div>
         <div class="pz-r"></div>
@@ -157,6 +161,9 @@ export class HUD {
     this.title = t;
     t.querySelector('#t-roam').onclick = () => this.game.begin();
     t.querySelector('#t-who').onclick = () => this.showPicker(() => this.syncTitle());
+    t.querySelector('#t-wipe').onclick = () => { t.querySelector('#t-wipe-c').hidden = false; };
+    t.querySelector('#t-wipe-n').onclick = () => { t.querySelector('#t-wipe-c').hidden = true; };
+    t.querySelector('#t-wipe-y').onclick = () => this.game.resetAll();
     const items = [...t.querySelectorAll('.pz-i')];
     const sel = (k) => { this.tSel = (k + items.length) % items.length; items.forEach((b, i) => b.classList.toggle('sel', i === this.tSel)); };
     items.forEach((b, i) => b.addEventListener('mouseenter', () => sel(i)));
@@ -173,6 +180,7 @@ export class HUD {
     const sv = savedCharacter();
     t.querySelector('#t-roam').textContent = sv ? `Continue as ${sv.name}` : 'Start';
     t.querySelector('#t-who').textContent = sv ? 'Change character' : 'New character';
+    t.querySelector('#t-wipe').hidden = !sv;
     const S = this.game.stats;
     t.querySelector('#t-stats').innerHTML = S && sv ? `<span><b>${fmtRupees(S.money)}</b> cash</span><span><b>${S.rides || 0}</b> rides</span>${S.rating ? `<span><b>${S.rating.toFixed(1)}</b> rating</span>` : ''}` : '';
   }
@@ -346,6 +354,10 @@ export class HUD {
     this.pause.querySelectorAll('.pz-i').forEach(b => b.classList.toggle('open', !!id && b.dataset.pane === id));
     this.pause.querySelectorAll('.pane').forEach(q => q.classList.toggle('on', q.dataset.pane === id));
     this.pause.classList.toggle('has-pane', !!id);
+    // on the Settings page the city stays live and sharp behind, so changes show as you make them
+    const live = id === 'set', G = this.game;
+    G.livePause = live; G.renderer.domElement.classList.toggle('paused', !live && G.state === 'pause');
+    this.pause.classList.toggle('live', live);
     this.pause.querySelector('.pz-r').scrollTop = 0;
   }
   pauseSel(k) {
@@ -385,7 +397,7 @@ export class HUD {
             <button class="pz-i" data-pane="set">Settings</button>
             <button class="pz-i" data-pane="ctrl">Controls</button>
             <button class="pz-i" data-pane="ch">E-challans<i id="p-ch-badge" hidden></i></button>
-            <button class="pz-i" data-pane="me">Character</button>
+            <button class="pz-i" data-pane="me">Character and save</button>
             <button class="pz-i" id="p-title">Quit to title</button>
           </nav>
         </div>

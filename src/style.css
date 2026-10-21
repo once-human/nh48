@@ -1103,3 +1103,13 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .icos { display: inline-flex; gap: 2px; vertical-align: -2px; }
 .ico { width: 13px; height: 13px; fill: currentColor; }
 .ico.star { color: var(--acc); } .ico.heart { color: #ff4f6d; } .ico.off { opacity: .22; }
+.pause.live .pz { background: linear-gradient(90deg, rgba(5, 5, 7, .92) 0%, rgba(5, 5, 7, .78) 34%, rgba(5, 5, 7, .18) 62%, rgba(5, 5, 7, .1) 100%) !important; }
+.pause.live .pz .group .row { background: linear-gradient(90deg, rgba(10, 10, 13, .82), rgba(10, 10, 13, .62)); }
+.ttl .ttl-head { gap: 0; }
+.ttl .ttl-head b { font-size: clamp(110px, 13vw, 200px) !important; line-height: .82; letter-spacing: -0.05em !important; }
+.ttl-mr { font-family: 'Yatra One', 'Tiro Devanagari Marathi', var(--font-dev); font-size: clamp(40px, 4.4vw, 68px); color: var(--acc); line-height: 1; margin: 6px 0 0 6px; }
+.ttl-sub { margin: 18px 0 0; max-width: 34ch; font: 500 16px/1.5 var(--font-ui); color: var(--tx2); }
+.ttl-wipe { display: grid; gap: 8px; max-width: 460px; padding: 16px 18px; border-radius: 4px; background: rgba(255, 69, 58, .1); box-shadow: inset 3px 0 0 #ff6159; }
+.ttl-wipe b { font: 800 15px var(--font-ui); text-transform: uppercase; letter-spacing: .06em; color: #ff8a80; }
+.ttl-wipe span { font-size: 13px; color: var(--tx2); line-height: 1.5; }
+.ttl-wipe > div { display: flex; gap: 8px; margin-top: 4px; }
