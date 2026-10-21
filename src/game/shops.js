@@ -258,6 +258,8 @@ export class Shops {
       const r = p.kind === 'fuel' ? 16 : 10;
       if (dd < r && (P.onFoot || (p.kind === 'fuel' && Math.abs(P.v) < 1.2)) && (!best || dd < bd + 4)) { best = { ...p, door: null }; bd = dd; }
     }
+    const tr = P.onFoot && this.g.transit && this.g.transit.near(P.x, P.z);
+    if (tr && (!best || Math.hypot(tr.x - P.x, tr.z - P.z) < bd + 3)) { best = tr; bd = 3; }
     const prop = this.g.props && this.g.props.near(P.x, P.z, P.onFoot ? 7 : 0);
     if (prop) best = { kind: 'property', name: prop.name, prop, x: prop.x, z: prop.z };
     // a dog or a cow right next to you
@@ -273,6 +275,7 @@ export class Shops {
     if (!this.near || this.open) return false;
     this.scanT = 0;                  // look again next frame: what's in front of you has changed
     if (this.near.kind === 'animal') { this.g.strays.interact(this.near.a); this.scanT = 0.5; return true; }
+    if (this.near.kind === 'metro' || this.near.kind === 'bus') { this.g.transit.show(this.near); return true; }
     const I = this.g.interiors;
     if (this.near.kind === 'ispot') { I.use(this.near.s); this.scanT = 0.3; return true; }
     // a storefront with a room behind it: walk in (a club at night wants its cover charge first)
@@ -288,6 +291,7 @@ export class Shops {
     if (!n) return null;
     if (n.kind === 'property') return this.g.props.label(n.prop);
     if (n.kind === 'animal') return this.g.strays.label(n.a);
+    if (n.kind === 'metro' || n.kind === 'bus') return this.g.transit.label(n);
     if (n.kind === 'ispot') return n.s.label;
     if (this.g.interiors && this.g.interiors.templateOf(n.kind) && n.door) return `Go into ${n.name} · ${KIND_INFO[n.kind][0]}`;
     const K = KIND_INFO[n.kind];

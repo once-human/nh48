@@ -146,6 +146,21 @@ export function buildGlobalProps(W) {
   for (const b of M.buses) collision.addCircle(b[0] / 100, b[1] / 100, 0.9, 2);
   for (const s of M.stalls) collision.addCircle(s[0] / 100, s[1] / 100, 0.9, 2);
   for (const w of M.walls) { const p = cmRing(w); for (let k = 0; k + 3 < p.length; k += 2) collision.addSeg(p[k], p[k + 1], p[k + 2], p[k + 3], 5); }   // kind 5: a 1.8 m compound wall you can climb
+  // metro stair towers and underground entrance kiosks (same shapes as buildPropsChunk draws)
+  for (const c of index.chunks) {
+    for (const st of c.mstations) {
+      const p = st.pts, L = polyLength(p); if (L < 40) continue;
+      const ax = p[0], az = p[1], bx = p[p.length - 2], bz = p[p.length - 1], dx = (bx - ax) / L, dz = (bz - az) / L, nx = dz, nz = -dx;
+      const cx = (ax + bx) / 2, cz = (az + bz) / 2, hl = Math.min(70, L / 2 + 5), hw = 11;
+      const tx0 = cx + dx * (hl - 9) + nx * (hw + 3.2), tz0 = cz + dz * (hl - 9) + nz * (hw + 3.2);
+      collision.addRing([[-5, -3], [5, -3], [5, 3], [-5, 3]].flatMap(([a, b]) => [tx0 + dx * a + nx * b, tz0 + dz * a + nz * b]), 0);
+    }
+    for (const g of c.mgates) {
+      const ang = hash1(g.x * 3.1 + g.z) * Math.PI, ux = Math.cos(ang), uz = Math.sin(ang), vx = -uz, vz = ux;
+      const kc = [[-3.5, -2.2], [3.5, -2.2], [3.5, 2.2], [-3.5, 2.2]].map(([a, b]) => [g.x + ux * a + vx * b, g.z + uz * a + vz * b]);
+      collision.addLine([kc[1][0], kc[1][1], kc[2][0], kc[2][1], kc[3][0], kc[3][1], kc[0][0], kc[0][1]], 0);
+    }
+  }
   W.metroPiers = [];
   for (const [, line] of M.metro) {
     const p = cmRing(line);
@@ -316,6 +331,17 @@ export function* buildPropsChunk(W, C, group) {
     const ring = corners.flat();
     gb.poly([ring], 18.5, GL.concrete, 0.85);
     gb.poly([ring], 8.5, GL.concrete, 0.5, true);
+    // a stair and escalator tower down to the footpath at one end, on the station's side of the road
+    { const tx0 = cx + dx * (hl - 9) + nx * (hw + 3.2), tz0 = cz + dz * (hl - 9) + nz * (hw + 3.2);
+      const tc = [[-5, -3], [5, -3], [5, 3], [-5, 3]].map(([a, b]) => [tx0 + dx * a + nx * b, tz0 + dz * a + nz * b]);
+      for (let k = 0; k < 4; k++) {
+        const [x0, z0] = tc[k], [x1, z1] = tc[(k + 1) % 4], l = Math.hypot(x1 - x0, z1 - z0);
+        let ox = (z1 - z0) / l, oz = -(x1 - x0) / l;
+        if (ox * ((x0 + x1) / 2 - tx0) + oz * ((z0 + z1) / 2 - tz0) < 0) { ox = -ox; oz = -oz; }
+        fb.wall(x0, z0, x1, z1, 0, 11.0, ox, oz, 0, { eu: 0, eL: l, tint, style: 1, layer: WL.cladding, flags: 6, seed, tx: (x1 - x0) / l, tz: (z1 - z0) / l, top: 11 });
+      }
+      gb.poly([tc.flat()], 11.0, GL.concrete, 0.8);
+    }
     const s = signs.metro;
     for (const side of [1, -1]) {
       const fx = cx + nx * (hw + 0.05) * side, fz = cz + nz * (hw + 0.05) * side;
@@ -323,6 +349,23 @@ export function* buildPropsChunk(W, C, group) {
       sb.quad([fx - dx * 9, 18.6, fz - dz * 9], [fx + dx * 9, 18.6, fz + dz * 9], [fx + dx * 9, 20.1, fz + dz * 9], [fx - dx * 9, 20.1, fz - dz * 9],
         [nx * side, 0, nz * side], ltr ? s.u0 : s.u1, s.v0, ltr ? s.u1 : s.u0, s.v1);
     }
+  }
+  // underground metro entrances: a glass kiosk with the Metro sign over the stairs
+  for (const g of C.mgates || []) {
+    const ang = hash1(g.x * 3.1 + g.z) * Math.PI, ux = Math.cos(ang), uz = Math.sin(ang), vx = -uz, vz = ux;
+    const kc = [[-3.5, -2.2], [3.5, -2.2], [3.5, 2.2], [-3.5, 2.2]].map(([a, b]) => [g.x + ux * a + vx * b, g.z + uz * a + vz * b]);
+    const tint = [0.86, 0.88, 0.92], seed = 7;
+    for (let k = 0; k < 4; k++) {
+      const [x0, z0] = kc[k], [x1, z1] = kc[(k + 1) % 4], l = Math.hypot(x1 - x0, z1 - z0);
+      let ox = (z1 - z0) / l, oz = -(x1 - x0) / l;
+      if (ox * ((x0 + x1) / 2 - g.x) + oz * ((z0 + z1) / 2 - g.z) < 0) { ox = -ox; oz = -oz; }
+      if (k === 0) continue;                       // the open side: the stairs go down here
+      fb.wall(x0, z0, x1, z1, 0, 3.3, ox, oz, 0, { eu: 0, eL: l, tint, style: 9, layer: WL.concrete, flags: 0, seed, tx: (x1 - x0) / l, tz: (z1 - z0) / l, top: 3.3 });
+    }
+    gb.poly([kc.flat()], 3.4, GL.concrete, 0.8);
+    gb.poly([kc.flat()], 0.06, GL.concrete, 0.4);
+    const s2 = signs.metro, fx = g.x - vx * 2.25, fz = g.z - vz * 2.25;
+    sb.quad([fx - ux * 3, 3.45, fz - uz * 3], [fx + ux * 3, 3.45, fz + uz * 3], [fx + ux * 3, 4.45, fz + uz * 3], [fx - ux * 3, 4.45, fz - uz * 3], [-vx, 0, -vz], s2.u0, s2.v0, s2.u1, s2.v1);
   }
   // emit
   yield;

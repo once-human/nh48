@@ -17,6 +17,7 @@ import { Shops, lookFromJSON, DEALER } from './shops.js';
 import { Props } from './props.js';
 import { Gigs } from './gigs.js';
 import { Hustle } from './hustle.js';
+import { Transit } from './transit.js';
 import { Club } from './club.js';
 import { Bag } from './bag.js';
 import { Strays } from '../people/strays.js';
@@ -124,6 +125,7 @@ export class Game {
     this.props = new Props(this);
     this.gigs = new Gigs(this);
     this.hustle = new Hustle(this);
+    this.transit = new Transit(this);
     this.club = new Club(this);
     this.bag = new Bag(this);
     this.strays = new Strays(this);
@@ -332,6 +334,7 @@ export class Game {
     if (this.shops && this.shops.open) this.shops.close();
     if (this.bag && this.bag.open) this.bag.close();
     if (this.club && this.club.on) this.club.leave();
+    if (this.transit && this.transit.open) this.transit.close();
     if (this.state === 'shop') this.state = 'play';
   }
   togglePause(force) {

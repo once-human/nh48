@@ -706,3 +706,5 @@ input[type=range] { width: 100%; accent-color: var(--stone); }
 @media (max-width: 520px) { .settings .set-grid { grid-template-columns: 1fr; gap: 4px; } }
 /* minimal HUD: just the minimap, money and what's happening */
 #hud.hud-min .vit, #hud.hud-min .mm-hint, #hud.hud-min .nerd, #hud.hud-min .lockhint { display: none !important; }
+.shop.transit::before { background: var(--line, #d1495b); }
+.shop.transit .tr-sub { font: 500 12.5px var(--font-ui); color: var(--paper-3); margin-top: 4px; }

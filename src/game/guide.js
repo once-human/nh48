@@ -56,6 +56,11 @@ const SHOPS = [
     ['Petrol and CNG pump', 'Drive up and fill. Everything runs out of fuel eventually.'],
     ['Travels', 'Rent a scooter by the day.'],
   ]],
+  ['Getting around', [
+    ['Pune Metro', 'Purple Line (PCMC to Swargate, underground from Shivajinagar to Swargate) and Aqua Line (Vanaz to Ramwadi, elevated). F at the stairs of a station or the entrance kiosk of an underground one. ₹10 to ₹35 by distance, change at District Court. Runs 6 am to 11 pm. Line 3 to Hinjewadi isn’t open yet.'],
+    ['PMPML buses', 'F at any bus stop: the real routes that stop there (81, 94, 283, 5, 256, 333, 114 and more), or the local buses. ₹10 for every 5 km. Slower than the metro, far cheaper than an auto.'],
+    ['Rickshaw', 'Open the map (M), click a place, take a rickshaw: the meter fare, no cap.'],
+  ], 'Metro and bus drop you on foot; whatever you were driving stays where you left it.'],
   ['Places', [
     ['Police chowki', 'Pay your pending challans, collect a towed auto, or turn yourself in.'],
     ['Lodge', 'A room for the night: sleep, energy back.'],

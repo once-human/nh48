@@ -2,6 +2,7 @@
 // chunk when the camera comes near and disposed when it leaves, nearest chunks first, inside a
 // per-frame time budget so driving never hitches.
 import * as THREE from 'three';
+import TRANSIT from '../game/transit.json';
 import { cmRing } from './geo.js';
 
 // district centres (same table as the baker): 0 deccan/FC, 1 peth, 2 camp, 3 KP, 4 station, 5 residential, 6 riverside
@@ -27,7 +28,7 @@ export class WorldIndex {
       this.chunks.push({ ci: k, i, j, cx: this.x0 + (i + 0.5) * this.size, cz: this.z0 + (j + 0.5) * this.size,
         ground: [], water: [], kerbs: [], banks: [], lakebanks: [], rails: [], bld: [], walls: [], lamps: [], poles: [],
         signals: [], buses: [], stalls: [], hoardings: [], center: [], lane: [], zebra: [], stop: [], bump: [], pot: [],
-        metro: [], railways: [], platforms: [], mstations: [], built: null, dist: 0, district: 5 });
+        metro: [], railways: [], platforms: [], mstations: [], mgates: [], built: null, dist: 0, district: 5 });
     }
     for (const c of this.chunks) c.district = this.district(c.cx, c.cz);
     const at = (x, z) => this.chunkOf(x, z);
@@ -55,6 +56,25 @@ export class WorldIndex {
     for (const r of M.railways || []) { const p = cmRing(r[1]); put('railways', at(p[0], p[1]), { yard: r[0], pts: p }); }
     for (const pf of M.platforms || []) { const p = cmRing(pf); put('platforms', at(p[0], p[1]), p); }
     for (const st of M.mstations || []) { const p = cmRing(st[1]); put('mstations', at(p[0], p[1]), { name: st[0], pts: p }); }
+    // every elevated Pune Metro station gets a station building on the viaduct (where the map has no
+    // platform drawn), every underground one an entrance kiosk on the street (game/transit.json)
+    const segs = [];
+    for (const m of M.metro) { const p = cmRing(m[1]); for (let k = 0; k + 3 < p.length; k += 2) segs.push([p[k], p[k + 1], p[k + 2], p[k + 3]]); }
+    const have = (M.mstations || []).map(st => { const p = cmRing(st[1]); return [(p[0] + p[p.length - 2]) / 2, (p[1] + p[p.length - 1]) / 2]; });
+    for (const l of TRANSIT.metro) for (const s of l.stations) {
+      if (s.ug) { put('mgates', at(s.x, s.z), { name: s.name, x: s.x, z: s.z, color: l.color }); continue; }
+      if (have.some(([x, z]) => Math.hypot(x - s.x, z - s.z) < 120)) continue;
+      let best = null, bd = 70;
+      for (const [ax, az, bx, bz] of segs) {
+        const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz; if (L2 < 1) continue;
+        const t = Math.max(0, Math.min(1, ((s.x - ax) * dx + (s.z - az) * dz) / L2)), px = ax + dx * t, pz = az + dz * t, d = Math.hypot(px - s.x, pz - s.z);
+        if (d < bd) { bd = d; const L = Math.sqrt(L2); best = [px, pz, dx / L, dz / L]; }
+      }
+      if (!best) continue;
+      const [cx, cz, ux, uz] = best;
+      have.push([cx, cz]);
+      put('mstations', at(cx, cz), { name: s.name, pts: [cx - ux * 65, cz - uz * 65, cx + ux * 65, cz + uz * 65], color: l.color });
+    }
     // shops grouped by building: bi -> Map(edge * 4096 + slot -> [bi, edge, slot, nameIndex, source])
     this.shopNames = M.shopNames || [];
     this.shopsByBld = new Map();
