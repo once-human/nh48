@@ -2,8 +2,10 @@
 // Desktop first. The HUD sits in the corners with no boxes where text alone reads — location
 // top-left, wallet top-right, map bottom-left, the vehicle bottom-right, prompts and subtitles
 // bottom-centre, toasts under the objective.
+import * as THREE from 'three';
 import { fmtRupees, isTouch } from '../core/util.js';
 import { MapScreen, CATS, drawPin, drawArrow, drawFlag, fmtDist } from './map.js';
+import { CHARACTERS, SKINS, lookFor, savedCharacter, saveCharacter } from '../people/characters.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 const STONE = '<svg viewBox="0 0 40 52" aria-hidden="true"><path d="M4 22a16 16 0 0 1 32 0v26H4z" fill="#F4F1EA"/><path d="M4 22a16 16 0 0 1 32 0z" fill="#F2B705"/><rect x="4" y="44" width="32" height="4" fill="#C9C4B8"/></svg>';
@@ -97,42 +99,149 @@ export class HUD {
     if (isTouch && Math.min(innerWidth, innerHeight) < 720) this.buildPhoneNotice();
   }
 
-  // ---------------------------------------------------------------- title / city select
+  // ---------------------------------------------------------------- title
   buildTitle() {
     const t = el('div', 'ov title');
     t.innerHTML = `
       <div class="t-col">
-        <div class="t-brand">${STONE}<span class="t-word">NH48</span><span class="t-ed">Pune edition</span></div>
+        <div class="t-brand">${STONE}<span class="t-word">NH48</span><span class="t-ed">Pune</span></div>
         <div class="t-hero">
+          <div class="t-kicker"><span lang="mr">पुणे</span> · Deccan to Koregaon Park</div>
           <h1>The city is <em>open</em>.</h1>
-          <p>Deccan to Koregaon Park, mapped street by street. Drive anything, follow the rules or don’t, and the city remembers.</p>
+          <p>Every real street, every real shop (with a wink), the Mills at midnight and the peths at noon. Your auto is waiting. Drive it, fill it, or leave it and walk.</p>
         </div>
-        <div class="cities" role="radiogroup" aria-label="City">
-          <button class="city on" role="radio" aria-checked="true" id="c-pune"><canvas width="360" height="172"></canvas><span class="badge">Live</span>
-            <span class="meta"><span class="nm">Pune <span lang="mr">पुणे</span></span><span class="ds">Deccan to Koregaon Park</span></span></button>
-          <button class="city soon" role="radio" aria-checked="false" aria-disabled="true"><span class="art"></span><span class="badge">Soon</span>
-            <span class="meta"><span class="nm">Bengaluru <span lang="kn">ಬೆಂಗಳೂರು</span></span><span class="ds">Coming later</span></span></button>
-          <button class="city soon" role="radio" aria-checked="false" aria-disabled="true"><span class="art"></span><span class="badge">Soon</span>
-            <span class="meta"><span class="nm">Mumbai <span lang="mr">मुंबई</span></span><span class="ds">Coming later</span></span></button>
+        <div class="t-start">
+          <button class="btn primary t-go" id="t-roam">Start <span class="kbd">↵</span></button>
+          <button class="t-who" id="t-who" hidden><span class="t-who-sw"></span><span class="t-who-t"><b></b><small>Change character</small></span></button>
         </div>
-        <div class="t-actions">
-          <button class="btn primary" id="t-roam">Play free roam <span class="kbd">↵</span></button>
-          <button class="btn" id="t-shift">Start an auto shift</button>
-        </div>
+        <div class="t-stats" id="t-stats"></div>
+        <div class="t-cities"><span class="on"><canvas width="240" height="96" id="c-pune"></canvas><b>Pune</b><i>Live</i></span><span><b>Bengaluru</b><i>Later</i></span><span><b>Mumbai</b><i>Later</i></span></div>
         <div class="t-foot">
           <span class="keys">
-            <span><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> drive</span>
-            <span><span class="kbd">Space</span> handbrake</span><span><span class="kbd">H</span> horn</span>
-            <span><span class="kbd">F</span> get out / take a vehicle</span><span><span class="kbd">C</span> camera</span><span><span class="kbd">M</span> map</span><span><span class="kbd">Esc</span> pause</span>
+            <span><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> drive / walk</span>
+            <span><span class="kbd">Space</span> handbrake · jump</span><span><span class="kbd">F</span> get in / out</span><span><span class="kbd">H</span> horn</span>
+            <span><span class="kbd">C</span> camera</span><span><span class="kbd">M</span> map</span><span><span class="kbd">Esc</span> pause</span>
           </span>
-          <span>Map data © OpenStreetMap contributors (ODbL) and Overture Maps Foundation. Businesses are fictional parodies.</span>
+          <span>Map data © OpenStreetMap contributors (ODbL), Overture Maps Foundation. Businesses are parodies.</span>
         </div>
       </div>`;
     this.root.appendChild(t);
     this.title = t;
-    t.querySelector('#t-shift').onclick = () => this.game.startPlay(true);
-    t.querySelector('#t-roam').onclick = () => this.game.startPlay(false);
-    this.drawCityArt(t.querySelector('#c-pune canvas'));
+    t.querySelector('#t-roam').onclick = () => this.game.start();
+    t.querySelector('#t-who').onclick = () => this.showPicker(() => this.syncTitle());
+    this.drawCityArt(t.querySelector('#c-pune'));
+    this.syncTitle();
+  }
+  syncTitle() {
+    const t = this.title; if (!t) return;
+    const sv = savedCharacter();
+    const who = t.querySelector('#t-who');
+    who.hidden = !sv;
+    if (sv) {
+      const ch = CHARACTERS.find(x => x.id === sv.id) || CHARACTERS[0];
+      who.querySelector('b').textContent = `Playing as ${ch.name}`;
+      who.querySelector('.t-who-sw').style.background = '#' + ch.top.toString(16).padStart(6, '0');
+      t.querySelector('#t-roam').firstChild.textContent = 'Start ';
+    }
+    const S = this.game.stats;
+    t.querySelector('#t-stats').innerHTML = S ? `<span><b>${fmtRupees(S.money)}</b> in your pocket</span><span><b>${S.rides || 0}</b> rides done</span>${S.rating ? `<span><b>${S.rating.toFixed(1)}★</b> rating</span>` : ''}` : '';
+  }
+  hasCharacter() { return !!savedCharacter(); }
+  // ---------------------------------------------------------------- character picker
+  showPicker(done) {
+    if (!this.picker) this.buildPicker();
+    const P = this.picker;
+    const sv = savedCharacter();
+    P.sel = { id: sv ? sv.id : 'aarav', skin: sv ? sv.skin : 'wheatish' };
+    P.done = done;
+    P.el.hidden = false; this.pickerOpen = true;
+    this.renderPicker();
+    P.run = true; P.loop();
+  }
+  buildPicker() {
+    const m = el('div', 'ov picker');
+    m.innerHTML = `
+      <div class="pk-l">
+        <div class="pk-h"><span class="t-ed">Who are you?</span><h2>Pick your character</h2><p>You can change this later from the menu. Nobody else in the city will look like you.</p></div>
+        <div class="pk-tabs" role="tablist"><button data-g="m" role="tab">Male</button><button data-g="f" role="tab">Female</button></div>
+        <div class="pk-cards"></div>
+        <div class="pk-skin"><span>Skin tone</span><div class="pk-sw"></div></div>
+        <div class="pk-go"><button class="btn primary" id="pk-ok">Play as Aarav</button><button class="btn" id="pk-x">Back</button></div>
+      </div>
+      <div class="pk-r"><canvas class="pk-cv"></canvas><div class="pk-name"></div><div class="pk-hint">Drag to turn</div></div>`;
+    this.root.appendChild(m);
+    const P = this.picker = { el: m, cv: m.querySelector('.pk-cv'), yaw: 0.35, run: false };
+    m.querySelectorAll('.pk-tabs button').forEach(b => b.onclick = () => {
+      const g = b.dataset.g; const first = CHARACTERS.find(c => (c.female ? 'f' : 'm') === g);
+      P.sel.id = first.id; this.renderPicker();
+    });
+    m.querySelector('#pk-ok').onclick = () => {
+      saveCharacter(P.sel.id, P.sel.skin);
+      this.game.player.setLook(lookFor(P.sel.id, P.sel.skin));
+      this.closePicker(); if (P.done) P.done();
+    };
+    m.querySelector('#pk-x').onclick = () => this.closePicker();
+    let drag = null;
+    P.cv.addEventListener('pointerdown', e => { drag = e.clientX; P.cv.setPointerCapture(e.pointerId); });
+    P.cv.addEventListener('pointermove', e => { if (drag !== null) { P.yaw += (e.clientX - drag) * 0.012; drag = e.clientX; } });
+    P.cv.addEventListener('pointerup', () => { drag = null; });
+    // a small separate renderer for the preview
+    const R = new THREE.WebGLRenderer({ canvas: P.cv, antialias: true, alpha: true });
+    R.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    R.outputColorSpace = THREE.SRGBColorSpace; R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 0.95;
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight(0xfff4e0, 0x3a3226, 1.6));
+    const key = new THREE.DirectionalLight(0xfff0dc, 1.9); key.position.set(2, 3, 2.5); scene.add(key);
+    const rim = new THREE.DirectionalLight(0x9fc4ff, 1.2); rim.position.set(-2.5, 2, -2); scene.add(rim);
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(0.75, 40), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 }));
+    floor.rotation.x = -Math.PI / 2; scene.add(floor);
+    const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+    Object.assign(P, { R, scene, cam, clock: new THREE.Clock(), H: null, key: '' });
+    P.loop = () => {
+      if (!P.run) return;
+      requestAnimationFrame(P.loop);
+      const w = P.cv.clientWidth, h = P.cv.clientHeight;
+      if (w && h && (P.w !== w || P.h !== h)) { P.w = w; P.h = h; R.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+      const dt = Math.min(0.05, P.clock.getDelta());
+      const tall = 1.85, dist = tall / 2 / Math.tan(cam.fov * Math.PI / 360) * (cam.aspect < 0.7 ? 1.45 / cam.aspect * 0.7 : 1.25);
+      cam.position.set(0, 1.0, dist); cam.lookAt(0, 0.92, 0);
+      if (P.H) { P.H.mixer.update(dt); P.H.holder.rotation.y = P.yaw - Math.PI / 2; }
+      R.render(scene, cam);
+    };
+  }
+  renderPicker() {
+    const P = this.picker, m = P.el;
+    const ch = CHARACTERS.find(x => x.id === P.sel.id) || CHARACTERS[0];
+    const g = ch.female ? 'f' : 'm';
+    m.querySelectorAll('.pk-tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.g === g));
+    const cards = m.querySelector('.pk-cards'); cards.innerHTML = '';
+    for (const c of CHARACTERS.filter(c => !!c.female === ch.female)) {
+      const b = el('button', 'pk-card' + (c.id === ch.id ? ' on' : ''), `<span class="pk-dot" style="background:#${c.top.toString(16).padStart(6, '0')}"></span><b>${c.name}</b><small>${c.blurb}</small>`);
+      b.onclick = () => { P.sel.id = c.id; this.renderPicker(); };
+      cards.appendChild(b);
+    }
+    const sw = m.querySelector('.pk-sw'); sw.innerHTML = '';
+    for (const s of SKINS) {
+      const b = el('button', 'pk-s' + (s.id === P.sel.skin ? ' on' : ''), `<i style="background:#${s.hex.toString(16)}"></i>${s.name}`);
+      b.onclick = () => { P.sel.skin = s.id; this.renderPicker(); };
+      sw.appendChild(b);
+    }
+    m.querySelector('#pk-ok').textContent = `Play as ${ch.name}`;
+    m.querySelector('.pk-name').innerHTML = `<b>${ch.name}</b>`;
+    const key = P.sel.id + '/' + P.sel.skin;
+    const kit = this.game.W.kit;
+    if (kit && key !== P.key) {
+      P.key = key;
+      if (P.H) { P.scene.remove(P.H.holder); P.H.dispose(); }
+      P.H = kit.create(lookFor(P.sel.id, P.sel.skin));
+      P.H.holder.traverse(o => { o.frustumCulled = false; });
+      P.scene.add(P.H.holder);
+      P.H.play(ch.female ? 'idle' : 'arms_folded'); P.H.play('idle', { fade: 0 });
+    }
+  }
+  closePicker() {
+    const P = this.picker; if (!P) return;
+    P.run = false; P.el.hidden = true; this.pickerOpen = false;
   }
   drawCityArt(cv) {
     const city = this.game.city;
@@ -192,6 +301,7 @@ export class HUD {
             <span class="k"><span class="kbd">Shift</span></span><span>Sprint (on foot)</span>
             <span class="k"><span class="kbd">1</span><span class="kbd">4</span></span><span>Answer the police</span>
           </div></div>
+        <button class="btn" id="p-char">Change character</button>
         <button class="btn" id="p-title">Quit to title</button>
         <div class="fine">Map data © OpenStreetMap contributors (ODbL); buildings and places from Overture Maps Foundation (ODbL, CDLA-Permissive-2.0), including Google Open Buildings and Microsoft footprints. All business names are fictional parodies of real places. People and animals: Quaternius (CC0). Voices: Kokoro-82M (Apache-2.0) and Piper mr_IN, trained on Google’s crowdsourced Marathi speech (OpenSLR 64, CC BY-SA 4.0). Sounds: Freesound (CC0). Fines follow the MV Act as reported for Pune and may be out of date.</div>
       </div>`;
@@ -200,7 +310,8 @@ export class HUD {
     p.addEventListener('click', (e) => { if (e.target === p) this.game.togglePause(false); });
     p.querySelector('#p-resume').onclick = () => this.game.togglePause(false);
     p.querySelector('#p-map').onclick = () => { this.game.togglePause(false); this.game.toggleMap(true); };
-    p.querySelector('#p-title').onclick = () => this.game.endShift();
+    p.querySelector('#p-title').onclick = () => { this.game.endShift(); this.syncTitle(); };
+    p.querySelector('#p-char').onclick = () => this.showPicker();
     p.querySelectorAll('#p-time button').forEach(b => b.onclick = () => { this.game.setHour(parseFloat(b.dataset.h)); this.syncPause(); });
     p.querySelectorAll('#p-q button').forEach(b => b.onclick = () => { this.game.setQuality(b.dataset.q); this.syncPause(); });
     p.querySelector('#p-ch-pay').onclick = () => { if (this.game.police) this.game.police.payDues(); this.syncPause(); };
@@ -242,8 +353,9 @@ export class HUD {
     if (on) this.root.appendChild(this.corner); else this.corner.remove();
     this.title.hidden = on;
     this.$('h-sub').classList.remove('show');
-    this.$('h-mode').textContent = this.game.rides && this.game.rides.enabled ? 'Auto shift' : 'Free roam';
+    this.setMode();
   }
+  setMode() { this.$('h-mode').textContent = this.game.rides && this.game.rides.enabled ? 'On shift' : 'Free roam'; }
 
   // ---------------------------------------------------------------- per frame
   update(dt) {

@@ -1,0 +1,17 @@
+import puppeteer from 'puppeteer-core';
+const out = process.argv[2];
+const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--window-size=1280,720'], protocolTimeout: 900000 });
+const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 720 });
+const logs = []; page.on('pageerror', e => logs.push('ERR ' + e.message)); page.on('console', m => { if (/error|warn/i.test(m.type())) logs.push(m.text().slice(0, 300)); });
+await page.goto('http://127.0.0.1:8848/test.html?test&q=low&frames=1', { waitUntil: 'load', timeout: 300000 });
+await page.waitForFunction('window.__shotReady === true || window.__error', { timeout: 600000, polling: 500 });
+await page.evaluate("document.getElementById('loading') && (document.getElementById('loading').hidden = true)");
+await page.screenshot({ path: out + '_title.png' });
+await page.evaluate(() => { try { localStorage.removeItem('nh48_char'); } catch (e) {} window.__game.hud.showPicker(() => {}); });
+await new Promise(r => setTimeout(r, 8000));
+await page.screenshot({ path: out + '_pick_m.png' });
+await page.evaluate(() => { const h = window.__game.hud; h.picker.sel = { id: 'meera', skin: 'medium' }; h.renderPicker(); });
+await new Promise(r => setTimeout(r, 8000));
+await page.screenshot({ path: out + '_pick_f.png' });
+console.log(logs.slice(0, 20).join('\n'));
+await browser.close();

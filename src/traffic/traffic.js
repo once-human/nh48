@@ -165,7 +165,7 @@ export class Traffic {
     else if (type === 'bus') v.col = [1, 1, 1];
     else if (T.two) v.col = pick(P.two);
     else v.col = pick(P.car);
-    v.colB = pick(P.shirt); v.colC = pick(P.helmet);
+    v.colB = type === 'auto' ? [0.62, 0.55, 0.4] : pick(P.shirt); v.colC = pick(P.helmet);   // Pune auto drivers wear khaki
     this.place(v, 0);
     this.list.push(v);
     return v;

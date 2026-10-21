@@ -122,10 +122,14 @@ export class Police {
     if (this.stop || (this.cool[kind] || 0) > 0) return;
     const P = this.g.player;
     if (P.onFoot) return;
-    this.cool[kind] = kind === 'helmet' ? 40 : 8;
-    const cop = info.cop !== false && this.copSeeing(x, z, info.copRange || 45);
-    if (cop && this.rng.next() < (info.stopChance ?? 0.85)) { this.beginStop(cop, kind, info); return; }
-    if (cop || this.rng.next() < (info.camChance ?? 0)) this.eChallan(kind, x, z, cop ? 'noted by the traffic police' : info.how || 'caught on camera');
+    // Pune reality: most offences go unnoticed. A havaldar right there may stop you, or just blow the
+    // whistle and wave you on; cameras only watch the big junctions. At most one challan every ~2 minutes.
+    this.cool[kind] = kind === 'helmet' ? 90 : 45;
+    const quiet = (this.lastChallanT ?? -1e9) > this.g.t - 120;
+    const cop = info.cop !== false && this.copSeeing(x, z, info.copRange || 30);
+    if (cop && !quiet && this.rng.next() < (info.stopChance ?? 0.45)) { this.lastChallanT = this.g.t; this.beginStop(cop, kind, info); return; }
+    if (cop && this.rng.next() < 0.6) { this.g.hud.toast('Whistle!', `${cop.name} waved you on. Next time it's a challan.`, 'warn', 2.4); this.g.audio.whistle && this.g.audio.whistle(); return; }
+    if (!quiet && (cop || this.rng.next() < (info.camChance ?? 0))) { this.lastChallanT = this.g.t; this.eChallan(kind, x, z, cop ? 'noted by the traffic police' : info.how || 'caught on camera'); }
     else if (info.missed) this.g.hud.toast(info.missed[0], info.missed[1], 'warn', 2.2);
   }
   eChallan(kind, x, z, how, extra = 0) {
@@ -589,6 +593,9 @@ export class Police {
     if (this.stop && this.stop.phase === 'wave') out.push({ x: this.stop.cop.x, z: this.stop.cop.z, kind: 'cop' });
     for (const m of this.marshals) out.push({ x: m.veh.x, z: m.veh.z, kind: 'marshal' });
     if (this.towedAt) out.push({ x: this.towedAt.x, z: this.towedAt.z, kind: 'tow' });
+    // your own auto, wherever you left it
+    const P = this.g.player;
+    if (!this.towedAt && P && P.auto && (P.onFoot || P.cur !== P.auto)) out.push({ x: P.auto.x, z: P.auto.z, kind: 'tow', label: 'Your auto' });
     return out;
   }
 }

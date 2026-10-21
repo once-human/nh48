@@ -29,11 +29,7 @@ export class Crowd {
     return s;
   }
   dress(s, look) {
-    const u = s.H.mat.userData;
-    u.top.copy(look.top); u.bottom.copy(look.bottom); u.skin.copy(look.skin); u.shoe.copy(look.shoe); u.cut.copy(look.cut);
-    for (const o of s.accs) o.visible = o.name === look.acc || (look.acc === 'cap_police' && o.name === 'hair_short');
-    s.H.acc.color.copy(look.acc === 'cap_police' ? new THREE.Color(0xf4f4f0) : look.acc === 'helmet' ? new THREE.Color(0x222428) : look.hair);
-    s.H.root.scale.setScalar(look.scale);
+    this.kit.applyLook(s.H, look);
   }
 
   update(dt, cx, cz) {

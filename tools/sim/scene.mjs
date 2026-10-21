@@ -13,10 +13,10 @@ await page.goto('http://127.0.0.1:8848/test.html?test&play=1&q=low&drive=0&frame
 await page.waitForFunction('window.__shotReady === true || window.__error', { timeout: 600000, polling: 500 });
 for (const v of views) {
   const [name, spec] = v.split(':'); const [x, z, th, hour] = spec.split(',').map(Number);
-  const info = await page.evaluate(async (x, z, th, hour) => {
+  const info = await page.evaluate(async (x, z, th, hour, process_env_FOOT) => {
     const g = window.__game, P = g.player;
     g.setHour(hour); g.W.activity.setHour(hour); g.traffic.hour = hour;
-    P.reset(x, z, th); g.W.streamer.warm && g.W.streamer.warm(x, z, 250);
+    P.reset(x, z, th); if (process_env_FOOT) P.teleportFoot(x, z, th, g.traffic); g.W.streamer.warm && g.W.streamer.warm(x, z, 250);
     // fresh crowd and traffic for this place and hour
     g.people.list = g.people.list.filter(p => p.fixed || p.pax); g.people.actT = 0;
     for (let i = g.traffic.list.length - 1; i >= 0; i--) g.traffic.despawn(i);
@@ -24,7 +24,7 @@ for (const v of views) {
     for (let k = 0; k < 40; k++) g.people.update(0.1, P, null);
     const t0 = g.t; while (g.t - t0 < 1.5) await new Promise(r => requestAnimationFrame(r));
     return { peds: g.people.list.length, target: g.people.target, act: +g.people.actHere.toFixed(1), night: +g.people.nightHere.toFixed(2), traffic: g.traffic.list.length };
-  }, x, z, th, hour);
+  }, x, z, th, hour, !!process.env.FOOT);
   await page.screenshot({ path: `${outDir}/${name}.png` });
   console.log(`${name} ${JSON.stringify(info)}`);
 }

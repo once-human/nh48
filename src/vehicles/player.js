@@ -72,13 +72,24 @@ export class PlayerAuto {
       this.tilt.add(pm);
       this.paxMeshes.push(pm);
     }
-    // rear sticker
-    if (W.signs && W.signs.sticker && W.mats && W.mats.oldSign) {
-      const s = W.signs.sticker;
-      const g = new THREE.PlaneGeometry(0.98, 0.2);
-      const uv = g.attributes.uv;
-      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) ? s.u1 : s.u0, uv.getY(i) ? s.v1 : s.v0);
-      const st = new THREE.Mesh(g, W.mats.oldSign);
+    // rear sticker "आई तुझा आशीर्वाद": its own sharp texture (in the shared sign atlas it bled and
+    // blurred as soon as the chase camera pulled back at speed)
+    {
+      const c = document.createElement('canvas'); c.width = 1024; c.height = 208;
+      const x = c.getContext('2d');
+      const T = 'आई तुझा आशीर्वाद';
+      const paint = () => {
+        x.fillStyle = '#0c0b0a'; x.fillRect(0, 0, 1024, 208);
+        x.fillStyle = '#F2C230'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        let fs = 140; x.font = `400 ${fs}px "Yatra One", "Mukta", sans-serif`;
+        while (x.measureText(T).width > 940 && fs > 40) { fs -= 4; x.font = `400 ${fs}px "Yatra One", "Mukta", sans-serif`; }
+        x.fillText(T, 512, 112);
+      };
+      paint();
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { paint(); tex.needsUpdate = true; });
+      const st = new THREE.Mesh(new THREE.PlaneGeometry(0.98, 0.2), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, metalness: 0, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.08 }));
       st.position.set(-1.452, 1.1, 0);
       st.rotation.y = -Math.PI / 2;
       this.tilt.add(st);

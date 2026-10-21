@@ -104,7 +104,7 @@ export class Game {
       if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;     // typing in the map search
       if (e.code === 'Escape' || e.code === 'KeyP') { if (this.state === 'play' || this.state === 'pause') this.togglePause(); }
       if (e.code === 'KeyM' && (this.state === 'play' || this.state === 'map')) this.toggleMap();
-      if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space')) this.startPlay(false);
+      if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space') && !(this.hud.pickerOpen)) this.start();
     });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'play') this.togglePause(true); });
     // drag on the canvas orbits the camera a little
@@ -137,6 +137,11 @@ export class Game {
   focus() { return this.state === 'title' ? this.camera.position : this.player.root.position; }
 
   // ---------------------------------------------------------------- state changes
+  // Start: pick who you are the first time, then you're in your auto (the shift runs while you drive it)
+  start() {
+    if (!this.hud.hasCharacter || this.hud.hasCharacter()) return this.startPlay(false);
+    this.hud.showPicker(() => this.startPlay(false));
+  }
   startPlay(shift) {
     // drop focus from the menu button so Space (handbrake) can't press it again
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
@@ -170,10 +175,12 @@ export class Game {
     if (to && this.state === 'play') { this.state = 'map'; this.hud.mapScreen.open(); this.audio.updateEngine(0, 0, false); }
     else if (!to && this.state === 'map') { this.state = 'play'; this.hud.mapScreen.close(); }
   }
-  // fast travel: a cab ride you skip. ₹20 + ₹30/km, never more than ₹200
+  // take a rickshaw: someone else's auto drives you there (the ride is skipped). Pune RTA meter:
+  // ₹26 for the first 1.5 km, ₹17 a km after, by road (~1.3x the straight line), never more than ₹200.
+  // You arrive on foot; your own auto stays where you left it, marked on the map.
   fastTravelCost(x, z) {
-    const d = Math.hypot(x - this.player.x, z - this.player.z);
-    return Math.min(200, Math.max(20, Math.round((20 + d / 1000 * 30) / 5) * 5));
+    const km = Math.hypot(x - this.player.x, z - this.player.z) * 1.3 / 1000;
+    return Math.min(200, Math.round(26 + Math.max(0, km - 1.5) * 17));
   }
   fastTravelBlock() {
     if (this.police && this.police.heat > 0) return 'Not while the police are after you';
@@ -183,28 +190,23 @@ export class Game {
   }
   fastTravel(x, z, name) {
     const why = this.fastTravelBlock();
-    if (why) { this.hud.toast('Can’t fast travel', why, 'warn', 2.6); return false; }
+    if (why) { this.hud.toast('No rickshaw right now', why, 'warn', 2.6); return false; }
     const cost = this.fastTravelCost(x, z);
-    if (this.stats.money < cost) { this.hud.toast('Not enough money', `Fast travel here costs ₹${cost}`, 'warn', 2.6); return false; }
+    if (this.stats.money < cost) { this.hud.toast('Not enough money', `The meter says ₹${cost}`, 'warn', 2.6); return false; }
     const G = this.W.graph;
     const near = G.nearest(x, z, 300, e => e.rank >= 1 && !e.restricted) || G.nearest(x, z, 600);
-    if (!near) { this.hud.toast('Can’t fast travel', 'No road near there', 'warn', 2.4); return false; }
+    if (!near) { this.hud.toast('No rickshaw goes there', 'No road near that spot', 'warn', 2.4); return false; }
     const e = near.e, t = G.at(e, near.s), th = Math.atan2(t[3], t[2]);
     const P = this.player;
-    if (P.onFoot) {
-      const sw = e.w / 2 + Math.max(0.8, e.sw / 2);           // step onto the footpath
-      P.teleportFoot(t[0] + t[3] * sw, t[1] - t[2] * sw, th + Math.PI / 2, this.traffic);
-    } else {
-      const lat = e.oneway ? e.w / 2 - 1.6 : 1.6;
-      const X = t[0] + t[3] * lat, Z = t[1] - t[2] * lat;
-      if (P.cur && P.cur !== P.auto) P.cur.reset(X, Z, th); else P.reset(X, Z, th);
-    }
+    // dropped at the kerb, on foot; whatever you were driving stays parked where you left it
+    const sw = e.w / 2 + Math.max(0.8, e.sw / 2);
+    P.teleportFoot(t[0] + t[3] * sw, t[1] - t[2] * sw, th + Math.PI / 2, this.traffic);
     this.stats.money -= cost; this.saveStats();
     this.setWaypoint(null);
     this.W.streamer.warm(P.x, P.z, Math.min(260, this.quality.streamRadius || 260));
     this.traffic.prefill(P.x, P.z);
     this.toggleMap(false);
-    this.hud.flash(name || 'Fast travel', `₹${cost} · ${this.W.graph.names[e.name] ? this.W.graph.names[e.name][0] : ''}`);
+    this.hud.flash(name || 'Here you are', `Rickshaw fare ₹${cost} · ${this.W.graph.names[e.name] ? this.W.graph.names[e.name][0] : ''} · your auto is marked on the map`);
     return true;
   }
   // waypoint + GPS: a blue route along the road graph, refreshed as you drive
@@ -396,6 +398,13 @@ export class Game {
       this.people.update(Math.min(dt, 0.05), P, this.inView);
     }
     if (this.state === 'play') {
+      // the shift is on whenever you're driving an auto (yours or one you took), off when you get out
+      const want = P.inAnyAuto && !this.police.suspended && !this.params.has('noshift');
+      if (want !== this.rides.enabled && !(this.rides.current && this.rides.current.state === 'onboard')) {
+        this.rides.setEnabled(want);
+        this.hud.setMode();
+        if (want && this.t - (this.shiftToastT ?? -99) > 30) { this.shiftToastT = this.t; this.hud.toast('On shift', 'People waving for an auto show up green on the map', 'meter', 3); }
+      }
       this.rides.update(dt);
       this.police.update(dt);
       if (this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);
@@ -467,6 +476,21 @@ export class Game {
     this.hud.toast('Back on the road', '', 'info', 1.4);
   }
 
+  // is there a road under (x, z) that you may drive along in direction (hx, hz)?
+  rightWayHere(x, z, hx, hz) {
+    const G = this.W.graph;
+    for (const e of G.gridQuery(x, z, 20)) {
+      const p = e.pts;
+      for (let k = 0; k + 3 < p.length; k += 2) {
+        const ax = p[k], az = p[k + 1], dx = p[k + 2] - ax, dz = p[k + 3] - az, L2 = dx * dx + dz * dz || 1e-9;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2));
+        const d = Math.hypot(x - ax - dx * t, z - az - dz * t);
+        if (d > e.w / 2 + 0.8) continue;
+        if (!e.oneway || (hx * dx + hz * dz) > 0) return true;
+      }
+    }
+    return false;
+  }
   // street names, wrong way, red lights
   checkRoad(dt) {
     const P = this.player, G = this.W.graph;
@@ -484,8 +508,13 @@ export class Game {
     const t = G.at(e, near.s);
     const hx = Math.cos(P.th), hz = Math.sin(P.th);
     const dot = hx * t[2] + hz * t[3];
-    if (e.oneway && dot < -0.5 && P.v > 3 && this.timers.wrong <= 0 && !P.onFoot) {
-      this.timers.wrong = 6;
+    // wrong way only if no carriageway under you runs your way (dual carriageways such as North Main
+    // Road are two one-way roads side by side; the nearest centreline is often the other one), and only
+    // after a few seconds of it
+    const wrongNow = e.oneway && dot < -0.5 && P.v > 3 && !P.onFoot && !this.rightWayHere(P.x, P.z, hx, hz);
+    this.wrongT = wrongNow ? (this.wrongT || 0) + 0.4 : 0;
+    if (wrongNow && this.wrongT >= 2.8 && this.timers.wrong <= 0) {
+      this.timers.wrong = 20;
       this.police.offence('wrong', P.x, P.z, { camChance: e.rank >= 4 ? 0.2 : 0, how: 'junction camera', missed: ['Wrong side of a one-way', 'Very Pune. Also very dangerous.'] });
       this.rides.onEvent({ type: 'wrongway' });
     }
@@ -498,7 +527,7 @@ export class Game {
         const st = this.traffic.signals.stateForAngle(nd.i, Math.atan2(hz, hx));
         const pol = this.police;
         if (P.v > 3 && !P.onFoot) {
-          if (st === 'r') pol.offence('signal', nd.x, nd.z, { camChance: 0.35, how: 'signal camera', missed: ['Jumped a red light', 'Nobody saw. This time.'] });
+          if (st === 'r') pol.offence('signal', nd.x, nd.z, { camChance: 0.2, how: 'signal camera', missed: ['Jumped a red light', 'Nobody saw. This time.'] });
           else if (st === 'a') {
             // strict officers stop you for amber too — and then you can argue, and be right
             const cop = pol.copSeeing(nd.x, nd.z, 40);
@@ -506,7 +535,7 @@ export class Game {
           }
           // helmet cameras at signals (two-wheelers without a helmet)
           const S = P.spec;
-          if (S && S.helmet && P.cur && !P.cur.helmet) pol.offence('helmet', nd.x, nd.z, { camChance: 0.3, how: 'ITMS helmet camera', stopChance: 0.7 });
+          if (S && S.helmet && P.cur && !P.cur.helmet) pol.offence('helmet', nd.x, nd.z, { camChance: 0.12, how: 'ITMS helmet camera', stopChance: 0.5 });
         }
       }
       if (d > nd.jr + 8 && this.lastJunction === nd.i) this.lastJunction = -1;
@@ -599,11 +628,12 @@ export class Game {
       if (fps < 45) p.slow++; else p.slow = 0;
       if (fps > 57) p.fast++; else p.fast = 0;
       const maxPr = Math.min(window.devicePixelRatio || 1, this.QUALITY[this.qualityName].pixelRatio);
-      if (p.slow >= 1 && p.pr > 0.6) { p.pr = Math.max(0.6, p.pr - (fps < 30 ? 0.2 : 0.1)); this.applyPixelRatio(p.pr); p.slow = 0; }
+      // never below 0.75: at 0.6 text (number plates, boards, the auto's sticker) smeared while driving
+      if (p.slow >= 1 && p.pr > 0.75) { p.pr = Math.max(0.75, p.pr - (fps < 30 ? 0.15 : 0.08)); this.applyPixelRatio(p.pr); p.slow = 0; }
       else if (p.fast >= 3 && p.pr < maxPr) { p.pr = Math.min(maxPr, p.pr + 0.08); this.applyPixelRatio(p.pr); p.fast = 0; }
       // still struggling at the lowest resolution: step the graphics preset down once per level
       // (only when the player hasn't picked a preset themselves)
-      p.floor = (p.pr <= 0.61 && fps < 30) ? (p.floor || 0) + 1 : 0;
+      p.floor = (p.pr <= 0.76 && fps < 30) ? (p.floor || 0) + 1 : 0;
       if (p.floor >= 2 && !this.userQuality && this.qualityName !== 'low') {
         p.floor = 0;
         const next = this.qualityName === 'high' ? 'med' : 'low';

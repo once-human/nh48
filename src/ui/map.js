@@ -273,7 +273,7 @@ export class MapScreen {
       <div class="bm-card glass" id="bm-card" hidden>
         <div class="bm-c-cat" id="bm-c-cat"></div><div class="bm-c-n" id="bm-c-n"></div><div class="bm-c-mr" lang="mr" id="bm-c-mr"></div>
         <div class="bm-c-b" id="bm-c-b"></div>
-        <div class="bm-c-act"><button class="btn primary small" id="bm-c-go">Set waypoint</button><button class="btn small" id="bm-c-ft">Fast travel</button><button class="btn small" id="bm-c-x">Close</button></div>
+        <div class="bm-c-act"><button class="btn primary small" id="bm-c-go">Set waypoint</button><button class="btn small" id="bm-c-ft">Take a rickshaw</button><button class="btn small" id="bm-c-x">Close</button></div>
       </div>
       <div class="bm-foot"><span class="bm-scale" id="bm-scale"><i></i><b></b></span><span class="bm-hint">Drag to move · scroll to zoom · right-click to drop a pin · <span class="kbd">M</span> close</span></div>`;
     root.appendChild(m);
@@ -417,7 +417,7 @@ export class MapScreen {
     this.$('bm-c-b').textContent = p.blurb || '';
     this.$('bm-c-b').hidden = !p.blurb;
     const ft = this.$('bm-c-ft'), cost = this.g.fastTravelCost(p.x, p.z), why = this.g.fastTravelBlock();
-    ft.textContent = `Fast travel · ₹${cost}`;
+    ft.textContent = `Take a rickshaw · ₹${cost}`;
     ft.disabled = !!why || this.g.stats.money < cost || d < 40;
     ft.title = why || (this.g.stats.money < cost ? `You have ₹${this.g.stats.money}` : 'Skip the drive');
     const wp = this.g.waypoint;
@@ -608,7 +608,8 @@ export class MapScreen {
     // ride and police markers
     for (const m of [...(g.rides ? g.rides.markers() : []), ...(g.police ? g.police.markers() : [])]) {
       const [X, Y] = T(m.x, m.z);
-      drawPin(x, X, Y, m.kind === 'pax' ? '#33d17a' : m.kind === 'cop' ? '#5aa2ff' : m.kind === 'marshal' ? '#ff4b3e' : '#f2b705', null, 6);
+      drawPin(x, X, Y, m.kind === 'pax' ? '#33d17a' : m.kind === 'cop' ? '#5aa2ff' : m.kind === 'marshal' ? '#ff4b3e' : '#f2b705', m.kind === 'tow' ? 'A' : null, m.kind === 'tow' ? 8 : 6);
+      if (m.label) { x.textAlign = 'left'; x.textBaseline = 'middle'; } if (m.label) text(m.label, X + 11, Y, '700 11px Inter, system-ui, sans-serif', '#f2b705');
     }
     // waypoint + selection
     if (g.waypoint) { const [X, Y] = T(g.waypoint.x, g.waypoint.z); drawFlag(x, X, Y); }

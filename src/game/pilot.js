@@ -5,8 +5,17 @@ import * as THREE from 'three';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { flyResolve } from '../world/flyover.js';
 import { clamp, damp, dampAngle, wrapAngle, RNG } from '../core/util.js';
+import { lookFor, savedCharacter } from '../people/characters.js';
 
 const WALK = 1.55, JOG = 3.4, SPRINT = 6.2;
+// where you sit (vehicle-local: x forward, y up, z to the right; Indian cars are right-hand drive)
+const SEATS = { auto: [0.36, 0.8, 0], hatch: [-0.2, 0.57, 0.36], sedan: [-0.55, 0.56, 0.36], taxi: [-0.55, 0.56, 0.36], suv: [-0.3, 0.7, 0.38], tempo: [0.75, 0.95, 0.32] };
+function seatFor(veh, S, isAuto) {
+  if (S.two) return [S.seat ? S.seat[0] : -0.3, S.seat ? S.seat[1] : 0.8, 0];
+  if (isAuto) return SEATS.auto;
+  if (veh.type === 'bus') return [S.L / 2 - 1.2, 1.25, 0.75];
+  return SEATS[veh.type] || null;
+}
 const SHOUTS = [
   ['Arre, gaadi kyon cheen rahe ho?!', 'Hey, why are you taking my vehicle?!'],
   ['Thamba! Maazi gaadi aahe ti!', 'Stop! That’s my vehicle!'],
@@ -28,14 +37,8 @@ export class Pilot {
     this.foot = { x: 0, z: 0, y: 0, yaw: 0, v: 0, vx: 0, vz: 0, anim: 'idle', agent: { x: 0, z: 0, hx: 1, hz: 0, v: 0, W: 0.6, L: 0.6, isPlayer: true } };
     this.offer = null; this.offerT = 0; this.busy = 0;
     if (kit) {
-      const look = kit.randomLook(new RNG(2024), { female: false });
-      look.top = new THREE.Color(0x2f6f73).convertSRGBToLinear(); look.bottom = new THREE.Color(0x2b3550).convertSRGBToLinear();
-      look.cut = new THREE.Vector4(0.36, 0.93, 0.5, 0); look.scale = 0.95; look.acc = 'hair_short';
-      this.look = look;
-      this.human = kit.create(look);
-      this.human.holder.visible = false;
-      scene.add(this.human.holder);
-      this.human.play('idle');
+      const sv = savedCharacter();
+      this.setLook(lookFor(sv && sv.id, sv && sv.skin));
     }
     this.parkGrid = null;
   }
@@ -59,10 +62,22 @@ export class Pilot {
   get agent() { return this.onFoot ? this.foot.agent : this.cur.agent; }
   get spec() { return this.onFoot ? null : this.cur === this.auto ? specOf('auto') : this.cur.spec; }
   get inAuto() { return this.cur === this.auto && !this.onFoot; }
+  // your own auto or anyone else's: the shift runs in whichever auto you're driving
+  get inAnyAuto() { return !this.onFoot && (this.cur === this.auto || (this.cur && this.cur.type === 'auto')); }
   get cockpitEye() { return this.onFoot ? null : this.cur.cockpitEye || null; }
   get camDist() { const s = this.spec; return s ? Math.max(0, s.L - 2.7) * 0.75 : -2; }
-  setCockpit(on) { if (!this.onFoot && this.cur.setCockpit) this.cur.setCockpit(on); }
-  setPassengers(n, s) { this.auto.setPassengers(n, s); }
+  setCockpit(on) {
+    if (this.onFoot) return;
+    if (this.cur.setCockpit) this.cur.setCockpit(on);
+    this.cockpitOn = on;
+    // you are the one at the wheel: the vehicle's stand-in driver never shows, and your own body hides
+    // only in the driver's-seat view (its head would sit on the camera)
+    if (this.human) {
+      if (this.cur === this.auto) this.auto.driver.visible = false;
+      this.human.holder.visible = !!this.riderShown && !on;
+    }
+  }
+  setPassengers(n, s) { const v = this.onFoot ? this.auto : this.cur; if (v && v.setPassengers) v.setPassengers(n, s); else this.auto.setPassengers(0); }
   reset(x, z, th) {
     if (this.mode !== 'auto') this.switchTo(this.auto);
     this.auto.reset(x, z, th);
@@ -82,7 +97,9 @@ export class Pilot {
       this.cur.update(dt, inp, traffic);
       for (const e of this.cur.events) this.events.push(e);
       if (this.riderShown) this.placeRider();
+      else if (this.human) this.human.holder.visible = false;     // never left standing on the road
     }
+    if (this.onFoot && this.human && !this.human.holder.visible) this.human.holder.visible = true;
     // vehicles left behind settle and stay solid
     for (const d of this.dropped) if (d.veh !== this.cur && d.veh.sync) d.veh.sync(0);
     this.updateNpcs(dt);
@@ -273,32 +290,44 @@ export class Pilot {
     if (veh === this.auto) { this.auto.cockpit = undefined; this.auto.setCockpit(false); }
     this.mode = veh === this.auto ? 'auto' : 'veh';
     const S = veh === this.auto ? specOf('auto') : veh.spec;
-    // ride a two-wheeler: the player sits on it (with a helmet); cars, buses, autos: inside
-    if (S.two && this.human) this.showRider(veh); else this.hideRider();
-    if (this.human) this.human.holder.visible = S.two;
+    // you stay you: on a two-wheeler (with a helmet if there is one), at the wheel of an auto or car
+    const seat = this.human ? seatFor(veh, S, veh === this.auto || veh.type === 'auto') : null;
+    if (seat) this.showRider(veh, seat); else this.hideRider();
+    if (veh === this.auto && this.human) this.auto.driver.visible = false;
+    if (this.human) this.human.holder.visible = !!seat;
     this.events.push({ type: 'enter', vehicle: veh });
   }
-  showRider(veh) {
-    this.riderShown = veh;
-    this.setAcc(veh.spec.helmet && veh.helmet ? 'helmet' : this.look.acc);
+  showRider(veh, seat) {
+    this.riderShown = veh; this.seat = seat;
+    const S = veh === this.auto ? specOf('auto') : veh.spec;
+    this.setAcc(S.helmet && veh.helmet ? 'helmet' : this.look.acc);
     this.human.play('drive', { fade: 0.1 });
     this.placeRider();
   }
   hideRider() { this.riderShown = null; }
   placeRider() {
     const v = this.riderShown, H = this.human;
-    const seat = v.spec.seat || [-0.3, 0.8];
+    const seat = this.seat || [-0.3, 0.8, 0];
     v.tilt.updateWorldMatrix(true, false);
-    const p = new THREE.Vector3(seat[0] - 0.05, seat[1] - 0.62, 0).applyMatrix4(v.tilt.matrixWorld);
+    const p = new THREE.Vector3(seat[0] - 0.05, seat[1] - 0.62, seat[2] || 0).applyMatrix4(v.tilt.matrixWorld);
     H.holder.position.copy(p);
     H.holder.rotation.set(0, -v.th, 0);
     H.root.rotation.x = 0;
     H.holder.rotateX(v.lean || 0);
     H.mixer.update(1 / 60);
   }
-  setAcc(name) {
-    this.human.root.traverse(o => { if (o.isSkinnedMesh && !o.name.startsWith('body')) o.visible = o.name === name; });
-    if (name === 'helmet') this.human.acc.color.set(0x1b1d22); else this.human.acc.color.copy(this.look.hair);
+  setAcc(name) { this.human.setAcc(name || null); }
+  // become someone else (the character picker): same place, same vehicle, new body
+  setLook(look) {
+    const kit = this.kit;
+    if (!kit) return;
+    const old = this.human;
+    this.look = look; kit.player = look;
+    this.human = kit.create(look);
+    this.scene.add(this.human.holder);
+    if (old) { this.human.holder.visible = old.holder.visible; this.human.holder.position.copy(old.holder.position); this.human.holder.rotation.copy(old.holder.rotation); this.scene.remove(old.holder); old.dispose(); }
+    else this.human.holder.visible = false;
+    if (this.riderShown) this.showRider(this.riderShown, this.seat); else this.human.play('idle');
   }
   addDropped(veh, traffic) {
     const S = veh === this.auto ? specOf('auto') : veh.spec;
@@ -346,7 +375,13 @@ export class Pilot {
   // ---------------------------------------------------------------- the driver you pulled out
   spawnAngryDriver(o) {
     if (!this.kit) return;
-    const H = this.kit.create(this.kit.randomLook(this.rng, { female: this.rng.chance(0.25), helmet: o.T && o.T.two }));
+    // the same person who was riding it: their shirt and helmet colours carry over from the traffic model
+    const two = o.T && o.T.two, shown = two || o.type === 'auto';
+    const look = this.kit.randomLook(this.rng, { female: shown ? false : this.rng.chance(0.25), helmet: two && o.type !== 'cycle', avoid: this.look });
+    if (shown && o.colB) look.top = new THREE.Color(o.colB[0], o.colB[1], o.colB[2]);
+    if (o.type === 'auto') look.bottom = new THREE.Color(0.62, 0.55, 0.4);                // auto drivers: khaki uniform
+    const H = this.kit.create(look);
+    if (two && o.colC && H.acc) H.acc.color.setRGB(o.colC[0], o.colC[1], o.colC[2]);
     const side = o.T && o.T.two ? -1 : 1;
     const x = o.x + (-o.hz) * (o.T.W / 2 + 0.7) * side, z = o.z + o.hx * (o.T.W / 2 + 0.7) * side;
     H.holder.position.set(x, this.W.surf.height(x, z), z);

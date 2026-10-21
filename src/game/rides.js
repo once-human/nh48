@@ -136,7 +136,7 @@ export class Rides {
     if (!this.current) {
       for (const o of this.offers) {
         const d = Math.hypot(o.p.x - P.x, o.p.z - P.z);
-        if (P.inAuto === false) continue;            // only your own auto picks up passengers
+        if (!P.inAnyAuto) continue;                  // only an auto picks up passengers
         if (d < 7.5 && Math.abs(P.v) < 1.6 && !P.tipped) { this.board(o); break; }
         if (d < 25 && !o.greeted && Math.abs(P.v) < 7) {
           o.greeted = true;
@@ -151,7 +151,7 @@ export class Rides {
       c.t += dt;
       if (c.t > 1.1) { c.state = 'onboard'; P.setPassengers(1); g.audio.chime(); g.hud.toast('METER DOWN', `To ${c.dest.name}`, 'meter', 2.2); }
     }
-    if (c && c.state === 'onboard' && P.inAuto === false) {
+    if (c && c.state === 'onboard' && !P.inAnyAuto) {
       // you walked off mid-ride: the passenger waits, then gives up
       c.outT = (c.outT || 0) + dt;
       if (c.outT > 25 && !c.gaveUp) {
