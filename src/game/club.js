@@ -28,7 +28,7 @@ export class Club {
     (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
     el.addEventListener('click', (e) => { const b = e.target.closest('button[data-a]'); if (b) this.act(b.dataset.a); });
-    window.addEventListener('keydown', (e) => { if (this.on && (e.code === 'Escape' || e.code === 'KeyF')) { e.preventDefault(); e.stopImmediatePropagation(); this.leave(); } }, true);
+    window.addEventListener('keydown', (e) => { if (!this.on) return; if (e.code === 'Escape' || e.code === 'KeyF') { e.preventDefault(); e.stopImmediatePropagation(); this.leave(); return; } const m = /^Digit([1-4])$/.exec(e.code); if (m) this.act(['dance', 'drink', 'talk', 'leave'][+m[1] - 1]); }, true);
   }
   enter(ctx) {
     const G = this.g;

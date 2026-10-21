@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { CLOTHES, SHOES, fmt } from './shops.js';
 import { TIER_MUL } from './brands.js';
+import { KbNav } from '../ui/kbnav.js';
 
 const WHO = { M: 'Men’s', W: 'Women’s', U: 'Unisex' };
 const r10 = (v) => Math.max(10, Math.round(v / 10) * 10);
@@ -20,7 +21,7 @@ export class Trial {
     el.innerHTML = `<div class="tr-head"><div class="sh-k"></div><div class="sh-t"></div></div>
       <div class="tr-filters"></div><div class="tr-list"></div>
       <div class="tr-buy"><div class="tr-sel"><b></b><small></small></div><button class="tr-go"></button></div>
-      <div class="sh-msg"></div><div class="sh-foot"><span></span><span><span class="kbd">Esc</span> step out</span></div>`;
+      <div class="sh-msg"></div><div class="sh-foot"><span></span><span><span class="kbd">↑↓</span> try on · <span class="kbd">Enter</span> buy · <span class="kbd">A</span><span class="kbd">D</span> filter · <span class="kbd">F</span> step out</span></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
     el.addEventListener('click', (e) => {
@@ -28,7 +29,20 @@ export class Trial {
       const it = e.target.closest('[data-i]'); if (it) { this.pick(+it.dataset.i); return; }
       if (e.target.closest('.tr-go')) this.buy();
     });
-    window.addEventListener('keydown', (e) => { if (this.open && (e.code === 'Escape' || e.code === 'KeyF')) { e.preventDefault(); e.stopImmediatePropagation(); this.close(); } }, true);
+    this.nav = new KbNav(el.querySelector('.tr-list'), '.tr-item', (b) => this.pick(+b.dataset.i));
+    window.addEventListener('keydown', (e) => {
+      if (!this.open) return;
+      if (e.code === 'Escape' || e.code === 'KeyF') { e.preventDefault(); e.stopImmediatePropagation(); this.close(); return; }
+      if (e.code === 'Enter' || e.code === 'Space' || e.code === 'NumpadEnter') { e.preventDefault(); e.stopImmediatePropagation(); if (this.sel >= 0) this.buy(); return; }
+      if (this.mode === 'clothes' && /^(KeyA|KeyD|ArrowLeft|ArrowRight)$/.test(e.code)) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        const F = ['all', 'M', 'W', 'U'], k = (F.indexOf(this.filter) + (/D|Right/.test(e.code) ? 1 : 3)) % 4;
+        this.filter = F[k]; this.nav.i = -1; this.render(); return;
+      }
+      const m = /^Digit(\d)$/.exec(e.code);
+      if (m) { const b = this.nav.items()[(+m[1] || 10) - 1]; if (b) { this.nav.i = (+m[1] || 10) - 1; this.pick(+b.dataset.i); } return; }
+      this.nav.key(e);
+    }, true);
   }
   get life() { return this.g.life; }
   // mode: 'clothes' | 'shoes' | 'salon'
@@ -41,6 +55,7 @@ export class Trial {
     this.el.querySelector('.sh-k').textContent = mode === 'salon' ? 'Salon chair' : mode === 'shoes' ? 'Footwear' : 'Trial room';
     this.el.querySelector('.sh-t').textContent = ctx.name;
     this.msg('');
+    this.nav.i = -1;
     this.build();
     this.render();
     this.el.hidden = false;
@@ -78,6 +93,7 @@ export class Trial {
     this.el.querySelector('.tr-sel small').textContent = it ? (it.own ? 'Already yours' : `${fmt(it.price)}`) : 'You’ll see it on yourself right away';
     go.disabled = !it; go.textContent = it ? (it.own ? 'Wear it' : `Buy and wear · ${fmt(it.price)}`) : 'Buy';
     this.el.querySelector('.sh-foot span').textContent = `Cash ${fmt(this.g.stats.money)}`;
+    this.nav.paint();
   }
   pick(i) {
     const G = this.g, P = G.player, it = this.items[i];

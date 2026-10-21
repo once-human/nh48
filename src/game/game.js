@@ -178,9 +178,16 @@ export class Game {
     document.addEventListener('mousemove', (e) => { if (locked() && this.state === 'play') this.rig.drag(e.movementX * 0.8, e.movementY * 0.8); });
     document.addEventListener('pointerlockchange', () => {
       this.hud.setLockHint?.(this.state === 'play' && !locked());
-      // Esc released the mouse during play: that's a pause, like any game
-      if (!locked() && this.state === 'play' && !this._unlockOk) this.togglePause(true);
+      // Esc released the mouse during play: that's a pause, like any game. Esc that closed a shop
+      // or the jhola only closes it; the next key you press takes the mouse back.
+      const fromMenu = performance.now() - (this._menuT || 0) < 450;
+      if (!locked() && this.state === 'play' && !this._unlockOk && !fromMenu) this.togglePause(true);
       this._unlockOk = false;
+    });
+    // any key in play takes the mouse back (keys count as a gesture; Esc never does)
+    window.addEventListener('keydown', (e) => {
+      if (this.state !== 'play' || locked() || e.code === 'Escape' || this.params.has('test') || !cv.requestPointerLock) return;
+      try { const r = cv.requestPointerLock({ unadjustedMovement: true }); if (r && r.catch) r.catch(() => {}); } catch (err) { /* tried too soon after Esc; the next key will do it */ }
     });
     this.releaseMouse = () => { if (locked()) { this._unlockOk = true; document.exitPointerLock(); } };
     window.addEventListener('pointermove', (e) => { if (drag) { this.rig.drag(e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; } });
@@ -622,8 +629,10 @@ export class Game {
   frame(dt) {
     const P = this.player;
     if (this.state === 'play') { this.hour = (this.hour + dt * this.timeScale) % 24; this.clock += dt * this.timeScale; }
-    // menus get the cursor; play gets the mouse back on the next click
-    if (this.state !== 'play' && document.pointerLockElement && this.releaseMouse) this.releaseMouse();
+    // shop panels, the jhola and conversations keep the mouse (they're all number keys and arrows);
+    // the pause menu, the map and the title get the cursor
+    if (this.state === 'shop') this._menuT = performance.now();
+    else if (this.state !== 'play' && document.pointerLockElement && this.releaseMouse) this.releaseMouse();
     if ((this._lhT = (this._lhT || 0) - dt) <= 0) { this._lhT = 0.5; this.hud.setLockHint?.(this.state === 'play' && !document.pointerLockElement && !this.params.has('test')); }
     // never left floating outside the city (a room you didn't get out of properly, an old save)
     if (this.state === 'play' && this.player.onFoot && !this.interiors.inside && Math.abs(this.player.x) > 30000) { const A = this.player.auto, sp = this.safeDrop(A.x, A.z); if (sp) this.player.teleportFoot(sp.x, sp.z, sp.th, this.traffic); this.rig.footMode = false; }
@@ -669,6 +678,7 @@ export class Game {
       if (this.input.took('KeyR') && P.tipped === 0 && !P.onFoot) this.backOnRoad();
       if (!this.interiors.inside) this.checkRoad(dt);
       this.interiors.update(dt);
+      this.date.update(dt);
       this.updateNav(dt);
       this.rig.update(dt, P);
       const S = P.spec;

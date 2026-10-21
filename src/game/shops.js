@@ -13,6 +13,7 @@
 //   places        police chowki (pay challans, turn yourself in) · lodge (sleep) · estate agent
 // Prices follow the area: Koregaon Park costs more than Kasba Peth.
 import * as THREE from 'three';
+import { KbNav } from '../ui/kbnav.js';
 import { clamp, RNG } from '../core/util.js';
 import { ITEMS, describe } from './life.js';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
@@ -605,7 +606,7 @@ export class Shops {
     el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Shop');
     el.innerHTML = `<div class="sh-head"><div class="sh-k"></div><div class="sh-t"></div><div class="sh-mr" lang="mr"></div>
       <div class="sh-say"><b></b><span></span></div></div><div class="sh-list"></div><div class="sh-msg" aria-live="polite"></div>
-      <div class="sh-foot"><span class="sh-wallet"></span><span><span class="kbd">1–9</span> buy · <span class="kbd">Esc</span> leave</span></div>`;
+      <div class="sh-foot"><span class="sh-wallet"></span><span><span class="kbd">1–9</span> or <span class="kbd">↑↓</span> <span class="kbd">Enter</span> · <span class="kbd">F</span> leave</span></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
     el.addEventListener('click', (e) => { const b = e.target.closest('.sh-item'); if (b && !b.disabled) this.buy(+b.dataset.i); });
@@ -613,8 +614,10 @@ export class Shops {
       if (!this.open) return;
       if (e.code === 'Escape' || e.code === 'KeyF' || e.code === 'KeyE') { e.preventDefault(); e.stopImmediatePropagation(); this.close(); return; }
       const m = /^Digit(\d)$/.exec(e.code);
-      if (m) { const i = (+m[1] || 10) - 1; this.buy(i); }
+      if (m) { const i = (+m[1] || 10) - 1; this.buy(i); return; }
+      this.nav.key(e);
     }, true);
+    this.nav = new KbNav(el.querySelector('.sh-list'), '.sh-item');
   }
   show(ctx) {
     const G = this.g;
@@ -631,6 +634,7 @@ export class Shops {
     this.el.querySelector('.sh-say b').textContent = hello[0] ? `“${hello[0]}”` : '';
     this.el.querySelector('.sh-say span').textContent = hello[1] && hello[1] !== hello[0] ? hello[1] : '';
     this.msg('');
+    this.nav.i = -1;
     this.render();
     this.el.hidden = false;
     this.el.classList.remove('in'); void this.el.offsetWidth; this.el.classList.add('in');
@@ -651,6 +655,7 @@ export class Shops {
       list.appendChild(b);
     });
     const L = this.life;
+    this.nav.paint();
     this.el.querySelector('.sh-wallet').textContent = `Cash ${fmt(this.g.stats.money)}${L.s.bank ? ` · Bank ${fmt(L.s.bank)}` : ''}`;
   }
   buy(i) {

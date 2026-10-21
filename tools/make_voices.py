@@ -64,6 +64,14 @@ for kind, (voice, lang, tempo) in shopl['_voice'].items():
             lid = f'k_{kind}_{sc}{i}'
             jobs.append((lid, voice, lang, deva)); shape[lid] = (1.0, tempo)
 
+# people you talk to (clubs, dates): every line in a woman's and a man's voice
+dl = json.load(open(os.path.join(ROOT, 'src/game/date_lines.json')))
+for key, arr in dl.items():
+    if key.startswith('_'): continue
+    for i, t in enumerate(arr):
+        jobs.append((f'd_f_{key}{i}', 'hf_beta', 'en-us', t)); shape[f'd_f_{key}{i}'] = (1.0, 1.04)
+        jobs.append((f'd_m_{key}{i}', 'hm_psi', 'en-us', t)); shape[f'd_m_{key}{i}'] = (1.0, 1.02)
+
 def af_for(lid): return lid
 for lid, voice, lang, tts in jobs:
     if only and lid not in only and not any(lid.startswith(o) for o in only): continue

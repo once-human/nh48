@@ -611,7 +611,7 @@ export class HUD {
   }
   leavePlace() { this.inPlace = false; this.mm.hidden = false; this.areaT = 0; this.lastStreet = null; }
   setLockHint(on) {
-    if (!this.lockEl) { this.lockEl = el('div', 'h lockhint', 'Click to take control of the camera · Esc for the menu'); this.root.appendChild(this.lockEl); }
+    if (!this.lockEl) { this.lockEl = el('div', 'h lockhint', 'Click or press any key to take the camera · Esc for the menu'); this.root.appendChild(this.lockEl); }
     if (this.lockEl.hidden === on) this.lockEl.hidden = !on;
   }
   // low health: the screen edges go red and pulse with your heartbeat

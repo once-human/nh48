@@ -6,8 +6,10 @@ import { ITEMS, describe } from './life.js';
 import { KIND_INFO, fmt, lookFromJSON } from './shops.js';
 import { PROPERTIES } from './props.js';
 import { icon, ITEM_ICON } from '../ui/icons.js';
+import { KbNav } from '../ui/kbnav.js';
+import { levelOf } from './date.js';
 
-const TABS = [['bag', 'Bag', 'झोळी'], ['me', 'Me', 'मी'], ['wear', 'Wardrobe', 'कपडे'], ['own', 'Owned', 'माझं'], ['near', 'Nearby', 'जवळ']];
+const TABS = [['bag', 'Bag', 'झोळी'], ['me', 'Me', 'मी'], ['wear', 'Wardrobe', 'कपडे'], ['own', 'Owned', 'माझं'], ['near', 'Nearby', 'जवळ'], ['ppl', 'People', 'लोक']];
 const GROUPS = [['food', 'Food'], ['night', 'Night'], ['look', 'Look'], ['health', 'Health'], ['money', 'Money'], ['things', 'Shops'], ['vehicle', 'Vehicles'], ['place', 'Places'], ['homes', 'Homes for sale']];
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -22,9 +24,10 @@ export class Bag {
     el.innerHTML = `<div class="jh-top"><div class="jh-title"><b>Jhola</b><span lang="mr">झोळी</span></div><div class="jh-money"></div></div>
       <div class="jh-tabs" role="tablist">${TABS.map(([k, l, m]) => `<button role="tab" data-t="${k}"><b>${l}</b><span lang="mr">${m}</span></button>`).join('')}</div>
       <div class="jh-body"></div><div class="jh-msg" aria-live="polite"></div>
-      <div class="jh-foot"><span><span class="kbd">E</span> close</span><span><span class="kbd">Tab</span> me</span></div>`;
+      <div class="jh-foot"><span><span class="kbd">A</span><span class="kbd">D</span> tabs · <span class="kbd">↑↓</span> <span class="kbd">Enter</span> use</span><span><span class="kbd">E</span> close · <span class="kbd">Tab</span> me</span></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
+    this.nav = new KbNav(el.querySelector('.jh-body'), '.jh-item, .jh-row[data-act], .jh-chips.sel button, .gd-sec > summary');
     el.addEventListener('click', (e) => {
       const t = e.target.closest('[data-t]'); if (t) { this.tab = t.dataset.t; this.msg(''); this.render(); return; }
       const g = e.target.closest('[data-g]'); if (g) { this.group = g.dataset.g; this.render(); return; }
@@ -34,6 +37,11 @@ export class Bag {
       if (!this.open) return;
       if (e.code === 'Escape' || e.code === 'KeyE' || (e.code === 'Tab' && this.tab === 'me')) { e.preventDefault(); e.stopImmediatePropagation(); this.close(); }
       else if (e.code === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); this.tab = 'me'; this.render(); }
+      else if (/^(KeyA|KeyD|ArrowLeft|ArrowRight|KeyQ)$/.test(e.code)) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        const k = TABS.findIndex(t => t[0] === this.tab), n = TABS.length;
+        this.tab = TABS[(k + (/D|Right/.test(e.code) ? 1 : n - 1)) % n][0]; this.nav.i = -1; this.msg(''); this.render();
+      } else this.nav.key(e);
     }, true);
   }
   get life() { return this.g.life; }
@@ -41,7 +49,7 @@ export class Bag {
     const G = this.g;
     if (G.state !== 'play') return;
     if (tab) this.tab = tab;
-    this.open = true; G.state = 'shop';
+    this.open = true; G.state = 'shop'; this.nav.i = -1;
     G.audio.updateEngine?.(0, 0, false);
     this.el.hidden = false; this.msg('');
     this.render();
@@ -103,6 +111,17 @@ export class Bag {
       h += this.row('auto', 'Your auto', G.police.towedAt ? `Towed to ${G.police.towedAt.name}` : `Fuel ${Math.round((G.player.auto.fuel ?? 1) * 100)}% · body ${Math.round((1 - (G.player.auto.dmg || 0)) * 100)}%`, 'Find', 'wp', 'auto');
       for (const v of s.vehicles) { const w = this.whereVeh(v); h += this.row('scooter', `${cap(v.type)} · ${v.plate}`, w ? 'Parked. Tap to find it' : 'In storage. Bring it out at one of your homes', w ? 'Find' : '', w ? 'wp' : null, `v:${v.id}`); }
       if (!s.vehicles.length) h += `<p class="jh-empty">Showrooms (Honda, Bajaj, Maruti and the rest) sell everything from a cycle to an SUV.</p>`;
+    } else if (this.tab === 'ppl') {
+      const cs = (s.contacts || []).slice().sort((a, b) => (b.partner - a.partner) || b.aff - a.aff);
+      if (!cs.length) h += `<p class="jh-empty">Nobody in your phone yet. In a club or a café, people with a small heart over them are up for a chat. Get them talking, then ask for their number.</p>`;
+      const pend = G.date.pending;
+      for (const c of cs) {
+        const hearts = Math.max(0, Math.min(5, Math.round(c.aff / 20)));
+        const lvl = levelOf(c), days = Math.max(0, Math.floor(((G.clock || 0) - (c.lastSeen || 0)) / 24));
+        const note = `${lvl} · ${'♥'.repeat(hearts)}${'♡'.repeat(5 - hearts)} · met at ${c.met}${days >= 2 ? ` · not seen in ${days} days` : ''}`;
+        h += this.row(c.partner ? 'health' : 'phone', c.name, note, pend && pend.ct === c ? 'On the way' : 'Ask to meet', pend && pend.ct === c ? null : 'meet', c.name, c.partner ? 'partner' : '');
+      }
+      if (cs.length) h += `<p class="jh-empty">They pick a café nearby. Be there within a few hours. Bring a gajra, sweets or a book if you have one.</p>`;
     } else if (this.tab === 'near') {
       h += `<div class="jh-chips sel">${GROUPS.map(([k, l]) => `<button data-g="${k}" aria-pressed="${k === this.group}">${l}</button>`).join('')}</div>`;
       const P = G.player;
@@ -115,6 +134,7 @@ export class Bag {
       list.forEach((x, i) => { h += this.row(x.ic, x.name, x.note, dist(x.d), 'goto', i); });
     }
     B.innerHTML = h;
+    this.nav.paint();
   }
   whereVeh(v) {
     if (!v) return null;
@@ -142,6 +162,7 @@ export class Bag {
       if (t) { G.setWaypoint({ x: t.x, z: t.z, name: t.name || 'Waypoint' }); this.close(); }
       return;
     }
+    if (a === 'meet') { const c = (L.s.contacts || []).find(q => q.name === arg); if (c && G.date.askToMeet(c)) this.close(); return; }
     if (a === 'goto') { const x = this.nearList && this.nearList[+arg]; if (x) { G.setWaypoint({ x: x.x, z: x.z, name: x.name }); this.close(); } }
   }
 }
