@@ -10,7 +10,7 @@ import { icon, ITEM_ICON } from '../ui/icons.js';
 import { KbNav } from '../ui/kbnav.js';
 import { guideHTML } from './guide.js';
 import { BUSINESSES as BIZ } from './hustle.js';
-import { levelOf } from './date.js';
+import { levelOf, ASKS } from './date.js';
 
 const TABS = [['bag', 'Bag', 'झोळी'], ['me', 'Me', 'मी'], ['wear', 'Wardrobe', 'कपडे'], ['own', 'Owned', 'माझं'], ['near', 'Nearby', 'जवळ'], ['ppl', 'Phone', 'फोन'], ['guide', 'Guide', 'माहिती']];
 const GROUPS = [['food', 'Food'], ['night', 'Night'], ['look', 'Look'], ['health', 'Health'], ['money', 'Money'], ['things', 'Shops'], ['vehicle', 'Vehicles'], ['place', 'Places'], ['homes', 'Homes for sale']];
@@ -130,6 +130,11 @@ export class Bag {
         const c = sel, hearts = Math.max(0, Math.min(5, Math.round(c.aff / 20)));
         h += `<div class="jh-sub">${esc(c.name)}</div>`;
         h += `<p class="jh-empty">${esc(levelOf(c))} ${heartsI(hearts)} · met at ${esc(c.met)}${c.done ? ' · blocked you' : c.upset ? ' · upset with you' : ''}</p>`;
+        if (c.ask && ASKS[c.ask.q]) {
+          const m = G.date.text(c, 't_q_' + c.ask.q, { place: c.sawAt });
+          h += `<div class="jh-read"><span>${esc(c.name)} asked</span><b>${esc(m.t)}</b></div>`;
+          ASKS[c.ask.q].forEach((o, i) => { h += this.row('phone', o[0], i === 0 ? 'Reply' : '', 'Send', 'reply', c.name + '|' + i); });
+        }
         h += this.row('phone', `Call ${c.name}`, c.calledDay === Math.floor((G.clock || 0) / 24) ? 'You spoke today' : 'Hear how they are', 'Call', c.done ? null : 'call', c.name);
         h += this.row('pin', 'Ask to meet', 'They pick a café nearby and wait a few hours', pend && pend.ct === c ? 'On the way' : 'Text', pend && pend.ct === c || c.done ? null : 'meet', c.name);
         h += this.row('home', 'Back to contacts', '', '', 'contacts', '');
@@ -138,7 +143,7 @@ export class Bag {
         for (const c of cs) {
           const hearts = Math.max(0, Math.min(5, Math.round(c.aff / 20)));
           const lvl = levelOf(c), days = Math.max(0, Math.floor(((G.clock || 0) - (c.lastSeen || 0)) / 24));
-          const note = { html: `${esc(lvl)} ${heartsI(hearts)} · met at ${esc(c.met)}${days >= 2 ? ` · not seen in ${days} days` : ''}${c.done ? ' · blocked you' : c.upset ? ' · upset with you' : ''}` };
+          const note = { html: `${esc(lvl)} ${heartsI(hearts)} · met at ${esc(c.met)}${days >= 2 ? ` · not seen in ${days} days` : ''}${c.done ? ' · blocked you' : c.upset ? ' · upset with you' : ''}${c.ask ? ' · <b>waiting for your reply</b>' : ''}` };
           h += this.row(c.partner ? 'health' : 'phone', c.name, note, pend && pend.ct === c ? 'On the way' : 'Open', 'contact', c.name, c.partner ? 'partner' : '');
         }
       }
@@ -185,6 +190,7 @@ export class Bag {
       return;
     }
     if (a === 'meet') { const c = (L.s.contacts || []).find(q => q.name === arg); if (c && G.date.askToMeet(c)) this.close(); return; }
+    if (a === 'reply') { const [n, i] = arg.split('|'); const c = (L.s.contacts || []).find(q => q.name === n); if (c) { G.date.reply(c, +i); this.render(); } return; }
     if (a === 'contact') { this.contactSel = arg; this.render(); return; }
     if (a === 'contacts') { this.contactSel = null; this.render(); return; }
     if (a === 'call') { const c = (L.s.contacts || []).find(q => q.name === arg); if (c) { this.close(); G.date.call(c); } return; }

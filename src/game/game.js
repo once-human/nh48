@@ -509,6 +509,7 @@ export class Game {
       L.s.tally.knockedOut++; L.change('mood', -0.1);
       if (P.human) P.human.play('idle', { fade: 0.3 });
       this.rig.footMode = false;
+      this.date && this.date.event('hosp', bill);
       this.hud.toast(`Discharged from ${best ? best.name : 'hospital'}`, `Hospital bill ₹${bill.toLocaleString('en-IN')}${fromBank ? ' (part from your bank)' : ''}${robbed ? ` · ₹${robbed} was taken from your wallet` : ''} · ${hours} hours later`, 'bad', 6);
       this._blacking = false;
     });
@@ -643,7 +644,7 @@ export class Game {
     for (const ev of evs) {
       if (ev.type === 'crash') {
         this.rig.shake(Math.min(0.5, ev.speed * 0.06)); this.audio.crash(Math.min(1, ev.speed / 8));
-        if (!P.onFoot && ev.speed > 3) { const v = P.cur; v.dmg = Math.min(1, (v.dmg || 0) + (ev.speed - 3) * 0.006); if (v.dmg > 0.6 && !this._dmgWarn) { this._dmgWarn = true; this.hud.toast('Your vehicle is badly damaged', 'It’s slower now. Any garage can fix it', 'warn', 3.4); } if (v.dmg < 0.3) this._dmgWarn = false; }
+        if (!P.onFoot && ev.speed > 3) { const v = P.cur; v.dmg = Math.min(1, (v.dmg || 0) + (ev.speed - 3) * 0.006); if (v.dmg > 0.6 && !this._dmgWarn) { this._dmgWarn = true; this.date && this.date.event('crash'); this.hud.toast('Your vehicle is badly damaged', 'It’s slower now. Any garage can fix it', 'warn', 3.4); } if (v.dmg < 0.3) this._dmgWarn = false; }
         if (ev.kind === 3) this.hud.toast('End of the shift area', 'Turn back, the map ends here', 'warn', 2);
       }
       if (ev.type === 'scrape') this.audio.thud(0.15);

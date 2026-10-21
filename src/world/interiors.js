@@ -162,8 +162,19 @@ export class Interiors {
     box(B, -W / 2 - 0.1, H / 2, D / 2, 0.2, H, D, wall); box(B, W / 2 + 0.1, H / 2, D / 2, 0.2, H, D, wall);
     box(B, 0, H / 2, D + 0.1, W, H, 0.2, wall);
     box(B, -W / 4 - 0.45, H / 2, -0.1, W / 2 - 0.9, H, 0.2, wall); box(B, W / 4 + 0.45, H / 2, -0.1, W / 2 - 0.9, H, 0.2, wall);
-    box(B, 0, H - 0.45, -0.1, 1.8, 0.9, 0.2, wall);
-    box(B, 0, 1.2, -0.16, 1.8, 2.4, 0.04, 0xbcd7e6);                // glass door, the street glow behind it
+    box(B, 0, (2.45 + H) / 2, -0.1, 1.8, H - 2.45, 0.2, wall);        // wall over the door, all the way up
+    // the door: a dark aluminium frame, two leaves of tinted glass over a kick plate, push bars, a lit EXIT sign
+    const fr = 0x2a2c30, glass = 0x33414c;
+    box(B, -0.88, 1.225, -0.12, 0.08, 2.45, 0.14, fr); box(B, 0.88, 1.225, -0.12, 0.08, 2.45, 0.14, fr); box(B, 0, 2.41, -0.12, 1.84, 0.08, 0.14, fr);
+    for (const sx of [-1, 1]) {
+      const cx = sx * 0.43;
+      box(B, cx, 1.22, -0.16, 0.84, 2.36, 0.03, fr);                   // the leaf
+      box(B, cx, 1.36, -0.14, 0.7, 1.86, 0.02, glass);                 // its glass
+      box(B, cx, 0.2, -0.14, 0.7, 0.3, 0.02, 0x1d1e21);                // kick plate
+      box(B, sx * 0.1, 1.1, -0.06, 0.04, 0.5, 0.04, 0xc9cbcf);         // pull handle
+    }
+    box(B, 0, 1.22, -0.13, 0.03, 2.36, 0.05, fr);                      // where the leaves meet
+    box(GL, 0, 2.62, -0.0, 0.62, 0.2, 0.03, 0x22d36f);                 // EXIT
     // shopfront windows either side of the door
     if (tpl !== 'club') for (const s of [-1, 1]) box(GL, s * (W / 4 + 0.45), 1.5, 0.005, W / 2 - 2.4, 1.6, 0.02, 0xd8e6ee);
     for (const s of [-1, 1]) box(B, s * W / 2, 0.06, D / 2, 0.04, 0.12, D, accent);
