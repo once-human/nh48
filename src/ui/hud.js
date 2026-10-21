@@ -71,7 +71,11 @@ export class HUD {
     this.obj = el('div', 'h obj', '<div class="obj-main" id="h-obj"></div><div class="obj-sub" id="h-obj-sub"></div>');
     this.mm = el('div', 'h mm');
     this.mmCanvas = el('canvas'); this.mmCanvas.width = 432; this.mmCanvas.height = 432;
-    this.mm.append(this.mmCanvas, el('div', 'mm-n', 'N'));
+    this.mm.append(this.mmCanvas, el('div', 'mm-n', 'N'), el('div', 'mm-hint', '<span class="kbd">M</span> map'));
+    // the minimap opens the big map
+    this.mm.style.pointerEvents = 'auto'; this.mm.style.cursor = 'pointer';
+    this.mm.title = 'Open the map (M)';
+    this.mm.addEventListener('click', () => this.game.toggleMap(true));
     this.gps = el('div', 'mm-gps', '<span id="h-gps-t">Destination</span><b id="h-gps-d"></b>');
     this.gps.hidden = true;
     this.mm.appendChild(this.gps);
@@ -92,8 +96,7 @@ export class HUD {
     this.nerd = el('div', 'h nerd', 'F3 performance stats · Tab your status · E backpack');
     this.corner = el('div', 'h corner');
     const mkBtn = (icon, label, fn) => { const b = el('button', 'ibtn', `${ICON[icon]}<span class="sr">${label}</span>`); b.title = label; b.onclick = fn; return b; };
-    this.corner.append(mkBtn('cam', 'Camera (C)', () => this.game.rig.setMode(this.game.rig.mode + 1)), mkBtn('map', 'Map (M)', () => this.game.toggleMap()),
-      mkBtn('pause', 'Pause (Esc)', () => this.game.togglePause()));
+    this.corner.append(mkBtn('pause', 'Pause (Esc)', () => this.game.togglePause()));
     R.append(this.scrim, this.hurtEl, this.nerd, this.loc, this.wallet, this.placeEl, this.obj, this.mm, this.zoneEl, this.dash, this.lower, this.toastWrap, this.smsWrap, this.stopEl, this.flashEl);
     this.$ = (id) => document.getElementById(id);
     this.$money = this.$('h-money'); this.$speed = this.$('h-speed'); this.$gear = this.$('h-gear'); this.$rpm = this.$('h-rpm');
@@ -125,7 +128,7 @@ export class HUD {
           <span class="keys">
             <span><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> drive / walk</span>
             <span><span class="kbd">Space</span> handbrake · jump / climb</span><span><span class="kbd">F</span> get in / out · shops · talk</span><span><span class="kbd">Click</span> punch</span><span><span class="kbd">Ctrl</span> roll</span><span><span class="kbd">E</span> backpack</span>
-            <span><span class="kbd">C</span> camera</span><span><span class="kbd">M</span> map</span><span><span class="kbd">Esc</span> pause</span>
+            <span><span class="kbd">H</span> horn</span><span><span class="kbd">C</span> camera</span><span><span class="kbd">M</span> map</span><span><span class="kbd">Esc</span> pause</span>
           </span>
           <span>Map data © OpenStreetMap contributors (ODbL), Overture Maps Foundation. Businesses are parodies.</span>
         </div>
@@ -299,7 +302,7 @@ export class HUD {
             <span class="k"><span class="kbd">W</span><span class="kbd">S</span></span><span>Accelerate · brake, hold to reverse</span>
             <span class="k"><span class="kbd">A</span><span class="kbd">D</span></span><span>Steer</span>
             <span class="k"><span class="kbd">Space</span></span><span>Handbrake · on foot: jump, or climb a wall you face</span>
-            <span class="k"><span class="kbd">H</span><span class="kbd">Q</span></span><span>Horn</span>
+            <span class="k"><span class="kbd">H</span></span><span>Horn</span>
             <span class="k"><span class="kbd">C</span><span class="kbd">B</span></span><span>Camera · look back</span>
             <span class="k"><span class="kbd">R</span></span><span>Back on the road</span>
             <span class="k"><span class="kbd">F</span></span><span>Get out · get in or take a vehicle</span>

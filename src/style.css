@@ -523,3 +523,6 @@ input[type=range] { width: 100%; accent-color: var(--stone); }
 .vitals { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; font: 600 11px var(--font-ui); color: var(--paper-2); }
 .vitals span { display: flex; gap: 4px; align-items: center; } .vitals span.low { color: #ffb4ab; }
 .nerd { position: absolute; left: 50%; bottom: calc(6px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); font: 500 10px var(--font-ui); color: rgba(244, 241, 234, .32); pointer-events: none; letter-spacing: .04em; }
+
+.mm-hint { position: absolute; right: 9px; top: 9px; font: 600 10px var(--font-ui); color: var(--paper-2); white-space: nowrap; display: flex; gap: 5px; align-items: center; padding: 3px 7px 3px 4px; border-radius: 99px; background: rgba(10, 11, 13, .7); pointer-events: none; }
+.mm-hint .kbd { min-width: 16px; height: 16px; font-size: 10px; padding: 0 4px; }

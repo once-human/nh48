@@ -35,7 +35,7 @@ export class Input {
     this.steerKb += clamp(target - this.steerKb, -rate * dt, rate * dt);
     let steer = this.steerKb;
     let hand = k('Space');
-    let horn = k('KeyH', 'KeyQ');
+    let horn = k('KeyH');
     // touch
     const T = this.touch;
     if (T.gas) thr = Math.max(thr, T.gas);
