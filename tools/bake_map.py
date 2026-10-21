@@ -1516,7 +1516,11 @@ def chunked_polys(g, min_area=0.5):
             cb = box(G0X + i * CHUNK, G0Z + j * CHUNK, G0X + (i + 1) * CHUNK, G0Z + (j + 1) * CHUNK)
             if not g.intersects(cb):
                 continue
-            part = fix(shapely.clip_by_rect(g, *cb.bounds))
+            try:
+                part = fix(shapely.clip_by_rect(g, *cb.bounds))
+            except shapely.errors.GEOSException:
+                # a sliver ring the rect clipper chokes on: snap to a cm grid and intersect instead
+                part = fix(shapely.set_precision(g, 0.01).intersection(cb))
             for p in as_polys(part):
                 if p.area < min_area:
                     continue
