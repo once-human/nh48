@@ -671,11 +671,12 @@ export class Interiors {
     if (!best && C.R.seats.length) for (const s of C.R.seats) { if (s.used || s.salon) continue; const d = Math.hypot(s.x - x, s.z - z); if (d < 1.1 && d < bd) { bd = d; best = { kind: 'seat', seat: s, label: C.plate ? `Sit down and eat your ${C.plate.name.toLowerCase()}` : 'Sit down' }; } }
     // someone close by beats a big area spot (the dance floor covers the whole floor, so it used to hide everyone on it)
     let talk = null, td = 1e9;
-    if (C.R.peds && !C.seat) { const D = this.g.date; for (const p of C.R.peds) { if (!p.name || p.walkedOff || !(p.dateWith || D && D.eligible(p))) continue; const d = Math.hypot(p.x - x, p.z - z); if (d < 2.4 && d < td) { td = d; talk = { kind: 'talk', p, label: p.dateWith ? `Join ${p.name}` : `Talk to ${p.name}` }; } } }
+    // (sitting down, only the person you're on a date with: you're at their table)
+    if (C.R.peds) { const D = this.g.date; for (const p of C.R.peds) { if (!p.name || p.walkedOff || !(p.dateWith || D && D.eligible(p)) || (C.seat && !p.dateWith)) continue; const d = Math.hypot(p.x - x, p.z - z); if (d < 2.4 && d < td) { td = d; talk = { kind: 'talk', p, label: p.dateWith ? (C.seat ? `Talk to ${p.name}` : `Sit with ${p.name}`) : `Talk to ${p.name}` }; } } }
     if (talk && (!best || td < bd || (best.r >= 3 && td < 1.9))) best = talk;
     if (best && C.ctx.kind === 'optician' && (best.kind === 'rack' || best.kind === 'counter')) best = { ...best, kind: 'counter', label: best.kind === 'rack' ? 'Try on frames' : 'Eye test and glasses' };
     if (best && C.ctx.kind === 'shoes' && best.kind === 'rack') best = { ...best, kind: 'counter', label: 'Try on shoes' };
-    if (C.seat) best = { kind: 'stand', label: C.eating ? 'Eating…' : 'Get up' };
+    if (C.seat) best = talk && talk.p.dateWith && !C.eating ? talk : { kind: 'stand', label: C.eating ? 'Eating…' : 'Get up' };
     if (C.dancing && !(talk && td < 1.9)) best = { kind: 'undance', label: 'Stop dancing' };
     return best;
   }
@@ -697,7 +698,11 @@ export class Interiors {
       case 'undance': this.dance(false); return;
       case 'workout': G.shops.show({ ...ctx, kind: 'gym', inside: true }); return;
       case 'vehicle': G.shops.show({ ...ctx, kind: 'dealer', inside: true }); return;
-      case 'talk': if (C.dancing) this.dance(false); G.date && G.date.talk(s.p, C); return;
+      case 'talk':
+        if (C.dancing) this.dance(false);
+        // a date: sit down next to them first, then talk
+        if (s.p.dateWith && s.p.dateSeat && !C.seat) { s.p.dateSeat.used = false; this.sit(s.p.dateSeat); }
+        G.date && G.date.talk(s.p, C); return;
     }
   }
   sit(seat, salon) {

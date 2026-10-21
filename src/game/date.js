@@ -440,6 +440,9 @@ export class Dates {
     seat.used = true;
     this.twoTiming(d.ct);
     const p = G.interiors.addPerson(seat.x, seat.z, seat.yaw, 'sit_talk', d.ct.female);
+    // your seat: the one kept free at their table, nearest to them
+    const mine = pick ? pick.filter(q => q !== seat && !q.used).sort((a, b) => Math.hypot(a.x - seat.x, a.z - seat.z) - Math.hypot(b.x - seat.x, b.z - seat.z))[0] : null;
+    if (p && mine) p.dateSeat = mine;
     if (p) { const cm = castByName(d.ct.name, d.ct.female); if (cm) { castAs(p, cm, G.W.kit); G.interiors.markHearts?.(G.interiors.cur.R); } p.name = d.ct.name; p.interest = 60; p.prof = { lang: d.ct.lang || 'en', vibe: d.ct.vibe || 'chill', likes: d.ct.likes, job: d.ct.job ?? 0, area: d.ct.area ?? 0, picky: 0.4, known: { job: true, likes: true, area: true, vibe: true }, asked: { ask_job: 1, ask_area: 1, ask_fun: 1 } }; p.dateWith = true; d.ct.dateNow = true; }
     G.hud.toast(`${d.ct.name} is here`, 'At a table. Go and say hi (F)', 'good', 3);
   }
