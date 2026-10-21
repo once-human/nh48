@@ -654,7 +654,7 @@ for e in edges:
         x, z = node_xy[n]
         if not VIS.buffer(-6).contains(Point(x, z)):
             if TILE:
-                if OUTL.exterior.distance(Point(x, z)) < 8: barricade_nodes.add(n)
+                if OUTL.boundary.distance(Point(x, z)) < 8: barricade_nodes.add(n)
             else:
                 portal_nodes.add(n)
 
