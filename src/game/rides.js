@@ -2,6 +2,8 @@
 // Pune RTA tariff (₹30 for the first 1.5 km, ₹20/km after, revised 1 Sept 2026). Drive well, get tipped.
 import * as THREE from 'three';
 import { RNG, clamp, lerp } from '../core/util.js';
+import PAX from './pax_lines.json';
+const PERS_M = ['kaka', 'ajoba', 'dada', 'bhaiya', 'collegeboy'], PERS_F = ['kaku', 'aaji', 'tai', 'aunty', 'collegegirl'];
 
 export const TARIFF = { base: 30, baseKm: 1.5, perKm: 20 };
 export function fareFor(meters) {
@@ -99,17 +101,22 @@ export class Rides {
       const p = this.g.people.spawnPassenger(e, s, side);
       p.lat = side * (e.w / 2 + 0.25); p.latT = p.lat;
       this.g.people.place(p);
-      const dest = this.pickDest(tmp[0], tmp[1]);
+      // who's waving: their own way of talking, and the kind of place they're usually going
+      const persona = pick(rng, p.female ? PERS_F : PERS_M);
+      const who = PAX._who[persona];
+      p.persona = persona;
+      const dest = this.pickDest(tmp[0], tmp[1], who && new RegExp(who.dest, 'i'));
       if (!dest) { this.g.people.remove(p); return; }
-      this.offers.push({ p, dest, fem: !!p.female, name: pick(rng, p.female ? NAMES_F : NAMES_M), t: 0, life: rng.range(110, 200) });
+      this.offers.push({ p, dest, fem: !!p.female, persona, name: who ? pick(rng, who.names) : pick(rng, p.female ? NAMES_F : NAMES_M), t: 0, life: rng.range(110, 200) });
       return;
     }
   }
-  pickDest(x, z) {
+  pickDest(x, z, like) {
     let best = null;
-    for (let t = 0; t < 30; t++) {
+    for (let t = 0; t < 40; t++) {
       const d = this.dests[Math.floor(this.rng.next() * this.dests.length)];
       const dist = Math.hypot(d.x - x, d.z - z);
+      if (like && t < 25 && !like.test(d.name)) continue;
       if (dist > 450 && dist < 1900) return d;
       if (!best || Math.abs(dist - 900) < Math.abs(Math.hypot(best.x - x, best.z - z) - 900)) best = d;
     }
@@ -140,9 +147,16 @@ export class Rides {
         if (d < 7.5 && Math.abs(P.v) < 1.6 && !P.tipped) { this.board(o); break; }
         if (d < 25 && !o.greeted && Math.abs(P.v) < 7) {
           o.greeted = true;
-          const [l, tr] = pick(this.rng, L.hail);
-          g.hud.say(o.name, l.replace('{d}', o.dest.name), tr.replace('{d}', o.dest.name));
-          this.voice('call', this.rng.int(0, 2), o.fem, o.p);
+          const hl = o.persona && PAX[o.persona] && PAX[o.persona].hail;
+          if (hl) {
+            const [, roman, en] = hl[0];
+            g.hud.say(o.name, `${roman} · ${o.dest.name}`, `${en} (${o.dest.name})`);
+            this.voice(null, 0, o.fem, o.p, `q_${o.persona}_hail0`);
+          } else {
+            const [l, tr] = pick(this.rng, L.hail);
+            g.hud.say(o.name, l.replace('{d}', o.dest.name), tr.replace('{d}', o.dest.name));
+            this.voice('call', this.rng.int(0, 2), o.fem, o.p);
+          }
         }
       }
     }
@@ -176,6 +190,9 @@ export class Rides {
       if (c.elapsed > c.limit) c.mood -= dt * 0.004;
       const dd = Math.hypot(c.dest.x - P.x, c.dest.z - P.z);
       if (dd < 60 && !c.nearSaid) { c.nearSaid = true; this.line('near', 1); }
+      // small talk on the way, if you're not scaring them
+      c.chatT -= dt;
+      if (c.chatT <= 0 && c.chats < 2 && c.mood > 0.6 && dd > 150 && this.lineCool <= 0) { c.chatT = 22 + this.rng.range(0, 15); c.chats++; this.line('chat', 1); }
       if (dd < 13 && Math.abs(P.v) < 1.8 && !P.tipped) this.dropOff();
     }
     // markers
@@ -199,11 +216,11 @@ export class Rides {
     this.offers = [];
     g.people.remove(o.p);
     const P = g.player;
-    this.current = { state: 'boarding', t: 0, dest: o.dest, name: o.name, fem: o.fem, fare: TARIFF.base, dist: 0, elapsed: 0, mood: 1, rt: 0, limit: 60 };
+    this.current = { state: 'boarding', t: 0, dest: o.dest, name: o.name, fem: o.fem, persona: o.persona, fare: TARIFF.base, dist: 0, elapsed: 0, mood: 1, rt: 0, limit: 60, chats: 0, chatT: 10 + this.rng.range(0, 10) };
     this.reroute(true);
     const c = this.current;
     c.limit = 45 + (c.routeLen || 1000) / 6.2;
-    this.speak(this.current, 'board', this.rng.int(0, 2), 2);
+    this.speak(this.current, 'board', -1, 3);
     void P;
   }
   reroute(first) {
@@ -230,7 +247,7 @@ export class Rides {
     g.audio.cash();
     g.hud.toast(`+₹${fare}${tip ? ` · ₹${tip} tip` : ''}`, '★'.repeat(stars) + '☆'.repeat(5 - stars) + `  ${(c.dist / 1000).toFixed(1)} km`, 'money', 3.4);
     const kind = mood > 0.8 ? 'happy' : mood > 0.45 ? 'meh' : 'angry';
-    this.speak(c, kind, this.rng.int(0, L[kind].length - 1), 3.5);
+    this.speak(c, kind, -1, 3.5);
     g.player.setPassengers(0);
     this.current = null; this.routePts = null;
     this.cool = 3;
@@ -241,21 +258,35 @@ export class Rides {
   line(kind, prob = 1) {
     const c = this.current;
     if (!c || c.state !== 'onboard' || this.lineCool > 0 || this.rng.next() > prob) return;
-    this.speak(c, kind, this.rng.int(0, L[kind].length - 1));
+    this.speak(c, kind, -1);
     this.lineCool = 3.5;
   }
   // subtitle + recorded voice (male / female version of the same line)
+  // the passenger's own line for this moment (persona voice), never the same one twice in a row
   speak(c, kind, i, life = 4.5) {
-    const [l0, tr] = L[kind][i];
+    const arr = c.persona && PAX[c.persona] && PAX[c.persona][kind];
+    if (arr && arr.length) {
+      let k = i >= 0 && i < arr.length ? i : Math.floor(this.rng.next() * arr.length);
+      this.last = this.last || {};
+      if (arr.length > 1 && this.last[kind] === k) k = (k + 1) % arr.length;
+      this.last[kind] = k;
+      const [, roman, en] = arr[k];
+      this.g.hud.say(c.name, roman, en, life);
+      this.voice(null, 0, c.fem, null, `q_${c.persona}_${kind}${k}`);
+      return;
+    }
+    if (!L[kind]) return;
+    const j = i >= 0 && i < L[kind].length ? i : this.rng.int(0, L[kind].length - 1);
+    const [l0, tr] = L[kind][j];
     const l = c.fem && FEM[l0] ? FEM[l0] : l0;
     this.g.hud.say(c.name, l, tr, life);
-    this.voice(kind, i, c.fem);
+    this.voice(kind, j, c.fem);
   }
-  voice(kind, i, fem, src) {
+  voice(kind, i, fem, src, id) {
     const A = this.g.audio, P = this.g.player;
     let vol = 0.95, pan = 0;
     if (src) { const d = Math.hypot(src.x - P.x, src.z - P.z); vol = Math.min(1, 14 / (d + 6)); }
-    A.voice(`p_${kind}${i}_${fem ? 'f' : 'm'}`, vol, pan);
+    A.voice(id || `p_${kind}${i}_${fem ? 'f' : 'm'}`, vol, pan);
   }
   onEvent(ev) {
     const c = this.current;

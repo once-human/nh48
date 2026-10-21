@@ -11,6 +11,7 @@ import { buildParked } from '../traffic/parked.js';
 import { Police } from './police.js';
 import { Crowd } from '../people/crowd.js';
 import { Fauna } from '../people/animals.js';
+import { Vehicle } from '../vehicles/vehicle.js';
 
 export class Game {
   constructor(ctx) {
@@ -114,8 +115,23 @@ export class Game {
     cv.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse' && e.button === 0) drag = { x: e.clientX, y: e.clientY }; });
     window.addEventListener('pointermove', (e) => { if (drag) { this.rig.drag(e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; } });
     window.addEventListener('pointerup', () => { drag = null; });
+    this.prewarm();
     if (this.test.play) this.startPlay(this.test.play === 'shift');
     if (this.resumed) { this.startPlay(false); this.hud.toast('Recovered', 'Your graphics driver reset, so the game reloaded where you were.', 'info', 4); }
+  }
+  // compile every shader the game will need now, behind the loading screen, instead of the first
+  // time someone new walks up or you take a vehicle (that compile was the freeze)
+  prewarm() {
+    const R = this.renderer, cam = this.camera, kit = this.W.kit;
+    const shown = [], tmp = [];
+    try {
+      const at = (o) => { o.position.set(cam.position.x, cam.position.y - 40, cam.position.z); };
+      if (this.crowd) for (const s of this.crowd.pool) { s.H.holder.visible = true; at(s.H.holder); for (const o of s.H.parts) o.visible = true; shown.push(s); }
+      for (const t of ['sedan', 'scooter', 'bike', 'auto', 'bus', 'tempo']) { const v = new Vehicle(this.W, this.scene, this.vmats, t); v.root.position.set(cam.position.x, cam.position.y - 40, cam.position.z); tmp.push(v); }
+      R.compile(this.scene, cam);
+    } catch (e) { console.warn('prewarm', e); }
+    for (const s of shown) { s.H.holder.visible = false; if (kit) kit.applyLook(s.H, s.H.look); }
+    for (const v of tmp) v.dispose();
   }
   saveResume() {
     const P = this.player;

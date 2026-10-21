@@ -48,6 +48,14 @@ for pid, P in street['_personas'].items():
             lid = f's_{pid}_{sc}{i}'
             jobs.append((lid, P['voice'], P['lang'], deva)); shape[lid] = (P['pitch'], P['tempo'])
 
+# auto passengers: same persona voices
+pax = json.load(open(os.path.join(ROOT, 'src/game/pax_lines.json')))
+for pid, P in street['_personas'].items():
+    for kind, arr in pax.get(pid, {}).items():
+        for i, (deva, roman, en) in enumerate(arr):
+            lid = f'q_{pid}_{kind}{i}'
+            jobs.append((lid, P['voice'], P['lang'], deva)); shape[lid] = (P['pitch'], P['tempo'])
+
 def af_for(lid): return lid
 for lid, voice, lang, tts in jobs:
     if only and lid not in only and not any(lid.startswith(o) for o in only): continue

@@ -144,7 +144,7 @@ export class People {
     if (!this.say || !p || this.lineT > 0 || this.rng.next() > chance) return false;
     let per = p.persona;
     if (!per || !STREET[per]) per = p.persona = this.pickPersona(p.female, p.x, p.z);
-    const arr = STREET[per][scenario] || STREET[per][scenario === 'carjack' ? 'fall' : 'dodge'];
+    const arr = STREET[per][scenario] || (scenario.startsWith('carjack') ? STREET[per].carjack_two || STREET[per].fall : STREET[per].dodge);
     if (!arr || !arr.length) return false;
     // don't repeat the last line this persona said
     let i = Math.floor(this.rng.next() * arr.length);

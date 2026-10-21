@@ -26,7 +26,13 @@ export const SPECS = {
 };
 export function specOf(type) { const s = SPECS[type]; return s && s.alias ? SPECS[s.alias] : s; }
 
+// models are built once per type (taking a vehicle used to rebuild its whole mesh on the spot)
+const MODELS = new Map();
 function modelFor(type) {
+  if (!MODELS.has(type)) MODELS.set(type, buildModel(type));
+  return MODELS.get(type);
+}
+function buildModel(type) {
   switch (type) {
     case 'scooter': case 'scooterP': return buildScooter({ parked: true });
     case 'bike': case 'bikeP': return buildBike({ parked: true });
@@ -81,10 +87,9 @@ export class Vehicle {
     } else if (S.two) this.cockpitEye = [S.seat[0] + 0.14, S.seat[1] + 0.74, 0];
     else if (type === 'bus') this.cockpitEye = [S.L / 2 - 0.85, 2.35, 0.75];
     else if (type === 'tempo') this.cockpitEye = [1.05, 1.6, 0.32];
-    this.headlight = new THREE.SpotLight(0xfff1d0, 0, 55, 0.5, 0.5, 1.3);
-    this.headlight.position.set(S.L / 2 - 0.1, 0.8, 0);
-    this.headlight.target.position.set(S.L / 2 + 12, 0, 0);
-    this.tilt.add(this.headlight, this.headlight.target);
+    // no light of its own: adding a light to the scene makes three.js recompile every shader (a
+    // multi-second freeze on the spot). The player's single headlight moves to whatever you drive.
+    this.headlight = null;
     scene.add(this.root);
     const n = Math.max(1, Math.round(S.L / S.W));
     this.circles = [];
@@ -196,7 +201,7 @@ export class Vehicle {
     const hx = Math.cos(this.th), hz = Math.sin(this.th);
     for (let it = 0; it < 2; it++) for (const [o, r] of this.circles) {
       const cx = this.x + hx * o, cz = this.z + hz * o;
-      const res = this.flyResolve(this, cx, cz, r);
+      const res = flyResolve(this, cx, cz, r);
       if (!res) continue;
       this.x += res.nx * res.depth; this.z += res.nz * res.depth;
       const vx = hx * this.v - hz * this.vl, vz = hz * this.v + hx * this.vl;
@@ -257,6 +262,14 @@ export class Vehicle {
     this.tilt.position.set(0, this.y + idle, 0);
     this.tilt.rotation.set(this.lean, 0, this.pitch, 'YXZ');
     if (this.inCockpit && this.cockpit) this.cockpit.update(this.steer, Math.abs(this.v) * 3.6, this.gear, this.rpm);
+  }
+  // borrow the one shared headlight (see Pilot.switchTo)
+  takeHeadlight(light) {
+    const S = this.spec;
+    light.position.set(S.L / 2 - 0.1, 0.8, 0);
+    light.target.position.set(S.L / 2 + 12, 0, 0);
+    this.tilt.add(light, light.target);
+    this.headlight = light;
   }
   dispose() {
     this.root.parent?.remove(this.root);

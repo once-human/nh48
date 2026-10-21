@@ -342,6 +342,10 @@ export class Pilot {
     this.events.push({ type: 'exit' });
   }
   switchTo(veh) {
+    // one headlight for the player, moved between vehicles (never a new light in the scene)
+    const L = this.auto.headlightShared || (this.auto.headlightShared = this.auto.headlight);
+    if (veh === this.auto) { if (L.parent !== this.auto.tilt) { L.position.set(1.3, 0.75, 0); L.target.position.set(12, 0, 0); this.auto.tilt.add(L, L.target); } }
+    else if (veh.takeHeadlight) veh.takeHeadlight(L);
     this.cur = veh;
     if (veh === this.auto) { this.auto.cockpit = undefined; this.auto.setCockpit(false); }
     this.mode = veh === this.auto ? 'auto' : 'veh';
@@ -443,7 +447,10 @@ export class Pilot {
     H.holder.position.set(x, this.W.surf.height(x, z), z);
     this.scene.add(H.holder);
     H.play('no', { fade: 0.1 });
-    if (this.speakAs) this.speakAs('carjack', { x, z, female: look.female, persona: look.female ? this.rng.pick(['kaku', 'tai', 'aunty', 'collegegirl']) : this.rng.pick(['kaka', 'dada', 'bhaiya', 'collegeboy']) });
+    // what they shout depends on what you took: their scooter, their car, their rickshaw
+    const cls = o.type === 'auto' ? 'auto' : two ? 'two' : 'car';
+    const pool = cls === 'auto' ? ['kaka', 'dada', 'bhaiya'] : look.female ? ['kaku', 'tai', 'aunty', 'collegegirl'] : cls === 'car' ? ['kaka', 'ajoba', 'dada', 'bhaiya', 'collegeboy'] : ['kaka', 'ajoba', 'dada', 'bhaiya', 'collegeboy'];
+    if (this.speakAs) this.speakAs('carjack_' + cls, { x, z, female: look.female, persona: this.rng.pick(pool) });
     else if (this.speak) this.speak(this.rng.pick(['sh1', 'sh2', 'sh3', 'sh4', 'sh5']), { x, z });
     else { const [line, tr] = this.rng.pick(SHOUTS); this.hud?.say('Driver', line, tr, 3.6); }
     this.npcs.push({ H, x, z, t: 0, yaw: Math.atan2(this.foot.z - z, this.foot.x - x) });
