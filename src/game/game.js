@@ -116,7 +116,7 @@ export class Game {
     player.makePed = (look, x, z, per) => this.people.spawnAt(look, x, z, per);
     player.pickPersona = (f, x, z) => this.people.pickPersona(f, x, z);
     this.buildLightPools();
-    const parked = buildParked(W, this.scene, this.vmats, this.quality);
+    const parked = W.parked = buildParked(W, this.scene, this.vmats, this.quality);
     W.instSets.push(...parked.sets);
     this.traffic.setStatics(parked.statics);
     // you as a person (hunger, respect...), the shops, property, deliveries, nights out, the backpack

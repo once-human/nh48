@@ -407,23 +407,14 @@ export class TreeField {
     this.W = W; this.q = quality;
     const kit = createTreeKit(renderer, quality, tex);
     Object.assign(this, kit);
-    // per-tree data, bucketed in a 64 m grid
-    const T = W.M.trees;
-    const n = T.length;
-    this.n = n;
-    this.x = new Float32Array(n); this.z = new Float32Array(n); this.k = new Uint8Array(n); this.s = new Float32Array(n); this.r = new Float32Array(n);
+    // per-tree data, bucketed in a 64 m grid; trees arrive and leave with their tile
+    this.x = []; this.z = []; this.k = []; this.s = []; this.r = []; this.tag = [];
     this.cell = 64;
     this.grid = new Map();
+    this.n = 0;
     const counts = new Array(8).fill(0);
-    for (let i = 0; i < n; i++) {
-      const t = T[i];
-      const x = t[0] / 100, z = t[1] / 100, k = t[2];
-      this.x[i] = x; this.z[i] = z; this.k[i] = k; this.s[i] = t[3] * (0.85 + hash1(i * 1.7) * 0.3); this.r[i] = hash1(t[0] * 7 + t[1]) * 6.283;
-      counts[k]++;
-      const key = Math.floor(x / this.cell) + ',' + Math.floor(z / this.cell);
-      let l = this.grid.get(key); if (!l) this.grid.set(key, l = []); l.push(i);
-      W.collision.addCircle(x, z, this.arch[k].trunkR * this.s[i] + 0.1, 1);
-    }
+    for (const t of W.M.trees) counts[t[2]]++;
+    this.addTile(W.M.trees, 0);
     // instanced meshes
     const mk = (geo, mat, cap, cast) => {
       const m = new THREE.InstancedMesh(geo, mat, Math.max(1, cap));
@@ -431,15 +422,18 @@ export class TreeField {
       scene.add(m); return m;
     };
     const capNear = quality.treeNearCap || 260, capMid = quality.treeMidCap || 1600;
+    // a streamed city doesn't know its tree counts up front: size by the quality caps then
+    const dyn = !!W.M.meta.tiles;
+    const cap = (k, c) => dyn ? c : Math.min(counts[k], c);
     this.sets = this.arch.map((A, k) => ({
-      nb: mk(A.near.b, this.barkMats[k], Math.min(counts[k], capNear), quality.shadows),
-      nl: mk(A.near.l, this.leafMat, Math.min(counts[k], capNear), quality.shadows),
-      mb: mk(A.mid.b, this.barkMats[k], Math.min(counts[k], capMid), false),     // only near trees cast shadows
-      ml: mk(A.mid.l, this.leafMat, Math.min(counts[k], capMid), false),
+      nb: mk(A.near.b, this.barkMats[k], cap(k, capNear), quality.shadows),
+      nl: mk(A.near.l, this.leafMat, cap(k, capNear), quality.shadows),
+      mb: mk(A.mid.b, this.barkMats[k], cap(k, capMid), false),     // only near trees cast shadows
+      ml: mk(A.mid.l, this.leafMat, cap(k, capMid), false),
     }));
     const quad = new THREE.PlaneGeometry(1, 1, 1, 1);
     quad.translate(0, 0.5, 0);
-    const capFar = Math.min(n, quality.treeFarCap || 9000);
+    const capFar = Math.max(1, dyn ? quality.treeFarCap || 9000 : Math.min(this.n, quality.treeFarCap || 9000));
     this.bb = new THREE.InstancedMesh(quad, this.bbMat, capFar);
     this.bbCell = new THREE.InstancedBufferAttribute(new Float32Array(capFar), 1);
     quad.setAttribute('aCell', this.bbCell);
@@ -448,6 +442,26 @@ export class TreeField {
     this.nearR = quality.treeNearRange || 55; this.midR = quality.treeMidRange || 170; this.farR = quality.treeFarRange || 900;
     this.m4 = new THREE.Matrix4(); this.q4 = new THREE.Quaternion(); this.v3 = new THREE.Vector3(); this.s3 = new THREE.Vector3(); this.e3 = new THREE.Euler();
     this.lastX = 1e9; this.lastZ = 1e9;
+  }
+  addTile(T, tag) {
+    const W = this.W;
+    for (const t of T) {
+      const i = this.x.length;
+      const x = t[0] / 100, z = t[1] / 100, k = t[2];
+      this.x.push(x); this.z.push(z); this.k.push(k); this.s.push(t[3] * (0.85 + hash1(i * 1.7) * 0.3)); this.r.push(hash1(t[0] * 7 + t[1]) * 6.283); this.tag.push(tag);
+      const key = Math.floor(x / this.cell) + ',' + Math.floor(z / this.cell);
+      let l = this.grid.get(key); if (!l) this.grid.set(key, l = []); l.push(i);
+      W.collision.addCircle(x, z, this.arch[k].trunkR * this.s[i] + 0.1, 1);
+    }
+    this.n = this.x.length;
+    this.lastX = 1e9;
+  }
+  removeTile(tag) {
+    for (const [key, l] of this.grid) {
+      const kept = l.filter(i => this.tag[i] !== tag);
+      if (!kept.length) this.grid.delete(key); else if (kept.length !== l.length) this.grid.set(key, kept);
+    }
+    this.lastX = 1e9; this.farX = 1e9;
   }
   // near/mid trees follow the camera every few metres; the far impostor field (thousands of
   // instances) is only rebuilt every 30 m, so driving fast doesn't re-upload it several times a second

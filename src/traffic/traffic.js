@@ -532,9 +532,17 @@ class Signals {
     this.W = W;
     this.g = W.graph;
     this.j = new Map();
-    const rng = new RNG(99);
-    for (const n of this.g.nodes) {
-      if (!n.signal) continue;
+    this.rng = new RNG(99);
+    this.addNodes(this.g.nodes.map(n => n.i));
+    this.heads = [];
+  }
+  // (re)build the junctions at these nodes: at start, and when a tile's roads arrive or leave
+  addNodes(list) {
+    const rng = this.rng;
+    for (const i of list) {
+      const n = this.g.nodes[i];
+      this.j.delete(i);
+      if (!n || !n.signal) continue;
       const arms = [];
       for (const l of n.inc) {
         // incoming direction at the node
@@ -559,7 +567,6 @@ class Signals {
       }
       this.j.set(n.i, { phases, cur: rng.int(0, phases.length - 1), t: rng.range(0, 15), green: rng.range(16, 26), amber: 3, allRed: 1.2 });
     }
-    this.heads = [];
   }
   update(dt) {
     for (const s of this.j.values()) {

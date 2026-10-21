@@ -13,9 +13,9 @@ const DISTRICT_CENTRES = [
   [3, 18.5355, 73.8930], [6, 18.5420, 73.8650], [6, 18.5250, 73.8620],
 ];
 const EMPTY = Object.freeze([]);
-const TILE_FIELDS = ['ground', 'water', 'kerbs', 'banks', 'lakebanks', 'rails', 'bld', 'walls', 'lamps', 'poles', 'signals', 'buses', 'stalls', 'hoardings',
+const TILE_FIELDS = ['ground', 'water', 'kerbs', 'banks', 'lakebanks', 'rails', 'bld', 'walls', 'lamps', 'poles', 'signals', 'stalls', 'hoardings',
   'center', 'lane', 'zebra', 'stop', 'bump', 'pot', 'railways', 'platforms'];
-const CHUNK_FIELDS = [...TILE_FIELDS, 'metro', 'mstations', 'mgates'];
+const CHUNK_FIELDS = [...TILE_FIELDS, 'buses', 'metro', 'mstations', 'mgates'];
 export const DISTRICTS = ['deccan', 'peth', 'camp', 'kp', 'station', 'residential', 'riverside'];
 
 export class WorldIndex {
@@ -51,6 +51,7 @@ export class WorldIndex {
   // city-wide things from the base map: the metro and its stations
   addBase(M) {
     const at = (x, z) => this.chunkOf(x, z), put = (a, ci, it) => this.put(a, ci, it);
+    for (const s of M.buses || []) put('buses', at(s[0] / 100, s[1] / 100), s);
     for (const m of M.metro || []) { const p = cmRing(m[1]); for (let k = 0; k + 3 < p.length; k += 2) put('metro', at((p[k] + p[k + 2]) / 2, (p[k + 1] + p[k + 3]) / 2), [m[0], p[k], p[k + 1], p[k + 2], p[k + 3]]); }
     for (const st of M.mstations || []) { const p = cmRing(st[1]); put('mstations', at(p[0], p[1]), { name: st[0], pts: p }); }
     // every elevated Pune Metro station gets a station building on the viaduct (where the map has no
@@ -90,7 +91,6 @@ export class WorldIndex {
     for (const l of D.lamps) put('lamps', at(l[0] / 100, l[1] / 100), l);
     for (const l of D.poles) put('poles', at(l[0] / 100, l[1] / 100), l);
     for (const s of D.signals) put('signals', at(s[0] / 100, s[1] / 100), s);
-    for (const s of D.buses || []) put('buses', at(s[0] / 100, s[1] / 100), s);
     for (const s of D.stalls) put('stalls', at(s[0] / 100, s[1] / 100), s);
     for (const h of D.hoardings) put('hoardings', at(h[2] / 100, h[3] / 100), h);
     for (const q of D.marks.center) { const p = cmRing(q); put('center', at(p[p.length >> 2 << 1], p[(p.length >> 2 << 1) + 1]), p); }
@@ -121,7 +121,7 @@ export class WorldIndex {
     for (const c of this.chunks) {
       if (r && !(c.cx >= r[0] && c.cx < r[2] && c.cz >= r[1] && c.cz < r[3])) continue;
       for (const f of TILE_FIELDS) c[f] = EMPTY;
-      c.wires = []; c.extras = [];
+      c.wires = []; c.extras = (c.extras || []).filter(e => e.kind === 'pier');   // the metro stays
     }
     for (let k = 0; k < T.n; k++) this.shopsByBld.delete(T.off + k);
     this.tileRanges.delete(tag);

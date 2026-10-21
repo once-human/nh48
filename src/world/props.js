@@ -37,6 +37,7 @@ export function foliage(mat, key) {
 }
 
 // ---------------------------------------------------------------- instanced sets with distance culling
+// items added while InstancedSet.tag is set belong to that tile
 export class InstancedSet {
   constructor(scene, geo, mat, capacity, range, opts = {}) {
     this.mesh = new THREE.InstancedMesh(geo, mat, capacity);
@@ -55,10 +56,11 @@ export class InstancedSet {
   add(x, z, matrix, color) {
     const m = new Float32Array(16);
     matrix.toArray(m);
-    const it = { x, z, m, c: color || null, off: false };
+    const it = { x, z, m, c: color || null, off: false, tag: InstancedSet.tag };
     this.items.push(it);
     return it;
   }
+  removeTag(tag) { this.items = this.items.filter(it => it.tag !== tag); }
   update(cx, cz, fr) {
     const arr = this.mesh.instanceMatrix.array;
     const col = this.hasColor ? this.mesh.instanceColor.array : null;
@@ -753,3 +755,5 @@ export function buildProps(M, W) {
 export function updateProps(W, cx, cz, frustumTest) {
   for (const s of W.instSets) s.update(cx, cz, frustumTest);
 }
+
+InstancedSet.tag = 0;

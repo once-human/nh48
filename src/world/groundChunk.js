@@ -112,11 +112,15 @@ function kindLayer(kind, district) {
 
 // global per-map extras computed once (physics needs them everywhere): potholes + speed breakers
 export function prepareGroundGlobals(W) {
-  const { graph, index } = W;
-  const rng = new RNG(911);
-  const tmp = [0, 0, 0, 0];
   W.potholes = []; W.bumps = []; W.zebras = [];
-  for (const e of graph.edges) {
+  addGroundTile(W, W.M, W.graph.edges, 0);
+}
+// potholes along a tile's roads, its speed bumps and zebra crossings
+export function addGroundTile(W, D, edges, tag) {
+  const { graph, index } = W;
+  const rng = new RNG(911 + tag);
+  const tmp = [0, 0, 0, 0];
+  for (const e of edges) {
     const per = e.rank <= 2 ? 34 : e.rank === 3 ? 60 : 140;
     let s = rng.range(5, per);
     while (s < e.len - 5) {
@@ -124,14 +128,30 @@ export function prepareGroundGlobals(W) {
       const lat = rng.range(-e.w / 2 + 0.8, e.w / 2 - 0.8);
       const x = tmp[0] + tmp[3] * lat, z = tmp[1] - tmp[2] * lat;
       const r = rng.range(0.35, 0.8);
-      const p = { x, z, r: r * 0.8, rr: r, ang: rng.range(0, 6.28), sq: rng.range(0.7, 1.0) };
+      const p = { x, z, r: r * 0.8, rr: r, ang: rng.range(0, 6.28), sq: rng.range(0.7, 1.0), tag };
       W.potholes.push(p);
       index.put('pot', index.chunkOf(x, z), p);
       s += rng.range(per * 0.6, per * 1.6);
     }
   }
-  for (const s of W.M.marks.bump) W.bumps.push({ x: s[0] / 100, z: s[1] / 100, ang: s[2], w: s[3] / 100 });
-  for (const z of W.M.marks.zebra) W.zebras.push({ x: z[0] / 100, z: z[1] / 100, ang: z[2], w: z[3] / 100 });
+  for (const s of D.marks.bump) W.bumps.push({ x: s[0] / 100, z: s[1] / 100, ang: s[2], w: s[3] / 100, tag });
+  for (const z of D.marks.zebra) W.zebras.push({ x: z[0] / 100, z: z[1] / 100, ang: z[2], w: z[3] / 100, tag });
+  W.bumpGrid = null;
+}
+// speed breakers near a point (a 16 m grid: every wheel of every vehicle asks, every step)
+const NONE = [];
+export function bumpsAt(W, x, z) {
+  if (!W.bumpGrid) {
+    W.bumpGrid = new Map();
+    for (const b of W.bumps) for (let i = Math.floor((b.x - 8) / 16); i <= Math.floor((b.x + 8) / 16); i++) for (let j = Math.floor((b.z - 8) / 16); j <= Math.floor((b.z + 8) / 16); j++) {
+      const k = i * 65536 + j; let l = W.bumpGrid.get(k); if (!l) W.bumpGrid.set(k, l = []); l.push(b);
+    }
+  }
+  return W.bumpGrid.get(Math.floor(x / 16) * 65536 + Math.floor(z / 16)) || NONE;
+}
+export function removeGroundTile(W, tag) {
+  W.potholes = W.potholes.filter(p => p.tag !== tag); W.bumps = W.bumps.filter(p => p.tag !== tag); W.zebras = W.zebras.filter(p => p.tag !== tag);
+  W.bumpGrid = null;
 }
 
 export function* buildGroundChunk(W, C, group) {

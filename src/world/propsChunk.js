@@ -24,84 +24,24 @@ export function buildGlobalProps(W) {
   const sets = W.instSets;
   for (const c of index.chunks) { c.wires = []; c.extras = []; }
 
-  // ---- street lamps
-  const lampSet = new InstancedSet(scene, P.lamp, W.mats.prop, 900, q.propRange, { cast: q.shadows });
-  sets.push(lampSet);
+  // ---- street lamps, electric poles and their cables, signals: per tile (addStreetProps)
+  const dyn = !!M.meta.tiles;
+  W.lampSet = new InstancedSet(scene, P.lamp, W.mats.prop, 900, q.propRange, { cast: q.shadows });
+  W.poleSet = new InstancedSet(scene, P.pole, W.mats.prop, 900, q.propRange, { cast: q.shadows });
+  sets.push(W.lampSet, W.poleSet);
   W.lampPositions = [];
-  for (const l of M.lamps) {
-    const x = l[0] / 100, z = l[1] / 100, a = l[2];
-    const dx = Math.cos(a), dz = Math.sin(a);
-    lampSet.add(x, z, compose(x, 0.15, z, yawX(dx, dz)));
-    collision.addCircle(x, z, 0.16, 2);
-    W.lampPositions.push([x + dx * 1.75, z + dz * 1.75]);
-  }
-
-  // ---- electric poles; cables go to the chunk of their first pole
-  const poleSet = new InstancedSet(scene, P.pole, W.mats.prop, 900, q.propRange, { cast: q.shadows });
-  sets.push(poleSet);
-  const byRoad = new Map();
-  for (const p of M.poles) {
-    const x = p[0] / 100, z = p[1] / 100;
-    if (!byRoad.has(p[2])) byRoad.set(p[2], []);
-    byRoad.get(p[2]).push({ x, z, d: p[3] });
-    collision.addCircle(x, z, 0.14, 2);
-  }
-  for (const list of byRoad.values()) {
-    list.sort((a, b) => a.d - b.d);
-    for (let k = 0; k < list.length; k++) {
-      const a = list[k], nb = list[k + 1];
-      const dirx = nb ? nb.x - a.x : 1, dirz = nb ? nb.z - a.z : 0;
-      poleSet.add(a.x, a.z, compose(a.x, 0.15, a.z, yawX(-dirz, dirx)));
-      if (!nb) continue;
-      const L = Math.hypot(nb.x - a.x, nb.z - a.z);
-      if (L > 55) continue;
-      const ci = index.chunkOf(a.x, a.z);
-      if (ci < 0) continue;
-      const arr = index.chunks[ci].wires;
-      const ux = -(nb.z - a.z) / L, uz = (nb.x - a.x) / L;
-      for (const o of [-0.7, -0.25, 0.25, 0.7, 0.0]) {
-        const y0 = o === 0 ? 6.4 : 8.08;
-        const sag = 0.35 + L * 0.012 + (o === 0 ? 0.4 : 0);
-        let px = a.x + ux * o, pz = a.z + uz * o, py = y0 + 0.15;
-        for (let s = 1; s <= 6; s++) {
-          const t = s / 6;
-          const qx = a.x + (nb.x - a.x) * t + ux * o, qz = a.z + (nb.z - a.z) * t + uz * o;
-          const qy = y0 + 0.15 - 4 * sag * t * (1 - t);
-          arr.push(px, py, pz, qx, qy, qz);
-          px = qx; py = qy; pz = qz;
-        }
-      }
-    }
-  }
   W.wireMat = new THREE.LineBasicMaterial({ color: 0x151515 });
-
-  // ---- signals (bulb colours driven by the traffic system)
-  const nSig = Math.max(1, M.signals.length);
-  const sigSet = new InstancedSet(scene, P.signal, W.mats.prop, nSig, q.propRange * 1.5, { cast: q.shadows });
-  sets.push(sigSet);
-  const bulbMat = new THREE.MeshBasicMaterial({ toneMapped: false });
-  const bulbs = new THREE.InstancedMesh(P.bulb, bulbMat, nSig * 3);
+  const nSig = dyn ? 1500 : Math.max(1, M.signals.length);
+  W.sigSet = new InstancedSet(scene, P.signal, W.mats.prop, nSig, q.propRange * 1.5, { cast: q.shadows });
+  sets.push(W.sigSet);
+  const bulbs = new THREE.InstancedMesh(P.bulb, new THREE.MeshBasicMaterial({ toneMapped: false }), nSig * 3);
   bulbs.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(nSig * 3 * 3 + 3), 3);
   bulbs.frustumCulled = false;
+  bulbs.count = 0;
   scene.add(bulbs);
   W.signalHeads = [];
-  let bi = 0;
-  for (const s of M.signals) {
-    const x = s[0] / 100, z = s[1] / 100, a = s[2];
-    const dx = Math.cos(a), dz = Math.sin(a);
-    sigSet.add(x, z, compose(x, 0.15, z, yawX(dx, dz)));
-    collision.addCircle(x, z, 0.14, 2);
-    const head = { node: s[3], x, z, dx, dz, bulbs: [] };
-    for (let k = 0; k < 3; k++) {
-      const m = compose(x + dx * 0.24, 0.15 + 3.55 - k * 0.3, z + dz * 0.24, Math.atan2(dx, dz));
-      bulbs.setMatrixAt(bi, m);
-      bulbs.setColorAt(bi, new THREE.Color(0.05, 0.05, 0.05));
-      head.bulbs.push(bi++);
-    }
-    W.signalHeads.push(head);
-  }
-  bulbs.count = bi;
   W.signalBulbs = bulbs;
+  addStreetProps(W, M, 0);
 
   // ---- street-name boards + festival banners near main junctions (placed per chunk)
   const rng = new RNG(777);
@@ -175,6 +115,88 @@ export function buildGlobalProps(W) {
       collision.addCircle(x, z, 1.0, 2);
     }, 10);
   }
+}
+
+// one tile's lamps, poles (with cables into the chunks) and signal heads; nmap turns the tile's own graph
+// node numbers into the world's
+export function addStreetProps(W, D, tag, nmap) {
+  const { collision, index } = W;
+  InstancedSet.tag = tag;
+  for (const l of D.lamps) {
+    const x = l[0] / 100, z = l[1] / 100, a = l[2];
+    const dx = Math.cos(a), dz = Math.sin(a);
+    W.lampSet.add(x, z, compose(x, 0.15, z, yawX(dx, dz)));
+    collision.addCircle(x, z, 0.16, 2);
+    W.lampPositions.push([x + dx * 1.75, z + dz * 1.75, tag]);
+  }
+  const byRoad = new Map();
+  for (const p of D.poles) {
+    const x = p[0] / 100, z = p[1] / 100;
+    if (!byRoad.has(p[2])) byRoad.set(p[2], []);
+    byRoad.get(p[2]).push({ x, z, d: p[3] });
+    collision.addCircle(x, z, 0.14, 2);
+  }
+  for (const list of byRoad.values()) {
+    list.sort((a, b) => a.d - b.d);
+    for (let k = 0; k < list.length; k++) {
+      const a = list[k], nb = list[k + 1];
+      const dirx = nb ? nb.x - a.x : 1, dirz = nb ? nb.z - a.z : 0;
+      W.poleSet.add(a.x, a.z, compose(a.x, 0.15, a.z, yawX(-dirz, dirx)));
+      if (!nb) continue;
+      const L = Math.hypot(nb.x - a.x, nb.z - a.z);
+      if (L > 55) continue;
+      const ci = index.chunkOf(a.x, a.z);
+      if (ci < 0) continue;
+      const c = index.chunks[ci];
+      if (!c.wires) c.wires = [];
+      const arr = c.wires;
+      const ux = -(nb.z - a.z) / L, uz = (nb.x - a.x) / L;
+      for (const o of [-0.7, -0.25, 0.25, 0.7, 0.0]) {
+        const y0 = o === 0 ? 6.4 : 8.08;
+        const sag = 0.35 + L * 0.012 + (o === 0 ? 0.4 : 0);
+        let px = a.x + ux * o, pz = a.z + uz * o, py = y0 + 0.15;
+        for (let s = 1; s <= 6; s++) {
+          const t = s / 6;
+          const qx = a.x + (nb.x - a.x) * t + ux * o, qz = a.z + (nb.z - a.z) * t + uz * o;
+          const qy = y0 + 0.15 - 4 * sag * t * (1 - t);
+          arr.push(px, py, pz, qx, qy, qz);
+          px = qx; py = qy; pz = qz;
+        }
+      }
+    }
+  }
+  for (const s of D.signals) {
+    const x = s[0] / 100, z = s[1] / 100, a = s[2];
+    const dx = Math.cos(a), dz = Math.sin(a);
+    W.sigSet.add(x, z, compose(x, 0.15, z, yawX(dx, dz)));
+    collision.addCircle(x, z, 0.14, 2);
+    W.signalHeads.push({ node: nmap ? nmap[s[3]] : s[3], x, z, dx, dz, bulbs: [], tag });
+  }
+  InstancedSet.tag = 0;
+  layoutBulbs(W);
+}
+export function removeStreetProps(W, tag) {
+  for (const S of [W.lampSet, W.poleSet, W.sigSet]) S.removeTag(tag);
+  W.lampPositions = W.lampPositions.filter(p => p[2] !== tag);
+  W.signalHeads = W.signalHeads.filter(h => h.tag !== tag);
+  layoutBulbs(W);
+}
+// the three bulbs of every signal head, packed into the one instanced mesh
+function layoutBulbs(W) {
+  const bulbs = W.signalBulbs, cap = bulbs.instanceMatrix.count;
+  let bi = 0;
+  const dark = new THREE.Color(0.05, 0.05, 0.05);
+  for (const h of W.signalHeads) {
+    h.bulbs = [];
+    for (let k = 0; k < 3 && bi < cap; k++) {
+      bulbs.setMatrixAt(bi, compose(h.x + h.dx * 0.24, 0.15 + 3.55 - k * 0.3, h.z + h.dz * 0.24, Math.atan2(h.dx, h.dz)));
+      bulbs.setColorAt(bi, dark);
+      h.bulbs.push(bi++);
+    }
+  }
+  bulbs.count = bi;
+  bulbs.instanceMatrix.needsUpdate = true;
+  if (bulbs.instanceColor) bulbs.instanceColor.needsUpdate = true;
 }
 
 export function updateProps(W, cx, cz) {

@@ -35,16 +35,21 @@ export class Activity {
     this.w = Float32Array.from(this.cls.map(c => WEIGHT[c] || 1));
     this.map = new Map();
     // peths keep the old afternoon closing for their shops
-    const peths = (M.areas || []).filter(a => /Peth\b/.test(a[0])).map(a => [a[2] / 100, a[3] / 100]);
-    for (const r of A.cells) {
-      const x = (r[0] + 0.5) * this.cell, z = (r[1] + 0.5) * this.cell;
-      let peth = false;
-      for (const [px, pz] of peths) if ((px - x) ** 2 + (pz - z) ** 2 < 450 * 450) { peth = true; break; }
-      this.map.set(r[0] + ',' + r[1], { v: Float32Array.from(r.slice(2)), peth });
-    }
+    this.peths = (M.areas || []).filter(a => /Peth\b/.test(a[0])).map(a => [a[2] / 100, a[3] / 100]);
+    this.addCells(A.cells || [], 0);
     this.ri = this.cls.indexOf('retail'); this.ni = this.cls.indexOf('night');
     this._h = -1; this._p = new Float32Array(this.cls.length);
   }
+  // a tile's cells come and go with the tile
+  addCells(cells, tag) {
+    for (const r of cells) {
+      const x = (r[0] + 0.5) * this.cell, z = (r[1] + 0.5) * this.cell;
+      let peth = false;
+      for (const [px, pz] of this.peths) if ((px - x) ** 2 + (pz - z) ** 2 < 450 * 450) { peth = true; break; }
+      this.map.set(r[0] + ',' + r[1], { v: Float32Array.from(r.slice(2)), peth, tag });
+    }
+  }
+  removeTag(tag) { for (const [k, c] of this.map) if (c.tag === tag) this.map.delete(k); }
   setHour(h) {
     if (Math.abs(h - this._h) < 0.02) return;
     this._h = h;

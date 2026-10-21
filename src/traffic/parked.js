@@ -45,7 +45,11 @@ export function buildParked(W, scene, vmats, quality) {
   };
   const pick = (a) => rng.pick(a).map(lin);
   const statics = [];        // parked cars sit on the road: traffic sees them as stopped vehicles
-  for (const p of W.M.parked) {
+  // a tile's parked vehicles (all of them at once for the single map)
+  const addTile = (D, tag) => {
+  InstancedSet.tag = tag;
+  const n0 = W.parkedList.length, s0 = statics.length;
+  for (const p of D.parked) {
     const x = p[0] / 100, z = p[1] / 100, ang = p[2], kind = p[3], n = p[4], side = p[5];
     const mask = p[6] ?? ((1 << n) - 1);
     const tx = Math.cos(ang), tz = Math.sin(ang);          // along the kerb
@@ -70,6 +74,11 @@ export function buildParked(W, scene, vmats, quality) {
       rec.circles.push(W.collision.addCircle(px, pz, 0.45, 2));
     }
   }
+  for (let k = n0; k < W.parkedList.length; k++) W.parkedList[k].tag = tag;
+  for (let k = s0; k < statics.length; k++) statics[k].tag = tag;
+  InstancedSet.tag = 0;
+  };
+  addTile(W.M, 0);
   // auto stands: rows of autos waiting near bus stops
   for (const b of W.M.buses) {
     if (rng.next() > 0.45) continue;
@@ -89,5 +98,10 @@ export function buildParked(W, scene, vmats, quality) {
   }
   const all = [];
   for (const k in sets) { const S = sets[k]; all.push(S.sN, S.sF); if (S.sG) all.push(S.sG); }
-  return { sets: all, statics };
+  const removeTile = (tag) => {
+    for (const S of all) S.removeTag(tag);
+    W.parkedList = W.parkedList.filter(r => r.tag !== tag);
+    for (let k = statics.length - 1; k >= 0; k--) if (statics[k].tag === tag) statics.splice(k, 1);
+  };
+  return { sets: all, statics, addTile, removeTile };
 }

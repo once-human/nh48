@@ -259,25 +259,27 @@ export class Surfaces {
     this.cs = meta.chunk; this.ncx = meta.ncx; this.ncz = meta.ncz;
     this.road = new Map();    // chunk -> [{rings, bb}]
     this.water = new Map();
+    this.bld = new Map();     // building footprints, filed in every chunk their box touches
+    if (M.buildings) this.addTile(M, 0);
+  }
+  addTile(D, tag) {
     const add = (map, ci, rings) => {
       const rr = rings.map(cmRing);
       let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
       const o = rr[0];
       for (let k = 0; k < o.length; k += 2) { x0 = Math.min(x0, o[k]); x1 = Math.max(x1, o[k]); z0 = Math.min(z0, o[k + 1]); z1 = Math.max(z1, o[k + 1]); }
       if (!map.has(ci)) map.set(ci, []);
-      map.get(ci).push({ rings: rr, bb: [x0, z0, x1, z1] });
+      map.get(ci).push({ rings: rr, bb: [x0, z0, x1, z1], tag });
     };
-    for (const [kind, polys] of M.ground) {
+    for (const [kind, polys] of D.ground) {
       if (kind === 'asphalt' || kind === 'concrete' || kind === 'bridge_road') for (const [ci, rings] of polys) add(this.road, ci, rings);
     }
-    for (const [ci, rings] of M.water) add(this.water, ci, rings);
-    // building footprints, filed in every chunk their box touches (for "is this spot inside a building")
-    this.bld = new Map();
-    for (const B of M.buildings) {
+    for (const [ci, rings] of D.water) add(this.water, ci, rings);
+    for (const B of D.buildings) {
       const r = cmRing(B[1]);
       let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
       for (let k = 0; k < r.length; k += 2) { x0 = Math.min(x0, r[k]); x1 = Math.max(x1, r[k]); z0 = Math.min(z0, r[k + 1]); z1 = Math.max(z1, r[k + 1]); }
-      const rec = { rings: [r], bb: [x0, z0, x1, z1] };
+      const rec = { rings: [r], bb: [x0, z0, x1, z1], tag };
       const i0 = Math.floor((x0 - this.x0) / this.cs), i1 = Math.floor((x1 - this.x0) / this.cs), j0 = Math.floor((z0 - this.z0) / this.cs), j1 = Math.floor((z1 - this.z0) / this.cs);
       for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
         if (i < 0 || j < 0 || i >= this.ncx || j >= this.ncz) continue;
@@ -285,6 +287,12 @@ export class Surfaces {
         if (!this.bld.has(ci)) this.bld.set(ci, []);
         this.bld.get(ci).push(rec);
       }
+    }
+  }
+  removeTile(tag) {
+    for (const map of [this.road, this.water, this.bld]) for (const [ci, l] of map) {
+      const k = l.filter(p => p.tag !== tag);
+      if (!k.length) map.delete(ci); else if (k.length !== l.length) map.set(ci, k);
     }
   }
   inBuilding(x, z) { return this.test(this.bld, x, z); }
@@ -310,10 +318,17 @@ export class Surfaces {
 
 // ---------------------------------------------------------------- static collision
 export class Collision {
-  constructor(cell = 8) { this.cell = cell; this.segs = new Map(); this.circ = new Map(); this.nseg = 0; }
+  // everything added while .tag is set belongs to that tile, and goes when the tile goes
+  constructor(cell = 8) { this.cell = cell; this.segs = new Map(); this.circ = new Map(); this.nseg = 0; this.tag = 0; }
+  removeTag(tag) {
+    for (const map of [this.segs, this.circ]) for (const [k, l] of map) {
+      const kept = l.filter(s => s.tag !== tag);
+      if (!kept.length) map.delete(k); else if (kept.length !== l.length) map.set(k, kept);
+    }
+  }
   key(i, j) { return i * 100003 + j; }
   addSeg(ax, az, bx, bz, kind = 0) {
-    const s = { ax, az, bx, bz, kind };
+    const s = { ax, az, bx, bz, kind, tag: this.tag };
     const c = this.cell;
     const L = Math.hypot(bx - ax, bz - az);
     const n = Math.max(1, Math.ceil(L / (c * 0.5)));
@@ -333,7 +348,7 @@ export class Collision {
   addCircle(x, z, r, kind = 1) {
     const key = this.key(Math.floor(x / this.cell), Math.floor(z / this.cell));
     let l = this.circ.get(key); if (!l) this.circ.set(key, l = []);
-    const c = { x, z, r, kind, off: false };
+    const c = { x, z, r, kind, off: false, tag: this.tag };
     l.push(c);
     return c;
   }
