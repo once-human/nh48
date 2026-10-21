@@ -28,6 +28,8 @@ def speakable(t):
 
 def kokoro(text, voice, lang, path):
     text = speakable(text)
+    # Kokoro has no retroflex l: espeak drops ळ entirely (वेळ came out "ve"), so read it as ल
+    if lang in ('mr', 'hi'): text = text.replace('\u0933', '\u0932')
     global kok
     if kok is None:
         from kokoro_onnx import Kokoro
@@ -85,8 +87,9 @@ def gform(t, f): return re.sub(r'\{([^{}|]*)\|([^{}|]*)\}', lambda m: m.group(1)
 # date lines: the first form is the real script (Devanagari for Hindi and Marathi), read in the speaker's
 # own language; Marathi falls back to the Hindi phonemizer when the Piper Marathi model isn't installed
 _MR = 'mr0' if os.path.exists(os.path.join(MODELS, 'mr_IN-google-medium.onnx')) else 'hf_alpha'
-DV = {'f': {'en': ('hf_beta', 'en-us', 1.0), 'hi': ('hf_beta', 'hi', 0.98), 'mr': (_MR, 'hi' if _MR == 'hf_alpha' else 'mr', 0.96)},
-      'm': {'en': ('hm_psi', 'en-us', 1.0), 'hi': ('hm_omega', 'hi', 0.98), 'mr': ('hm_psi', 'hi', 0.96)}}
+# Marathi through espeak's own Marathi rules (not Hindi's): v not ʋ, Marathi stress
+DV = {'f': {'en': ('hf_beta', 'en-us', 1.0), 'hi': ('hf_beta', 'hi', 0.98), 'mr': (_MR, 'mr', 0.96)},
+      'm': {'en': ('hm_psi', 'en-us', 1.0), 'hi': ('hm_omega', 'hi', 0.98), 'mr': ('hm_psi', 'mr', 0.96)}}
 for lang in ('en', 'hi', 'mr'):
     dl = json.load(open(os.path.join(ROOT, f'src/game/date/{lang}.json')))
     for key, arr in dl.items():
