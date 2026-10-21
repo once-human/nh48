@@ -201,7 +201,7 @@ export class Dates {
     const v = c.mode === 'date' ? c.contact.aff : c.interest;
     const h = Math.max(0, Math.min(5, Math.round(v / 20)));
     const st = this.stage(c);
-    this.el.querySelector('.tk-k').textContent = c.q ? 'They ask you' : { knowing: 'Getting to know them', better: 'Getting along', spark: 'Sparks', date: `On a date · ${levelOf(c.contact)}`, partner: 'Your partner' }[st];
+    this.el.querySelector('.tk-k').textContent = c.q ? 'They ask you' : (st === 'date' ? `On a date · ${levelOf(c.contact)}` : { knowing: 'Getting to know them', better: 'Getting along', spark: 'Sparks', partner: 'Your partner' }[st]);
     this.el.querySelector('.tk-name').textContent = c.p.name;
     this.el.querySelector('.tk-hearts').textContent = '♥'.repeat(h) + '♡'.repeat(5 - h);
     const bits = [LANG_LABEL[P.lang]];

@@ -758,6 +758,38 @@ log('markings: center', len(marks_center), 'lane', len(marks_lane), 'zebras', le
 # ---------------------------------------------------------------- buildings
 BLOCKERS = fix(unary_union([ROAD, MEDIANS]).buffer(0.1))      # carriageway only: sidewalks never cut a real building
 log('blockers ready')
+# the road union is one huge polygon: clip it (and the water) into 250 m cells once, so each
+# building is cut only by the pieces around it (minutes faster per tile than cutting by the whole)
+from shapely.prepared import prep as _prep
+_CELL = 250.0
+_vb = VIS.bounds
+_X0, _Z0 = math.floor(_vb[0] / _CELL) * _CELL, math.floor(_vb[1] / _CELL) * _CELL
+_n = 1
+while _X0 + _n * _CELL < _vb[2] or _Z0 + _n * _CELL < _vb[3]: _n *= 2
+def _clip(g, i0, j0, n, out):
+    if g.is_empty: return
+    if n == 1: out[(i0, j0)] = g; return
+    h = n // 2
+    for di, dj in ((0, 0), (h, 0), (0, h), (h, h)):
+        b = box(_X0 + (i0 + di) * _CELL, _Z0 + (j0 + dj) * _CELL, _X0 + (i0 + di + h) * _CELL, _Z0 + (j0 + dj + h) * _CELL)
+        _clip(g.intersection(b), i0 + di, j0 + dj, h, out)
+_BL_CELLS, _WA_CELLS = {}, {}
+_clip(BLOCKERS, 0, 0, _n, _BL_CELLS)
+_clip(WATER, 0, 0, _n, _WA_CELLS)
+_VIS_P = _prep(VIS)
+def cut_local(p, roads=True):
+    b = p.bounds
+    i0, i1 = int((b[0] - _X0) // _CELL), int((b[2] - _X0) // _CELL)
+    j0, j1 = int((b[1] - _Z0) // _CELL), int((b[3] - _Z0) // _CELL)
+    q = p
+    for i in range(i0, i1 + 1):
+        for j in range(j0, j1 + 1):
+            for cells in ((_BL_CELLS, _WA_CELLS) if roads else (_WA_CELLS,)):
+                g = cells.get((i, j))
+                if g is not None and q.intersects(g): q = q.difference(g)
+    q = fix(q)
+    return q if _VIS_P.contains(q) else q.intersection(VIS)
+log('road cells', len(_BL_CELLS))
 main_lines = [r['line'] for r in RD if r['rank'] >= 4]
 main_tree = STRtree(main_lines)
 anyroad_lines = [r['line'] for r in RD]
@@ -787,13 +819,13 @@ for p, t, oid in bpolys:
         continue
     if p.area < 10:
         continue
-    q = fix(p.difference(BLOCKERS).difference(WATER)).intersection(VIS)
+    q = cut_local(p)
     lost = 1 - q.area / max(p.area, 1e-6)
     if lost > 0.3 and t.get('building') == 'train_station' and not re.search(r'railway station|junction', t.get('name', ''), re.I):
         cut_stats['elevated station skipped'] += 1
         continue                      # metro stations stand over the road; the metro layer draws them
     if lost > 0.3 and p.area > 150:
-        q = fix(p.difference(WATER)).intersection(VIS)        # the footprint is real; the road overlap is a data artefact
+        q = cut_local(p, roads=False)        # the footprint is real; the road overlap is a data artefact
         cut_stats['kept whole'] += 1
     parts = [x for x in as_polys(q) if x.area > 12]
     if not parts:
