@@ -144,7 +144,7 @@ export class HUD {
         <div class="pz-l">
           <div class="ttl-brand">${STONE}<b>NH48</b><span>Pune <span lang="mr">पुणे</span></span></div>
           <div class="pz-head ttl-head"><span class="pz-k">An open-world game</span><b>Pune</b><span class="ttl-mr" lang="mr">पुणे</span>
-            <p class="ttl-sub">Peths at noon, Koregaon Park at midnight. Drive an auto, chase a date, dodge the challan. Play a man (built stronger) or a woman (asked out far more).</p></div>
+            <p class="ttl-sub">Peths at noon, Koregaon Park at midnight. Drive an auto on the meter, eat your way down FC Road, fall for someone at a Baner café, and try not to get towed. The city has its rules: shops shut at night, chai is ₹10 and the traffic cop has seen it all.</p></div>
           <nav class="pz-menu">
             <button class="pz-i sel" id="t-roam">Start</button>
             <button class="pz-i" id="t-who">New character</button>

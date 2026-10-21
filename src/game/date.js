@@ -42,6 +42,16 @@ const VIBES = ['shy', 'witty', 'chill', 'serious', 'flirty'];
 const PERSONA_LANG = { kaka: 'mr', ajoba: 'mr', dada: 'mr', kaku: 'mr', aaji: 'mr', tai: 'mr', bhaiya: 'hi', collegeboy: 'hi', aunty: 'hi', collegegirl: 'hi', kpguy: 'en', kpgirl: 'en' };
 const OLDER = new Set(['kaka', 'ajoba', 'kaku', 'aaji', 'aunty']);
 const TEASES = ['Tease them about their dancing', 'Bet they put ketchup on misal', 'Guess they’re a Kothrud person', 'Tell them they look like trouble', 'Say their drink order is suspicious', 'Ask if they always look this serious'];
+// what people you're seeing ask you by text, and what you can say back: [label, affection, needs affection ≥, special]
+export const ASKS = {
+  wyd: [['Tell them what you’re actually doing', 3], ['“Thinking about you, honestly”', 4, 40], ['“Busy. Talk later”', -1]],
+  eat: [['“Yes, had a proper meal”', 2], ['“Not yet…”', 1, 0, 'feed'], ['“Food is for the weak”', -1]],
+  plans: [['“Whatever you’re doing”', 5, 30, 'invite'], ['“Not sure yet”', 0], ['“Out with friends”', -2]],
+  pic: [['Send a photo of the street', 3], ['“Later, I look terrible”', 1], ['Leave it on read', -2]],
+  call: [['Call them now', 3, 0, 'call'], ['“Can’t talk, text me?”', -1]],
+  miss: [['“Obviously”', 4, 30], ['“A little”', 1], ['“Who is this?”', -6, 0, 'joke']],
+  who: [['“Just a friend. Relax”', 0, 0, 'roll'], ['“Nobody important”', -4], ['“Are you checking up on me?”', -7]],
+};
 const LEVELS = [[0, 'Met'], [15, 'Talking'], [40, 'Dating'], [101, 'Partner']];
 export const levelOf = (c) => c.partner ? 'Partner' : LEVELS.filter(l => c.aff >= l[0]).pop()[1];
 // {for a woman speaking|for a man speaking}
@@ -96,7 +106,7 @@ export class Dates {
   text(ct, key, vars = {}) {
     const T = TX[ct.lang || 'en'] || TX.en, arr = T[key] || TX.en[key];
     const row = arr[this.rng.int(0, arr.length - 1)], f = ct.female;
-    const fill = (s) => g(s, f).replace(/\{name\}/g, ct.name).replace(/\{place\}/g, vars.place || ct.met || '');
+    const fill = (s) => g(s, f).replace(/\{name\}/g, ct.name).replace(/\{place\}/g, vars.place || ct.met || '').replace(/\{amt\}/g, vars.amt || '');
     return Array.isArray(row) ? { t: fill(row[0]), en: fill(row[1]) } : { t: fill(row), en: '' };
   }
   sms(ct, key, hint = '', vars) {
@@ -387,6 +397,7 @@ export class Dates {
     const contact = { name: p.name, female: !!p.female, lang: P.lang, vibe: P.vibe, likes: P.likes, job: P.job, area: P.area, met: c.room.ctx.name, aff: 12, t: G.clock || 0, lastSeen: G.clock || 0, partner: false };
     const had = this.contacts.find(x => x.partner);
     this.life.s.contacts = this.contacts.filter(x => x.name !== contact.name).concat([contact]);
+    this.heardOf(contact, contact.met);
     L.change('mood', 0.12); L.change('respect', 1); L.save();
     this.say(this.line(p, 'number_yes'), `${p.name} is in your phone. Jhola → People to text them`);
     p.walkedOff = true;
@@ -470,6 +481,48 @@ export class Dates {
     G.setWaypoint({ x: place.x, z: place.z, name: `Meet ${ct.name}: ${place.name}` });
     return true;
   }
+  // they ask you something by text; it waits in Jhola → Phone. Leave it too long and it costs you
+  ask(ct, q) {
+    ct.ask = { q, t: this.g.clock || 0 };
+    this.sms(ct, 't_q_' + q, 'Reply from Jhola → Phone', { place: ct.sawAt });
+  }
+  reply(ct, i) {
+    const G = this.g, A = ct.ask, o = A && ASKS[A.q] && ASKS[A.q][i];
+    if (!o) return;
+    ct.ask = null; ct.ignored = 0;
+    let [, gain, min = 0, act] = o;
+    if (ct.aff < min) gain = Math.min(gain, 0) - 1;            // too much, too soon
+    if (act === 'joke') gain = ct.vibe === 'witty' || ct.vibe === 'flirty' ? 3 : gain;
+    if (act === 'roll') gain = this.rng.next() < 0.5 + this.life.charm * 0.4 ? 2 : -6;
+    ct.aff = Math.max(0, Math.min(100, ct.aff + gain));
+    if (act === 'call') { this.call(ct); return; }
+    this.sms(ct, gain >= 2 ? 't_reply_good' : gain >= 0 ? 't_reply_meh' : 't_reply_bad');
+    if (act === 'feed' && (ct.partner || ct.aff > 50)) G.later(40, () => { this.life.add('tiffin'); this.sms(ct, 't_food', 'A parcel meal is in your jhola'); });
+    if (act === 'invite' && gain > 0 && !this.pending) G.later(this.rng.range(60, 200), () => this.invite(ct));
+    if (gain < 0 && ct.partner && ct.aff < 50 && this.rng.next() < 0.3) ct.upset = true;
+    this.life.save && this.life.save();
+  }
+  // someone you're seeing hears about someone else (a new number, a date): they may ask
+  heardOf(withCt, place) {
+    const now = this.g.clock || 0;
+    for (const c of this.contacts) if (c !== withCt && !c.done && (c.partner || c.aff >= 40) && this.rng.next() < (c.partner ? 0.45 : 0.25)) { c.sawOther = now; c.sawAt = place || ''; }
+  }
+  // something happened to you: the people who care text, a partner might help with the bill
+  event(kind, amount = 0) {
+    const G = this.g;
+    let paid = false;
+    const cs = this.contacts.filter(c => !c.done && (c.partner || c.aff >= 35)).sort((a, b) => b.partner - a.partner || b.aff - a.aff);
+    for (const c of cs) {
+      if (!c.partner && this.rng.next() > (c.aff >= 60 ? 0.7 : 0.35)) continue;
+      G.later(this.rng.range(15, 80), () => {
+        this.sms(c, 't_care_' + kind, 'They’re worried about you');
+        if (!paid && amount > 0 && (c.partner || c.aff >= 70) && this.rng.next() < 0.6) {
+          paid = true; const amt = Math.round(amount * 0.5 / 100) * 100;
+          if (amt > 0) G.later(20, () => { G.stats.money += amt; G.saveStats && G.saveStats(); this.sms(c, 't_care_paid', `+₹${amt.toLocaleString('en-IN')}`, { amt: amt.toLocaleString('en-IN') }); });
+        }
+      });
+    }
+  }
   // they text first: a place near you, then it's a date like any other
   invite(ct) {
     const G = this.g, P = G.player;
@@ -500,7 +553,7 @@ export class Dates {
       s.used = s !== pick[1];      // the seat across stays free for you
     }
     seat.used = true;
-    this.twoTiming(d.ct);
+    this.twoTiming(d.ct); this.heardOf(d.ct, d.place && d.place.name);
     const p = G.interiors.addPerson(seat.x, seat.z, seat.yaw, 'sit_talk', d.ct.female);
     // your seat: the one kept free at their table, nearest to them
     const mine = pick ? pick.filter(q => q !== seat && !q.used).sort((a, b) => Math.hypot(a.x - seat.x, a.z - seat.z) - Math.hypot(b.x - seat.x, b.z - seat.z))[0] : null;
@@ -541,6 +594,26 @@ export class Dates {
         if (hour > 7.5 && hour < 9.5 && ct.mornDay !== Math.floor(now / 24) && this.rng.next() < 0.5) { ct.mornDay = Math.floor(now / 24); this.sms(ct, 't_morning'); }
         if ((!ct.tipT || now - ct.tipT > 30) && this.rng.next() < 0.08) { ct.tipT = now; this.sms(ct, 't_tip'); }
         if (days > 4 && !ct.upset) { ct.upset = true; this.sms(ct, 't_angry', 'They’re upset. Meet them and make it right'); }
+      }
+      // a question left unanswered for three hours: seen, not replied
+      if (ct.ask && now - ct.ask.t > 3) {
+        ct.ask = null; ct.ignored = (ct.ignored || 0) + 1; ct.aff = Math.max(0, ct.aff - (ct.partner ? 6 : 3));
+        this.sms(ct, 't_ignored', 'You left them on read');
+        if (ct.partner && ct.ignored >= 3) { ct.upset = true; this.sms(ct, 't_angry', 'They’re upset. Meet them and make it right'); }
+      } else if (!ct.ask && !ct.done && ct.aff >= 15 && hour > 9 && hour < 23.5 && !(ct.askT && now - ct.askT < (ct.partner ? 3 : 7)) &&
+                 this.rng.next() < (ct.partner ? 0.16 : 0.06) * (this.g.player.look.female ? 1.4 : 1)) {
+        ct.askT = now;
+        const q = ct.sawOther && now - ct.sawOther < 24 && ct.aff >= 40 ? 'who' : L.s.hunger < 0.3 && this.rng.next() < 0.6 ? 'eat'
+          : this.rng.pick(ct.aff >= 30 ? ['wyd', 'wyd', 'plans', 'pic', 'call', 'miss'] : ['wyd', 'plans', 'pic']);
+        if (q === 'who') ct.sawOther = 0;
+        this.ask(ct, q);
+      }
+      // broke: someone who loves you sends money
+      if ((ct.partner || ct.aff >= 65) && !ct.done && !ct.upset && this.g.stats.money < 300 && !(ct.moneyT && now - ct.moneyT < 30) && this.rng.next() < (ct.partner ? 0.3 : 0.1)) {
+        ct.moneyT = now;
+        const amt = Math.round((ct.partner ? this.rng.range(1000, 2500) : this.rng.range(500, 1200)) / 100) * 100;
+        this.g.stats.money += amt; this.g.saveStats && this.g.saveStats();
+        this.sms(ct, 't_money', `+₹${amt.toLocaleString('en-IN')}`, { amt: amt.toLocaleString('en-IN') });
       }
       // they ask you out: far more often when you're a woman
       if (!ct.done && !ct.upset && ct.aff >= 12 && !this.pending && !(ct.askT && now - ct.askT < 8) && hour > 10 && hour < 23 &&
