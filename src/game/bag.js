@@ -62,7 +62,7 @@ export class Bag {
   close() { this.open = false; this.el.hidden = true; if (this.g.state === 'shop') this.g.state = 'play'; this.life.save(); this.g.lockMouse?.(); }
   msg(t, good) { const m = this.el.querySelector('.jh-msg'); m.textContent = t || ''; m.classList.toggle('good', !!good); }
   row(ic, label, note, right, act, arg, cls = '') {
-    return `<button class="jh-row ${cls}" ${act ? `data-act="${act}"` : 'disabled'} ${arg !== undefined ? `data-arg="${esc(arg)}"` : ''}>${icon(ic)}<span class="nm"><b>${esc(label)}</b><small>${esc(note || '')}</small></span><span class="go">${esc(right || '')}</span></button>`;
+    return `<button class="jh-row ${cls}" ${act ? `data-act="${act}"` : 'disabled'} ${arg !== undefined ? `data-arg="${esc(arg)}"` : ''}>${icon(ic)}<span class="nm"><b>${esc(label)}</b><small>${note && note.html ? note.html : esc(note || '')}</small></span><span class="go">${esc(right || '')}</span></button>`;
   }
   render() {
     const G = this.g, L = this.life, s = L.s;
@@ -126,7 +126,7 @@ export class Bag {
       for (const c of cs) {
         const hearts = Math.max(0, Math.min(5, Math.round(c.aff / 20)));
         const lvl = levelOf(c), days = Math.max(0, Math.floor(((G.clock || 0) - (c.lastSeen || 0)) / 24));
-        const note = `${lvl} · ${heartsI(hearts)} · met at ${c.met}${days >= 2 ? ` · not seen in ${days} days` : ''}`;
+        const note = { html: `${esc(lvl)} ${heartsI(hearts)} · met at ${esc(c.met)}${days >= 2 ? ` · not seen in ${days} days` : ''}${c.done ? ' · blocked you' : c.upset ? ' · upset with you' : ''}` };
         h += this.row(c.partner ? 'health' : 'phone', c.name, note, pend && pend.ct === c ? 'On the way' : 'Ask to meet', pend && pend.ct === c ? null : 'meet', c.name, c.partner ? 'partner' : '');
       }
       if (cs.length) h += `<p class="jh-empty">They pick a café nearby. Be there within a few hours. Bring a gajra, sweets or a book if you have one.</p>`;
