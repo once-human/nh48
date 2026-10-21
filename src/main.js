@@ -19,6 +19,8 @@ import { Pilot } from './game/pilot.js';
 import { HumanKit } from './people/humans.js';
 import { AnimalKit } from './people/animals.js';
 import { MetroTrains } from './world/metroTrains.js';
+import { TileManager, cityFromBase } from './world/tiles.js';
+import * as Save from './game/save.js';
 
 export const QUALITY = {
   // for old laptops and office PCs: 75% resolution, no shadows or grass, a shorter view, thinner crowds
@@ -35,6 +37,8 @@ export const QUALITY = {
 const params = new URLSearchParams(location.search);
 const EXPO = +(params.get('expo') || 1.0);
 export const TEST = params.has('test');
+// all of Pune, streamed in 4 km tiles (?city=pune while it's being finished)
+const PUNE = params.get('city') === 'pune';
 
 function gpuClass() {
   try {
@@ -109,6 +113,7 @@ async function main() {
   let manifest = {};
   try { manifest = JSON.parse(document.getElementById('manifest').textContent); } catch (e) { /* dev */ }
   const loader = new Loader((f) => { shownF = Math.max(shownF, f * 0.6); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
+  if (PUNE) ASSETS.map = 'assets/pune/base.json.gz';
   for (const v of Object.values(ASSETS)) for (const u of typeof v === 'string' ? [v] : Object.values(v)) loader.expect(u, manifest[u] || 1e6);
   const sndUrl = (n) => `assets/snd/${n}.mp3`;
   for (const n of SOUNDS) loader.expect(sndUrl(n), manifest[sndUrl(n)] || 5e4);
@@ -126,7 +131,7 @@ async function main() {
     } catch (e) { /* silent dialogue */ }
   })()]);
   const [M, gAlb, gNrm, gArm, wAlb, wNrm, wArm, bark, barkN, palm] = await Promise.all([
-    loader.json(ASSETS.map), loader.bitmap(ASSETS.gAlb), loader.bitmap(ASSETS.gNrm), loader.bitmap(ASSETS.gArm),
+    PUNE ? loader.bytes(ASSETS.map).then(async (b) => cityFromBase(JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text()))) : loader.json(ASSETS.map), loader.bitmap(ASSETS.gAlb), loader.bitmap(ASSETS.gNrm), loader.bitmap(ASSETS.gArm),
     loader.bitmap(ASSETS.wAlb), loader.bitmap(ASSETS.wNrm), loader.bitmap(ASSETS.wArm),
     loader.bitmap(ASSETS.bark), loader.bitmap(ASSETS.barkN), loader.bitmap(ASSETS.palm)]);
   await sndJob;
@@ -157,6 +162,15 @@ async function main() {
   const post = new Post(renderer, scene, camera, quality);
   window.__W = W; window.__updateProps = updateProps; window.__U = U;
 
+  if (PUNE) {
+    // the tiles around where you'll start: your saved spot, or FC Road for a new game
+    let sx = -2450, sz = 1100;
+    try { const sp = Save.startPoint(Save.load()); if (sp) { sx = sp.x; sz = sp.z; } } catch (e) { /* new game */ }
+    try { const r = JSON.parse(sessionStorage.getItem('nh48_resume') || 'null'); if (r) { sx = r.x; sz = r.z; } } catch (e) { /* none */ }
+    W.tiles = new TileManager(W);
+    await progress('Loading this part of Pune', 0.83);
+    await W.tiles.warm(sx, sz, (k, n) => { shownF = Math.max(shownF, 0.83 + 0.03 * k / n); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
+  }
   if (params.has('fly')) return runFly({ W, renderer, scene, camera, sky, post, quality, progress });
 
   // ---- gameplay
@@ -174,6 +188,8 @@ async function main() {
   const game = new Game({ W, scene, camera, renderer, sky, player, traffic, rig, input, quality, params, QUALITY, vmats, post, sounds });
   ctxGame = game;
   window.__game = game;
+  W.cityMap = game.city;
+  W.tiles?.attachGame(game);
   // the shopkeepers' and the people-you-talk-to voice packs, in the background
   setTimeout(() => {
     const idx = manifest.__voices || {}, bg = new Loader(() => {});
@@ -243,6 +259,7 @@ async function main() {
     pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     frustum.setFromProjectionMatrix(pv);
     camera.getWorldDirection(fwd);
+    W.tiles?.update(dt, focus.x, focus.z);
     W.streamer.update(focus.x, focus.z, fwd);
     W.nearBoards.update(camera.position.x, camera.position.z, dt);
     W.trains?.update(dt, camera.position);

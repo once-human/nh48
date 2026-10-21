@@ -95,6 +95,9 @@ for (const f of fs.readdirSync(path.join(root, 'assets'))) {
   const s = path.join(root, 'assets', f), d = path.join(dist, 'assets', f);
   if (fs.statSync(s).isDirectory()) copyDir(s, d); else fs.copyFileSync(s, d);
 }
+// whole-Pune tiles (when baked): copied as they are, gzip JSON fetched by the tile streamer
+const puneSrc = path.join(root, 'data/pune');
+if (fs.existsSync(puneSrc)) copyDir(puneSrc, path.join(dist, 'assets/pune'));
 // voice lines: concatenated into one .mp3 (one request instead of a hundred; still a valid audio/mpeg file); offsets go in the manifest
 const voiceDir = path.join(root, 'assets/voice');
 const voiceIndex = {};
