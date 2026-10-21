@@ -7,7 +7,7 @@ import soundfile as sf
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELS = '/home/claude/assets_src/piper'
-OUT = os.path.join(ROOT, 'assets', 'voice')
+OUT = os.environ.get('NH_VOICE_OUT') or os.path.join(ROOT, 'assets', 'voice')
 os.makedirs(OUT, exist_ok=True)
 lines = {k: v for k, v in json.load(open(os.path.join(ROOT, 'src/game/lines.json'))).items() if not k.startswith('_')}
 only = set(sys.argv[1:])
