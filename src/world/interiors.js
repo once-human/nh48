@@ -741,13 +741,23 @@ export class Interiors {
       case 'talk':
         if (C.dancing) this.dance(false);
         // a date: sit down next to them first, then talk
-        if (s.p.dateWith && !C.seat) {
-          const ds = s.p.dateSeat && Math.hypot(s.p.dateSeat.x - s.p.x, s.p.dateSeat.z - s.p.z) < 1.8 ? s.p.dateSeat : null;
-          const seat = ds || C.R.seats.filter(q => !q.used && !q.salon && Math.hypot(q.x - s.p.x, q.z - s.p.z) < 1.8).sort((a, b) => Math.hypot(a.x - s.p.x, a.z - s.p.z) - Math.hypot(b.x - s.p.x, b.z - s.p.z))[0];
-          if (seat) { seat.used = false; this.sit(seat); }
-        }
+        if (s.p.dateWith && !C.seat) { const seat = this.dateSeatFor(s.p); if (seat) { seat.used = false; this.sit(seat); } }
         G.date && G.date.talk(s.p, C); return;
     }
+  }
+  // where you sit on a date: across the table from them, or beside them if there's no chair opposite
+  dateSeatFor(p) {
+    const R = this.cur.R, d = (a, x, z) => Math.hypot(a.x - x, a.z - z);
+    const hers = R.seats.filter(q => !q.salon && q.table).sort((a, b) => d(a, p.x, p.z) - d(b, p.x, p.z))[0];
+    if (!hers || d(hers, p.x, p.z) > 0.6) return null;
+    const T = hers.table, mates = R.seats.filter(q => q !== hers && q.table && Math.hypot(q.table.x - T.x, q.table.z - T.z) < 0.05);
+    const hx = hers.x - T.x, hz = hers.z - T.z;
+    const across = mates.filter(q => (q.x - T.x) * hx + (q.z - T.z) * hz < 0).sort((a, b) => d(a, hers.x, hers.z) - d(b, hers.x, hers.z))[0];
+    const pick = across || mates.sort((a, b) => d(a, hers.x, hers.z) - d(b, hers.x, hers.z))[0];
+    if (!pick) return null;
+    // whoever was sitting there finds another table
+    for (const q of R.peds.slice()) if (q !== p && d(q, pick.x, pick.z) < 0.35) { this.g.people.remove(q); R.peds.splice(R.peds.indexOf(q), 1); }
+    return pick;
   }
   sit(seat, salon) {
     const C = this.cur, P = this.g.player;
