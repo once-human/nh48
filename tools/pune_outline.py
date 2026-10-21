@@ -8,13 +8,20 @@ from shapely.geometry import Polygon, MultiPolygon, LineString, box
 from shapely.ops import unary_union, linemerge, polygonize
 D = 'data/raw/pune/'
 # --- the subdistrict
-root = ET.parse(D + 'rel_pune_city.osm').getroot()
-nodes = {n.get('id'): (float(n.get('lon')), float(n.get('lat'))) for n in root.iter('node')}
-ways = {w.get('id'): [nodes[nd.get('ref')] for nd in w.iter('nd') if nd.get('ref') in nodes] for w in root.iter('way')}
-rel = root.find('relation')
-lines = [LineString(ways[m.get('ref')]) for m in rel.iter('member') if m.get('type') == 'way' and m.get('role') in ('outer', '') and m.get('ref') in ways and len(ways[m.get('ref')]) > 1]
-city = unary_union(list(polygonize(linemerge(lines))))
-print('subdistrict km2', round(city.area * 111.0 * 105.6, 1))
+import os
+from shapely.geometry import Point
+if not os.path.exists(D + 'rel_pune_city.osm'):
+    # no OSM boundary to hand: anchor on the old city (Shaniwar Wada to Swargate) and let the built-up
+    # area decide the rest, which is the real shape of Pune and Pimpri-Chinchwad anyway
+    city = Point(73.856, 18.515).buffer(0.03)
+else:
+  root = ET.parse(D + 'rel_pune_city.osm').getroot()
+  nodes = {n.get('id'): (float(n.get('lon')), float(n.get('lat'))) for n in root.iter('node')}
+  ways = {w.get('id'): [nodes[nd.get('ref')] for nd in w.iter('nd') if nd.get('ref') in nodes] for w in root.iter('way')}
+  rel = root.find('relation')
+  lines = [LineString(ways[m.get('ref')]) for m in rel.iter('member') if m.get('type') == 'way' and m.get('role') in ('outer', '') and m.get('ref') in ways and len(ways[m.get('ref')]) > 1]
+  city = unary_union(list(polygonize(linemerge(lines))))
+  print('subdistrict km2', round(city.area * 111.0 * 105.6, 1))
 # --- built-up density from buildings on a 250 m grid
 BB = (73.70, 18.40, 74.06, 18.72); STEP = 0.0024     # ~250 m
 nx, ny = int((BB[2] - BB[0]) / STEP) + 1, int((BB[3] - BB[1]) / STEP) + 1

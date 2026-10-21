@@ -169,7 +169,7 @@ n_osm = len(cands)
 log('osm candidates', n_osm)
 
 import duckdb
-con = duckdb.connect(); con.sql('load spatial')
+import sys as _s, os as _o; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); from ddb import connect as _ddb; con = _ddb()
 rows = con.sql(f"""select ST_X(geometry), ST_Y(geometry), names.primary, basic_category, taxonomy.primary, confidence
                    from '{OVT}' where confidence >= 0.35 and names.primary is not null""").fetchall()
 # geocoder fallbacks: Overture lists hundreds of businesses at the city centroid (18.5203, 73.8567),

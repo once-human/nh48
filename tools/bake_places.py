@@ -122,7 +122,7 @@ AREAS = {   # english -> (marathi, tier)  tier 1 shows on the whole-city view, 2
     'Ghorpuri': ('घोरपडी', 2), 'Pune Cantonment': ('पुणे छावणी', 2),
 }
 import duckdb, statistics
-con = duckdb.connect(); con.sql('load spatial')
+import sys as _s, os as _o; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); from ddb import connect as _ddb; con = _ddb()
 OVT = os.environ.get('NH_PLACES') or (os.environ.get('NH_PLACES') or os.path.join(ROOT, 'data/raw/overture/places.parquet'))
 addr = con.sql(f"select ST_X(geometry), ST_Y(geometry), lower(addresses[1].freeform) from '{OVT}' where addresses[1].freeform is not null").fetchall()
 osm_areas = {p[0]: p for p in M['pois'] if p[4] in ('suburb', 'neighbourhood', 'locality')}

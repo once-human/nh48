@@ -337,7 +337,7 @@ OVT_B = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data/raw
 if os.path.exists(OVT_B) and not os.environ.get('NO_OVERTURE'):
     import duckdb
     from shapely import wkb as _wkb
-    con = duckdb.connect(); con.sql('load spatial')
+    import sys as _s, os as _o; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); from ddb import connect as _ddb; con = _ddb()
     if TILE:
         OVT_B = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data/raw/pune/building.parquet')
         _b = VIS.bounds

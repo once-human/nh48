@@ -9,7 +9,8 @@ import json, sys, duckdb
 from shapely import wkb
 lon0, lat0, lon1, lat1 = map(float, sys.argv[1:5]); OUT = sys.argv[5]
 D = 'data/raw/pune/'
-con = duckdb.connect(); con.sql('load spatial')
+import os as _o; sys.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); from ddb import connect as _ddb
+con = _ddb(); G = 'ST_AsWKB(geometry)'
 W = f"bbox.xmax >= {lon0} and bbox.xmin <= {lon1} and bbox.ymax >= {lat0} and bbox.ymin <= {lat1}"
 nodes, ways = {}, {}
 key2id = {}
@@ -38,7 +39,7 @@ def rings(g):
 
 # ---- roads and rails
 HW = {'motorway': 'trunk', 'motorway_link': 'trunk_link', 'unknown': 'unclassified'}
-rows = con.sql(f"""select ST_AsWKB(geometry), subtype, class, subclass, names, road_flags, rail_flags, level_rules, access_restrictions
+rows = con.sql(f"""select {G}, subtype, class, subclass, names, road_flags, rail_flags, level_rules, access_restrictions
                    from '{D}segment.parquet' where {W}""").fetchall()
 for g, sub, cls, subcls, names, rflags, railflags, levels, access in rows:
     geom = wkb.loads(bytes(g))
@@ -78,7 +79,7 @@ for g, sub, cls, subcls, names, rflags, railflags, levels, access in rows:
     for cs in lines(geom): way(cs, t)
 
 # ---- infrastructure: signals, crossings, bus stops, walls, bridges... (original OSM tags)
-rows = con.sql(f"select ST_AsWKB(geometry), source_tags, names from '{D}infrastructure.parquet' where {W}").fetchall()
+rows = con.sql(f"select {G}, source_tags, names from '{D}infrastructure.parquet' where {W}").fetchall()
 for g, st, names in rows:
     geom = wkb.loads(bytes(g)); tags = dict(st or [])
     if names and names.get('primary') and 'name' not in tags: tags['name'] = names['primary']
@@ -89,7 +90,7 @@ for g, st, names in rows:
 
 # ---- water and land use (original OSM tags)
 for f in ('water', 'land_use'):
-    rows = con.sql(f"select ST_AsWKB(geometry), source_tags, names from '{D}{f}.parquet' where {W}").fetchall()
+    rows = con.sql(f"select {G}, source_tags, names from '{D}{f}.parquet' where {W}").fetchall()
     for g, st, names in rows:
         geom = wkb.loads(bytes(g)); tags = dict(st or [])
         if names and names.get('primary') and 'name' not in tags: tags['name'] = names['primary']
