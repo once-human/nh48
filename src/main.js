@@ -117,7 +117,7 @@ async function main() {
     // all voice lines in one file; the manifest says where each one starts
     try {
       const b = await loader.bytes(VOICE_BIN), idx = manifest.__voices || {};
-      for (const [id, [off, len]] of Object.entries(idx)) sounds['v_' + id] = b.buffer.slice(b.byteOffset + off, b.byteOffset + off + len);
+      for (const [id, [off, len, pack]] of Object.entries(idx)) if (!pack) sounds['v_' + id] = b.buffer.slice(b.byteOffset + off, b.byteOffset + off + len);
     } catch (e) { /* silent dialogue */ }
   })()]);
   const [M, gAlb, gNrm, gArm, wAlb, wNrm, wArm, bark, barkN, palm] = await Promise.all([
@@ -168,6 +168,13 @@ async function main() {
   const game = new Game({ W, scene, camera, renderer, sky, player, traffic, rig, input, quality, params, QUALITY, vmats, post, sounds });
   ctxGame = game;
   window.__game = game;
+  // the shopkeepers' and the people-you-talk-to voice packs, in the background
+  setTimeout(() => {
+    const idx = manifest.__voices || {}, bg = new Loader(() => {});
+    ['assets/voices_k.mp3', 'assets/voices_d.mp3'].forEach((url, k) => bg.bytes(url).then((b) => {
+      for (const [id, [off, len, pack]] of Object.entries(idx)) if (pack === k + 1) game.audio.raw['v_' + id] = b.buffer.slice(b.byteOffset + off, b.byteOffset + off + len);
+    }).catch(() => { /* those voices stay silent; subtitles still show */ }));
+  }, 1500);
   await game.init(progress);
   // warm the chunks around the start before the first frame
   await progress('Building the streets', 0.86);

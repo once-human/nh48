@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { clamp, lerp, RNG, safeStorage, wrapAngle, damp } from '../core/util.js';
 import { HUD } from '../ui/hud.js';
 import { CityMap } from '../ui/map.js';
-import { Rides } from './rides.js';
+import { Rides, fareFor } from './rides.js';
 import { Audio } from './audio.js';
 import { People } from '../people/peds.js';
 import { buildParked } from '../traffic/parked.js';
@@ -171,7 +171,7 @@ export class Game {
     const locked = () => document.pointerLockElement === cv;
     cv.addEventListener('pointerdown', (e) => {
       if (e.pointerType !== 'mouse') { drag = { x: e.clientX, y: e.clientY }; return; }
-      if (this.state === 'play' && !locked() && cv.requestPointerLock) { try { const r = cv.requestPointerLock({ unadjustedMovement: true }); if (r && r.catch) r.catch(() => cv.requestPointerLock()); } catch (err) { cv.requestPointerLock(); } return; }
+      if (this.state === 'play' && !locked() && cv.requestPointerLock) { this.lockMouse(); return; }
       if (locked() && e.button === 0 && this.state === 'play') this.input.pressed.add('Mouse0');
       if (!locked() && (e.button === 0 || e.button === 2)) drag = { x: e.clientX, y: e.clientY };
     });
@@ -181,14 +181,20 @@ export class Game {
       // Esc released the mouse during play: that's a pause, like any game. Esc that closed a shop
       // or the jhola only closes it; the next key you press takes the mouse back.
       const fromMenu = performance.now() - (this._menuT || 0) < 450;
-      if (!locked() && this.state === 'play' && !this._unlockOk && !fromMenu) this.togglePause(true);
+      // the browser eats Esc to release the mouse, so inside a shop or the jhola that release IS the Esc
+      if (!locked() && this.state === 'shop' && !this._unlockOk) { this.closeMenus(); this._menuT = performance.now(); }
+      else if (!locked() && this.state === 'play' && !this._unlockOk && !fromMenu) this.togglePause(true);
       this._unlockOk = false;
     });
     // any key in play takes the mouse back (keys count as a gesture; Esc never does)
     window.addEventListener('keydown', (e) => {
       if (this.state !== 'play' || locked() || e.code === 'Escape' || this.params.has('test') || !cv.requestPointerLock) return;
-      try { const r = cv.requestPointerLock({ unadjustedMovement: true }); if (r && r.catch) r.catch(() => {}); } catch (err) { /* tried too soon after Esc; the next key will do it */ }
+      this.lockMouse();
     });
+    this.lockMouse = () => {
+      if (locked() || !cv.requestPointerLock || this.params.has('test')) return;
+      try { const r = cv.requestPointerLock({ unadjustedMovement: true }); if (r && r.catch) r.catch(() => { try { cv.requestPointerLock(); } catch (e2) { /* next key */ } }); } catch (err) { /* tried too soon after Esc; the next key will do it */ }
+    };
     this.releaseMouse = () => { if (locked()) { this._unlockOk = true; document.exitPointerLock(); } };
     window.addEventListener('pointermove', (e) => { if (drag) { this.rig.drag(e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; } });
     window.addEventListener('pointerup', () => { drag = null; });
@@ -284,13 +290,15 @@ export class Game {
     // drop focus from the menu button so Space (handbrake) can't press it again
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     this.state = 'play';
+    this.goFullscreen();
+    this.lockMouse && this.lockMouse();
     this.audio.start();
     if (shift && this.police.suspended) { shift = false; this.hud.toast('Licence suspended', 'No fares until it’s back, free roam only. Pay pending challans from the menu.', 'bad', 4); }
     this.rides.setEnabled(shift);
     this.hud.setPlaying(true);
     this.rig.inited = false;
     this.playT0 = this.t;
-    if (this.pendingHeat) { const h = this.pendingHeat; this.pendingHeat = 0; this.later(1.5, () => this.police.raiseHeat(h, 'Still wanted from before')); }
+    if (this.pendingHeat) { const h = this.pendingHeat; this.pendingHeat = 0; this.later(1.5, () => { for (const c of this.pendingCharges || []) this.police.charges.add(c); this.police.raiseHeat(h, 'Still wanted from before', null); }); }
     if (this.saved && !this.welcomed) { this.welcomed = true; this.hud.toast('Welcome back', 'Right where you left off', 'info', 2.6); }
     if (shift) this.hud.toast('Shift started', 'People waving for an auto show up green on the map', 'meter', 3.6);
   }
@@ -301,6 +309,25 @@ export class Game {
     this.hud.setPlaying(false);
     this.audio.updateEngine(0, 0, false);
     this.saveStats();
+  }
+  // full screen when you start playing (a click is needed for it). With Esc held by the keyboard
+  // lock, Esc reaches the game (closes menus, pauses) instead of throwing you out of full screen.
+  goFullscreen() {
+    if (this.params.has('test') || this.settings?.fullscreen === false) return;
+    const el = document.documentElement;
+    if (document.fullscreenElement) return;
+    const hint = () => { if (!this._fsHint) { this._fsHint = true; this.hud.toast('Play full screen', /Mac/.test(navigator.platform) ? 'Press Ctrl + Cmd + F' : 'Press F11', 'info', 4); } };
+    if (!el.requestFullscreen) return hint();
+    el.requestFullscreen({ navigationUI: 'hide' }).then(() => { navigator.keyboard?.lock?.(['Escape']).catch(() => {}); }).catch(hint);
+  }
+  // close whatever list is open (shop, trial room, conversation, jhola, club card)
+  closeMenus() {
+    if (this.date && this.date.cur) this.date.close();
+    if (this.trial && this.trial.open) this.trial.close();
+    if (this.shops && this.shops.open) this.shops.close();
+    if (this.bag && this.bag.open) this.bag.close();
+    if (this.club && this.club.on) this.club.leave();
+    if (this.state === 'shop') this.state = 'play';
   }
   togglePause(force) {
     const to = force !== undefined ? force : this.state !== 'pause';
@@ -316,11 +343,11 @@ export class Game {
     else if (!to && this.state === 'map') { this.state = 'play'; this.hud.mapScreen.close(); this.audio.hush(false); }
   }
   // take a rickshaw: someone else's auto drives you there (the ride is skipped). Pune RTA meter:
-  // ₹26 for the first 1.5 km, ₹17 a km after, by road (~1.3x the straight line), never more than ₹200.
-  // You arrive on foot; your own auto stays where you left it, marked on the map.
+  // ₹30 for the first 1.5 km, ₹20 a km after (RTA, from 1 Sept 2026), 25% more from midnight to 5,
+  // by road (~1.3x the straight line), no cap. You arrive on foot; your own auto stays where it was.
   fastTravelCost(x, z) {
     const km = Math.hypot(x - this.player.x, z - this.player.z) * 1.3 / 1000;
-    return Math.min(200, Math.round(26 + Math.max(0, km - 1.5) * 17));
+    return Math.round(fareFor(km * 1000, this.hour));
   }
   fastTravelBlock() {
     if (this.police && this.police.heat > 0) return 'Not while the police are after you';
@@ -537,6 +564,8 @@ export class Game {
     // a few drinks in, the steering wanders
     const dr = this.life ? this.life.s.drunk : 0;
     if (dr > 0.4 && !this.player.onFoot) { this._wob = (this._wob || 0) + dt; inp.steer = Math.max(-1, Math.min(1, inp.steer + Math.sin(this._wob * 1.3) * Math.sin(this._wob * 0.37) * (dr - 0.4) * 0.6)); }
+    // C: on foot it's a roll, in a vehicle it changes the camera (V always does)
+    if (this.state === 'play' && !this.player.onFoot && this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);
     if (this.state === 'play') this.brawl.update(dt, this.input);
     this.player.update(dt, inp, this.traffic, this.input, this.rig.footMode ? this.rig.footYaw : undefined);
     this.t += dt;

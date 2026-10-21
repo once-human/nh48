@@ -695,3 +695,5 @@ input[type=range] { width: 100%; accent-color: var(--stone); }
 /* keyboard highlight in any list panel */
 .sh-item.kb, .tr-item.kb, .jh-row.kb, .jh-item.kb, .jh-chips.sel button.kb, .gd-sec > summary.kb { outline: 2px solid var(--stone); outline-offset: -2px; background: rgba(242, 183, 5, .08); }
 .shop[data-ui] .sh-item.kb { outline-color: currentColor; }
+.talk .tk-tr { font: 500 12.5px/1.35 var(--font-ui); color: var(--paper-2); font-style: italic; }
+.talk .tk-tr:empty { display: none; }

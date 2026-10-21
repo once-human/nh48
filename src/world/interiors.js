@@ -119,7 +119,8 @@ export function designOf(ctx) {
     case 'lodge': aes = pick(['heritage', 'local']); break;
     case 'office': aes = pick(['minimal', 'local']); break;
   }
-  return { tpl, aes, layout, scale, key: `${tpl}:${aes}:${layout}:${scale}` };
+  const sub = tpl === 'boutique' && (k === 'optician' || k === 'shoes') ? k : '';
+  return { tpl, aes, layout, scale, kind: sub, key: `${tpl}:${aes}:${layout}:${scale}${sub ? ':' + sub : ''}` };
 }
 // kept for older callers
 export function styleOf(ctx) { return designOf(ctx).aes; }
@@ -330,7 +331,8 @@ export class Interiors {
       R.customers = 3;
     } else if (tpl === 'boutique') {
       const racks = [];
-      const label = (i) => [['Shirts and tees', 'tops'], ['Trousers and jeans', 'bottoms'], ['Kurtas and sarees', 'ethnic']][i % 3];
+      const LBL = dz.kind === 'optician' ? [['Frames', 'frames'], ['Sunglasses', 'shades'], ['Contact lenses', 'lens']] : dz.kind === 'shoes' ? [['Sneakers', 'sneak'], ['Formal shoes', 'formal'], ['Chappals and sandals', 'chappal']] : [['Shirts and tees', 'tops'], ['Trousers and jeans', 'bottoms'], ['Kurtas and sarees', 'ethnic']];
+      const label = (i) => LBL[i % 3];
       if (lay === 'gallery') {
         // clothes hung along the walls, a big table of folded things in the middle, lots of space
         for (let z = 2.5, i = 0; z < D - 3; z += 3.2, i++) { racks.push([-W / 2 + 1.0, z, ...label(i), true]); racks.push([W / 2 - 1.0, z, ...label(i + 1), true]); }
@@ -341,10 +343,39 @@ export class Interiors {
       } else {
         for (let z = 3.4, j = 0; z < D - 3.5; z += 3.4, j++) for (let x = -W / 2 + 3.5, i = 0; x <= W / 2 - 3.5 + 0.01; x += 5, i++) racks.push([x, z, ...label(i + j), false]);
       }
+      // garments that read as what they are: shirts with shoulders, trousers with two legs, sarees
+      // with a gold border, on hangers; a printed sign over every rack says what's there
+      const COLS = [0xf2f0ea, 0x8fb3d9, 0x1f2024, 0xbf3f3a, 0xe0b23a, 0x2f5d45, 0xd1495b, 0x7b2cbf, 0x6b4a2e, 0x4cc9f0];
+      const smallGoods = dz.kind === 'optician' || dz.kind === 'shoes';
+      const garment = (gx, gz, sub, col, alongX) => {
+        if (smallGoods) {      // a little stand: three tiers of frames or pairs of shoes
+          for (let t = 0; t < 3; t++) { const y = 0.7 + t * 0.4, c = dz.kind === 'shoes' ? col : [0x1a1a1a, 0x8a6a2a, col][t];
+            alongX ? box(B, gx, y, gz, 0.22, dz.kind === 'shoes' ? 0.1 : 0.05, dz.kind === 'shoes' ? 0.3 : 0.14, c) : box(B, gx, y, gz, dz.kind === 'shoes' ? 0.3 : 0.14, dz.kind === 'shoes' ? 0.1 : 0.05, 0.22, c);
+            alongX ? box(B, gx, y - 0.06, gz, 0.28, 0.02, 0.36, 0xe8e4dc) : box(B, gx, y - 0.06, gz, 0.36, 0.02, 0.28, 0xe8e4dc); }
+          return;
+        }
+        // t: thickness along the rail, w: width across it
+        const bx = (cx, cy, cz, t, h, w, c) => alongX ? box(B, cx, cy, cz, t, h, w, c) : box(B, cx, cy, cz, w, h, t, c);
+        bx(gx, 1.56, gz, 0.02, 0.08, 0.04, 0x8e9093);                       // hook
+        bx(gx, 1.5, gz, 0.03, 0.03, 0.44, 0x6b4a2e);                        // hanger
+        if (sub === 'tops') { bx(gx, 1.22, gz, 0.06, 0.56, 0.42, col); bx(gx, 1.42, gz, 0.06, 0.14, 0.62, col); }
+        else if (sub === 'bottoms') { const o = 0.1; alongX ? (box(B, gx, 1.02, gz - o, 0.06, 0.92, 0.17, col), box(B, gx, 1.02, gz + o, 0.06, 0.92, 0.17, col)) : (box(B, gx - o, 1.02, gz, 0.17, 0.92, 0.06, col), box(B, gx + o, 1.02, gz, 0.17, 0.92, 0.06, col)); bx(gx, 1.45, gz, 0.06, 0.08, 0.38, col); }
+        else { bx(gx, 0.86, gz, 0.05, 1.28, 0.46, col); bx(gx, 0.28, gz, 0.055, 0.1, 0.47, 0xc9a227); }
+      };
       for (const [x, z, lbl, sub, wallRack] of racks) {
         const along = wallRack ? 2.6 : 2.2;
-        if (wallRack) { box(B, x, 1.6, z, 0.04, 0.04, along, 0x8e9093); for (let k = 0; k < 9; k++) box(B, x, 1.05, z - along / 2 + 0.15 + k * 0.29, 0.5, 1.0, 0.06, [0xf2f0ea, 0x8fb3d9, 0x1f2024, 0xbf3f3a, 0xe0b23a, 0x2f5d45, 0xd1495b, 0x7b2cbf][(k + Math.round(z)) & 7]); solid(x, z, 0.6, along, 2); spot(x + (x < 0 ? 1.1 : -1.1), z, 1.1, 'rack', lbl, { sub }); }
-        else { box(B, x, 1.55, z, along, 0.04, 0.04, 0x8e9093); for (let k = 0; k < 8; k++) box(B, x - 0.95 + k * 0.27, 1.0, z, 0.06, 1.0, 0.5, [0xf2f0ea, 0x8fb3d9, 0x1f2024, 0xbf3f3a, 0xe0b23a, 0x2f5d45, 0xd1495b, 0x7b2cbf][(k + Math.round(x)) & 7]); C.addCircle(O.x + x, O.z + z, 1.0, 2); spot(x, z - 1.2, 1.1, 'rack', lbl, { sub }); browse(x + 1.4, z - 1.0); }
+        if (wallRack) {
+          box(B, x, 1.6, z, 0.04, 0.04, along, 0x8e9093);
+          for (let k = 0; k < 8; k++) garment(x, z - along / 2 + 0.2 + k * 0.31, sub, COLS[(k * 3 + Math.round(z)) % COLS.length], false);
+          solid(x, z, 0.6, along, 2); spot(x + (x < 0 ? 1.1 : -1.1), z, 1.1, 'rack', lbl, { sub });
+          this.sign(R, lbl, x + (x < 0 ? 0.05 : -0.05), 2.35, z, x < 0 ? Math.PI / 2 : -Math.PI / 2, 2.2, accent);
+        } else {
+          box(B, x, 1.6, z, along, 0.04, 0.04, 0x8e9093); for (const e of [-1, 1]) box(B, x + e * along / 2, 0.8, z, 0.04, 1.6, 0.04, 0x8e9093);
+          for (let k = 0; k < 7; k++) garment(x - 0.9 + k * 0.3, z, sub, COLS[(k * 3 + Math.round(x)) % COLS.length], true);
+          C.addCircle(O.x + x, O.z + z, 1.0, 2); spot(x, z - 1.2, 1.1, 'rack', lbl, { sub }); browse(x + 1.4, z - 1.0);
+          box(B, x, 2.0, z, 0.03, 0.8, 0.03, 0x8e9093);
+          this.sign(R, lbl, x, 2.55, z - 0.02, Math.PI, 2.0, accent);
+        }
       }
       // mirror, trial rooms at the back, the till
       box(B, W / 2 - 0.05, 1.4, D - 2, 0.04, 2.2, 1.2, 0xbcd0dc);
@@ -446,11 +477,26 @@ export class Interiors {
     const mesh = new THREE.Mesh(B.build(), this.mat); mesh.receiveShadow = false; mesh.castShadow = false;
     const glow = GL.empty ? null : new THREE.Mesh(GL.build(), this.glowMat);
     const grp = new THREE.Group(); grp.add(mesh); if (glow) grp.add(glow); for (const d of R.dyn) grp.add(d);
+    for (const m of R.signs || []) grp.add(m);
     grp.visible = false;
     this.g.scene.add(grp);
     R.group = grp;
     this.rooms[dz.key] = R;
     return R;
+  }
+  // a printed sign: dark board, white capitals, a stripe in the shop's colour (both faces)
+  sign(R, text, x, y, z, ry, w = 2, accent = 0xc9a227) {
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 112;
+    const g = cv.getContext('2d');
+    g.fillStyle = '#16171b'; g.fillRect(0, 0, 512, 112);
+    g.fillStyle = '#' + accent.toString(16).padStart(6, '0'); g.fillRect(0, 98, 512, 14);
+    g.fillStyle = '#f4f2ee'; g.font = '700 46px Archivo, Inter, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(text.toUpperCase().replace(' AND ', ' & '), 256, 52, 490);
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 112 / 512), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, toneMapped: false }));
+    m.position.set(R.O.x + x, FLOOR + y, R.O.z + z); m.rotation.y = ry;
+    (R.signs || (R.signs = [])).push(m);
+    return m;
   }
   // today's menu, painted on the board behind the counter
   paintBoard(R, ctx) {

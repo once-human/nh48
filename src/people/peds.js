@@ -633,7 +633,7 @@ export class People {
     if (p.shoves === 1) this.say && this.say('cop_push', p);
     else if (p.shoves === 2) this.say && this.say('cop_warn', p);
     else if (p.shoves === 3) { this.say && this.say('cop_fine', p); if (pol) pol.charge('obstruct', 500, 'Obstructing a public servant'); }
-    else { this.startFight(p, P); this.say && this.say('cop_fight', p); if (pol) pol.raiseHeat(1, 'Shoving a traffic cop'); }
+    else { this.startFight(p, P); this.say && this.say('cop_fight', p); if (pol) pol.raiseHeat(1, 'Shoving a traffic cop', 'assault'); }
     if (this.brawl) this.brawl.g.events?.push?.({ type: 'copShoved', n: p.shoves });
   }
   // ---------------------------------------------------------------- fights (see fight.js)

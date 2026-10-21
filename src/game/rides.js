@@ -5,11 +5,13 @@ import { RNG, clamp, lerp } from '../core/util.js';
 import PAX from './pax_lines.json';
 const PERS_M = ['kaka', 'ajoba', 'dada', 'bhaiya', 'collegeboy'], PERS_F = ['kaku', 'aaji', 'tai', 'aunty', 'collegegirl'];
 
-export const TARIFF = { base: 30, baseKm: 1.5, perKm: 20 };
-export function fareFor(meters) {
+// No cap: a long ride is a long fare. Midnight to 5 am is 25% extra inside PMC/PCMC limits.
+export const TARIFF = { base: 30, baseKm: 1.5, perKm: 20, night: 1.25 };
+export const isNight = (hour) => hour >= 0 && hour < 5;
+export function fareFor(meters, hour = 12) {
   const km = meters / 1000;
-  if (km <= TARIFF.baseKm) return TARIFF.base;
-  return TARIFF.base + (km - TARIFF.baseKm) * TARIFF.perKm;
+  const f = km <= TARIFF.baseKm ? TARIFF.base : TARIFF.base + (km - TARIFF.baseKm) * TARIFF.perKm;
+  return f * (isNight(hour) ? TARIFF.night : 1);
 }
 
 // passenger lines: [romanised line, English gloss]
@@ -180,7 +182,7 @@ export class Rides {
       c.outT = 0;
       c.elapsed += dt;
       c.dist += Math.abs(P.v) * dt;
-      c.fare = fareFor(c.dist);
+      c.fare = fareFor(c.dist, g.hour);
       // reroute every few seconds
       c.rt -= dt;
       if (c.rt <= 0) { this.reroute(); c.rt = 2.5; }

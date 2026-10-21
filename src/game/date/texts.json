@@ -1,0 +1,44 @@
+{
+"en": {
+"t_hi": ["Hey, it's {name} from {place} :)", "Hi :) Got home safe. That was fun.", "So... what are you sending that's better than 'hi'? ;)"],
+"t_yes": ["Yes! {place}, in an hour?", "Okay, {place}. Don't be late this time.", "Perfect timing. {place}? I'm close."],
+"t_busy": ["Can't today, sorry! Tomorrow?", "Stuck at work :( Rain check?", "Family dinner tonight. Next time for sure."],
+"t_morning": ["Good morning! Don't skip breakfast.", "Woke up thinking about you. Weird. Good weird.", "Morning! It's raining here. Drive carefully."],
+"t_miss": ["Hey stranger. Did you forget about me?", "It's been days. I miss talking to you.", "Are we still a thing, or did you move to Bangalore?"],
+"t_angry": ["You were really late. Not cool.", "I waited. You didn't come. Okay.", "Don't text me tonight."],
+"t_jealous": ["So who's the new number? My friend saw you.", "Heard you were busy at the club. With someone.", "Interesting night out, I hear."],
+"t_tip": ["Nakabandi near the chowk tonight. Be careful.", "Petrol's cheaper at the pump near my place, fyi.", "There's a sale at the mall this weekend. Get yourself a nice shirt.", "My cousin says the station auto stand is busy tonight. Go earn!"],
+"t_food": ["You haven't eaten, have you. I left a dabba with your watchman. Eat.", "Ordered food for you. No arguments."],
+"t_naka": ["Police checking at the chowk. Wear your helmet.", "Cops on FC Road tonight. Don't do anything stupid."],
+"t_breakup": ["I think we should stop seeing each other. Take care.", "This isn't working. I'm sorry."],
+"t_afterdate": ["Reached home. Tonight was really nice :)", "Still smiling. That's your fault.", "Thanks for tonight. Next one's on me."]
+},
+"hi": {
+"t_hi": [["Hii, {name} hoon. {place} {wali|wala} :)", "Hi, it's {name}. From {place} :)"], ["Ghar pahunch {gayi|gaya}. Maza aaya aaj :)", "Got home. Today was fun :)"], ["Toh... 'hi' se accha kya bhejoge? ;)", "So... what are you sending that's better than 'hi'? ;)"]],
+"t_yes": [["Haan! {place}, ek ghante mein?", "Yes! {place}, in an hour?"], ["Theek hai, {place}. Is baar late mat hona.", "Okay, {place}. Don't be late this time."], ["Perfect timing. {place}? Main paas hi hoon.", "Perfect timing. {place}? I'm close by."]],
+"t_busy": [["Aaj nahin ho payega yaar, kal?", "Can't today, tomorrow?"], ["Office mein {phansi|phansa} hoon :( baad mein?", "Stuck at the office :( later?"], ["Aaj ghar pe dinner hai. Next time pakka.", "Family dinner tonight. Next time for sure."]],
+"t_morning": [["Good morning! Naashta skip mat karna.", "Good morning! Don't skip breakfast."], ["Uthte hi tumhara khayal aaya. Ajeeb. Accha ajeeb.", "Woke up thinking of you. Weird. Good weird."], ["Baarish ho rahi hai, dhyaan se chalana.", "It's raining, drive carefully."]],
+"t_miss": [["Kahan gaayab ho? Bhool {gaye|gayi} kya?", "Where have you vanished? Forgot me?"], ["Kitne din ho gaye. Baat karne ka mann hai.", "It's been days. I want to talk."], ["Hum abhi bhi saath hain ya Bangalore shift ho {gaye|gayi}?", "Are we still a thing, or did you move to Bangalore?"]],
+"t_angry": [["Itna late? Not cool.", "That late? Not cool."], ["Main wait {karti rahi|karta raha}. Tum nahin {aaye|aayi}. Theek hai.", "I waited. You didn't come. Fine."], ["Aaj raat message mat karna.", "Don't text me tonight."]],
+"t_jealous": [["Naya number kiska hai? Meri friend ne dekha.", "Whose new number is that? My friend saw."], ["Suna club mein busy {the|thi}. Kisi ke saath.", "Heard you were busy at the club. With someone."], ["Interesting raat thi, suna maine.", "Interesting night, I heard."]],
+"t_tip": [["Aaj chowk pe nakabandi hai. Dhyaan rakhna.", "Nakabandi at the chowk tonight. Be careful."], ["Mere ghar ke paas waale pump pe petrol sasta hai, fyi.", "Petrol's cheaper at the pump near my place, fyi."], ["Mall mein sale hai is weekend. Ek acchi shirt le lo.", "There's a sale at the mall this weekend. Get a nice shirt."], ["Station pe aaj autos ki demand hai. Jao kamao!", "Autos are in demand at the station tonight. Go earn!"]],
+"t_food": [["Kuch khaaya nahin na? Watchman ke paas dabba rakha hai. Khao.", "You haven't eaten, have you? Left a dabba with your watchman. Eat."], ["Tumhare liye khaana order kiya hai. Koi bahas nahin.", "Ordered food for you. No arguments."]],
+"t_naka": [["Chowk pe police checking hai. Helmet pehenna.", "Police checking at the chowk. Wear your helmet."], ["FC Road pe aaj police hai. Kuch ulta seedha mat karna.", "Cops on FC Road tonight. Don't do anything stupid."]],
+"t_breakup": [["Mujhe lagta hai ab humein milna band karna chahiye. Khayal rakhna.", "I think we should stop seeing each other. Take care."], ["Ye kaam nahin kar raha. Sorry.", "This isn't working. Sorry."]],
+"t_afterdate": [["Ghar pahunch {gayi|gaya}. Aaj bahut accha laga :)", "Got home. Today was really nice :)"], ["Abhi tak muskura {rahi|raha} hoon. Tumhari galti hai.", "Still smiling. Your fault."], ["Aaj ke liye thanks. Agli baar meri treat.", "Thanks for today. Next one's my treat."]]
+},
+"mr": {
+"t_hi": [["Hii, {name} aahe. {place} {madhli|madhla} :)", "Hi, it's {name}, from {place} :)"], ["Ghari {pochle|pochlo}. Aaj maja aali :)", "Got home. Today was fun :)"], ["Mag... 'hi' peksha bhaari kaay paathavnaar? ;)", "So... what are you sending that's better than 'hi'? ;)"]],
+"t_yes": [["Ho! {place}, taasabharaat?", "Yes! {place}, in an hour?"], ["Bara, {place}. Ya veli ushir nako.", "Okay, {place}. Don't be late this time."], ["Perfect. {place}? Mi javalch aahe.", "Perfect. {place}? I'm close."]],
+"t_busy": [["Aaj nahi jamnaar {re|ga}, udya?", "Can't make it today, tomorrow?"], ["Office madhye {adakley|adakloy} :( nantar?", "Stuck at the office :( later?"], ["Aaj ghari jevan aahe. Pudhchya veli nakki.", "Family dinner tonight. Next time for sure."]],
+"t_morning": [["Good morning! Naashta chukvu nakos.", "Good morning! Don't skip breakfast."], ["Uthlyaa uthlyaa tujhi aathvan aali. Vichitra. Chaangla vichitra.", "Woke up thinking of you. Weird. Good weird."], ["Paus padtoy, gaadi saavkaash chaalav.", "It's raining, drive slowly."]],
+"t_miss": [["Kuthe gaayab? {Visarlaas|Visarlis} ki kaay?", "Where did you vanish? Forgot me?"], ["Kiti divas jhaale. Bolaavasa vaattay.", "It's been days. I want to talk."], ["Aapan ajun sobat aahot ki tu Bangalore la {gelaas|gelis}?", "Are we still a thing, or did you move to Bangalore?"]],
+"t_angry": [["Evdha ushir? Not cool.", "That late? Not cool."], ["Mi vaat baghat {basle|baslo}. Tu {aala|aali} naahis. Theek aahe.", "I waited. You didn't come. Fine."], ["Aaj raatri message karu nakos.", "Don't text me tonight."]],
+"t_jealous": [["Navin number konacha? Maajhya maitrini ne paahila.", "Whose new number is that? My friend saw."], ["Aikla club madhye busy {hotaas|hotis}. Konaatari barobar.", "Heard you were busy at the club. With someone."], ["Interesting raatra hoti, aikla mi.", "Interesting night, I heard."]],
+"t_tip": [["Aaj chowkaat nakabandi aahe. Jara jaapun.", "Nakabandi at the chowk tonight. Careful."], ["Maajhya gharajavalchya pump var petrol swasta aahe, fyi.", "Petrol's cheaper at the pump near my place, fyi."], ["Mall madhye sale aahe ya weekend la. Ek chhaan shirt ghe.", "There's a sale at the mall this weekend. Get a nice shirt."], ["Station la aaj rikshaanna demand aahe. Ja, kamav!", "Autos are in demand at the station tonight. Go earn!"]],
+"t_food": [["Kaahi khaalla naahis na? Watchman kade dabba thevlaay. Khaa.", "You haven't eaten, have you? Left a dabba with your watchman. Eat."], ["Tujhyaasaathi jevan order kelay. Vaad naahi.", "Ordered food for you. No arguments."]],
+"t_naka": [["Chowkaat police checking aahe. Helmet ghaal.", "Police checking at the chowk. Wear your helmet."], ["FC Road la aaj police aahet. Kaahi ulta-seedha karu nakos.", "Cops on FC Road tonight. Don't do anything stupid."]],
+"t_breakup": [["Mala vaatta aapan aata bhetna thaambavaava. Kaalji ghe.", "I think we should stop seeing each other. Take care."], ["He jamat naahiye. Sorry.", "This isn't working. Sorry."]],
+"t_afterdate": [["Ghari {pochle|pochlo}. Aaj khup chhaan vaatla :)", "Got home. Today was really nice :)"], ["Ajun {hastey|hastoy}. Tujhi chuk aahe.", "Still smiling. Your fault."], ["Aajchyaasaathi thanks. Pudhchya veli maajhyakadun.", "Thanks for today. Next one's on me."]]
+}
+}

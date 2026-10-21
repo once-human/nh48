@@ -147,7 +147,7 @@ export class Life {
   get charm() {
     const s = this.s, st = this.style(), d = s.drunk;
     const drink = d > 0.15 && d < 0.5 ? 0.12 : d >= 0.7 ? -0.22 : 0;
-    return clamp(0.35 + (st.score - 0.6) * 0.5 + (s.mood - 0.5) * 0.25 + (s.charmBoost || 0) + drink + Math.max(0, s.respect) / 400, 0, 1);
+    return clamp(0.35 + (st.score - 0.6) * 0.5 + (s.mood - 0.5) * 0.25 + (s.charmBoost || 0) + (s.partnerConf || 0) + drink + Math.max(0, s.respect) / 400, 0, 1);
   }
   // tiredness, hunger and drink as gameplay
   get sprintMul() { const s = this.s; return (s.energy < 0.15 ? 0.75 : 1) * (s.hunger < 0.08 ? 0.85 : 1) * (s.drunk > 0.6 ? 0.85 : 1); }

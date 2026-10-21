@@ -131,7 +131,7 @@ export class HUD {
           <span class="keys">
             <span><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> drive / walk</span>
             <span><span class="kbd">Space</span> handbrake · jump / climb</span><span><span class="kbd">F</span> get in / out · shops · talk</span><span><span class="kbd">Click</span> punch</span><span><span class="kbd">C</span> roll</span><span><span class="kbd">E</span> backpack</span>
-            <span><span class="kbd">H</span> horn</span><span><span class="kbd">V</span> camera</span><span><span class="kbd">M</span> map</span><span><span class="kbd">Esc</span> pause</span>
+            <span><span class="kbd">H</span> horn</span><span><span class="kbd">C</span> camera (driving)</span><span><span class="kbd">M</span> map</span><span><span class="kbd">Esc</span> pause</span>
           </span>
           <span>Map data © OpenStreetMap contributors (ODbL), Overture Maps Foundation. Businesses are parodies.</span>
         </div>
@@ -290,6 +290,7 @@ export class HUD {
       <div class="sheet" role="dialog" aria-label="Paused">
         <h2>Paused <span lang="mr">थांबा</span></h2>
         <div class="row2"><button class="btn primary" id="p-resume">Resume</button><button class="btn" id="p-map">Map</button></div>
+        <button class="btn" id="p-guide">Guide: places, money, police, dating</button>
         <div class="sec" id="p-ch"><div class="cap">E-challans</div>
           <div class="ch-row"><div><div class="ch-amt num" id="p-ch-amt">₹0</div><div class="note" id="p-ch-note">Nothing pending</div></div>
           <button class="btn" id="p-ch-pay">Pay all</button></div>
@@ -306,7 +307,7 @@ export class HUD {
             <span class="k"><span class="kbd">A</span><span class="kbd">D</span></span><span>Steer</span>
             <span class="k"><span class="kbd">Space</span></span><span>Handbrake · on foot: jump, or climb a wall you face</span>
             <span class="k"><span class="kbd">H</span></span><span>Horn</span>
-            <span class="k"><span class="kbd">V</span><span class="kbd">B</span></span><span>Camera · look back</span>
+            <span class="k"><span class="kbd">C</span><span class="kbd">V</span><span class="kbd">B</span></span><span>Camera view (C while driving, V anytime) · look back</span>
             <span class="k"><span class="kbd">R</span></span><span>Back on the road</span>
             <span class="k"><span class="kbd">F</span></span><span>Get out · get in or take a vehicle</span>
             <span class="k"><span class="kbd">Shift</span><span class="kbd">Alt</span></span><span>Sprint · walk (on foot)</span>
@@ -331,7 +332,8 @@ export class HUD {
     this.root.appendChild(p);
     this.pause = p;
     p.addEventListener('click', (e) => { if (e.target === p) this.game.togglePause(false); });
-    p.querySelector('#p-resume').onclick = () => this.game.togglePause(false);
+    p.querySelector('#p-resume').onclick = () => { this.game.togglePause(false); this.game.lockMouse?.(); this.game.goFullscreen?.(); };
+    p.querySelector('#p-guide').onclick = () => { this.game.togglePause(false); this.game.bag.show('guide'); this.game.lockMouse?.(); };
     p.querySelector('#p-map').onclick = () => { this.game.togglePause(false); this.game.toggleMap(true); };
     p.querySelector('#p-title').onclick = () => { this.game.endShift(); this.syncTitle(); };
     p.querySelector('#p-char').onclick = () => this.showPicker();

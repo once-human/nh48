@@ -92,12 +92,15 @@ for (const f of fs.readdirSync(path.join(root, 'assets'))) {
 const voiceDir = path.join(root, 'assets/voice');
 const voiceIndex = {};
 if (fs.existsSync(voiceDir)) {
-  const parts = []; let off = 0;
+  // three packs: the street, police and passengers load with the game; the shopkeepers (k_) and the
+  // people you talk to (d_) arrive in the background once you're playing
+  const packOf = (id) => id.startsWith('d_') ? 2 : id.startsWith('k_') ? 1 : 0, names = ['voices.mp3', 'voices_k.mp3', 'voices_d.mp3'];
+  const parts = [[], [], []], off = [0, 0, 0];
   for (const f of fs.readdirSync(voiceDir).filter(f => f.endsWith('.mp3')).sort()) {
-    const b = fs.readFileSync(path.join(voiceDir, f));
-    voiceIndex[f.replace(/\.mp3$/, '')] = [off, b.length]; parts.push(b); off += b.length;
+    const b = fs.readFileSync(path.join(voiceDir, f)), id = f.replace(/\.mp3$/, ''), k = packOf(id);
+    voiceIndex[id] = k ? [off[k], b.length, k] : [off[k], b.length]; parts[k].push(b); off[k] += b.length;
   }
-  fs.writeFileSync(path.join(dist, 'assets/voices.mp3'), Buffer.concat(parts));
+  names.forEach((n, k) => fs.writeFileSync(path.join(dist, 'assets', n), Buffer.concat(parts[k])));
   fs.rmSync(path.join(dist, 'assets/voice'), { recursive: true, force: true });
 }
 // manifest with byte sizes (honest progress bar)

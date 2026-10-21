@@ -7,9 +7,10 @@ import { KIND_INFO, fmt, lookFromJSON } from './shops.js';
 import { PROPERTIES } from './props.js';
 import { icon, ITEM_ICON } from '../ui/icons.js';
 import { KbNav } from '../ui/kbnav.js';
+import { guideHTML } from './guide.js';
 import { levelOf } from './date.js';
 
-const TABS = [['bag', 'Bag', 'झोळी'], ['me', 'Me', 'मी'], ['wear', 'Wardrobe', 'कपडे'], ['own', 'Owned', 'माझं'], ['near', 'Nearby', 'जवळ'], ['ppl', 'People', 'लोक']];
+const TABS = [['bag', 'Bag', 'झोळी'], ['me', 'Me', 'मी'], ['wear', 'Wardrobe', 'कपडे'], ['own', 'Owned', 'माझं'], ['near', 'Nearby', 'जवळ'], ['ppl', 'People', 'लोक'], ['guide', 'Guide', 'माहिती']];
 const GROUPS = [['food', 'Food'], ['night', 'Night'], ['look', 'Look'], ['health', 'Health'], ['money', 'Money'], ['things', 'Shops'], ['vehicle', 'Vehicles'], ['place', 'Places'], ['homes', 'Homes for sale']];
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -122,6 +123,8 @@ export class Bag {
         h += this.row(c.partner ? 'health' : 'phone', c.name, note, pend && pend.ct === c ? 'On the way' : 'Ask to meet', pend && pend.ct === c ? null : 'meet', c.name, c.partner ? 'partner' : '');
       }
       if (cs.length) h += `<p class="jh-empty">They pick a café nearby. Be there within a few hours. Bring a gajra, sweets or a book if you have one.</p>`;
+    } else if (this.tab === 'guide') {
+      h += `<div class="guide">${guideHTML()}</div>`;
     } else if (this.tab === 'near') {
       h += `<div class="jh-chips sel">${GROUPS.map(([k, l]) => `<button data-g="${k}" aria-pressed="${k === this.group}">${l}</button>`).join('')}</div>`;
       const P = G.player;

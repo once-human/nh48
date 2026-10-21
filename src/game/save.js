@@ -28,7 +28,7 @@ export function snapshot(G) {
     veh: P.mode === 'veh' ? vehOf(P.cur, A) : null,
     auto: { x: r2(A.x), z: r2(A.z), th: r2(A.th), towed: d && d.towed ? d.towed : null, towedAt: G.police.towedAt || null },
     dropped: P.dropped.filter(q => q.veh !== A).map(q => vehOf(q.veh, A)),
-    heat: G.police.heat || 0, hp: Math.round(P.hp ?? 100),
+    heat: G.police.heat || 0, charges: [...(G.police.charges || [])], hp: Math.round(P.hp ?? 100),
     waypoint: G.waypoint ? { x: G.waypoint.x, z: G.waypoint.z, name: G.waypoint.name || '' } : null,
   };
 }
@@ -79,7 +79,7 @@ export function restore(G, s, Vehicle) {
     try { P.switchTo(make(s.veh)); } catch (e) { /* stay on foot */ }
   }
   if (s.waypoint) G.setWaypoint(s.waypoint);
-  G.pendingHeat = s.heat || 0;
+  G.pendingHeat = s.heat || 0; G.pendingCharges = s.charges || [];
 }
 
 export function wipe() {

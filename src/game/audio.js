@@ -40,7 +40,8 @@ export class Audio {
   }
   async decodeAll() {
     const ctx = this.ctx;
-    await Promise.all(Object.entries(this.raw).map(async ([k, ab]) => {
+    // voice lines decode when first spoken (thousands of them; decoding all would cost seconds and memory)
+    await Promise.all(Object.entries(this.raw).filter(([k]) => !k.startsWith('v_')).map(async ([k, ab]) => {
       try { this.buf[k] = await ctx.decodeAudioData(ab.slice(0)); } catch (e) { /* unsupported codec: that sound stays silent */ }
     }));
     this.startLoops();
@@ -102,12 +103,35 @@ export class Audio {
     if (busy && (pri === 0 || (pri < 2 && pri <= this.voicePri))) return false;
     // after someone has spoken, a breath of quiet before the next bit of idle chatter
     if (pri === 0 && this.voiceEnd && now < this.voiceEnd + 2.5) return false;
+    const name = 'v_' + id;
+    if (!this.buf[name]) {
+      const raw = this.raw[name];
+      if (!raw) return false;
+      this.decoding = this.decoding || {};
+      if (!this.decoding[name]) {
+        this.decoding[name] = true;
+        const asked = now;
+        this.ctx.decodeAudioData(raw.slice(0)).then((b) => {
+          this.buf[name] = b; this.keepVoice(name);
+          if (this.ctx.currentTime - asked < 1.2) this.voice(id, vol, pan, radio, pri);
+        }).catch(() => { /* bad clip: stays silent */ }).finally(() => { delete this.decoding[name]; });
+      }
+      return true;
+    }
+    this.keepVoice(name);
     if (this.curVoice) { try { this.curVoice.g.gain.setTargetAtTime(0, now, 0.04); this.curVoice.src.stop(now + 0.15); } catch (e) { /* already stopped */ } }
     const v = this.play('v_' + id, { vol: 0.95 * vol, pan, filter: radio ? { type: 'bandpass', f: 1500, q: 0.9 } : undefined });
     if (!v) return false;
     this.curVoice = v; this.voicePri = pri; this.voiceEnd = now + v.src.buffer.duration;
     this.duck(radio ? 0.75 : 0.55, Math.min(4, v.src.buffer.duration + 0.3));
     return true;
+  }
+  // keep the most recent ~180 decoded lines, drop the oldest
+  keepVoice(name) {
+    const o = this.vOrder || (this.vOrder = []);
+    const i = o.indexOf(name); if (i >= 0) o.splice(i, 1);
+    o.push(name);
+    while (o.length > 180) { const old = o.shift(); if (!this.curVoice || this.curVoice.src.buffer !== this.buf[old]) delete this.buf[old]; }
   }
   voiceBusy() { return !!(this.ctx && this.curVoice && this.ctx.currentTime < this.voiceEnd - 0.15); }
   // street ambience dips while someone speaks

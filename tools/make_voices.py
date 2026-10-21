@@ -64,17 +64,26 @@ for kind, (voice, lang, tempo) in shopl['_voice'].items():
             lid = f'k_{kind}_{sc}{i}'
             jobs.append((lid, voice, lang, deva)); shape[lid] = (1.0, tempo)
 
-# people you talk to (clubs, dates): every line in a woman's and a man's voice
-dl = json.load(open(os.path.join(ROOT, 'src/game/date_lines.json')))
-for key, arr in dl.items():
-    if key.startswith('_'): continue
-    for i, t in enumerate(arr):
-        jobs.append((f'd_f_{key}{i}', 'hf_beta', 'en-us', t)); shape[f'd_f_{key}{i}'] = (1.0, 1.04)
-        jobs.append((f'd_m_{key}{i}', 'hm_psi', 'en-us', t)); shape[f'd_m_{key}{i}'] = (1.0, 1.02)
+# people you talk to (clubs, dates): every line in a woman's and a man's voice, in the speaker's language;
+# {woman|man} picks the gendered form
+import re
+def gform(t, f): return re.sub(r'\{([^{}|]*)\|([^{}|]*)\}', lambda m: m.group(1) if f else m.group(2), t)
+DV = {'f': {'en': ('hf_beta', 'en-us', 1.04), 'hi': ('hf_beta', 'hi', 1.04), 'mr': ('mr0', 'mr', 1.0)},
+      'm': {'en': ('hm_psi', 'en-us', 1.02), 'hi': ('hm_omega', 'hi', 1.0), 'mr': ('hm_psi', 'mr', 1.0)}}
+for lang in ('en', 'hi', 'mr'):
+    dl = json.load(open(os.path.join(ROOT, f'src/game/date/{lang}.json')))
+    for key, arr in dl.items():
+        for i, row in enumerate(arr):
+            for sx in ('f', 'm'):
+                voice, vl, tempo = DV[sx][lang]
+                text = gform(row[0] if isinstance(row, list) else row, sx == 'f')
+                lid = f'd_{sx}_{lang}_{key}{i}'
+                jobs.append((lid, voice, vl, text)); shape[lid] = (1.0, tempo)
 
 def af_for(lid): return lid
 for lid, voice, lang, tts in jobs:
     if only and lid not in only and not any(lid.startswith(o) for o in only): continue
+    if os.path.exists(os.path.join(OUT, lid + '.mp3')) and not os.environ.get('FORCE'): continue
     tmp = tempfile.mktemp(suffix='.wav')
     if voice.startswith('mr'): piper(tts, int(voice[2:]), tmp)
     else: kokoro(tts, voice, lang, tmp)

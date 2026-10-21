@@ -65,7 +65,7 @@ const SHOPS = [
 ];
 
 const EARN_LEGAL = [
-  ['Auto shifts', 'Get into any auto and you’re on shift. People waving for one show up green on the map. Pick them up, drive them on the meter, get rated. Tips go up with your rating and your charm.'],
+  ['Auto shifts', 'Get into any auto and you’re on shift. People waving for one show up green on the map. Pick them up, drive them on the meter (₹30 for the first 1.5 km, ₹20 a km after, 25% more from midnight to 5 am, no cap), get rated. Tips go up with your rating and your charm.'],
   ['Zwiggy deliveries', 'Buy a smartphone at a mobile shop. Your phone pings with orders (Y accepts): pick up at a real restaurant, drop at the door.'],
   ['Rent out a home', 'Buy a home and rent it out from the estate agent or your Owned tab. Rent arrives every day.'],
   ['Bank interest', 'A small amount every day on what’s in the bank.'],
@@ -73,7 +73,7 @@ const EARN_LEGAL = [
   ['Lottery', 'From any kirana. Scratch it in your jhola. Usually nothing.'],
 ];
 const EARN_ILLEGAL = [
-  ['Steal a vehicle', 'Walk up to a parked or stopped vehicle and take it (F). Beat marshals come looking (up to three stars); get caught and it’s bail, ₹5,000.'],
+  ['Steal a vehicle', 'Walk up to a parked or stopped vehicle and take it (F). Beat marshals come looking (up to three stars); get caught and it’s bail, ₹5,000. The police always know what you did: theft, hitting someone and driving off, beating someone up, laying a hand on a cop, running from custody, each booked under its own section with its own bail.'],
   ['Chai-pani', 'When a traffic cop stops you, a “chai-pani” sometimes makes the challan go away. Sometimes he’s honest, and then it costs more.'],
   ['Skip the challan', 'Drive off when waved over. It doubles, and the number is noted.'],
 ];
@@ -97,9 +97,9 @@ const PEOPLE = [
 ];
 
 const CONTROLS = [
-  ['W A S D', 'Walk or drive'], ['Mouse', 'Look around (click the game to capture the mouse)'], ['Click', 'Punch'], ['C', 'Roll'], ['Space', 'Handbrake; on foot, jump or climb'], ['Shift / Alt', 'Sprint / walk'], ['X', 'Punch (also)'],
-  ['F', 'Interact, enter, get in or out'], ['E', 'Jhola'], ['Tab', 'Your stats'], ['M', 'Map (or tap the minimap)'], ['H', 'Horn'], ['V', 'Camera'], ['B', 'Look back'],
-  ['R', 'Back on the road'], ['Y', 'Accept a delivery'], ['1 to 8', 'Choose what to say'], ['Esc', 'Pause'], ['F3', 'Performance info'],
+  ['W A S D', 'Walk or drive'], ['Mouse', 'Look around (the game keeps the mouse; any key or click takes it back)'], ['Click', 'Punch'], ['C', 'On foot: roll. Driving: change camera'], ['Space', 'Handbrake; on foot, jump or climb'], ['Shift / Alt', 'Sprint / walk'], ['X', 'Punch (also)'],
+  ['F', 'Interact, enter, get in or out'], ['E', 'Jhola'], ['Tab', 'Your stats'], ['M', 'Map (or tap the minimap)'], ['H', 'Horn'], ['V', 'Camera (anytime)'], ['B', 'Look back'],
+  ['R', 'Back on the road'], ['Y', 'Accept a delivery'], ['1 to 9, W/S, Enter', 'Pick in any menu'], ['Esc or F', 'Close any menu'], ['Esc', 'Pause (the only time you get a cursor)'], ['F3', 'Performance info'],
 ];
 
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

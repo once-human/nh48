@@ -1,0 +1,1297 @@
+{
+"open_club": [
+[
+"हाय! सॉरी, यहाँ बहुत शोर है।",
+"Hi! Sorry, yahaan bahut shor hai.",
+"Hi! Sorry, it's really loud here."
+],
+[
+"अरे, तुम डांस क्यों नहीं कर {रहे|रही}?",
+"Arre, tum dance kyun nahin kar {rahe|rahi}?",
+"Hey, why aren't you dancing?"
+],
+[
+"हैलो! तुम भी बर्थडे वाले ग्रुप के साथ हो?",
+"Hello! Tum bhi birthday waale group ke saath ho?",
+"Hello! Are you with the birthday group too?"
+],
+[
+"दस मिनट से वहीं {खड़े|खड़ी} हो। हाय।",
+"Das minute se wahin {khade|khadi} ho. Hi.",
+"You've been standing there ten minutes. Hi."
+],
+[
+"ये डीजे तो सच में अच्छा है, है ना?",
+"Ye DJ toh sach mein accha hai, hai na?",
+"This DJ is actually good, isn't he?"
+]
+],
+"open_cafe": [
+[
+"ओह, हाय। यहाँ कोई बैठा है? नहीं? ठीक है।",
+"Oh, hi. Yahaan koi baitha hai? Nahin? Theek hai.",
+"Oh, hi. Is anyone sitting here? No? Okay."
+],
+[
+"हाय! सॉरी, मैं कब से मेन्यू ही देख {रही|रहा} हूँ।",
+"Hi! Sorry, main kab se menu hi dekh {rahi|raha} hoon.",
+"Hi! Sorry, I've been staring at the menu forever."
+],
+[
+"तुम्हें पता है यहाँ क्या अच्छा मिलता है?",
+"Tumhe pata hai yahaan kya accha milta hai?",
+"Do you know what's good here?"
+],
+[
+"मैंने तुम्हें पहले भी यहाँ देखा है ना?",
+"Maine tumhe pehle bhi yahaan dekha hai na?",
+"I've seen you here before, haven't I?"
+],
+[
+"लैपटॉप पे मत जाओ, मैं बस काम करने का नाटक कर {रही|रहा} हूँ।",
+"Laptop pe mat jao, main bas kaam karne ka naatak kar {rahi|raha} hoon.",
+"Don't mind the laptop, I'm just pretending to work."
+]
+],
+"open_food": [
+[
+"तुम्हारा ऑर्डर भी अभी तक नहीं आया?",
+"Tumhara order bhi abhi tak nahin aaya?",
+"Your order hasn't come yet either?"
+],
+[
+"ये जगह हमेशा भरी रहती है, पर खाना कमाल है।",
+"Ye jagah hamesha bhari rehti hai, par khaana kamaal hai.",
+"This place is always packed, but the food is amazing."
+],
+[
+"सॉरी, ये तुम्हारी टेबल है? मैं हट {जाती|जाता} हूँ।",
+"Sorry, ye tumhari table hai? Main hat {jaati|jaata} hoon.",
+"Sorry, is this your table? I'll move."
+],
+[
+"तीखा वाला मँगाया? बहादुर हो।",
+"Teekha waala mangaaya? Bahaadur ho.",
+"You ordered the spicy one? Brave."
+],
+[
+"पहली बार {आए|आई} हो यहाँ?",
+"Pehli baar {aaye|aayi} ho yahaan?",
+"First time here?"
+]
+],
+"open_guarded": [
+[
+"हाय? मैं आपको {जानती|जानता} हूँ क्या?",
+"Hi? Main aapko {jaanti|jaanta} hoon kya?",
+"Hi? Do I know you?"
+],
+[
+"मैं अपने दोस्तों का इंतज़ार कर {रही|रहा} हूँ।",
+"Main apne doston ka intezaar kar {rahi|raha} hoon.",
+"I'm waiting for my friends."
+],
+[
+"अच्छा... हाय। बोलो?",
+"Accha... hi. Bolo?",
+"Okay... hi. Yes?"
+],
+[
+"जल्दी बोलो, खाना ठंडा हो रहा है।",
+"Jaldi bolo, khaana thanda ho raha hai.",
+"Say it quick, my food's getting cold."
+],
+[
+"जी? कहिए।",
+"Ji? Kahiye.",
+"Yes? Go on."
+]
+],
+"place_club": [
+[
+"हर शनिवार वही पाँच गाने बजते हैं, फिर भी मैं {नाचती|नाचता} हूँ।",
+"Har Shanivaar wahi paanch gaane bajte hain, phir bhi main {naachti|naachta} hoon.",
+"Every Saturday it's the same five songs, and I still dance."
+],
+[
+"दोस्त ज़बरदस्ती लाए थे। अब शिकायत नहीं है।",
+"Dost zabardasti laaye the. Ab shikaayat nahin hai.",
+"My friends dragged me here. No complaints now."
+],
+[
+"बार में बहुत टाइम लगता है, पर म्यूज़िक सब भुला देता है।",
+"Bar mein bahut time lagta hai, par music sab bhula deta hai.",
+"The bar takes ages, but the music makes up for it."
+]
+],
+"place_cafe": [
+[
+"यहाँ की कोल्ड कॉफ़ी सब ठीक कर देती है।",
+"Yahaan ki cold coffee sab theek kar deti hai.",
+"The cold coffee here fixes everything."
+],
+[
+"पढ़ने {आती|आता} हूँ, और लोगों को देखने में लग {जाती|जाता} हूँ।",
+"Padhne {aati|aata} hoon, aur logon ko dekhne mein lag {jaati|jaata} hoon.",
+"I come here to read and end up people watching."
+],
+[
+"शाम को यहाँ पुराने गाने बजते हैं। बेस्ट।",
+"Shaam ko yahaan puraane gaane bajte hain. Best.",
+"In the evening they play old songs here. The best."
+]
+],
+"place_food": [
+[
+"इनकी मिसल से आग लग जाए। मुझे बहुत पसंद है।",
+"Inki misal se aag lag jaaye. Mujhe bahut pasand hai.",
+"Their misal could start a fire. I love it."
+],
+[
+"कॉलेज से यहाँ आ {रही|रहा} हूँ। कुछ नहीं बदला।",
+"College se yahaan aa {rahi|raha} hoon. Kuch nahin badla.",
+"I've been coming here since college. Nothing's changed."
+],
+[
+"काउंटर वाले अंकल को मेरा ऑर्डर याद है। यही प्यार है।",
+"Counter waale uncle ko mera order yaad hai. Yahi pyaar hai.",
+"The uncle at the counter remembers my order. That's love."
+]
+],
+"job": [
+[
+"मैं यूएक्स डिज़ाइनर हूँ। ऐप्स को कम कन्फ़्यूज़िंग {बनाती|बनाता} हूँ।",
+"Main UX designer hoon. Apps ko kam confusing {banaati|banaata} hoon.",
+"I'm a UX designer. I make apps less confusing."
+],
+[
+"बाणेर के एक स्टार्टअप में कोड {लिखती|लिखता} हूँ। नींद के बारे में मत पूछो।",
+"Baner ke ek startup mein code {likhti|likhta} hoon. Neend ke baare mein mat poochho.",
+"I write code at a startup in Baner. Don't ask about sleep."
+],
+[
+"बीजे में मेडिकल स्टूडेंट हूँ। लाइब्रेरी ही मेरा घर है।",
+"BJ mein medical student hoon. Library hi mera ghar hai.",
+"Medical student at BJ. The library is my home."
+],
+[
+"सीए आर्टिकलशिप कर {रही|रहा} हूँ। टैक्स सीज़न कभी ख़त्म नहीं होता।",
+"CA articleship kar {rahi|raha} hoon. Tax season kabhi khatam nahin hota.",
+"Doing my CA articleship. Tax season never ends."
+],
+[
+"आर्किटेक्ट हूँ। इस शहर की हर बिल्डिंग को जज {करती|करता} हूँ।",
+"Architect hoon. Is shehar ki har building ko judge {karti|karta} hoon.",
+"I'm an architect. I judge every building in this city."
+],
+[
+"डांस {सिखाती|सिखाता} हूँ। सुबह कथक, शाम को बॉलीवुड।",
+"Dance {sikhaati|sikhaata} hoon. Subah Kathak, shaam ko Bollywood.",
+"I teach dance. Kathak in the morning, Bollywood in the evening."
+],
+[
+"घर से छोटी सी बेकरी {चलाती|चलाता} हूँ। केक चाहिए तो बोलना।",
+"Ghar se chhoti si bakery {chalaati|chalaata} hoon. Cake chahiye toh bolna.",
+"I run a little home bakery. Want a cake, just ask."
+],
+[
+"सिम्बायोसिस में एमबीए कर {रही|रहा} हूँ। प्रेज़ेंटेशन ज़्यादा, नींद कम।",
+"Symbiosis mein MBA kar {rahi|raha} hoon. Presentation zyaada, neend kam.",
+"Doing an MBA at Symbiosis. More presentations, less sleep."
+]
+],
+"area": [
+[
+"कोथरूड। असली वाला कोथरूड।",
+"Kothrud. Asli waala Kothrud.",
+"Kothrud. The real Kothrud."
+],
+[
+"बाणेर। जहाँ हर सड़क हमेशा खुदी रहती है।",
+"Baner. Jahaan har sadak hamesha khudi rehti hai.",
+"Baner. Where every road is always dug up."
+],
+[
+"कैंप। बेकरी सबसे अच्छी, पार्किंग सबसे बुरी।",
+"Camp. Bakery sabse acchi, parking sabse buri.",
+"Camp. Best bakeries, worst parking."
+],
+[
+"सदाशिव पेठ। हँसना मत।",
+"Sadashiv Peth. Hansna mat.",
+"Sadashiv Peth. Don't laugh."
+],
+[
+"विमान नगर। बालकनी से प्लेन की आवाज़ आती है।",
+"Viman Nagar. Balcony se plane ki aawaaz aati hai.",
+"Viman Nagar. I can hear the planes from my balcony."
+],
+[
+"औंध। शांत, हरा-भरा, एकदम परफ़ेक्ट।",
+"Aundh. Shaant, hara-bhara, ekdum perfect.",
+"Aundh. Quiet, green, just perfect."
+]
+],
+"likes_music": [
+[
+"अरिजीत जब उदास {होती|होता} हूँ, एपी ढिल्लों जब नहीं।",
+"Arijit jab udaas {hoti|hota} hoon, AP Dhillon jab nahin.",
+"Arijit when I'm sad, AP Dhillon when I'm not."
+],
+[
+"जितने कॉन्सर्ट हो सकें, {जाती|जाता} हूँ। एनएच सेवन तो ज़िंदगी थी।",
+"Jitne concert ho sakein, {jaati|jaata} hoon. NH7 toh zindagi thi.",
+"I go to every concert I can. NH7 was life."
+],
+[
+"थोड़ा गिटार {बजाती|बजाता} हूँ। बुरा, पर दिल से।",
+"Thoda guitar {bajaati|bajaata} hoon. Bura, par dil se.",
+"I play a bit of guitar. Badly, but with heart."
+]
+],
+"likes_food": [
+[
+"खाने की बात? बेडेकर या काटाकिर, अभी फ़ैसला करो।",
+"Khaane ki baat? Bedekar ya Katakir, abhi faisla karo.",
+"Food? Bedekar or Katakir, decide right now."
+],
+[
+"अच्छे वड़ा पाव के लिए पूरा शहर पार कर {सकती|सकता} हूँ।",
+"Acche vada pav ke liye poora shehar paar kar {sakti|sakta} hoon.",
+"I'd cross the whole city for a good vada pav."
+],
+[
+"संडे मतलब वैशाली में नाश्ता। ये नियम है।",
+"Sunday matlab Vaishali mein naashta. Ye niyam hai.",
+"Sunday means breakfast at Vaishali. That's the rule."
+]
+],
+"likes_travel": [
+[
+"अभी स्पीति से {लौटी|लौटा} हूँ। अब तक वहीं {खोई|खोया} हूँ।",
+"Abhi Spiti se {lauti|lauta} hoon. Ab tak wahin {khoyi|khoya} hoon.",
+"Just got back from Spiti. Still lost there."
+],
+[
+"हर मानसून लोनावला {जाती|जाता} हूँ। हाँ, पता है, क्लीशे है।",
+"Har monsoon Lonavala {jaati|jaata} hoon. Haan, pata hai, cliché hai.",
+"Every monsoon I go to Lonavala. Yes, I know, cliché."
+],
+[
+"महाराष्ट्र के सारे किले देखने हैं। अभी बारह हुए।",
+"Maharashtra ke saare kile dekhne hain. Abhi baarah hue.",
+"I want to see every fort in Maharashtra. Twelve done."
+]
+],
+"likes_cricket": [
+[
+"क्रिकेट? वर्ल्ड कप फ़ाइनल में मैं {रोई थी|रोया था}।",
+"Cricket? World Cup final mein main {royi thi|roya tha}.",
+"Cricket? I cried at the World Cup final."
+],
+[
+"अब भी संडे को गली क्रिकेट {खेलती|खेलता} हूँ।",
+"Ab bhi Sunday ko gully cricket {khelti|khelta} hoon.",
+"I still play gully cricket on Sundays."
+],
+[
+"एमसीए स्टेडियम में बारिश में मैच देखा है। मज़ा आ गया था।",
+"MCA stadium mein baarish mein match dekha hai. Maza aa gaya tha.",
+"I watched a match at MCA stadium in the rain. Loved it."
+]
+],
+"likes_movies": [
+[
+"शाहरुख़ की कोई भी फ़िल्म देख {लूँगी|लूँगा}। कोई शर्म नहीं।",
+"Shah Rukh ki koi bhi film dekh {loongi|loonga}. Koi sharam nahin.",
+"I'll watch any Shah Rukh film. No shame."
+],
+[
+"पुरानी मराठी फ़िल्में बहुत पसंद हैं।",
+"Puraani Marathi filmein bahut pasand hain.",
+"I love old Marathi films."
+],
+[
+"रात को अकेले हॉरर फ़िल्म, फिर नींद नहीं आती। हर बार।",
+"Raat ko akele horror film, phir neend nahin aati. Har baar.",
+"Horror films alone at night, then no sleep. Every time."
+]
+],
+"likes_fitness": [
+[
+"रोज़ सुबह वेताल टेकडी पर {दौड़ती|दौड़ता} हूँ। छह बजे।",
+"Roz subah Vetal Tekdi par {daudti|daudta} hoon. Chhah baje.",
+"I run on Vetal Tekdi every morning. Six a.m."
+],
+[
+"हफ़्ते में पाँच दिन जिम। लेग डे ही मेरी पहचान है।",
+"Hafte mein paanch din gym. Leg day hi meri pehchaan hai.",
+"Gym five days a week. Leg day is my identity."
+],
+[
+"अभी क्लाइंबिंग शुरू की है। हाथ टूट रहे हैं।",
+"Abhi climbing shuru ki hai. Haath toot rahe hain.",
+"Just started climbing. My arms are dying."
+]
+],
+"likes_books": [
+[
+"बैग में हमेशा एक किताब रहती है। अभी मुराकामी।",
+"Bag mein hamesha ek kitaab rehti hai. Abhi Murakami.",
+"There's always a book in my bag. Murakami right now."
+],
+[
+"अप्पा बलवंत चौक की पुरानी किताबें, ख़ज़ाना है।",
+"Appa Balwant Chowk ki puraani kitaabein, khazaana hai.",
+"The old books at Appa Balwant Chowk are treasure."
+],
+[
+"प्रेमचंद {पढ़ती|पढ़ता} हूँ जब दिल भारी हो।",
+"Premchand {padhti|padhta} hoon jab dil bhaari ho.",
+"I read Premchand when my heart feels heavy."
+]
+],
+"likes_bikes": [
+[
+"मेरे पास बुलेट है। हाँ, आवाज़ करती है। हाँ, मुझे प्यार है।",
+"Mere paas Bullet hai. Haan, aawaaz karti hai. Haan, mujhe pyaar hai.",
+"I have a Bullet. Yes, it's loud. Yes, I love it."
+],
+[
+"संडे सुबह सिंहगड की राइड। वही मेरी थेरेपी है।",
+"Sunday subah Sinhagad ki ride. Wahi meri therapy hai.",
+"A Sunday morning ride to Sinhagad. That's my therapy."
+],
+[
+"एक बार ख़ुद बाइक का इंजन ठीक किया था। अब तक गर्व है।",
+"Ek baar khud bike ka engine theek kiya tha. Ab tak garv hai.",
+"I fixed my bike's engine myself once. Still proud."
+]
+],
+"likes_gaming": [
+[
+"गेमिंग {करती|करता} हूँ, बहुत। वैलोरेंट। तुमसे अच्छा {खेलती|खेलता} हूँ।",
+"Gaming {karti|karta} hoon, bahut. Valorant. Tumse accha {khelti|khelta} hoon.",
+"I game a lot. Valorant. I play better than you."
+],
+[
+"पिछले हफ़्ते सुबह चार बजे तक गेम खेला। वर्थ इट।",
+"Pichhle hafte subah chaar baje tak game khela. Worth it.",
+"Last week I played till four a.m. Worth it."
+],
+[
+"पुराना प्लेस्टेशन अब भी है। हर वीकेंड दोस्तों के साथ फ़ुटबॉल।",
+"Puraana PlayStation ab bhi hai. Har weekend doston ke saath football.",
+"Still have my old PlayStation. Football with friends every weekend."
+]
+],
+"likes_art": [
+[
+"वीकेंड पे पेंट {करती|करता} हूँ। वॉटरकलर में पुणे की गलियाँ।",
+"Weekend pe paint {karti|karta} hoon. Watercolour mein Pune ki galiyaan.",
+"I paint on weekends. Pune's lanes in watercolour."
+],
+[
+"राजा केलकर म्यूज़ियम में घंटों बैठ {सकती|सकता} हूँ।",
+"Raja Kelkar museum mein ghanton baith {sakti|sakta} hoon.",
+"I can sit in the Raja Kelkar museum for hours."
+],
+[
+"अब पॉटरी {करती|करता} हूँ। कप टेढ़े बनते हैं, पर मेरे हैं।",
+"Ab pottery {karti|karta} hoon. Cup tedhe bante hain, par mere hain.",
+"I do pottery now. The cups come out crooked, but they're mine."
+]
+],
+"topic_meh": [
+[
+"हम्म। मेरा इतना शौक नहीं है।",
+"Hmm. Mera itna shauk nahin hai.",
+"Hmm. Not really my thing."
+],
+[
+"सच कहूँ तो इसके बारे में ज़्यादा नहीं पता।",
+"Sach kahoon toh iske baare mein zyaada nahin pata.",
+"Honestly, I don't know much about it."
+],
+[
+"अच्छा... और क्या पसंद है तुम्हें?",
+"Accha... aur kya pasand hai tumhe?",
+"Okay... what else do you like?"
+],
+[
+"ठीक है। सॉरी, थोड़ा ध्यान भटक गया।",
+"Theek hai. Sorry, thoda dhyaan bhatak gaya.",
+"Okay. Sorry, I drifted off a bit."
+]
+],
+"good": [
+[
+"हाहा! अच्छा, ये पसंद आया।",
+"Haha! Accha, ye pasand aaya.",
+"Haha! Okay, I like that."
+],
+[
+"तुमसे बात करने में मज़ा आ रहा है।",
+"Tumse baat karne mein maza aa raha hai.",
+"Talking to you is fun."
+],
+[
+"रुको, मैं भी! क्या बात है।",
+"Ruko, main bhi! Kya baat hai.",
+"Wait, me too! What are the odds."
+],
+[
+"अच्छा, अब तुमने मेरा ध्यान खींच लिया।",
+"Accha, ab tumne mera dhyaan kheench liya.",
+"Okay, now you've got my attention."
+],
+[
+"देखो, इसीलिए आज बाहर {निकली थी|निकला था}।",
+"Dekho, isiliye aaj baahar {nikli thi|nikla tha}.",
+"See, this is why I came out today."
+]
+],
+"meh": [
+[
+"हम्म, ठीक है।",
+"Hmm, theek hai.",
+"Hmm, okay."
+],
+[
+"अच्छा। हाँ।",
+"Accha. Haan.",
+"Right. Yeah."
+],
+[
+"दिलचस्प है... शायद।",
+"Dilchasp hai... shaayad.",
+"Interesting... maybe."
+],
+[
+"ओके...",
+"Okay...",
+"Okay..."
+],
+[
+"हम्म। कूल।",
+"Hmm. Cool.",
+"Mm. Cool."
+]
+],
+"bad": [
+[
+"वाह। अच्छा।",
+"Waah. Accha.",
+"Wow. Okay."
+],
+[
+"ये थोड़ा ज़्यादा नहीं हो गया?",
+"Ye thoda zyaada nahin ho gaya?",
+"Isn't that a bit much?"
+],
+[
+"मैं मान {लेती|लेता} हूँ कि तुमने ये नहीं कहा।",
+"Main maan {leti|leta} hoon ki tumne ye nahin kaha.",
+"I'll pretend you didn't say that."
+],
+[
+"नहीं यार, बिल्कुल नहीं।",
+"Nahin yaar, bilkul nahin.",
+"No, man. Not at all."
+],
+[
+"ये लाइन कभी किसी पे चली है?",
+"Ye line kabhi kisi pe chali hai?",
+"Has that line ever worked on anyone?"
+]
+],
+"laugh": [
+[
+"हाहाहा! बस करो। अच्छा, वो फ़नी था।",
+"Hahaha! Bas karo. Accha, woh funny tha.",
+"Hahaha! Stop. Okay, that was funny."
+],
+[
+"हे भगवान, तुम्हें कैसे पता?",
+"Hey bhagwaan, tumhe kaise pata?",
+"Oh god, how did you know?"
+],
+[
+"बदतमीज़! पर सही कहा।",
+"Badtameez! Par sahi kaha.",
+"Rude! But true."
+],
+[
+"तुम ख़तरनाक हो, है ना?",
+"Tum khatarnaak ho, hai na?",
+"You're dangerous, aren't you?"
+],
+[
+"अच्छा, हँस {रही|रहा} हूँ, पर ज़्यादा उड़ो मत।",
+"Accha, hans {rahi|raha} hoon, par zyaada udo mat.",
+"Okay, I'm laughing, but don't get too full of yourself."
+]
+],
+"tease_back": [
+[
+"ये कौन बोल {रहा|रही} है? पहले अपने कपड़े देखो।",
+"Ye kaun bol {raha|rahi} hai? Pehle apne kapde dekho.",
+"Look who's talking. Check your own outfit first."
+],
+[
+"बड़ी बातें, उससे जिसे नाचना नहीं आता।",
+"Badi baatein, usse jise naachna nahin aata.",
+"Big talk from someone who can't dance."
+],
+[
+"ख़ुद को फ़नी {समझते|समझती} हो? {थोड़े से|थोड़ी सी} हो।",
+"Khud ko funny {samajhte|samajhti} ho? {Thode se|Thodi si} ho.",
+"Think you're funny? You're a little funny."
+],
+[
+"संभल के। मैं भी {चिढ़ाती|चिढ़ाता} हूँ, और तुमसे बेहतर।",
+"Sambhal ke. Main bhi {chidhaati|chidhaata} hoon, aur tumse behtar.",
+"Careful. I tease too, and better than you."
+],
+[
+"ठीक है। पर अगला राउंड तुम्हारी तरफ़ से।",
+"Theek hai. Par agla round tumhari taraf se.",
+"Fine. But the next round's on you."
+]
+],
+"flustered": [
+[
+"ओह! अं... समझ नहीं आ रहा क्या बोलूँ।",
+"Oh! Um... samajh nahin aa raha kya boloon.",
+"Oh! Um... I don't know what to say."
+],
+[
+"बस करो, मैं लाल हो {रही|रहा} हूँ।",
+"Bas karo, main laal ho {rahi|raha} hoon.",
+"Stop, I'm going red."
+],
+[
+"वो... अच्छा, थैंक यू। शायद।",
+"Woh... accha, thank you. Shaayad.",
+"That's... okay, thank you. I think."
+],
+[
+"ऐसे कैसे कुछ भी बोल {देते|देती} हो?",
+"Aise kaise kuch bhi bol {dete|deti} ho?",
+"How can you just say things like that?"
+]
+],
+"unimpressed": [
+[
+"ये मज़ाक था?",
+"Ye mazaak tha?",
+"Was that a joke?"
+],
+[
+"हम्म। फिर से कोशिश करो।",
+"Hmm. Phir se koshish karo.",
+"Hmm. Try again."
+],
+[
+"तुम {उतने|उतनी} फ़नी नहीं हो जितना {सोचते|सोचती} हो।",
+"Tum {utne|utni} funny nahin ho jitna {sochte|sochti} ho.",
+"You're not as funny as you think."
+],
+[
+"ठीक है। आगे बढ़ते हैं।",
+"Theek hai. Aage badhte hain.",
+"Okay. Moving on."
+]
+],
+"compliment_ok": [
+[
+"अरे वाह। ये प्यारा था।",
+"Arre waah. Ye pyaara tha.",
+"Aww. That was sweet."
+],
+[
+"थैंक यू। तुम भी कुछ कम नहीं हो।",
+"Thank you. Tum bhi kuch kam nahin ho.",
+"Thank you. You're not bad yourself."
+],
+[
+"बहुत दिनों बाद किसी ने ऐसा कहा। थैंक्स।",
+"Bahut dinon baad kisi ne aisa kaha. Thanks.",
+"Nobody's said that to me in ages. Thanks."
+],
+[
+"तुमने नोटिस किया? अच्छा लगा।",
+"Tumne notice kiya? Accha laga.",
+"You noticed? That's nice."
+]
+],
+"compliment_cheesy": [
+[
+"हाहा। ये सबको {बोलते|बोलती} हो?",
+"Haha. Ye sabko {bolte|bolti} ho?",
+"Haha. Do you say that to everyone?"
+],
+[
+"स्मूद। कुछ ज़्यादा ही स्मूद।",
+"Smooth. Kuch zyaada hi smooth.",
+"Smooth. A bit too smooth."
+],
+[
+"अच्छा {रोमियो|जूलियट}, आराम से।",
+"Accha {Romeo|Juliet}, aaraam se.",
+"Okay {Romeo|Juliet}, relax."
+]
+],
+"deep": [
+[
+"एक बात बताऊँ? पिछले साल बेंगलुरु शिफ़्ट होने {वाली थी|वाला था}। अच्छा हुआ नहीं {गई|गया}।",
+"Ek baat bataoon? Pichhle saal Bengaluru shift hone {waali thi|waala tha}. Accha hua nahin {gayi|gaya}.",
+"Can I tell you something? I almost moved to Bangalore last year. Glad I didn't."
+],
+[
+"पापा चाहते थे मैं इंजीनियर बनूँ। अब तक उन्हें ग़लत साबित कर {रही|रहा} हूँ।",
+"Papa chaahte the main engineer banoon. Ab tak unhe galat saabit kar {rahi|raha} hoon.",
+"Dad wanted me to be an engineer. I'm still proving him wrong."
+],
+[
+"मैं बोलने से ज़्यादा {सुनती|सुनता} हूँ। पर तुम्हारे साथ बोलना आसान है।",
+"Main bolne se zyaada {sunti|sunta} hoon. Par tumhare saath bolna aasaan hai.",
+"I listen more than I talk. But talking to you is easy."
+],
+[
+"कभी-कभी रात को नदी किनारे बैठ {जाती|जाता} हूँ। वो मेरी जगह है।",
+"Kabhi-kabhi raat ko nadi kinaare baith {jaati|jaata} hoon. Woh meri jagah hai.",
+"Sometimes I sit by the river at night. That's my place."
+],
+[
+"सच बताऊँ, नए लोगों से मिलकर घबरा {जाती|जाता} हूँ।",
+"Sach bataoon, naye logon se milkar ghabra {jaati|jaata} hoon.",
+"Truth is, I get nervous meeting new people."
+]
+],
+"ask_job": [
+[
+"तो तुम क्या {करते|करती} हो?",
+"Toh tum kya {karte|karti} ho?",
+"So what do you do?"
+],
+[
+"अब तुम्हारी बारी। काम क्या है तुम्हारा?",
+"Ab tumhari baari. Kaam kya hai tumhara?",
+"Your turn now. What's your work?"
+]
+],
+"ask_area": [
+[
+"{रहते|रहती} कहाँ हो? पुणे में किधर?",
+"{Rehte|Rehti} kahaan ho? Pune mein kidhar?",
+"Where do you live? Which part of Pune?"
+],
+[
+"तुम्हारा घर किस तरफ़ है?",
+"Tumhara ghar kis taraf hai?",
+"Which side of town is your place?"
+]
+],
+"ask_fun": [
+[
+"काम के अलावा क्या {करते|करती} हो?",
+"Kaam ke alaawa kya {karte|karti} ho?",
+"What do you do besides work?"
+],
+[
+"तुम्हारा परफ़ेक्ट संडे कैसा होता है?",
+"Tumhara perfect Sunday kaisa hota hai?",
+"What's your perfect Sunday like?"
+]
+],
+"honest": [
+[
+"सच में? इज़्ज़त है। यहाँ सब झूठ बोलते हैं।",
+"Sach mein? Izzat hai. Yahaan sab jhooth bolte hain.",
+"Really? Respect. Everyone here lies."
+],
+[
+"ये रियल है। मुझे रियल लोग पसंद हैं।",
+"Ye real hai. Mujhe real log pasand hain.",
+"That's real. I like real people."
+],
+[
+"कोई फ़िल्टर नहीं, हाँ? बढ़िया।",
+"Koi filter nahin, haan? Badhiya.",
+"No filter, huh? Nice."
+]
+],
+"funny": [
+[
+"हाहाहा, अच्छा, मिस्टीरियस। चलेगा।",
+"Hahaha, accha, mysterious. Chalega.",
+"Hahaha, okay, mysterious. I'll allow it."
+],
+[
+"कितना अजीब जवाब है। मुझे पसंद आया।",
+"Kitna ajeeb jawaab hai. Mujhe pasand aaya.",
+"What a weird answer. I like it."
+],
+[
+"तुम्हारा कुछ नहीं हो सकता।",
+"Tumhara kuch nahin ho sakta.",
+"You're hopeless."
+]
+],
+"liar": [
+[
+"हम्म। ऐसे {लगते|लगती} तो नहीं।",
+"Hmm. Aise {lagte|lagti} toh nahin.",
+"Hmm. You don't look like one."
+],
+[
+"हाँ हाँ, और मैं {कटरीना कैफ़|शाहरुख़ ख़ान} हूँ।",
+"Haan haan, aur main {Katrina Kaif|Shah Rukh Khan} hoon.",
+"Sure, and I'm {Katrina Kaif|Shah Rukh Khan}."
+],
+[
+"यहाँ हर कोई यही बोलता है।",
+"Yahaan har koi yahi bolta hai.",
+"Everyone here says that."
+]
+],
+"drink_yes": [
+[
+"अच्छा, एक ड्रिंक। जिन वाला कुछ।",
+"Accha, ek drink. Gin waala kuch.",
+"Okay, one drink. Something with gin."
+],
+[
+"{कितने|कितनी} स्वीट हो। एक मोहितो प्लीज़।",
+"{Kitne|Kitni} sweet ho. Ek mojito please.",
+"You're sweet. A mojito, please."
+],
+[
+"ठीक है, पर अगली मेरी तरफ़ से।",
+"Theek hai, par agli meri taraf se.",
+"Fine, but the next one's on me."
+]
+],
+"drink_no": [
+[
+"नहीं थैंक्स, आज बस पानी।",
+"Nahin thanks, aaj bas paani.",
+"No thanks, just water today."
+],
+[
+"नहीं, मुझे गाड़ी चलानी है।",
+"Nahin, mujhe gaadi chalaani hai.",
+"No, I have to drive."
+]
+],
+"dance_yes": [
+[
+"चलो! पर मेरे स्टेप्स पे हँसना मत।",
+"Chalo! Par mere steps pe hansna mat.",
+"Come on! But don't laugh at my moves."
+],
+[
+"आख़िरकार किसी ने पूछा। चलो।",
+"Aakhirkaar kisi ne poochha. Chalo.",
+"Finally someone asked. Let's go."
+],
+[
+"अच्छा गाना लगे तो... लो, लग गया। चलो!",
+"Accha gaana lage toh... lo, lag gaya. Chalo!",
+"If a good song comes on... there it is. Let's go!"
+]
+],
+"dance_no": [
+[
+"बाद में। पैर जवाब दे गए हैं।",
+"Baad mein. Pair jawaab de gaye hain.",
+"Later. My feet have given up."
+],
+[
+"अभी नहीं, ड्रिंक तो ख़त्म करने दो।",
+"Abhi nahin, drink toh khatam karne do.",
+"Not yet, let me finish my drink."
+]
+],
+"number_yes": [
+[
+"फ़ोन दो। अजीब मत करना।",
+"Phone do. Ajeeb mat karna.",
+"Give me your phone. Don't make it weird."
+],
+[
+"ये लो। 'हाय' से अच्छा कुछ भेजना।",
+"Ye lo. 'Hi' se accha kuch bhejna.",
+"Here. Text me something better than 'hi'."
+],
+[
+"ज़रूर। तुम मज़ेदार हो, ऐसा कम मिलता है।",
+"Zaroor. Tum mazedaar ho, aisa kam milta hai.",
+"Sure. You're fun, that's rare."
+],
+[
+"ठीक है। पर गुड मॉर्निंग फ़ॉरवर्ड भेजे तो ब्लॉक।",
+"Theek hai. Par good morning forward bheje toh block.",
+"Okay. But send good morning forwards and you're blocked."
+]
+],
+"number_no": [
+[
+"देखते हैं, फिर कभी मिले तो।",
+"Dekhte hain, phir kabhi mile toh.",
+"Let's see if we run into each other again."
+],
+[
+"मैं नंबर ऐसे नहीं {देती|देता}। सॉरी।",
+"Main number aise nahin {deti|deta}. Sorry.",
+"I don't give my number out like that. Sorry."
+],
+[
+"आज नहीं। पर बात करके अच्छा लगा।",
+"Aaj nahin. Par baat karke accha laga.",
+"Not today. But it was nice talking."
+],
+[
+"अगली बार? अभी-अभी तो मिले हैं।",
+"Agli baar? Abhi-abhi toh mile hain.",
+"Next time? We just met."
+]
+],
+"walkoff": [
+[
+"मैं अपने दोस्तों के पास जा {रही|रहा} हूँ। बाय।",
+"Main apne doston ke paas ja {rahi|raha} hoon. Bye.",
+"I'm going back to my friends. Bye."
+],
+[
+"अच्छा, मुझे लगता है बात यहीं ख़त्म।",
+"Accha, mujhe lagta hai baat yahin khatam.",
+"Okay, I think we're done here."
+],
+[
+"मिलकर अच्छा लगा। या नहीं। बाय।",
+"Milkar accha laga. Ya nahin. Bye.",
+"Nice meeting you. Or not. Bye."
+],
+[
+"मुझे थोड़ी हवा चाहिए। अकेले।",
+"Mujhe thodi hawa chahiye. Akele.",
+"I need some air. Alone."
+]
+],
+"date_hi": [
+[
+"हाय! तुम सच में {आ गए|आ गई}। मैं तो नर्वस हो {रही थी|रहा था}।",
+"Hi! Tum sach mein {aa gaye|aa gayi}. Main toh nervous ho {rahi thi|raha tha}.",
+"Hi! You actually came. I was getting nervous."
+],
+[
+"हे! कोने वाली टेबल ले ली है।",
+"Hey! Kone waali table le li hai.",
+"Hey! I got us the corner table."
+],
+[
+"{आ गए|आ गई}। {अच्छे लग रहे|अच्छी लग रही} हो।",
+"{Aa gaye|Aa gayi}. {Acche lag rahe|Acchi lag rahi} ho.",
+"There you are. You look nice."
+],
+[
+"हाय! चाय पहले ही मँगा ली, रुका नहीं गया।",
+"Hi! Chai pehle hi manga li, ruka nahin gaya.",
+"Hi! I ordered chai already, couldn't wait."
+]
+],
+"date_late": [
+[
+"बहुत लेट हो। मैं जाने ही {वाली थी|वाला था}।",
+"Bahut late ho. Main jaane hi {waali thi|waala tha}.",
+"You're very late. I was about to leave."
+],
+[
+"सच में? चालीस मिनट से {बैठी|बैठा} हूँ।",
+"Sach mein? Chaalees minute se {baithi|baitha} hoon.",
+"Seriously? I've been sitting here forty minutes."
+]
+],
+"date_day": [
+[
+"लंबा दिन था। मैनेजर का मूड ख़राब, तो मेरा भी।",
+"Lamba din tha. Manager ka mood kharaab, toh mera bhi.",
+"Long day. My manager was in a mood, so I was too."
+],
+[
+"ठीक था। अब बेहतर है।",
+"Theek tha. Ab behtar hai.",
+"It was okay. Better now."
+],
+[
+"कर्वे रोड पे एक घंटा ट्रैफ़िक में {फँसी रही|फँसा रहा}।",
+"Karve Road pe ek ghanta traffic mein {phansi rahi|phansa raha}.",
+"Stuck in traffic on Karve Road for an hour."
+],
+[
+"आख़िरकार वो प्रोजेक्ट ख़त्म हुआ। बड़ा सुकून है।",
+"Aakhirkaar woh project khatam hua. Bada sukoon hai.",
+"That project is finally done. Such relief."
+],
+[
+"मम्मी ने तीन बार फ़ोन करके पूछा किससे मिल {रही|रहा} हूँ।",
+"Mummy ne teen baar phone karke poochha kisse mil {rahi|raha} hoon.",
+"Mom called three times asking who I'm meeting."
+]
+],
+"date_share": [
+[
+"सच में? ये तो पता ही नहीं था।",
+"Sach mein? Ye toh pata hi nahin tha.",
+"Really? I had no idea."
+],
+[
+"कितना प्यारा। बताने के लिए थैंक्स।",
+"Kitna pyaara. Bataane ke liye thanks.",
+"That's sweet. Thanks for telling me."
+],
+[
+"देखो, तुम {उतने|उतनी} सख़्त नहीं हो जितना {दिखाते|दिखाती} हो।",
+"Dekho, tum {utne|utni} sakht nahin ho jitna {dikhaate|dikhaati} ho.",
+"See, you're not as tough as you act."
+],
+[
+"लगता है अब तुम्हें थोड़ा और {जानती|जानता} हूँ।",
+"Lagta hai ab tumhe thoda aur {jaanti|jaanta} hoon.",
+"I feel like I know you a bit better now."
+]
+],
+"date_deep": [
+[
+"एक दिन अपना कुछ शुरू करना है। डर लगता है, पर करना है।",
+"Ek din apna kuch shuru karna hai. Darr lagta hai, par karna hai.",
+"Someday I want to start my own thing. It scares me, but I want to."
+],
+[
+"पिछले साल नानी चली गईं। उन्होंने मुझे खाना बनाना सिखाया था।",
+"Pichhle saal Naani chali gayin. Unhone mujhe khaana banaana sikhaaya tha.",
+"My grandmother passed last year. She taught me to cook."
+],
+[
+"सबसे ख़ुश तब {होती|होता} हूँ जब सुबह पाँच बजे बाइक पे {अकेली होती|अकेला होता} हूँ।",
+"Sabse khush tab {hoti|hota} hoon jab subah paanch baje bike pe {akeli hoti|akela hota} hoon.",
+"I'm happiest alone on a bike at five a.m."
+],
+[
+"कभी लगता है सबको सब पता है, सिवाय मेरे।",
+"Kabhi lagta hai sabko sab pata hai, siwaay mere.",
+"Sometimes it feels like everyone has it figured out except me."
+]
+],
+"date_tease": [
+[
+"फिर से वही, नर्वस नहीं होने का नाटक।",
+"Phir se wahi, nervous nahin hone ka naatak.",
+"There it is again, pretending you're not nervous."
+],
+[
+"मेरे लिए तैयार होकर {आए|आई} हो? हाँ, {आए|आई} हो।",
+"Mere liye taiyaar hokar {aaye|aayi} ho? Haan, {aaye|aayi} ho.",
+"Did you dress up for me? Yes, you did."
+],
+[
+"बकरी की तरह {चबाते|चबाती} हो। पर क्यूट है।",
+"Bakri ki tarah {chabaate|chabaati} ho. Par cute hai.",
+"You chew like a goat. It's cute, though."
+],
+[
+"मानो, बोलने की प्रैक्टिस करके {आए|आई} हो।",
+"Maano, bolne ki practice karke {aaye|aayi} ho.",
+"Admit it, you practised what to say."
+]
+],
+"date_plan": [
+[
+"इस संडे सिंहगड? जल्दी सुबह, भीड़ से पहले।",
+"Is Sunday Sinhagad? Jaldi subah, bheed se pehle.",
+"Sinhagad this Sunday? Early, before the crowds."
+],
+[
+"अगले हफ़्ते बालगंधर्व में नाटक है। चलो साथ।",
+"Agle hafte Balgandharva mein naatak hai. Chalo saath.",
+"There's a play at Balgandharva next week. Come with me."
+],
+[
+"कैंप में फ़ूड वॉक करते हैं। अच्छी जगहें {दिखाऊँगी|दिखाऊँगा}।",
+"Camp mein food walk karte hain. Acchi jagahein {dikhaoongi|dikhaoonga}.",
+"Let's do a food walk in Camp. I'll show you the good places."
+],
+[
+"अच्छा, पर अगली बार जगह मैं {चुनूँगी|चुनूँगा}।",
+"Accha, par agli baar jagah main {chunoongi|chunoonga}.",
+"Okay, but next time I pick the place."
+]
+],
+"date_order": [
+[
+"मेरे लिए ऑर्डर किया? हिम्मत है। और सही भी।",
+"Mere liye order kiya? Himmat hai. Aur sahi bhi.",
+"You ordered for me? Bold. And right."
+],
+[
+"बहुत अच्छा है। अब से तुम ही ऑर्डर करना।",
+"Bahut accha hai. Ab se tum hi order karna.",
+"This is so good. You order from now on."
+],
+[
+"तुम्हें याद था मुझे क्या पसंद है। इम्प्रेस्ड।",
+"Tumhe yaad tha mujhe kya pasand hai. Impressed.",
+"You remembered what I like. Impressed."
+]
+],
+"gift": [
+[
+"मेरे लिए? इसकी क्या ज़रूरत थी। बहुत पसंद आया।",
+"Mere liye? Iski kya zaroorat thi. Bahut pasand aaya.",
+"For me? You didn't need to. I love it."
+],
+[
+"बस करो, कितना प्यारा है।",
+"Bas karo, kitna pyaara hai.",
+"Stop, that's so sweet."
+],
+[
+"तुम्हें कैसे पता? एकदम परफ़ेक्ट।",
+"Tumhe kaise pata? Ekdum perfect.",
+"How did you know? It's perfect."
+],
+[
+"इसे हमेशा संभाल के {रखूँगी|रखूँगा}।",
+"Ise hamesha sambhaal ke {rakhoongi|rakhoonga}.",
+"I'll keep this safe forever."
+]
+],
+"hand_yes": [
+[
+"अच्छा। हाँ। ये अच्छा है।",
+"Accha. Haan. Ye accha hai.",
+"Okay. Yeah. This is nice."
+],
+[
+"तुम्हारे हाथ गरम हैं।",
+"Tumhare haath garam hain.",
+"Your hands are warm."
+],
+[
+"कितनी देर लगा दी।",
+"Kitni der laga di.",
+"Took you long enough."
+]
+],
+"hand_no": [
+[
+"धीरे। थोड़ी और बात करते हैं।",
+"Dheere. Thodi aur baat karte hain.",
+"Slow down. Let's talk a little more."
+],
+[
+"अभी नहीं। थोड़ा वक़्त दो।",
+"Abhi nahin. Thoda waqt do.",
+"Not yet. Give it some time."
+],
+[
+"अरे, आराम से। अभी तो आए हैं।",
+"Arre, aaraam se. Abhi toh aaye hain.",
+"Hey, easy. We just got here."
+]
+],
+"date_bye": [
+[
+"बहुत अच्छा लगा। घर पहुँचकर मैसेज करना।",
+"Bahut accha laga. Ghar pahunchkar message karna.",
+"This was lovely. Text me when you get home."
+],
+[
+"मम्मी फिर फ़ोन करें, उससे पहले जाना होगा। बाय!",
+"Mummy phir phone karein, usse pehle jaana hoga. Bye!",
+"I have to go before Mom calls again. Bye!"
+],
+[
+"अगले हफ़्ते इसी टाइम?",
+"Agle hafte isi time?",
+"Same time next week?"
+],
+[
+"आज के लिए थैंक यू। दिल से।",
+"Aaj ke liye thank you. Dil se.",
+"Thank you for today. Truly."
+]
+],
+"partner_yes": [
+[
+"हाँ! बिल्कुल हाँ। इतनी देर क्यों लगाई?",
+"Haan! Bilkul haan. Itni der kyun lagaayi?",
+"Yes! Of course yes. Why did you take so long?"
+],
+[
+"मैं इसी का इंतज़ार कर {रही थी|रहा था}। हाँ।",
+"Main isi ka intezaar kar {rahi thi|raha tha}. Haan.",
+"I was waiting for this. Yes."
+],
+[
+"ठीक है। हाँ। पछताने मत देना।",
+"Theek hai. Haan. Pachhtaane mat dena.",
+"Okay. Yes. Don't make me regret it."
+]
+],
+"partner_no": [
+[
+"तुम मुझे बहुत पसंद हो। बस अभी {उतनी|उतना} तैयार नहीं हूँ।",
+"Tum mujhe bahut pasand ho. Bas abhi {utni|utna} taiyaar nahin hoon.",
+"I really like you. I'm just not ready yet."
+],
+[
+"जल्दी मत करो ना। फिर कभी पूछना।",
+"Jaldi mat karo na. Phir kabhi poochhna.",
+"Don't rush it. Ask me again someday."
+],
+[
+"थोड़ा और वक़्त चाहिए। चलेगा?",
+"Thoda aur waqt chahiye. Chalega?",
+"I need a bit more time. Is that okay?"
+]
+],
+"partner_hi": [
+[
+"{आ गए|आ गई}। बहुत याद आई तुम्हारी।",
+"{Aa gaye|Aa gayi}. Bahut yaad aayi tumhari.",
+"You're here. I missed you so much."
+],
+[
+"हाय। आख़िरी समोसा तुम्हारे लिए बचाया है।",
+"Hi. Aakhri samosa tumhare liye bachaaya hai.",
+"Hi. I saved you the last samosa."
+],
+[
+"आख़िरकार। दिन कैसा था? सब बताओ।",
+"Aakhirkaar. Din kaisa tha? Sab batao.",
+"Finally. How was your day? Tell me everything."
+]
+],
+"partner_miss": [
+[
+"मुझे भी। बहुत। किसी को बताना मत।",
+"Mujhe bhi. Bahut. Kisi ko batana mat.",
+"Me too. A lot. Don't tell anyone."
+],
+[
+"कहते तो हो, पर कल फ़ोन नहीं किया।",
+"Kehte toh ho, par kal phone nahin kiya.",
+"You say that, but you didn't call yesterday."
+],
+[
+"बस करो, सबके सामने शरमा {जाऊँगी|जाऊँगा}।",
+"Bas karo, sabke saamne sharma {jaoongi|jaoonga}.",
+"Stop, I'll blush in front of everyone."
+]
+],
+"partner_future": [
+[
+"सोचो, कोथरूड में टैरेस वाला फ़्लैट। और एक कुत्ता।",
+"Socho, Kothrud mein terrace waala flat. Aur ek kutta.",
+"Imagine a flat in Kothrud with a terrace. And a dog."
+],
+[
+"मम्मी-पापा तुमसे मिलना चाहते हैं। कोई प्रेशर नहीं। थोड़ा सा है।",
+"Mummy-Papa tumse milna chaahte hain. Koi pressure nahin. Thoda sa hai.",
+"My parents want to meet you. No pressure. A little."
+],
+[
+"दिसंबर में गोवा चलें? बस हम दोनों।",
+"December mein Goa chalein? Bas hum dono.",
+"Goa in December? Just the two of us."
+],
+[
+"जो भी हो, अच्छा है कि तुम हो।",
+"Jo bhi ho, accha hai ki tum ho.",
+"Whatever happens, I'm glad it's you."
+]
+],
+"love_yes": [
+[
+"मैं भी तुमसे प्यार {करती|करता} हूँ। कब से कहना था।",
+"Main bhi tumse pyaar {karti|karta} hoon. Kab se kehna tha.",
+"I love you too. I've wanted to say it for so long."
+],
+[
+"कितनी देर लगा दी। आई लव यू।",
+"Kitni der laga di. I love you.",
+"Took you long enough. I love you."
+],
+[
+"अब कैफ़े में रो {रही|रहा} हूँ। मैं भी।",
+"Ab café mein ro {rahi|raha} hoon. Main bhi.",
+"Now I'm crying in a café. Me too."
+]
+],
+"love_notyet": [
+[
+"ये बहुत बड़ी बात है। तुम मेरे लिए बहुत मायने {रखते|रखती} हो। मुझे थोड़ा वक़्त दो।",
+"Ye bahut badi baat hai. Tum mere liye bahut maayne {rakhte|rakhti} ho. Mujhe thoda waqt do.",
+"That's big. You mean so much to me. Give me a little time."
+],
+[
+"अभी कह नहीं {पाऊँगी|पाऊँगा}। पर मैं कहीं नहीं जा {रही|रहा}।",
+"Abhi keh nahin {paoongi|paoonga}. Par main kahin nahin ja {rahi|raha}.",
+"I can't say it yet. But I'm not going anywhere."
+],
+[
+"बुरा मत मानो। जब सच में महसूस होगा, तब {कहूँगी|कहूँगा}।",
+"Bura mat maano. Jab sach mein mehsoos hoga, tab {kahoongi|kahoonga}.",
+"Don't be upset. I'll say it when I truly feel it."
+]
+],
+"upset": [
+[
+"तीन दिन ग़ायब {रहे|रही}। पता है कैसा लगा?",
+"Teen din gaayab {rahe|rahi}. Pata hai kaisa laga?",
+"You disappeared for three days. Know how that felt?"
+],
+[
+"क्लब में किससे बात कर {रहे थे|रही थी}?",
+"Club mein kisse baat kar {rahe the|rahi thi}?",
+"Who were you talking to at the club?"
+],
+[
+"कभी लगता है कोशिश सिर्फ़ मैं कर {रही|रहा} हूँ।",
+"Kabhi lagta hai koshish sirf main kar {rahi|raha} hoon.",
+"Sometimes it feels like I'm the only one trying."
+]
+],
+"makeup": [
+[
+"ठीक है। ये कहने के लिए थैंक्स। इधर आओ।",
+"Theek hai. Ye kehne ke liye thanks. Idhar aao.",
+"Okay. Thanks for saying that. Come here."
+],
+[
+"अभी भी थोड़ा गुस्सा हूँ। पर कम।",
+"Abhi bhi thoda gussa hoon. Par kam.",
+"Still a little mad. But less."
+],
+[
+"चलो, माफ़ किया। डिनर तुम्हारी तरफ़ से।",
+"Chalo, maaf kiya. Dinner tumhari taraf se.",
+"Fine, forgiven. Dinner's on you."
+]
+],
+"stillupset": [
+[
+"इस बार सॉरी काफ़ी नहीं है।",
+"Is baar sorry kaafi nahin hai.",
+"Sorry isn't enough this time."
+],
+[
+"अभी इस बारे में बात नहीं करनी।",
+"Abhi is baare mein baat nahin karni.",
+"I don't want to talk about it right now."
+]
+]
+}

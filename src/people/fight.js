@@ -226,8 +226,8 @@ export class Brawl {
   started(q) {
     const G = this.g, first = !this.active;
     this.active = 0.01;
-    if (q.cop) { if (this.heatT <= 0) { this.heatT = 25; G.police.raiseHeat(2, 'Assaulting a police officer'); } }
-    else if (this.heatT <= 0 && G.police.copSeeing && G.police.copSeeing(q.x, q.z, 40)) { this.heatT = 40; G.police.raiseHeat(1, 'Assault, a cop saw you'); }
+    if (q.cop) { if (this.heatT <= 0) { this.heatT = 25; G.police.raiseHeat(2, 'Assaulting a police officer', 'assault'); } }
+    else if (this.heatT <= 0 && G.police.copSeeing && G.police.copSeeing(q.x, q.z, 40)) { this.heatT = 40; G.police.raiseHeat(1, 'Beating someone up, a cop saw it', 'hurt'); }
     if (first) this.witnesses(q);
   }
   witnesses(q) {
@@ -302,7 +302,7 @@ export class Brawl {
     const P = this.P, ppl = this.people;
     p.fightT += dt;
     // a cop in a fight radios for backup (beat marshals come for you)
-    if (p.cop && p.backupT !== undefined && (p.backupT -= dt) <= 0) { p.backupT = undefined; this.g.police.say('cop_backup', null, true); this.g.police.raiseHeat(1, 'Assaulting a police officer, backup called'); }
+    if (p.cop && p.backupT !== undefined && (p.backupT -= dt) <= 0) { p.backupT = undefined; this.g.police.say('cop_backup', null, true); this.g.police.raiseHeat(1, 'Assaulting a police officer, backup called', 'assault'); }
     if (p.stun > 0) { p.stun -= dt; p.v = 0; return; }
     const tx = P.x, tz = P.z, dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
     // done: you drove off, ran away, it's gone on too long, or they've had enough
