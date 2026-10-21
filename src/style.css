@@ -1122,3 +1122,9 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .pk-tip { position: absolute; left: 22px; top: 50%; transform: translateY(-50%); width: 260px; padding: 10px 12px; background: #0e0f12; border: 1px solid rgba(255,178,36,.35); color: #e9e6df; font: 400 12px/1.45 var(--ui, sans-serif); white-space: normal; text-align: left; pointer-events: none; opacity: 0; transition: opacity .12s; z-index: 5; }
 .pk-tip b { color: var(--acc, #ffb224); font-weight: 600; }
 .pk-info:hover .pk-tip { opacity: 1; }
+.curtain { position: fixed; inset: 0; z-index: 90; background: #07080a; display: grid; place-content: center; gap: 14px; justify-items: center; opacity: 0; pointer-events: none; transition: opacity .25s ease; }
+.curtain.on { opacity: 1; pointer-events: auto; }
+.cu-t { color: #e9e6df; font: 700 14px/1 var(--ui, sans-serif); letter-spacing: .22em; text-transform: uppercase; }
+.cu-bar { width: 160px; height: 2px; background: rgba(255,255,255,.08); overflow: hidden; }
+.cu-bar i { display: block; width: 40%; height: 100%; background: var(--acc, #ffb224); animation: cu 1s ease-in-out infinite; }
+@keyframes cu { from { transform: translateX(-100%); } to { transform: translateX(250%); } }

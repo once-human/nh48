@@ -70,3 +70,15 @@ for f in sorted(glob.glob(os.path.join(SRC, 't_*_*.json'))):
                 if empty.getpixel((a, b)) == 0: continue          # wholly outside the city
                 im.crop((a * IMG, b * IMG, (a + 1) * IMG, (b + 1) * IMG)).save(os.path.join(d, f'{tx0 + a}_{tz0 + b}.webp'), 'WEBP', quality=78, method=4)
     print('map', os.path.basename(f), flush=True)
+
+# one picture of the whole city for the first look (loaded with the game): r0 pieces at half size
+r0 = os.path.join(OUT, 'r0')
+fs = [f for f in os.listdir(r0) if f.endswith('.webp')] if os.path.isdir(r0) else []
+if fs:
+    xy = [tuple(map(int, f[:-5].split('_'))) for f in fs]
+    nx, nz = max(a for a, _ in xy) + 1, max(b for _, b in xy) + 1
+    big = Image.new('RGB', (nx * IMG, nz * IMG), COL['bg'])
+    for f, (a, b) in zip(fs, xy): big.paste(Image.open(os.path.join(r0, f)).convert('RGB'), (a * IMG, b * IMG))
+    big = big.resize((nx * IMG // 2, nz * IMG // 2), Image.LANCZOS)
+    big.save(os.path.join(OUT, 'overview.webp'), 'WEBP', quality=80, method=5)
+    print('overview', big.size, os.path.getsize(os.path.join(OUT, 'overview.webp')) // 1024, 'KB')

@@ -106,7 +106,9 @@ export class CityMap {
     }
     // all of Pune: the zoomed-out map is pictures baked offline (tools/bake_maptiles.py), never drawn at runtime;
     // closer in, the live drawing goes over them only where the city has streamed in
-    this.raster = M.meta.tiles ? { levels: [[0.125, 4000], [0.25, 2000], [0.5, 1000]], img: new Map() } : null;
+    this.raster = M.meta.tiles ? { levels: [[0.125, 4000], [0.25, 2000], [0.5, 1000]], img: new Map(), ov: new Image() } : null;
+    // the whole city in one small picture, there from the first frame; sharper pieces load over it as you look
+    if (this.raster) { const o = this.raster.ov; o.decoding = 'async'; o.onload = () => { o.ok = true; }; o.src = 'assets/pune/map/overview.webp'; }
     this.chunks = I.chunks;
     this.res = Math.min(2, Math.max(1, Math.round(window.devicePixelRatio || 1)));   // tile pixels per CSS pixel
     this.cap = 160;
@@ -270,8 +272,10 @@ export class CityMap {
     return o;
   }
   drawRaster(ctx, cx, cz, r, devPpm) {
-    const R = this.raster, want = devPpm <= 0.18 ? 0 : devPpm <= 0.36 ? 1 : 2;
-    for (let L = 0; L <= want; L++) {
+    const R = this.raster, want = devPpm <= 0.09 ? -1 : devPpm <= 0.18 ? 0 : devPpm <= 0.36 ? 1 : 2;
+    if (R.ov.ok) ctx.drawImage(R.ov, this.x0, this.z0, R.ov.naturalWidth * 16, R.ov.naturalHeight * 16);   // 0.0625 px/m
+    if (want < 0) return;
+    for (let L = Math.max(0, want - 1); L <= want; L++) {
       const m = R.levels[L][1];
       const a0 = Math.floor((cx - r - this.x0) / m), a1 = Math.floor((cx + r - this.x0) / m);
       const b0 = Math.floor((cz - r - this.z0) / m), b1 = Math.floor((cz + r - this.z0) / m);

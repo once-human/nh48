@@ -749,6 +749,13 @@ export class HUD {
     if (k > 0.45 && (this._hbT = (this._hbT || 0) - 1 / 60) <= 0) { this._hbT = 0.85 - k * 0.25; this.game.audio.heartbeat?.(k); }
   }
   hurt() { const H = this.hurtEl; H.classList.remove('go'); void H.offsetWidth; H.classList.add('go'); }
+  // a black screen while the city ahead is fetched and built (fast travel, buses, the hospital)
+  curtain(on, text = '') {
+    let C = this.curtainEl;
+    if (!C) { C = this.curtainEl = el('div', 'curtain'); C.innerHTML = '<div class="cu-t"></div><div class="cu-bar"><i></i></div>'; (document.getElementById('hud') || document.body).appendChild(C); }
+    C.querySelector('.cu-t').textContent = text;
+    C.classList.toggle('on', !!on);
+  }
   flash(title, sub) {
     const F = this.flashEl;
     F.querySelector('.fl-t').textContent = title; F.querySelector('.fl-s').textContent = sub;

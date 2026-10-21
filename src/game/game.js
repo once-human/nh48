@@ -378,6 +378,13 @@ export class Game {
     if (why) { this.hud.toast('No rickshaw right now', why, 'warn', 2.6); return false; }
     const cost = this.fastTravelCost(x, z);
     if (this.stats.money < cost) { this.hud.toast('Not enough money', `The meter says ₹${cost}`, 'warn', 2.6); return false; }
+    // all of Pune: the streets over there are fetched and built first, behind a black screen
+    if (this.W.tiles && !this._arriving) {
+      this._arriving = true; this.toggleMap(false); const was = this.state; this.state = 'shop';
+      this.hud.curtain(true, name ? `Rickshaw to ${name}` : 'Taking a rickshaw');
+      this.W.tiles.ensure(x, z).catch(() => {}).then(() => { this.state = was === 'map' ? 'play' : (was || 'play'); this.fastTravel(x, z, name); this._arriving = false; setTimeout(() => this.hud.curtain(false), 250); });
+      return true;
+    }
     const spot = this.safeDrop(x, z);
     if (!spot) { this.hud.toast('No rickshaw goes there', 'No road near that spot', 'warn', 2.4); return false; }
     const e = spot.e;

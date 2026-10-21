@@ -46,14 +46,15 @@ export class TileManager {
     return Math.hypot(dx, dz);
   }
   url(T) { return `assets/pune/t_${T.i}_${T.j}.json.gz`; }
-  async fetch(T) {
+  fetch(T) { return (T.pending = this.fetch1(T)); }
+  async fetch1(T) {
     T.state = 'loading';
     try { T.data = await fetchJSONgz(this.url(T)); T.state = 'ready'; this.ready.push(T); }
     catch (e) { console.warn('tile', T.i, T.j, e); T.state = 'none'; T.retry = performance.now() + 5000; }
   }
   // before the first frame: everything near the start, all at once
-  async warm(x, z, onProgress) {
-    const near = this.list.filter(T => this.dist(T, x, z) < LOAD_R);
+  async warm(x, z, r, onProgress) {
+    const near = this.list.filter(T => this.dist(T, x, z) < r);
     let k = 0;
     await Promise.all(near.map(async T => { await this.fetch(T); onProgress && onProgress(++k, near.length * 2); }));
     for (const T of this.ready.splice(0)) { const it = this.integrate(T); while (!it.next().done) { /* drain */ } onProgress && onProgress(++k, near.length * 2); }
@@ -77,6 +78,18 @@ export class TileManager {
     if (this.job) {
       const t0 = performance.now();
       while (performance.now() - t0 < BUDGET) { if (this.job.next().done) { this.job = null; break; } }
+    }
+  }
+  // somewhere you're about to be (fast travel, a bus, the hospital): the pieces within r of (x, z) fetched and
+  // joined right now, behind the black screen, so you arrive in a built street
+  async ensure(x, z, r = 650) {
+    const need = this.list.filter(T => this.dist(T, x, z) < r);
+    while (this.job) { if (this.job.next().done) this.job = null; }
+    for (const T of need) if (T.state === 'dropping') { this.dropping = this.dropping.filter(q => q !== T); T.state = 'live'; }
+    await Promise.all(need.map(T => T.state === 'none' ? this.fetch(T) : T.state === 'loading' ? T.pending : null));
+    for (const T of need) if (T.state === 'ready') {
+      this.ready = this.ready.filter(q => q !== T);
+      const it = this.integrate(T); while (!it.next().done) { /* now */ }
     }
   }
   // join a tile to the world, a slice at a time

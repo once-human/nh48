@@ -120,18 +120,11 @@ async function main() {
   const sndUrl = (n) => `assets/snd/${n}.mp3`;
   for (const n of SOUNDS) loader.expect(sndUrl(n), manifest[sndUrl(n)] || 5e4);
   const VOICE_BIN = 'assets/voices.mp3';
-  loader.expect(VOICE_BIN, manifest[VOICE_BIN] || 1.2e6);
   await progress('Downloading Pune', 0.01);
   const sounds = {};
   const sndJob = Promise.all([...SOUNDS.map(async (n) => {
     try { const b = await loader.bytes(sndUrl(n)); sounds[n] = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); } catch (e) { /* plays without it */ }
-  }), (async () => {
-    // all voice lines in one file; the manifest says where each one starts
-    try {
-      const b = await loader.bytes(VOICE_BIN), idx = manifest.__voices || {};
-      for (const [id, [off, len, pack]] of Object.entries(idx)) if (!pack) sounds['v_' + id] = b.buffer.slice(b.byteOffset + off, b.byteOffset + off + len);
-    } catch (e) { /* silent dialogue */ }
-  })()]);
+  })]);
   const [M, gAlb, gNrm, gArm, wAlb, wNrm, wArm, bark, barkN, palm] = await Promise.all([
     PUNE ? loader.bytes(ASSETS.map).then(async (b) => cityFromBase(JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text()))) : loader.json(ASSETS.map), loader.bitmap(ASSETS.gAlb), loader.bitmap(ASSETS.gNrm), loader.bitmap(ASSETS.gArm),
     loader.bitmap(ASSETS.wAlb), loader.bitmap(ASSETS.wNrm), loader.bitmap(ASSETS.wArm),
@@ -171,7 +164,7 @@ async function main() {
     try { const r = JSON.parse(sessionStorage.getItem('nh48_resume') || 'null'); if (r) { sx = r.x; sz = r.z; } } catch (e) { /* none */ }
     W.tiles = new TileManager(W);
     await progress('Loading this part of Pune', 0.83);
-    await W.tiles.warm(sx, sz, (k, n) => { shownF = Math.max(shownF, 0.83 + 0.03 * k / n); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
+    await W.tiles.warm(sx, sz, 700, (k, n) => { shownF = Math.max(shownF, 0.83 + 0.03 * k / n); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
   }
   if (params.has('fly')) return runFly({ W, renderer, scene, camera, sky, post, quality, progress });
 
@@ -192,13 +185,13 @@ async function main() {
   window.__game = game;
   W.cityMap = game.city;
   W.tiles?.attachGame(game);
-  // the shopkeepers' and the people-you-talk-to voice packs, in the background
-  setTimeout(() => {
+  // voices never hold up the start: the street voices first, a few seconds in, then the shopkeepers' and the
+  // people-you-talk-to packs one after another (the city around you gets the bandwidth first)
+  {
     const idx = manifest.__voices || {}, bg = new Loader(() => {});
-    ['assets/voices_k.mp3', 'assets/voices_d.mp3'].forEach((url, k) => bg.bytes(url).then((b) => {
-      for (const [id, [off, len, pack]] of Object.entries(idx)) if (pack === k + 1) game.audio.raw['v_' + id] = b.buffer.slice(b.byteOffset + off, b.byteOffset + off + len);
-    }).catch(() => { /* those voices stay silent; subtitles still show */ }));
-  }, 1500);
+    const pack = (url, k) => bg.bytes(url).then((b) => { for (const [id, [off, len, pk]] of Object.entries(idx)) if ((pk || 0) === k) game.audio.raw['v_' + id] = b.buffer.slice(b.byteOffset + off, b.byteOffset + off + len); }).catch(() => { /* subtitles still show */ });
+    setTimeout(async () => { await pack(VOICE_BIN, 0); await new Promise(r => setTimeout(r, 8000)); await pack('assets/voices_k.mp3', 1); await pack('assets/voices_d.mp3', 2); }, 4000);
+  }
   await game.init(progress);
   // warm the chunks around the start before the first frame
   await progress('Building the streets', 0.86);
