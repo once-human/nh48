@@ -2,6 +2,7 @@
 // taxis, tempos and the city bus. Same arcade core as the auto, tuned per class from real-world
 // figures (top speed, 0–60 feel, braking, turning circle), slowed by load, footpaths and potholes.
 import * as THREE from 'three';
+import { bumpsAt } from '../world/groundChunk.js';
 import { flyResolve, flyTrack, flyHeight } from '../world/flyover.js';
 import { buildScooter, buildBike, buildCycle, buildCar, buildBus, buildTempo, buildAuto, PAINTS } from './models.js';
 import { buildCarCockpit } from './cockpit.js';
@@ -115,7 +116,7 @@ export class Vehicle {
   heightAt(x, z) {
     const W = this.W;
     let h = W.surf.height(x, z);
-    for (const b of W.bumps) {
+    for (const b of bumpsAt(W, x, z)) {
       const dx = x - b.x, dz = z - b.z;
       if (Math.abs(dx) > 8 || Math.abs(dz) > 8) continue;
       const ca = Math.cos(b.ang), sa = Math.sin(b.ang);

@@ -1,6 +1,7 @@
 // The player's auto-rickshaw: arcade physics tuned to feel like a Bajaj RE, slow to pick up,
 // turns on a coin, lifts a rear wheel if you corner too hard, and tips over if you insist.
 import * as THREE from 'three';
+import { bumpsAt } from '../world/groundChunk.js';
 import { flyResolve, flyTrack, flyHeight } from '../world/flyover.js';
 import { buildAuto, addRider } from './models.js';
 import { ColorBuilder } from '../world/geo.js';
@@ -137,7 +138,7 @@ export class PlayerAuto {
     const W = this.W;
     let h = W.surf.height(x, z);
     // speed breakers
-    for (const b of W.bumps) {
+    for (const b of bumpsAt(W, x, z)) {
       const dx = x - b.x, dz = z - b.z;
       if (Math.abs(dx) > 8 || Math.abs(dz) > 8) continue;
       const ca = Math.cos(b.ang), sa = Math.sin(b.ang);
