@@ -125,10 +125,17 @@ export class Game {
     const R = this.renderer, cam = this.camera, kit = this.W.kit;
     const shown = [], tmp = [];
     try {
-      const at = (o) => { o.position.set(cam.position.x, cam.position.y - 40, cam.position.z); };
+      // in front of the camera, really rendered once (behind the loading screen): that also builds
+      // the shadow and skinning variants that compile() alone skips
+      const fw = new THREE.Vector3(); cam.getWorldDirection(fw);
+      let k = 0;
+      const at = (o) => { o.position.set(cam.position.x + fw.x * 7 + (k % 6 - 3) * 1.2, cam.position.y - 1.6, cam.position.z + fw.z * 7 + Math.floor(k / 6) * 1.2); k++; };
       if (this.crowd) for (const s of this.crowd.pool) { s.H.holder.visible = true; at(s.H.holder); for (const o of s.H.parts) o.visible = true; shown.push(s); }
-      for (const t of ['sedan', 'scooter', 'bike', 'auto', 'bus', 'tempo']) { const v = new Vehicle(this.W, this.scene, this.vmats, t); v.root.position.set(cam.position.x, cam.position.y - 40, cam.position.z); tmp.push(v); }
+      for (const t of ['sedan', 'scooter', 'bike', 'auto', 'bus', 'tempo']) { const v = new Vehicle(this.W, this.scene, this.vmats, t); at(v.root); tmp.push(v); }
+      if (this.player.human) { this.player.human.holder.visible = true; at(this.player.human.holder); }
       R.compile(this.scene, cam);
+      R.render(this.scene, cam);
+      if (this.player.human) this.player.human.holder.visible = false;
     } catch (e) { console.warn('prewarm', e); }
     for (const s of shown) { s.H.holder.visible = false; if (kit) kit.applyLook(s.H, s.H.look); }
     for (const v of tmp) v.dispose();
@@ -210,14 +217,12 @@ export class Game {
     if (why) { this.hud.toast('No rickshaw right now', why, 'warn', 2.6); return false; }
     const cost = this.fastTravelCost(x, z);
     if (this.stats.money < cost) { this.hud.toast('Not enough money', `The meter says ₹${cost}`, 'warn', 2.6); return false; }
-    const G = this.W.graph;
-    const near = G.nearest(x, z, 300, e => e.rank >= 1 && !e.restricted) || G.nearest(x, z, 600);
-    if (!near) { this.hud.toast('No rickshaw goes there', 'No road near that spot', 'warn', 2.4); return false; }
-    const e = near.e, t = G.at(e, near.s), th = Math.atan2(t[3], t[2]);
+    const spot = this.safeDrop(x, z);
+    if (!spot) { this.hud.toast('No rickshaw goes there', 'No road near that spot', 'warn', 2.4); return false; }
+    const e = spot.e;
     const P = this.player;
     // dropped at the kerb, on foot; whatever you were driving stays parked where you left it
-    const sw = e.w / 2 + Math.max(0.8, e.sw / 2);
-    P.teleportFoot(t[0] + t[3] * sw, t[1] - t[2] * sw, th + Math.PI / 2, this.traffic);
+    P.teleportFoot(spot.x, spot.z, spot.th, this.traffic);
     this.stats.money -= cost; this.saveStats();
     this.setWaypoint(null);
     this.W.streamer.warm(P.x, P.z, Math.min(260, this.quality.streamRadius || 260));
@@ -225,6 +230,40 @@ export class Game {
     this.toggleMap(false);
     this.hud.flash(name || 'Here you are', `Rickshaw fare ₹${cost} · ${this.W.graph.names[e.name] ? this.W.graph.names[e.name][0] : ''} · your auto is marked on the map`);
     return true;
+  }
+  // somewhere you can actually stand: on a public road's footpath or kerb, never inside a building,
+  // a wall, the river or a compound, and with room to walk away. Falls back to the road itself.
+  safeDrop(x, z) {
+    const G = this.W.graph, S = this.W.surf, C = this.W.collision;
+    const clear = (px, pz) => {
+      if (S.inBuilding(px, pz) || S.isWater(px, pz) || C.resolve(px, pz, 0.55)) return false;
+      // room to move: at least three of four directions 1.5 m away are open too
+      let open = 0;
+      for (const [dx, dz] of [[1.5, 0], [-1.5, 0], [0, 1.5], [0, -1.5]]) if (!S.inBuilding(px + dx, pz + dz) && !C.resolve(px + dx, pz + dz, 0.4)) open++;
+      return open >= 3;
+    };
+    const cands = [];
+    for (const e of G.gridQuery(x, z, 320)) {
+      if (e.rank < 1 || e.restricted || e.bridge) continue;
+      const n = G.nearest(x, z, 400, q => q === e);
+      if (n) cands.push([n.d + (e.rank < 2 ? 25 : 0), e, n.s]);
+    }
+    cands.sort((a, b) => a[0] - b[0]);
+    for (const [, e, s0] of cands.slice(0, 30)) {
+      for (const ds of [0, 6, -6, 12, -12, 20, -20, 32, -32]) {
+        const s = Math.max(1, Math.min(e.len - 1, s0 + ds));
+        const t = G.at(e, s), th = Math.atan2(t[3], t[2]);
+        for (const side of [1, -1]) for (const off of [e.w / 2 + Math.max(0.8, e.sw / 2), e.w / 2 + 0.45]) {
+          const px = t[0] + t[3] * off * side, pz = t[1] - t[2] * off * side;
+          if (clear(px, pz)) return { x: px, z: pz, th: th + Math.PI / 2 * side, e };
+        }
+      }
+    }
+    // last resort: the edge of the carriageway of the nearest proper road
+    const near = G.nearest(x, z, 600, e => e.rank >= 2 && !e.restricted) || G.nearest(x, z, 900);
+    if (!near) return null;
+    const e = near.e, t = G.at(e, near.s), lat = e.w / 2 - 0.8;
+    return { x: t[0] + t[3] * lat, z: t[1] - t[2] * lat, th: Math.atan2(t[3], t[2]), e };
   }
   // waypoint + GPS: a blue route along the road graph, refreshed as you drive
   setWaypoint(wp) {

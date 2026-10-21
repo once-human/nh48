@@ -22,8 +22,17 @@ export class AnimalKit {
       const box = new THREE.Box3().setFromObject(g.scene, true);
       const sz = box.getSize(new THREE.Vector3());
       const scale = TARGET[k] / (k === 'kite' ? Math.max(sz.x, sz.z) : sz.y);
-      const longX = sz.x > sz.z;
-      this.src[k] = { g, clips, scale, box, longX };
+      // which way the animal actually faces in its rest pose: front feet / head minus back feet / tail
+      // (some models face +X, some +Z; guessing wrong made them walk sideways)
+      const fr = new THREE.Vector3(), bk = new THREE.Vector3(); let nf = 0, nb = 0;
+      g.scene.traverse((o) => {
+        const n = o.name || '';
+        const p = o.getWorldPosition(new THREE.Vector3());
+        if (/front|head|neck/i.test(n)) { fr.add(p); nf++; } else if (/back(?!bone)|tail|hips/i.test(n) && !/^Back$/.test(n)) { bk.add(p); nb++; }
+      });
+      let yaw = Math.PI / 2;
+      if (nf && nb) { fr.divideScalar(nf); bk.divideScalar(nb); const fx = fr.x - bk.x, fz = fr.z - bk.z; if (Math.hypot(fx, fz) > 1e-4) yaw = Math.atan2(fz, fx); }
+      this.src[k] = { g, clips, scale, box, yaw };
     }
   }
   has(k) { return !!this.src[k]; }
@@ -66,7 +75,7 @@ export class AnimalKit {
     return A;
   }
   // models face +Z after export; the game's heading 0 is +X
-  fixYaw(kind) { return Math.PI / 2 + (this.flip && this.flip[kind] ? Math.PI : 0); }
+  fixYaw(kind) { return kind === 'kite' ? Math.PI / 2 : (this.src[kind] ? this.src[kind].yaw : Math.PI / 2); }
 }
 
 // Draws peds.js animals (cows, dogs) plus cats on the footpaths and kites in the sky.

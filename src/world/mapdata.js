@@ -235,7 +235,23 @@ export class Surfaces {
       if (kind === 'asphalt' || kind === 'concrete' || kind === 'bridge_road') for (const [ci, rings] of polys) add(this.road, ci, rings);
     }
     for (const [ci, rings] of M.water) add(this.water, ci, rings);
+    // building footprints, filed in every chunk their box touches (for "is this spot inside a building")
+    this.bld = new Map();
+    for (const B of M.buildings) {
+      const r = cmRing(B[1]);
+      let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+      for (let k = 0; k < r.length; k += 2) { x0 = Math.min(x0, r[k]); x1 = Math.max(x1, r[k]); z0 = Math.min(z0, r[k + 1]); z1 = Math.max(z1, r[k + 1]); }
+      const rec = { rings: [r], bb: [x0, z0, x1, z1] };
+      const i0 = Math.floor((x0 - this.x0) / this.cs), i1 = Math.floor((x1 - this.x0) / this.cs), j0 = Math.floor((z0 - this.z0) / this.cs), j1 = Math.floor((z1 - this.z0) / this.cs);
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+        if (i < 0 || j < 0 || i >= this.ncx || j >= this.ncz) continue;
+        const ci = i + j * this.ncx;
+        if (!this.bld.has(ci)) this.bld.set(ci, []);
+        this.bld.get(ci).push(rec);
+      }
+    }
   }
+  inBuilding(x, z) { return this.test(this.bld, x, z); }
   chunkOf(x, z) {
     const i = Math.floor((x - this.x0) / this.cs), j = Math.floor((z - this.z0) / this.cs);
     if (i < 0 || j < 0 || i >= this.ncx || j >= this.ncz) return -1;
