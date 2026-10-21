@@ -17,14 +17,14 @@ from shapely import wkb
 from shapely.geometry import LineString, Point, Polygon
 from shapely.strtree import STRtree
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-MAP = os.path.join(ROOT, 'data/map.json')
+MAP = os.environ.get('NH_MAP') or os.path.join(ROOT, 'data/map.json')
 M = json.load(open(MAP)); meta = M['meta']
 rng = random.Random(4848)
 def proj(lat, lon): return ((lon - meta['lon0']) * meta['mlon'], -(lat - meta['lat0']) * meta['mlat'])
 cm = lambda v: int(round(v * 100))
 def ring(flat): return [(flat[k] / 100, flat[k + 1] / 100) for k in range(0, len(flat) - 1, 2)]
 # idempotent: work from the walls / parking bake_map.py made (saved the first time this runs on a fresh bake)
-BASE = os.path.join(ROOT, 'data/raw/street_base.json')
+BASE = os.environ.get('NH_STREETBASE') or os.path.join(ROOT, 'data/raw/street_base.json')
 if M.get('street'):
     base = json.load(open(BASE)); M['walls'], M['parked'] = base['walls'], base['parked']
 else:
@@ -219,7 +219,7 @@ def add(x, z, c, w=1.0):
         for b in (-1, 0, 1):
             grid[(i + a, j + b)][k] += w * (1.0 if a == 0 and b == 0 else 0.35 if a == 0 or b == 0 else 0.2)
 vis = [v / 100 for v in meta['vis']]
-T = pq.read_table(os.path.join(ROOT, 'data/raw/overture/places.parquet'), columns=['geometry', 'confidence', 'basic_category', 'taxonomy', 'operating_status'])
+T = pq.read_table((os.environ.get('NH_PLACES') or os.path.join(ROOT, 'data/raw/overture/places.parquet')), columns=['geometry', 'confidence', 'basic_category', 'taxonomy', 'operating_status'])
 cnt = collections.Counter()
 rows = list(zip(*[T.column(c).to_pylist() for c in ['geometry', 'confidence', 'basic_category', 'taxonomy', 'operating_status']]))
 pts = [wkb.loads(r[0]) for r in rows]

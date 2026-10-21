@@ -39,6 +39,23 @@ MARGIN = 138.0
 VIS = PLAY.buffer(MARGIN, join_style='mitre')   # rendered + AI area
 VB = VIS.bounds
 CHUNK = 200.0
+# ---- tile mode (whole Pune, tools/bake_pune.py): NH_TILE="x0,z0,x1,z1" (game metres, chunk aligned),
+# NH_GRID="gx0,gz0,ncx,ncz" (the global chunk grid). The same projection as the original map, the
+# area clipped to the city outline (data/raw/pune/outline.json). Everything is computed over the tile
+# plus a margin, and only what falls in the tile's own chunks is written, so tiles join seamlessly.
+TILE = os.environ.get('NH_TILE')
+OUTL = None
+if TILE:
+    TX0, TZ0, TX1, TZ1 = map(float, TILE.split(','))
+    GX0, GZ0, GNCX, GNCZ = os.environ['NH_GRID'].split(','); GX0, GZ0, GNCX, GNCZ = float(GX0), float(GZ0), int(GNCX), int(GNCZ)
+    _ol = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data/raw/pune/outline.json')))['outline'][0]
+    OUTL = Polygon([proj(la, lo) for lo, la in _ol]).buffer(0)
+    CORE = box(TX0, TZ0, TX1, TZ1)
+    VIS = CORE.buffer(320.0, join_style='mitre').intersection(OUTL)
+    PLAY = VIS
+    PX0, PZ0, PX1, PZ1 = TX0, TZ0, TX1, TZ1
+    VB = VIS.bounds
+    MARGIN = 0.0
 rng = random.Random(1618)
 
 import time as _time
@@ -166,6 +183,8 @@ for k, r in RELS.items():
         water_polys += rel_polys(r)
 RIVER = fix(unary_union(water_polys)).intersection(VIS) if water_polys else Polygon()
 LAKES = fix(unary_union(lake_polys)).intersection(VIS) if lake_polys else Polygon()
+if RIVER.is_empty:
+    RIVER = box(9e6, 9e6, 9e6 + 1, 9e6 + 1)      # no river in this tile: a speck far away keeps the overlays happy
 WATER = fix(unary_union([RIVER, LAKES]))
 log('water area', round(RIVER.area), 'lakes', round(LAKES.area))
 
@@ -319,12 +338,20 @@ if os.path.exists(OVT_B) and not os.environ.get('NO_OVERTURE'):
     import duckdb
     from shapely import wkb as _wkb
     con = duckdb.connect(); con.sql('load spatial')
+    if TILE:
+        OVT_B = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data/raw/pune/building.parquet')
+        _b = VIS.bounds
+        _lo0, _lo1 = _b[0] / MLON + LON0, _b[2] / MLON + LON0
+        _la0, _la1 = -_b[3] / MLAT + LAT0, -_b[1] / MLAT + LAT0
+        _where = f"where bbox.xmax >= {_lo0} and bbox.xmin <= {_lo1} and bbox.ymax >= {_la0} and bbox.ymin <= {_la1}"
+    else:
+        _where = ''
     rows = con.sql(f"""select ST_AsWKB(geometry), list_transform(sources, s -> s.dataset), num_floors, height
-                       from '{OVT_B}'""").fetchall()
+                       from '{OVT_B}' {_where}""").fetchall()
     osm_tree = STRtree([b[0] for b in bpolys])
     added = 0
     for i, (g, srcs, floors, height) in enumerate(rows):
-        if 'OpenStreetMap' in srcs:
+        if 'OpenStreetMap' in srcs and not TILE:
             continue
         geom = _wkb.loads(bytes(g))
         for gp in ([geom] if geom.geom_type == 'Polygon' else list(getattr(geom, 'geoms', []))):
@@ -621,11 +648,15 @@ for s in signal_nodes:
 log('signalised junctions', len(signal_j))
 
 portal_nodes = set()
+barricade_nodes = set()
 for e in edges:
     for n in (e['a'], e['b']):
         x, z = node_xy[n]
         if not VIS.buffer(-6).contains(Point(x, z)):
-            portal_nodes.add(n)
+            if TILE:
+                if OUTL.exterior.distance(Point(x, z)) < 8: barricade_nodes.add(n)
+            else:
+                portal_nodes.add(n)
 
 # ---------------------------------------------------------------- markings
 marks_center, marks_lane, zebras, stoplines, bumps = [], [], [], [], []
@@ -1431,18 +1462,26 @@ for name, mr, x, z, kind in poi_src:
 log('pois', len(pois))
 
 # ---------------------------------------------------------------- chunking + output
+if TILE:
+    G0X, G0Z = GX0, GZ0
+    NCX, NCZ = GNCX, GNCZ
+    CI = (int(round((TX0 - GX0) / CHUNK)), int(round((TX1 - GX0) / CHUNK)))
+    CJ = (int(round((TZ0 - GZ0) / CHUNK)), int(round((TZ1 - GZ0) / CHUNK)))
+else:
+    G0X, G0Z = VB[0], VB[1]
+    NCX = int(math.ceil((VB[2] - VB[0]) / CHUNK)); NCZ = int(math.ceil((VB[3] - VB[1]) / CHUNK))
+    CI, CJ = (0, NCX), (0, NCZ)
 def chunk_index(x, z):
-    i = int((x - VB[0]) // CHUNK); j = int((z - VB[1]) // CHUNK)
+    i = int((x - G0X) // CHUNK); j = int((z - G0Z) // CHUNK)
     return i, j
-
-NCX = int(math.ceil((VB[2] - VB[0]) / CHUNK)); NCZ = int(math.ceil((VB[3] - VB[1]) / CHUNK))
+def in_core(i, j): return CI[0] <= i < CI[1] and CJ[0] <= j < CJ[1]
 
 def chunked_polys(g, min_area=0.5):
     out = []
     g = fix(g)
-    for i in range(NCX):
-        for j in range(NCZ):
-            cb = box(VB[0] + i * CHUNK, VB[1] + j * CHUNK, VB[0] + (i + 1) * CHUNK, VB[1] + (j + 1) * CHUNK)
+    for i in range(*CI):
+        for j in range(*CJ):
+            cb = box(G0X + i * CHUNK, G0Z + j * CHUNK, G0X + (i + 1) * CHUNK, G0Z + (j + 1) * CHUNK)
             if not g.intersects(cb):
                 continue
             part = fix(shapely.clip_by_rect(g, *cb.bounds))
@@ -1458,9 +1497,9 @@ def chunked_polys(g, min_area=0.5):
 
 def chunked_lines(g, min_len=0.3):
     out = []
-    for i in range(NCX):
-        for j in range(NCZ):
-            cb = box(VB[0] + i * CHUNK, VB[1] + j * CHUNK, VB[0] + (i + 1) * CHUNK, VB[1] + (j + 1) * CHUNK)
+    for i in range(*CI):
+        for j in range(*CJ):
+            cb = box(G0X + i * CHUNK, G0Z + j * CHUNK, G0X + (i + 1) * CHUNK, G0Z + (j + 1) * CHUNK)
             if not g.intersects(cb):
                 continue
             for s in as_lines(shapely.clip_by_rect(g, *cb.bounds)):
@@ -1536,9 +1575,13 @@ lake_banks = chunked_lines(LAKES.boundary, 0.5) if not LAKES.is_empty else []
 water_out = chunked_polys(RIVER) + chunked_polys(LAKES) if not LAKES.is_empty else chunked_polys(RIVER)
 
 bout = []
-for b in buildings:
+bmap = {}
+for bi0, b in enumerate(buildings):
     c = b['p'].representative_point()
     i, j = chunk_index(c.x, c.y)
+    if not in_core(i, j):
+        continue
+    bmap[bi0] = len(bout)
     bout.append([i + j * NCX, ring_out(b['p'].exterior.coords), b['levels'], b['style'], b['roof'],
                  b['flags'], b['tint'], b.get('hoard', 0), 1 if b['peth'] else 0, b['dist'], b['name']])
 
@@ -1547,9 +1590,15 @@ for n, (x, z) in enumerate(node_xy):
     f = 0
     if n in signal_j: f |= 1
     if n in portal_nodes: f |= 2
+    if n in barricade_nodes: f |= 4
     graph_nodes.append([cm(x), cm(z), f, cm(jrad[n])])
 graph_edges = []
+def _edge_in_core(e):
+    if not TILE: return True
+    ln = LineString(e['pts']); m = ln.interpolate(0.5, normalized=True)
+    return CORE.contains(m)
 for e in edges:
+    if not _edge_in_core(e): continue
     r = e['r']
     graph_edges.append([e['a'], e['b'], cm(r['w']), r['rank'], 1 if r['ow'] else 0, r['nid'], cm(r['sw']),
                         line_out(e['pts']), 1 if r['bridge'] else 0, 1 if r['access'] in ('private',) else 0])
@@ -1570,9 +1619,26 @@ for k, w in WAYS.items():
             if VIS.contains(ln.centroid):
                 mstations.append([t.get('name', ''), line_out(ln.coords)])
 
+if TILE:
+    # point features: only the ones standing in this tile
+    def _core_pts(L, ix=0, iz=1):
+        return [q for q in L if CORE.contains(Point(q[ix] / 100, q[iz] / 100))]
+    trees = _core_pts(trees); lamps = _core_pts(lamps); poles = _core_pts(poles); signals_out = _core_pts(signals_out)
+    buses = _core_pts(buses); stalls = _core_pts(stalls); hoardings = _core_pts(hoardings, 2, 3); pois = [q for q in pois if CORE.contains(Point(q[2] / 100, q[3] / 100))] if pois and len(pois[0]) > 3 and isinstance(pois[0][2], (int, float)) else pois
+    marks_center = [l for l in marks_center if CORE.contains(Point(l[0] / 100, l[1] / 100))]
+    marks_lane = [l for l in marks_lane if CORE.contains(Point(l[0] / 100, l[1] / 100))]
+    zebras = _core_pts(zebras); stoplines = _core_pts(stoplines); bumps = _core_pts(bumps)
+    walls = [w for w in walls if CORE.contains(Point(w[0] / 100, w[1] / 100))]
+    parked = [q for q in parked if CORE.contains(Point(q[0] / 100, q[1] / 100))] if parked and isinstance(parked[0][0], (int, float)) else parked
+    metro_out = [m for m in metro_out if CORE.contains(Point(m[1][0] / 100, m[1][1] / 100))]
+    mstations = [m for m in mstations if CORE.contains(Point(m[1][0] / 100, m[1][1] / 100))]
+    shops_out = [[bmap[q[0]]] + list(q[1:]) for q in shops_out if q[0] in bmap]
+    rail_out = [r for r in rail_out if CORE.contains(Point(r[1][0] / 100, r[1][1] / 100))]
+    platforms_out = [r for r in platforms_out if r and CORE.contains(Point(r[0] / 100, r[1] / 100))]
 out = dict(
     meta=dict(lat0=LAT0, lon0=LON0, mlat=MLAT, mlon=MLON, play=[cm(PX0), cm(PZ0), cm(PX1), cm(PZ1)],
-              vis=[cm(VB[0]), cm(VB[1]), cm(VB[2]), cm(VB[3])], chunk=CHUNK, ncx=NCX, ncz=NCZ,
+              vis=[cm(G0X), cm(G0Z), cm(G0X + NCX * CHUNK), cm(G0Z + NCZ * CHUNK)] if TILE else [cm(VB[0]), cm(VB[1]), cm(VB[2]), cm(VB[3])],
+              chunk=CHUNK, ncx=NCX, ncz=NCZ, tile=[cm(TX0), cm(TZ0), cm(TX1), cm(TZ1)] if TILE else None,
               attribution='Map data (c) OpenStreetMap contributors, ODbL'),
     names=NAMES,
     ground=[[k, v] for k, v in ground_layers],

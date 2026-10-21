@@ -20,9 +20,9 @@ from shapely.strtree import STRtree
 from shopnames import board_name, pin_name, _h
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-MAP = os.path.join(ROOT, 'data/map.json')
-OSM = os.path.join(ROOT, 'data/raw/merged.json')
-OVT = os.path.join(ROOT, 'data/raw/overture/places.parquet')
+MAP = os.environ.get('NH_MAP') or os.path.join(ROOT, 'data/map.json')
+OSM = os.environ.get('NH_OSM') or (os.environ.get('NH_OSM') or os.path.join(ROOT, 'data/raw/merged.json'))
+OVT = os.environ.get('NH_PLACES') or (os.environ.get('NH_PLACES') or os.path.join(ROOT, 'data/raw/overture/places.parquet'))
 SHOP_CELL = 3.6                 # must match buildingsChunk.js / the facade shader
 SNAP = 6.0                      # first pass: inside its building or within this many metres of it
 NEAR_R = 25.0                   # second pass: nearest real building within this radius

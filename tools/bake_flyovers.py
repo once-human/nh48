@@ -12,9 +12,9 @@ from shapely.geometry import LineString, Polygon, Point
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-MAP = os.path.join(ROOT, 'data/map.json')
+MAP = os.environ.get('NH_MAP') or os.path.join(ROOT, 'data/map.json')
 M = json.load(open(MAP)); meta = M['meta']
-D = json.load(open(os.path.join(ROOT, 'data/raw/merged.json')))
+D = json.load(open((os.environ.get('NH_OSM') or os.path.join(ROOT, 'data/raw/merged.json'))))
 def proj(lat, lon): return ((lon - meta['lon0']) * meta['mlon'], -(lat - meta['lat0']) * meta['mlat'])
 P = {int(k): proj(v[0], v[1]) for k, v in D['nodes'].items()}
 vis = [v / 100 for v in meta['vis']]

@@ -9,8 +9,8 @@
 # the boards in the street.
 import json, math, os, re, sys, collections
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-MAP = os.path.join(ROOT, 'data/map.json')
-OSM = os.path.join(ROOT, 'data/raw/merged.json')
+MAP = os.environ.get('NH_MAP') or os.path.join(ROOT, 'data/map.json')
+OSM = os.environ.get('NH_OSM') or (os.environ.get('NH_OSM') or os.path.join(ROOT, 'data/raw/merged.json'))
 M = json.load(open(MAP))
 meta = M['meta']
 LAT0, LON0, MLAT, MLON = meta['lat0'], meta['lon0'], meta['mlat'], meta['mlon']
@@ -123,7 +123,7 @@ AREAS = {   # english -> (marathi, tier)  tier 1 shows on the whole-city view, 2
 }
 import duckdb, statistics
 con = duckdb.connect(); con.sql('load spatial')
-OVT = os.path.join(ROOT, 'data/raw/overture/places.parquet')
+OVT = os.environ.get('NH_PLACES') or (os.environ.get('NH_PLACES') or os.path.join(ROOT, 'data/raw/overture/places.parquet'))
 addr = con.sql(f"select ST_X(geometry), ST_Y(geometry), lower(addresses[1].freeform) from '{OVT}' where addresses[1].freeform is not null").fetchall()
 osm_areas = {p[0]: p for p in M['pois'] if p[4] in ('suburb', 'neighbourhood', 'locality')}
 areas = []

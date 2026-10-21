@@ -4,3 +4,4 @@ dist/
 scratch/
 *.log
 __pycache__/
+data/tiles/
