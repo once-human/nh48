@@ -192,8 +192,11 @@ for f in files:
     print(f'tile {i},{j}', 'buildings', len(B), 'pins', len(T['pins']), flush=True)
 # (every real place for the map's search: tools/bake_allplaces.py writes data/pune/pins.json.gz)
 out = dict(meta={**meta, 'outline': [[round(v, 5) for v in p] for p in outline], 'tiles': tiles, 'tileSize': 1000, 'activity': act_meta},
-           names=names, coarse=dict(nodes=coarse_nodes, edges=coarse_edges), cwater=cwater, districts=['deccan', 'peth', 'camp', 'kp', 'station', 'residential', 'riverside'],
+           names=names, districts=['deccan', 'peth', 'camp', 'kp', 'station', 'residential', 'riverside'],
            landmarks=base['landmarks'], areas=base['areas'], flyovers=base['flyovers'], metro=base['metro'], mstations=base['mstations'], buses=base['buses'], places=base['places'], pois=base['pois'], street=1)
 s = json.dumps(out, separators=(',', ':'), ensure_ascii=False).encode()
 with gzip.open(os.path.join(OUT, 'base.json.gz'), 'wb', 9) as fh: fh.write(s)
+# the main-road network and rivers for the map's street names: not needed to start, so a file of their own
+with gzip.open(os.path.join(OUT, 'base_map.json.gz'), 'wb', 9) as fh:
+    fh.write(json.dumps(dict(coarse=dict(nodes=coarse_nodes, edges=coarse_edges), cwater=cwater), separators=(',', ':'), ensure_ascii=False).encode())
 print('base', len(s) // 1024, 'KB', 'coarse nodes', len(coarse_nodes), 'edges', len(coarse_edges), 'names', len(names), 'tiles', len(tiles))

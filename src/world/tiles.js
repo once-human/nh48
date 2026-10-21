@@ -2,6 +2,7 @@
 // world a slice at a time so no frame stalls: roads, buildings, surfaces, collision, trees, street furniture,
 // parked vehicles, road markings, crowd activity, shops. Tiles far behind you are dropped again, so even a
 // weak PC only ever holds a handful.
+import { versioned } from '../core/assets.js';
 import { cmRing } from './geo.js';
 import { addStreetProps, removeStreetProps } from './propsChunk.js';
 import { addGroundTile, removeGroundTile } from './groundChunk.js';
@@ -10,7 +11,7 @@ import { addGroundTile, removeGroundTile } from './groundChunk.js';
 const LOAD_R = 1200, DROP_R = 1900, BUDGET = 3;
 
 async function fetchJSONgz(url) {
-  const r = await fetch(url);
+  const r = await fetch(versioned(url));
   if (!r.ok) throw new Error(url + ' ' + r.status);
   const s = r.body.pipeThrough(new DecompressionStream('gzip'));
   return JSON.parse(await new Response(s).text());

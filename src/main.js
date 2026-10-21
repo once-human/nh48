@@ -176,7 +176,7 @@ async function main() {
     try { const r = JSON.parse(sessionStorage.getItem('nh48_resume') || 'null'); if (r) { sx = r.x; sz = r.z; } } catch (e) { /* none */ }
     W.tiles = new TileManager(W);
     await progress('Loading this part of Pune', 0.83);
-    await W.tiles.warm(sx, sz, 450, (k, n) => { shownF = Math.max(shownF, 0.83 + 0.03 * k / n); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
+    await W.tiles.warm(sx, sz, 300, (k, n) => { shownF = Math.max(shownF, 0.83 + 0.03 * k / n); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
   }
   if (params.has('fly')) return runFly({ W, renderer, scene, camera, sky, post, quality, progress });
 
@@ -202,6 +202,11 @@ async function main() {
   {
     const idx = manifest.__voices || {}, bg = new Loader(() => {});
     const pack = (url, k) => bg.bytes(url).then((b) => { for (const [id, [off, len, pk]] of Object.entries(idx)) if ((pk || 0) === k) game.audio.raw['v_' + id] = b.buffer.slice(b.byteOffset + off, b.byteOffset + off + len); }).catch(() => { /* subtitles still show */ });
+    // the main roads of all Pune for the map's street names (left out of the start)
+    if (W.tiles) setTimeout(() => bg.bytes('assets/pune/base_map.json.gz').then(async (b) => {
+      const d = JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+      W.cityMap && W.cityMap.setCoarse(d.coarse, d.cwater);
+    }).catch(() => { /* names fill in as you go */ }), 6000);
     // every shop and place in Pune onto the map (names and spots only, about a megabyte)
     if (W.tiles) setTimeout(() => bg.bytes('assets/pune/pins.json.gz').then(async (b) => {
       const list = JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text());

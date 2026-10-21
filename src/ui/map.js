@@ -1,6 +1,7 @@
 // City map: tiles drawn on demand from the same map data the world is built from, a places index
 // for search, and the full-screen map screen (drag, zoom, search, filters, waypoint + GPS).
 // The minimap draws through the same tile cache, so both always agree with the streets you drive.
+import { versioned } from '../core/assets.js';
 import { cmRing } from '../world/geo.js';
 
 const TILE = 256;
@@ -79,36 +80,12 @@ export class CityMap {
     }).sort((a, b) => b.rank - a.rank || b.len - a.len);
     // all of Pune (streamed): the city's outline, its rivers and its main roads are always drawn, whether or not
     // the detailed tile there is loaded; the detail goes on top where it is
-    if (M.coarse) {
-      const bbf = (r) => { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; for (let k = 0; k < r.length; k += 2) { const x = r[k], z = r[k + 1]; if (x < a) a = x; if (x > c) c = x; if (z < b) b = z; if (z > d) d = z; } return [a, b, c, d]; };
-      const m = (q) => Float32Array.from(q, v => v / 100);
-      const N = M.coarse.nodes;
-      const edges = M.coarse.edges.map(e => {
-        const pts = e[5] && e[5].length >= 4 ? m(e[5]) : m([N[e[0]][0], N[e[0]][1], N[e[1]][0], N[e[1]][1]]);
-        return { pts, rank: e[2], name: e[4], bb: bbf(pts) };
-      }).sort((a, b) => a.rank - b.rank);
-      const water = (M.cwater || []).map(r => { const q = m(r); return { r: q, bb: bbf(q) }; });
-      const ol = (M.meta.outlineXZ || []).flatMap(([x, z]) => [x / 100, z / 100]);
-      this.coarse = { edges, water, outline: ol.length ? ol : null };
-      // street names from the main roads, for labels and search before you've been there
-      const nm = M.names || [], have = new Set(this.streets.map(s => s.n)), longest = new Map();
-      for (const e of edges) {
-        const n = nm[e.name]; if (!n || !n[0] || have.has(n[0])) continue;
-        const L = Math.hypot(e.bb[2] - e.bb[0], e.bb[3] - e.bb[1]), o = longest.get(n[0]);
-        if (!o || L > o.L) longest.set(n[0], { e, n, L });
-      }
-      for (const { e, n, L } of longest.values()) {
-        const p = e.pts, k = (p.length >> 2) << 1, a0 = Math.atan2(p[Math.min(p.length - 1, k + 3)] - p[k + 1], p[Math.min(p.length - 2, k + 2)] - p[k]);
-        let a = a0; if (a > Math.PI / 2) a -= Math.PI; else if (a < -Math.PI / 2) a += Math.PI;
-        this.streets.push({ n: n[0], mr: n[1], c: 'street', x: p[k], z: p[k + 1], rank: e.rank, a, len: L });
-      }
-      this.streets.sort((a, b) => b.rank - a.rank || b.len - a.len);
-    }
+    if (M.coarse) this.setCoarse(M.coarse, M.cwater);
     // all of Pune: the zoomed-out map is pictures baked offline (tools/bake_maptiles.py), never drawn at runtime;
     // closer in, the live drawing goes over them only where the city has streamed in
     this.raster = M.meta.tiles ? { levels: [[0.125, 4000], [0.25, 2000], [0.5, 1000], [1, 1000]], img: new Map(), ov: new Image() } : null;
     // the whole city in one small picture, there from the first frame; sharper pieces load over it as you look
-    if (this.raster) { const o = this.raster.ov; o.decoding = 'async'; o.onload = () => { o.ok = true; }; o.src = 'assets/pune/map/overview.webp'; }
+    if (this.raster) { const o = this.raster.ov; o.decoding = 'async'; o.onload = () => { o.ok = true; }; o.src = versioned('assets/pune/map/overview.webp'); }
     this.chunks = I.chunks;
     this.res = Math.min(2, Math.max(1, Math.round(window.devicePixelRatio || 1)));   // tile pixels per CSS pixel
     this.cap = 160;
@@ -266,7 +243,7 @@ export class CityMap {
       o.im.decoding = 'async';
       o.im.onload = () => { o.ok = true; };
       o.im.onerror = () => { o.bad = true; };
-      o.im.src = `assets/pune/map/r${L}/${tx}_${tz}.webp`;
+      o.im.src = versioned(`assets/pune/map/r${L}/${tx}_${tz}.webp`);
       R.img.set(k, o);
     }
     return o;
@@ -286,6 +263,36 @@ export class CityMap {
         const o = this.rimg(L, a, b);
         if (o.ok) ctx.drawImage(o.im, this.x0 + a * m, this.z0 + b * m, m + 0.5 / devPpm, m + 0.5 / devPpm);
       }
+    }
+  }
+  // the main-road network (streamed Pune: it arrives a few seconds after the start) gives the map its
+  // street names everywhere, before you've been there
+  setCoarse(coarse, cwater) {
+    const M = { ...this.W.M, coarse, cwater };
+    {
+      const bbf = (r) => { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; for (let k = 0; k < r.length; k += 2) { const x = r[k], z = r[k + 1]; if (x < a) a = x; if (x > c) c = x; if (z < b) b = z; if (z > d) d = z; } return [a, b, c, d]; };
+      const m = (q) => Float32Array.from(q, v => v / 100);
+      const N = M.coarse.nodes;
+      const edges = M.coarse.edges.map(e => {
+        const pts = e[5] && e[5].length >= 4 ? m(e[5]) : m([N[e[0]][0], N[e[0]][1], N[e[1]][0], N[e[1]][1]]);
+        return { pts, rank: e[2], name: e[4], bb: bbf(pts) };
+      }).sort((a, b) => a.rank - b.rank);
+      const water = (M.cwater || []).map(r => { const q = m(r); return { r: q, bb: bbf(q) }; });
+      const ol = (M.meta.outlineXZ || []).flatMap(([x, z]) => [x / 100, z / 100]);
+      this.coarse = { edges, water, outline: ol.length ? ol : null };
+      // street names from the main roads, for labels and search before you've been there
+      const nm = M.names || [], have = new Set(this.streets.map(s => s.n)), longest = new Map();
+      for (const e of edges) {
+        const n = nm[e.name]; if (!n || !n[0] || have.has(n[0])) continue;
+        const L = Math.hypot(e.bb[2] - e.bb[0], e.bb[3] - e.bb[1]), o = longest.get(n[0]);
+        if (!o || L > o.L) longest.set(n[0], { e, n, L });
+      }
+      for (const { e, n, L } of longest.values()) {
+        const p = e.pts, k = (p.length >> 2) << 1, a0 = Math.atan2(p[Math.min(p.length - 1, k + 3)] - p[k + 1], p[Math.min(p.length - 2, k + 2)] - p[k]);
+        let a = a0; if (a > Math.PI / 2) a -= Math.PI; else if (a < -Math.PI / 2) a += Math.PI;
+        this.streets.push({ n: n[0], mr: n[1], c: 'street', x: p[k], z: p[k + 1], rank: e.rank, a, len: L });
+      }
+      this.streets.sort((a, b) => b.rank - a.rank || b.len - a.len);
     }
   }
   // quietly fetch a whole level's pictures (or those within r of x, z), a few at a time, so the map is sharp

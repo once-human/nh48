@@ -122,6 +122,11 @@ if (fs.existsSync(voiceDir)) {
 const sizes = {}, hashes = {};
 const walk = (d, rel = '') => { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); const r = rel ? rel + '/' + f : f; if (fs.statSync(p).isDirectory()) walk(p, r); else { sizes['assets/' + r] = fs.statSync(p).size; hashes['assets/' + r] = crypto.createHash('sha1').update(fs.readFileSync(p)).digest('hex').slice(0, 10); } } };
 walk(path.join(dist, 'assets'));
+// streamed Pune (a thousand map pieces and pictures): one version for the whole folder instead of an entry per
+// file in the page; every URL under it carries ?v=<that>
+const puneHash = crypto.createHash('sha1');
+for (const k of Object.keys(hashes).sort()) if (k.startsWith('assets/pune/') || k.startsWith('assets/fonts/')) { puneHash.update(k + hashes[k]); if (!/base\.json\.gz$/.test(k)) { delete hashes[k]; delete sizes[k]; } }
+const PV = puneHash.digest('hex').slice(0, 10);
 
 const tpl = fs.readFileSync(path.join(root, 'src/page.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'src/style.css'), 'utf8');
@@ -130,7 +135,7 @@ const body = tpl
   .replace('/*FONTS*/', () => fontCss)
   .replace('/*CSS*/', () => css)
   .replace('<!--IMPORTMAP-->', () => importMap)
-  .replace('/*MANIFEST*/', () => JSON.stringify({ ...sizes, __voices: voiceIndex, __v: hashes }))
+  .replace('/*MANIFEST*/', () => JSON.stringify({ ...sizes, __voices: voiceIndex, __v: hashes, __pv: PV }))
   .replace('/*JS*/', () => js.replace(/<\/script/gi, '<\\/script'));
 fs.writeFileSync(path.join(dist, 'index.html'), body);
 fs.writeFileSync(path.join(dist, 'test.html'), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:dark}body{margin:0}[hidden]{display:none!important}</style></head><body>${body}</body></html>`);

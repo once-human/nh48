@@ -2,7 +2,15 @@
 // audio buffers. Everything is fetched relative to the page (published alongside it).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
+// the content version of an asset URL: its own hash, or the streamed-Pune folder's (assets/pune/...)
+let MAN = null;
+export function assetVersion(url) {
+  if (!MAN) { try { MAN = JSON.parse(document.getElementById('manifest').textContent); } catch (e) { MAN = {}; } }
+  return (MAN.__v && MAN.__v[url]) || (url.startsWith('assets/pune/') || url.startsWith('assets/fonts/') ? MAN.__pv : null) || null;
+}
+export const versioned = (url) => { const v = assetVersion(url); return v ? url + '?v=' + v : url; };
 export class Loader {
   constructor(onProgress) {
     this.onProgress = onProgress || (() => {});
@@ -19,7 +27,7 @@ export class Loader {
   async bytes(url) {
     // every asset URL carries its content hash, so a new map or model is never served from a stale cache
     let v = null;
-    try { v = (Loader.versions || (Loader.versions = JSON.parse(document.getElementById('manifest').textContent).__v || {}))[url]; } catch (e) { Loader.versions = {}; }
+    v = assetVersion(url);
     const res = await fetch(v ? url + '?v=' + v : url);
     if (!res.ok) throw new Error(`Could not load ${url} (${res.status})`);
     const len = +res.headers.get('content-length') || 0;
@@ -74,7 +82,7 @@ export class Loader {
   }
   async gltf(url) {
     const b = await this.unwrap(url, await this.bytes(url));
-    const loader = new GLTFLoader();
+    const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);   // the people models are meshopt-packed (a third the size)
     return await new Promise((resolve, reject) => loader.parse(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength), '', resolve, reject));
   }
   async audio(ctx, url) {
