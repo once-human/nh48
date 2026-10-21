@@ -270,8 +270,8 @@ export class Game {
   findStart(roadName) {
     const { W } = this;
     const ids = new Set(W.graph.names.map((n, i) => (n[0] === roadName ? i : -1)).filter(i => i >= 0));
-    let edges = W.graph.edges.filter(e => ids.has(e.name) && e.len > 40);
-    if (!edges.length) edges = W.graph.edges.filter(e => e.rank >= 4 && e.len > 60);
+    let edges = W.graph.liveEdges.filter(e => ids.has(e.name) && e.len > 40);
+    if (!edges.length) edges = W.graph.liveEdges.filter(e => e.rank >= 4 && e.len > 60);
     edges.sort((a, b) => b.pts[1] - a.pts[1]);
     const e = edges[Math.min(edges.length - 1, parseInt(this.params.get('ei') || '1'))];
     const s = Math.min(e.len * 0.5, 30);

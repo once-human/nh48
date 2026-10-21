@@ -12,6 +12,10 @@ const DISTRICT_CENTRES = [
   [4, 18.5270, 73.8760], [2, 18.5160, 73.8790], [2, 18.5195, 73.8840], [6, 18.5370, 73.8820], [3, 18.5395, 73.8920],
   [3, 18.5355, 73.8930], [6, 18.5420, 73.8650], [6, 18.5250, 73.8620],
 ];
+const EMPTY = Object.freeze([]);
+const TILE_FIELDS = ['ground', 'water', 'kerbs', 'banks', 'lakebanks', 'rails', 'bld', 'walls', 'lamps', 'poles', 'signals', 'buses', 'stalls', 'hoardings',
+  'center', 'lane', 'zebra', 'stop', 'bump', 'pot', 'railways', 'platforms'];
+const CHUNK_FIELDS = [...TILE_FIELDS, 'metro', 'mstations', 'mgates'];
 export const DISTRICTS = ['deccan', 'peth', 'camp', 'kp', 'station', 'residential', 'riverside'];
 
 export class WorldIndex {
@@ -22,44 +26,37 @@ export class WorldIndex {
     this.size = meta.chunk; this.ncx = meta.ncx; this.ncz = meta.ncz;
     this.dc = DISTRICT_CENTRES.map(([d, la, lo]) => ({ d, x: (lo - meta.lon0) * meta.mlon, z: -(la - meta.lat0) * meta.mlat }));
     const n = this.ncx * this.ncz;
+    // chunk data arrays start as one shared empty array and get their own on the first item: the whole
+    // city is 36,000 chunks and most of them are far away and empty at any moment
     this.chunks = [];
     for (let k = 0; k < n; k++) {
       const i = k % this.ncx, j = Math.floor(k / this.ncx);
-      this.chunks.push({ ci: k, i, j, cx: this.x0 + (i + 0.5) * this.size, cz: this.z0 + (j + 0.5) * this.size,
-        ground: [], water: [], kerbs: [], banks: [], lakebanks: [], rails: [], bld: [], walls: [], lamps: [], poles: [],
-        signals: [], buses: [], stalls: [], hoardings: [], center: [], lane: [], zebra: [], stop: [], bump: [], pot: [],
-        metro: [], railways: [], platforms: [], mstations: [], mgates: [], built: null, dist: 0, district: 5 });
+      const c = { ci: k, i, j, cx: this.x0 + (i + 0.5) * this.size, cz: this.z0 + (j + 0.5) * this.size, built: null, dist: 0, district: 5 };
+      for (const f of CHUNK_FIELDS) c[f] = EMPTY;
+      this.chunks.push(c);
     }
     for (const c of this.chunks) c.district = this.district(c.cx, c.cz);
-    const at = (x, z) => this.chunkOf(x, z);
-    const put = (arr, ci, item) => { if (ci >= 0 && ci < n) this.chunks[ci][arr].push(item); };
-    for (const [kind, polys] of M.ground) for (const [ci, rings] of polys) put('ground', ci, { kind, rings: rings.map(cmRing) });
-    for (const [ci, rings] of M.water) put('water', ci, rings.map(cmRing));
-    for (const [ci, line] of M.kerbs) put('kerbs', ci, cmRing(line));
-    for (const [ci, line] of M.banks) put('banks', ci, cmRing(line));
-    for (const [ci, line] of M.lakebanks || []) put('lakebanks', ci, cmRing(line));
-    for (const [ci, line] of M.rails) put('rails', ci, cmRing(line));
-    M.buildings.forEach((b, bi) => put('bld', b[0], bi));
-    for (const w of M.walls) put('walls', at(w[0] / 100, w[1] / 100), cmRing(w));
-    for (const l of M.lamps) put('lamps', at(l[0] / 100, l[1] / 100), l);
-    for (const l of M.poles) put('poles', at(l[0] / 100, l[1] / 100), l);
-    for (const s of M.signals) put('signals', at(s[0] / 100, s[1] / 100), s);
-    for (const s of M.buses) put('buses', at(s[0] / 100, s[1] / 100), s);
-    for (const s of M.stalls) put('stalls', at(s[0] / 100, s[1] / 100), s);
-    for (const h of M.hoardings) put('hoardings', at(h[2] / 100, h[3] / 100), h);
-    for (const s of M.marks.center) { const p = cmRing(s); put('center', at(p[p.length >> 2 << 1], p[(p.length >> 2 << 1) + 1]), p); }
-    for (const s of M.marks.lane) { const p = cmRing(s); put('lane', at(p[p.length >> 2 << 1], p[(p.length >> 2 << 1) + 1]), p); }
-    for (const z of M.marks.zebra) put('zebra', at(z[0] / 100, z[1] / 100), z);
-    for (const z of M.marks.stop) put('stop', at(z[0] / 100, z[1] / 100), z);
-    for (const z of M.marks.bump) put('bump', at(z[0] / 100, z[1] / 100), z);
-    for (const m of M.metro) { const p = cmRing(m[1]); for (let k = 0; k + 3 < p.length; k += 2) put('metro', at((p[k] + p[k + 2]) / 2, (p[k + 1] + p[k + 3]) / 2), [m[0], p[k], p[k + 1], p[k + 2], p[k + 3]]); }
-    for (const r of M.railways || []) { const p = cmRing(r[1]); put('railways', at(p[0], p[1]), { yard: r[0], pts: p }); }
-    for (const pf of M.platforms || []) { const p = cmRing(pf); put('platforms', at(p[0], p[1]), p); }
+    this.shopNames = [];
+    this.shopsByBld = new Map();
+    this.tileRanges = new Map();
+    this.addBase(M);
+    if (M.buildings) this.addTile(M, 0, null);
+  }
+  put(arr, ci, item) {
+    const c = this.chunks[ci];
+    if (!c || (this._rng && !this._rng(c))) return;
+    if (c[arr] === EMPTY) c[arr] = [];
+    c[arr].push(item);
+  }
+  // city-wide things from the base map: the metro and its stations
+  addBase(M) {
+    const at = (x, z) => this.chunkOf(x, z), put = (a, ci, it) => this.put(a, ci, it);
+    for (const m of M.metro || []) { const p = cmRing(m[1]); for (let k = 0; k + 3 < p.length; k += 2) put('metro', at((p[k] + p[k + 2]) / 2, (p[k + 1] + p[k + 3]) / 2), [m[0], p[k], p[k + 1], p[k + 2], p[k + 3]]); }
     for (const st of M.mstations || []) { const p = cmRing(st[1]); put('mstations', at(p[0], p[1]), { name: st[0], pts: p }); }
     // every elevated Pune Metro station gets a station building on the viaduct (where the map has no
     // platform drawn), every underground one an entrance kiosk on the street (game/transit.json)
     const segs = [];
-    for (const m of M.metro) { const p = cmRing(m[1]); for (let k = 0; k + 3 < p.length; k += 2) segs.push([p[k], p[k + 1], p[k + 2], p[k + 3]]); }
+    for (const m of M.metro || []) { const p = cmRing(m[1]); for (let k = 0; k + 3 < p.length; k += 2) segs.push([p[k], p[k + 1], p[k + 2], p[k + 3]]); }
     const have = (M.mstations || []).map(st => { const p = cmRing(st[1]); return [(p[0] + p[p.length - 2]) / 2, (p[1] + p[p.length - 1]) / 2]; });
     for (const l of TRANSIT.metro) for (const s of l.stations) {
       if (s.ug) { put('mgates', at(s.x, s.z), { name: s.name, x: s.x, z: s.z, color: l.color }); continue; }
@@ -75,14 +72,59 @@ export class WorldIndex {
       have.push([cx, cz]);
       put('mstations', at(cx, cz), { name: s.name, pts: [cx - ux * 65, cz - uz * 65, cx + ux * 65, cz + uz * 65], color: l.color });
     }
-    // shops grouped by building: bi -> Map(edge * 4096 + slot -> [bi, edge, slot, nameIndex, source])
-    this.shopNames = M.shopNames || [];
-    this.shopsByBld = new Map();
-    for (const s of M.shops || []) {
+  }
+  // one tile's worth of the city into its chunks. bOff: where its buildings start in M.buildings;
+  // rect (metres) keeps everything inside the tile's own chunks. Returns the chunks it touched.
+  addTile(D, bOff, rect, tag = 0) {
+    const at = (x, z) => this.chunkOf(x, z), put = (a, ci, it) => this.put(a, ci, it);
+    this._rng = rect ? (c) => c.cx >= rect[0] && c.cx < rect[2] && c.cz >= rect[1] && c.cz < rect[3] : null;
+    const off = bOff || 0;
+    for (const [kind, polys] of D.ground) for (const [ci, rings] of polys) put('ground', ci, { kind, rings: rings.map(cmRing) });
+    for (const [ci, rings] of D.water) put('water', ci, rings.map(cmRing));
+    for (const [ci, line] of D.kerbs) put('kerbs', ci, cmRing(line));
+    for (const [ci, line] of D.banks) put('banks', ci, cmRing(line));
+    for (const [ci, line] of D.lakebanks || []) put('lakebanks', ci, cmRing(line));
+    for (const [ci, line] of D.rails) put('rails', ci, cmRing(line));
+    D.buildings.forEach((b, bi) => put('bld', b[0], bi + off));
+    for (const w of D.walls) put('walls', at(w[0] / 100, w[1] / 100), cmRing(w));
+    for (const l of D.lamps) put('lamps', at(l[0] / 100, l[1] / 100), l);
+    for (const l of D.poles) put('poles', at(l[0] / 100, l[1] / 100), l);
+    for (const s of D.signals) put('signals', at(s[0] / 100, s[1] / 100), s);
+    for (const s of D.buses || []) put('buses', at(s[0] / 100, s[1] / 100), s);
+    for (const s of D.stalls) put('stalls', at(s[0] / 100, s[1] / 100), s);
+    for (const h of D.hoardings) put('hoardings', at(h[2] / 100, h[3] / 100), h);
+    for (const q of D.marks.center) { const p = cmRing(q); put('center', at(p[p.length >> 2 << 1], p[(p.length >> 2 << 1) + 1]), p); }
+    for (const q of D.marks.lane) { const p = cmRing(q); put('lane', at(p[p.length >> 2 << 1], p[(p.length >> 2 << 1) + 1]), p); }
+    for (const z of D.marks.zebra) put('zebra', at(z[0] / 100, z[1] / 100), z);
+    for (const z of D.marks.stop) put('stop', at(z[0] / 100, z[1] / 100), z);
+    for (const z of D.marks.bump) put('bump', at(z[0] / 100, z[1] / 100), z);
+    for (const r of D.railways || []) { const p = cmRing(r[1]); put('railways', at(p[0], p[1]), { yard: r[0], pts: p }); }
+    for (const pf of D.platforms || []) { const p = cmRing(pf); put('platforms', at(p[0], p[1]), p); }
+    // shops grouped by building: bi -> Map(edge * 4096 + slot -> [bi, edge, slot, nameIndex, source]);
+    // the tile's shop-board names join the global table
+    const nOff = this.shopNames.length;
+    for (const nm of D.shopNames || []) this.shopNames.push(nm);
+    for (const s0 of D.shops || []) {
+      const s = off || nOff ? [s0[0] + off, s0[1], s0[2], s0[3] + nOff, s0[4]] : s0;
       let m = this.shopsByBld.get(s[0]);
       if (!m) { m = new Map(); this.shopsByBld.set(s[0], m); }
       m.set(s[1] * 4096 + s[2], s);
     }
+    this._rng = null;
+    this.tileRanges.set(tag, { off, n: D.buildings.length, rect });
+  }
+  // forget a tile: its chunks go back to empty, its buildings and shops are dropped
+  removeTile(tag) {
+    const T = this.tileRanges.get(tag);
+    if (!T) return;
+    const r = T.rect;
+    for (const c of this.chunks) {
+      if (r && !(c.cx >= r[0] && c.cx < r[2] && c.cz >= r[1] && c.cz < r[3])) continue;
+      for (const f of TILE_FIELDS) c[f] = EMPTY;
+      c.wires = []; c.extras = [];
+    }
+    for (let k = 0; k < T.n; k++) this.shopsByBld.delete(T.off + k);
+    this.tileRanges.delete(tag);
   }
   chunkOf(x, z) {
     const i = Math.floor((x - this.x0) / this.size), j = Math.floor((z - this.z0) / this.size);

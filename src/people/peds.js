@@ -196,7 +196,7 @@ export class People {
       this._near = [...this.g.gridQuery(px, pz, 160)].filter(e => e.rank >= 2 || (this.act && this.act.at(e.pts[0], e.pts[1]) > 6));
       this._nearT = 120; this._nearX = px; this._nearZ = pz;
     }
-    const edges = this._near.length ? this._near : this.g.edges;
+    const edges = this._near.length ? this._near : this.g.liveEdges;
     for (let t = 0; t < 30; t++) {
       const e = edges[Math.floor(this.rng.next() * edges.length)];
       if (e.rank < 2 && !this.act) continue;
@@ -252,7 +252,7 @@ export class People {
   }
   spawnAnimals() {
     const r = this.rng;
-    const edges = this.g.edges.filter(e => e.rank >= 2 && e.rank <= 4 && e.len > 30);
+    const edges = this.g.liveEdges.filter(e => e.rank >= 2 && e.rank <= 4 && e.len > 30);
     for (let k = 0; k < 14; k++) {
       const e = r.pick(edges), s = r.range(5, e.len - 5), side = r.chance(0.5) ? 1 : -1;
       const cow = k < 6;
@@ -529,7 +529,7 @@ export class People {
   }
   relocate(a, px, pz) {
     for (let t = 0; t < 12; t++) {
-      const e = this.g.edges[Math.floor(this.rng.next() * this.g.edges.length)];
+      const LE = this.g.liveEdges, e = LE[Math.floor(this.rng.next() * LE.length)];
       if (e.rank < 2 || e.rank > 4 || e.len < 30) continue;
       this.g.at(e, e.len / 2, TMP);
       const d = Math.hypot(TMP[0] - px, TMP[1] - pz);

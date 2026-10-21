@@ -17,25 +17,63 @@ export async function loadMapJSON() {
 
 // ---------------------------------------------------------------- road graph
 export class Graph {
+  // the road graph grows and shrinks by tile: a tile's nodes join the existing ones that sit on the same
+  // spot (the seams between tiles), its edges are linked in, and dropping a tile unlinks its edges again
   constructor(M) {
-    const N = M.graph.nodes, E = M.graph.edges;
-    this.nodes = N.map((n, i) => ({ i, x: n[0] / 100, z: n[1] / 100, signal: !!(n[2] & 1), portal: !!(n[2] & 2), jr: n[3] / 100, out: [], inc: [], deg: 0, maxRank: 0 }));
-    this.edges = E.map((e, i) => {
+    this.nodes = []; this.edges = []; this.key = new Map(); this.names = M.names || [];
+    this.cell = 40; this.grid = new Map();
+    if (M.graph) this.addTile(M.graph, 0);
+  }
+  addTile(G, tag) {
+    const nmap = G.nodes.map((n) => {
+      const k = n[0] + ',' + n[1];
+      let i = this.key.get(k);
+      // only nodes from another tile join (a seam); two nodes on one spot in the same tile are a
+      // flyover over a road, and stay apart
+      if (i === undefined || this.nodes[i].tag0 === tag) {
+        i = this.nodes.length; this.key.set(k, i);
+        this.nodes.push({ i, x: n[0] / 100, z: n[1] / 100, signal: !!(n[2] & 1), portal: !!(n[2] & 2), jr: n[3] / 100, out: [], inc: [], deg: 0, maxRank: 0, tags: 0, tag0: tag });
+      } else {
+        const N = this.nodes[i];
+        // a seam node: the road continues into the next tile, so it isn't a way out of the map
+        N.signal = N.signal || !!(n[2] & 1); N.portal = N.portal && !!(n[2] & 2); N.jr = Math.max(N.jr, n[3] / 100);
+      }
+      this.nodes[i].tags++;
+      return i;
+    });
+    const added = [];
+    for (const e of G.edges) {
       const pts = cmRing(e[7]);
       const cum = [0];
       for (let k = 2; k < pts.length; k += 2) cum.push(cum[cum.length - 1] + Math.hypot(pts[k] - pts[k - 2], pts[k + 1] - pts[k - 1]));
-      return { i, a: e[0], b: e[1], w: e[2] / 100, rank: e[3], oneway: !!e[4], name: e[5], sw: e[6] / 100, pts, cum, len: cum[cum.length - 1], bridge: !!e[8], restricted: !!e[9] };
-    });
-    for (const e of this.edges) {
-      const A = this.nodes[e.a], B = this.nodes[e.b];
+      const E = { i: this.edges.length, a: nmap[e[0]], b: nmap[e[1]], w: e[2] / 100, rank: e[3], oneway: !!e[4], name: e[5], sw: e[6] / 100, pts, cum, len: cum[cum.length - 1], bridge: !!e[8], restricted: !!e[9], tag };
+      this.edges.push(E); added.push(E);
+      const A = this.nodes[E.a], B = this.nodes[E.b];
       A.deg++; B.deg++;
-      A.maxRank = Math.max(A.maxRank, e.rank); B.maxRank = Math.max(B.maxRank, e.rank);
+      A.maxRank = Math.max(A.maxRank, E.rank); B.maxRank = Math.max(B.maxRank, E.rank);
       // directed links: dir +1 a->b, -1 b->a
-      A.out.push({ e, dir: 1 }); B.inc.push({ e, dir: 1 });
-      if (!e.oneway) { B.out.push({ e, dir: -1 }); A.inc.push({ e, dir: -1 }); }
+      A.out.push({ e: E, dir: 1 }); B.inc.push({ e: E, dir: 1 });
+      if (!E.oneway) { B.out.push({ e: E, dir: -1 }); A.inc.push({ e: E, dir: -1 }); }
+      if (this.gridOn) this.gridAdd(E);
     }
-    this.names = M.names;
+    return { nodes: nmap, edges: added };
   }
+  removeTile(tag) {
+    const gone = new Set();
+    for (const e of this.edges) if (e.tag === tag && !e.dead) { e.dead = true; gone.add(e); }
+    if (!gone.size) return;
+    for (const e of gone) {
+      for (const n of [this.nodes[e.a], this.nodes[e.b]]) {
+        n.out = n.out.filter(l => l.e !== e); n.inc = n.inc.filter(l => l.e !== e); n.deg--;
+        // a seam node with nothing left on the other side is a dead end until that tile loads again
+        if (n.deg <= 0) n.portal = true;
+      }
+      this.gridRemove(e);
+    }
+    this.live = null;
+  }
+  // the edges that exist right now (tiles that are loaded)
+  get liveEdges() { return this.live || (this.live = this.edges.filter(e => !e.dead)); }
   // point along edge at distance s (0..len), returns [x,z,dx,dz]
   at(e, s, out = [0, 0, 0, 0]) {
     const pts = e.pts, cum = e.cum;
@@ -77,25 +115,23 @@ export class Graph {
     return best;
   }
   buildGrid(cell = 40) {
-    this.cell = cell;
-    this.grid = new Map();
-    for (const e of this.edges) {
-      const p = e.pts;
-      const seen = new Set();
-      for (let k = 0; k + 3 < p.length; k += 2) {
-        const L = Math.hypot(p[k + 2] - p[k], p[k + 3] - p[k + 1]);
-        const n = Math.max(1, Math.ceil(L / (cell / 2)));
-        for (let j = 0; j <= n; j++) {
-          const x = p[k] + (p[k + 2] - p[k]) * j / n, z = p[k + 1] + (p[k + 3] - p[k + 1]) * j / n;
-          const key = Math.floor(x / cell) + ',' + Math.floor(z / cell);
-          if (seen.has(key)) continue;
-          seen.add(key);
-          if (!this.grid.has(key)) this.grid.set(key, []);
-          this.grid.get(key).push(e);
-        }
+    this.cell = cell; this.grid = new Map(); this.gridOn = true;
+    for (const e of this.edges) if (!e.dead) this.gridAdd(e);
+  }
+  gridCells(e) {
+    const p = e.pts, cell = this.cell, seen = new Set();
+    for (let k = 0; k + 3 < p.length; k += 2) {
+      const L = Math.hypot(p[k + 2] - p[k], p[k + 3] - p[k + 1]);
+      const n = Math.max(1, Math.ceil(L / (cell / 2)));
+      for (let j = 0; j <= n; j++) {
+        const x = p[k] + (p[k + 2] - p[k]) * j / n, z = p[k + 1] + (p[k + 3] - p[k + 1]) * j / n;
+        seen.add(Math.floor(x / cell) + ',' + Math.floor(z / cell));
       }
     }
+    return seen;
   }
+  gridAdd(e) { this.live = null; for (const key of this.gridCells(e)) { let l = this.grid.get(key); if (!l) this.grid.set(key, l = []); l.push(e); } }
+  gridRemove(e) { for (const key of this.gridCells(e)) { const l = this.grid.get(key); if (!l) continue; const k = l.indexOf(e); if (k >= 0) l.splice(k, 1); if (!l.length) this.grid.delete(key); } }
   gridQuery(x, z, r) {
     const c = this.cell, out = new Set();
     for (let i = Math.floor((x - r) / c); i <= Math.floor((x + r) / c); i++)

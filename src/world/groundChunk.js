@@ -126,7 +126,7 @@ export function prepareGroundGlobals(W) {
       const r = rng.range(0.35, 0.8);
       const p = { x, z, r: r * 0.8, rr: r, ang: rng.range(0, 6.28), sq: rng.range(0.7, 1.0) };
       W.potholes.push(p);
-      index.chunks[index.chunkOf(x, z)]?.pot.push(p);
+      index.put('pot', index.chunkOf(x, z), p);
       s += rng.range(per * 0.6, per * 1.6);
     }
   }

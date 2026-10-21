@@ -123,7 +123,12 @@ export class Traffic {
     return {};
   }
   randomLink(px, pz, rMin, rMax) {
-    const edges = this.graph.edges;
+    // roads around you (cached, refreshed as you move): picking from the whole city's graph would
+    // almost never land near you once all of Pune is loaded
+    if (!this._near || Math.hypot(px - this._nearX, pz - this._nearZ) > 60 || this._nearR !== rMax) {
+      this._near = [...this.graph.gridQuery(px, pz, rMax)]; this._nearX = px; this._nearZ = pz; this._nearR = rMax;
+    }
+    const edges = this._near.length ? this._near : this.graph.liveEdges;
     for (let tries = 0; tries < 40; tries++) {
       const e = edges[Math.floor(this.rng.next() * edges.length)];
       if (e.rank < 2) continue;
