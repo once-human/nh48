@@ -119,7 +119,7 @@ export class HUD {
         <div class="t-foot">
           <span class="keys">
             <span><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> drive / walk</span>
-            <span><span class="kbd">Space</span> handbrake · jump</span><span><span class="kbd">F</span> get in / out</span><span><span class="kbd">H</span> horn</span>
+            <span><span class="kbd">Space</span> handbrake · jump / climb</span><span><span class="kbd">F</span> get in / out</span><span><span class="kbd">H</span> horn</span>
             <span><span class="kbd">C</span> camera</span><span><span class="kbd">M</span> map</span><span><span class="kbd">Esc</span> pause</span>
           </span>
           <span>Map data © OpenStreetMap contributors (ODbL), Overture Maps Foundation. Businesses are parodies.</span>

@@ -127,11 +127,23 @@ export class Pilot {
     F.vx = damp(F.vx, tvx, acc, dt); F.vz = damp(F.vz, tvz, acc, dt);
     F.v = Math.hypot(F.vx, F.vz);
     if (F.v > 0.2) F.yaw = dampAngle(F.yaw, Math.atan2(F.vz, F.vx), 10, dt);
+    // jump (Space) or, facing a compound wall, climb over it
+    const FLY = this.W.fly;
+    const groundY = () => (F.deck >= 0 && FLY ? FLY.heightOn(F.deck, F.x, F.z) : this.W.surf.height(F.x, F.z));
+    if (F.climb) { this.stepClimb(dt); return; }
+    if (input.took('Space') && !F.air && !this.downT) {
+      const fx = Math.cos(F.yaw), fz = Math.sin(F.yaw);
+      const wall = this.W.collision.resolve(F.x + fx * 0.45, F.z + fz * 0.45, 0.32);
+      if (wall && wall.kind === 5 && (fx * -wall.nx + fz * -wall.nz) > 0.5) this.startClimb(-wall.nx, -wall.nz);
+      else { F.air = true; F.vy = 3.4; this.human.play('jump_start', { once: true, fade: 0.08 }); this.events.push({ type: 'jump' }); }
+      if (F.climb) return;
+    }
+    if (F.air) { F.vx *= 1 - dt * 0.15; F.vz *= 1 - dt * 0.15; }   // little air control
     F.x += F.vx * dt; F.z += F.vz * dt;
-    // walls, poles, parked vehicles, trees
+    // walls, poles, parked vehicles, trees (in the air you clear scooters, stalls and bollards)
     for (let it = 0; it < 2; it++) {
       const res = flyResolve({ W: this.W, deck: F.deck ?? -1 }, F.x, F.z, 0.3);
-      if (res) { F.x += res.nx * res.depth; F.z += res.nz * res.depth; }
+      if (res && !(F.air && res.kind === 2 && F.y - groundY() > 0.55)) { F.x += res.nx * res.depth; F.z += res.nz * res.depth; }
     }
     // traffic: get shoved / knocked down
     if (traffic) traffic.near(F.x, F.z, 6, (o) => {
@@ -156,7 +168,15 @@ export class Pilot {
     const FL = this.W.fly;
     F.deck = FL ? FL.track(F.x, F.z, F.deck ?? -1, F.y) : -1;
     const gy = F.deck >= 0 ? FL.heightOn(F.deck, F.x, F.z) : this.W.surf.height(F.x, F.z);
-    F.y = damp(F.y, gy, 18, dt);
+    if (F.air) {
+      F.vy -= 9.8 * dt; F.y += F.vy * dt;
+      if (F.y <= gy && F.vy < 0) {
+        F.y = gy; F.air = false;
+        this.landT = 0.35; this.human.play('jump_land', { once: true, fade: 0.06 });
+        if (F.vy < -7.5) { this.downT = 2.2; this.human.play('knockback', { once: true, fade: 0.08 }); this.events.push({ type: 'gotHit', speed: -F.vy, who: 'fall' }); }
+        F.vy = 0;
+      }
+    } else F.y = damp(F.y, gy, 18, dt);
     Object.assign(F.agent, { x: F.x, z: F.z, hx: Math.cos(F.yaw), hz: Math.sin(F.yaw), v: F.v });
     // animation
     if (this.downT > 0) {
@@ -164,12 +184,48 @@ export class Pilot {
       F.vx *= 0.9; F.vz *= 0.9;
       if (this.downT < 1.4 && this.human.cur !== this.human.actions.getup) this.human.play('getup', { once: true, fade: 0.2 });
       if (this.downT <= 0) { this.downT = 0; this.human.play('idle'); }
+    } else if (F.air) {
+      if (F.vy < 1.5 && this.human.cur === this.human.actions.jump_start) this.human.play('jump_loop', { fade: 0.15 });
+    } else if ((this.landT = (this.landT || 0) - dt) > 0) {
+      // finishing the landing
     } else {
       const a = F.v < 0.25 ? 'idle' : F.v < 2.2 ? 'walk' : F.v < 4.6 ? 'jog' : 'sprint';
       const nat = { idle: 1, walk: 1.25, jog: 3.2, sprint: 5.6 }[a];
       this.human.play(a, { speed: a === 'idle' ? 1 : clamp(F.v / nat, 0.6, 1.6) });
     }
     const H = this.human;
+    H.holder.position.set(F.x, F.y, F.z);
+    H.holder.rotation.set(0, -F.yaw, 0);
+    H.mixer.update(dt);
+  }
+
+  // over a compound wall: hands on top, swing up (0.9 s), over and drop down the other side
+  startClimb(nx, nz) {
+    const F = this.foot;
+    F.climb = { t: 0, x0: F.x, z0: F.z, y0: F.y, nx, nz, top: F.y + 1.8 };
+    F.vx = F.vz = 0; F.v = 0;
+    F.yaw = Math.atan2(nz, nx);
+    this.human.play('climb', { once: true, fade: 0.1, speed: 1.15 });
+    this.events.push({ type: 'climb' });
+  }
+  stepClimb(dt) {
+    const F = this.foot, C = F.climb, H = this.human;
+    C.t += dt;
+    const T1 = 0.85, T2 = 1.25;
+    if (C.t < T1) {           // up the face of the wall
+      const u = C.t / T1, e = u * u * (3 - 2 * u);
+      F.y = C.y0 + (C.top - C.y0) * e;
+      F.x = C.x0 + C.nx * 0.25 * e; F.z = C.z0 + C.nz * 0.25 * e;
+    } else if (C.t < T2) {    // over the top
+      const u = (C.t - T1) / (T2 - T1);
+      F.x = C.x0 + C.nx * (0.25 + 0.75 * u); F.z = C.z0 + C.nz * (0.25 + 0.75 * u);
+      F.y = C.top + Math.sin(u * Math.PI) * 0.08;
+    } else {                  // drop down the far side
+      F.climb = null; F.air = true; F.vy = 0.5;
+      F.vx = C.nx * 1.2; F.vz = C.nz * 1.2;
+      H.play('jump_loop', { fade: 0.15 });
+    }
+    Object.assign(F.agent, { x: F.x, z: F.z, hx: Math.cos(F.yaw), hz: Math.sin(F.yaw), v: 0 });
     H.holder.position.set(F.x, F.y, F.z);
     H.holder.rotation.set(0, -F.yaw, 0);
     H.mixer.update(dt);

@@ -84,6 +84,8 @@ export class HumanKit {
     this.clips = {};
     for (const cl of gM.animations) {
       cl.tracks = cl.tracks.filter(t => !t.name.endsWith('.scale'));
+      // root-motion clips: the game moves the body itself
+      if (cl.name === 'climb' || cl.name === 'roll') cl.tracks = cl.tracks.filter(t => t.name !== 'root.position');
       this.clips[cl.name] = cl;
     }
     this.bindM = {}; this.maps = {}; this.hairMat = {}; this.eyeMat = {};

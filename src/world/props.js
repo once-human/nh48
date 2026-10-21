@@ -631,7 +631,7 @@ export function buildProps(M, W) {
       const cy = ((bz + nz * 0.14) - (az + nz * 0.14)) * ((ax - nx * 0.14) - (ax + nx * 0.14)) - ((bx + nx * 0.14) - (ax + nx * 0.14)) * ((az - nz * 0.14) - (az + nz * 0.14));
       if (cy >= 0) fb.i.push(c0, c1, c2, c0, c2, c3); else fb.i.push(c0, c2, c1, c0, c3, c2);
       u += L;
-      collision.addSeg(ax, az, bx, bz, 0);
+      collision.addSeg(ax, az, bx, bz, 5);
     }
     // gate pillars at both ends
     const ends = [[p[0], p[1], p[2], p[3]], [p[p.length - 2], p[p.length - 1], p[p.length - 4], p[p.length - 3]]];

@@ -145,7 +145,7 @@ export function buildGlobalProps(W) {
   // collision for per-chunk statics (needed even when the chunk isn't built)
   for (const b of M.buses) collision.addCircle(b[0] / 100, b[1] / 100, 0.9, 2);
   for (const s of M.stalls) collision.addCircle(s[0] / 100, s[1] / 100, 0.9, 2);
-  for (const w of M.walls) { const p = cmRing(w); for (let k = 0; k + 3 < p.length; k += 2) collision.addSeg(p[k], p[k + 1], p[k + 2], p[k + 3], 0); }
+  for (const w of M.walls) { const p = cmRing(w); for (let k = 0; k + 3 < p.length; k += 2) collision.addSeg(p[k], p[k + 1], p[k + 2], p[k + 3], 5); }   // kind 5: a 1.8 m compound wall you can climb
   W.metroPiers = [];
   for (const [, line] of M.metro) {
     const p = cmRing(line);
