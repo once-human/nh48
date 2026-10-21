@@ -30,7 +30,9 @@ const OLD_OUT = { tee: 'casual', shirt: 'western', kurta: 'trad', top: 'casual',
 // fill in anything missing (and read a save from before the creator)
 export function normalise(ch) {
   ch = { ...DEFAULT, ...(ch || {}) };
+  // a save from before the creator: convert it once, then it's an ordinary character (never re-applied)
   if (ch.id && OLD[ch.id] && !ch.made) { const [f, n, h, o] = OLD[ch.id]; Object.assign(ch, { female: f, name: ch.name || n, hair: h, outfit: o }); }
+  delete ch.id; ch.made = true;
   const g = ch.female ? 'f' : 'm';
   if (OLD_OUT[ch.outfit]) ch.outfit = OLD_OUT[ch.outfit];
   if (!HAIRS[g].some(h => h.id === ch.hair)) ch.hair = HAIRS[g][0].id;

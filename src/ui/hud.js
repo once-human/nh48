@@ -594,7 +594,9 @@ export class HUD {
     }
     if (this.subT > 0) { this.subT -= dt; if (this.subT <= 0) this.$('h-sub').classList.remove('show'); }
     if (this.promptT > 0) { this.promptT -= dt; if (this.promptT <= 0) this.$('h-prompt').classList.remove('show'); }
-    this.drawMinimap(dt);
+    // the minimap at 30 fps on Low and 20 on Lite (weak machines spend the time on the 3D view instead)
+    const mmStep = { lite: 1 / 20, low: 1 / 30 }[g.qualityName] || 0;
+    if ((this._mmAcc = (this._mmAcc || 0) + dt) >= mmStep) { this._mmAcc = 0; this.drawMinimap(dt); }
     if (!this.mapScreen.hidden) this.mapScreen.draw(dt);
     else g.city.pump(1.5);
   }
