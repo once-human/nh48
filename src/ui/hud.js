@@ -164,14 +164,14 @@ export class HUD {
     t.querySelector('#t-wipe').onclick = () => { t.querySelector('#t-wipe-c').hidden = false; };
     t.querySelector('#t-wipe-n').onclick = () => { t.querySelector('#t-wipe-c').hidden = true; };
     t.querySelector('#t-wipe-y').onclick = () => this.game.resetAll();
-    const items = [...t.querySelectorAll('.pz-i')];
-    const sel = (k) => { this.tSel = (k + items.length) % items.length; items.forEach((b, i) => b.classList.toggle('sel', i === this.tSel)); };
-    items.forEach((b, i) => b.addEventListener('mouseenter', () => sel(i)));
+    const vis = () => [...t.querySelectorAll('.pz-i')].filter(b => !b.hidden);
+    const sel = (k) => { const items = vis(); this.tSel = (k + items.length) % items.length; items.forEach((b, i) => b.classList.toggle('sel', i === this.tSel)); };
+    t.querySelectorAll('.pz-i').forEach(b => b.addEventListener('mouseenter', () => sel(vis().indexOf(b))));
     window.addEventListener('keydown', (e) => {
       if (t.hidden || this.pickerOpen) return;
       if (e.code === 'KeyW' || e.code === 'ArrowUp') { e.preventDefault(); sel((this.tSel || 0) - 1); }
       else if (e.code === 'KeyS' || e.code === 'ArrowDown') { e.preventDefault(); sel((this.tSel || 0) + 1); }
-      else if (e.code === 'Enter') { e.preventDefault(); items[this.tSel || 0].click(); }
+      else if (e.code === 'Enter') { e.preventDefault(); vis()[this.tSel || 0]?.click(); }
     });
     this.syncTitle();
   }
