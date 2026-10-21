@@ -1,0 +1,20 @@
+import puppeteer from 'puppeteer-core';
+const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--window-size=800,450'], protocolTimeout: 600000 });
+const page = await browser.newPage(); await page.setViewport({ width: 800, height: 450 });
+const logs = []; page.on('pageerror', e => logs.push('ERR ' + e.message));
+await page.goto('http://127.0.0.1:8848/test.html?test&play=1&q=low&frames=1', { waitUntil: 'load', timeout: 300000 });
+await page.waitForFunction('window.__shotReady === true || window.__error', { timeout: 400000, polling: 500 });
+const r = await page.evaluate(async () => {
+  const g = window.__game, P = g.player, { Save, Vehicle } = g.debugSave;
+  P.exit(g.traffic, true);
+  const s = Save.snapshot(g);
+  s.auto.towed = { fee: 1700, at: 'Shivajinagar chowki' }; s.auto.towedAt = { x: s.auto.x + 50, z: s.auto.z, name: 'Shivajinagar chowki' };
+  s.auto.x += 50; s.mode = 'veh'; s.veh = { type: 'sedan', col: [0.8, 0.1, 0.1], x: s.foot.x + 3, z: s.foot.z, th: 0, stolen: true };
+  s.dropped = [{ type: 'scooter', col: [0.2, 0.2, 0.9], x: s.foot.x - 3, z: s.foot.z, th: 1 }];
+  P.reset(s.foot.x, s.foot.z, 0);
+  Save.restore(g, s, Vehicle);
+  const s2 = Save.snapshot(g);
+  return { mode: s2.mode, veh: s2.veh && s2.veh.type, towed: s2.auto.towed, autoDx: Math.round(s2.auto.x - s.auto.x), dropped: s2.dropped.map(d => d.type) };
+});
+console.log(JSON.stringify(r)); console.log(logs.join('\n'));
+await browser.close();

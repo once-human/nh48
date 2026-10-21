@@ -11,6 +11,7 @@ import { buildParked } from '../traffic/parked.js';
 import { Police } from './police.js';
 import { Crowd } from '../people/crowd.js';
 import { Brawl } from '../people/fight.js';
+import * as Save from './save.js';
 import { Fauna } from '../people/animals.js';
 import { Vehicle } from '../vehicles/vehicle.js';
 
@@ -29,7 +30,7 @@ export class Game {
     const st0 = safeStorage();
     let saved = null; try { saved = st0 && st0.getItem('nh48_quality'); } catch (e) { /* ignore */ }
     this.userQuality = !!(this.params.get('q') || saved);
-    this.stats = { money: 2000, rides: 0, starSum: 0, rating: 0, grant: 1 };     // every new player starts with ₹2,000
+    this.stats = { money: 5000, rides: 0, starSum: 0, rating: 0, grant: 2 };     // every new player starts with ₹5,000
     this.test = {
       drive: parseFloat(this.params.get('drive') || '0'),
       steer: parseFloat(this.params.get('steer') || '0'),
@@ -48,8 +49,12 @@ export class Game {
   async init(progress) {
     const { W, player, traffic } = this;
     const st = safeStorage();
-    if (st) { try { const s = JSON.parse(st.getItem('nh48_stats') || 'null'); if (s) { Object.assign(this.stats, s); if (!s.grant) { this.stats.money += 2000; this.stats.grant = 1; } } } catch (e) { /* ignore */ } }
+    if (st) { try { const s = JSON.parse(st.getItem('nh48_stats') || 'null'); if (s) { Object.assign(this.stats, s); if ((s.grant || 0) < 2) { this.stats.money = Math.max(5000, this.stats.money); this.stats.grant = 2; } } } catch (e) { /* ignore */ } }
     const start = this.findStart(this.params.get('spawn') || 'FC Road');
+    // where you were last time (position, vehicle, towed auto...)
+    this.saved = this.params.has('test') || this.params.has('spawn') ? null : Save.load();
+    const sp = Save.startPoint(this.saved);
+    if (sp) { start.x = sp.x; start.z = sp.z; start.th = sp.th; if (this.saved.hour !== undefined) this.hour = this.saved.hour; }
     // coming back from a graphics reset: same spot, same time of day, straight into play
     let resume = null;
     try { resume = JSON.parse(sessionStorage.getItem('nh48_resume') || 'null'); sessionStorage.removeItem('nh48_resume'); } catch (e) { /* ignore */ }
@@ -100,6 +105,13 @@ export class Game {
     const parked = buildParked(W, this.scene, this.vmats, this.quality);
     W.instSets.push(...parked.sets);
     this.traffic.setStatics(parked.statics);
+    if (this.saved) { try { Save.restore(this, this.saved, Vehicle); } catch (e) { console.warn('restore', e); } }
+    // keep it saved: every few seconds while playing, and whenever the tab goes away
+    const persist = () => { if (this.state === 'play' || this.state === 'pause' || this.state === 'map') { Save.save(this); this.saveStats(); } };
+    this.debugSave = { Save, Vehicle };
+    setInterval(persist, 5000);
+    window.addEventListener('pagehide', persist);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) persist(); });
     await progress('Waking up the traffic', 0.94);
     traffic.prefill(player.x, player.z);
     W.activity.setHour(this.hour); this.traffic.hour = this.hour;
@@ -146,10 +158,11 @@ export class Game {
     for (const v of tmp) v.dispose();
   }
   // run fn after t seconds of game time
-  later(t, fn) { (this.timers || (this.timers = [])).push({ t, fn }); }
+  later(t, fn) { (this.delayed || (this.delayed = [])).push({ t, fn }); }
   tickTimers(dt) {
-    if (!this.timers) return;
-    for (let i = this.timers.length - 1; i >= 0; i--) { const T = this.timers[i]; if ((T.t -= dt) <= 0) { this.timers.splice(i, 1); T.fn(); } }
+    const D = this.delayed;
+    if (!D) return;
+    for (let i = D.length - 1; i >= 0; i--) { const T = D[i]; if ((T.t -= dt) <= 0) { D.splice(i, 1); T.fn(); } }
   }
   saveResume() {
     const P = this.player;
@@ -187,6 +200,8 @@ export class Game {
     this.hud.setPlaying(true);
     this.rig.inited = false;
     this.playT0 = this.t;
+    if (this.pendingHeat) { const h = this.pendingHeat; this.pendingHeat = 0; this.later(1.5, () => this.police.raiseHeat(h, 'Still wanted from before')); }
+    if (this.saved && !this.welcomed) { this.welcomed = true; this.hud.toast('Welcome back', 'Right where you left off', 'info', 2.6); }
     if (shift) this.hud.toast('Shift started', 'People waving for an auto show up green on the map', 'meter', 3.6);
   }
   endShift() {
@@ -329,9 +344,15 @@ export class Game {
     this.renderer.setPixelRatio(pr);
     if (this.post) this.post.setSize(window.innerWidth, window.innerHeight); else this.renderer.setSize(window.innerWidth, window.innerHeight, false);
   }
+  // Start over: wipe all progress (with the warning shown in the pause menu) and reload fresh
+  resetAll() {
+    this.state = 'resetting';
+    Save.wipe();
+    location.reload();
+  }
   saveStats() {
     const st = safeStorage();
-    if (st) try { st.setItem('nh48_stats', JSON.stringify({ money: this.stats.money, rides: this.stats.rides, starSum: this.stats.starSum, rating: this.stats.rating, grant: 1 })); } catch (e) { /* ignore */ }
+    if (st) try { st.setItem('nh48_stats', JSON.stringify({ money: this.stats.money, rides: this.stats.rides, starSum: this.stats.starSum, rating: this.stats.rating, grant: 2 })); } catch (e) { /* ignore */ }
   }
 
   objective() {
