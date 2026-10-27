@@ -79,7 +79,9 @@ export class Dates {
   get life() { return this.g.life; }
   get contacts() { return this.life.s.contacts || (this.life.s.contacts = []); }
   // who you'd talk to: young-ish people of the other gender from your character
-  eligible(p) { return !!p && !p.walkedOff && !!p.female !== !!this.g.player.look.female && !OLDER.has(p.persona); }
+  eligible(p) { return !!p && !p.walkedOff && !!p.female !== !!this.g.player.look.female && !OLDER.has(p.persona) && !this.blocked(p); }
+  // someone who blocked you: no heart over them, and they won't talk to you
+  blocked(p) { return !!(p && p.name && (this.contacts || []).some(c => c.name === p.name && c.done)); }
   profile(p) {
     if (p.prof) return p.prof;
     // one of the cast: the same person every time (their language, vibe, likes, job, area, how picky)
@@ -136,6 +138,7 @@ export class Dates {
   talk(p, room) {
     const G = this.g, L = this.life;
     if (p.walkedOff) { G.hud.toast(`${p.name} isn’t interested`, 'Let it go', 'info', 2); return; }
+    if (this.blocked(p)) { G.hud.toast(`${p.name} has blocked you`, 'They look away', 'bad', 2.2); return; }
     const P = this.profile(p);
     const contact = this.contacts.find(c => c.name === p.name && c.dateNow);
     // someone you're seeing is in the same room and sees you chatting up somebody else

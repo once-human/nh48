@@ -675,9 +675,9 @@ export class Interiors {
   recolourHearts() { const R = this.cur && this.cur.R; if (R && R.hearts && this.heartMats) for (const m of R.hearts) m.material = this.heartMats[this.heartKind(m.userData.p)]; }
   heartKind(p) {
     const D = this.g.date, ct = D && p.name && (D.contacts || []).find(c => c.name === p.name && !c.done);
-    if (ct && ct.partner) return 'partner';
-    if (ct || p.dateWith || (p.interest || 0) > 0) return 'seeing';
-    return 'new';
+    // pink: someone new; blue: their number is in your phone; black: your partner (or they said I love you back)
+    if (ct && (ct.partner || ct.saidLove)) return 'partner';
+    return ct ? 'seeing' : 'new';
   }
   markHearts(R) {
     const G = this.g;
@@ -685,7 +685,7 @@ export class Interiors {
     for (const m of R.hearts || []) G.scene.remove(m);
     R.hearts = [];
     for (const p of R.peds) {
-      if (!p.name || !(p.dateWith || G.date && G.date.eligible(p))) continue;
+      if (!p.name || (G.date && G.date.blocked(p)) || !(p.dateWith || G.date && G.date.eligible(p))) continue;
       const m = new THREE.Sprite(this.heartMats[this.heartKind(p)]); m.scale.setScalar(p.dateWith ? 0.34 : 0.22);
       m.position.set(p.x, FLOOR + (/sit/.test(p.anim) ? 1.55 : 2.05), p.z); m.userData.p = p;
       G.scene.add(m); R.hearts.push(m);

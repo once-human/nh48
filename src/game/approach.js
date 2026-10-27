@@ -27,7 +27,7 @@ export class StreetApproach {
     if (P.look.female) rate *= 3.5;
     rate *= 0.4 + G.life.charm * 1.2;
     if (Math.random() > rate * dt) return;
-    const cand = ppl.list.filter(q => q.clubber && !q.approached && !q.hidden && q.mode === 'stand' && !!q.female !== !!P.look.female && Math.hypot(q.x - P.x, q.z - P.z) < 14 && Math.hypot(q.x - P.x, q.z - P.z) > 2);
+    const cand = ppl.list.filter(q => q.clubber && !q.approached && !D.blocked(q) && !q.hidden && q.mode === 'stand' && !!q.female !== !!P.look.female && Math.hypot(q.x - P.x, q.z - P.z) < 14 && Math.hypot(q.x - P.x, q.z - P.z) > 2);
     if (!cand.length) { this.cool = 6; return; }
     const p = cand[Math.floor(Math.random() * cand.length)];
     p.approached = true;
