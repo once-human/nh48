@@ -27,6 +27,11 @@ const P = {
   pin: '<path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>',
   shirt: '<path d="M8 3 4 6l2 4 2-1v12h8V9l2 1 2-4-4-3a4 4 0 0 1-8 0z"/>',
   phone: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
+  torch: '<path d="M7 3h10l-2 6H9z"/><path d="M9 9h6v12H9z"/><path d="M12 13v2"/>',
+  jhola: '<path d="M5 9h14l-1.2 10.5a2 2 0 0 1-2 1.5H8.2a2 2 0 0 1-2-1.5z"/><path d="M8.5 9V7a3.5 3.5 0 0 1 7 0v2"/><path d="M8 13h8"/>',
+  person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+  compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
+  guide: '<path d="M4 5.5C6.5 4 9.5 4 12 5.5 14.5 4 17.5 4 20 5.5V19c-2.5-1.5-5.5-1.5-8 0-2.5-1.5-5.5-1.5-8 0z"/><path d="M12 5.5V19"/>',
   star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
 };
 export function icon(name, cls = '') {
@@ -34,7 +39,7 @@ export function icon(name, cls = '') {
 }
 // which icon each backpack item uses
 export const ITEM_ICON = { water: 'bottle', tiffin: 'parcel', vadapav: 'parcel', biscuit: 'biscuit', banana: 'banana', chikki: 'chikki', medkit: 'medkit', painkiller: 'pill', ors: 'pill',
-  energy: 'can', coldcoffee: 'cup', bakarwadi: 'gift', barfi: 'gift', shrewsbury: 'gift', gajra: 'flower', book: 'book', lottery: 'ticket', beer: 'mug' };
+  energy: 'can', coldcoffee: 'cup', bakarwadi: 'gift', barfi: 'gift', shrewsbury: 'gift', gajra: 'flower', book: 'book', lottery: 'ticket', beer: 'mug', torch: 'torch' };
 
 // small inline icons for text: rating stars and hearts (never font glyphs)
 const svg = (d, cls) => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;

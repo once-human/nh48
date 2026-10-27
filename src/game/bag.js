@@ -12,7 +12,7 @@ import { guideHTML } from './guide.js';
 import { BUSINESSES as BIZ } from './hustle.js';
 import { levelOf, ASKS } from './date.js';
 
-const TABS = [['bag', 'Bag', 'झोळी'], ['me', 'Me', 'मी'], ['wear', 'Wardrobe', 'कपडे'], ['own', 'Owned', 'माझं'], ['near', 'Nearby', 'जवळ'], ['ppl', 'Phone', 'फोन'], ['guide', 'Guide', 'माहिती']];
+const TABS = [['bag', 'Bag', 'झोळी', 'jhola'], ['me', 'Me', 'मी', 'person'], ['wear', 'Wardrobe', 'कपडे', 'shirt'], ['own', 'Owned', 'माझं', 'key'], ['near', 'Nearby', 'जवळ', 'compass'], ['ppl', 'Phone', 'फोन', 'phone'], ['guide', 'Guide', 'माहिती', 'guide']];
 const GROUPS = [['food', 'Food'], ['night', 'Night'], ['look', 'Look'], ['health', 'Health'], ['money', 'Money'], ['things', 'Shops'], ['vehicle', 'Vehicles'], ['place', 'Places'], ['homes', 'Homes for sale']];
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -24,8 +24,8 @@ export class Bag {
     const el = document.createElement('div');
     el.className = 'jhola'; el.hidden = true;
     el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Backpack');
-    el.innerHTML = `<div class="jh-top"><div class="jh-title"><b>Jhola</b><span lang="mr">झोळी</span></div><div class="jh-money"></div></div>
-      <div class="jh-tabs" role="tablist">${TABS.map(([k, l, m]) => `<button role="tab" data-t="${k}"><b>${l}</b><span lang="mr">${m}</span></button>`).join('')}</div>
+    el.innerHTML = `<div class="jh-top"><div class="jh-title"><i class="jh-badge">${icon('jhola')}</i><b>Jhola</b><span lang="mr">झोळी</span></div><div class="jh-money"></div></div>
+      <div class="jh-tabs" role="tablist">${TABS.map(([k, l, m, ic]) => `<button role="tab" data-t="${k}">${icon(ic)}<b>${l}</b><span lang="mr">${m}</span></button>`).join('')}</div>
       <div class="jh-body"></div><div class="jh-msg" aria-live="polite"></div>
       <div class="jh-foot"><span><span class="kbd">A</span><span class="kbd">D</span> tabs · <span class="kbd">↑↓</span> <span class="kbd">Enter</span> use</span><span><span class="kbd">E</span> close · <span class="kbd">Tab</span> me</span></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
@@ -62,7 +62,8 @@ export class Bag {
   close() { this.open = false; this.el.hidden = true; if (this.g.state === 'shop') this.g.state = 'play'; this.life.save(); this.g.lockMouse?.(); }
   msg(t, good) { const m = this.el.querySelector('.jh-msg'); m.textContent = t || ''; m.classList.toggle('good', !!good); }
   row(ic, label, note, right, act, arg, cls = '') {
-    return `<button class="jh-row ${cls}" ${act ? `data-act="${act}"` : 'disabled'} ${arg !== undefined ? `data-arg="${esc(arg)}"` : ''}>${icon(ic)}<span class="nm"><b>${esc(label)}</b><small>${note && note.html ? note.html : esc(note || '')}</small></span><span class="go">${esc(right || '')}</span></button>`;
+    const lead = act === 'contact' ? `<span class="av">${esc(String(label).charAt(0))}</span>` : icon(ic);
+    return `<button class="jh-row ${cls}" ${act ? `data-act="${act}"` : 'disabled'} ${arg !== undefined ? `data-arg="${esc(arg)}"` : ''}>${lead}<span class="nm"><b>${esc(label)}</b><small>${note && note.html ? note.html : esc(note || '')}</small></span><span class="go">${esc(right || '')}</span></button>`;
   }
   render() {
     const G = this.g, L = this.life, s = L.s;
@@ -74,10 +75,15 @@ export class Bag {
       const ids = Object.keys(s.inv).filter(k => s.inv[k] > 0 && ITEMS[k]);
       if (!ids.length) h += `<p class="jh-empty">Nothing in here. A kirana sells water, Parle-G and bananas; any eatery will pack you a parcel.</p>`;
       else {
+        // tools first (the torch), then food and drink, then the rest
+        const order = (id) => ITEMS[id].tool ? 0 : ITEMS[id].use && (ITEMS[id].use.hunger || ITEMS[id].use.thirst) ? 1 : 2;
+        ids.sort((a, b) => order(a) - order(b));
+        const torchOn = G.lights && G.lights.torchOn;
         h += '<div class="jh-grid">';
         for (const id of ids) {
-          const it = ITEMS[id];
-          h += `<button class="jh-item" data-act="use" data-arg="${id}" title="${esc(it.note || describe(it.use))}">${icon(ITEM_ICON[id] || 'parcel')}<b>${esc(it.name)}</b><small>${esc(it.scratch ? 'Scratch it' : it.feed ? (it.feed === 'dog' ? 'Eat, or feed a dog' : 'Eat, or feed a cow') : describe(it.use))}</small><i>${s.inv[id]}</i></button>`;
+          const it = ITEMS[id], on = it.tool && torchOn;
+          const what = it.tool ? (on ? 'On. Tap to switch off' : 'Tap to switch on') : it.scratch ? 'Scratch it' : it.feed ? (it.feed === 'dog' ? 'Eat, or feed a dog' : 'Eat, or feed a cow') : describe(it.use);
+          h += `<button class="jh-item${it.tool ? ' tool' : ''}${on ? ' on' : ''}" data-act="use" data-arg="${id}" title="${esc(it.note || describe(it.use))}"><span class="pk">${icon(ITEM_ICON[id] || 'parcel')}</span><b>${esc(it.name)}</b><small>${esc(what)}</small>${it.tool ? `<em>${on ? 'ON' : 'OFF'}</em>` : `<i>×${s.inv[id]}</i>`}</button>`;
         }
         h += '</div>';
       }
@@ -121,7 +127,8 @@ export class Bag {
       if (!s.vehicles.length) h += `<p class="jh-empty">Showrooms (Honda, Bajaj, Maruti and the rest) sell everything from a cycle to an SUV.</p>`;
     } else if (this.tab === 'ppl') {
       // your handset: a keypad phone to start with (texts and calls); apps need a smartphone
-      h += `<div class="jh-read"><span>${s.phone ? 'Smartphone' : 'Keypad phone'}</span><b>${s.phone ? 'Calls, texts, Zwiggy, offers' : 'Calls and texts'}</b></div>`;
+      const hh = String(Math.floor(G.hour || 0)).padStart(2, '0'), mm = String(Math.floor(((G.hour || 0) % 1) * 60)).padStart(2, '0');
+      h += `<div class="jh-phone${s.phone ? ' smart' : ''}"><div class="ph-bar"><span>${s.phone ? 'Smartphone' : 'Keypad phone'}</span><span class="ph-sig"><i></i><i></i><i></i><i></i></span><b>${hh}:${mm}</b></div><div class="ph-screen">`;
       if (!s.phone) h += `<p class="jh-empty">Zwiggy orders, parcel runs and race invites need a smartphone: any mobile shop has one.</p>`;
       const cs = (s.contacts || []).slice().sort((a, b) => (b.partner - a.partner) || b.aff - a.aff);
       const pend = G.date.pending, sel = this.contactSel && cs.find(c => c.name === this.contactSel);
@@ -147,6 +154,7 @@ export class Bag {
           h += this.row(c.partner ? 'health' : 'phone', c.name, note, pend && pend.ct === c ? 'On the way' : 'Open', 'contact', c.name, c.partner ? 'partner' : '');
         }
       }
+      h += `</div><div class="ph-keys" aria-hidden="true">${'123456789*0#'.split('').map(k => `<i>${k}</i>`).join('')}</div></div>`;
     } else if (this.tab === 'guide') {
       h += `<div class="guide">${guideHTML()}</div>`;
     } else if (this.tab === 'near') {

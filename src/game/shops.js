@@ -448,7 +448,7 @@ export class Shops {
       case 'bank': this.bank(out); break;
       case 'jeweller': this.jeweller(out); break;
       case 'kirana':
-        for (const [id, base] of [['water', 20], ['biscuit', 10], ['banana', 60], ['chikki', 40], ['energy', 110], ['lottery', 50]]) { const price = r10(base * (mul > 1 ? 1.1 : 1)); out.push({ label: ITEMS[id].name, note: ITEMS[id].note || describe(ITEMS[id].use), price, act: pay(price, () => { L.add(id); return `${ITEMS[id].name}, in your bag`; }) }); }
+        for (const [id, base] of [['water', 20], ['biscuit', 10], ['banana', 60], ['chikki', 40], ['energy', 110], ['lottery', 50], ['torch', 250]]) { const price = r10(base * (mul > 1 ? 1.1 : 1)); out.push({ label: ITEMS[id].name, note: ITEMS[id].note || describe(ITEMS[id].use), price, act: pay(price, () => { L.add(id); return `${ITEMS[id].name}, in your bag`; }) }); }
         break;
       case 'mobile':
         if (!L.s.phone) out.push({ label: 'Smartphone', note: 'Get delivery orders on the go (Zwiggy partner app)', price: r10(11999 * mul / 1.2), act: pay(r10(11999 * mul / 1.2), () => { L.s.phone = true; L.s.zwiggy = true; return 'New phone. Zwiggy orders will ping you, Y to accept'; }) });
@@ -456,6 +456,7 @@ export class Shops {
         out.push({ label: 'Prepaid recharge, 28 days', note: 'Unlimited calls, 2 GB a day', price: 299, act: pay(299, () => { L.change('mood', 0.02); return 'Recharged'; }) });
         break;
       case 'electronics':
+        out.push({ label: 'LED torch', note: 'Bright, rechargeable. L switches it on', price: r10(450 * mul), act: pay(r10(450 * mul), () => { L.add('torch'); return 'In your jhola'; }) });
         out.push({ label: 'Speaker system for your auto', note: 'Bollywood on the go: passengers tip 15% more', price: r10(3500 * mul), tag: L.s.upg.speaker ? 'owned' : '', disabled: L.s.upg.speaker ? 'Fitted' : '', act: pay(r10(3500 * mul), () => { L.s.upg.speaker = 1; return 'Fitted. Passengers love it'; }) });
         out.push({ label: 'Dashcam', note: 'Argue a challan with evidence: better odds', price: r10(4999 * mul), tag: L.s.upg.dashcam ? 'owned' : '', disabled: L.s.upg.dashcam ? 'Fitted' : '', act: pay(r10(4999 * mul), () => { L.s.upg.dashcam = 1; return 'Dashcam on. The police argue less'; }) });
         if (!L.s.phone) out.push({ label: 'Smartphone', note: 'Unlocks delivery orders on the go', price: r10(12999 * mul / 1.2), act: pay(r10(12999 * mul / 1.2), () => { L.s.phone = true; L.s.zwiggy = true; return 'New phone. Zwiggy orders will ping you'; }) });

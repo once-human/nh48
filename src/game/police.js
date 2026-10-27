@@ -540,6 +540,7 @@ export class Police {
     const fine = (this.stop && this.stop.kind === kind ? this.stop.total || FINES[kind].amt : FINES[kind].amt) + (extra ? 5000 : 0);
     this.charge(kind, fine, `Bail after arrest: ${FINES[kind].name}`);
     G.date && G.date.event('arrest', fine);
+    if (G.lights && G.rng.chance(0.5)) G.lights.lose('Kept at the chowki with your other things');
     this.clearCharges();
     this.heat = 0; this.unseenT = 0; this.clearMarshals();
     const ch = this.nearestChowki(P.x, P.z);
