@@ -30,22 +30,22 @@ const c = (h) => new THREE.Color(h).convertSRGBToLinear();
 
 // bind-pose landmarks (metres, glTF y-up, the body faces +z)
 const BODY = {
-  m: { hip: 0.95, neck: 1.55, armY: 1.30, shoulder: 0.21, wrist: 0.70 },
-  f: { hip: 0.93, neck: 1.51, armY: 1.27, shoulder: 0.15, wrist: 0.64 },
+  m: { hip: 0.95, neck: 1.55, armY: 1.30, shoulder: 0.21, wrist: 0.70, knee: 0.54, waist: 1.05 },
+  f: { hip: 0.93, neck: 1.51, armY: 1.27, shoulder: 0.15, wrist: 0.64, knee: 0.53, waist: 1.02 },
 };
 
 function patchBody(mat) {
   mat.onBeforeCompile = (sh) => {
     const u = mat.userData;
     Object.assign(sh.uniforms, { uTop: { value: u.top }, uBottom: { value: u.bottom }, uSkin: { value: u.skin }, uShoe: { value: u.shoe },
-      uCut: { value: u.cut }, uBindM: { value: u.bindM }, uBody: { value: u.body }, uArms: { value: u.arms }, uStyle: { value: u.style } });
+      uCut: { value: u.cut }, uBindM: { value: u.bindM }, uBody: { value: u.body }, uArms: { value: u.arms }, uStyle: { value: u.style }, uFit: { value: u.fit } });
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vBind; uniform mat4 uBindM;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBind = (uBindM * vec4(position, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vBind; uniform vec3 uTop, uBottom, uSkin, uShoe; uniform vec4 uCut, uBody, uArms, uStyle;`)
+      varying vec3 vBind; uniform vec3 uTop, uBottom, uSkin, uShoe; uniform vec4 uCut, uBody, uArms, uStyle, uFit;`)
       .replace('#include <map_fragment>', `
       vec3 tex = texture2D(map, vMapUv).rgb;
-      // uBody: hip, neck, arm height, ankle; uArms: shoulder x, wrist x
+      // uBody: hip, neck, arm height, ankle; uArms: shoulder x, wrist x, -, sleeve hem; uFit.x waistband
       vec3 p = vBind; float ax = abs(p.x);
       float hip = uBody.x, neck = uBody.y;
       // skin keeps the texture's detail relative to its own (light-tan) skin
@@ -59,11 +59,14 @@ function patchBody(mat) {
       if (arm) {
         // sleeve: uCut.x is how far down the arm it reaches (0 sleeveless, 0.4 short, 1 full)
         float t = (ax - uArms.x) / (uArms.y - uArms.x);
-        if (t < uCut.x) { col = uTop; cloth = 1.0; }
+        if (t < uArms.w) { col = uTop; cloth = 1.0; }
       } else if (p.y > neck) {
         col = skin;
       } else if (p.y > hip) {
         col = uTop; cloth = 1.0;
+        // trousers or a skirt come up to the waistband (uFit.x), a belt at the top; the top tucks in over it
+        bool tuck = uCut.y > 0.9 && (uCut.w < 1.5 || uCut.w > 2.5);
+        if (tuck && p.y < uFit.x) col = p.y > uFit.x - 0.022 && uCut.w < 1.5 ? uBottom * 0.42 : uBottom;
         // neckline: a V at the front
         if (p.z > 0.0 && p.y > neck - 0.07 - uCut.z * 0.05 && ax < (p.y - (neck - 0.07 - uCut.z * 0.05)) * 0.9 + 0.012) { col = skin; cloth = 0.0; }
       } else {
@@ -71,39 +74,50 @@ function patchBody(mat) {
         if (uCut.w > 1.5 && uCut.w < 2.5 && p.y < uCut.y * hip) col = mix(uBottom, uTop, step(0.5, fract(p.y * 3.0)) * 0.12);   // saree pleats
         if (uCut.w > 2.5 && p.y < uStyle.y * hip) { col = skin; cloth = 0.0; }                                                // below a skirt's hem: legs
         if (p.y < uBody.w) col = uShoe;
-        if (p.y > hip - 0.03 && p.y < hip + 0.01 && uCut.y > 0.9) col *= 0.45;    // belt
       }
       // under the clothes the body isn't drawn at all (no skin or muscle pushing through the cloth);
       // a 2-4 cm band at each edge stays painted so no gap opens at a hem or cuff
-      bool torsoIn = !arm && p.y > hip + 0.03 && p.y < neck - 0.045;
-      bool armIn = arm && (ax - uArms.x) / (uArms.y - uArms.x) < uCut.x - 0.07;
-      bool legIn = p.y < hip - 0.03 && p.y > uBody.w + 0.03 && (uCut.w < 1.5 || (uCut.w > 2.5 && p.y > uStyle.y * hip + 0.03));
+      bool torsoIn = !arm && p.y > (uCut.y > 0.9 && (uCut.w < 1.5 || uCut.w > 2.5) ? uFit.x + 0.03 : hip + 0.03) && p.y < neck - 0.045;
+      // except across the tops of the shoulders, where the shirt shell has a gap: there the body shows in the shirt's colour
+      if (p.y > neck - 0.11 && ax > 0.07 && (ax - uArms.x) / (uArms.y - uArms.x) < 0.22) torsoIn = false;
+      bool armIn = arm && (ax - uArms.x) / (uArms.y - uArms.x) < uArms.w - 0.07 && (ax - uArms.x) / (uArms.y - uArms.x) > 0.22;
+      bool legIn = p.y < hip - 0.03 && p.y > uBody.w + 0.03 && (uCut.w < 2.5 || p.y > uStyle.y * hip + 0.03);
       bool footIn = p.y < uBody.w - 0.015;
       if (torsoIn || armIn || legIn || footIn) discard;
       if (cloth > 0.5) col *= 0.92;
       diffuseColor.rgb *= col;`);
   };
-  mat.customProgramCacheKey = () => 'nh-people-ubc2';
+  mat.customProgramCacheKey = () => 'nh-people-ubc8';
   return mat;
 }
 
 // the cloth shells get their fabric from where they sit on the body (bind pose), not UVs: stripes,
 // checks, denim, a print, an open jacket over a tee, colour blocks; a skirt is the long shell cut at its hem
 // uStyle: x pattern (0 plain, 1 stripes, 2 checks, 3 denim, 4 dots, 5 open jacket, 6 colour block), y hem (x hip height)
+// uWhich: 0 top, 1 trousers, 2 saree / skirt, 3 kurta. vP is the bind-pose position (the bpos attribute, made
+// when the models load: every cloth mesh has its own bind transform).
+// uArm: shoulder x, wrist x, arm height, sleeve hem (0 at the shoulder, 1 at the wrist).
+// uFit: x waistband (the body is painted as trousers up to it; 'hip' is lower, across the seat), y knee,
+// z what's below (0 trousers, 1 kurta, 2 saree, 3 skirt), w hip. The top stops just over the waistband and the trousers
+// start under it, so the two shells never cross (they used to, all over the seat); under a kurta the
+// trousers stop at the knee
 function patchCloth(mat, which) {
   mat.onBeforeCompile = (sh) => {
     const u = mat.userData;
-    Object.assign(sh.uniforms, { uStyle: { value: u.style }, uPat: { value: u.pat }, uWhich: { value: which }, uBindM: { value: u.bindM } });
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vP; uniform mat4 uBindM;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvP = (uBindM * vec4(position, 1.0)).xyz;');
+    Object.assign(sh.uniforms, { uStyle: { value: u.style }, uPat: { value: u.pat }, uWhich: { value: which }, uFit: { value: u.fit }, uArm: { value: u.arm } });
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vP; attribute vec3 bpos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvP = bpos;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vP; uniform vec4 uStyle; uniform vec3 uPat; uniform float uWhich;
+      varying vec3 vP; uniform vec4 uStyle, uFit, uArm; uniform vec3 uPat; uniform float uWhich;
       float h21(vec2 q) { return fract(sin(dot(q, vec2(127.1, 311.7))) * 43758.5453); }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
       vec3 p = vP; float pt = uStyle.x;
       // the long shell as a skirt: nothing below the hem
-      if (uWhich > 1.5 && uStyle.y > 0.01 && p.y < uStyle.y * 0.95) discard;
-      if (uWhich < 0.5) {
+      if (uWhich > 1.5 && uWhich < 2.5 && uStyle.y > 0.01 && p.y < uStyle.y * uFit.w) discard;
+      if (uWhich < 0.5 && abs(p.x) > uArm.x && p.y > uArm.z && (abs(p.x) - uArm.x) / (uArm.y - uArm.x) > uArm.w + 0.012) discard;
+      if (uWhich < 0.5 && (uFit.z < 0.5 || uFit.z > 2.5) && p.y < uFit.x - 0.015) discard;
+      if (uWhich > 0.5 && uWhich < 1.5 && (uFit.z > 0.5 && uFit.z < 1.5 && p.y > uFit.y + 0.04)) discard;
+      if (uWhich < 0.5 || uWhich > 2.5) {
         if (pt > 0.5 && pt < 1.5) diffuseColor.rgb = mix(diffuseColor.rgb, uPat, step(0.5, fract(p.y * 16.0)));
         else if (pt > 1.5 && pt < 2.5) { float a = step(0.5, fract(p.x * 11.0)), b = step(0.5, fract(p.y * 11.0)); diffuseColor.rgb = mix(diffuseColor.rgb, uPat, (a + b) * 0.33); }
         else if (pt > 3.5 && pt < 4.5) { vec2 g = fract(vec2(p.x + p.z, p.y) * 22.0) - 0.5; diffuseColor.rgb = mix(diffuseColor.rgb, uPat, step(length(g), 0.17)); }
@@ -116,7 +130,7 @@ function patchCloth(mat, which) {
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.35, smoothstep(0.03, 0.12, p.z) * smoothstep(0.45, 0.75, p.y) * 0.5);
       }`);
   };
-  mat.customProgramCacheKey = () => 'nh-cloth-' + which;
+  mat.customProgramCacheKey = () => 'nh-cloth3-' + which;
   return mat;
 }
 
@@ -152,6 +166,135 @@ export function ikArm(H, side, target, pole, w = 1) {
   R.updateMatrixWorld(true);
 }
 
+// the kurta and the saree / skirt are tubes from the waist down. As baked they stood 5 cm off the body all
+// round (a ledge at the waist you could see into) and split their weight evenly between the legs, so a
+// thigh stepping forward came straight through the front. Fitted once per body when the models load:
+// the top ring hugs the shirt and the tube eases out to its old flare by mid-thigh, and each side of the
+// tube follows its own leg, sharing only a 5 cm strip down the middle.
+const _v = new THREE.Vector3();
+function bindOf(o) {
+  const sk = o.skeleton, M = new THREE.Matrix4().multiplyMatrices(sk.bones[0].matrixWorld, sk.boneInverses[0]);
+  return new THREE.Matrix4().multiplyMatrices(o.bindMatrixInverse, M).multiply(o.bindMatrix);
+}
+function floatAttr(geo, name) {
+  const a = geo.getAttribute(name);
+  if (a.array instanceof Float32Array && !a.normalized) return a;
+  const f = new THREE.BufferAttribute(new Float32Array(a.count * a.itemSize), a.itemSize);
+  for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) f.setComponent(i, c, a.getComponent(i, c));
+  geo.setAttribute(name, f);
+  return f;
+}
+function fitTubes(scene, B) {
+  scene.updateMatrixWorld(true);
+  const meshes = {};
+  scene.traverse(o => { if (o.isSkinnedMesh) meshes[o.name] = o; });
+  // what the tube must stay outside: the shirts and the body, in bind space (metres, y up, facing +z)
+  const under = [];
+  for (const n of ['cloth_top_short', 'cloth_top_long', Object.keys(meshes).find(n => n.startsWith('body'))]) {
+    const o = meshes[n]; if (!o) continue;
+    const M = bindOf(o), pos = o.geometry.getAttribute('position');
+    for (let i = 0; i < pos.count; i++) { _v.fromBufferAttribute(pos, i).applyMatrix4(M); if (_v.y > B.knee && _v.y < B.hip + 0.2) under.push(_v.x, _v.y, _v.z); }
+  }
+  for (const [n, o] of Object.entries(meshes)) {
+    if (!n.startsWith('cloth') || n === 'cloth_kurta' || n === 'cloth_saree') continue;
+    const M = bindOf(o), pos = o.geometry.getAttribute('position'), b = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) { _v.fromBufferAttribute(pos, i).applyMatrix4(M); b[i * 3] = _v.x; b[i * 3 + 1] = _v.y; b[i * 3 + 2] = _v.z; }
+    o.geometry.setAttribute('bpos', new THREE.BufferAttribute(b, 3));
+  }
+  fitShoes(meshes.cloth_shoes);
+  const SEG = 36;
+  for (const n of ['cloth_kurta', 'cloth_saree']) {
+    const o = meshes[n]; if (!o || !o.skeleton) continue;
+    const geo = o.geometry, M = bindOf(o), Mi = M.clone().invert();
+    const pos = floatAttr(geo, 'position'), P = [];
+    let y0 = -1e9, y1 = 1e9;
+    for (let i = 0; i < pos.count; i++) { _v.fromBufferAttribute(pos, i).applyMatrix4(M); P.push(_v.clone()); y0 = Math.max(y0, _v.y); y1 = Math.min(y1, _v.y); }
+    // rings by height; each ring's centre and, per direction, how far out anything underneath reaches
+    const rings = new Map();
+    for (const p of P) { const key = Math.round(p.y * 200); (rings.get(key) || rings.set(key, []).get(key)).push(p); }
+    for (const ring of rings.values()) {
+      const y = ring[0].y, cx = ring.reduce((s, p) => s + p.x, 0) / ring.length, cz = ring.reduce((s, p) => s + p.z, 0) / ring.length;
+      const need = new Float32Array(SEG);
+      for (let i = 0; i < under.length; i += 3) {
+        if (Math.abs(under[i + 1] - y) > 0.025) continue;
+        const dx = under[i] - cx, dz = under[i + 2] - cz, a = Math.floor((Math.atan2(dz, dx) / (2 * Math.PI) + 1) * SEG) % SEG;
+        need[a] = Math.max(need[a], Math.hypot(dx, dz));
+      }
+      const f = (y0 - y) / Math.max(0.01, y0 - y1), ease = THREE.MathUtils.smoothstep(f, 0, 0.45);
+      for (const p of ring) {
+        const dx = p.x - cx, dz = p.z - cz, r0 = Math.hypot(dx, dz) || 1e-4;
+        const a = Math.floor((Math.atan2(dz, dx) / (2 * Math.PI) + 1) * SEG) % SEG;
+        const nd = Math.max(need[a], need[(a + 1) % SEG], need[(a + SEG - 1) % SEG]);
+        if (nd <= 0) continue;
+        const snug = nd + 0.012, r = THREE.MathUtils.lerp(snug, Math.max(r0, snug), ease);
+        p.x = cx + dx / r0 * r; p.z = cz + dz / r0 * r;
+      }
+    }
+    for (let i = 0; i < P.length; i++) { _v.copy(P[i]).applyMatrix4(Mi); pos.setXYZ(i, _v.x, _v.y, _v.z); }
+    pos.needsUpdate = true; geo.computeVertexNormals(); geo.computeBoundingSphere();
+    geo.setAttribute('bpos', new THREE.Float32BufferAttribute(P.flatMap(p => [p.x, p.y, p.z]), 3));
+    // weights: the waist on the pelvis, down the tube more and more on the leg that side
+    const bi = (nm) => o.skeleton.bones.findIndex(b => b.name === nm);
+    const pel = bi('pelvis'), tl = bi('thigh_l'), tr = bi('thigh_r'), cl = bi('calf_l'), cr = bi('calf_r');
+    if (pel < 0 || tl < 0 || tr < 0 || cl < 0 || cr < 0) continue;
+    const si = new THREE.Uint16BufferAttribute(new Uint16Array(pos.count * 4), 4), sw = new THREE.Float32BufferAttribute(new Float32Array(pos.count * 4), 4);
+    for (let i = 0; i < P.length; i++) {
+      const p = P[i], f = (y0 - p.y) / Math.max(0.01, y0 - y1), leg = Math.min(1, f * 1.3) * 0.95;
+      const side = THREE.MathUtils.clamp(0.5 + p.x / 0.05, 0, 1);
+      // below the knee a saree hangs from the shin, so sitting it falls to the feet instead of sticking out
+      const shin = 1 - THREE.MathUtils.smoothstep(p.y, B.knee - 0.12, B.knee + 0.03);
+      si.setXYZW(i, pel, tl, tr, side >= 0.5 ? cl : cr);
+      sw.setXYZW(i, 1 - leg, leg * side * (1 - shin), leg * (1 - side) * (1 - shin), leg * shin);
+    }
+    geo.setAttribute('skinIndex', si); geo.setAttribute('skinWeight', sw);
+  }
+}
+
+// the shoe shell as baked had its sole plate floating 2 cm under the upper (a see-through gap round the
+// foot) and the toes showing through the toe cap: the sole is flattened up into the upper, and the upper is
+// smoothed (its top edge at the ankle stays put)
+function fitShoes(o) {
+  if (!o) return;
+  const geo = o.geometry, M = bindOf(o), Mi = M.clone().invert(), pos = floatAttr(geo, 'position'), idx = geo.index;
+  if (!idx) return;
+  const P = [], key = new Map(), weld = new Int32Array(pos.count);
+  let y0 = 1e9;
+  for (let i = 0; i < pos.count; i++) {
+    _v.fromBufferAttribute(pos, i).applyMatrix4(M);
+    const k = `${Math.round(_v.x * 2000)},${Math.round(_v.y * 2000)},${Math.round(_v.z * 2000)}`;
+    let w = key.get(k); if (w === undefined) { w = P.length; key.set(k, w); P.push(_v.clone()); }
+    weld[i] = w; y0 = Math.min(y0, _v.y);
+  }
+  const nb = P.map(() => new Set()), edges = new Map();
+  for (let f = 0; f < idx.count; f += 3) {
+    const t = [weld[idx.getX(f)], weld[idx.getX(f + 1)], weld[idx.getX(f + 2)]];
+    for (let e = 0; e < 3; e++) {
+      const a = t[e], b = t[(e + 1) % 3]; nb[a].add(b); nb[b].add(a);
+      const ek = a < b ? a * 1e6 + b : b * 1e6 + a; edges.set(ek, (edges.get(ek) || 0) + 1);
+    }
+  }
+  const rim = new Uint8Array(P.length);
+  for (const [ek, n] of edges) if (n === 1) { const a = Math.floor(ek / 1e6), b = ek - a * 1e6; if (P[a].y > 0.04) rim[a] = 1; if (P[b].y > 0.04) rim[b] = 1; }
+  const sole = y0 + 0.006;
+  for (const p of P) if (p.y < 0.012) p.y = sole;
+  const tmp = P.map(p => p.clone());
+  for (let it = 0; it < 5; it++) {
+    for (let i = 0; i < P.length; i++) {
+      if (rim[i] || P[i].y <= sole + 1e-4 || !nb[i].size) { tmp[i].copy(P[i]); continue; }
+      _v.set(0, 0, 0); for (const j of nb[i]) _v.add(P[j]); _v.divideScalar(nb[i].size);
+      tmp[i].copy(P[i]).lerp(_v, 0.55); tmp[i].y = Math.max(tmp[i].y, sole);
+    }
+    for (let i = 0; i < P.length; i++) P[i].copy(tmp[i]);
+  }
+  const b = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const p = P[weld[i]]; b[i * 3] = p.x; b[i * 3 + 1] = p.y; b[i * 3 + 2] = p.z;
+    _v.copy(p).applyMatrix4(Mi); pos.setXYZ(i, _v.x, _v.y, _v.z);
+  }
+  pos.needsUpdate = true; geo.computeVertexNormals(); geo.computeBoundingSphere();
+  geo.setAttribute('bpos', new THREE.BufferAttribute(b, 3));
+}
+
 export class HumanKit {
   constructor(gM, gF) {
     this.src = { m: gM, f: gF };
@@ -178,6 +321,7 @@ export class HumanKit {
       });
     }
     this.accMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55, metalness: 0 });
+    for (const [k, g] of Object.entries(this.src)) fitTubes(g.scene, BODY[k]);
   }
   // a random Pune look; opts: female, role ('police'), helmet, avoid (the player's look: never copy it)
   randomLook(rng, opts = {}) {
@@ -230,9 +374,9 @@ export class HumanKit {
     const root = skeletonClone(g.scene);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.78, metalness: 0, map: this.maps[k] || null });
     const B = BODY[k];
-    const style = new THREE.Vector4(), pat = new THREE.Color();
-    mat.userData = { top: look.top.clone(), bottom: look.bottom.clone(), skin: look.skin.clone(), shoe: look.shoe.clone(), cut: look.cut.clone(), style,
-      bindM: this.bindM[k] || new THREE.Matrix4(), body: new THREE.Vector4(B.hip, B.neck, B.armY, 0.085), arms: new THREE.Vector4(B.shoulder, B.wrist, 0, 0) };
+    const style = new THREE.Vector4(), pat = new THREE.Color(), fit = new THREE.Vector4(B.waist, B.knee, 0, B.hip), arm = new THREE.Vector4(B.shoulder, B.wrist, B.armY, 0.3);
+    mat.userData = { top: look.top.clone(), bottom: look.bottom.clone(), skin: look.skin.clone(), shoe: look.shoe.clone(), cut: look.cut.clone(), style, fit,
+      bindM: this.bindM[k] || new THREE.Matrix4(), body: new THREE.Vector4(B.hip, B.neck, B.armY, 0.085), arms: arm };
     if (mat.map) patchBody(mat);
     const acc = this.accMat.clone();
     const hairMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.65, metalness: 0, map: this.hairMat[k] || null });
@@ -241,7 +385,10 @@ export class HumanKit {
     const botMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
     const shoeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0 });
     const skirtMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
-    for (const [m, w] of [[topMat, 0], [botMat, 1], [skirtMat, 2]]) { m.userData = { style, pat, bindM: this.bindM[k] || new THREE.Matrix4() }; patchCloth(m, w); }
+    const kurtaMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
+    for (const [m, w] of [[topMat, 0], [botMat, 1], [skirtMat, 2], [kurtaMat, 3]]) { m.userData = { style, pat, fit, arm }; patchCloth(m, w); }
+    // where the top overlaps the waistband it wins the depth test (the shells sit a few mm apart)
+    topMat.polygonOffset = true; topMat.polygonOffsetFactor = -1; topMat.polygonOffsetUnits = -2;
     let body = null; const parts = [];
     root.traverse((o) => {
       if (!o.isSkinnedMesh) return;
@@ -249,7 +396,7 @@ export class HumanKit {
       if (o.name.startsWith('body')) { o.material = mat; body = o; }
       else if (o.name.startsWith('eyes')) { o.castShadow = false; }
       else if (o.name.startsWith('hair') || o.name.startsWith('face')) { o.material = hairMat; o.castShadow = false; parts.push(o); }
-      else if (o.name.startsWith('cloth')) { o.material = o.name === 'cloth_pants' ? botMat : o.name === 'cloth_shoes' ? shoeMat : o.name === 'cloth_saree' ? skirtMat : topMat; o.castShadow = o.name !== 'cloth_shoes'; parts.push(o); }
+      else if (o.name.startsWith('cloth')) { o.material = o.name === 'cloth_pants' ? botMat : o.name === 'cloth_shoes' ? shoeMat : o.name === 'cloth_saree' ? skirtMat : o.name === 'cloth_kurta' ? kurtaMat : topMat; o.castShadow = o.name !== 'cloth_shoes'; parts.push(o); }
       else { o.material = acc; parts.push(o); }
     });
     const holder = new THREE.Group();
@@ -257,7 +404,7 @@ export class HumanKit {
     root.scale.setScalar(look.scale);
     holder.add(root);
     const mixer = new THREE.AnimationMixer(root);
-    const H = { holder, root, mixer, mat, acc, hairMat, topMat, botMat, shoeMat, skirtMat, style, pat, body, parts, actions: {}, cur: null, look };
+    const H = { holder, root, mixer, mat, acc, hairMat, topMat, botMat, shoeMat, skirtMat, kurtaMat, style, pat, fit, arm, body, parts, actions: {}, cur: null, look };
     // a built man (the player, as a man): a deeper chest, bigger arms and legs. The clips key bone scale, so it goes on
     // after every mixer step; the neck undoes the chest so the head stays the head
     const BULK = [['spine_03', 1.12, 1.1], ['neck_01', 1 / 1.12, 1 / 1.1], ['upperarm_l', 1.14, 1.14], ['upperarm_r', 1.14, 1.14], ['thigh_l', 1.07, 1.07], ['thigh_r', 1.07, 1.07]]
@@ -294,7 +441,7 @@ export class HumanKit {
       return a;
     };
     H.setAcc = (name) => { H.look = Object.assign({}, H.look, { acc: name }); this.applyLook(H, H.look, true); };
-    H.dispose = () => { mat.dispose(); acc.dispose(); hairMat.dispose(); topMat.dispose(); botMat.dispose(); skirtMat.dispose(); mixer.stopAllAction(); };
+    H.dispose = () => { mat.dispose(); acc.dispose(); hairMat.dispose(); topMat.dispose(); botMat.dispose(); skirtMat.dispose(); kurtaMat.dispose(); mixer.stopAllAction(); };
     return H;
   }
   // geometry for the head-bone extras, built once per body in the rig's rest pose and carried into the
@@ -359,7 +506,7 @@ export class HumanKit {
       const u = H.mat.userData;
       u.top.copy(look.top); u.bottom.copy(look.bottom); u.skin.copy(look.skin); u.shoe.copy(look.shoe); u.cut.copy(look.cut);
       H.hairMat.color.copy(look.hair).multiplyScalar(1.8);
-      H.topMat.color.copy(look.top); H.botMat.color.copy(look.bottom); H.shoeMat.color.copy(look.shoe);
+      H.topMat.color.copy(look.top); H.kurtaMat?.color.copy(look.top); H.botMat.color.copy(look.bottom); H.shoeMat.color.copy(look.shoe);
       // a saree's shell is the saree's colour; a skirt's is the skirt's
       if (H.skirtMat) H.skirtMat.color.copy(look.cut.w > 2.5 ? look.bottom : look.top);
       if (H.style) { H.style.set(look.pat || 0, look.cut.w > 2.5 ? look.hem || 0.62 : 0, look.denim ? 1 : 0, 0); H.pat.copy(look.patCol || look.top); }
@@ -368,6 +515,9 @@ export class HumanKit {
     }
     const helmet = look.acc === 'helmet', cap = look.acc === 'cap_police';
     const saree = look.cut.w > 1.5, kurta = !saree && look.cut.y < 0.9, longSleeve = look.cut.x > 0.6;
+    if (H.fit) H.fit.z = kurta ? 1 : look.cut.w > 2.5 ? 3 : saree ? 2 : 0;
+    // the hem stays a little inside the sleeve shell's own ragged end (short 0.38, long 0.93 of the arm)
+    if (H.arm) H.arm.w = Math.min(look.cut.x, longSleeve ? 0.87 : 0.32);
     for (const o of H.parts) {
       const n = o.name;
       if (n.startsWith('face')) o.visible = true;                                         // eyebrows

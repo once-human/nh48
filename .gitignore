@@ -6,3 +6,4 @@ scratch/
 __pycache__/
 data/tiles/
 data/pune/
+tools/clothes/*.bundle.js
