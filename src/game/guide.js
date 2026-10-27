@@ -1,6 +1,7 @@
 // The in-game guide (Jhola → Guide, or Guide in the pause menu): every kind of place and what you
 // can do there, every way to make money (legal and not), where to buy what, how your body works,
 // the people you meet, and the controls. Written as a Punekar would explain it to a friend.
+import { keyLabel } from './keys.js';
 
 const SHOPS = [
   ['Eat and drink', [
@@ -106,7 +107,7 @@ const PEOPLE = [
   ['Partners', 'Met → Talking → Dating. Once you’re dating, ask them to be your partner. A partner lifts your mood every day, sends food when you’re starving, warns you about nakabandis. Ignore them for days and they’ll say so; keep ignoring them and it’s over. Getting someone else’s number may get back to them.'],
 ];
 
-const CONTROLS = [
+const CONTROLS_DEF = [
   ['W A S D', 'Walk or drive'], ['Mouse', 'Look around (the game keeps the mouse; any key or click takes it back)'], ['Click', 'Punch'], ['C', 'On foot: roll. Driving: change camera'], ['Space', 'Handbrake; on foot, jump or climb'], ['Shift / Alt', 'Sprint / walk'], ['X', 'Punch (also)'],
   ['F', 'Interact, enter, get in or out'], ['E', 'Jhola'], ['Tab', 'Your stats'], ['M', 'Map (or tap the minimap)'], ['H', 'Horn'], ['V', 'Camera (anytime)'], ['B', 'Look back'],
   ['R', 'Back on the road'], ['G', 'Pickpocket (on foot, next to someone)'], ['Y', 'Accept an offer on your phone'], ['Y', 'Accept a delivery'], ['1 to 9, W/S, Enter', 'Pick in any menu'], ['Esc or F', 'Close any menu'], ['Esc', 'Pause (the only time you get a cursor)'], ['F3', 'Performance info'],
@@ -123,7 +124,7 @@ export function guideHTML() {
     ['Money', `<h4>Straight</h4>${cards(EARN_LEGAL)}<h4>Not so straight</h4>${cards(EARN_ILLEGAL)}${note('Crime raises your wanted level. Money in the bank is safe; cash on you can be taken when you’re knocked out.')}`],
     ['Your body', cards(BODY)],
     ['People and dating', cards(PEOPLE)],
-    ['Controls', `<div class="gd-keys">${CONTROLS.map(([k, d]) => `<div><span>${k.split(/ (?:or|to|\/) /).map(x => `<span class="kbd">${esc(x)}</span>`).join('')}</span><p>${esc(d)}</p></div>`).join('')}</div>`],
+    ['Controls', `<div class="gd-keys">${CONTROLS_DEF.map(([k, d]) => [k === 'W A S D' ? ['W', 'A', 'S', 'D'].map(keyLabel).join(' ') : k.split(' / ').map(x => keyLabel(x === 'Shift' ? 'ShiftLeft' : x === 'Alt' ? 'AltLeft' : x)).join(' / '), d]).map(([k, d]) => `<div><span>${k.split(/ (?:or|to|\/) /).map(x => `<span class="kbd">${esc(x)}</span>`).join('')}</span><p>${esc(d)}</p></div>`).join('')}</div>`],
   ];
   return `<p class="gd-intro">Everything in NH48 Pune, in one place. Real shops from the map are all over the city; Nearby and the map (M) show what’s around you.</p>
     ${T.map((_, k) => `<input type="radio" name="gd" id="gd-${k}" class="gd-r"${k ? '' : ' checked'}>`).join('')}

@@ -27,7 +27,7 @@ export class Transit {
     el.className = 'shop glass transit'; el.hidden = true;
     el.innerHTML = `<div class="sh-head"><div class="sh-k tr-k"></div><div class="sh-t tr-t"></div><div class="sh-mr tr-mr" lang="mr"></div><div class="tr-sub"></div></div>
       <div class="sh-list tr-list"></div><div class="sh-msg"></div>
-      <div class="sh-foot"><span class="tr-cash"></span><span><span class="kbd">1–9</span> or <span class="kbd">↑↓</span> <span class="kbd">Enter</span> · <span class="kbd">F</span> leave</span></div>`;
+      <div class="sh-foot"><span class="tr-cash"></span><span><span class="kbd">1–9</span> or <span class="kbd">↑↓</span> <span class="kbd">Enter</span> · <span class="kbd" data-k="F">F</span> leave</span></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
     this.nav = new KbNav(el.querySelector('.tr-list'), '.sh-item');

@@ -407,13 +407,13 @@ export class MapScreen {
         <button class="ibtn" id="bm-in" title="Zoom in (+)">+</button><button class="ibtn" id="bm-out" title="Zoom out (−)">−</button>
         <button class="ibtn" id="bm-me" title="Centre on me (Space)"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="3" fill="currentColor"/><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
       </div>
-      <button class="btn small bm-close" id="bm-close">Close <span class="kbd">M</span></button>
+      <button class="btn small bm-close" id="bm-close">Close <span class="kbd" data-k="M">M</span></button>
       <div class="bm-card glass" id="bm-card" hidden>
         <div class="bm-c-cat" id="bm-c-cat"></div><div class="bm-c-n" id="bm-c-n"></div><div class="bm-c-mr" lang="mr" id="bm-c-mr"></div>
         <div class="bm-c-b" id="bm-c-b"></div>
         <div class="bm-c-act"><button class="btn primary small" id="bm-c-go">Set waypoint</button><button class="btn small" id="bm-c-ft">Take a rickshaw</button><button class="btn small" id="bm-c-x">Close</button></div>
       </div>
-      <div class="bm-foot"><span class="bm-scale" id="bm-scale"><i></i><b></b></span><span class="bm-hint">Drag to move · scroll to zoom · right-click to drop a pin · <span class="kbd">M</span> close</span></div>`;
+      <div class="bm-foot"><span class="bm-scale" id="bm-scale"><i></i><b></b></span><span class="bm-hint">Drag to move · scroll to zoom · right-click to drop a pin · <span class="kbd" data-k="M">M</span> close</span></div>`;
     root.appendChild(m);
     this.el = m;
     this.cv = m.querySelector('.bm-canvas');

@@ -1211,3 +1211,15 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
   .jh-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .jh-title b { font-size: 24px !important; } .jh-badge { width: 36px; height: 36px; }
 }
+/* ---- settings: audio & controls ---- */
+.settings .vol { display: flex; align-items: center; gap: 10px; }
+.settings .vol input[type=range] { flex: 1; min-width: 120px; }
+.settings .vol output { min-width: 40px; text-align: right; font: 600 12px/1 var(--font-ui); color: var(--paper-3); font-variant-numeric: tabular-nums; }
+.set-reset { display: flex; justify-content: flex-end; margin: 8px 0 18px; }
+.ctl-tip { margin: 0 0 10px; font-size: 12.5px; color: var(--paper-3); }
+.group.ctl .rc { gap: 6px; }
+.keybtn { min-width: 58px; height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--paper); color: var(--ink-0);
+  font: 700 12px/1 var(--font-ui); cursor: pointer; transition: transform .12s ease, background .12s ease, box-shadow .12s ease; }
+.keybtn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
+.keybtn.wait { background: #ffb224; color: #1a1408; animation: keywait 1s ease-in-out infinite; }
+@keyframes keywait { 50% { box-shadow: 0 0 0 4px rgba(255, 178, 36, .25); } }

@@ -3,7 +3,8 @@ import { icon } from './icons.js';
 // Desktop first. The HUD sits in the corners with no boxes where text alone reads, location
 // top-left, wallet top-right, map bottom-left, the vehicle bottom-right, prompts and subtitles
 // bottom-centre, toasts under the objective.
-import { settingsHTML, bindSettings, syncSettings } from '../game/settings.js';
+import { settingsHTML, bindSettings, syncSettings, controlsHTML, bindControls } from '../game/settings.js';
+import { keyLabel } from '../game/keys.js';
 import * as THREE from 'three';
 import { fmtRupees, isTouch } from '../core/util.js';
 import { MapScreen, CATS, drawPin, drawArrow, drawFlag, fmtDist } from './map.js';
@@ -88,7 +89,7 @@ export class HUD {
     this.obj = el('div', 'h obj', '<div class="obj-main" id="h-obj"></div><div class="obj-sub" id="h-obj-sub"></div>');
     this.mm = el('div', 'h mm');
     this.mmCanvas = el('canvas'); this.mmCanvas.width = 432; this.mmCanvas.height = 432;
-    this.mm.append(this.mmCanvas, el('div', 'mm-n', 'N'), el('div', 'mm-hint', '<span class="kbd">M</span> map'));
+    this.mm.append(this.mmCanvas, el('div', 'mm-n', 'N'), el('div', 'mm-hint', `<span class="kbd">${keyLabel('M')}</span> map`));
     // the minimap opens the big map
     this.mm.style.pointerEvents = 'auto'; this.mm.style.cursor = 'pointer';
     this.mm.title = 'Open the map (M)';
@@ -355,6 +356,7 @@ export class HUD {
   // ---------------------------------------------------------------- pause
   // the pause menu works like a game's: a list you walk with W/S (or the mouse), Enter opens, A/D change an option
   pausePane(id) {
+    this.pause.querySelector('#p-ctl')?._stopKeys?.();
     this.pause.querySelectorAll('.pz-i').forEach(b => b.classList.toggle('open', !!id && b.dataset.pane === id));
     this.pause.querySelectorAll('.pane').forEach(q => q.classList.toggle('on', q.dataset.pane === id));
     this.pause.classList.toggle('has-pane', !!id);
@@ -414,12 +416,12 @@ export class HUD {
             <div class="group"><div class="row"><div class="rl">Graphics<small id="p-qnote"></small></div><div class="rc"><div class="seg" id="p-q"><button data-q="lite">Lite</button><button data-q="low">Low</button><button data-q="med">Medium</button><button data-q="high">High</button></div></div></div></div>
             ${settingsHTML('av')}
             <div class="gt">Sound</div>
-            <div class="group"><div class="row"><div class="rl">Master volume</div><div class="rc"><input type="range" id="p-vol" min="0" max="1" step="0.05"></div></div></div>
+            ${settingsHTML('sound')}
             <div class="gt">Game</div>
             ${settingsHTML('game')}
           </section>
           <section class="pane" data-pane="ctrl"><h2>Controls</h2>
-            <div class="gt">Driving</div><div class="group"><div class="row"><div class="rl">Accelerate, brake, hold to reverse</div><div class="rc k"><span class="kbd">W</span><span class="kbd">S</span></div></div><div class="row"><div class="rl">Steer</div><div class="rc k"><span class="kbd">A</span><span class="kbd">D</span></div></div><div class="row"><div class="rl">Handbrake</div><div class="rc k"><span class="kbd">Space</span></div></div><div class="row"><div class="rl">Horn</div><div class="rc k"><span class="kbd">H</span></div></div><div class="row"><div class="rl">Change camera</div><div class="rc k"><span class="kbd">C</span></div></div><div class="row"><div class="rl">Look back</div><div class="rc k"><span class="kbd">B</span></div></div><div class="row"><div class="rl">Back on the road</div><div class="rc k"><span class="kbd">R</span></div></div><div class="row"><div class="rl">Get out</div><div class="rc k"><span class="kbd">F</span></div></div></div><div class="gt">On foot</div><div class="group"><div class="row"><div class="rl">Walk</div><div class="rc k"><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span></div></div><div class="row"><div class="rl">Sprint</div><div class="rc k"><span class="kbd">Shift</span></div></div><div class="row"><div class="rl">Walk slowly</div><div class="rc k"><span class="kbd">Alt</span></div></div><div class="row"><div class="rl">Jump, or climb the wall you face</div><div class="rc k"><span class="kbd">Space</span></div></div><div class="row"><div class="rl">Roll</div><div class="rc k"><span class="kbd">C</span></div></div><div class="row"><div class="rl">Punch (keep clicking: jab, cross, hook)</div><div class="rc k"><span class="kbd">Click</span></div></div><div class="row"><div class="rl">Talk, walk in, get in or take a vehicle</div><div class="rc k"><span class="kbd">F</span></div></div><div class="row"><div class="rl">Pickpocket (risky)</div><div class="rc k"><span class="kbd">G</span></div></div></div><div class="gt">Anytime</div><div class="group"><div class="row"><div class="rl">Jhola: eat, drink, use what you carry</div><div class="rc k"><span class="kbd">E</span></div></div><div class="row"><div class="rl">Your status</div><div class="rc k"><span class="kbd">Tab</span></div></div><div class="row"><div class="rl">Map, waypoints, rickshaw, metro, bus</div><div class="rc k"><span class="kbd">M</span></div></div><div class="row"><div class="rl">Accept an offer on your phone</div><div class="rc k"><span class="kbd">Y</span></div></div><div class="row"><div class="rl">Answer the police</div><div class="rc k"><span class="kbd">1</span><span class="kbd">4</span></div></div><div class="row"><div class="rl">Camera distance</div><div class="rc k"><span class="kbd">V</span></div></div><div class="row"><div class="rl">Close any menu, or pause</div><div class="rc k"><span class="kbd">Esc</span></div></div><div class="row"><div class="rl">Performance stats</div><div class="rc k"><span class="kbd">F3</span></div></div></div>
+            <div id="p-ctl">${controlsHTML()}</div>
           </section>
           <section class="pane" data-pane="ch" id="p-ch"><h2>E-challans</h2>
             <div class="pz-big"><b class="ch-amt num" id="p-ch-amt">₹0</b><small id="p-ch-note">Nothing pending</small></div>
@@ -453,8 +455,7 @@ export class HUD {
     p.querySelectorAll('#p-q button').forEach(b => b.onclick = () => { this.game.setQuality(b.dataset.q); this.syncPause(); });
     p.querySelector('#p-ch-pay').onclick = () => { if (this.game.police) this.game.police.payDues(); this.syncPause(); };
     bindSettings(p, this.game);
-    const vol = p.querySelector('#p-vol');
-    vol.oninput = () => this.game.audio.setVolume(parseFloat(vol.value));
+    bindControls(p.querySelector('#p-ctl'), () => { const g = p.querySelector('.guide'); if (g) g.innerHTML = guideHTML(); });
   }
   syncPause() {
     const pw = this.pause && this.pause.querySelector('#p-who'), sv = savedCharacter();
@@ -466,7 +467,6 @@ export class HUD {
     if (this.pzSel == null || !this.pause.classList.contains('has-pane')) this.pauseSel(0);
     const qn = g.qualityName || (g.quality && g.quality.name) || 'med';
     this.pause.querySelectorAll('#p-q button').forEach(b => b.classList.toggle('on', b.dataset.q === qn));
-    this.pause.querySelector('#p-vol').value = g.audio.volume;
     syncSettings(this.pause, g);
     this.pause.querySelector('#p-qnote').textContent = g.qualityNote || '';
     const h = g.hour;
@@ -638,7 +638,7 @@ export class HUD {
     this.subT = life;
   }
   prompt(key, text, life = 0.25) {
-    this.$('h-prompt-k').textContent = key;
+    this.$('h-prompt-k').textContent = keyLabel(key);
     this.$('h-prompt-t').textContent = text;
     this.$('h-prompt').classList.add('show');
     this.promptT = life;

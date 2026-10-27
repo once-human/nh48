@@ -64,7 +64,7 @@ export class Dates {
     el.className = 'shop glass talk'; el.hidden = true;
     el.innerHTML = `<div class="sh-head"><div class="sh-k tk-k">Talking</div><div class="sh-t tk-name"></div><div class="tk-meta"><span class="tk-hearts"></span><span class="tk-job"></span></div>
       <div class="tk-bubble"><b class="tk-line"></b><span class="tk-tr"></span><span class="tk-how"></span></div></div><div class="sh-list tk-opts"></div><div class="sh-msg"></div>
-      <div class="sh-foot"><span class="tk-charm"></span><span><span class="kbd">1–8</span> or <span class="kbd">↑↓</span> <span class="kbd">Enter</span> · <span class="kbd">F</span> leave</span></div>`;
+      <div class="sh-foot"><span class="tk-charm"></span><span><span class="kbd">1–8</span> or <span class="kbd">↑↓</span> <span class="kbd">Enter</span> · <span class="kbd" data-k="F">F</span> leave</span></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
     el.addEventListener('click', (e) => { const b = e.target.closest('.sh-item'); if (b && !b.disabled) this.pick(+b.dataset.i); });

@@ -21,7 +21,7 @@ export class Trial {
     el.innerHTML = `<div class="tr-head"><div class="sh-k"></div><div class="sh-t"></div></div>
       <div class="tr-filters"></div><div class="tr-list"></div>
       <div class="tr-buy"><div class="tr-sel"><b></b><small></small></div><button class="tr-go"></button></div>
-      <div class="sh-msg"></div><div class="sh-foot"><span></span><span><span class="kbd">↑↓</span> try on · <span class="kbd">Enter</span> buy · <span class="kbd">A</span><span class="kbd">D</span> filter · <span class="kbd">F</span> step out</span></div>`;
+      <div class="sh-msg"></div><div class="sh-foot"><span></span><span><span class="kbd">↑↓</span> try on · <span class="kbd">Enter</span> buy · <span class="kbd">A</span><span class="kbd">D</span> filter · <span class="kbd" data-k="F">F</span> step out</span></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
     el.addEventListener('click', (e) => {

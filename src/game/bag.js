@@ -8,6 +8,7 @@ import { KIND_INFO, fmt, lookFromJSON } from './shops.js';
 import { PROPERTIES } from './props.js';
 import { icon, ITEM_ICON } from '../ui/icons.js';
 import { KbNav } from '../ui/kbnav.js';
+import { refreshChips } from './keys.js';
 import { guideHTML } from './guide.js';
 import { BUSINESSES as BIZ } from './hustle.js';
 import { levelOf, ASKS } from './date.js';
@@ -27,7 +28,7 @@ export class Bag {
     el.innerHTML = `<div class="jh-top"><div class="jh-title"><i class="jh-badge">${icon('jhola')}</i><b>Jhola</b><span lang="mr">झोळी</span></div><div class="jh-money"></div></div>
       <div class="jh-tabs" role="tablist">${TABS.map(([k, l, m, ic]) => `<button role="tab" data-t="${k}">${icon(ic)}<b>${l}</b><span lang="mr">${m}</span></button>`).join('')}</div>
       <div class="jh-body"></div><div class="jh-msg" aria-live="polite"></div>
-      <div class="jh-foot"><span><span class="kbd">A</span><span class="kbd">D</span> tabs · <span class="kbd">↑↓</span> <span class="kbd">Enter</span> use</span><span><span class="kbd">E</span> close · <span class="kbd">Tab</span> me</span></div>`;
+      <div class="jh-foot"><span><span class="kbd">A</span><span class="kbd">D</span> tabs · <span class="kbd">↑↓</span> <span class="kbd">Enter</span> use</span><span><span class="kbd" data-k="E">E</span> close · <span class="kbd" data-k="Tab">Tab</span> me</span></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
     this.nav = new KbNav(el.querySelector('.jh-body'), '.jh-item, .jh-row[data-act], .jh-chips.sel button, .gd-sec > summary');
@@ -54,7 +55,7 @@ export class Bag {
     if (tab) this.tab = tab;
     this.open = true; G.state = 'shop'; this.nav.i = -1;
     G.audio.updateEngine?.(0, 0, false);
-    this.el.hidden = false; this.msg('');
+    this.el.hidden = false; this.msg(''); refreshChips(this.el);
     this.render();
     this.el.classList.remove('in'); void this.el.offsetWidth; this.el.classList.add('in');
     G.releaseMouse?.();          // the jhola and status are pointer menus

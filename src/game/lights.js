@@ -4,6 +4,7 @@
 // kirana or an electronics shop. Both lights live in the scene from the start (intensity 0 when off),
 // so switching never recompiles a shader.
 import * as THREE from 'three';
+import { keyLabel } from './keys.js';
 
 export class Lights {
   constructor(G) {
@@ -68,8 +69,8 @@ export class Lights {
       this._ind = ind;
       this.el.hidden = !ind;
       this.el.innerHTML = ind === 'head'
-        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6c-4 0-6 2.7-6 6s2 6 6 6h2V6z"/><path d="M15 8h6M15 12h6M15 16h6"/></svg><span>Lights</span><span class="kbd">L</span>'
-        : ind === 'torch' ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10l-2 6H9z"/><path d="M9 9h6v12H9z"/><path d="M12 13v2"/></svg><span>Torch</span><span class="kbd">L</span>' : '';
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6c-4 0-6 2.7-6 6s2 6 6 6h2V6z"/><path d="M15 8h6M15 12h6M15 16h6"/></svg><span>Lights</span><span class="kbd">' + keyLabel('L') + '</span>'
+        : ind === 'torch' ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10l-2 6H9z"/><path d="M9 9h6v12H9z"/><path d="M12 13v2"/></svg><span>Torch</span><span class="kbd">' + keyLabel('L') + '</span>' : '';
     }
   }
 }

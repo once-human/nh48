@@ -16,9 +16,18 @@ const HORN = {
   bell: { s: 'horn_beep', r: 2.6, v: 0.25, gap: 0.2 },
 };
 
+// every sound goes through one of these, each with its own volume in Settings
+export const BUSES = ['traffic', 'voice', 'world', 'fx', 'music'];
+// which bus a recorded sample belongs to, by name
+const busOf = (name) => name.startsWith('v_') ? 'voice'
+  : /^(horn_|car_idle|diesel_idle|auto_start|amb_traffic|amb_auto_ride)/.test(name) ? 'traffic'
+  : /^(amb_|crow|dog_bark|cow_moo|temple_bells)/.test(name) ? 'world' : 'fx';
+
 export class Audio {
   constructor(raw) {
     this.ctx = null; this.enabled = true; this.volume = 0.8;
+    this.vols = { traffic: 1, voice: 1, world: 1, fx: 1, music: 1 };
+    this.buses = {}; this._bus = null;
     this.lastHonk = 0;
     this.raw = raw || {};          // name -> ArrayBuffer (mp3)
     this.buf = {};
@@ -33,6 +42,7 @@ export class Audio {
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -16; comp.ratio.value = 5;
     this.master.connect(comp).connect(ctx.destination);
+    for (const k of BUSES) { const g = this.buses[k] = ctx.createGain(); g.gain.value = this.vols[k] ?? 1; g.connect(this.bus()); }
     this.noise = this.makeNoise(2);
     this.buildEngine();
     this.buildAmbient();
@@ -47,6 +57,11 @@ export class Audio {
     this.startLoops();
   }
   setVolume(v) { this.volume = v; if (this.master) this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05); }
+  setBusVolume(k, v) { this.vols[k] = v; const g = this.buses[k]; if (g) g.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05); }
+  // the node a sound connects to: its category's bus (inside horn() etc. the category is set for the call)
+  bus(k) { return this.buses[k || this._bus || 'fx'] || this.master; }
+  // run fn with every sound it makes going to bus k
+  on(k, fn) { const was = this._bus; this._bus = k; try { return fn(); } finally { this._bus = was; } }
   makeNoise(sec) {
     const ctx = this.ctx, n = ctx.sampleRate * sec;
     const b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
@@ -54,7 +69,7 @@ export class Audio {
     return b;
   }
   // ---------------------------------------------------------------- samples
-  play(name, { vol = 0.5, pan = 0, rate = 1, delay = 0, offset = 0, dur, filter } = {}) {
+  play(name, { vol = 0.5, pan = 0, rate = 1, delay = 0, offset = 0, dur, filter, bus } = {}) {
     const b = this.buf[name];
     if (!this.ctx || !b) return null;
     const ctx = this.ctx, t = ctx.currentTime + delay;
@@ -67,7 +82,8 @@ export class Audio {
       node.connect(f); node = f;
     }
     node.connect(g);
-    if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p).connect(this.master); } else g.connect(this.master);
+    const out = this.bus(bus || this._bus || busOf(name));
+    if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p).connect(out); } else g.connect(out);
     src.start(t, offset, dur);
     return { src, g };
   }
@@ -76,7 +92,7 @@ export class Audio {
     if (!this.ctx || !b) return null;
     const src = this.ctx.createBufferSource(); src.buffer = b; src.loop = true;
     const g = this.ctx.createGain(); g.gain.value = vol;
-    src.connect(g).connect(this.master);
+    src.connect(g).connect(this.bus(busOf(name)));
     src.start(0, Math.random() * b.duration);
     return { src, g };
   }
@@ -128,7 +144,7 @@ export class Audio {
     }
     this.keepVoice(name);
     if (this.curVoice) { try { this.curVoice.g.gain.setTargetAtTime(0, now, 0.04); this.curVoice.src.stop(now + 0.15); } catch (e) { /* already stopped */ } }
-    const v = this.play('v_' + id, { vol: 0.95 * vol * (this.voiceVol ?? 1), pan, filter: radio ? { type: 'bandpass', f: 1500, q: 0.9 } : undefined });
+    const v = this.play('v_' + id, { vol: 0.95 * vol, pan, filter: radio ? { type: 'bandpass', f: 1500, q: 0.9 } : undefined });
     if (!v) return false;
     this.curVoice = v; this.voicePri = pri; this.voiceEnd = now + v.src.buffer.duration;
     this.duck(radio ? 0.75 : 0.55, Math.min(4, v.src.buffer.duration + 0.3));
@@ -161,7 +177,8 @@ export class Audio {
       const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
       const m = ctx.createGain(); m.gain.value = 0.35;
       o.connect(bp); o2.connect(m).connect(bp); bp.connect(g);
-      if (p) g.connect(p).connect(this.master); else g.connect(this.master);
+      const out = this.bus('traffic');
+      if (p) g.connect(p).connect(out); else g.connect(out);
       o.start(); o2.start();
       this.sir = { o, o2, g, p, ph: 0 };
     }
@@ -178,7 +195,7 @@ export class Audio {
     const ctx = this.ctx;
     this.eng = {};
     const out = ctx.createGain(); out.gain.value = 0;
-    out.connect(this.master);
+    out.connect(this.bus('traffic'));
     const osc = ctx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 12;
     const osc2 = ctx.createOscillator(); osc2.type = 'square'; osc2.frequency.value = 24;
     const shaper = ctx.createWaveShaper();
@@ -233,7 +250,7 @@ export class Audio {
     const src = ctx.createBufferSource(); src.buffer = this.noise; src.loop = true;
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260;
     const g = ctx.createGain(); g.gain.value = 0.04;
-    src.connect(lp).connect(g).connect(this.master);
+    src.connect(lp).connect(g).connect(this.bus('world'));
     src.start();
     this.amb = { g, lp };
   }
@@ -253,7 +270,7 @@ export class Audio {
   // ---------------------------------------------------------------- horns
   horn(kind, vol = 0.5, pan = 0, n = 1) {
     const H = HORN[kind] || HORN.car;
-    if (kind === 'tempo' || !this.buf[H.s]) return this.hornSynth(kind, vol, pan, n);
+    if (kind === 'tempo' || !this.buf[H.s]) return this.on('traffic', () => this.hornSynth(kind, vol, pan, n));
     for (let k = 0; k < n; k++) this.play(H.s, { vol: vol * H.v, pan, rate: H.r * (0.97 + Math.random() * 0.06), delay: k * H.gap, filter: H.f });
   }
   hornSynth(kind, vol, pan, n) {
@@ -286,7 +303,7 @@ export class Audio {
         if (H.f.gain !== undefined) f.gain.value = H.f.gain;
         src.connect(f); node = f;
       }
-      node.connect(g).connect(this.master);
+      node.connect(g).connect(this.bus('traffic'));
       src.start();
       g.gain.setTargetAtTime(0.55 * H.v, ctx.currentTime, 0.008);
       this.hornNode = { src, g };
@@ -309,7 +326,8 @@ export class Audio {
     const ctx = this.ctx, t = ctx.currentTime + delay;
     const g = ctx.createGain();
     const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-    if (p) { p.pan.value = clamp(pan, -1, 1); g.connect(p).connect(this.master); } else g.connect(this.master);
+    const out = this.bus();
+    if (p) { p.pan.value = clamp(pan, -1, 1); g.connect(p).connect(out); } else g.connect(out);
     const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freqs[0] * 2.2; bp.Q.value = 0.7;
     bp.connect(g);
     for (const f of freqs) {
@@ -326,11 +344,11 @@ export class Audio {
     const src = ctx.createBufferSource(); src.buffer = this.noise;
     const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900 + Math.random() * 500; bp.Q.value = 0.9;
     const g = ctx.createGain();
-    src.connect(bp).connect(g).connect(this.master);
+    src.connect(bp).connect(g).connect(this.bus());
     this.env(g, t, 0.002, clamp(0.25 + strength * 0.4, 0.1, 0.8), 0.01, 0.07);
     src.start(t, Math.random()); src.stop(t + 0.15);
     const o = ctx.createOscillator(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(55, t + 0.12);
-    const og = ctx.createGain(); o.connect(og).connect(this.master);
+    const og = ctx.createGain(); o.connect(og).connect(this.bus());
     this.env(og, t, 0.002, clamp(0.2 + strength * 0.35, 0.1, 0.7), 0.01, 0.12);
     o.start(t); o.stop(t + 0.2);
   }
@@ -341,7 +359,7 @@ export class Audio {
     for (const [dt, f] of [[0, 62], [0.16, 54]]) {
       const o = ctx.createOscillator(), g = ctx.createGain();
       o.frequency.setValueAtTime(f, t + dt); o.frequency.exponentialRampToValueAtTime(34, t + dt + 0.12);
-      o.connect(g).connect(this.master); this.env(g, t + dt, 0.004, 0.25 + k * 0.35, 0.02, 0.12);
+      o.connect(g).connect(this.bus()); this.env(g, t + dt, 0.004, 0.25 + k * 0.35, 0.02, 0.12);
       o.start(t + dt); o.stop(t + dt + 0.2);
     }
   }
@@ -353,7 +371,7 @@ export class Audio {
     const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.4;
     bp.frequency.setValueAtTime(500, t); bp.frequency.exponentialRampToValueAtTime(1800, t + 0.12);
     const g = ctx.createGain();
-    src.connect(bp).connect(g).connect(this.master);
+    src.connect(bp).connect(g).connect(this.bus());
     this.env(g, t, 0.03, 0.08 * strength, 0.04, 0.08);
     src.start(t, Math.random()); src.stop(t + 0.25);
   }
@@ -363,11 +381,11 @@ export class Audio {
     const src = ctx.createBufferSource(); src.buffer = this.noise;
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 180 + strength * 400;
     const g = ctx.createGain();
-    src.connect(lp).connect(g).connect(this.master);
+    src.connect(lp).connect(g).connect(this.bus());
     this.env(g, t, 0.005, clamp(strength * 0.35, 0.05, 0.9), 0.02, 0.25);
     src.start(t, Math.random()); src.stop(t + 0.4);
     const o = ctx.createOscillator(); o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.2);
-    const og = ctx.createGain(); o.connect(og).connect(this.master);
+    const og = ctx.createGain(); o.connect(og).connect(this.bus());
     this.env(og, t, 0.005, clamp(strength * 0.3, 0.05, 0.6), 0.02, 0.2);
     o.start(t); o.stop(t + 0.3);
   }
@@ -386,7 +404,7 @@ export class Audio {
       const g = ctx.createGain();
       const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
       o.connect(bp).connect(g);
-      if (p) { p.pan.value = pan; g.connect(p).connect(this.master); } else g.connect(this.master);
+      if (p) { p.pan.value = pan; g.connect(p).connect(this.bus('world')); } else g.connect(this.bus('world'));
       this.env(g, st, 0.02, 0.05, 0.12, 0.14);
       o.start(st); o.stop(st + 0.35);
     }
@@ -401,7 +419,7 @@ export class Audio {
       o.frequency.setValueAtTime(420, st); o.frequency.exponentialRampToValueAtTime(260, st + 0.12);
       const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
       const g = ctx.createGain();
-      o.connect(lp).connect(g).connect(this.master);
+      o.connect(lp).connect(g).connect(this.bus('world'));
       this.env(g, st, 0.01, vol * 0.2, 0.04, 0.08);
       o.start(st); o.stop(st + 0.2);
     }
@@ -424,7 +442,7 @@ export class Audio {
       const am = ctx.createGain(); am.gain.value = 0.7;
       const amo = ctx.createOscillator(); amo.frequency.value = 38; const amg = ctx.createGain(); amg.gain.value = 0.3; amo.connect(amg).connect(am.gain);
       const g = ctx.createGain();
-      o.connect(am).connect(g).connect(this.master);
+      o.connect(am).connect(g).connect(this.bus());
       this.env(g, t, 0.015, 0.13, len, 0.05);
       for (const n of [o, trill, amo]) { n.start(t); n.stop(t + len + 0.1); }
     }
