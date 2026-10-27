@@ -25,6 +25,7 @@ import { Interiors } from '../world/interiors.js';
 import { StreetApproach } from './approach.js';
 import { Dates } from './date.js';
 import { loadSettings, applySettings } from './settings.js';
+import { refreshChips } from './keys.js';
 import { Trial } from './trial.js';
 import { Fauna } from '../people/animals.js';
 import { Vehicle } from '../vehicles/vehicle.js';
@@ -304,6 +305,7 @@ export class Game {
     this.hud.showPicker(() => this.startPlay(false));
   }
   startPlay(shift) {
+    refreshChips();      // key chips in every panel show your bindings
     if (this.warming && !this._warmDone) { this.warming.then(() => this.startPlay(shift)); return; }   // Start before the city's ready: in a moment
     // drop focus from the menu button so Space (handbrake) can't press it again
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();

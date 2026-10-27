@@ -694,7 +694,7 @@ export class Shops {
     el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Shop');
     el.innerHTML = `<div class="sh-head"><div class="sh-k"></div><div class="sh-t"></div><div class="sh-mr" lang="mr"></div>
       <div class="sh-say"><b></b><span></span></div></div><div class="sh-list"></div><div class="sh-msg" aria-live="polite"></div>
-      <div class="sh-foot"><span class="sh-wallet"></span><span><span class="kbd">1–9</span> or <span class="kbd">↑↓</span> <span class="kbd">Enter</span> · <span class="kbd">F</span> leave</span></div>`;
+      <div class="sh-foot"><span class="sh-wallet"></span><span><span class="kbd">1–9</span> or <span class="kbd">↑↓</span> <span class="kbd">Enter</span> · <span class="kbd" data-k="F">F</span> leave</span></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
     el.addEventListener('click', (e) => { const b = e.target.closest('.sh-item'); if (b && !b.disabled) this.buy(+b.dataset.i); });
