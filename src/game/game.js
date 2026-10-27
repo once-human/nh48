@@ -84,6 +84,7 @@ export class Game {
     const unlock = () => { this.audio.start(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
     window.addEventListener('pointerdown', unlock); window.addEventListener('keydown', unlock);
     this.people = new People(W, this.scene, this.vmats.body, this.quality);
+    this.people.cars = () => this.traffic ? this.traffic.list : null;      // people step out of the way of cars, never through them
     // which shop fronts are clubs (they get a crowd out front at night)
     this.people.isClub = (d) => { if (d.club === undefined) { const inf = d.shop >= 0 && this.shops && this.shops.infoOf(d); d.club = !!(inf && inf.kind === 'bar' && this.shops.isClub(inf)); } return d.club; };
     this.crowd = new Crowd(this.people, W.kit, this.scene, W, this.quality);

@@ -125,10 +125,10 @@ export class Traffic {
   randomLink(px, pz, rMin, rMax) {
     // roads around you (cached, refreshed as you move): picking from the whole city's graph would
     // almost never land near you once all of Pune is loaded
-    if (!this._near || Math.hypot(px - this._nearX, pz - this._nearZ) > 60 || this._nearR !== rMax) {
-      this._near = [...this.graph.gridQuery(px, pz, rMax)]; this._nearX = px; this._nearZ = pz; this._nearR = rMax;
-    }
-    const edges = this._near.length ? this._near : this.graph.liveEdges;
+    // one cache per radius: the spawner asks for two (round you, and down the road ahead)
+    const C = (this._nearC = this._nearC || {})[rMax] || (this._nearC[rMax] = { list: null, x: 0, z: 0 });
+    if (!C.list || Math.hypot(px - C.x, pz - C.z) > 60) { C.list = [...this.graph.gridQuery(px, pz, rMax)]; C.x = px; C.z = pz; }
+    const edges = C.list.length ? C.list : this.graph.liveEdges;
     for (let tries = 0; tries < 40; tries++) {
       const e = edges[Math.floor(this.rng.next() * edges.length)];
       if (e.rank < 2) continue;
@@ -142,15 +142,16 @@ export class Traffic {
     }
     return null;
   }
-  spawn(px, pz, rMin, rMax, avoidView) {
+  spawn(px, pz, rMin, rMax, avoidView, ox = px, oz = pz, oMin = 0) {
     const r = this.randomLink(px, pz, rMin, rMax);
     if (!r) return null;
+    if (oMin && Math.hypot(r.x - ox, r.z - oz) < oMin) return null;
     if (avoidView && avoidView(r.x, r.z)) return null;
     for (const o of this.list) if (Math.abs(o.x - r.x) < 9 && Math.abs(o.z - r.z) < 9) return null;
     const type = this.pickType(r.l);
     const T = TYPES[type];
     // never drop a bus or truck right on top of the player's camera
-    if (T.L > 5 && Math.hypot(r.x - px, r.z - pz) < 45) return null;
+    if (T.L > 5 && Math.hypot(r.x - ox, r.z - oz) < 45) return null;
     const v = this.pool.pop() || {};
     const [lo, hi] = latBounds(r.l);
     Object.assign(v, {
@@ -253,11 +254,22 @@ export class Traffic {
   update(dt, px, pz, avoidView) {
     this.time += dt;
     this.signals.update(dt);
+    // how fast and which way the player is going: at speed the road ahead has to be full when you get there
+    if (this._px === undefined) { this._px = px; this._pz = pz; this._sp = 0; this._hx = 1; this._hz = 0; }
+    const mdx = px - this._px, mdz = pz - this._pz, md = Math.hypot(mdx, mdz);
+    this._px = px; this._pz = pz;
+    if (md < 50 && dt > 0) {          // a teleport (fast travel) isn't speed
+      this._sp += (md / dt - this._sp) * Math.min(1, dt * 2);
+      if (md > 0.02) { this._hx += (mdx / md - this._hx) * Math.min(1, dt * 3); this._hz += (mdz / md - this._hz) * Math.min(1, dt * 3); const n = Math.hypot(this._hx, this._hz) || 1; this._hx /= n; this._hz /= n; }
+    }
+    const sp = this._sp, fast = sp > 7, hx = this._hx, hz = this._hz;
     // keep population
     for (let i = this.list.length - 1; i >= 0; i--) {
       const v = this.list[i];
-      const d = Math.hypot(v.x - px, v.z - pz);
-      if (d > 300 || !v.alive) this.despawn(i);
+      const dx = v.x - px, dz = v.z - pz, d = Math.hypot(dx, dz);
+      // at speed, what you've left behind goes (out of sight) so the budget moves to the road ahead
+      const behind = fast && dx * hx + dz * hz < -0.3 * d && d > 110 && (!avoidView || !avoidView(v.x, v.z));
+      if (d > 300 || !v.alive || behind) this.despawn(i);
     }
     // fewer vehicles at 3 am than at 6 pm; the far ones drop out as it thins
     const target = Math.round(this.max * curve(TRAFFIC, this.hour));
@@ -265,10 +277,16 @@ export class Traffic {
       const v = this.list[i];
       if (Math.hypot(v.x - px, v.z - pz) > 150 && (!avoidView || !avoidView(v.x, v.z))) this.despawn(i);
     }
-    let tries = 8;
+    let tries = 8 + Math.min(16, Math.round(sp));
     while (this.list.length < target && tries-- > 0) {
       const urgent = this.list.length < target * 0.5;
-      this.spawn(px, pz, urgent ? 25 : 80, 240, urgent ? null : avoidView);
+      if (fast && this.rng.next() < 0.8) {
+        // ahead: around a point 6-8 s down the road, never closer than 70 m and never in plain view
+        // (the view check alone would refuse the whole road ahead: in view is fine past 140 m, where a car is a speck in the haze)
+        const look = Math.min(sp * 7, 200);
+        const hidden = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 140 : null;
+        this.spawn(px + hx * look, pz + hz * look, 0, 170, hidden, px, pz, 70);
+      } else this.spawn(px, pz, urgent ? 25 : 80, 240, urgent ? null : avoidView);
     }
     this.buildGrid();
     for (const v of this.list) this.step(v, dt);

@@ -554,13 +554,45 @@ export class People {
     if (d < 0.3 || g.t > 25) { p.goal = null; g.then(p); return; }
     const sp = p.speed * (g.hurry ? 1.9 : 1);
     const st = Math.min(d, sp * dt);
-    p.x += dx / d * st; p.z += dz / d * st;
+    const surf = this.W.surf, ox = p.x, oz = p.z;
+    let nx = p.x + dx / d * st, nz = p.z + dz / d * st;
+    // never step into a building: stop at the wall instead of tunnelling through it
+    if (surf.inBuilding && surf.inBuilding(nx, nz) && !surf.inBuilding(ox, oz)) { nx = ox; nz = oz; }
+    p.x = nx; p.z = nz;
     const res = this.W.collision.resolve(p.x, p.z, 0.22);
     if (res && res.kind !== 3) { p.x += res.nx * res.depth; p.z += res.nz * res.depth; }
-    p.yaw += wrapAngle(Math.atan2(dz, dx) - p.yaw) * Math.min(1, dt * 8);
+    // nor through a car: pushed out of any vehicle's box (moving traffic and the ones stopped in it)
+    const cars = this.cars ? this.cars() : null;
+    if (cars) for (const v of cars) {
+      const ex = p.x - v.x, ez = p.z - v.z;
+      if (Math.abs(ex) > 4 || Math.abs(ez) > 4 || !v.T) continue;
+      const hl = v.T.L / 2 + 0.25, hw = v.T.W / 2 + 0.25, lx = ex * v.hx + ez * v.hz, lz = -ex * v.hz + ez * v.hx;
+      if (Math.abs(lx) >= hl || Math.abs(lz) >= hw) continue;
+      const pl = hl - Math.abs(lx), pw = hw - Math.abs(lz);
+      if (pl < pw) { const s = Math.sign(lx) || 1; p.x += v.hx * pl * s; p.z += v.hz * pl * s; }
+      else { const s = Math.sign(lz) || 1; p.x += -v.hz * pw * s; p.z += v.hx * pw * s; }
+    }
+    // somehow inside a building (spawned or shoved there): back out to the street at once
+    if (surf.inBuilding && surf.inBuilding(p.x, p.z)) {
+      const near = this.g.nearest(p.x, p.z, 60);
+      if (near) { this.g.at(near.e, near.s, TMP); p.x = TMP[0]; p.z = TMP[1]; }
+    }
+    // stuck against something (a wall between them and where they're going): don't keep running into
+    // it; head for the street, or give up and carry on from here
+    const moved = Math.hypot(p.x - ox, p.z - oz);
+    g.stuck = moved < st * 0.35 ? (g.stuck || 0) + dt : Math.max(0, (g.stuck || 0) - dt);
+    if (g.stuck > 0.7) {
+      g.stuck = 0;
+      const near = !g.rerouted && this.g.nearest(p.x, p.z, 40);
+      if (near) { this.g.at(near.e, near.s, TMP); g.x = TMP[0]; g.z = TMP[1]; g.rerouted = true; }
+      else { p.goal = null; g.then(p); return; }
+    }
+    const mdx = p.x - ox, mdz = p.z - oz;
+    const face = moved > 1e-4 ? Math.atan2(mdz, mdx) : Math.atan2(dz, dx);
+    p.yaw += wrapAngle(face - p.yaw) * Math.min(1, dt * 8);
     p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
-    p.v = sp; p.phase += dt * sp * 4.2;
-    p.onRoad = this.W.surf.isRoad(p.x, p.z);
+    p.v = moved / Math.max(dt, 1e-4); p.phase += dt * p.v * 4.2;
+    p.onRoad = surf.isRoad(p.x, p.z);
   }
   // back to the footpath and carry on walking
   backToPath(p) {
