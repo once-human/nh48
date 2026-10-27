@@ -1129,3 +1129,85 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 /* the city fades in once its shaders are ready (the title is already up) */
 #gl { transition: opacity .5s ease; }
 #gl.warming { opacity: 0; }
+
+/* ---- jhola ---- */
+/* a cloth bag, not a settings page: khadi weave on the panel, stitched pockets, a keypad handset for the phone */
+.jhola {
+  --jh-weave: repeating-linear-gradient(0deg, rgba(255, 228, 180, .025) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(255, 228, 180, .02) 0 1px, transparent 1px 3px);
+  background: var(--jh-weave), linear-gradient(180deg, rgba(38, 30, 22, .88), rgba(20, 17, 14, .9)) !important;
+  border: 1px solid rgba(255, 214, 150, .16) !important;
+  width: min(780px, calc(100vw - 24px)) !important;
+}
+.jh-top { align-items: center !important; padding: 22px 26px 14px !important; }
+.jh-title { align-items: center !important; gap: 12px !important; }
+.jh-badge { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: linear-gradient(160deg, #ffc24a, #e08a12); color: #2a1a04; box-shadow: 0 6px 16px -6px rgba(255, 170, 40, .6), inset 0 1px 0 rgba(255, 255, 255, .35); }
+.jh-badge .ic { width: 26px; height: 26px; stroke-width: 2; }
+.jh-title b { font-size: 30px !important; }
+.jh-title span { color: #e9b765 !important; font-size: 18px !important; }
+.jh-money span { background: rgba(255, 228, 180, .07) !important; border: 1px dashed rgba(255, 214, 150, .22) !important; border-radius: 12px !important; }
+.jh-money b { color: #fff3dc; }
+/* tabs: an icon and a word, the open one lifted like a tag */
+.jh-tabs { background: rgba(0, 0, 0, .28) !important; margin: 0 22px !important; padding: 5px !important; border-radius: 16px !important; gap: 4px !important; }
+.jh-tabs button { display: grid !important; justify-items: center; gap: 3px !important; padding: 8px 6px 7px !important; border-radius: 12px !important; color: rgba(255, 236, 205, .55) !important; min-width: 64px; }
+.jh-tabs button .ic { width: 20px; height: 20px; }
+.jh-tabs button b { font: 600 12px var(--font-ui) !important; }
+.jh-tabs button:hover { color: #ffe9c4 !important; background: rgba(255, 228, 180, .06); }
+.jh-tabs button[aria-selected=true] { background: linear-gradient(180deg, #ffbf47, #f0a01e) !important; color: #2a1a04 !important; box-shadow: 0 6px 14px -6px rgba(255, 170, 40, .7) !important; }
+.jh-body { padding: 18px 22px 18px !important; }
+/* pockets: stitched cloth labels */
+.jh-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; gap: 10px !important; }
+.jh-item { min-height: 128px !important; padding: 14px 14px 12px !important; border-radius: 18px !important;
+  background: linear-gradient(180deg, rgba(255, 232, 196, .09), rgba(255, 232, 196, .04)) !important;
+  outline: 1.5px dashed rgba(255, 214, 150, .2); outline-offset: -6px; }
+.jh-item:hover { background: linear-gradient(180deg, rgba(255, 232, 196, .14), rgba(255, 232, 196, .07)) !important; outline-color: rgba(255, 190, 80, .5); }
+.jh-item .pk { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; background: rgba(255, 178, 36, .14); margin-bottom: 6px; }
+.jh-item .pk .ic { width: 26px !important; height: 26px !important; margin: 0 !important; color: #ffc65c !important; }
+.jh-item b { font: 650 14px var(--font-ui) !important; color: #fff3dc; }
+.jh-item small { color: rgba(255, 236, 205, .55) !important; font-size: 12px !important; }
+.jh-item i { top: 12px !important; right: 12px !important; background: rgba(255, 236, 205, .14) !important; color: #ffe9c4 !important; font-weight: 700 !important; }
+.jh-item em { position: absolute; top: 12px; right: 12px; font: 800 11px var(--font-ui); font-style: normal; letter-spacing: .06em; padding: 4px 8px; border-radius: 99px; background: rgba(255, 236, 205, .12); color: rgba(255, 236, 205, .6); }
+.jh-item.tool.on { background: linear-gradient(180deg, rgba(255, 196, 80, .26), rgba(255, 170, 40, .1)) !important; outline-color: rgba(255, 200, 90, .7); }
+.jh-item.tool.on em { background: #ffc24a; color: #2a1a04; box-shadow: 0 0 14px rgba(255, 200, 90, .7); }
+.jh-item.tool.on .pk { background: #ffc24a; } .jh-item.tool.on .pk .ic { color: #2a1a04 !important; }
+/* rows */
+.jh-row { border-radius: 16px !important; background: rgba(255, 232, 196, .06) !important; padding: 10px 14px 10px 10px !important; }
+.jh-row:hover:not(:disabled) { background: rgba(255, 232, 196, .11) !important; }
+.jh-row .ic { border-radius: 12px !important; background: rgba(255, 178, 36, .14) !important; color: #ffc65c !important; }
+.jh-row b { color: #fff3dc; }
+.jh-row .go { color: #ffbf47 !important; }
+.jh-row .av { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(160deg, #6a4a8c, #3c2a56); color: #fff; font: 700 16px var(--font-ui); }
+.jh-row.partner .av { background: linear-gradient(160deg, #ff6b8b, #c2185b); }
+.jh-sub { color: #e9b765 !important; font-weight: 700 !important; }
+.jh-read { background: rgba(255, 178, 36, .1) !important; border-radius: 16px !important; }
+.jh-ring, .jh-chips > span, .jh-stats span { background: rgba(255, 232, 196, .06) !important; }
+.jh-empty { color: rgba(255, 236, 205, .55) !important; }
+.jh-foot { border-top: 1px dashed rgba(255, 214, 150, .16) !important; }
+/* the phone tab: a keypad handset with a warm backlit screen */
+.jh-phone { justify-self: center; width: min(420px, 100%); padding: 14px 14px 16px; border-radius: 34px; background: linear-gradient(180deg, #2b2b30, #18181c); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 18px 40px -16px rgba(0, 0, 0, .8); }
+.ph-bar { display: flex; align-items: center; gap: 8px; padding: 6px 14px 8px; font: 600 11px var(--font-ui); color: rgba(255, 255, 255, .5); }
+.ph-bar b { margin-left: auto; color: rgba(255, 255, 255, .8); font-variant-numeric: tabular-nums; }
+.ph-sig { display: inline-flex; align-items: end; gap: 2px; height: 10px; }
+.ph-sig i { width: 3px; background: rgba(255, 255, 255, .6); border-radius: 1px; } .ph-sig i:nth-child(1) { height: 4px; } .ph-sig i:nth-child(2) { height: 6px; } .ph-sig i:nth-child(3) { height: 8px; } .ph-sig i:nth-child(4) { height: 10px; }
+.ph-screen { display: grid; gap: 6px; padding: 12px; border-radius: 16px; background: linear-gradient(180deg, #f7e7b6, #ecd391); color: #2c230e; max-height: 46vh; overflow: auto; box-shadow: inset 0 2px 8px rgba(0, 0, 0, .25); }
+.jh-phone.smart .ph-screen { background: linear-gradient(180deg, #f4f6fb, #e3e8f2); color: #1b2030; }
+.ph-screen .jh-row { background: rgba(255, 255, 255, .45) !important; color: inherit; }
+.ph-screen .jh-row:hover:not(:disabled), .ph-screen .jh-row.kb { background: rgba(255, 255, 255, .8) !important; }
+.ph-screen .jh-row b { color: inherit; } .ph-screen .jh-row small { color: rgba(44, 35, 14, .65) !important; }
+.ph-screen .jh-row .ic { background: rgba(44, 35, 14, .1) !important; color: #7a4e00 !important; }
+.ph-screen .jh-row .go { color: #8a5300 !important; }
+.ph-screen .jh-sub, .ph-screen .jh-empty { color: rgba(44, 35, 14, .7) !important; margin: 4px 2px !important; }
+.ph-screen .jh-read { background: rgba(255, 255, 255, .5) !important; }
+.ph-screen .jh-read span { color: rgba(44, 35, 14, .6); } .ph-screen .jh-read b { color: inherit; }
+.ph-screen .ico.heart { color: #d81b60; }
+.ph-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 12px 18px 0; }
+.ph-keys i { display: grid; place-items: center; height: 24px; border-radius: 10px; background: linear-gradient(180deg, #3a3a40, #2a2a2f); color: rgba(255, 255, 255, .7); font: 600 12px var(--font-ui); font-style: normal; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); }
+/* the light switch chip on the HUD (headlight / torch) */
+.lamp-ind { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); display: flex; align-items: center; gap: 7px; padding: 5px 7px 5px 10px; border-radius: 999px;
+  background: rgba(24, 24, 28, .62); border: .5px solid rgba(255, 255, 255, .14); color: #ffd27a; font: 600 12px var(--font-ui); pointer-events: none; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.lamp-ind svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.lamp-ind .kbd { margin-left: 2px; }
+@media (max-width: 600px) {
+  .jh-tabs button { min-width: 52px; } .jh-tabs button b { font-size: 11px !important; }
+  .jh-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .jh-title b { font-size: 24px !important; } .jh-badge { width: 36px; height: 36px; }
+}

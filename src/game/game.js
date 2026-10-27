@@ -19,6 +19,7 @@ import { Gigs } from './gigs.js';
 import { Hustle } from './hustle.js';
 import { Transit } from './transit.js';
 import { Club } from './club.js';
+import { Lights } from './lights.js';
 import { Bag } from './bag.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
@@ -132,6 +133,7 @@ export class Game {
     this.transit = new Transit(this);
     this.club = new Club(this);
     this.bag = new Bag(this);
+    this.lights = new Lights(this);
     this.strays = new Strays(this);
     this.interiors = new Interiors(this);
     this.date = new Dates(this);
@@ -529,6 +531,7 @@ export class Game {
       P.ko = false; P.downT = 0; P.hp = L.hpMax * 0.7; P.hurtT = 0;
       L.s.hunger = Math.max(L.s.hunger, 0.5); L.s.thirst = Math.max(L.s.thirst, 0.55); L.s.energy = Math.max(L.s.energy, 0.5); L.s.drunk = 0;
       L.s.tally.knockedOut++; L.change('mood', -0.1);
+      if ((cause === 'beaten' || robbed) && this.rng.chance(0.7)) this.lights.lose('Lost while you were out cold');
       if (P.human) P.human.play('idle', { fade: 0.3 });
       this.rig.footMode = false;
       this.date && this.date.event('hosp', bill);
@@ -753,6 +756,7 @@ export class Game {
       for (const d of P.dropped) if (d.veh.owned && d.veh.owned.rental && this.clock > d.veh.owned.until && d.veh !== P.cur) { P.removeDropped(d, this.traffic); d.veh.dispose(); this.hud.toast('Rental returned', 'The travels picked up their scooter', 'info', 2.6); break; }
       this.vehicleWear(dt);
       if (this.input.took('KeyV')) this.rig.setMode(this.rig.mode + 1);
+      if (this.input.took('KeyL')) this.lights.toggle();
       this.rig.lookBack = this.input.key('KeyB');
       if (this.input.took('KeyR') && P.tipped === 0 && !P.onFoot) this.backOnRoad();
       if (!this.interiors.inside) this.checkRoad(dt);
@@ -790,7 +794,7 @@ export class Game {
     if (this.timers.sig <= 0) { this.timers.sig = 0.25; this.updateSignalLamps(); }
     // night lights
     const night = this.sky.state ? this.sky.state.night : 0;
-    P.headlight.intensity = night * 24;
+    this.lights.update(dt, night);
     if (this.lightPools) { this.lightPools.mesh.visible = night > 0.05; this.lightPools.mesh.material.opacity = night * 0.55; }
     this.people.render(P.x, P.z);
     if (this.crowd) { this.crowd.inView = this.inView; this.crowd.update(dt, this.camera.position.x, this.camera.position.z); }

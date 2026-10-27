@@ -35,6 +35,7 @@ export const ITEMS = {
   gajra: { name: 'Mogra gajra', gift: 20, use: { mood: 0.08 }, note: 'Smells of summer evenings' },
   book: { name: 'Paperback novel', use: { mood: 0.08, energy: -0.02 } },
   lottery: { name: 'Lottery ticket', note: 'Scratch it from the bag', scratch: true },
+  torch: { name: 'Torch', note: 'Lights the way after dark. L to switch it on or off', tool: true },
   beer: { name: 'Beer (pint)', use: { drunk: 0.3, thirst: 0.1, mood: 0.05 } },
 };
 
@@ -43,9 +44,11 @@ export class Life {
     this.g = G;
     this.s = Object.assign({
       hunger: 0.85, thirst: 0.85, energy: 0.9, mood: 0.7, respect: 0, karma: 0, fitness: 0, drunk: 0,
-      inv: { water: 1, biscuit: 2 }, bank: 0, gold: 0, props: [], vehicles: [], wardrobe: [], look: null, upg: {}, phone: false, zwiggy: false,
+      inv: { water: 1, biscuit: 2, torch: 1 }, bank: 0, gold: 0, props: [], vehicles: [], wardrobe: [], look: null, upg: {}, phone: false, zwiggy: false,
       tally: { deliveries: 0, fightsWon: 0, knockedOut: 0, fed: 0, meals: 0, rentEarned: 0 }, lastRentDay: -1,
     }, this.load() || {});
+    // older saves start with a torch too
+    if (!this.s.torchGiven) { this.s.torchGiven = 1; if (!this.s.inv.torch) this.s.inv.torch = 1; }
     this.warned = {};
     this.saveT = 0;
   }
@@ -69,6 +72,7 @@ export class Life {
     const it = ITEMS[id];
     if (!it || !this.has(id)) return '';
     if (it.scratch) { this.take(id); return this.scratch(); }
+    if (it.tool) return this.g.lights ? this.g.lights.setTorch(!this.g.lights.torchOn) : '';
     this.take(id);
     this.apply(it.use);
     return `${it.name}: ${describe(it.use)}`;
