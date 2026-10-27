@@ -133,15 +133,16 @@ export class Vehicle {
     if (!this._potT || (this._potT -= dt) <= 0) { this._potT = 0.5; W.potholeNear = W.potholes.filter(p => Math.abs(p.x - this.x) < 40 && Math.abs(p.z - this.z) < 40); }
     const thr = clamp(inp.throttle, 0, 1), brk = clamp(inp.brake, 0, 1);
     this.throttle = thr; this.brake = brk;
-    if (!this.reverse && this.v < 0.3 && brk > 0.5 && thr < 0.1) { this.revT += dt; if (this.revT > 0.35 && !S.two) this.reverse = true; }
+    if (!this.reverse && this.v < 0.3 && brk > 0.5 && thr < 0.1) { this.revT += dt; if (this.revT > 0.35) this.reverse = true; }
     else if (!(brk > 0.5)) this.revT = 0;
     if (this.reverse && thr > 0.1) this.reverse = false;
     // ---- longitudinal
     const v = this.v;
     let a;
     if (this.reverse) {
-      a = -1.8 * brk;
-      if (v < -3.2) a = Math.max(a, 0);
+      // two-wheelers back up slowly, walked back with the feet
+      a = (S.two ? -0.7 : -1.8) * brk;
+      if (v < (S.two ? -0.9 : -3.2)) a = Math.max(a, 0);
       if (brk < 0.1) a = -v * 2;
     } else {
       const load = 1 + this.load * 0.1;

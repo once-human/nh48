@@ -890,6 +890,8 @@ export class Interiors {
     const C = this.cur, G = this.g;
     if (!C) return;
     const R = C.R;
+    // seated you stay square in the chair: nothing else (a chat closing, a nudge, a key held) turns or slides you
+    if (C.seat && G.player.seated && !C.seat.salon) { const F = G.player.foot; F.yaw = C.seat.yaw; F.x = C.seat.x; F.z = C.seat.z; F.vx = F.vz = 0; }
     this.approachTick(dt);
     // the floor pulses with the beat
     if (R.ball) R.ball.rotation.y += dt * 0.8;
