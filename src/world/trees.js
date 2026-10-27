@@ -134,9 +134,9 @@ function finish(g, H, cellUV, roots) {
   g.l.setAttribute('wind', new THREE.BufferAttribute(wind, 1));
   g.crownLow = lb.min.y + (lb.max.y - lb.min.y) * 0.15;
   pruneLow(g.b, Math.max(2.6, H * 0.2), 1.4);
-  if (roots) addRoots(g, bb, H);
+  const rootFrom = roots ? addRoots(g, bb, H) : Infinity;
   const bw = new Float32Array(g.b.attributes.position.count);
-  for (let i = 0; i < bw.length; i++) bw[i] = Math.min(1, Math.max(0, g.b.attributes.position.getY(i) / H - 0.25)) * 0.5;
+  for (let i = 0; i < bw.length && i < rootFrom; i++) bw[i] = Math.min(1, Math.max(0, g.b.attributes.position.getY(i) / H - 0.25)) * 0.5;
   g.b.setAttribute('wind', new THREE.BufferAttribute(bw, 1));
   g.b.computeBoundingSphere(); g.l.computeBoundingSphere();
   return { b: g.b, l: g.l, W: Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z), H: bb.max.y, cx: (bb.max.x + bb.min.x) / 2 };
@@ -166,20 +166,43 @@ function pruneLow(geo, minY, trunkClear) {
   geo.setIndex(keep);
 }
 
-// banyan aerial roots: thin vertical columns hanging from the outer limbs
+// banyan aerial roots: strands that drop straight down from the underside of the outer limbs to the
+// ground (some thicken into pillars), picked from the real limb vertices so each one hangs from a
+// branch instead of standing loose under the crown. Returns the first root vertex (roots don't sway).
 function addRoots(g, bb, H) {
-  const parts = [g.b];
-  for (let k = 0; k < 14; k++) {
-    const a = hash1(k * 13.1) * Math.PI * 2, rr = (0.25 + hash1(k * 7.7) * 0.5) * (bb.max.x - bb.min.x) * 0.45;
-    const h = Math.max(2.5, (g.crownLow || H * 0.4) + hash1(k * 3.3) * 1.2);
-    const cyl = new THREE.CylinderGeometry(0.04 + hash1(k) * 0.08, 0.06 + hash1(k) * 0.1, h, 4, 1, true);
-    cyl.translate(Math.cos(a) * rr, h / 2, Math.sin(a) * rr);
-    cyl.deleteAttribute('uv'); cyl.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(cyl.attributes.position.count * 2), 2));
-    parts.push(cyl);
+  const p = g.b.attributes.position;
+  const cand = [];
+  for (const i of new Set(g.b.index.array)) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), r = Math.hypot(x, z);
+    if (r > 2.2 && y > 3.2 && y < H * 0.6) cand.push([x, y, z, r]);
+  }
+  // per sector round the trunk: the low underside of the outermost limb
+  const SECT = 18, best = new Array(SECT).fill(null), score = (c) => c[1] - c[3] * 0.4;
+  for (const c of cand) {
+    const s = Math.floor((Math.atan2(c[2], c[0]) / (Math.PI * 2) + 1) * SECT) % SECT;
+    if (!best[s] || score(c) < score(best[s])) best[s] = c;
+  }
+  const parts = [g.b], first = p.count;
+  let k = 0;
+  for (const c of best) {
+    if (!c) continue;
+    k++;
+    const [x, y, z] = c, strands = 1 + Math.floor(hash1(k * 5.3) * 3);
+    for (let j = 0; j < strands; j++) {
+      const ox = j ? (hash1(k * 9.1 + j) - 0.5) * 0.35 : 0, oz = j ? (hash1(k * 4.7 + j) - 0.5) * 0.35 : 0;
+      const pillar = j === 0 && hash1(k * 2.9) < 0.35;
+      const top = y - 0.04, h = top + 0.08;                 // into the limb a touch, and a little into the ground
+      const rt = pillar ? 0.07 : 0.025 + hash1(k + j) * 0.02, rb = pillar ? 0.16 + hash1(k * 1.7) * 0.08 : rt * 1.2;
+      const cyl = new THREE.CylinderGeometry(rt, rb, h, pillar ? 6 : 4, 1, true);
+      cyl.translate(x + ox, top - h / 2, z + oz);
+      cyl.deleteAttribute('uv'); cyl.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(cyl.attributes.position.count * 2), 2));
+      parts.push(cyl);
+    }
   }
   const merged = mergeSimple(parts);
   g.b.dispose();
   g.b = merged;
+  return first;
 }
 function mergeSimple(list) {
   let nv = 0, ni = 0;
