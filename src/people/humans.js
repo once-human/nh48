@@ -110,6 +110,8 @@ function patchCloth(mat, which) {
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
       varying vec3 vP; uniform vec4 uStyle, uFit, uArm; uniform vec3 uPat; uniform float uWhich;
       float h21(vec2 q) { return fract(sin(dot(q, vec2(127.1, 311.7))) * 43758.5453); }`)
+      // folds in the baked shells (on top of the shoulders) face inward: light them by the smooth outward normal
+      .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n      normal = normalize(vNormal);')
       .replace('#include <color_fragment>', `#include <color_fragment>
       vec3 p = vP; float pt = uStyle.x;
       // the long shell as a skirt: nothing below the hem
@@ -130,7 +132,7 @@ function patchCloth(mat, which) {
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.35, smoothstep(0.03, 0.12, p.z) * smoothstep(0.45, 0.75, p.y) * 0.5);
       }`);
   };
-  mat.customProgramCacheKey = () => 'nh-cloth3-' + which;
+  mat.customProgramCacheKey = () => 'nh-cloth4-' + which;
   return mat;
 }
 
@@ -462,7 +464,10 @@ export class HumanKit {
     let cap = null, eyes = null;
     sc.traverse((o) => {
       if (!o.isSkinnedMesh) return;
-      const b = new THREE.Box3().setFromBufferAttribute(o.geometry.attributes.position).applyMatrix4(o.matrixWorld);
+      // rest-pose world space goes through the skin's bind (the packed models keep their dequantising
+      // scale there, so the node's own matrix would put the glasses and plaits at the feet)
+      const sk = o.skeleton, M = new THREE.Matrix4().multiplyMatrices(sk.bones[0].matrixWorld, sk.boneInverses[0]).multiply(o.bindMatrix);
+      const b = new THREE.Box3().setFromBufferAttribute(o.geometry.attributes.position).applyMatrix4(M);
       if (o.name === (k === 'f' ? 'hair_buzzedfemale' : 'hair_buzzed')) cap = b;
       else if (o.name.startsWith('eyes')) eyes = b;
     });

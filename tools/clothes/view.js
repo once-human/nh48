@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { HumanKit } from '../../src/people/humans.js';
 import { lookOf, OUTFITS } from '../../src/people/characters.js';
+import { RNG } from '../../src/core/util.js';
 const q = new URLSearchParams(location.search);
 const pose = q.get('pose') || 'idle', t = +(q.get('t') || 0.4), view = q.get('view') || 'back', zoom = +(q.get('zoom') || 1);
 const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); document.body.style.margin = 0; document.body.appendChild(R.domElement);
@@ -18,7 +19,7 @@ const kit = new HumanKit(gm, gf);
 let i = 0;
 const only = q.get('only'); for (const female of [false, true]) for (const o of OUTFITS[female ? 'f' : 'm']) {
   if (only && only !== (female ? 'f' : 'm') + o.id) { i++; continue; }
-  const look = lookOf({ female, outfit: o.id, made: true, name: 'x' });
+  const look = q.get('rand') ? kit.randomLook(new RNG(+q.get('rand') + i * 7), { female }) : lookOf({ female, outfit: o.id, made: true, name: 'x' });
   const H = kit.create(look);
   const hide = (q.get('hide') || '').split(',');
   H.root.traverse(o => { if (o.isSkinnedMesh && hide.some(h => h && o.name.startsWith(h))) o.material = new THREE.MeshBasicMaterial({ visible: false }); });
