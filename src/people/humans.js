@@ -170,7 +170,7 @@ export function ikArm(H, side, target, pole, w = 1) {
 // round (a ledge at the waist you could see into) and split their weight evenly between the legs, so a
 // thigh stepping forward came straight through the front. Fitted once per body when the models load:
 // the top ring hugs the shirt and the tube eases out to its old flare by mid-thigh, and each side of the
-// tube follows its own leg, sharing only a 5 cm strip down the middle.
+// tube leans toward its own leg while hanging between both (legs under it aren't drawn).
 const _v = new THREE.Vector3();
 function bindOf(o) {
   const sk = o.skeleton, M = new THREE.Matrix4().multiplyMatrices(sk.bones[0].matrixWorld, sk.boneInverses[0]);
@@ -239,12 +239,19 @@ function fitTubes(scene, B) {
     if (pel < 0 || tl < 0 || tr < 0 || cl < 0 || cr < 0) continue;
     const si = new THREE.Uint16BufferAttribute(new Uint16Array(pos.count * 4), 4), sw = new THREE.Float32BufferAttribute(new Float32Array(pos.count * 4), 4);
     for (let i = 0; i < P.length; i++) {
-      const p = P[i], f = (y0 - p.y) / Math.max(0.01, y0 - y1), leg = Math.min(1, f * 1.3) * 0.95;
-      const side = THREE.MathUtils.clamp(0.5 + p.x / 0.05, 0, 1);
-      // below the knee a saree hangs from the shin, so sitting it falls to the feet instead of sticking out
+      const p = P[i], f = (y0 - p.y) / Math.max(0.01, y0 - y1), leg = Math.min(1, f * 1.9);
+      // cloth hangs between the legs: each side leans only a little toward its own leg (0.2-0.8), so a
+      // stride doesn't split the tube in two or drag the back of it out behind like a cape
+      const side = 0.5 + 0.3 * THREE.MathUtils.clamp(p.x / 0.15, -1, 1);
+      // below the knee it hangs from the shins, so sitting it falls to the feet instead of sticking out
       const shin = 1 - THREE.MathUtils.smoothstep(p.y, B.knee - 0.12, B.knee + 0.03);
-      si.setXYZW(i, pel, tl, tr, side >= 0.5 ? cl : cr);
-      sw.setXYZW(i, 1 - leg, leg * side * (1 - shin), leg * (1 - side) * (1 - shin), leg * shin);
+      if (shin > 0) {
+        si.setXYZW(i, tl, tr, cl, cr);
+        sw.setXYZW(i, side * (1 - shin), (1 - side) * (1 - shin), side * shin, (1 - side) * shin);
+      } else {
+        si.setXYZW(i, pel, tl, tr, 0);
+        sw.setXYZW(i, 1 - leg, leg * side, leg * (1 - side), 0);
+      }
     }
     geo.setAttribute('skinIndex', si); geo.setAttribute('skinWeight', sw);
   }
