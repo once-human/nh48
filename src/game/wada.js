@@ -60,6 +60,7 @@ export class Wada {
         }
       }
     } else this._wasIn = v > SW.GV + 9 && u > SW.U0 && u < SW.U1 && v < SW.V1;
+    this.haunt(dt);
     // tourists while you're around and it's open (a few hang about outside in the evening)
     if ((this.t -= dt) > 0) return;
     this.t = 1.5;
@@ -72,6 +73,41 @@ export class Wada {
     for (let k = 0; k < 4 && nOut < wantOut; k++, nOut++) this.spawnOutside();
     for (let k = 0; k < 4 && nIn < wantIn; k++, nIn++) this.spawnInside();
     if (!this.guard || !G.people.list.includes(this.guard)) this.spawnGuard();
+  }
+  // after midnight, by the Delhi Darwaza: Pune's oldest ghost story. Young Peshwa Narayanrao was killed in the
+  // wada in 1773 and, the story goes, on some nights you can still hear him call for his uncle
+  haunt(dt) {
+    const G = this.g, P = G.player, h = G.hour;
+    if (!(h >= 23.5 || h < 4) || !P.onFoot) { this.hauntT = 0; return; }
+    const g = this.P(SW.GU, SW.GV - 10);
+    if (Math.hypot(P.x - g.x, P.z - g.z) > 45) { this.hauntT = 0; return; }
+    const night = Math.floor(((G.clock || 0) + 8) / 24);
+    if (this.hauntNight === night) return;
+    if ((this.hauntT = (this.hauntT || 0) + dt) < 7) return;
+    this.hauntNight = night;
+    this.wail();
+    G.hud.say && G.hud.say('…', 'काका, मला वाचवा!', '“Uncle, save me!”', 5);
+    G.later(5.5, () => G.hud.toast('Did you hear that?', 'Shaniwar Wada after midnight. Narayanrao Peshwa, 1773. Puneri dadis still won’t walk past here at night', 'info', 6));
+  }
+  // a thin voice-like wail: filtered noise and a falling tone, far off, from the gate
+  wail() {
+    const A = this.g.audio, ctx = A && A.ctx;
+    if (!ctx) return;
+    try {
+      const t = ctx.currentTime, out = ctx.createGain(); out.gain.value = 0; out.connect(A.master || ctx.destination);
+      out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(0.22, t + 1.2); out.gain.linearRampToValueAtTime(0.16, t + 3); out.gain.linearRampToValueAtTime(0, t + 5);
+      const o = ctx.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(620, t); o.frequency.exponentialRampToValueAtTime(430, t + 1.6); o.frequency.exponentialRampToValueAtTime(560, t + 2.4); o.frequency.exponentialRampToValueAtTime(300, t + 4.8);
+      const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 5.5; lg.gain.value = 14; lfo.connect(lg); lg.connect(o.frequency);
+      const n = ctx.createBufferSource(), buf = ctx.createBuffer(1, ctx.sampleRate * 5, ctx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.5;
+      n.buffer = buf; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 2.5;
+      const og = ctx.createGain(); og.gain.value = 0.35; const ng = ctx.createGain(); ng.gain.value = 0.5;
+      const rv = ctx.createDelay(); rv.delayTime.value = 0.23; const fb = ctx.createGain(); fb.gain.value = 0.45; rv.connect(fb); fb.connect(rv);
+      o.connect(og); og.connect(out); n.connect(bp); bp.connect(ng); ng.connect(out); out.connect(rv); rv.connect(A.master || ctx.destination);
+      o.start(t); lfo.start(t); n.start(t); o.stop(t + 5.2); lfo.stop(t + 5.2); n.stop(t + 5.2);
+      setTimeout(() => { try { fb.disconnect(); rv.disconnect(); } catch (e) { /* gone */ } }, 9000);
+    } catch (e) { /* no sound, still the words */ }
   }
   drop() {
     const list = this.g.people.list;
