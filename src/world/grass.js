@@ -2,6 +2,7 @@
 // bare soil, medians, gets little alpha-cut tufts scattered when its chunk is built, and one
 // instanced mesh shows the ones within a few tens of metres, swaying in the wind and shrinking
 // to nothing at the edge of the radius so they never pop. Far away the ground texture does the work.
+import { grassBlocked } from './landmarks.js';
 import * as THREE from 'three';
 import { U } from '../gfx/materials.js';
 import { RNG } from '../core/util.js';
@@ -30,7 +31,7 @@ export function* scatterTufts(C) {
     const n = Math.min(MAX_PER_CHUNK - out.length / 4, Math.round((x1 - x0) * (z1 - z0) * K.d));
     for (let k = 0; k < n; k++) {
       const x = rng.range(x0, x1), z = rng.range(z0, z1);
-      if (!pointInRings(x, z, g.rings)) continue;
+      if (!pointInRings(x, z, g.rings) || grassBlocked(x, z)) continue;
       // clumpy: thin out with a cheap noise so it reads as patches, not a carpet
       const cl = Math.sin(x * 0.31 + Math.sin(z * 0.17) * 2.0) * Math.sin(z * 0.27 + Math.sin(x * 0.13) * 2.0);
       if (cl < -0.35 && rng.chance(0.7)) continue;

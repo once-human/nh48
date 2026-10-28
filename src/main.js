@@ -413,10 +413,6 @@ async function runFly({ W, renderer, scene, camera, sky, post, quality, progress
   function frame(now) {
     let dt = Math.min(0.1, (now - last) / 1000);
     last = now;
-    // frame pacing: small wobbles in frame time (16, 17, 15, 18 ms) are smoothed so motion doesn't judder;
-    // a real hitch still counts in full so nothing drifts from the clock
-    dtS = Math.abs(dt - dtS) < 0.012 ? dtS + (dt - dtS) * 0.2 : dt;
-    dt = dtS;
     if (TEST) dt = 1 / 30;
     renderer.info.reset();
     const sp = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 60 : 14) * dt;

@@ -190,22 +190,27 @@ function horseman(B, u, v, s, yaw) {
   const Y = (y) => y0 + y;
   // body and chest
   put('h_body', () => { const g = new THREE.CapsuleGeometry(0.42, 1.25, 6, 14); g.rotateX(Math.PI / 2); g.scale(1, 1.05, 1); return g; }, 0, Y(1.55), 0);
-  put('h_chest', () => new THREE.SphereGeometry(0.48, 14, 10), 0.72, Y(1.6), 0);
+  put('h_chest', () => new THREE.SphereGeometry(0.52, 14, 10), 0.74, Y(1.62), 0);
   put('h_rump', () => new THREE.SphereGeometry(0.47, 14, 10), -0.7, Y(1.6), 0);
-  // neck arched up, the head with its muzzle, ears, the mane along the crest
-  put('h_neck', () => { const g = new THREE.CylinderGeometry(0.2, 0.33, 0.95, 12); g.rotateX(0.62); return g; }, 1.05, Y(2.12), 0);
-  put('h_head', () => { const g = new THREE.CylinderGeometry(0.13, 0.2, 0.62, 10); g.rotateX(1.75); return g; }, 1.42, Y(2.52), 0);
-  put('h_muzzle', () => new THREE.SphereGeometry(0.15, 10, 8), 1.7, Y(2.43), 0);
-  for (const sd of [-1, 1]) put('h_ear', () => new THREE.ConeGeometry(0.05, 0.18, 6), 1.3, Y(2.82), sd * 0.08);
-  put('h_mane', () => { const g = new THREE.BoxGeometry(0.06, 0.16, 0.9); g.rotateX(0.62); return g; }, 0.98, Y(2.32), 0, dk);
-  // legs: upper and lower; the near foreleg lifted and bent
+  // neck rising forward at a horse's angle, the head angled down from the poll, the muzzle, ears, the mane
+  put('h_neck2', () => { const g = new THREE.CylinderGeometry(0.21, 0.36, 0.98, 14); g.rotateX(0.95); return g; }, 1.02, Y(2.1), 0);
+  put('h_crest', () => { const g = new THREE.SphereGeometry(0.26, 12, 8); g.scale(1, 0.8, 1.6); g.rotateX(0.95); return g; }, 0.98, Y(2.2), 0);
+  put('h_head2', () => { const g = new THREE.CylinderGeometry(0.11, 0.2, 0.66, 12); g.rotateX(2.3); return g; }, 1.67, Y(2.19), 0);
+  put('h_jaw', () => new THREE.SphereGeometry(0.17, 10, 8), 1.5, Y(2.28), 0);
+  put('h_muzzle2', () => new THREE.SphereGeometry(0.12, 10, 8), 1.9, Y(1.99), 0);
+  for (const sd of [-1, 1]) put('h_ear2', () => new THREE.ConeGeometry(0.05, 0.2, 6), 1.42, Y(2.58), sd * 0.09);
+  put('h_mane2', () => { const g = new THREE.BoxGeometry(0.07, 0.2, 0.95); g.rotateX(0.95 - Math.PI / 2 + Math.PI / 2); return g; }, 0.93, Y(2.36), 0, dk);
+  put('h_forelock', () => new THREE.ConeGeometry(0.07, 0.25, 6), 1.5, Y(2.55), 0, dk);
+  // legs: strong forearms and gaskins, cannon bones, hooves; the near foreleg lifted and bent at the knee
   const leg = (a, b, lift) => {
-    if (!lift) { put('h_upleg', () => new THREE.CylinderGeometry(0.1, 0.13, 0.7, 8), a, Y(0.95), b); put('h_loleg', () => new THREE.CylinderGeometry(0.06, 0.08, 0.62, 8), a, Y(0.34), b); put('h_hoof', () => new THREE.CylinderGeometry(0.08, 0.09, 0.08, 8), a, Y(0.04), b, dk); return; }
-    put('h_upleg_r', () => { const g = new THREE.CylinderGeometry(0.1, 0.13, 0.66, 8); g.rotateX(0.9); return g; }, a + 0.22, Y(1.08), b);
-    put('h_loleg_r', () => { const g = new THREE.CylinderGeometry(0.06, 0.08, 0.6, 8); g.rotateX(-0.35); return g; }, a + 0.38, Y(0.7), b);
+    if (!lift) { put('h_upleg2', () => new THREE.CylinderGeometry(0.12, 0.17, 0.72, 10), a, Y(0.98), b); put('h_loleg2', () => new THREE.CylinderGeometry(0.075, 0.1, 0.62, 10), a, Y(0.34), b);
+      put('h_hoof2', () => new THREE.CylinderGeometry(0.1, 0.12, 0.1, 10), a, Y(0.05), b, dk); return; }
+    put('h_upleg_r2', () => { const g = new THREE.CylinderGeometry(0.12, 0.17, 0.66, 10); g.rotateX(0.9); return g; }, a + 0.22, Y(1.08), b);
+    put('h_loleg_r2', () => { const g = new THREE.CylinderGeometry(0.075, 0.1, 0.58, 10); g.rotateX(-0.35); return g; }, a + 0.4, Y(0.72), b);
+    put('h_hoof_r', () => new THREE.CylinderGeometry(0.1, 0.12, 0.1, 10), a + 0.33, Y(0.44), b, dk);
   };
   leg(0.62, -0.2, false); leg(0.62, 0.2, true); leg(-0.62, -0.2, false); leg(-0.68, 0.2, false);
-  put('h_tail', () => { const g = new THREE.CylinderGeometry(0.05, 0.16, 1.0, 8); g.rotateX(-0.55); return g; }, -1.28, Y(1.3), 0, dk);
+  put('h_tail', () => { const g = new THREE.CylinderGeometry(0.06, 0.2, 1.1, 10); g.rotateX(-0.42); return g; }, -1.3, Y(1.25), 0, dk);
   // saddle cloth and saddle
   put('h_cloth', () => new THREE.BoxGeometry(0.98, 0.5, 0.95), -0.05, Y(1.72), 0, [0.24, 0.2, 0.12]);
   // the rider: legs astride, torso upright in an angarkha, the pagadi, shield on the back, the spear
@@ -345,6 +350,14 @@ const BUILD = {
     B.box(gu, gv + 4.4, gw + 0.6, 9, 0, 9.5, sA, null); B.box(gu, gv + 4.4, gw + 0.6, 9, 9.5, 17.5, bA, B.A(WL.slab, STONE));
     B.arch(gu, gv - 0.12, 6.2, 9.4, 0, [0.12, 0.09, 0.07]);
     B.arch(gu, gv + 9.0, 6.2, 9.4, 0, [0.12, 0.09, 0.07], false, Math.PI);                 // and its inner face, into the fort
+    for (const side of [-1, 1]) {                                                        // the doors from inside: teak, iron bands, the bar
+      const du = gu + side * 1.5;
+      B.cbox(du, 0, gv + 9.16, 2.9, 7.6, 0.16, C.teak);
+      for (let r = 0; r < 4; r++) B.cbox(du, 1.1 + r * 1.7, gv + 9.27, 2.9, 0.09, 0.05, C.iron);
+      for (let k = 0; k < 3; k++) B.cbox(du + (k - 1) * 0.9, 0.4, gv + 9.28, 0.12, 6.8, 0.06, [0.3, 0.18, 0.1]);
+    }
+    B.cbox(gu, 3.6, gv + 9.34, 5.6, 0.22, 0.18, [0.24, 0.16, 0.09]);                       // the cross bar
+    B.cbox(W.WU, 0, gv + 9.27, 1.25, 2.1, 0.06, [0.05, 0.04, 0.03]);                       // the wicket, open
     for (const side of [-1, 1]) {
       const du = gu + side * 1.5;
       B.cbox(du, 0, gv - 0.2, 2.9, 7.6, 0.18, C.teak);
@@ -373,6 +386,7 @@ const BUILD = {
       const cw = w * 0.42, cd = d * 0.42;
       B.ground([[u - cw / 2, v - cd / 2], [u + cw / 2, v - cd / 2], [u + cw / 2, v + cd / 2], [u - cw / 2, v + cd / 2]], 0.93, GL.grass, 0.9);
       B.cbox(u, 0.9, v, 3.2, 0.35, 3.2, C.stone); B.cbox(u, 1.0, v, 2.6, 0.27, 2.6, C.water);          // the courtyard's little tank
+      B.hitc(u, v, 1.75);
       // rooms: the courtyard's edge, the partitions out to the rim
       for (const [a, b, c2, d2] of [[-cw / 2, -cd / 2, cw / 2, -cd / 2], [cw / 2, -cd / 2, cw / 2, cd / 2], [cw / 2, cd / 2, -cw / 2, cd / 2], [-cw / 2, cd / 2, -cw / 2, -cd / 2],
         [-w / 2 + 0.3, -d / 2 + 0.3, w / 2 - 0.3, -d / 2 + 0.3], [w / 2 - 0.3, -d / 2 + 0.3, w / 2 - 0.3, d / 2 - 0.3], [w / 2 - 0.3, d / 2 - 0.3, -w / 2 + 0.3, d / 2 - 0.3], [-w / 2 + 0.3, d / 2 - 0.3, -w / 2 + 0.3, -d / 2 + 0.3]]) {
@@ -395,16 +409,20 @@ const BUILD = {
       B.hitk(su, v - d / 2, su, v - 2.2, 5); B.hitk(su, v + 2.2, su, v + d / 2, 5);
       const ou = u - sgn * w / 2; B.hitk(ou, v - d / 2, ou, v + d / 2, 5);
     }
-    // Hazari Karanje: the sixteen-petal lotus fountain
-    { const [u, v] = W.karanje, pts = []; for (let i = 0; i < 32; i++) { const r = i % 2 ? 4.4 : 6.6, a = i / 32 * 6.283; pts.push([u + Math.cos(a) * r, v + Math.sin(a) * r]); }
-      B.ring(pts, 0, 0.75, B.A(WL.rubble, STONE, 11, 2, 0.75)); B.ring(pts, 0, 0.75, B.A(WL.rubble, STONE, 11, 2, 0.75), true); B.ground(pts, 0.6, GL.concrete, 0.8); B.cyl(u, 0.62, v, 3.6, 0.05, C.water, 20);
-      B.cyl(u, 0.6, v, 0.55, 1.3, C.stone, 8); B.cone(u, 1.9, v, 0.5, 0.6, C.stone, 8); B.hitc(u, v, 6); }
-    // big old trees along the walls
-    for (const [u, v, r] of W.trees) {
-      B.cyl(u, 0, v, r * 0.11, r * 1.1, [0.33, 0.24, 0.17], 7);
-      B.sphere(u, r * 1.55, v, r, [0.17, 0.3, 0.12]); B.sphere(u + r * 0.4, r * 1.25, v - r * 0.3, r * 0.75, [0.2, 0.34, 0.14]);
-      B.hitc(u, v, r * 0.13);
-    }
+    // Hazari Karanje: the sixteen-petal lotus fountain. A solid stone basin on the petal outline, a rim you could
+    // sit on, water filling the petals, the stepped central spout and a thin jet
+    { const [u, v] = W.karanje, out = [], inn = [];
+      for (let i = 0; i < 32; i++) { const a = i / 32 * 6.283, r = i % 2 ? 4.6 : 6.6; out.push([u + Math.cos(a) * r, v + Math.sin(a) * r]); inn.push([u + Math.cos(a) * (r - 0.55), v + Math.sin(a) * (r - 0.55)]); }
+      const rimA = B.A(WL.sandstone, T([0.78, 0.72, 0.62]), 11, 2, 0.7);
+      B.ring(out, 0, 0.7, rimA); B.ring(inn, 0.25, 0.7, rimA, true);
+      for (let i = 0; i < 32; i++) { const a = out[i], b = out[(i + 1) % 32], c2 = inn[(i + 1) % 32], d = inn[i]; B.flat([a, b, c2, d], 0.7, B.A(WL.sandstone, T([0.8, 0.72, 0.6]), 11, 2, 0.7)); }
+      B.ground(inn, 0.42, GL.concrete, 0.55);
+      B.part(geo('kwater', () => { const g = new THREE.CircleGeometry(1, 32); g.rotateX(-Math.PI / 2); return g; }), u, 0.5, v, [0.16, 0.32, 0.36], 0, 5.2, 1, 5.2);
+      B.cyl(u, 0.4, v, 1.4, 0.35, C.stone, 16); B.cyl(u, 0.75, v, 0.95, 0.3, C.stone, 16); B.cyl(u, 1.05, v, 0.5, 0.5, C.stone, 12);
+      B.part(geo('klotus', () => new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2)), u, 1.55, v, [0.8, 0.74, 0.64], 0, 0.42, 0.3, 0.42);
+      B.cyl(u, 1.8, v, 0.045, 1.6, [0.82, 0.9, 0.95], 6, 0.25);
+      B.hitc(u, v, 6.4); }
+    // big old trees along the walls: real mango, neem, peepal and ashoka trees from the city's tree field (addLandmarks)
     // ---- outside the gate: the garden, Bajirao I on his tall plinth, the ticket window, the plaque
     const sv = gv - 36;
     B.ground([[gu - 18, sv - 15], [gu + 18, sv - 15], [gu + 18, sv + 15], [gu - 18, sv + 15]], 0.04, GL.grass, 0.9);
@@ -451,7 +469,9 @@ const BUILD = {
     B.deckBand(ring, [[W.U0, W.V0], [W.U1, W.V0], [W.U1, W.V1], [W.U0, W.V1]], 10.6, [gu - gw / 2 - 0.5, gu + gw / 2 + 0.5, gv + 9.2]);
     for (const sgn of [1, -1]) {
       const ua = gu + sgn * 13, ub = gu + sgn * 43, vv = W.V0 + 1.7, n = 30;
-      for (let k = 0; k < n; k++) { const t = (k + 0.5) / n; B.cbox(ua + (ub - ua) * t, 0, vv, 1.02, 10.6 * (k + 1) / n, 3.2, C.stone); }
+      const stA = B.A(WL.rubble, STONE, 11, 2, 10.6), trA = B.A(WL.slab, T([0.7, 0.65, 0.57]));
+      for (let k = 0; k < n; k++) { const t = (k + 0.5) / n, h = 10.6 * (k + 1) / n; B.box(ua + (ub - ua) * t, vv, Math.abs(ub - ua) / n + 0.02, 3.2, 0, h, stA, trA); }
+      for (let k = 0; k < n; k += 2) { const t = (k + 1) / n, h = 10.6 * (k + 1) / n; B.box(ua + (ub - ua) * t, vv + 1.75, Math.abs(ub - ua) * 2 / n + 0.04, 0.3, h - 0.2, h + 0.85, stA, trA); }
       B.deckRamp(ua, vv, ub, vv, 3.2, 0, 10.6);
       B.hitk(ua, vv + 1.6, ub, vv + 1.6, 5);
     }
@@ -933,8 +953,25 @@ export function addLandmarks(W) {
     try { BUILD[L.id](B); } catch (e) { console.warn('landmark', L.id, e); }
     for (const h of col) { if (h[0] === 's') collision.addSeg(h[1], h[2], h[3], h[4], h[5] || 0); else collision.addCircle(h[1], h[2], h[3], 0); }
     if (B.decks) for (const d of B.decks) addDeck(W, L, d);
+    if (L.id === 'shaniwar' && W.trees) W.trees.addTile(SW.trees.map(([u, v], i) => {
+      const x = L.x + u * Math.cos(L.rot) + v * Math.sin(L.rot), z = L.z + u * Math.sin(L.rot) - v * Math.cos(L.rot);
+      return [Math.round(x * 100), Math.round(z * 100), [7, 3, 2, 7, 4, 3, 7, 2][i % 8], 0.72 + ((i * 37) % 11) / 40];
+    }), 0);
   }
 }
+// where grass shouldn't grow inside a landmark's grounds: paving, plinth tops, the wall band (world/grass.js asks)
+export function grassBlocked(x, z) {
+  const L = SW_L || (SW_L = LM.find(l => l.id === 'shaniwar'));
+  if (!L) return false;
+  const dx = x - L.x, dz = z - L.z, c = Math.cos(L.rot), s = Math.sin(L.rot), u = dx * c + dz * s, v = dx * s - dz * c, W = SW;
+  if (u < W.U0 - 14 || u > W.U1 + 14 || v < W.GV - 60 || v > W.V1 + 14) return false;
+  if (u < W.U0 + 3.5 || u > W.U1 - 3.5 || v < W.V0 + 3.5 || v > W.V1 - 3.5) return v > W.GV - 16;        // the walls, the inner walk round them, the forecourt
+  if (Math.abs(u - W.GU) < 3.6) return true;                                                           // the gate-to-south path
+  if (W.cross.some(cv => Math.abs(v - cv) < 3)) return true;                                           // the cross paths
+  if (W.plinths.some(([pu, pv, pw, pd]) => Math.abs(u - pu) < pw / 2 + 1.5 && Math.abs(v - pv) < pd / 2 + 1.5)) return true;
+  return Math.hypot(u - W.karanje[0], v - W.karanje[1]) < 7.5;                                          // Hazari Karanje
+}
+let SW_L = null;
 // a deck in world terms: a box to test first, then the height (above the landmark's base) or -1
 function addDeck(W, L, d) {
   const c = Math.cos(L.rot), s = Math.sin(L.rot), base = BASE + (L.y || 0);
