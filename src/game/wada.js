@@ -2,6 +2,7 @@
 // counter charges Indian visitors), a guard at the little wicket door who wants to see it, and tourists: a
 // crowd on the garden in front (photos with Bajirao's statue, the gate), families and college groups strolling
 // the lawns and the palace plinths inside.
+import * as THREE from 'three';
 import LM from '../world/landmarks.json';
 import { SW } from '../world/landmarks.js';
 import { fmt } from './shops.js';
@@ -92,9 +93,32 @@ export class Wada {
     if (this.hauntNight === night) return;
     if ((this.hauntT = (this.hauntT || 0) + dt) < 7) return;
     this.hauntNight = night;
-    this.wail();
-    G.hud.say && G.hud.say('…', 'काका, मला वाचवा!', '“Uncle, save me!”', 5);
+    // the recorded voice (a child's, far off, then right there); the synth wail only if it couldn't load
+    if (!G.audio.voice || !G.audio.voice('ghost_kaka', 1.6, 0, false, 9)) this.wail();
+    this.apparition();
+    G.later(3.6, () => G.hud.say && G.hud.say('…', 'काका, मला वाचवा!', '“Uncle, save me!”', 4));
     G.later(5.5, () => G.hud.toast('Did you hear that?', 'Shaniwar Wada after midnight. Narayanrao Peshwa, 1773. Puneri dadis still won’t walk past here at night', 'info', 6));
+  }
+  // in the arch of the Delhi Darwaza, for a breath: a boy in white, there and gone
+  apparition() {
+    const G = this.g;
+    if (!this.ghost) {
+      const m = new THREE.MeshBasicMaterial({ color: 0xe8f0ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.34, 1.15, 12), m); body.position.y = 0.75; g.add(body);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), m); head.position.y = 1.48; g.add(head);
+      g.visible = false; G.scene.add(g); this.ghost = { g, m };
+    }
+    const { g, m } = this.ghost, at = this.P(SW.GU, SW.GV - 1.2), t0 = performance.now() + 3600;
+    g.position.set(at.x, 0.15, at.z); g.visible = true;
+    const tick = () => {
+      const t = (performance.now() - t0) / 1000;
+      m.opacity = t < 0 ? 0 : t < 0.25 ? t * 1.6 : t < 1.4 ? 0.4 + Math.random() * 0.15 : Math.max(0, 0.4 - (t - 1.4) * 0.8);
+      g.position.y = 0.15 + Math.max(0, t) * 0.05;
+      if (t < 2.0) requestAnimationFrame(tick); else { g.visible = false; m.opacity = 0; }
+    };
+    requestAnimationFrame(tick);
+    G.later(3.7, () => G.rig && G.rig.shake && G.rig.shake(0.25));
   }
   // a thin voice-like wail: filtered noise and a falling tone, far off, from the gate
   wail() {
