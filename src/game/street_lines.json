@@ -126,6 +126,16 @@
         "सावकाश रे बाबा, घरी कोणीतरी वाट बघतंय.",
         "Saavkash re baba, ghari konitari vaat baghtay.",
         "Slowly, son. Someone's waiting for you at home."
+      ],
+      [
+        "हे पुणं आहे, रेसिंग ट्रॅक नाही!",
+        "He Puna aahe, racing track naahi!",
+        "This is Pune, not a racing track!"
+      ],
+      [
+        "अरे, सिग्नल काय फक्त शोभेसाठी आहे का?",
+        "Arre, signal kay fakt shobhesathi aahe ka?",
+        "Hey, is the signal just for decoration?"
       ]
     ],
     "honk": [
@@ -143,6 +153,16 @@
         "थांब जरा, कुठे आग लागलीये?",
         "Thamb jara, kuthe aag laagliye?",
         "Hold on. Where's the fire?"
+      ],
+      [
+        "आमच्या वेळी हॉर्न म्हणजे लग्नाचा बँड असायचा.",
+        "Aamchya veli horn mhanje lagnacha band asaycha.",
+        "In our day a horn meant a wedding band."
+      ],
+      [
+        "दुपारी एक ते चार झोपायची वेळ आहे, माहितीये ना?",
+        "Dupaari ek te chaar zopaychi vel aahe, maahitiye na?",
+        "One to four is nap time, you know that, right?"
       ]
     ],
     "fall": [
@@ -160,6 +180,11 @@
         "अरे, माणूस आहे मी, खांब नाही!",
         "Arre, maanus aahe mi, khaamb naahi!",
         "I'm a person, not a lamp post!"
+      ],
+      [
+        "अरे देवा! कंबर गेली माझी.",
+        "Arre deva! Kambar geli maajhi.",
+        "Oh god! My back's gone."
       ]
     ],
     "bump": [
@@ -196,6 +221,16 @@
         "नमस्कार. आज गर्दी फार आहे, नाही?",
         "Namaskar. Aaj gardi phaar aahe, naahi?",
         "Hello. Big crowd today, isn't it?"
+      ],
+      [
+        "काय मग, चहा झाला का?",
+        "Kay mag, chaha zaala ka?",
+        "So, had your tea?"
+      ],
+      [
+        "नमस्कार! आज पाऊस नाही बरं का.",
+        "Namaskar! Aaj paaus naahi bara ka.",
+        "Namaskar! No rain today, mind you."
       ]
     ],
     "stunt": [
@@ -230,6 +265,21 @@
         "संध्याकाळी बाकरवडी आणायचीये, घरी संपली.",
         "Sandhyakali bakarwadi aanaychiye, ghari sampli.",
         "Need to buy bakarwadi this evening, we're out at home."
+      ],
+      [
+        "तुळशीबागेत गेलास की घासाघीस करायची, हे लक्षात ठेव.",
+        "Tulshibaget gelaas ki ghaasaghees karaychi, he lakshaat thev.",
+        "If you go to Tulshibaug, bargain. Remember that."
+      ],
+      [
+        "पुण्यात पत्ता विचारलास तर तीन वेगळी उत्तरं मिळतील.",
+        "Punyat patta vicharlas tar teen vegli uttara miltil.",
+        "Ask for directions in Pune and you'll get three different answers."
+      ],
+      [
+        "चितळ्यांची बाकरवडी आणलीस का? नाही? मग काय उपयोग.",
+        "Chitalyanchi bakarwadi aanlis ka? Naahi? Mag kay upyog.",
+        "Did you bring Chitale's bakarwadi? No? Then what's the point."
       ]
     ],
     "carjack_two": [
@@ -263,6 +313,11 @@
         "चष्मा कुठे ठेवला मी?",
         "Chashma kuthe thevla mi?",
         "Where did I put my glasses?"
+      ],
+      [
+        "आजकालची पोरं, काही खरं नाही.",
+        "Aajkalchi pora, kaahi khara naahi.",
+        "Kids these days, honestly."
       ]
     ],
     "hit": [
@@ -352,6 +407,11 @@
         "वेग कमी कर, यमराजाला काही घाई नाहीये.",
         "Veg kami kar, Yamrajala kaahi ghaai naahiye.",
         "Slow down. Yama isn't in any hurry."
+      ],
+      [
+        "सावकाश! म्हातारा माणूस आहे मी.",
+        "Saavkaash! Mhataara maanus aahe mi.",
+        "Slowly! I'm an old man."
       ]
     ],
     "honk": [
@@ -364,6 +424,11 @@
         "शांतता! इथे माणसं राहतात.",
         "Shaantata! Ithe maansa raahtaat.",
         "Quiet! People live here."
+      ],
+      [
+        "एवढी घाई? पुणं कुठे पळून चाललंय?",
+        "Evdhi ghaai? Puna kuthe palun chaallay?",
+        "Such a hurry? Pune isn't running away."
       ]
     ],
     "fall": [
@@ -412,6 +477,11 @@
         "दुपारी एक ते चार झोपेची वेळ, लक्षात ठेव.",
         "Dupaari ek te chaar jhopechi vel, lakshaat thev.",
         "One to four in the afternoon is nap time. Remember that."
+      ],
+      [
+        "या, या. बसा जरा.",
+        "Ya, ya. Basa jara.",
+        "Come, come. Sit a while."
       ]
     ],
     "stunt": [
@@ -441,6 +511,16 @@
         "हल्ली कोणी पत्र लिहीत नाही.",
         "Halli koni patra lihit naahi.",
         "Nobody writes letters any more."
+      ],
+      [
+        "आमच्या वेळी डेक्कनला सायकलीवर जायचो.",
+        "Aamchya veli Deccanla saaykalivar jaaycho.",
+        "In my day we cycled to Deccan."
+      ],
+      [
+        "शनिवारवाडा बघितलास का? पेशव्यांचा इतिहास आहे तो.",
+        "Shaniwarwada baghitlas ka? Peshvyancha itihaas aahe to.",
+        "Seen Shaniwar Wada? That's the Peshwas' history."
       ]
     ],
     "carjack_two": [
@@ -551,6 +631,16 @@
         "काय रे, रेस लावलीये का?",
         "Kaay re, race laavliye ka?",
         "What, are you racing someone?"
+      ],
+      [
+        "ए भावा, जरा बघून की!",
+        "E bhava, jara baghun ki!",
+        "Oi bro, watch it!"
+      ],
+      [
+        "लय भारी चालवतोस, पण माणसं बघ की!",
+        "Lay bhaari chalavtos, pan maansa bagh ki!",
+        "Great driving, but watch the people!"
       ]
     ],
     "honk": [
@@ -563,6 +653,11 @@
         "हॉर्न नको वाजवू, डोकं दुखतंय.",
         "Horn nako vaajavu, doka dukhtay.",
         "Don't honk, my head hurts."
+      ],
+      [
+        "वाजव वाजव, अजून वाजव!",
+        "Vaajav vaajav, ajun vaajav!",
+        "Go on, honk, honk some more!"
       ]
     ],
     "fall": [
@@ -611,6 +706,16 @@
         "चहा घ्यायचा का? अमृततुल्य इथेच आहे.",
         "Chaha ghyaycha ka? Amruttulya ithech aahe.",
         "Want some chai? There's an amruttulya right here."
+      ],
+      [
+        "काय भावा, कसा आहेस?",
+        "Kay bhava, kasa aahes?",
+        "What's up, bro, how are you?"
+      ],
+      [
+        "चल, अमृततुल्यला चहा मारूया.",
+        "Chal, amruttulyala chaha maaruya.",
+        "Come on, let's grab tea at the amruttulya."
       ]
     ],
     "stunt": [
@@ -623,6 +728,11 @@
         "पार्कूर? पुण्यात?",
         "Parkour? Punyaat?",
         "Parkour? In Pune?"
+      ],
+      [
+        "झकास रे! परत कर ना!",
+        "Zakaas re! Parat kar na!",
+        "Awesome! Do it again!"
       ]
     ],
     "chat": [
@@ -645,6 +755,16 @@
         "मिसळ खायला जायचं का?",
         "Misal khaayla jaaycha ka?",
         "Want to go get misal?"
+      ],
+      [
+        "आज रात्री एफसी रोडला भेटू, मस्त गर्दी असेल.",
+        "Aaj raatri FC Roadla bhetu, mast gardi asel.",
+        "Meet you on FC Road tonight, it'll be buzzing."
+      ],
+      [
+        "गणपतीत ढोल-ताशा पथकात आहेस का तू?",
+        "Ganpatit dhol-taasha pathakat aahes ka tu?",
+        "Are you in a dhol-tasha troupe for Ganpati?"
       ]
     ],
     "carjack_two": [
@@ -678,6 +798,11 @@
         "पेट्रोल संपत आलंय, शिट.",
         "Petrol sampat aalay, shit.",
         "Running out of petrol, damn."
+      ],
+      [
+        "ट्रॅफिक बघ, अर्धा दिवस इथेच जाणार.",
+        "Traffic bagh, ardha divas ithech jaanar.",
+        "Look at this traffic, half the day's gone right here."
       ]
     ],
     "hit": [
@@ -1167,6 +1292,11 @@
         "सावकाश रे! लहान मुलं आहेत इथे.",
         "Saavkash re! Lahaan mula aahet ithe.",
         "Slowly! There are little kids here."
+      ],
+      [
+        "अरे बाळा, हळू! हृदय बंद पडेल माझं.",
+        "Arre baala, halu! Hruday band padel maajha.",
+        "Child, slowly! My heart will stop."
       ]
     ],
     "honk": [
@@ -1179,6 +1309,11 @@
         "हॉर्न वाजवून काही होणार नाही, पुढे बघ.",
         "Horn vaajavun kaahi honaar naahi, pudhe bagh.",
         "Honking won't help. Look ahead."
+      ],
+      [
+        "कानठळ्या बसल्या ना!",
+        "Kaanthalya baslya na!",
+        "You've deafened me!"
       ]
     ],
     "fall": [
@@ -1227,6 +1362,11 @@
         "मंडईत आज मटार स्वस्त आहे.",
         "Mandait aaj mataar swasta aahe.",
         "Peas are cheap at the market today."
+      ],
+      [
+        "अगं बाई, किती दिवसांनी!",
+        "Aga baai, kiti divsanni!",
+        "Oh my, it's been ages!"
       ]
     ],
     "stunt": [
@@ -1251,6 +1391,16 @@
         "संध्याकाळी भिशीला जायचंय.",
         "Sandhyakali bhishila jaaychay.",
         "I've got my kitty-party this evening."
+      ],
+      [
+        "मंडईत आज भाजी स्वस्त आहे, जा लवकर.",
+        "Mandait aaj bhaaji swasta aahe, ja lavkar.",
+        "Vegetables are cheap at Mandai today, go quickly."
+      ],
+      [
+        "आमच्या सोसायटीत पाणी दोनच तास येतं.",
+        "Aamchya societyt paani donach taas yeta.",
+        "Our society gets water for just two hours a day."
       ]
     ],
     "carjack_two": [
@@ -1277,6 +1427,11 @@
         "घरी गेल्यावर कुकर लावायचा आहे.",
         "Ghari gelyaavar kukar laavaaycha aahe.",
         "Have to put the cooker on when I get home."
+      ],
+      [
+        "सगळे मोबाईलमध्येच, कोणी बघत नाही रस्त्यावर.",
+        "Sagle mobilemadhech, koni baghat naahi rastyavar.",
+        "Everyone's on their phones, nobody watches the road."
       ]
     ],
     "hit": [
@@ -1356,6 +1511,11 @@
         "अरे देवा! हळू रे बाळा.",
         "Arre deva! Halu re baala.",
         "Oh God! Slowly, child."
+      ],
+      [
+        "अरे देवा, हळू रे!",
+        "Arre deva, halu re!",
+        "Oh god, slow down!"
       ]
     ],
     "honk": [
@@ -1401,6 +1561,11 @@
         "छान दिसतोस हो.",
         "Chhaan distos ho.",
         "You look nice, dear."
+      ],
+      [
+        "जेवलास का बाळा?",
+        "Jevlaas ka baala?",
+        "Have you eaten, child?"
       ]
     ],
     "stunt": [
@@ -1420,6 +1585,11 @@
         "सूनबाईंनी आज पुरणपोळी केलीये.",
         "Soonbaainni aaj puranpoli keliye.",
         "My daughter-in-law made puran poli today."
+      ],
+      [
+        "आमच्या लहानपणी इथे शेतं होती, आता बघ.",
+        "Aamchya lahaanpani ithe sheta hoti, aata bagh.",
+        "When I was little there were fields here. Look at it now."
       ]
     ],
     "mutter": [
@@ -1502,6 +1672,11 @@
         "दिसत नाही का, माणसं चालतायत?",
         "Disat naahi ka, maansa chaaltaayat?",
         "Can't you see people are walking?"
+      ],
+      [
+        "ओ हॅलो! फुटपाथ आहे हा!",
+        "O hello! Footpath aahe ha!",
+        "Hello?! This is a footpath!"
       ]
     ],
     "honk": [
@@ -1509,6 +1684,11 @@
         "हो, ऐकलं, थांब जरा.",
         "Ho, aikla, thamb jara.",
         "Yes, I heard. Wait a second."
+      ],
+      [
+        "हॉर्न बंद कर, डोकं दुखतंय.",
+        "Horn band kar, doka dukhtay.",
+        "Stop honking, my head hurts."
       ]
     ],
     "fall": [
@@ -1542,6 +1722,11 @@
         "हाय! इथे जवळ एटीएम कुठे आहे?",
         "Hi! Ithe javal ATM kuthe aahe?",
         "Hi! Is there an ATM near here?"
+      ],
+      [
+        "हाय! चल, कट्ट्यावर भेटू.",
+        "Hi! Chal, kattyavar bhetu.",
+        "Hi! Let's meet at the katta."
       ]
     ],
     "stunt": [
@@ -1566,6 +1751,16 @@
         "हा पाऊस कधी थांबणार?",
         "Ha paaus kadhi thaambnaar?",
         "When is this rain going to stop?"
+      ],
+      [
+        "वैशालीला गेलो होतो, अर्धा तास वेटिंग!",
+        "Vaishalila gelo hoto, ardha taas waiting!",
+        "Went to Vaishali, half an hour of waiting!"
+      ],
+      [
+        "उद्या परीक्षा आहे आणि मी इथे फिरतेय.",
+        "Udya pariksha aahe aani mi ithe firtey.",
+        "Exam tomorrow and here I am roaming around."
       ]
     ],
     "carjack_two": [
@@ -1592,6 +1787,11 @@
         "आज जिम नक्की जायचं.",
         "Aaj gym nakki jaaycha.",
         "Definitely going to the gym today."
+      ],
+      [
+        "पीएमटीची वाट बघून कंटाळा आला.",
+        "PMTchi vaat baghun kantaala aala.",
+        "Sick of waiting for the PMT bus."
       ]
     ],
     "hit": [
