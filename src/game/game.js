@@ -329,13 +329,17 @@ export class Game {
   // Start: pick who you are the first time, then you're in your auto (the shift runs while you drive it)
   // Free roam: no police, unlimited cash, any time of day, go anywhere from the map. Your story game is left alone
   beginFree() {
-    if (!this.free) { this._story = { money: this.stats.money, hour: this.hour }; this.free = true; this.stats.money = 99999999; }
+    if (!this.free) { const P = this.player; this._story = { money: this.stats.money, hour: this.hour, x: P.x, z: P.z, th: P.onFoot ? P.foot.yaw : P.th, foot: P.onFoot }; this.free = true; this.stats.money = 99999999; }
     this.hud.setFree?.(true);
     if (!this.hud.hasCharacter || this.hud.hasCharacter()) return this.startPlay(false);
     this.hud.showPicker(() => this.startPlay(false));
   }
   begin() {
-    if (this.free) { this.free = false; this.stats.money = this._story.money; this.hour = this._story.hour; this.hud.setFree?.(false); }
+    if (this.free) {
+      // back to the story: your money, your time of day, and where you were, as if free roam never happened
+      const S = this._story; this.free = false; this.stats.money = S.money; this.hour = S.hour; this.hud.setFree?.(false);
+      try { if (S.foot) this.player.teleportFoot(S.x, S.z, S.th, this.traffic); else this.player.reset(S.x, S.z, S.th); this.rig.inited = false; } catch (e) { /* stay */ }
+    }
     if (!this.hud.hasCharacter || this.hud.hasCharacter()) return this.startPlay(false);
     this.hud.showPicker(() => this.startPlay(false));
   }
