@@ -22,7 +22,6 @@ import { AnimalKit } from './people/animals.js';
 import { MetroTrains } from './world/metroTrains.js';
 import { TileManager, cityFromBase } from './world/tiles.js';
 import * as Save from './game/save.js';
-import { fixPins } from './world/venues.js';
 
 export const QUALITY = {
   // for old laptops and office PCs: 75% resolution, no shadows or grass, a shorter view, thinner crowds
@@ -218,7 +217,7 @@ async function main() {
     // every shop and place in Pune onto the map (names and spots only, about a megabyte)
     if (W.tiles) setTimeout(() => bg.bytes('assets/pune/pins.json.gz').then(async (b) => {
       const list = JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
-      W.cityMap && W.cityMap.addPins(fixPins(list));
+      W.cityMap && W.cityMap.addPins(list);
     }).catch(() => { /* the map fills in as you go */ }), 9000);
     // the voice lines (about 40 MB in all) aren't downloaded up front any more: each clip is fetched the first
     // time someone says it (a ranged read from its pack), so the game stays light in memory
