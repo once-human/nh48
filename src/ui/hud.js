@@ -13,16 +13,6 @@ import { SKINS, OUTFITS, lookOf, normalise, savedCharacter, saveCharacter } from
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 const STONE = '<svg viewBox="0 0 40 52" aria-hidden="true"><path d="M4 22a16 16 0 0 1 32 0v26H4z" fill="#F4F1EA"/><path d="M4 22a16 16 0 0 1 32 0z" fill="#F2B705"/><rect x="4" y="44" width="32" height="4" fill="#C9C4B8"/></svg>';
-// notification symbols, drawn like SF Symbols (one weight, rounded ends), on a tinted rounded square
-const TS = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
-const TOAST_IC = {
-  info: TS('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.01"/>'),
-  warn: TS('<path d="M12 3.5 2.8 19.5h18.4Z"/><path d="M12 10v4.2M12 17v.01"/>'),
-  bad: TS('<path d="M12 3 4.5 6v5.6c0 4.4 3.1 8.1 7.5 9.4 4.4-1.3 7.5-5 7.5-9.4V6Z"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5"/>'),
-  challan: TS('<path d="M6 3h9l3 3v15H6Z"/><path d="M9 10h6M9 14h6M9 18h3"/>'),
-  good: TS('<circle cx="12" cy="12" r="9"/><path d="m8 12.4 2.7 2.6L16 9.6"/>'),
-  meter: TS('<path d="M7 5h10M7 9h10M7 5c5 0 5 8 0 8l7 6"/>'),
-};
 const ICON = {
   cam: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="4" width="13" height="9" rx="2"/><path d="M5.5 4l1-2h3l1 2"/><circle cx="8" cy="8.5" r="2.4"/></svg>',
   map: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 3.5l4-1.5 5 2 4-1.5v10l-4 1.5-5-2-4 1.5z"/><path d="M5.5 2v10.5M10.5 4v10.5"/></svg>',
@@ -659,7 +649,7 @@ export class HUD {
     const tm = setTimeout(close, 12000);
   }
   toast(main, sub = '', kind = 'info', life = 3) {
-    const t = el('div', 'glass toast ' + kind, `<i class="tt-ic">${TOAST_IC[kind] || TOAST_IC.info}</i><div class="tt-main"></div>${sub ? '<div class="tt-sub"></div>' : ''}`);
+    const t = el('div', 'glass toast ' + kind, `<div class="tt-main"></div>${sub ? '<div class="tt-sub"></div>' : ''}`);
     t.querySelector('.tt-main').textContent = main;
     if (sub) t.querySelector('.tt-sub').textContent = sub;
     this.toastWrap.appendChild(t);
