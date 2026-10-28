@@ -159,6 +159,7 @@ export class Pilot {
       if (F.climb) return;
     }
     if (F.air) { F.vx *= 1 - dt * 0.15; F.vz *= 1 - dt * 0.15; }   // little air control
+    const px0 = F.x, pz0 = F.z;
     F.x += F.vx * dt; F.z += F.vz * dt;
     // walls, poles, parked vehicles, trees (in the air you clear scooters, stalls and bollards)
     for (let it = 0; it < 2; it++) {
@@ -188,7 +189,15 @@ export class Pilot {
     const FL = this.W.fly;
     F.deck = FL ? FL.track(F.x, F.z, F.deck ?? -1, F.y) : -1;
     const wet = F.deck < 0 && this.W.surf.isWater(F.x, F.z);
-    const gy = wet ? SWIM_Y : F.deck >= 0 ? FL.heightOn(F.deck, F.x, F.z) : this.W.surf.height(F.x, F.z);
+    let gy = wet ? SWIM_Y : F.deck >= 0 ? FL.heightOn(F.deck, F.x, F.z) : this.W.surf.height(F.x, F.z);
+    // no walking up walls: on foot you step up a stair's height at most (steps and ramps rise a little at a
+    // time); anything taller holds you back, and walking off something high is a fall, not a glide down
+    if (!F.air && !F.swim && !wet && gy > F.y + 0.55) {
+      F.x = px0; F.z = pz0; F.vx = F.vz = 0; F.v = 0;
+      F.deck = FL ? FL.track(F.x, F.z, F.deck ?? -1, F.y) : -1;
+      gy = F.deck >= 0 ? FL.heightOn(F.deck, F.x, F.z) : this.W.surf.height(F.x, F.z);
+      if (gy > F.y + 0.55) F.y = gy;                 // the ground came up under you (a hill streamed in): stand on it
+    } else if (!F.air && !F.swim && !wet && gy < F.y - 0.8) { F.air = true; F.vy = 0; }
     // stepped off the bank: you drop into the river
     if (wet && !F.swim && !F.air && F.y > gy + 0.3) { F.air = true; F.vy = 0.5; F.splash = true; }
     F.swim = wet && !F.air;

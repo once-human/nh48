@@ -89,15 +89,7 @@ export function buildGlobalProps(W) {
   for (const w of M.walls) { const p = cmRing(w); for (let k = 0; k + 3 < p.length; k += 2) collision.addSeg(p[k], p[k + 1], p[k + 2], p[k + 3], 5); }   // kind 5: a 1.8 m compound wall you can climb
   // metro stair towers and underground entrance kiosks (same shapes as buildPropsChunk draws)
   for (const c of index.chunks) {
-    for (const st of c.mstations) {
-      const p = st.pts, L = polyLength(p); if (L < 40) continue;
-      const ax = p[0], az = p[1], bx = p[p.length - 2], bz = p[p.length - 1], dx = (bx - ax) / L, dz = (bz - az) / L, nx = dz, nz = -dx;
-      const cx = (ax + bx) / 2, cz = (az + bz) / 2, hl = Math.min(70, L / 2 + 5), hw = 11;
-      const tx0 = cx + dx * (hl - 9) + nx * (hw + 3.2), tz0 = cz + dz * (hl - 9) + nz * (hw + 3.2);
-      collision.addRing([[-5, -3], [5, -3], [5, 3], [-5, 3]].flatMap(([a, b]) => [tx0 + dx * a + nx * b, tz0 + dz * a + nz * b]), 0);
-      const ca = Math.min(38, hl * 0.6);
-      for (const a of [-ca * 0.7, 0, ca * 0.7]) collision.addCircle(cx + dx * a, cz + dz * a, 1.1, 2);
-    }
+    // the stations' columns and stair towers are placed off the road once the streets are in (stationLayout)
     for (const g of c.mgates) {
       const ang = hash1(g.x * 3.1 + g.z) * Math.PI, ux = Math.cos(ang), uz = Math.sin(ang), vx = -uz, vz = ux;
       const kc = [[-3.5, -2.2], [3.5, -2.2], [3.5, 2.2], [-3.5, 2.2]].map(([a, b]) => [g.x + ux * a + vx * b, g.z + uz * a + vz * b]);
@@ -131,6 +123,48 @@ export function buildGlobalProps(W) {
 
 // one tile's lamps, poles (with cables into the chunks) and signal heads; nmap turns the tile's own graph
 // node numbers into the world's
+// Where a station's columns and its stair tower stand: off the carriageway. Pune's stations straddle the road
+// on portal frames when there's no median, and the stair tower sits on the footpath beside the road. Worked out
+// from the streets (W.surf) once they're loaded around the station, then kept, with its collision, for good.
+function stationLayout(W, st) {
+  const p = st.pts, L = polyLength(p), key = Math.round(p[0]) + ',' + Math.round(p[1]);
+  const cache = W._stLay || (W._stLay = new Map());
+  if (cache.has(key)) return cache.get(key);
+  const ax = p[0], az = p[1], bx = p[p.length - 2], bz = p[p.length - 1];
+  const dx = (bx - ax) / L, dz = (bz - az) / L, nx = dz, nz = -dx, cx = (ax + bx) / 2, cz = (az + bz) / 2;
+  const hl = Math.min(70, L / 2 + 5), ca = Math.min(38, hl * 0.6);
+  const P = (a, b) => [cx + dx * a + nx * b, cz + dz * a + nz * b];
+  const road = (a, b) => { const [x, z] = P(a, b); return W.surf.isRoad(x, z); };
+  let known = false;                                  // any street under or beside it yet?
+  for (let b = -12; b <= 12 && !known; b += 1.5) known = road(0, b) || road(-ca * 0.7, b) || road(ca * 0.7, b);
+  // first edge off the road on one side (b > 0 or b < 0), within lim metres
+  const edge = (a, sg, lim) => { for (let b = 0.5; b <= lim; b += 0.5) if (!road(a, b * sg)) return b * sg; return null; };
+  const cols = [];
+  for (const a of [-ca * 0.7, 0, ca * 0.7]) {
+    if (!road(a, 0)) { cols.push([a, 0]); continue; }
+    const l = edge(a, 1, 10), r = edge(a, -1, 10);
+    if (l != null && r != null) { cols.push([a, l + Math.sign(l) * 0.9], [a, r + Math.sign(r) * 0.9]); }
+    else cols.push([a, 0]);                           // a wide road: its median
+  }
+  // the stair tower: the first spot beside the road (either side) where its whole footprint is off the road
+  let tower = null, ta = hl - 9;
+  for (const a of [hl - 9, -(hl - 9), hl - 20, -(hl - 20), 0]) {
+    for (let b = 8; b <= 30 && tower == null; b += 1) for (const sg of [1, -1]) {
+      let ok = true;
+      for (const [u, v] of [[-5, -3], [5, -3], [5, 3], [-5, 3], [0, 0], [0, -3], [0, 3]]) { const [x, z] = P(a + u, (b + v) * sg); if (W.surf.isRoad(x, z) || W.surf.inBuilding(x, z)) { ok = false; break; } }
+      if (ok) { tower = b * sg; ta = a; break; }
+    }
+    if (tower != null) break;
+  }
+  const out = { cols, tower, ta };
+  if (!known) return out;                             // the streets here aren't in yet: work it out again later
+  cache.set(key, out);
+  const C = W.collision, t0 = C.tag; C.tag = 0;
+  for (const [a, b] of cols) { const [x, z] = P(a, b); C.addCircle(x, z, 1.1, 2); }
+  if (tower != null) { const [tx, tz] = P(ta, tower); C.addRing([[-5, -3], [5, -3], [5, 3], [-5, 3]].flatMap(([u, v]) => [tx + dx * u + nx * v, tz + dz * u + nz * v]), 0); }
+  C.tag = t0;
+  return out;
+}
 export function addStreetProps(W, D, tag, nmap) {
   const { collision, index } = W;
   InstancedSet.tag = tag;
@@ -395,7 +429,8 @@ export function* buildPropsChunk(W, C, group) {
     // the concourse under the tracks, on three columns in the median
     const ca = Math.min(38, hl * 0.6);
     box(-ca, ca, -9, 9, 7.4, 10.9, 1, WL.cladding, 6);
-    for (const a of [-ca * 0.7, 0, ca * 0.7]) box(a - 0.8, a + 0.8, -0.8, 0.8, 0, 7.4, 3, WL.plaster, 2);
+    const LY = stationLayout(W, st);
+    for (const [a, b] of LY.cols) box(a - 0.8, a + 0.8, b - 0.8, b + 0.8, 0, 7.4, 3, WL.plaster, 2);
     // side platforms at track level, with a parapet on the outer edge
     for (const sd of [1, -1]) {
       const b0 = 2.6 * sd, b1 = 7.4 * sd;
@@ -419,7 +454,7 @@ export function* buildPropsChunk(W, C, group) {
       gq([ex0, 16.7, ez0], [ex1, 16.7, ez1], [ex1, 17.0, ez1], [ex0, 17.0, ez0], [nx * sd, 0, nz * sd], GL.concrete, 0.8, true);
     }
     // a stair and escalator tower down to the footpath at one end, on the station's side of the road
-    { const tx0 = cx + dx * (hl - 9) + nx * (hw + 3.2), tz0 = cz + dz * (hl - 9) + nz * (hw + 3.2);
+    if (LY.tower) { const tb = LY.tower, tx0 = cx + dx * LY.ta + nx * tb, tz0 = cz + dz * LY.ta + nz * tb, sg = Math.sign(tb);
       const tc = [[-5, -3], [5, -3], [5, 3], [-5, 3]].map(([a, b]) => [tx0 + dx * a + nx * b, tz0 + dz * a + nz * b]);
       for (let k = 0; k < 4; k++) {
         const [x0, z0] = tc[k], [x1, z1] = tc[(k + 1) % 4], l = Math.hypot(x1 - x0, z1 - z0);
@@ -429,7 +464,7 @@ export function* buildPropsChunk(W, C, group) {
       }
       gb.poly([tc.flat()], 11.0, GL.concrete, 0.8);
       // a bridge from the tower into the concourse
-      const [bx0, bz0] = P(Math.min(ca - 1, hl - 12), 9), [bx1, bz1] = P(Math.min(ca - 1, hl - 12) + 6, 9), [bx2, bz2] = P(Math.min(ca - 1, hl - 12) + 6, hw + 0.2), [bx3, bz3] = P(Math.min(ca - 1, hl - 12), hw + 0.2);
+      const a0 = Math.min(Math.max(-ca + 1, Math.min(ca - 7, LY.ta - 3)), LY.ta - 4), a1 = Math.max(a0 + 6, LY.ta + 4), [bx0, bz0] = P(a0, 9 * sg), [bx1, bz1] = P(a1, 9 * sg), [bx2, bz2] = P(a1, tb - 3 * sg), [bx3, bz3] = P(a0, tb - 3 * sg);
       gb.poly([[bx0, bz0, bx1, bz1, bx2, bz2, bx3, bz3]], 10.9, GL.concrete, 0.8);
     }
     // the Metro sign along both canopy edges
