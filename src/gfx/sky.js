@@ -258,9 +258,18 @@ export class Sky {
       const r = this.shadowRange;
       const sz = this.sun.shadow.mapSize.x || 1024;
       const texel = (2 * r) / sz;
-      const fx = Math.round(focus.x / texel) * texel, fz = Math.round(focus.z / texel) * texel;
-      this.sun.target.position.set(fx, 0, fz);
-      this.sun.position.set(fx + lightDir.x * 220, lightDir.y * 220, fz + lightDir.z * 220);
+      // the shadow's sun moves in small held steps (a continuously sliding light makes every edge crawl)
+      const sd = this._sd || (this._sd = lightDir.clone());
+      if (sd.dot(lightDir) < 0.99999 || this._sdN === undefined) { sd.copy(lightDir); this._sdN = 1; }
+      // snap in the light's own frame, so moving about never slides the texel grid under the shadows
+      const rx = sd.z, rz = -sd.x, rl = Math.hypot(rx, rz) || 1;            // right = up x dir, flat
+      const R = [rx / rl, 0, rz / rl];
+      const ux = R[1] * sd.z - R[2] * sd.y, uy = R[2] * sd.x - R[0] * sd.z, uz = R[0] * sd.y - R[1] * sd.x;  // up' = R x dir
+      const fy = 0, a = focus.x * R[0] + focus.z * R[2], b = focus.x * ux + fy * uy + focus.z * uz;
+      const da = a - Math.round(a / texel) * texel, db = b - Math.round(b / texel) * texel;
+      const fx = focus.x - da * R[0] - db * ux, fz = focus.z - da * R[2] - db * uz, fyy = -db * uy;
+      this.sun.target.position.set(fx, fyy, fz);
+      this.sun.position.set(fx + sd.x * 220, fyy + sd.y * 220, fz + sd.z * 220);
       this.sun.target.updateMatrixWorld();
     }
     this.dome.position.set(focus ? focus.x : 0, 0, focus ? focus.z : 0);
