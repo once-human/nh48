@@ -78,7 +78,7 @@ export class Rides {
   markers() {
     const m = [];
     for (const o of this.offers) m.push({ kind: 'pax', x: o.p.x, z: o.p.z });
-    if (this.current && this.current.state === 'onboard') m.push({ kind: 'dest', x: this.current.dest.x, z: this.current.dest.z });
+    if (this.current && this.current.state === 'onboard') { const c = this.current; m.push({ kind: 'dest', x: c.dropX ?? c.dest.x, z: c.dropZ ?? c.dest.z }); }
     return m;
   }
 
@@ -190,7 +190,7 @@ export class Rides {
       if (P.onFootpath && Math.abs(P.v) > 2) { c.mood -= dt * 0.025; this.line('footpath', 0.4 * dt); }
       if (c.elapsed > c.limit && !c.lateSaid) { c.lateSaid = true; this.line('late', 1); }
       if (c.elapsed > c.limit) c.mood -= dt * 0.004;
-      const dd = Math.hypot(c.dest.x - P.x, c.dest.z - P.z);
+      const dd = Math.hypot((c.dropX ?? c.dest.x) - P.x, (c.dropZ ?? c.dest.z) - P.z);
       if (dd < 60 && !c.nearSaid) { c.nearSaid = true; this.line('near', 1); }
       // small talk on the way, if you're not scaring them
       c.chatT -= dt;
@@ -200,7 +200,7 @@ export class Rides {
     // markers
     this.beacon.visible = !!(c && c.state === 'onboard');
     if (this.beacon.visible) {
-      this.beacon.position.set(c.dest.x, 30, c.dest.z);
+      this.beacon.position.set(c.dropX ?? c.dest.x, 30, c.dropZ ?? c.dest.z);
       this.beacon.material.opacity = 0.18 + 0.1 * Math.sin(performance.now() / 300) + (1 - g.W.sky.state.night) * 0.05;
     }
     this.pins.forEach((m, i) => {
@@ -229,7 +229,13 @@ export class Rides {
     const g = this.g, P = g.player, G = this.W.graph, c = this.current;
     const from = G.nearest(P.x, P.z, 60, e => e.rank >= 2);
     if (!from) return;
-    const to = { e: c.dest.e, s: c.dest.s };
+    // the drop point: the road right by the place, found in the streets as they are now (the old base-map edge
+    // numbers point at other roads once the city streams in tiles, which sent the route somewhere else)
+    if (!c.destRoad || !c.destRoad.e || c.destRoad.e.dead) {
+      const n = G.nearest(c.dest.x, c.dest.z, 140, e => e.rank >= 2) || G.nearest(c.dest.x, c.dest.z, 300);
+      if (n) { c.destRoad = n; const t = G.at(n.e, n.s); c.dropX = t[0]; c.dropZ = t[1]; }
+    }
+    const to = c.destRoad ? { e: c.destRoad.e, s: c.destRoad.s } : { e: c.dest.e, s: c.dest.s };
     const r = G.route(from, to, false) || G.route(from, to, true);
     if (!r) return;
     this.routePts = G.routePolyline(r, from, to);

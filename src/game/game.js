@@ -671,7 +671,7 @@ export class Game {
     const c = r.current;
     if (c && c.state === 'boarding') return { main: `${c.name} is getting in…`, sub: '' };
     if (c && c.state === 'onboard') {
-      const d = Math.hypot(c.dest.x - P.x, c.dest.z - P.z);
+      const d = Math.hypot((c.dropX ?? c.dest.x) - P.x, (c.dropZ ?? c.dest.z) - P.z);
       const left = Math.max(0, c.limit - c.elapsed);
       return { main: `Drop at ${c.dest.name}`, sub: `${d > 950 ? (d / 1000).toFixed(1) + ' km' : Math.round(d / 10) * 10 + ' m'} away · ${left > 0 ? Math.ceil(left) + ' s left for a tip' : 'running late'}`, urgent: left <= 0 };
     }
