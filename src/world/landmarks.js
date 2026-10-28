@@ -513,8 +513,7 @@ const BUILD = {
     const hw = B.L.w / 2, hd = B.L.d / 2;
     const inA = B.A(WL.plaster, T([0.84, 0.78, 0.64]), 3, 0, 10);
     B.box(0, 0, B.L.w - 5, B.L.d - 5, 0, 10, inA, B.A(WL.slab, CREAM));
-    B.ground([[-hw - 40, -hd - 40], [hw + 40, -hd - 40], [hw + 40, hd + 40], [-hw - 40, hd + 40]], 0.03, GL.grass, 0.95);
-    B.ground([[-3, -hd - 40], [3, -hd - 40], [3, -hd], [-3, -hd]], 0.05, GL.pavers);
+    B.ground([[-hw - 6, -hd - 6], [hw + 6, -hd - 6], [hw + 6, hd + 6], [-hw - 6, hd + 6]], 0.03, GL.grass, 0.95);     // its lawn, kept off the roads
     // the arcades on both floors, all four sides
     const side = (ua, va, ub, vb, nu, nv) => {
       const L = Math.hypot(ub - ua, vb - va), n = Math.max(2, Math.round(L / 3.4)), yaw = Math.atan2(vb - va, ub - ua);
@@ -544,11 +543,7 @@ const BUILD = {
     B.roof(0, 0, B.L.w + 1.6, B.L.d + 1.6, 8.4, 4.2, B.A(WL.clayTiles, T(C.tile)), true);
     for (let k = -4; k <= 4; k++) { B.cbox(k * 7.2, 4.4, -hd - 0.6, 3.4, 2.2, 1.2, C.teak); B.cbox(k * 7.2, 6.6, -hd - 0.7, 3.8, 0.2, 1.5, [0.3, 0.18, 0.1]); }
     B.arch(0, -hd - 0.08, 3.4, 4.2, 0, C.teak);
-    B.ground([[-B.L.w / 2, -hd - 18], [B.L.w / 2, -hd - 18], [B.L.w / 2, -hd - 1], [-B.L.w / 2, -hd - 1]], 0.04, GL.grass, 0.9);
-    B.box(-14, -hd - 9, 3, 3, 0, 2.2, B.A(WL.sandstone, STONE), B.A(WL.slab, STONE));
-    B.cyl(-14.4, 2.2, -hd - 9, 0.45, 1.6, C.bronze, 10); B.sphere(-14.4, 4.05, -hd - 9, 0.25, C.bronze);
-    B.cyl(-13.5, 2.2, -hd - 9, 0.28, 1.0, C.bronze, 10); B.sphere(-13.5, 3.35, -hd - 9, 0.18, C.bronze);
-    B.hitBox(0, 0, B.L.w, B.L.d); B.hitBox(-14, -hd - 9, 3, 3);
+    B.hitBox(0, 0, B.L.w, B.L.d);
   },
 
   // Ohel David (Lal Deval, 1867): red brick Gothic with a tall tower and spire
@@ -742,7 +737,7 @@ const BUILD = {
     const L = B.L, hd = L.d / 2, w = L.w, fv = -hd;
     B.box(0, 0, w, L.d, 0, 11.2, B.A(WL.plaster, T([0.93, 0.87, 0.74]), 2, 0, 11.2), null);
     B.roof(0, 0, w + 1.2, L.d + 1.2, 11.2, 3, B.A(WL.clayTiles, T(C.tile)), true);
-    for (let k = 0; k <= Math.floor(w / 3); k++) { const u = -w / 2 + 0.4 + k * (w - 0.8) / Math.floor(w / 3); B.cbox(u, 0, fv - 0.6, 0.4, 3.9, 0.4, C.teak); }
+    for (let k = 0; k <= Math.floor(w / 3); k++) { const u = -w / 2 + 0.4 + k * (w - 0.8) / Math.floor(w / 3); B.cbox(u, 0, fv + 0.3, 0.4, 3.9, 0.4, C.teak); }
     B.cbox(0, 3.9, fv - 0.6, w, 0.45, 0.7, C.teak); B.cbox(0, 4.3, fv - 0.9, w + 0.4, 0.15, 1.4, [0.3, 0.18, 0.1]);
     // the balcony: carved teak, its own little roof, brackets under
     const bw = Math.min(13, w * 0.3);
