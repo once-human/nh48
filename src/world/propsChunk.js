@@ -11,6 +11,7 @@ import { GL } from '../gfx/pbr.js';
 import { InstancedSet, buildProto, compose, yawX } from './props.js';
 import { GB } from './groundChunk.js';
 import { FacadeB, BASE } from './buildingsChunk.js';
+import { addLandmarks, buildLandmark } from './landmarks.js';
 
 const STREET_IDX = { 'FC Road': 0, 'JM Road': 1, 'Karve Road': 2, 'Prabhat Road': 3, 'Bhandarkar Road': 4, 'Ghole Road': 5, 'Apte Road': 6,
   'Tilak Road': 7, 'Laxmi Road': 8, 'Ganeshkhind Road': 9, 'Lakdi Pul (Sambhaji Bridge)': 12 };
@@ -115,6 +116,7 @@ export function buildGlobalProps(W) {
       collision.addCircle(x, z, 1.0, 2);
     }, 10);
   }
+  addLandmarks(W);
 }
 
 // one tile's lamps, poles (with cables into the chunks) and signal heads; nmap turns the tile's own graph
@@ -260,6 +262,8 @@ export function* buildPropsChunk(W, C, group) {
         sb.quad([x - ux * 1.65, 1.9, z - uz * 1.65], [x + ux * 1.65, 1.9, z + uz * 1.65], [x + ux * 1.65, 2.9, z + uz * 1.65], [x - ux * 1.65, 2.9, z - uz * 1.65],
           [-nx, 0, -nz], s.u0, s.v0, s.u0 + 0.001, s.v0 + 0.001);
       }
+    } else if (ex.kind === 'landmark') {
+      try { buildLandmark(W, ex.id, { fb, gb, cb, group, mm }); } catch (e) { console.warn('landmark', ex.id, e); }
     } else if (ex.kind === 'pier') {
       const { x, z, dx, dz } = ex;
       const ring = [];

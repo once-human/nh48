@@ -61,7 +61,7 @@ export function groundMaterial(T) {
       if (L > 22.5 && L < 23.5) baseL = 0.0;           // bridge decks: asphalt
       if (L > 23.5) {                                  // building compounds: concrete / tiles / pavers / bare soil patches
         float r = nhNoise(vWP.xz * 0.021 + 11.0) + (nhNoise(vWP.xz * 0.45) - 0.5) * 0.06;
-        baseL = r < 0.36 ? 7.0 : r < 0.56 ? 3.0 : r < 0.74 ? 2.0 : r < 0.86 ? 4.0 : 6.0;
+        baseL = r < 0.44 ? 7.0 : r < 0.62 ? 3.0 : r < 0.72 ? 2.0 : r < 0.95 ? 6.0 : 4.0;   // mostly concrete and tiles, some garden, little bare soil
       }
       int li = int(baseL);
       float sc = uGScale[li];

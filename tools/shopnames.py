@@ -52,11 +52,49 @@ BRANDS = [
     ('merino', ('Marino Laminates', 'मरिनो लॅमिनेट्स')), ('zo rooms', ('Yo Rooms', 'यो रूम्स')),
     ('dominos', ("Domingo's Pizza", 'डोमिंगोज पिझ्झा')), ('mc donald', ("McDougal's", 'मॅकडूगल्स')),
 ]
+# Pune's own places keep their real names (that is how people recognise the city); only national and
+# international chains get a parody. key -> (English as on the board, Marathi)
+REAL = {
+    'vaishali': ('Vaishali', 'वैशाली'), 'roopali': ('Roopali', 'रूपाली'), 'rupali': ('Roopali', 'रूपाली'), 'wadeshwar': ('Wadeshwar', 'वाडेश्वर'),
+    'goodluck': ('Goodluck Cafe', 'गुडलक कॅफे'), 'good luck': ('Goodluck Cafe', 'गुडलक कॅफे'), 'chitale bandhu': ('Chitale Bandhu', 'चितळे बंधू'),
+    'chitale': ('Chitale Bandhu', 'चितळे बंधू'), 'kayani': ('Kayani Bakery', 'कयानी बेकरी'), 'german bakery': ('German Bakery', 'जर्मन बेकरी'),
+    'dorabjee': ('Dorabjee & Sons', 'दोराबजी अँड सन्स'), 'marz o rin': ('Marz-o-rin', 'मार्झ-ओ-रिन'), 'effingut': ('Effingut', 'एफिनगट'),
+    'malaka spice': ('Malaka Spice', 'मलाका स्पाइस'), 'cosmos': ('Cosmos Bank', 'कॉसमॉस बँक'), 'p n gadgil': ('P N Gadgil Jewellers', 'पु. ना. गाडगीळ'),
+    'png': ('PNG Jewellers', 'पु. ना. गाडगीळ'), 'chandukaka': ('Chandukaka Saraf', 'चंदूकाका सराफ'), 'sujata mastani': ('Sujata Mastani', 'सुजाता मस्तानी'),
+    'kaka halwai': ('Kaka Halwai', 'काका हलवाई'), 'bedekar': ('Bedekar Misal', 'बेडेकर मिसळ'), 'alka': ('Alka Talkies', 'अलका टॉकीज'),
+    'durvankur': ('Durvankur Thali', 'दूर्वांकुर थाळी'), 'shreyas': ('Shreyas', 'श्रेयस'), 'katakirr': ('Katakirr Misal', 'कटाकिर्र मिसळ'),
+    'joshi wadewale': ('Joshi Wadewale', 'जोशी वडेवाले'), 'garden vada pav': ('Garden Vada Pav', 'गार्डन वडा पाव'), 'jj garden': ('JJ Garden Vada Pav', 'जेजे गार्डन वडा पाव'),
+    'shabree': ('Shabree', 'शबरी'), 'janakiraman': ('Janakiraman', 'जानकीरमण'), 'vohuman': ('Vohuman Cafe', 'वोहुमन कॅफे'), 'ranka': ('Ranka Jewellers', 'रांका ज्वेलर्स'),
+    'high spirits': ('High Spirits', 'हाय स्पिरिट्स'), 'flour works': ('The Flour Works', 'द फ्लोअर वर्क्स'), 'le plaisir': ('Le Plaisir', 'ल प्लेझिर'),
+    'pagdandi': ('Pagdandi Books Chai Cafe', 'पगडंडी'), 'dario': ("Dario's", 'डारियोज'), 'arthur': ("Arthur's Theme", 'आर्थर्स थीम'),
+    'karachi sweets': ('Karachi Sweets', 'कराची स्वीट्स'), 'nevale': ('Nevale Misal', 'नेवाळे मिसळ'), 'shrimant dagdusheth': ('Shrimant Dagdusheth Halwai', 'श्रीमंत दगडूशेठ हलवाई'),
+}
 SHORT = {'kfc', 'sbi', 'png', 'jio', 'ccd', 'bata', 'axis', 'puma', 'nike', 'zara', 'oyo', 'acer', 'sony', 'marz', 'alka', 'levi', 'idbi', 'hdfc', 'total', 'mochi', 'biba', 'oppo', 'vivo'}
 _ALL = BRANDS + CURATED
 
 def _strip_accents(s):
     return ''.join(c for c in unicodedata.normalize('NFKD', s) if not unicodedata.combining(c))
+
+_LOCAL_KEYS = set(REAL) | {'vaishali', 'roopali', 'rupali', 'wadeshwar', 'goodluck', 'good luck', 'chitale', 'kayani', 'german bakery', 'dorabjee', 'marz', 'dario',
+    'effingut', 'malaka', 'arthur', 'cosmos', 'p n gadgil', 'png', 'chandukaka', 'sujata', 'kaka halwai', 'bedekar', 'alka', 'high spirits', 'flour works',
+    'le plaisir', 'pagdandi', 'chitale bandhu', 'wadeshwar', 'durvankur', 'shreyas', 'katakirr', 'joshi wadewale', 'garden vada pav', 'jj garden', 'shabree',
+    'janakiraman', 'vohuman', 'ranka', 'karachi sweets', 'aroma', 'shree krishna'}
+_ALL = [(k, v) for k, v in _ALL if k not in _LOCAL_KEYS]
+
+_GEN = re.compile(r"\b(?:restaurant|hotel|cafe|café|bakery|bakers|and|&|pure|veg|family|the|pune|poona|deccan|camp|fc|f\.c\.|jm|j\.m\.|road|rd|"
+                  r"mithaiwale|mithaiwala|mastani|misal|thali|sweets|jewellers|saraf|bank|talkies|theatre|bar|kitchen|xpress|express|sons|ltd|pvt|"
+                  r"near|opp|kothrud|aundh|baner|camp|bhuvan|ice|cream|house|co|corner|shop|store|outlet|original|new|old|shree|shri|"
+                  r"karve|nagar|peth|chowk|sadashiv|narayan|shaniwar|budhwar|tilak|laxmi|apte|prabhat|bhandarkar|koregaon|park|kp|mg|m\.g\.)\b", re.I)
+def real_local(name):
+    """Pune's own famous places, matched only when the name is that place (plus generic words), so
+    'Dr. Vaishali Jagdale' stays a doctor and 'Chitale Medical' stays a chemist."""
+    low = _strip_accents(name).lower()
+    rest = re.sub(r'[^a-z ]', ' ', _GEN.sub(' ', low))
+    rest = ' '.join(rest.split())
+    for key, val in REAL.items():
+        k = ' '.join(re.sub(r'[^a-z ]', ' ', _GEN.sub(' ', key)).split()) or key
+        if rest == k or rest.replace(' ', '') == k.replace(' ', ''): return val
+    return None
 
 def brand_parody(name):
     low = _strip_accents(name).lower()
@@ -72,8 +110,7 @@ _CUT = re.compile(r'\s*(?:\||–|—| - |,|\(|@|:|;| near | opp\.? | opposite | 
 _TAIL = re.compile(r'(?:\s+(?:pune|poona|deccan|camp|f\.?\s?c\.?\s?road|j\.?\s?m\.?\s?road|koregaon park|kp|shivajinagar|'
                    r'sadashiv peth|narayan peth|shaniwar peth|budhwar peth|kasba peth|navi peth|ravivar peth|branch|'
                    r'pvt\.?|ltd\.?|private|limited|llp|india|main|registered|regd\.?|pune city|pune station|outlet|store pune))+\s*$', re.I)
-AWAY = re.compile(r'mahabaleshwar|lonavala|lonavla|goa\b|nashik|varanasi|andheri|botswana|kharadi|balewadi|baner|hinjewadi|wakad|'
-                  r'viman ?nagar|hadapsar|pimpri|chinchwad|aundh|wagholi|magarpatta|mumbai|satara|solapur|kolhapur|delhi|bangalore|bengaluru', re.I)
+AWAY = re.compile(r'mahabaleshwar|lonavala|lonavla|goa\b|nashik|varanasi|andheri|botswana|mumbai|satara|solapur|kolhapur|delhi|bangalore|bengaluru', re.I)
 
 NOT_SHOP = re.compile(r'solution|consultan|technolog|infotech|software|logistic|realty|realtor|developers|associates|'
                       r'dispensary|no\.\s?\d|office|headquarter|corporate|industries|foundation|trust|society|'
@@ -153,6 +190,8 @@ def local_parody(name, cat):
 
 def board_name(raw, cat):
     """-> (english, marathi, brand?) or None if the name isn't usable on a board."""
+    r = real_local(raw)
+    if r: return r[0], r[1], False
     b = brand_parody(raw)
     if b:
         return b[0], b[1], True
@@ -162,8 +201,9 @@ def board_name(raw, cat):
     b = brand_parody(c)
     if b:
         return b[0], b[1], True
-    en, mr = local_parody(c, cat)
-    return en, mr, False
+    r = real_local(raw) or real_local(c)
+    if r: return r[0], r[1], False
+    return c, to_marathi(c) or CAT_MR.get(cat, ''), False
 
 # ---------------------------------------------------------------- invented, realistic fillers
 # (english, marathi) pairs; every filler is assembled only from these, so Marathi is always right
@@ -267,5 +307,6 @@ def pin_name(raw):
     if len(s) > 40: s = ' '.join(s.split()[:5])
     if s.isupper() and len(s) > 5 or s.islower():
         s = ' '.join(w if (w.isupper() and len(w) <= 3) else w.capitalize() for w in s.split())
-    en, mr = local_parody(s, 'generic')
-    return en, mr, False
+    r = real_local(raw)
+    if r: return r[0], r[1], False
+    return s, to_marathi(s) or '', False

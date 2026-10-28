@@ -17,6 +17,7 @@ if (TOUCH) await page.emulateMediaFeatures([{ name: 'pointer', value: 'coarse' }
 const logs = [];
 page.on('console', m => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', e => logs.push(`[pageerror] ${e.message}\n${e.stack || ''}`));
+page.on('response', r => { if (r.status() >= 400) logs.push('[http ' + r.status() + '] ' + r.url().slice(0, 140)); });
 page.on('requestfailed', r => logs.push(`[requestfailed] ${r.url().slice(0, 120)} ${r.failure()?.errorText}`));
 const t0 = Date.now();
 await page.goto(url, { waitUntil: 'load', timeout: 300000 });

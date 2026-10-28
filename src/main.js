@@ -173,7 +173,8 @@ async function main() {
   if (PUNE) {
     // the tiles around where you'll start: your saved spot, or FC Road for a new game
     let sx = -2450, sz = 1100;
-    try { const sp = Save.startPoint(Save.load()); if (sp) { sx = sp.x; sz = sp.z; } } catch (e) { /* new game */ }
+    if (params.has('fly') && params.get('at')) { const a = params.get('at').split(',').map(Number); sx = a[0]; sz = a[1]; }
+    try { if (params.has('fly')) throw 0; const sp = Save.startPoint(Save.load()); if (sp) { sx = sp.x; sz = sp.z; } } catch (e) { /* new game */ }
     try { const r = JSON.parse(sessionStorage.getItem('nh48_resume') || 'null'); if (r) { sx = r.x; sz = r.z; } } catch (e) { /* none */ }
     W.tiles = new TileManager(W);
     await progress('Loading this part of Pune', 0.83);
@@ -367,7 +368,7 @@ async function runFly({ W, renderer, scene, camera, sky, post, quality, progress
   if (!TEST) document.getElementById('ui').appendChild(dev);
   let pending = 0;
   window.__nh = {
-    setView: (x, z, y, yawDeg, pitchDeg) => { Object.assign(cam, { x, z, y, yaw: yawDeg * Math.PI / 180, pitch: pitchDeg * Math.PI / 180 }); placeCamera(); W.streamer.warm(x, z, warmR); updateProps(W, x, z); },
+    setView: async (x, z, y, yawDeg, pitchDeg) => { Object.assign(cam, { x, z, y, yaw: yawDeg * Math.PI / 180, pitch: pitchDeg * Math.PI / 180 }); placeCamera(); if (W.tiles) await W.tiles.warm(x, z, 300); W.streamer.warm(x, z, warmR); updateProps(W, x, z); },
     setHour: (h) => { hour = h; },
     pending: () => pending,
     stats: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures, chunks: W.streamer.built.size }),
@@ -409,7 +410,8 @@ async function runFly({ W, renderer, scene, camera, sky, post, quality, progress
         `chunks ${W.streamer.built.size} · queue ${pending} · last ${W.streamer.stats.ms.toFixed(1)} ms\n` +
         `x ${cam.x.toFixed(0)} z ${cam.z.toFixed(0)} · ${Math.floor(hour)}:${String(Math.floor(hour % 1 * 60)).padStart(2, '0')}\nWASD fly · Q/E down/up · Shift fast · [ ] time`;
     }
-    if (TEST && frames === 3) window.__shotReady = true;
+    if (TEST && frames >= 3 && (pending === 0 || frames > 600)) window.__shotReady = true;
+    if (W.tiles && W.tiles.update) W.tiles.update(dt, cam.x, cam.z);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

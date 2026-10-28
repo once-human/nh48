@@ -121,7 +121,7 @@ export class WorldIndex {
     for (const c of r ? this.chunksIn(r) : this.chunks) {
       if (r && !(c.cx >= r[0] && c.cx < r[2] && c.cz >= r[1] && c.cz < r[3])) continue;
       for (const f of TILE_FIELDS) c[f] = EMPTY;
-      c.wires = []; c.extras = (c.extras || []).filter(e => e.kind === 'pier');   // the metro stays
+      c.wires = []; c.extras = (c.extras || []).filter(e => e.kind === 'pier' || e.kind === 'landmark');   // the metro and the landmarks stay
     }
     for (let k = 0; k < T.n; k++) this.shopsByBld.delete(T.off + k);
     this.tileRanges.delete(tag);

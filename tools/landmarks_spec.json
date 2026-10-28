@@ -1,0 +1,107 @@
+{
+ "_": "Landmarks with their own models (src/world/landmarks.js). way: OSM outline that places and sizes them; node: OSM point (size given). claim: metres around the outline where the map's generic buildings are removed.",
+ "list": [
+  {
+   "id": "shaniwar",
+   "name": "Shaniwar Wada",
+   "way": 1145089204,
+   "claim": 4,
+   "front": [
+    0,
+    -1
+   ],
+   "plaza": [
+    [
+     -40,
+     -150
+    ],
+    [
+     25,
+     -150
+    ],
+    [
+     25,
+     -86
+    ],
+    [
+     -40,
+     -86
+    ]
+   ]
+  },
+  {
+   "id": "dagdusheth",
+   "name": "Shreemant Dagdusheth Halwai Ganpati",
+   "way": 264276391,
+   "claim": 1
+  },
+  {
+   "id": "mandai",
+   "name": "Mahatma Phule Mandai",
+   "way": 65486228,
+   "claim": 3
+  },
+  {
+   "id": "station",
+   "name": "Pune Railway Station",
+   "way": 1494691943,
+   "claim": 5,
+   "front": [
+    0,
+    -1
+   ]
+  },
+  {
+   "id": "agakhan",
+   "name": "Aga Khan Palace",
+   "way": 215998839,
+   "claim": 22
+  },
+  {
+   "id": "lalmahal",
+   "name": "Lal Mahal",
+   "way": 217271037,
+   "claim": 2
+  },
+  {
+   "id": "ohel",
+   "name": "Ohel David Synagogue (Lal Deval)",
+   "way": 67168944,
+   "claim": 2
+  },
+  {
+   "id": "tulshibaug",
+   "name": "Tulshibaug Ram Mandir",
+   "way": 380363669,
+   "claim": 1
+  },
+  {
+   "id": "kasba",
+   "name": "Kasba Ganpati",
+   "node": 2289294092,
+   "size": [
+    16,
+    22
+   ],
+   "claim": 2
+  },
+  {
+   "id": "sppu",
+   "name": "Savitribai Phule Pune University Main Building",
+   "way": 106617531,
+   "claim": 4
+  },
+  {
+   "id": "coep",
+   "name": "College of Engineering Pune",
+   "way": 674378540,
+   "claim": 3
+  },
+  {
+   "id": "osho",
+   "name": "Osho International Meditation Resort",
+   "way": 264403539,
+   "claim": 3
+  }
+ ]
+}
