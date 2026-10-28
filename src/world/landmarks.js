@@ -171,20 +171,53 @@ function archHead(pointed) {
   return new THREE.ShapeGeometry(sh, 10);
 }
 
-// a statue on horseback (Bajirao at Shaniwar Wada): horse, rider, raised sword
+// Bajirao I on horseback, the bronze outside the Delhi Darwaza: the horse mid-stride with its near foreleg
+// raised, neck arched, tail streaming; the Peshwa upright in the saddle in his pagadi, a long spear held high
 function horseman(B, u, v, s, yaw) {
-  const br = C.bronze, rot = (du, dv) => [u + du * Math.cos(yaw) - dv * Math.sin(yaw), v + du * Math.sin(yaw) + dv * Math.cos(yaw)];
-  const at = (du, y, dv, w, h, d) => { const [a, b] = rot(du, dv); B.cbox(a, y, b, w * s, h * s, d * s, br, yaw); };
-  at(0, 0, 0, 3.2, 3.6, 5.6);                           // pedestal is drawn by the caller; this is the plinth top
-  const y0 = 3.6 * s;
-  const [hx, hz] = rot(0, 0);
-  B.part(geo('horse', () => { const g = new THREE.CapsuleGeometry(0.55, 1.5, 4, 10); g.rotateX(Math.PI / 2); return g; }), hx, y0 + 1.7 * s, hz, br, yaw, s, s, s);
-  for (const [du, dv] of [[-0.35, -0.75], [0.35, -0.75], [-0.35, 0.8], [0.35, 0.8]]) { const [a, b] = rot(du, dv); B.cyl(a, y0, b, 0.11 * s, 1.35 * s, br, 6); }
-  { const [a, b] = rot(0, -1.25); B.part(geo('neck', () => { const g = new THREE.CylinderGeometry(0.22, 0.32, 1.1, 8); g.rotateX(-0.7); return g; }), a, y0 + 2.25 * s, b, br, yaw, s, s, s); }
-  { const [a, b] = rot(0, -1.75); B.part(geo('hhead', () => { const g = new THREE.BoxGeometry(0.3, 0.32, 0.75); return g; }), a, y0 + 2.75 * s, b, br, yaw, s, s, s); }
-  { const [a, b] = rot(0, 1.2); B.part(geo('tail', () => { const g = new THREE.CylinderGeometry(0.05, 0.12, 0.9, 6); g.rotateX(0.5); return g; }), a, y0 + 1.5 * s, b, br, yaw, s, s, s); }
-  { const [a, b] = rot(0, -0.1); B.cbox(a, y0 + 2.25 * s, b, 0.5 * s, 0.9 * s, 0.4 * s, br, yaw); B.sphere(a, y0 + 3.35 * s, b, 0.2 * s, br); B.cone(a, y0 + 3.5 * s, b, 0.22 * s, 0.35 * s, br, 8); }
-  { const [a, b] = rot(0.35, -0.3); B.part(geo('sword', () => { const g = new THREE.BoxGeometry(0.05, 1.1, 0.05); g.rotateX(-0.5); return g; }), a, y0 + 3.4 * s, b, C.iron, yaw, s, s, s); }
+  const br = C.bronze, dk = [0.2, 0.17, 0.11];
+  const cs = Math.cos(yaw), sn = Math.sin(yaw);
+  // local statue frame: a along the horse (+a is where it faces: the front, -v), b across; y up
+  const at = (a, b) => [u + b * cs - (-a) * sn, v + b * sn + (-a) * cs];
+  const put = (key, mk, a, y, b, col = br, sx = 1, sy = 1, sz = 1) => { const [pu, pv] = at(a * s, b * s); B.part(geo(key, mk), pu, y * s, pv, col, yaw, s * sx, s * sy, s * sz); };
+  const y0 = 3.6 / s;                                   // on top of the plinth
+  const Y = (y) => y0 + y;
+  // body and chest
+  put('h_body', () => { const g = new THREE.CapsuleGeometry(0.42, 1.25, 6, 14); g.rotateX(Math.PI / 2); g.scale(1, 1.05, 1); return g; }, 0, Y(1.55), 0);
+  put('h_chest', () => new THREE.SphereGeometry(0.48, 14, 10), 0.72, Y(1.6), 0);
+  put('h_rump', () => new THREE.SphereGeometry(0.47, 14, 10), -0.7, Y(1.6), 0);
+  // neck arched up, the head with its muzzle, ears, the mane along the crest
+  put('h_neck', () => { const g = new THREE.CylinderGeometry(0.2, 0.33, 0.95, 12); g.rotateX(0.62); return g; }, 1.05, Y(2.12), 0);
+  put('h_head', () => { const g = new THREE.CylinderGeometry(0.13, 0.2, 0.62, 10); g.rotateX(1.75); return g; }, 1.42, Y(2.52), 0);
+  put('h_muzzle', () => new THREE.SphereGeometry(0.15, 10, 8), 1.7, Y(2.43), 0);
+  for (const sd of [-1, 1]) put('h_ear', () => new THREE.ConeGeometry(0.05, 0.18, 6), 1.3, Y(2.82), sd * 0.08);
+  put('h_mane', () => { const g = new THREE.BoxGeometry(0.06, 0.16, 0.9); g.rotateX(0.62); return g; }, 0.98, Y(2.32), 0, dk);
+  // legs: upper and lower; the near foreleg lifted and bent
+  const leg = (a, b, lift) => {
+    if (!lift) { put('h_upleg', () => new THREE.CylinderGeometry(0.1, 0.13, 0.7, 8), a, Y(0.95), b); put('h_loleg', () => new THREE.CylinderGeometry(0.06, 0.08, 0.62, 8), a, Y(0.34), b); put('h_hoof', () => new THREE.CylinderGeometry(0.08, 0.09, 0.08, 8), a, Y(0.04), b, dk); return; }
+    put('h_upleg_r', () => { const g = new THREE.CylinderGeometry(0.1, 0.13, 0.66, 8); g.rotateX(0.9); return g; }, a + 0.22, Y(1.08), b);
+    put('h_loleg_r', () => { const g = new THREE.CylinderGeometry(0.06, 0.08, 0.6, 8); g.rotateX(-0.35); return g; }, a + 0.38, Y(0.7), b);
+  };
+  leg(0.62, -0.2, false); leg(0.62, 0.2, true); leg(-0.62, -0.2, false); leg(-0.68, 0.2, false);
+  put('h_tail', () => { const g = new THREE.CylinderGeometry(0.05, 0.16, 1.0, 8); g.rotateX(-0.55); return g; }, -1.28, Y(1.3), 0, dk);
+  // saddle cloth and saddle
+  put('h_cloth', () => new THREE.BoxGeometry(0.98, 0.5, 0.95), -0.05, Y(1.72), 0, [0.24, 0.2, 0.12]);
+  // the rider: legs astride, torso upright in an angarkha, the pagadi, shield on the back, the spear
+  for (const sd of [-1, 1]) {
+    put('r_thigh', () => { const g = new THREE.CylinderGeometry(0.1, 0.12, 0.55, 8); g.rotateX(Math.PI / 2 - 0.3); return g; }, 0.1, Y(2.05), sd * 0.38);
+    put('r_shin', () => new THREE.CylinderGeometry(0.07, 0.09, 0.62, 8), 0.27, Y(1.55), sd * 0.43);
+  }
+  put('r_hips', () => new THREE.BoxGeometry(0.42, 0.22, 0.5), -0.05, Y(2.1), 0);
+  put('r_torso', () => { const g = new THREE.CylinderGeometry(0.2, 0.27, 0.72, 10); return g; }, -0.04, Y(2.55), 0);
+  put('r_skirt', () => new THREE.CylinderGeometry(0.27, 0.38, 0.3, 12), -0.04, Y(2.18), 0);
+  put('r_head', () => new THREE.SphereGeometry(0.14, 12, 10), -0.02, Y(3.06), 0);
+  put('r_pagadi', () => { const g = new THREE.CylinderGeometry(0.16, 0.18, 0.18, 12); g.rotateZ(0.12); return g; }, -0.05, Y(3.22), 0);
+  put('r_kalgi', () => new THREE.ConeGeometry(0.035, 0.22, 6), -0.12, Y(3.4), 0);
+  put('r_shield', () => { const g = new THREE.SphereGeometry(0.22, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2.4); g.rotateZ(Math.PI / 2); return g; }, -0.26, Y(2.6), 0);
+  // right arm up holding the spear, the left on the reins
+  put('r_arm_up', () => { const g = new THREE.CylinderGeometry(0.055, 0.07, 0.62, 8); g.rotateX(-0.25); g.rotateZ(-0.35); return g; }, 0.02, Y(3.0), 0.3);
+  put('r_arm_rein', () => { const g = new THREE.CylinderGeometry(0.055, 0.07, 0.6, 8); g.rotateX(Math.PI / 2 - 0.6); return g; }, 0.25, Y(2.55), -0.2);
+  put('r_spear', () => { const g = new THREE.CylinderGeometry(0.025, 0.025, 3.4, 6); g.rotateX(0.18); return g; }, 0.12, Y(3.15), 0.42);
+  put('r_spearhead', () => { const g = new THREE.ConeGeometry(0.06, 0.32, 6); g.rotateX(0.18); return g; }, 0.42, Y(4.85), 0.42, [0.5, 0.48, 0.45]);
 }
 
 // a Nagara spire: tiers narrowing upward with small corner spirelets, an amalaka, a gold kalash. Returns the top
@@ -318,9 +351,16 @@ const BUILD = {
     const sv = gv - 36;
     B.ground([[gu - 18, sv - 15], [gu + 18, sv - 15], [gu + 18, sv + 15], [gu - 18, sv + 15]], 0.04, GL.grass, 0.9);
     path(gu - 2.5, sv + 15, gu + 2.5, gv - 0.4);
-    B.box(gu, sv, 4.4, 7.2, 0, 3.4, B.A(WL.sandstone, STONE), B.A(WL.slab, STONE));
-    horseman(B, gu, sv, 1.0, 0);
-    B.hitBox(gu, sv, 4.6, 7.4);
+    { const pA = B.A(WL.sandstone, T([0.62, 0.57, 0.5]), 11, 2, 3.6), cap = B.A(WL.slab, T([0.7, 0.66, 0.6]));
+      B.box(gu, sv, 6.4, 9.0, 0, 0.45, pA, cap); B.box(gu, sv, 5.6, 8.2, 0.45, 0.9, pA, cap);
+      B.box(gu, sv, 4.2, 6.8, 0.9, 3.3, pA, null); B.box(gu, sv, 4.8, 7.4, 3.3, 3.6, pA, cap);
+      B.cbox(gu, 1.5, sv - 3.42, 2.2, 1.2, 0.05, [0.24, 0.2, 0.13]);
+      B.board(gu, 2.1, sv - 3.46, 2.0, 1.05, (x, w, h) => { x.fillStyle = '#3a3122'; x.fillRect(0, 0, w, h); x.fillStyle = '#d9c38c'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.font = `800 ${h * 0.17}px Mukta, sans-serif`; x.fillText('श्रीमंत बाजीराव पेशवे', w / 2, h * 0.3); x.font = `700 ${h * 0.12}px Inter, sans-serif`; x.fillText('SHRIMANT BAJIRAO PESHWA I', w / 2, h * 0.55);
+        x.font = `500 ${h * 0.1}px Inter, sans-serif`; x.fillText('1700 – 1740', w / 2, h * 0.76); }, 'sw-bajirao');
+      for (let k = 0; k < 16; k++) { const a = k / 16 * 6.283; B.cyl(gu + Math.cos(a) * 7.2, 0, sv + Math.sin(a) * 9.2, 0.07, 0.75, C.iron, 6); }
+      horseman(B, gu, sv, 1.35, 0);
+      B.hitBox(gu, sv, 6.4, 9.0); }
     { const [ku, kv] = W.counter;
       B.box(ku, kv, 3.4, 2.4, 0, 2.7, B.A(WL.plaster, T([0.93, 0.86, 0.7]), 2, 2, 2.7), null);
       B.roof(ku, kv, 4.2, 3.2, 2.7, 0.9, B.A(WL.clayTiles, T(C.tile)), true);
