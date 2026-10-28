@@ -139,6 +139,7 @@ export class Police {
   }
   // a rule was broken at (x, z). Cop nearby → maybe a stop. Camera → e-challan later. Else nothing.
   offence(kind, x, z, info = {}) {
+    if (this.g.free) return;                 // free roam: no cops after you
     if (this.stop || (this.cool[kind] || 0) > 0) return;
     const P = this.g.player;
     if (P.onFoot) return;
@@ -465,6 +466,7 @@ export class Police {
   }
   raiseHeat(n, why, charge = 'theft') {
     const G = this.g;
+    if (G.free) return;
     const was = this.heat;
     if (charge) this.charges.add(charge);
     this.heat = Math.min(3, this.heat + n);

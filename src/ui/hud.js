@@ -148,6 +148,7 @@ export class HUD {
             <p class="ttl-sub">Start at Shaniwar Wada. Run an auto on the meter, misal on FC Road, a date in Baner. Shops shut 1 to 4, obviously.</p></div>
           <nav class="pz-menu">
             <button class="pz-i sel" id="t-roam">Start</button>
+            <button class="pz-i" id="t-free">Free roam</button>
             <button class="pz-i" id="t-who">New character</button>
             <button class="pz-i" id="t-wipe">Start over</button>
           </nav>
@@ -161,6 +162,7 @@ export class HUD {
     this.root.appendChild(t);
     this.title = t;
     t.querySelector('#t-roam').onclick = () => this.game.begin();
+    t.querySelector('#t-free').onclick = () => this.game.beginFree();
     t.querySelector('#t-who').onclick = () => this.showPicker(() => this.syncTitle());
     t.querySelector('#t-wipe').onclick = () => { t.querySelector('#t-wipe-c').hidden = false; };
     t.querySelector('#t-wipe-n').onclick = () => { t.querySelector('#t-wipe-c').hidden = true; };
@@ -413,7 +415,7 @@ export class HUD {
           <section class="pane" data-pane="guide"><h2>Guide</h2><div class="guide">${guideHTML()}</div></section>
           <section class="pane" data-pane="set"><h2>Settings</h2>
             <div class="gt">World</div>
-            <div class="group"><div class="row"><div class="rl">Time of day</div><div class="rc"><div class="seg" id="p-time"><button data-h="8.5">Morning</button><button data-h="13">Noon</button><button data-h="17.85">Sunset</button><button data-h="21.5">Night</button></div></div></div></div>
+            <div class="group" id="p-time-g"><div class="row"><div class="rl">Time of day<small>Free roam only</small></div><div class="rc"><div class="seg" id="p-time"><button data-h="8.5">Morning</button><button data-h="13">Noon</button><button data-h="17.85">Sunset</button><button data-h="21.5">Night</button></div></div></div></div>
             <div class="gt">Picture</div>
             <div class="group"><div class="row"><div class="rl">Graphics<small id="p-qnote"></small></div><div class="rc"><div class="seg" id="p-q"><button data-q="lite">Lite</button><button data-q="low">Low</button><button data-q="med">Medium</button><button data-q="high">High</button></div></div></div></div>
             ${settingsHTML('av')}
@@ -467,6 +469,7 @@ export class HUD {
     bindControls(p.querySelector('#p-ctl'), () => { const g = p.querySelector('.guide'); if (g) g.innerHTML = guideHTML(); });
   }
   syncPause() {
+    { const g = this.pause.querySelector('#p-time-g'); if (g) g.hidden = !this.game.free; }
     const pw = this.pause && this.pause.querySelector('#p-who'), sv = savedCharacter();
     if (pw) { pw.textContent = sv ? sv.name : 'Paused'; this.pause.querySelector('.pz-k').textContent = sv ? 'Paused' : 'Puneri · Pune'; }
     const g = this.game;
@@ -512,7 +515,8 @@ export class HUD {
     this.$('h-sub').classList.remove('show');
     this.setMode();
   }
-  setMode() { this.$('h-mode').textContent = this.game.rides && this.game.rides.enabled ? 'On shift' : 'Free roam'; }
+  setMode() { this.$('h-mode').textContent = this.game.free ? 'Free roam' : this.game.rides && this.game.rides.enabled ? 'On shift' : 'On foot in Pune'; }
+  setFree(on) { this.setMode(); const g = this.pause && this.pause.querySelector('#p-time-g'); if (g) g.hidden = !on; }
 
   // ---------------------------------------------------------------- per frame
   update(dt) {

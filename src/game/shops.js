@@ -639,6 +639,7 @@ export class Shops {
   // ---------------------------------------------------------------- doing it
   spend(price, bankToo = false) {
     const S = this.g.stats, L = this.life;
+    if (this.g.free) { this.g.audio.cash?.(); return true; }            // free roam: unlimited cash
     if (S.money >= price) { S.money -= price; this.g.saveStats(); this.g.audio.cash?.(); return true; }
     if (bankToo && S.money + L.s.bank >= price) { const fromBank = price - S.money; S.money = 0; L.s.bank -= fromBank; this.g.saveStats(); this.g.audio.cash?.(); return true; }
     this.msg(bankToo ? `Not enough money, cash and bank together are short of ${fmt(price)}` : `Not enough cash for ${fmt(price)}${L.s.bank >= price ? ' (it’s in the bank)' : ''}`);

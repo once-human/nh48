@@ -163,7 +163,7 @@ export class Game {
     if (this.life.s.autoDmg !== undefined) player.auto.dmg = this.life.s.autoDmg;
     this.applyUpgrades();
     // keep it saved: every few seconds while playing, and whenever the tab goes away
-    const persist = () => { if (this.state === 'play' || this.state === 'pause' || this.state === 'map') { Save.save(this); this.saveStats(); } };
+    const persist = () => { if (this.free) return; if (this.state === 'play' || this.state === 'pause' || this.state === 'map') { Save.save(this); this.saveStats(); } };
     this.debugSave = { Save, Vehicle };
     setInterval(persist, 5000);
     window.addEventListener('pagehide', persist);
@@ -325,7 +325,15 @@ export class Game {
 
   // ---------------------------------------------------------------- state changes
   // Start: pick who you are the first time, then you're in your auto (the shift runs while you drive it)
+  // Free roam: no police, unlimited cash, any time of day, go anywhere from the map. Your story game is left alone
+  beginFree() {
+    if (!this.free) { this._story = { money: this.stats.money, hour: this.hour }; this.free = true; this.stats.money = 99999999; }
+    this.hud.setFree?.(true);
+    if (!this.hud.hasCharacter || this.hud.hasCharacter()) return this.startPlay(false);
+    this.hud.showPicker(() => this.startPlay(false));
+  }
   begin() {
+    if (this.free) { this.free = false; this.stats.money = this._story.money; this.hour = this._story.hour; this.hud.setFree?.(false); }
     if (!this.hud.hasCharacter || this.hud.hasCharacter()) return this.startPlay(false);
     this.hud.showPicker(() => this.startPlay(false));
   }
@@ -356,6 +364,7 @@ export class Game {
   }
   endShift() {
     this.togglePause(false);
+    if (this.free && this.police) { this.police.heat = 0; }
     this.state = 'title';
     this.rides.setEnabled(false);
     this.hud.setPlaying(false);
@@ -598,6 +607,7 @@ export class Game {
     location.reload();
   }
   saveStats() {
+    if (this.free) return;                   // free roam never touches your story game
     const st = safeStorage();
     if (st) try { st.setItem('nh48_stats', JSON.stringify({ money: this.stats.money, rides: this.stats.rides, starSum: this.stats.starSum, rating: this.stats.rating, grant: 2 })); } catch (e) { /* ignore */ }
   }
@@ -612,7 +622,7 @@ export class Game {
     const veh = !P.onFoot ? P.cur : null;
     if (veh && veh.fuel !== undefined && veh.fuel <= 0) return { main: 'Out of fuel', sub: 'Crawl to a pump (on the map), or call roadside help from the backpack', urgent: true };
     // free roam: a short hint at the start, then a clean screen
-    if (!r.enabled) return this.t - (this.playT0 || 0) < 6 ? { main: 'Free roam', sub: 'Esc for menu · M for map' } : { main: '', sub: '' };
+    if (!r.enabled) return this.t - (this.playT0 || 0) < 6 ? { main: this.free ? 'Free roam' : 'Pune', sub: this.free ? 'No cops, unlimited cash · Esc for the time of day · M to go anywhere' : 'Esc for menu · M for map' } : { main: '', sub: '' };
     const c = r.current;
     if (c && c.state === 'boarding') return { main: `${c.name} is getting in…`, sub: '' };
     if (c && c.state === 'onboard') {

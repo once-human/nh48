@@ -11,7 +11,7 @@ export class PhotoMode {
     this.c = { x: 0, y: 0, z: 0 }; this.yaw = 0; this.pitch = 0.25; this.dist = 9;
     const el = document.createElement('div');
     el.className = 'photo-ui'; el.hidden = true;
-    el.innerHTML = `<div class="ph-bar glass"><b>Photo mode</b><span>Drag to look · scroll to zoom · <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> move · <span class="kbd">Q</span><span class="kbd">E</span> height · <span class="kbd">←</span><span class="kbd">→</span> time · <span class="kbd">H</span> hide this</span><button class="btn primary ph-shoot">Take photo <span class="kbd">Space</span></button><button class="btn ph-exit">Done <span class="kbd">Esc</span></button></div><div class="ph-flash"></div>`;
+    el.innerHTML = `<div class="ph-bar glass"><b>Photo mode</b><span>Drag to look · scroll to zoom · <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> move · <span class="kbd">Q</span><span class="kbd">E</span> height · <span class="kbd">←</span><span class="kbd">→</span> time (free roam) · <span class="kbd">H</span> hide this</span><button class="btn primary ph-shoot">Take photo <span class="kbd">Space</span></button><button class="btn ph-exit">Done <span class="kbd">Esc</span></button></div><div class="ph-flash"></div>`;
     (document.getElementById('ui') || document.body).appendChild(el);
     this.el = el;
     el.querySelector('.ph-shoot').onclick = () => this.shoot();
@@ -79,8 +79,8 @@ export class PhotoMode {
     if (d > MAX_R) { this.c.x = this.home.x + dx / d * MAX_R; this.c.z = this.home.z + dz / d * MAX_R; }
     const ground = G.W.surf.height(this.c.x, this.c.z);
     this.c.y = Math.max(ground + 0.3, Math.min(ground + 80, this.c.y));
-    if (k.has('ArrowRight')) G.setHour((G.hour + dt * 1.5) % 24);
-    if (k.has('ArrowLeft')) G.setHour((G.hour - dt * 1.5 + 24) % 24);
+    if (G.free && k.has('ArrowRight')) G.setHour((G.hour + dt * 1.5) % 24);
+    if (G.free && k.has('ArrowLeft')) G.setHour((G.hour - dt * 1.5 + 24) % 24);
     const cp = Math.cos(this.pitch), cam = G.camera;
     let x = this.c.x + Math.sin(this.yaw) * cp * this.dist, z = this.c.z + Math.cos(this.yaw) * cp * this.dist, y = this.c.y + Math.sin(this.pitch) * this.dist;
     y = Math.max(G.W.surf.height(x, z) + 0.25, y);

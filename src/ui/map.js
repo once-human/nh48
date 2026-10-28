@@ -557,7 +557,7 @@ export class MapScreen {
     this.$('bm-c-b').textContent = p.blurb || '';
     this.$('bm-c-b').hidden = !p.blurb;
     const ft = this.$('bm-c-ft'), cost = this.g.fastTravelCost(p.x, p.z), why = this.g.fastTravelBlock();
-    ft.textContent = `Take a rickshaw · ₹${cost}`;
+    ft.textContent = this.g.free ? 'Go there now' : `Take a rickshaw · ₹${cost}`;
     ft.disabled = !!why || this.g.stats.money < cost || d < 40;
     ft.title = why || (this.g.stats.money < cost ? `You have ₹${this.g.stats.money}` : 'Skip the drive');
     const wp = this.g.waypoint;
