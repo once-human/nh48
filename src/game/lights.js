@@ -16,7 +16,9 @@ export class Lights {
     G.scene.add(t, t.target);
     const el = document.createElement('div');
     el.className = 'lamp-ind'; el.hidden = true;
-    (document.getElementById('hud') || document.body).appendChild(el);
+    // in the bottom-centre stack, above the F prompt, so it never sits on top of anything
+    const low = G.hud && G.hud.lower;
+    if (low) low.prepend(el); else (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
     this._ind = '';
   }
@@ -64,7 +66,8 @@ export class Lights {
       t.target.updateMatrixWorld();
     }
     // the HUD chip
-    const ind = !P.onFoot ? (this.headOn(night) ? 'head' : '') : on ? 'torch' : '';
+    // only the torch gets a chip (on foot, while it's on); everyone knows how their headlights work
+    const ind = P.onFoot && on && !G.interiors?.inside ? 'torch' : '';
     if (ind !== this._ind) {
       this._ind = ind;
       this.el.hidden = !ind;
