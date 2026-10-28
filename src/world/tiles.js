@@ -4,6 +4,7 @@
 // weak PC only ever holds a handful.
 import { versioned } from '../core/assets.js';
 import { cmRing } from './geo.js';
+import { fixVenues } from './venues.js';
 import { addStreetProps, removeStreetProps } from './propsChunk.js';
 import { addGroundTile, removeGroundTile } from './groundChunk.js';
 
@@ -114,6 +115,7 @@ export class TileManager {
     T.bOff = bOff; T.bN = D.buildings.length;
     for (const [bi, d] of D.hillB || []) if (M.buildings[bOff + bi]) M.buildings[bOff + bi].y = d / 10;   // up on a hillside
     D.buses = []; D.pois = []; D.places = [];
+    fixVenues(D);
     W.index.addTile(D, bOff, rect, tag);
     yield;
     W.surf.addTile({ ground: D.ground, water: D.water, buildings: [] }, tag);
