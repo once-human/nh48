@@ -849,11 +849,14 @@ export class Game {
       this.camera.up.set(0, 1, 0);
       const a = performance.now() / 1000 * 0.05 + 2.3;
       const L = this.W.landmarks && this.W.landmarks.find(l => l.id === 'shaniwar');
-      if (L && Math.hypot(P.x - L.x, P.z - L.z) < 400) {
-        // by Shaniwar Wada: a slow drone shot round the fort, the Delhi Darwaza swinging past
-        const b = performance.now() / 1000 * 0.035 + 4.2, r2 = 175;
-        this.camera.position.set(L.x + Math.cos(b) * r2, 78 + Math.sin(b * 0.6) * 8, L.z + Math.sin(b) * r2);
-        this.camera.lookAt(L.x, 4, L.z);
+      if (L && this.wadaIntro) {
+        // first launch: a low drone shot drifting across the front of Shaniwar Wada, the Delhi Darwaza and
+        // Bajirao's statue in frame, the city behind
+        const c = Math.cos(L.rot), sn = Math.sin(L.rot), Pw = (u, v) => [L.x + u * c + v * sn, L.z + u * sn - v * c];
+        const t = performance.now() / 1000 * 0.06, sw = Math.sin(t) * 0.75;           // swings 85 degrees side to side
+        const [gx, gz] = Pw(2.7, -86), [ox, oz] = Pw(2.7 + Math.sin(sw) * 78, -86 - Math.cos(sw) * 78);
+        this.camera.position.set(ox, 21 + Math.sin(t * 0.7) * 3, oz);
+        this.camera.lookAt(gx, 9, gz);
       } else {
         const r = 11;
         this.camera.position.set(P.x + Math.cos(a) * r, 3.2 + Math.sin(a * 0.7) * 0.5, P.z + Math.sin(a) * r);

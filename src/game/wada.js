@@ -72,7 +72,15 @@ export class Wada {
     let nOut = 0, nIn = 0; for (const p of this.tourists) p.wadaIn ? nIn++ : nOut++;
     for (let k = 0; k < 4 && nOut < wantOut; k++, nOut++) this.spawnOutside();
     for (let k = 0; k < 4 && nIn < wantIn; k++, nIn++) this.spawnInside();
-    if (!this.guard || !G.people.list.includes(this.guard)) this.spawnGuard();
+    // closing time: the crowd goes home (a couple at a time, never the ones right in front of you)
+    let extraOut = nOut - wantOut, extraIn = nIn - wantIn;
+    for (const p of [...this.tourists]) {
+      if (p.wadaIn ? extraIn <= 0 : extraOut <= 0) continue;
+      if (Math.hypot(p.x - P.x, p.z - P.z) < 12) continue;
+      this.remove(p); p.wadaIn ? extraIn-- : extraOut--;
+    }
+    if (open && (!this.guard || !G.people.list.includes(this.guard))) this.spawnGuard();
+    if (!open && this.guard) { this.remove(this.guard); this.guard = null; }
   }
   // after midnight, by the Delhi Darwaza: Pune's oldest ghost story. Young Peshwa Narayanrao was killed in the
   // wada in 1773 and, the story goes, on some nights you can still hear him call for his uncle
@@ -108,6 +116,11 @@ export class Wada {
       o.start(t); lfo.start(t); n.start(t); o.stop(t + 5.2); lfo.stop(t + 5.2); n.stop(t + 5.2);
       setTimeout(() => { try { fb.disconnect(); rv.disconnect(); } catch (e) { /* gone */ } }, 9000);
     } catch (e) { /* no sound, still the words */ }
+  }
+  remove(p) {
+    const list = this.g.people.list, i = list.indexOf(p);
+    if (i >= 0) { if (p.body) p.body.release(); list.splice(i, 1); }
+    this.tourists = this.tourists.filter(q => q !== p);
   }
   drop() {
     const list = this.g.people.list;
