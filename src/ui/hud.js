@@ -145,9 +145,9 @@ export class HUD {
         <div class="pz-l">
           <div class="ttl-brand">${STONE}<b>PUNERI</b><span>Pune <span lang="mr">पुणे</span></span></div>
           <div class="pz-head ttl-head"><span class="pz-k">An open-world game</span><b>Pune</b><span class="ttl-mr" lang="mr">पुणे</span>
-            <p class="ttl-sub">Start at Shaniwar Wada. Run an auto on the meter, misal on FC Road, a date in Baner. Shops shut 1 to 4, obviously.</p></div>
+            <p class="ttl-sub">Start at Shaniwar Wada. Run an auto on the meter, misal on FC Road, a date in Baner.</p></div>
           <nav class="pz-menu">
-            <button class="pz-i sel" id="t-roam">Start</button>
+            <button class="pz-i sel" id="t-roam">Story</button>
             <button class="pz-i" id="t-free">Free roam</button>
             <button class="pz-i" id="t-who">New character</button>
             <button class="pz-i" id="t-wipe">Start over</button>
@@ -181,8 +181,9 @@ export class HUD {
   syncTitle() {
     const t = this.title; if (!t) return;
     const sv = savedCharacter();
-    t.querySelector('#t-roam').textContent = sv ? `Continue as ${sv.name}` : 'Start';
-    t.querySelector('#t-who').textContent = sv ? 'Change character' : 'New character';
+    t.querySelector('#t-roam').textContent = sv ? `Story · ${sv.name}` : 'Story';
+    t.querySelector('#t-who').textContent = 'Change character';
+    t.querySelector('#t-who').hidden = !sv;              // first time: just Story and Free roam
     t.querySelector('#t-wipe').hidden = !sv;
     const S = this.game.stats;
     t.querySelector('#t-stats').innerHTML = S && sv ? `<span><b>${fmtRupees(S.money)}</b> cash</span><span><b>${S.rides || 0}</b> rides</span>${S.rating ? `<span><b>${S.rating.toFixed(1)}</b> rating</span>` : ''}` : '';
@@ -471,7 +472,7 @@ export class HUD {
   syncPause() {
     { const g = this.pause.querySelector('#p-time-g'); if (g) g.hidden = !this.game.free; }
     const pw = this.pause && this.pause.querySelector('#p-who'), sv = savedCharacter();
-    if (pw) { pw.textContent = sv ? sv.name : 'Paused'; this.pause.querySelector('.pz-k').textContent = sv ? 'Paused' : 'Puneri · Pune'; }
+    if (pw) { pw.textContent = sv ? sv.name : 'Paused'; this.pause.querySelector('.pz-k').textContent = this.game.free ? 'Free roam' : 'Paused'; }
     const g = this.game;
     const area = this.$('h-area')?.textContent || 'Pune', street = this.$('h-street')?.textContent || '';
     this.pause.querySelector('#p-meta').innerHTML = `<span>${street || area}</span><span>${this.$('h-clock')?.textContent || ''}</span><span>${fmtRupees(g.stats?.money ?? 0)}</span>`;

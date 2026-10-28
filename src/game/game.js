@@ -329,17 +329,24 @@ export class Game {
   // Start: pick who you are the first time, then you're in your auto (the shift runs while you drive it)
   // Free roam: no police, unlimited cash, any time of day, go anywhere from the map. Your story game is left alone
   beginFree() {
-    if (!this.free) { const P = this.player; this._story = { money: this.stats.money, hour: this.hour, x: P.x, z: P.z, th: P.onFoot ? P.foot.yaw : P.th, foot: P.onFoot }; this.free = true; this.stats.money = 99999999; }
+    if (!this.free) { const P = this.player; this._story = { money: this.stats.money, hour: this.hour, x: P.x, z: P.z, th: P.onFoot ? P.foot.yaw : P.th, foot: P.onFoot, life: JSON.stringify(this.life.s) }; this.free = true; this.stats.money = 99999999; this.hour = 17.2; this.wadaIntro = true; }   // a fresh game every time, from Shaniwar Wada at golden hour
     this.hud.setFree?.(true);
     if (!this.hud.hasCharacter || this.hud.hasCharacter()) return this.startPlay(false);
     this.hud.showPicker(() => this.startPlay(false));
   }
-  begin() {
-    if (this.free) {
+  leaveFree() {
+    if (!this.free) return;
+    if (this.police) this.police.heat = 0;
+    {
       // back to the story: your money, your time of day, and where you were, as if free roam never happened
       const S = this._story; this.free = false; this.stats.money = S.money; this.hour = S.hour; this.hud.setFree?.(false);
+      try { this.life.s = JSON.parse(S.life); } catch (e) { /* keep */ }
       try { if (S.foot) this.player.teleportFoot(S.x, S.z, S.th, this.traffic); else this.player.reset(S.x, S.z, S.th); this.rig.inited = false; } catch (e) { /* stay */ }
     }
+    this.hud.syncTitle?.();
+  }
+  begin() {
+    this.leaveFree();
     if (!this.hud.hasCharacter || this.hud.hasCharacter()) return this.startPlay(false);
     this.hud.showPicker(() => this.startPlay(false));
   }
@@ -380,7 +387,7 @@ export class Game {
   }
   endShift() {
     this.togglePause(false);
-    if (this.free && this.police) { this.police.heat = 0; }
+    if (this.free) this.leaveFree();
     this.state = 'title';
     this.rides.setEnabled(false);
     this.hud.setPlaying(false);
