@@ -303,11 +303,13 @@ export class People {
   // ---------------------------------------------------------------- update
   update(dt, player, avoidView) {
     const px = player.x, pz = player.z;
+    this.g_inView = avoidView;
     // population
     for (let i = this.list.length - 1; i >= 0; i--) {
       const p = this.list[i];
       if (p.pax || p.fixed) continue;
-      if (Math.hypot(p.x - px, p.z - pz) > 150 || p.dead) { if (p.door) p.door.n--; if (p.venue) (p.clubber ? p.venue.clubCrowd-- : p.venue.crowd--); if (p.body) p.body.release(); this.list[i] = this.list[this.list.length - 1]; this.list.pop(); }
+      const far = Math.hypot(p.x - px, p.z - pz);
+      if ((far > 150 && !(avoidView && avoidView(p.x, p.z) && far < 230)) || p.dead) { if (p.door) p.door.n--; if (p.venue) (p.clubber ? p.venue.clubCrowd-- : p.venue.crowd--); if (p.body) p.body.release(); this.list[i] = this.list[this.list.length - 1]; this.list.pop(); }
     }
     // traffic police (fixed) and waiting passengers don't count towards the walking crowd
     if (this.act && (this.actT -= dt) <= 0) {
@@ -332,7 +334,9 @@ export class People {
     while (walkers + (5 - tries) < this.target && tries-- > 0) {
       const urgent = walkers < this.target * 0.5;
       // most people appear within ~100 m (out of view), so the street around you feels busy
-      const p = this.spawnOne(px, pz, urgent ? 8 : 26, this.rng.chance(0.65) ? 90 : 140, urgent ? null : avoidView);
+      // never out of thin air in front of you: out of view, or far enough to be a figure in the crowd
+      const hidden = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 110 : null;
+      const p = this.spawnOne(px, pz, urgent ? 30 : 40, this.rng.chance(0.65) ? 95 : 140, hidden);
       // outside the bars at night people stand around in groups rather than walk
       if (p && this.rng.chance(0.18 + 0.55 * this.nightHere)) { p.mode = 'stand'; p.wait = this.rng.range(15, 90) * (1 + this.nightHere * 2); }
     }
@@ -633,7 +637,8 @@ export class People {
     const urgent = n < want * 0.4;
     // a group of 2-5 a couple of metres out from the door
     const k = this.rng.int(2, 5), gx = d.x + d.nx * this.rng.range(1.6, 3.2), gz = d.z + d.nz * this.rng.range(1.6, 3.2);
-    if (!urgent && avoidView && avoidView(gx, gz)) return;
+    if (avoidView && avoidView(gx, gz) && Math.hypot(gx - px, gz - pz) < 110) return;
+    void urgent;
     const near = this.g.nearest(gx, gz, 90);
     if (!near) return;
     d.crowd = (d.crowd || 0) + k;
@@ -661,7 +666,7 @@ export class People {
         const cap = Math.round(30 * peak);
         if ((d.clubCrowd || 0) >= cap) continue;
         const gx = d.x + d.nx * this.rng.range(1.8, 6.5) + d.nz * this.rng.range(-7, 7), gz = d.z + d.nz * this.rng.range(1.8, 6.5) - d.nx * this.rng.range(-7, 7);
-        if ((d.clubCrowd || 0) > 6 && avoidView && avoidView(gx, gz)) continue;
+        if (avoidView && avoidView(gx, gz) && Math.hypot(gx - px, gz - pz) < 110) continue;
         const near = this.g.nearest(gx, gz, 90);
         if (!near) continue;
         const k = this.rng.int(2, 6);
@@ -889,7 +894,7 @@ export class People {
       const st = S[k], x = st[0] / 100, z = st[1] / 100;
       if (Math.abs(x - px) > 110 || Math.abs(z - pz) > 110 || this.stallsUsed.has(k)) continue;
       const d = Math.hypot(x - px, z - pz);
-      if (d > 110 || d < 30) continue;
+      if (d > 110 || d < 30 || (this.g_inView && this.g_inView(x, z) && d < 100)) continue;
       const n = this.rng.int(0, 3);
       this.stallsUsed.set(k, n);
       for (let i = 0; i < n; i++) {

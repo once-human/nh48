@@ -269,7 +269,7 @@ export class Traffic {
       const dx = v.x - px, dz = v.z - pz, d = Math.hypot(dx, dz);
       // at speed, what you've left behind goes (out of sight) so the budget moves to the road ahead
       const behind = fast && dx * hx + dz * hz < -0.3 * d && d > 110 && (!avoidView || !avoidView(v.x, v.z));
-      if (d > 300 || !v.alive || behind) this.despawn(i);
+      if ((d > 300 && !(avoidView && avoidView(v.x, v.z) && d < 420)) || !v.alive || behind) this.despawn(i);
     }
     // fewer vehicles at 3 am than at 6 pm; the far ones drop out as it thins
     const target = Math.round(this.max * curve(TRAFFIC, this.hour));
@@ -286,8 +286,14 @@ export class Traffic {
         const look = Math.min(sp * 7, 200);
         const hidden = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 140 : null;
         this.spawn(px + hx * look, pz + hz * look, 0, 170, hidden, px, pz, 70);
-      } else this.spawn(px, pz, urgent ? 25 : 80, 240, urgent ? null : avoidView);
+      } else {
+        // never out of thin air where you can see: even when the streets are empty, a new vehicle starts
+        // round a corner or past 140 m, where it's a speck in the haze
+        const hidden = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 140 : null;
+        this.spawn(px, pz, urgent ? 50 : 80, 240, hidden);
+      }
     }
+    this._seen = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 160 : null;
     this.buildGrid();
     for (const v of this.list) this.step(v, dt);
     this.render();
@@ -466,7 +472,8 @@ export class Traffic {
       const r = Math.min(node.jr, e.len * 0.45);
       if (v.s >= e.len - r) {
         if (!v.next) v.next = this.chooseNext(v);
-        if (!v.next) { v.alive = false; return; }
+        // the end of the streets streamed in so far: only drop out where nobody's looking, else wait there
+        if (!v.next) { if (this._seen && this._seen(v.x, v.z)) { v.s = e.len - r; v.v = 0; return; } v.alive = false; return; }
         if (v.next.l.e === v.l.e && v.next.l.dir !== v.l.dir) {
           // U-turn at dead end
           v.l = v.next.l; v.s = Math.max(0.5, e.len - v.s); v.next = null;

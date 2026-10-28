@@ -80,15 +80,15 @@ export class Wada {
     if (d > 260) { this.drop(); return; }
     const h = G.hour, busy = open ? (h > 16 || h < 11 ? 1 : 0.7) : (h > 18.5 && h < 21.5 ? 0.35 : 0);
     const wantOut = Math.round(16 * busy), wantIn = open ? Math.round(18 * busy) : 0;
-    let nOut = 0, nIn = 0; for (const p of this.tourists) p.wadaIn ? nIn++ : nOut++;
+    let nOut = 0, nIn = 0; for (const p of this.tourists) { if (p.leaving) continue; p.wadaIn ? nIn++ : nOut++; }
     for (let k = 0; k < 4 && nOut < wantOut; k++, nOut++) this.spawnOutside();
     for (let k = 0; k < 4 && nIn < wantIn; k++, nIn++) this.spawnInside();
     // closing time: the crowd goes home (a couple at a time, never the ones right in front of you)
     let extraOut = nOut - wantOut, extraIn = nIn - wantIn;
     for (const p of [...this.tourists]) {
       if (p.wadaIn ? extraIn <= 0 : extraOut <= 0) continue;
-      if (Math.hypot(p.x - P.x, p.z - P.z) < 12) continue;
-      this.remove(p); p.wadaIn ? extraIn-- : extraOut--;
+      if (p.leaving) continue;
+      this.leave(p); p.wadaIn ? extraIn-- : extraOut--;
     }
     if (open && (!this.guard || !G.people.list.includes(this.guard))) this.spawnGuard();
     const carts = G.hour >= 8 && G.hour < 22.5;
@@ -159,6 +159,26 @@ export class Wada {
       o.start(t); lfo.start(t); n.start(t); o.stop(t + 5.2); lfo.stop(t + 5.2); n.stop(t + 5.2);
       setTimeout(() => { try { fb.disconnect(); rv.disconnect(); } catch (e) { /* gone */ } }, 9000);
     } catch (e) { /* no sound, still the words */ }
+  }
+  // closing time for one visitor: out through the wicket, down the garden path to the road, and then they're
+  // just someone on the footpath walking home (the street crowd takes them from there)
+  leave(p) {
+    const G = this.g, R = Math.random, peds = G.people;
+    p.leaving = true;
+    const legs = [];
+    if (p.wadaIn) legs.push([SW.GU + (R() - 0.5) * 3, SW.GV + 12], [SW.WU, SW.GV + 2], [SW.WU, SW.GV - 3]);
+    legs.push([SW.GU + (R() - 0.5) * 4, SW.GV - 20 - R() * 10], [SW.GU + (R() - 0.5) * 30, SW.GV - 58]);
+    p.mode = 'walk'; p.anchor = null; p.wait = 0;
+    const go = (q) => {
+      const L = legs.shift();
+      if (L) { const t = this.P(L[0], L[1]); peds.goTo(q, t.x, t.z, go); return; }
+      const near = G.W.graph.nearest(q.x, q.z, 60);
+      this.tourists = this.tourists.filter(o => o !== q);
+      if (!near) { this.remove(q); return; }
+      q.e = near.e; q.s = near.s; q.side = near.side || (R() < 0.5 ? 1 : -1); q.lat = q.latT = peds.sidewalkLat(q.e, q.side);
+      q.dir = R() < 0.5 ? 1 : -1; q.mode = 'walk'; q.tourist = false; q.wadaIn = false;
+    };
+    go(p);
   }
   remove(p) {
     const list = this.g.people.list, i = list.indexOf(p);
