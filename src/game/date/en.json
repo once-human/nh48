@@ -68,5 +68,6 @@
 "approach_dance": ["Okay, you can actually dance. Mind if I join you?", "Hi! You've got moves. Where did you learn that?", "I've been dancing next to you for three songs. Hi.", "This is my song! Dance with me, come on."],
 "approach_cafe": ["Sorry, is anyone sitting here? Everywhere else is full.", "Hi. I think I've seen you around FC Road before.", "Excuse me. What did you order? It looks better than mine."],
 "approach_ignore": ["Oh. Okay. Have a good night.", "Fair enough. Maybe later then."],
-"approach_reject": ["Wow. Okay. Your loss.", "Right. Sorry to bother you."]
+"approach_reject": ["Wow. Okay. Your loss.", "Right. Sorry to bother you."],
+"ran_into": ["Hey! What are you doing here?", "Oh my god, hi! Fancy running into you here.", "You again? Are you following me?", "Hey you! Didn't expect to see you here."]
 }

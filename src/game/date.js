@@ -140,7 +140,10 @@ export class Dates {
     if (p.walkedOff) { G.hud.toast(`${p.name} isn’t interested`, 'Let it go', 'info', 2); return; }
     if (this.blocked(p)) { G.hud.toast(`${p.name} has blocked you`, 'They look away', 'bad', 2.2); return; }
     const P = this.profile(p);
-    const contact = this.contacts.find(c => c.name === p.name && c.dateNow);
+    let contact = this.contacts.find(c => c.name === p.name && c.dateNow);
+    // someone already in your phone, here by chance: no introductions, they know you
+    const bump = !contact && this.contacts.find(c => c.name === p.name && !c.done);
+    if (bump) { contact = bump; p.prof = p.prof && p.prof.known && p.prof.known.job ? p.prof : { lang: bump.lang || 'en', vibe: bump.vibe || 'chill', likes: bump.likes || [], job: bump.job ?? 0, area: bump.area ?? 0, picky: 0.4, known: { job: true, likes: true, area: true, vibe: true }, asked: { ask_job: 1, ask_area: 1, ask_fun: 1 } }; }
     // someone you're seeing is in the same room and sees you chatting up somebody else
     if (!contact) for (const q of room.R.peds || []) {
       if (q === p || !q.cast) continue;
@@ -149,12 +152,13 @@ export class Dates {
     }
     const mode = contact ? 'date' : 'meet';
     const tpl = room.R.tpl;
-    this.cur = { p, room, mode, contact, club: tpl === 'club', interest: p.interest ?? 0, used: {}, turn: 0, q: null, teases: 0 };
+    this.cur = { p, room, mode, contact, bump: !!bump, club: tpl === 'club', interest: p.interest ?? 0, used: {}, turn: 0, q: null, teases: 0 };
     G.state = 'shop';
     let first;
     if (mode === 'date') {
       const ct = contact;
-      if (ct.late) { first = this.line(p, 'date_late'); ct.aff = Math.max(0, ct.aff - 8); ct.late = false; }
+      if (bump) first = this.line(p, ct.upset ? 'upset' : 'ran_into');
+      else if (ct.late) { first = this.line(p, 'date_late'); ct.aff = Math.max(0, ct.aff - 8); ct.late = false; }
       else if (ct.upset) first = this.line(p, 'upset');
       else first = this.line(p, ct.partner ? 'partner_hi' : 'date_hi');
     } else if (p.interest === undefined) {
@@ -163,7 +167,7 @@ export class Dates {
       this.cur.interest = guarded ? 0 : Math.round(6 + L.charm * 12 - P.picky * 6);
       first = this.line(p, guarded ? 'open_guarded' : tpl === 'club' ? 'open_club' : tpl === 'cafe' ? 'open_cafe' : 'open_food');
     } else first = this.line(p, 'meh');
-    this.say(first, mode === 'date' ? (contact.upset ? 'They’re upset with you' : 'They’re happy to see you') : '');
+    this.say(first, mode === 'date' ? (contact.upset ? 'They’re upset with you' : bump ? `You ran into ${p.name}` : 'They’re happy to see you') : '');
     this.render();
     this.el.hidden = false;
   }
@@ -205,6 +209,15 @@ export class Dates {
         { id: 'explain', label: 'Explain what happened', base: 0 },
         { id: 'brush', label: 'Brush it off', base: 0 },
       ];
+      if (c.bump) {
+        // ran into each other: catch up, maybe make plans, then get on with your evenings
+        const b = [{ id: 'day', label: 'Ask what brings them here', base: 6 }, { id: 'share', label: 'Tell them what you’re up to', base: 6 }, { id: 'dtease', label: '“Following me, are you?”', base: 6 }];
+        b.push({ id: 'plan', label: ct.partner ? 'Plan something for the weekend' : 'Ask them out properly, a real date', base: 8, min: 15 });
+        const gift = ['gajra', 'shrewsbury', 'barfi', 'bakarwadi', 'book', 'roses'].find(id => L.has(id));
+        if (gift && !c.used.gift) b.push({ id: 'gift', label: `Give them the ${gift === 'gajra' ? 'gajra' : gift === 'book' ? 'book' : gift === 'roses' ? 'roses' : 'sweets'}`, base: 12, gift });
+        b.push({ id: 'bye', label: 'See you around', base: 0 });
+        return b;
+      }
       o.push({ id: 'day', label: 'Ask about their day', base: 6 });
       if (ct.partner) o.push({ id: 'miss', label: 'Tell them you missed them', base: 8 });
       o.push({ id: 'share', label: 'Tell them something real about yourself', base: 8, min: 15 });
@@ -561,13 +574,14 @@ export class Dates {
     // your seat: the one kept free at their table, nearest to them
     const mine = pick ? pick.filter(q => q !== seat && !q.used).sort((a, b) => Math.hypot(a.x - seat.x, a.z - seat.z) - Math.hypot(b.x - seat.x, b.z - seat.z))[0] : null;
     if (p && mine) p.dateSeat = mine;
-    if (p) { const cm = castByName(d.ct.name, d.ct.female); if (cm) { castAs(p, cm, G.W.kit); G.interiors.markHearts?.(G.interiors.cur.R); } p.name = d.ct.name; p.interest = 60; p.prof = { lang: d.ct.lang || 'en', vibe: d.ct.vibe || 'chill', likes: d.ct.likes, job: d.ct.job ?? 0, area: d.ct.area ?? 0, picky: 0.4, known: { job: true, likes: true, area: true, vibe: true }, asked: { ask_job: 1, ask_area: 1, ask_fun: 1 } }; p.dateWith = true; d.ct.dateNow = true; }
+    if (p) { const cm = castByName(d.ct.name, d.ct.female); if (cm) castAs(p, cm, G.W.kit); p.name = d.ct.name; p.interest = 60; p.prof = { lang: d.ct.lang || 'en', vibe: d.ct.vibe || 'chill', likes: d.ct.likes, job: d.ct.job ?? 0, area: d.ct.area ?? 0, picky: 0.4, known: { job: true, likes: true, area: true, vibe: true }, asked: { ask_job: 1, ask_area: 1, ask_fun: 1 } }; p.dateWith = true; d.ct.dateNow = true; G.interiors.markHearts?.(G.interiors.cur.R); }   // the heart goes on once they're who they are
     G.hud.toast(`${d.ct.name} is here`, 'At a table. Go and say hi (F)', 'good', 3);
   }
   close(bye, keepDancing) {
     const G = this.g, c = this.cur;
     if (!c) return;
-    if (c.mode === 'date') {
+    if (c.mode === 'date' && c.bump) { c.contact.lastSeen = G.clock || 0; c.contact.missed = false; }
+    else if (c.mode === 'date') {
       const ct = c.contact;
       if (bye) this.say(this.line(c.p, 'date_bye'));
       ct.dateNow = false; c.p.walkedOff = true; ct.lastSeen = G.clock || 0; ct.missed = false;
