@@ -101,6 +101,7 @@ export function groundMaterial(T) {
       }
       float macro = mix(0.86, 1.1, nhFbm(vWP.xz * 0.045 + 3.0));
       vec3 col = alb.rgb * macro;
+      if (hillT < 0.5 && baseL > 4.5 && baseL < 5.5) col *= vec3(0.74, 1.06, 0.62);   // lawns and parks: green after the monsoon
       if (hillT > 0.5) {                               // golden October grass, greener in the folds, a rust tint on the bare ground
         float dry = smoothstep(0.3, 0.75, nhFbm(vWP.xz * 0.006 + 9.0));
         col *= mix(vec3(0.98, 1.04, 0.86), vec3(1.16, 1.02, 0.72), dry);
