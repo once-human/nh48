@@ -446,7 +446,7 @@ export class HUD {
     this.root.appendChild(p);
     this.pause = p;
     p.addEventListener('click', (e) => { if (e.target === p) this.game.togglePause(false); });
-    p.querySelector('#p-resume').onclick = () => { this.game.togglePause(false); this.game.lockMouse?.(); this.game.goFullscreen?.(); };
+    p.querySelector('#p-resume').onclick = () => { this.game.goFullscreen?.(); this.game.togglePause(false); };
     p.querySelector('#p-map').onclick = () => { this.game.togglePause(false); this.game.toggleMap(true); };
     p.querySelector('#p-share').onclick = async () => {
       const text = 'I\u2019m driving around Pune in my browser. FC Road, Shaniwar Wada, Parvati, autos on the meter.', url = 'https://nh48.vercel.app';

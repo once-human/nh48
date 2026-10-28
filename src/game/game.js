@@ -181,6 +181,7 @@ export class Game {
       if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space') && !(this.hud.pickerOpen)) this.begin();
     });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'play') this.togglePause(true); });
+    document.addEventListener('fullscreenchange', () => { this._fsT = performance.now(); });
     // drag on the canvas orbits the camera a little
     const cv = this.renderer.domElement;
     let drag = null;
@@ -199,7 +200,8 @@ export class Game {
       this.hud.setLockHint?.(this.state === 'play' && !locked());
       // Esc released the mouse during play: that's a pause, like any game. Esc that closed a shop
       // or the jhola only closes it; the next key you press takes the mouse back.
-      const fromMenu = performance.now() - (this._menuT || 0) < 450;
+      // going full screen, or coming back from the pause menu, can drop the mouse for a moment: that's no pause
+      const fromMenu = performance.now() - (this._menuT || 0) < 450 || performance.now() - (this._resumeT || 0) < 1500 || performance.now() - (this._fsT || 0) < 1500;
       // the browser eats Esc to release the mouse, so inside a shop or the jhola that release IS the Esc
       if (!locked() && this.state === 'shop' && !this._unlockOk) { this.closeMenus(); this._menuT = performance.now(); }
       else if (!locked() && this.state === 'play' && !this._unlockOk && !fromMenu) this.togglePause(true);
@@ -373,7 +375,7 @@ export class Game {
     const to = force !== undefined ? force : this.state !== 'pause';
     if (to && this.state === 'play') { this._pausedAt = performance.now(); this.state = 'pause'; this.pauseFrames = 0; this.renderer.domElement.classList.add('paused'); this.hud.setLockHint?.(false); this.hud.pause.hidden = false; this.hud.syncPause(); this.audio.updateEngine(0, 0, false); this.audio.playerHorn(false); this.audio.hush(true); }
     else if (!to && this.state === 'pause') {
-      this.state = 'play'; this.livePause = false; this.hud.pause.hidden = true; this.audio.hush(false); this.renderer.domElement.classList.remove('paused');
+      this.state = 'play'; this._resumeT = performance.now(); this.livePause = false; this.hud.pause.hidden = true; this.audio.hush(false); this.renderer.domElement.classList.remove('paused');
       try { this.lockMouse?.(); } catch (e) { /* the next click takes the mouse */ }
       if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     }
