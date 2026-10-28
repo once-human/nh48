@@ -292,6 +292,25 @@ export class Game {
     this.saveStats();
   }
 
+  // a floating marker over your auto until you first get in it
+  autoMarkerTick(dt) {
+    const P = this.player;
+    if (this.findAuto && !P.onFoot && P.cur === P.auto) {
+      this.findAuto = false;
+      const dd = P.dropped && P.dropped.find(q => q.veh === P.auto); if (dd) dd.safe = false;
+      this.hud.toast('Your auto', 'On the meter whenever you drive it: people waving show up green on the map', 'meter', 4);
+    }
+    if (!this.findAuto) { if (this._mk) this._mk.visible = false; return; }
+    if (!this._mk) {
+      const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.95, depthTest: false });
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.8, 4), m); cone.rotation.x = Math.PI; g.add(cone);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.06, 6, 24), m); ring.rotation.x = Math.PI / 2; ring.position.y = -0.7; g.add(ring);
+      g.renderOrder = 999; g.traverse(o => { o.renderOrder = 999; });
+      this.scene.add(g); this._mk = g;
+    }
+    const A = P.auto, t = performance.now() / 1000;
+    this._mk.visible = true; this._mk.position.set(A.x, 3.4 + Math.sin(t * 2.4) * 0.18, A.z); this._mk.rotation.y = t * 1.6;
+  }
   wadaStart() {
     const W = this.W, L = W.landmarks && W.landmarks.find(l => l.id === 'shaniwar');
     if (!L) return null;
@@ -363,7 +382,10 @@ export class Game {
         const c = Math.cos(L.rot), s = Math.sin(L.rot), P = (u, v) => [L.x + u * c + v * s, L.z + u * s - v * c];
         const [gx, gz] = P(2.7, -83), [x, z] = P(-4, -112);
         try { this.player.teleportFoot(x, z, Math.atan2(gz - z, gx - x), this.traffic); this.rig.inited = false; } catch (e) { /* stay in the auto */ }
-        this.later(1.2, () => this.hud.toast('Shaniwar Wada', 'Seat of the Peshwas, 1732. Tickets ₹25 at the window by the gate. Your auto is on the road behind you', 'info', 5.5));
+        const dd = this.player.dropped && this.player.dropped.find(q => q.veh === this.player.auto);
+        if (dd) dd.safe = true;
+        this.findAuto = true;
+        this.hud.intro?.(this.free);
       }
     }
     this.goFullscreen();
@@ -773,6 +795,7 @@ export class Game {
   frame(dt) {
     const P = this.player;
     if (this.state === 'photo') this.photo.update(dt);
+    this.autoMarkerTick(dt);
     if (this.state === 'play') { this.hour = (this.hour + dt * this.timeScale) % 24; this.clock += dt * this.timeScale; }
     // shop panels, the jhola and conversations keep the mouse (they're all number keys and arrows);
     // the pause menu, the map and the title get the cursor

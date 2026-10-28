@@ -571,7 +571,7 @@ export class Police {
     if ((this._twT = (this._twT || 0) - dt) > 0) return;
     this._twT = 1;
     for (const d of [...P.dropped]) {
-      if (d.towed) continue;
+      if (d.towed || d.safe) continue;            // safe: the parking spot by Shaniwar Wada you start from
       const v = d.veh;
       const far = Math.hypot(v.x - P.x, v.z - P.z) > 75;
       let illegal = false;

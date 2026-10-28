@@ -632,6 +632,18 @@ export class HUD {
     else g.city.pump(1.5);
   }
 
+  // the first minute: a card over a blurred city, then out of your way
+  intro(free) {
+    let el = this.$('h-intro');
+    if (!el) { el = el2('div', 'intro-card'); el.id = 'h-intro'; this.root.appendChild(el); }
+    el.innerHTML = `<div class="ic-k">${free ? 'Free roam' : 'Story'} · Pune</div><b>Shaniwar Wada</b><p>Seat of the Peshwas, 1732. You're in the garden in front of the Delhi Darwaza.</p>
+      <ul><li><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> walk, mouse to look</li><li>Your auto is parked by the garden: follow the <i class="ic-dot"></i> marker, <span class="kbd">F</span> to get in</li><li>Tickets for the Wada ₹25 at the window by the gate</li></ul><small>Any key to start</small>`;
+    el.hidden = false; this.root.classList.add('intro');
+    const close = () => { el.hidden = true; this.root.classList.remove('intro'); window.removeEventListener('keydown', k, true); clearTimeout(tm); };
+    const k = (e) => { if (e.code !== 'Escape') close(); };
+    setTimeout(() => window.addEventListener('keydown', k, true), 600);
+    const tm = setTimeout(close, 12000);
+  }
   toast(main, sub = '', kind = 'info', life = 3) {
     const t = el('div', 'glass toast ' + kind, `<div class="tt-main"></div>${sub ? '<div class="tt-sub"></div>' : ''}`);
     t.querySelector('.tt-main').textContent = main;
@@ -845,3 +857,5 @@ export class HUD {
   }
 }
 
+
+function el2(tag, cls) { const e = document.createElement(tag); e.className = cls; return e; }
