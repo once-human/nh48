@@ -145,7 +145,7 @@ export class HUD {
         <div class="pz-l">
           <div class="ttl-brand">${STONE}<b>NH48</b><span>Pune <span lang="mr">पुणे</span></span></div>
           <div class="pz-head ttl-head"><span class="pz-k">An open-world game</span><b>Pune</b><span class="ttl-mr" lang="mr">पुणे</span>
-            <p class="ttl-sub">Peths at noon, Koregaon Park at midnight. Drive an auto on the meter, eat your way down FC Road, fall for someone at a Baner café, and try not to get towed. The city has its rules: shops shut at night, chai is ₹10 and the traffic cop has seen it all.</p></div>
+            <p class="ttl-sub">Start at Shaniwar Wada. Run an auto on the meter, misal on FC Road, a date in Baner. Shops shut 1 to 4, obviously.</p></div>
           <nav class="pz-menu">
             <button class="pz-i sel" id="t-roam">Start</button>
             <button class="pz-i" id="t-who">New character</button>
@@ -156,7 +156,7 @@ export class HUD {
           <div class="t-stats" id="t-stats"></div>
         </div>
         <div class="pz-r"></div>
-        <div class="pz-keys"><span class="ttl-fine">Map data © OpenStreetMap contributors, Overture Maps Foundation. Every business is a parody.</span><span><span class="kbd">W</span><span class="kbd">S</span> Select</span><span><span class="kbd">Enter</span> Go</span></div>
+        <div class="pz-keys"><span class="ttl-fine">Map data © OpenStreetMap contributors, Overture Maps Foundation. Chains appear as parodies.</span><span><span class="kbd">W</span><span class="kbd">S</span> Select</span><span><span class="kbd">Enter</span> Go</span></div>
       </div>`;
     this.root.appendChild(t);
     this.title = t;
