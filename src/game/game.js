@@ -28,6 +28,7 @@ import { Bag } from './bag.js';
 import { Phone } from './phone.js';
 import { Patya } from './patya.js';
 import { Eggs } from './eggs.js';
+import { Story } from './story.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { StreetApproach } from './approach.js';
@@ -149,6 +150,7 @@ export class Game {
     this.phone = new Phone(this);
     this.patya = new Patya(this);
     this.eggs = new Eggs(this);
+    this.story = new Story(this);
     this.lights = new Lights(this);
     this.strays = new Strays(this);
     this.interiors = new Interiors(this);
@@ -667,6 +669,8 @@ export class Game {
   objective() {
     const r = this.rides, P = this.player;
     if (P.tipped) return { main: 'Auto tipped over!', sub: 'Hold on… getting it back on three wheels', urgent: true };
+    const so = this.story && this.story.objective();
+    if (so && !(r.current && r.current.state === 'onboard')) return so;
     const hj = this.hustle && this.hustle.objective();
     if (hj) return hj;
     const gj = this.gigs && this.gigs.objective();
@@ -674,7 +678,7 @@ export class Game {
     const veh = !P.onFoot ? P.cur : null;
     if (veh && veh.fuel !== undefined && veh.fuel <= 0) return { main: 'Out of fuel', sub: 'Crawl to a pump (on the map), or call roadside help from the backpack', urgent: true };
     // free roam: a short hint at the start, then a clean screen
-    if (!r.enabled) return this.t - (this.playT0 || 0) < 6 ? { main: this.free ? 'Free roam' : 'Pune', sub: this.free ? 'No cops, unlimited cash · Esc for the time of day · M to go anywhere' : 'Esc for menu · M for map' } : { main: '', sub: '' };
+    if (!r.enabled) return this.t - (this.playT0 || 0) < 6 ? { main: this.free ? 'Free roam' : 'Pune', sub: this.free ? 'No cops, unlimited cash · [ ] time of day · M to go anywhere' : 'Esc for menu · M for map' } : { main: '', sub: '' };
     const c = r.current;
     if (c && c.state === 'boarding') return { main: `${c.name} is getting in…`, sub: '' };
     if (c && c.state === 'onboard') {
@@ -842,6 +846,7 @@ export class Game {
       this.strays.update(dt);
       this.patya.update(dt);
       this.eggs.update(dt);
+      this.story.update(dt);
       this.rig.drunk = this.life.s.drunk;
       if (this.post) this.post.drunk = this.interiors.inside && this.interiors.cur.R.tpl === 'club' ? Math.min(this.life.s.drunk, 0.5) : this.life.s.drunk;
       this.hud.lowHealth?.((P.hp ?? 100) / this.life.hpMax);
