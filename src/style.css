@@ -1270,3 +1270,15 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .pz-i.pz-q em { position: absolute; top: 7px; right: 9px; font: 700 10px var(--font-ui); font-style: normal; color: rgba(245, 245, 247, .45); }
 .pz-i.pz-q:hover, .pz-i.pz-q.sel { transform: translateY(-2px); background: var(--acc); color: #0b0b0d; box-shadow: 0 10px 24px rgba(0, 0, 0, .35); }
 .pz-i.pz-q.sel em, .pz-i.pz-q:hover em { color: rgba(11, 11, 13, .55); }
+
+/* free roam: its own look; a teal accent, no wallet, no needs, no heat, no shift; just where you are and the time */
+#ui.free { --acc: #3ee0c5; }
+#ui.free #h-money, #ui.free .money, #ui.free #h-rides, #ui.free #h-dues, #ui.free #h-lic, #ui.free #h-vit, #ui.free #h-heat, #ui.free .obj, #ui.free .zone { display: none !important; }
+#ui.free .loc-time #h-mode { color: #0b0b0d; background: #3ee0c5; padding: 2px 9px; border-radius: 999px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-size: .82em; }
+#ui.free .loc-area .tick { background: #3ee0c5; }
+
+.free-tips { display: none; position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px;
+  background: rgba(8, 10, 12, .5); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: inset 0 0 0 1px rgba(62, 224, 197, .3); font: 600 12px var(--font-ui); color: rgba(245, 245, 247, .75); pointer-events: none; white-space: nowrap; }
+.free-tips i { width: 4px; height: 4px; border-radius: 50%; background: #3ee0c5; margin: 0 8px; }
+#ui.free.playing .free-tips { display: flex; }
+#ui.free.photo .free-tips, #ui.free.intro .free-tips { display: none; }

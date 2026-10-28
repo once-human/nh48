@@ -62,6 +62,7 @@ export class HUD {
   build() {
     const R = this.root;
     this.scrim = el('div', 'scrim');
+    R.appendChild(el('div', 'free-tips', '<span class="kbd">[</span><span class="kbd">]</span> time of day<i></i><span class="kbd">K</span> photo<i></i><span class="kbd">M</span> map<i></i><span class="kbd">Esc</span> pause'));
     this.loc = el('div', 'h loc', `
       <div class="loc-area cap"><i class="tick"></i><span id="h-area">Deccan</span></div>
       <div class="loc-street" id="h-street">FC Road</div>
@@ -519,11 +520,12 @@ export class HUD {
     this.setMode();
   }
   setMode() { this.$('h-mode').textContent = this.game.free ? 'Free roam' : this.game.rides && this.game.rides.enabled ? 'On shift' : 'On foot in Pune'; }
-  setFree(on) { this.setMode(); const g = this.pause && this.pause.querySelector('#p-time-g'); if (g) g.hidden = !on; }
+  setFree(on) { this.root.classList.toggle('free', !!on); this.setMode(); const g = this.pause && this.pause.querySelector('#p-time-g'); if (g) g.hidden = !on; }
 
   // ---------------------------------------------------------------- per frame
   update(dt) {
     const g = this.game, p = g.player;
+    const pl = g.state === 'play'; if (pl !== this._pl) { this._pl = pl; this.root.classList.toggle('playing', pl); }
     // vehicle cluster only while driving
     const foot = !!p.onFoot;
     this.dash.classList.toggle('foot', foot);
