@@ -37,6 +37,13 @@ export const SW = (() => {
     bastions: [[-6.7, -84.4, 4.4, 15], [12.4, -83.9, 4.6, 15], [71.9, -80.3, 6.9, 13], [74.2, 4.6, 6.0, 12.6], [70.3, 81.8, 5.6, 12.6], [-73.6, 81.8, 6.5, 13], [-75.9, -9.3, 4.8, 12.6], [-73.4, -81.5, 6.1, 13]],
     plinths: [[-34, -52, 36, 28], [38, -52, 34, 28], [-34, 1, 36, 32], [38, 1, 34, 32], [-34, 54, 36, 30], [38, 54, 34, 30]],
     karanje: [GU, -26], counter: [GU - 13, GV - 6], plaque: [GU + 13, GV - 5.5],
+    // the hawkers outside the gate: [u, v, key, name, mr, price, note, colour]
+    vendors: [[GU - 24, GV - 14, 'bhel', 'Bhel', 'भेळ', 40, 'Puffed rice, sev, chutney, a paper cone', [0.85, 0.2, 0.12]],
+      [GU - 26, GV - 24, 'vadapav', 'Vada pav', 'वडापाव', 20, 'With the dry garlic chutney', [0.95, 0.6, 0.1]],
+      [GU + 24, GV - 14, 'chai', 'Amruttulya chai', 'अमृततुल्य चहा', 15, 'Cutting, strong, sweet', [0.55, 0.3, 0.12]],
+      [GU + 26, GV - 24, 'butta', 'Bhutta', 'भाजलेलं कणीस', 40, 'Roasted corn, lime and chilli', [0.9, 0.75, 0.15]],
+      [GU - 28, GV - 34, 'ganne', 'Sugarcane juice', 'उसाचा रस', 30, 'Pressed while you wait, with ginger', [0.3, 0.6, 0.2]],
+      [GU + 28, GV - 34, 'kulfi', 'Kulfi', 'कुल्फी', 50, 'Malai kulfi on a stick', [0.95, 0.9, 0.8]]],
     isGateSeg: (a, b) => Math.abs(a[1] - GV) < 0.3 && Math.abs(b[1] - GV) < 0.3 && Math.min(a[0], b[0]) > -3 && Math.max(a[0], b[0]) < 8.5,
   };
 })();
@@ -379,6 +386,15 @@ const BUILD = {
       B.board(pu + 3.2, 1.75, pv - 0.08, 1.3, 0.62, (x, w, h) => { x.fillStyle = '#f6f3ea'; x.fillRect(0, 0, w, h); x.strokeStyle = '#9b1c1c'; x.lineWidth = h * 0.05; x.strokeRect(h * 0.05, h * 0.05, w - h * 0.1, h - h * 0.1);
         x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#9b1c1c'; x.font = `800 ${h * 0.24}px Mukta, sans-serif`; x.fillText('रात्री १२ नंतर', w / 2, h * 0.32);
         x.fillStyle = '#1a1a1a'; x.fillText('येथे थांबू नये.', w / 2, h * 0.62); x.font = `600 ${h * 0.1}px Inter, sans-serif`; x.fillStyle = '#555'; x.fillText('(do not linger here after midnight)', w / 2, h * 0.86); }, 'sw-patya'); }
+    // the hawkers' carts: a painted body, bicycle wheels, a striped umbrella, the name on a board
+    for (const [vu, vv, key, name, mr, price, , col] of W.vendors) {
+      B.cbox(vu, 0.55, vv, 2.0, 0.7, 1.05, col); B.cbox(vu, 1.25, vv, 2.1, 0.06, 1.15, [0.75, 0.74, 0.7]);
+      for (const sd of [-1, 1]) B.part(geo('cartwheel', () => { const g = new THREE.TorusGeometry(0.32, 0.04, 6, 16); return g; }), vu + sd * 0.7, 0.36, vv + 0.56, C.dark, 0);
+      B.cyl(vu, 1.3, vv, 0.03, 1.4, C.iron, 5); B.cone(vu, 2.62, vv, 1.25, 0.45, ({ bhel: [0.85, 0.15, 0.15], vadapav: [0.1, 0.35, 0.75], chai: [0.95, 0.85, 0.2], butta: [0.2, 0.55, 0.25], ganne: [0.95, 0.5, 0.1], kulfi: [0.9, 0.3, 0.45] })[key], 8);
+      B.board(vu, 1.55, vv - 0.6, 1.5, 0.4, (x, w, h) => { x.fillStyle = '#f7f1e3'; x.fillRect(0, 0, w, h); x.fillStyle = '#9b1c1c'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.font = `800 ${h * 0.42}px Mukta, sans-serif`; x.fillText(mr, w * 0.5, h * 0.36); x.fillStyle = '#1a1a1a'; x.font = `700 ${h * 0.26}px Inter, sans-serif`; x.fillText(`${name} · ₹${price}`, w * 0.5, h * 0.76); }, 'sw-v-' + key);
+      B.hitBox(vu, vv, 2.1, 1.2);
+    }
     // collision: the rampart all round, the gate shut except the wicket
     for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length]; if (W.isGateSeg(a, b)) continue; B.hit(...a, ...b); }
     B.hit(gu - gw / 2 - 0.3, gv, gu + gw / 2 + 0.3, gv);

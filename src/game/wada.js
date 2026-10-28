@@ -27,6 +27,7 @@ export class Wada {
   near(x, z) {
     if (!this.L) return null;
     if (Math.hypot(x - this.counter.x, z - this.counter.z) < 3.2) return { kind: 'wada', act: 'ticket', name: 'Shaniwar Wada tickets', x: this.counter.x, z: this.counter.z };
+    for (const V of SW.vendors) { const q = this.P(V[0], V[1] - 1.2); if (Math.hypot(x - q.x, z - q.z) < 2.4) return { kind: 'wada', act: 'vendor', V, name: V[3], x: q.x, z: q.z }; }
     const [u, v] = this.local(x, z);
     if (Math.abs(u - SW.GU) < 4.5 && v > SW.GV - 4 && v < SW.GV + 0.5) { const g = this.P(SW.WU, SW.GV - 1); return { kind: 'wada', act: 'in', name: 'Delhi Darwaza', x: g.x, z: g.z }; }
     if (Math.abs(u - SW.GU) < 4.5 && v > SW.GV + 8.5 && v < SW.GV + 13) { const g = this.P(SW.GU, SW.GV + 10); return { kind: 'wada', act: 'out', name: 'Delhi Darwaza', x: g.x, z: g.z }; }
@@ -35,12 +36,22 @@ export class Wada {
   label(n) {
     if (n && n.act === 'in') return !this.isOpen() ? 'Delhi Darwaza · Shut for the night · opens 8 am' : this.hasTicket() ? 'Go in through the Delhi Darwaza · F' : `Delhi Darwaza · Ticket first, ${fmt(PRICE)} at the window on the left`;
     if (n && n.act === 'out') return 'Leave by the Delhi Darwaza · F';
+    if (n && n.act === 'vendor') return this.g.hour >= 8 && this.g.hour < 22.5 ? `${n.V[3]} · ${fmt(n.V[5])} · F` : `${n.V[3]} · packed up for the night`;
     if (!this.isOpen()) return 'Shaniwar Wada · Ticket window shut · opens 8 am';
     if (this.hasTicket()) return 'You have your ticket · walk in by the small door in the gate';
     return `Buy a ticket for Shaniwar Wada · ${fmt(PRICE)} · F`;
   }
   use(n) {
     const G = this.g, P = G.player;
+    if (n && n.act === 'vendor') {
+      const [, , key, name, , price, note] = n.V;
+      if (!(G.hour >= 8 && G.hour < 22.5)) { G.hud.toast('Packed up', 'The carts are back at 8 in the morning', 'info', 2); return; }
+      if (!G.shops.spend(price)) { G.hud.toast('Not enough cash', `${name} is ${fmt(price)}`, 'warn', 2); return; }
+      const fx = { bhel: { hunger: 0.25, mood: 0.04 }, vadapav: { hunger: 0.32 }, chai: { thirst: 0.12, energy: 0.08, mood: 0.05 }, butta: { hunger: 0.2, mood: 0.03 }, ganne: { thirst: 0.35, energy: 0.05 }, kulfi: { mood: 0.1, thirst: 0.05 } }[key] || {};
+      G.life.apply && G.life.apply(fx);
+      G.hud.toast(name, `${note} · ${fmt(price)}`, 'good', 2.4);
+      return;
+    }
     if (n && n.act === 'out') { const o = this.P(SW.WU, SW.GV - 2.4), f = this.P(SW.WU, SW.GV - 20); P.teleportFoot(o.x, o.z, Math.atan2(f.z - o.z, f.x - o.x), G.traffic); G.rig.inited = false; return; }
     if (n && n.act === 'in') {
       if (!this.isOpen()) { G.hud.toast('Band aahe, udya ya', 'Shaniwar Wada is open 8 am to 6:30 pm', 'warn', 2.6); return; }
@@ -80,6 +91,15 @@ export class Wada {
       this.remove(p); p.wadaIn ? extraIn-- : extraOut--;
     }
     if (open && (!this.guard || !G.people.list.includes(this.guard))) this.spawnGuard();
+    const carts = G.hour >= 8 && G.hour < 22.5;
+    this.vendors = (this.vendors || []).filter(p => G.people.list.includes(p));
+    if (carts && !this.vendors.length) for (const V of SW.vendors) {
+      const at = this.P(V[0] + 0.2, V[1] + 0.9), look = this.P(V[0], V[1] - 4);
+      const p = this.person(at.x, at.z, { mode: 'stand', female: Math.random() < 0.3 });
+      if (!p) continue;
+      p.fixed = true; p.anchor = { x: at.x, z: at.z, fx: look.x, fz: look.z }; p.wait = 1e9; p.idle = 'idle'; this.vendors.push(p);
+    }
+    if (!carts && this.vendors.length) { for (const p of this.vendors) this.remove(p); this.vendors = []; }
     if (!open && this.guard) { this.remove(this.guard); this.guard = null; }
   }
   // after midnight, by the Delhi Darwaza: Pune's oldest ghost story. Young Peshwa Narayanrao was killed in the
