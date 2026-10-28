@@ -354,7 +354,7 @@ export class Shops {
     if (!this.near || this.open) return false;
     this.scanT = 0;                  // look again next frame: what's in front of you has changed
     if (this.near.kind === 'animal') { this.g.strays.interact(this.near.a); this.scanT = 0.5; return true; }
-    if (this.near.kind === 'wada') { this.g.wada.use(); this.scanT = 0.5; return true; }
+    if (this.near.kind === 'wada') { this.g.wada.use(this.near); this.scanT = 0.5; return true; }
     if (this.near.kind === 'metro' || this.near.kind === 'bus') { this.g.transit.show(this.near); return true; }
     const I = this.g.interiors;
     if (this.near.kind === 'ispot') { I.use(this.near.s); this.scanT = 0.3; return true; }
@@ -375,7 +375,7 @@ export class Shops {
     if (!n) return null;
     if (n.kind === 'property') return this.g.props.label(n.prop);
     if (n.kind === 'animal') return this.g.strays.label(n.a);
-    if (n.kind === 'wada') return this.g.wada.label();
+    if (n.kind === 'wada') return this.g.wada.label(n);
     if (n.kind === 'metro' || n.kind === 'bus') return this.g.transit.label(n);
     if (n.kind === 'ispot') return n.s.label;
     const oh = n.door && openNow(n, this.g.hour);

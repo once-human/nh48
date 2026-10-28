@@ -113,8 +113,8 @@ class LB {
     const [x, z] = this.P(u, v);
     this.cb.addGeo(g, compose(x, this.Y0 + y, z, -this.L.rot + yaw, sx, sy, sz, 0, 0, this.mm), col, glow);
   }
-  cbox(u, y, v, w, h, d, col, yaw = 0, glow = 0) { this.part(geo('box', () => new THREE.BoxGeometry(1, 1, 1)), u, y + h / 2, v, col, yaw, w, h, d, glow); }
-  cyl(u, y, v, r, h, col, n = 12, glow = 0) { this.part(geo('cyl' + n, () => new THREE.CylinderGeometry(1, 1, 1, n)), u, y + h / 2, v, col, 0, r, h, r, glow); }
+  cbox(u, y, v, w, h, d, col, yaw = 0, glow = 0) { if (y <= 0.6 && h > 1.8 && w < 1.6 && d < 1.6 && this.col) this.hitc(u, v, Math.max(w, d) / 2 + 0.05); this.part(geo('box', () => new THREE.BoxGeometry(1, 1, 1)), u, y + h / 2, v, col, yaw, w, h, d, glow); }
+  cyl(u, y, v, r, h, col, n = 12, glow = 0) { if (y <= 0.6 && h > 1.8 && r < 0.9 && this.col) this.hitc(u, v, r + 0.05); this.part(geo('cyl' + n, () => new THREE.CylinderGeometry(1, 1, 1, n)), u, y + h / 2, v, col, 0, r, h, r, glow); }
   cone(u, y, v, r, h, col, n = 12, glow = 0) { this.part(geo('cone' + n, () => new THREE.ConeGeometry(1, 1, n)), u, y + h / 2, v, col, 0, r, h, r, glow); }
   dome(u, y, v, r, h, col, n = 14, glow = 0) { this.part(geo('dome' + n, () => new THREE.SphereGeometry(1, n, 8, 0, Math.PI * 2, 0, Math.PI / 2)), u, y, v, col, 0, r, h, r, glow); }
   sphere(u, y, v, r, col, glow = 0) { this.part(geo('sph', () => new THREE.SphereGeometry(1, 12, 8)), u, y, v, col, 0, r, r, r, glow); }
@@ -127,6 +127,12 @@ class LB {
   // collision: a wall segment, a circle
   hit(ua, va, ub, vb) { const [ax, az] = this.P(ua, va), [bx, bz] = this.P(ub, vb); this.col.push(['s', ax, az, bx, bz]); }
   hitc(u, v, r) { const [x, z] = this.P(u, v); this.col.push(['c', x, z, r]); }
+  hitk(ua, va, ub, vb, kind) { const [ax, az] = this.P(ua, va), [bx, bz] = this.P(ub, vb); this.col.push(['s', ax, az, bx, bz, kind]); }
+  // walkable surfaces up off the ground (a plinth's top, a ramp of steps, the rampart walk): heights in the
+  // landmark's own frame, turned into Surfaces.height lookups once (addLandmarks)
+  deckRect(u, v, w, d, h) { (this.decks || (this.decks = [])).push({ t: 'rect', u, v, w, d, h }); }
+  deckRamp(u0, v0, u1, v1, w, h0, h1) { (this.decks || (this.decks = [])).push({ t: 'ramp', u0, v0, u1, v1, w, h0, h1 }); }
+  deckBand(ring, inner, h, skip) { (this.decks || (this.decks = [])).push({ t: 'band', ring, inner, h, skip }); }
   hitBox(u, v, w, d) { const h = [[u - w / 2, v - d / 2], [u + w / 2, v - d / 2], [u + w / 2, v + d / 2], [u - w / 2, v + d / 2]]; for (let i = 0; i < 4; i++) this.hit(...h[i], ...h[(i + 1) % 4]); }
   // merlons along a local polyline
   merlons(pts, y, col, every = 2.3, w = 1.2, h = 0.95, t = 0.7, closed = true) {
@@ -270,7 +276,7 @@ const BUILD = {
     path(gu - 3, W.V0, gu + 3, W.V1);                                              // gate to the south wall
     for (const v of W.cross) path(W.U0 + 3, v - 2.5, W.U1 - 3, v + 2.5);
     path(W.U0, W.V0, W.U1, W.V0 + 3); path(W.U0, W.V1 - 3, W.U1, W.V1); path(W.U0, W.V0, W.U0 + 3, W.V1); path(W.U1 - 3, W.V0, W.U1, W.V1);
-    const plA = B.A(WL.rubble, STONE, 11, 2, 0.9), slab = B.A(WL.slab, T([0.62, 0.58, 0.52]));
+    const plA = B.A(WL.rubble, STONE, 11, 2, 0.9), slab = B.A(WL.sandstone, T([0.86, 0.8, 0.7]), 11, 2, 0.9);
     for (const [u, v, w, d] of W.plinths) {
       B.box(u, v, w, d, 0, 0.9, plA, slab);
       const cw = w * 0.42, cd = d * 0.42;
@@ -279,21 +285,28 @@ const BUILD = {
       // rooms: the courtyard's edge, the partitions out to the rim
       for (const [a, b, c2, d2] of [[-cw / 2, -cd / 2, cw / 2, -cd / 2], [cw / 2, -cd / 2, cw / 2, cd / 2], [cw / 2, cd / 2, -cw / 2, cd / 2], [-cw / 2, cd / 2, -cw / 2, -cd / 2],
         [-w / 2 + 0.3, -d / 2 + 0.3, w / 2 - 0.3, -d / 2 + 0.3], [w / 2 - 0.3, -d / 2 + 0.3, w / 2 - 0.3, d / 2 - 0.3], [w / 2 - 0.3, d / 2 - 0.3, -w / 2 + 0.3, d / 2 - 0.3], [-w / 2 + 0.3, d / 2 - 0.3, -w / 2 + 0.3, -d / 2 + 0.3]]) {
-        const L2 = Math.hypot(c2 - a, d2 - b); B.cbox(u + (a + c2) / 2, 0.9, v + (b + d2) / 2, L2 + 0.5, 0.5, 0.5, C.stone, Math.atan2(d2 - b, c2 - a));
+        const L2 = Math.hypot(c2 - a, d2 - b); B.cbox(u + (a + c2) / 2, 0.9, v + (b + d2) / 2, L2 + 0.5, 0.28, 0.5, C.stone, Math.atan2(d2 - b, c2 - a));
       }
       for (let k = -2; k <= 2; k++) {
         if (k === 0) continue;
         const fu = k / 2.5 * (w / 2), fv = k / 2.5 * (d / 2);
-        B.cbox(u + fu, 0.9, v - (d / 2 + cd / 2) / 2, 0.5, 0.5, (d - cd) / 2 - 0.3, C.stone); B.cbox(u + fu, 0.9, v + (d / 2 + cd / 2) / 2, 0.5, 0.5, (d - cd) / 2 - 0.3, C.stone);
-        B.cbox(u - (w / 2 + cw / 2) / 2, 0.9, v + fv * 0.6, (w - cw) / 2 - 0.3, 0.5, 0.5, C.stone); B.cbox(u + (w / 2 + cw / 2) / 2, 0.9, v + fv * 0.6, (w - cw) / 2 - 0.3, 0.5, 0.5, C.stone);
+        B.cbox(u + fu, 0.9, v - (d / 2 + cd / 2) / 2, 0.5, 0.28, (d - cd) / 2 - 0.3, C.stone); B.cbox(u + fu, 0.9, v + (d / 2 + cd / 2) / 2, 0.5, 0.28, (d - cd) / 2 - 0.3, C.stone);
+        B.cbox(u - (w / 2 + cw / 2) / 2, 0.9, v + fv * 0.6, (w - cw) / 2 - 0.3, 0.28, 0.5, C.stone); B.cbox(u + (w / 2 + cw / 2) / 2, 0.9, v + fv * 0.6, (w - cw) / 2 - 0.3, 0.28, 0.5, C.stone);
       }
       for (let i = 0; i < 6; i++) for (const sv of [-1, 1]) B.cbox(u - cw / 2 + (i + 0.5) * cw / 6, 0.9, v + sv * (cd / 2 - 0.6), 0.55, 0.45, 0.55, C.stone);   // column stumps
-      const su = u < gu ? u + w / 2 : u - w / 2;
-      for (let k = 0; k < 3; k++) B.cbox(su + (u < gu ? 0.4 + k * 0.4 : -0.4 - k * 0.4), k * 0.3, v, 0.4, 0.3, 4, C.stone);         // steps up from the path
+      // three solid steps up from the path side, the rest of the edge a low stone wall you can climb (Space)
+      const sgn = u < gu ? 1 : -1, su = u + sgn * w / 2;
+      for (let k = 0; k < 3; k++) B.cbox(su + sgn * (1.0 - k * 0.4), 0, v, 0.42, (k + 1) * 0.3, 4.2, C.stone);
+      B.deckRamp(su + sgn * 1.25, v, su, v, 4.2, 0.0, 0.9);
+      B.deckRect(u, v, w, d, 0.9);
+      const e0 = [u - w / 2, v - d / 2], e1 = [u + w / 2, v - d / 2], e2 = [u + w / 2, v + d / 2], e3 = [u - w / 2, v + d / 2];
+      B.hitk(...e0, ...e1, 5); B.hitk(...e2, ...e3, 5);
+      B.hitk(su, v - d / 2, su, v - 2.2, 5); B.hitk(su, v + 2.2, su, v + d / 2, 5);
+      const ou = u - sgn * w / 2; B.hitk(ou, v - d / 2, ou, v + d / 2, 5);
     }
     // Hazari Karanje: the sixteen-petal lotus fountain
     { const [u, v] = W.karanje, pts = []; for (let i = 0; i < 32; i++) { const r = i % 2 ? 4.4 : 6.6, a = i / 32 * 6.283; pts.push([u + Math.cos(a) * r, v + Math.sin(a) * r]); }
-      B.ring(pts, 0, 0.75, B.A(WL.rubble, STONE, 11, 2, 0.75)); B.ground(pts, 0.6, GL.concrete, 0.8); B.cyl(u, 0.62, v, 3.6, 0.05, C.water, 20);
+      B.ring(pts, 0, 0.75, B.A(WL.rubble, STONE, 11, 2, 0.75)); B.ring(pts, 0, 0.75, B.A(WL.rubble, STONE, 11, 2, 0.75), true); B.ground(pts, 0.6, GL.concrete, 0.8); B.cyl(u, 0.62, v, 3.6, 0.05, C.water, 20);
       B.cyl(u, 0.6, v, 0.55, 1.3, C.stone, 8); B.cone(u, 1.9, v, 0.5, 0.6, C.stone, 8); B.hitc(u, v, 6); }
     // big old trees along the walls
     for (const [u, v, r] of W.trees) {
@@ -328,8 +341,26 @@ const BUILD = {
         x.fillStyle = '#1a1a1a'; x.fillText('येथे थांबू नये.', w / 2, h * 0.62); x.font = `600 ${h * 0.1}px Inter, sans-serif`; x.fillStyle = '#555'; x.fillText('(do not linger here after midnight)', w / 2, h * 0.86); }, 'sw-patya'); }
     // collision: the rampart all round, the gate shut except the wicket
     for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length]; if (W.isGateSeg(a, b)) continue; B.hit(...a, ...b); }
-    B.hit(gu - gw / 2 - 0.3, gv, W.WU - 0.7, gv); B.hit(W.WU + 0.7, gv, gu + gw / 2 + 0.3, gv);
-    B.hit(W.WU - 0.7, gv, W.WU - 0.7, gv + 8.8); B.hit(W.WU + 0.7, gv, W.WU + 0.7, gv + 8.8);
+    B.hit(gu - gw / 2 - 0.3, gv, gu + gw / 2 + 0.3, gv);
+    B.hitBox(gu, gv + 4.4, gw + 0.6, 9);
+    // ---- the rampart walk: up two flights of stone steps inside the north wall, round the top of the walls,
+    // with the old cannons on their carriages looking out over the city
+    B.deckBand(ring, [[W.U0, W.V0], [W.U1, W.V0], [W.U1, W.V1], [W.U0, W.V1]], 10.6, [gu - gw / 2 - 0.5, gu + gw / 2 + 0.5, gv + 9.2]);
+    for (const sgn of [1, -1]) {
+      const ua = gu + sgn * 13, ub = gu + sgn * 43, vv = W.V0 + 1.7, n = 30;
+      for (let k = 0; k < n; k++) { const t = (k + 0.5) / n; B.cbox(ua + (ub - ua) * t, 0, vv, 1.02, 10.6 * (k + 1) / n, 3.2, C.stone); }
+      B.deckRamp(ua, vv, ub, vv, 3.2, 0, 10.6);
+      B.hitk(ua, vv + 1.6, ub, vv + 1.6, 5);
+    }
+    const cannon = (u, v, yaw) => {
+      const fx = Math.sin(yaw), fz = -Math.cos(yaw), at = (a, b) => [u + a * Math.cos(yaw) - b * Math.sin(yaw), v + a * Math.sin(yaw) + b * Math.cos(yaw)];
+      B.cbox(u, 10.6, v, 1.2, 0.55, 2.2, C.teak, yaw);
+      for (const sd of [-1, 1]) { const [wu, wv] = at(sd * 0.7, 0.3); B.part(geo('wheel', () => { const g = new THREE.CylinderGeometry(0.42, 0.42, 0.14, 14); g.rotateZ(Math.PI / 2); return g; }), wu, 10.95, wv, [0.28, 0.17, 0.09], yaw); }
+      B.part(geo('barrel', () => { const g = new THREE.CylinderGeometry(0.17, 0.26, 2.6, 12); g.rotateX(Math.PI / 2); return g; }), u + fx * 0.3, 11.35, v + fz * 0.3, [0.13, 0.13, 0.14], yaw);
+      void fx;
+    };
+    for (const u of [gu - 26, gu + 26, -52, 50]) cannon(u, -77.6, 0);
+    for (const v of [-45, 40]) { cannon(-69.8, v, -Math.PI / 2); cannon(66.2, v, Math.PI / 2); }
   },
 
   // Dagdusheth Halwai Ganpati: a white marble temple open to the street, gold everywhere, the idol lit inside
@@ -802,8 +833,30 @@ export function addLandmarks(W) {
     const B = new LB(L, { fb: nullB(), gb: nullB(), cb: nullB(), group: { add() {} }, mm: new THREE.Matrix4() });
     B.col = col;
     try { BUILD[L.id](B); } catch (e) { console.warn('landmark', L.id, e); }
-    for (const h of col) { if (h[0] === 's') collision.addSeg(h[1], h[2], h[3], h[4], 0); else collision.addCircle(h[1], h[2], h[3], 0); }
+    for (const h of col) { if (h[0] === 's') collision.addSeg(h[1], h[2], h[3], h[4], h[5] || 0); else collision.addCircle(h[1], h[2], h[3], 0); }
+    if (B.decks) for (const d of B.decks) addDeck(W, L, d);
   }
+}
+// a deck in world terms: a box to test first, then the height (above the landmark's base) or -1
+function addDeck(W, L, d) {
+  const c = Math.cos(L.rot), s = Math.sin(L.rot), base = BASE + (L.y || 0);
+  const loc = (x, z) => { const dx = x - L.x, dz = z - L.z; return [dx * c + dz * s, dx * s - dz * c]; };
+  let pts, h;
+  if (d.t === 'rect') { pts = [[d.u - d.w / 2, d.v - d.d / 2], [d.u + d.w / 2, d.v + d.d / 2]]; h = (u, v) => Math.abs(u - d.u) <= d.w / 2 && Math.abs(v - d.v) <= d.d / 2 ? d.h : -1; }
+  else if (d.t === 'ramp') {
+    const ax = d.u1 - d.u0, av = d.v1 - d.v0, L2 = ax * ax + av * av, len = Math.sqrt(L2);
+    pts = [[Math.min(d.u0, d.u1) - d.w, Math.min(d.v0, d.v1) - d.w], [Math.max(d.u0, d.u1) + d.w, Math.max(d.v0, d.v1) + d.w]];
+    h = (u, v) => { const t = ((u - d.u0) * ax + (v - d.v0) * av) / L2, off = Math.abs((u - d.u0) * av - (v - d.v0) * ax) / len; return t >= 0 && t <= 1 && off <= d.w / 2 ? d.h0 + (d.h1 - d.h0) * t : -1; };
+  } else {
+    pts = d.ring;
+    const inside = (u, v, r) => { let o = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [ui, vi] = r[i], [uj, vj] = r[j]; if ((vi > v) !== (vj > v) && u < (uj - ui) * (v - vi) / (vj - vi) + ui) o = !o; } return o; };
+    const [[a0, b0], , [a1, b1]] = d.inner;
+    h = (u, v) => (u > a0 && u < a1 && v > b0 && v < b1) || (d.skip && u > d.skip[0] && u < d.skip[1] && v < d.skip[2]) || !inside(u, v, d.ring) ? -1 : d.h;
+  }
+  let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+  const us = pts.map(q => q[0]), vs = pts.map(q => q[1]);
+  for (const u of [Math.min(...us), Math.max(...us)]) for (const v of [Math.min(...vs), Math.max(...vs)]) { const x = L.x + u * c + v * s, z = L.z + u * s - v * c; x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+  (W.surf.decks || (W.surf.decks = [])).push({ bb: [x0, z0, x1, z1], h: (x, z) => { const [u, v] = loc(x, z), y = h(u, v); return y < 0 ? -1 : base + y; } });
 }
 function nullB() { return { wall() {}, flat() {}, poly() {}, addGeo() {}, v() { return 0; }, i: [] }; }
 // build one landmark into a chunk's builders

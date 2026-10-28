@@ -25,15 +25,30 @@ export class Wada {
   // the ticket window, for the F prompt
   near(x, z) {
     if (!this.L) return null;
-    return Math.hypot(x - this.counter.x, z - this.counter.z) < 3.2 ? { kind: 'wada', name: 'Shaniwar Wada tickets', x: this.counter.x, z: this.counter.z } : null;
+    if (Math.hypot(x - this.counter.x, z - this.counter.z) < 3.2) return { kind: 'wada', act: 'ticket', name: 'Shaniwar Wada tickets', x: this.counter.x, z: this.counter.z };
+    const [u, v] = this.local(x, z);
+    if (Math.abs(u - SW.GU) < 4.5 && v > SW.GV - 4 && v < SW.GV + 0.5) { const g = this.P(SW.WU, SW.GV - 1); return { kind: 'wada', act: 'in', name: 'Delhi Darwaza', x: g.x, z: g.z }; }
+    if (Math.abs(u - SW.GU) < 4.5 && v > SW.GV + 8.5 && v < SW.GV + 13) { const g = this.P(SW.GU, SW.GV + 10); return { kind: 'wada', act: 'out', name: 'Delhi Darwaza', x: g.x, z: g.z }; }
+    return null;
   }
-  label() {
+  label(n) {
+    if (n && n.act === 'in') return !this.isOpen() ? 'Delhi Darwaza · Shut for the night · opens 8 am' : this.hasTicket() ? 'Go in through the Delhi Darwaza · F' : `Delhi Darwaza · Ticket first, ${fmt(PRICE)} at the window on the left`;
+    if (n && n.act === 'out') return 'Leave by the Delhi Darwaza · F';
     if (!this.isOpen()) return 'Shaniwar Wada · Ticket window shut · opens 8 am';
     if (this.hasTicket()) return 'You have your ticket · walk in by the small door in the gate';
     return `Buy a ticket for Shaniwar Wada · ${fmt(PRICE)} · F`;
   }
-  use() {
-    const G = this.g;
+  use(n) {
+    const G = this.g, P = G.player;
+    if (n && n.act === 'out') { const o = this.P(SW.WU, SW.GV - 2.4), f = this.P(SW.WU, SW.GV - 20); P.teleportFoot(o.x, o.z, Math.atan2(f.z - o.z, f.x - o.x), G.traffic); G.rig.inited = false; return; }
+    if (n && n.act === 'in') {
+      if (!this.isOpen()) { G.hud.toast('Band aahe, udya ya', 'Shaniwar Wada is open 8 am to 6:30 pm', 'warn', 2.6); return; }
+      if (!this.hasTicket()) { G.hud.toast('Ticket? Ticket kaadha', `${fmt(PRICE)} at the window on the left`, 'warn', 2.6); return; }
+      const i = this.P(SW.GU, SW.GV + 11.5), f = this.P(SW.GU, SW.GV + 40);
+      P.teleportFoot(i.x, i.z, Math.atan2(f.z - i.z, f.x - i.x), G.traffic); G.rig.inited = false;
+      G.hud.toast('Shaniwar Wada', 'The plinths of the palace, Hazari Karanje, the steps up to the ramparts on either side of the gate', 'info', 4);
+      return;
+    }
     if (!this.isOpen()) { G.hud.toast('Closed for the day', 'Shaniwar Wada is open 8 am to 6:30 pm. The light and sound show is at the same window after dark', 'info', 3); return; }
     if (this.hasTicket()) { G.hud.toast('Already got one', 'In by the wicket in the Delhi Darwaza', 'info', 2); return; }
     if (!G.shops.spend(PRICE)) { G.hud.toast('Not enough cash', `The ticket is ${fmt(PRICE)}`, 'warn', 2); return; }
@@ -44,22 +59,6 @@ export class Wada {
     if (!this.L) return;
     const G = this.g, P = G.player;
     if (this.msgT > 0) this.msgT -= dt;
-    // the guard at the wicket: no ticket (or shut for the day), no entry. Nothing on wheels goes in at all
-    const [u, v] = this.local(P.x, P.z);
-    if (Math.abs(u - SW.WU) < 1.2 && v > SW.GV - 0.4 && v < SW.GV + 9) {
-      const ok = P.onFoot && this.isOpen() && this.hasTicket();
-      const goingIn = !this._wasIn;
-      if (!ok && goingIn) {
-        const out = this.P(SW.WU, SW.GV - 1.2);
-        if (P.onFoot) { P.foot.x = out.x; P.foot.z = out.z; P.foot.v = 0; }
-        else if (P.cur) { P.cur.x = out.x; P.cur.z = out.z; P.cur.v = 0; }
-        if (this.msgT <= 0) {
-          this.msgT = 3;
-          const why = !P.onFoot ? ['Gaadi aat nahi', 'Park it outside and walk in'] : !this.isOpen() ? ['Band aahe, udya ya', 'Shaniwar Wada is open 8 am to 6:30 pm'] : ['Ticket? Ticket kaadha', `${fmt(PRICE)} at the window on the left`];
-          G.hud.toast(why[0], why[1], 'warn', 2.6);
-        }
-      }
-    } else this._wasIn = v > SW.GV + 9 && u > SW.U0 && u < SW.U1 && v < SW.V1;
     this.haunt(dt);
     // tourists while you're around and it's open (a few hang about outside in the evening)
     if ((this.t -= dt) > 0) return;

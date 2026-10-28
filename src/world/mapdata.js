@@ -315,7 +315,13 @@ export class Surfaces {
   }
   isRoad(x, z) { return this.test(this.road, x, z); }
   isWater(x, z) { return this.test(this.water, x, z); }
-  height(x, z) { const b = this.isRoad(x, z) ? 0 : 0.15; return this.hills ? b + this.hills.height(x, z) : b; }
+  height(x, z) {
+    let b = this.isRoad(x, z) ? 0 : 0.15;
+    if (this.hills) b += this.hills.height(x, z);
+    // landmark decks: a plinth's top, steps, the rampart walk
+    if (this.decks) for (const d of this.decks) { if (x < d.bb[0] || x > d.bb[2] || z < d.bb[1] || z > d.bb[3]) continue; const y = d.h(x, z); if (y > b) b = y; }
+    return b;
+  }
 }
 
 // ---------------------------------------------------------------- static collision
