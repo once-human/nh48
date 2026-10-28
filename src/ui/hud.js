@@ -576,7 +576,7 @@ export class HUD {
     if (g.life && (this._vitT = (this._vitT || 0) - dt) <= 0) {
       this._vitT = 0.25;
       const L = g.life.s, vals = [(p.hp ?? 100) / g.life.hpMax, L.hunger, L.thirst, L.energy];
-      this.vit.querySelectorAll(':scope > span').forEach((sp, i) => { const v = Math.max(0, Math.min(1, vals[i])); sp.querySelector('.fg').setAttribute('stroke-dashoffset', (this.vitC * (1 - v)).toFixed(1)); sp.style.setProperty('--v', v.toFixed(3)); sp.classList.toggle('low', v < 0.2); sp.title = `${['Health', 'Hunger', 'Thirst', 'Energy'][i]} ${Math.round(v * 100)}%`; });
+      this.vit.querySelectorAll(':scope > span').forEach((sp, i) => { const v = Math.max(0, Math.min(1, vals[i])); sp.querySelector('.fg').setAttribute('stroke-dashoffset', (this.vitC * (1 - v)).toFixed(1)); sp.classList.toggle('low', v < 0.2); sp.title = `${['Health', 'Hunger', 'Thirst', 'Energy'][i]} ${Math.round(v * 100)}%`; });
       this.vit.hidden = !!this.inPlace && false;
     }
     // health: on foot, while hurt or in a fight

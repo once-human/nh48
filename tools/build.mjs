@@ -60,8 +60,6 @@ const fontDefs = [
   ['Rozha One', '@fontsource/rozha-one/files/rozha-one-latin-400-normal.woff2', 400, 'normal', LAT],
   ['Teko', '@fontsource/teko/files/teko-latin-500-normal.woff2', 500, 'normal', LAT],
   ['Teko', '@fontsource/teko/files/teko-latin-600-normal.woff2', 600, 'normal', LAT],
-  ['Teko', '@fontsource/teko/files/teko-latin-700-normal.woff2', 700, 'normal', LAT],
-  ['Teko', '@fontsource/teko/files/teko-latin-600-normal.woff2', 600, 'normal', LAT],
 ];
 // fonts as their own files (cached by the browser, and the page itself arrives ~1.2 MB lighter)
 let fontCss = '';
