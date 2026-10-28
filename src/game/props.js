@@ -54,10 +54,17 @@ export class Props {
     const rented = this.rentedOut(p);
     if (!rented) {
       out.push({ label: 'Sleep till morning', note: 'Full energy and health, wake at 7 AM. Saves you a lodge', price: 0, act: () => { G.shops.close(); G.sleep(); return ''; } });
-      out.push({ label: 'Cook at home', note: 'Varan bhaat, toop, limbu. Costs you ₹60 in groceries', price: 60, act: () => { if (!G.shops.spend(60)) return false; L.apply({ hunger: 0.7, thirst: 0.3, mood: 0.06 }); return 'Aai would approve'; } });
+      out.push({ label: 'Eat at home', note: 'Varan bhaat, toop, limbu. Free: the kitchen is stocked', price: 0, act: () => { L.apply({ hunger: 0.7, thirst: 0.2, mood: 0.06 }); return 'Aai would approve'; } });
+      out.push({ label: 'Water from the filter', note: 'A glass now and a bottle for the road. Free', price: 0, act: () => { L.apply({ thirst: 0.6 }); L.add('water'); return 'A bottle in your jhola'; } });
       out.push({ label: 'Wardrobe', note: 'Change into anything you own', price: 0, act: () => { G.shops.close(); G.bag && G.bag.show('wear'); return ''; } });
       const missing = L.s.vehicles.filter(v => !G.player.dropped.some(d => d.veh.owned && d.veh.owned.id === v.id) && !(G.player.cur && G.player.cur.owned && G.player.cur.owned.id === v.id));
       for (const v of missing) out.push({ label: `Bring out your ${v.type}`, note: 'From the parking downstairs', price: 0, act: () => { G.shops.respawnOwned(v, p); return 'It’s outside'; } });
+      // park what you own (and rode here) in the garage: safe from towing, theft and the rain
+      for (const d of G.player.dropped) {
+        const o = d.veh.owned; if (!o || o.rental || d.veh === G.player.cur || Math.hypot(d.veh.x - p.x, d.veh.z - p.z) > 45) continue;
+        const rec = L.s.vehicles.find(q => q.id === o.id); if (!rec) continue;
+        out.push({ label: `Park your ${rec.type} in the garage`, note: `${rec.plate} · safe from tow trucks and thieves`, price: 0, act: () => { rec.fuel = d.veh.fuel; G.player.removeDropped(d, G.traffic); d.veh.dispose(); L.save(); return 'Locked away downstairs'; } });
+      }
       out.push({ label: `Rent it out for ${fmt(p.rent)} a day`, note: 'Tenants move in. You can’t sleep here while they do', price: 0, act: () => { L.s.rented = (L.s.rented || []).concat([p.id]); L.save(); return 'Tenants found. Rent goes to your bank every morning'; } });
     } else out.push({ label: 'Ask the tenants to leave', note: `They pay ${fmt(p.rent)} a day. Move back in yourself`, price: 0, act: () => { L.s.rented = (L.s.rented || []).filter(q => q !== p.id); L.save(); return 'They’ll be out by tonight. It’s yours again'; } });
     out.push({ label: `Sell it for ${fmt(Math.round(p.price * 0.92))}`, note: 'A buyer is ready; the broker keeps 8%', price: 0, act: () => this.sell(p) });
@@ -89,6 +96,17 @@ export class Props {
     let tot = 0;
     for (const p of this.list) if (this.owned(p) && this.rentedOut(p)) tot += p.rent;
     if (L.s.bank > 0) { const int = Math.round(L.s.bank * 0.004); L.s.bank += int; if (int) G.hud.sms('Bank', `Interest credited: ${fmt(int)}`, fmt(int), `Balance ${fmt(L.s.bank)}`); }
+    // society maintenance on every home you own: a share of its value per day, and more per home the more you hold
+    const own = this.list.filter(p => this.owned(p));
+    if (own.length) {
+      const mult = 1 + 0.2 * (own.length - 1);
+      const fee = Math.round(own.reduce((a, p) => a + p.price * 0.00008, 0) * mult / 10) * 10;
+      let left = fee; const fromBank = Math.min(L.s.bank || 0, left); L.s.bank -= fromBank; left -= fromBank;
+      const fromCash = Math.min(G.stats.money, left); G.stats.money -= fromCash; left -= fromCash; G.saveStats();
+      if (left > 0) { L.change('mood', -0.05); G.hud.sms('Society', `Maintenance of ${fmt(fee)} is overdue on your ${own.length > 1 ? own.length + ' homes' : 'home'}. ${fmt(left)} unpaid.`, fmt(fee), 'Pay up or the secretary will talk'); }
+      else G.hud.sms('Society', `Maintenance for ${own.length > 1 ? own.length + ' homes' : own[0].name}: ${fmt(fee)} debited.`, fmt(fee), own.length > 1 ? `${Math.round((mult - 1) * 100)}% extra for owning ${own.length}` : 'Lift, watchman, water tanker');
+      L.save();
+    }
     if (!tot) return;
     L.s.bank += tot; L.s.tally.rentEarned += tot; L.save();
     G.hud.sms('Rent', `Your tenants paid ${fmt(tot)} into your bank account.`, fmt(tot), 'Withdraw at any bank or ATM');
