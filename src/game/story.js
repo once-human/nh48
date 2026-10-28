@@ -14,6 +14,7 @@ const WHO = {
   raghu: ['Raghu Bhau', '#ff6b6b'], salim: ['Salim', '#c3a6ff'], mohan: ['Mohan Sheth', '#ffb38a'], meera: ['Meera Kulkarni', '#9be7ff'],
   shinde: ['Insp. Shinde', '#d0d0d0'], you: ['You', '#ffffff'], unk: ['Unknown number', '#aaaaaa'],
 };
+const STORY_ON = false;
 const inHours = (h, a, b) => a <= b ? h >= a && h < b : h >= a || h < b;
 const hm = (h) => { const H = Math.floor(h) % 24, M = Math.floor((h % 1) * 60); return `${H % 12 || 12}:${String(M).padStart(2, '0')} ${H < 12 ? 'am' : 'pm'}`; };
 
@@ -179,7 +180,8 @@ export class Story {
   }
   get st() { const s = this.g.life.s; return s.story || (s.story = { m: 0, step: -1, flags: {}, nextAt: 0 }); }
   get on() { return !this.g.free && this.g.state !== 'title'; }
-  list() { return this._ms || (this._ms = MISSIONS(this)); }
+  // the old Act 1 is retired: Part One, Dark Store, is being written on this engine
+  list() { return this._ms || (this._ms = STORY_ON ? MISSIONS(this) : []); }
   mission() { return this.list()[this.st.m] || null; }
   cur() { const m = this.mission(); return m && this.st.step >= 0 ? m.steps[this.st.step] : null; }
   swAt(u, v, name) { const W = this.g.W, L = W.landmarks && W.landmarks.find(l => l.id === 'shaniwar'); if (!L) return null; const c = Math.cos(L.rot), s = Math.sin(L.rot); return { x: L.x + u * c + v * s, z: L.z + u * s - v * c, name }; }

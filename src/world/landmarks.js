@@ -432,11 +432,7 @@ const BUILD = {
         x.font = `800 ${h * 0.2}px Mukta, sans-serif`; x.fillText('शनिवारवाडा', w / 2, h * 0.24); x.font = `800 ${h * 0.15}px Inter, sans-serif`; x.fillText('SHANIWAR WADA', w / 2, h * 0.47);
         x.font = `500 ${h * 0.09}px Inter, sans-serif`; x.fillText('Seat of the Peshwas · 1732', w / 2, h * 0.66); x.fillText('Open 8 am to 6:30 pm', w / 2, h * 0.8); }, 'sw-plaque');
       B.hitBox(pu, pv, 3.2, 0.5);
-      // and, being Pune, a patya on its post next to it
-      B.cyl(pu + 3.2, 0, pv, 0.06, 1.9, C.iron, 6);
-      B.board(pu + 3.2, 1.75, pv - 0.08, 1.3, 0.62, (x, w, h) => { x.fillStyle = '#f6f3ea'; x.fillRect(0, 0, w, h); x.strokeStyle = '#9b1c1c'; x.lineWidth = h * 0.05; x.strokeRect(h * 0.05, h * 0.05, w - h * 0.1, h - h * 0.1);
-        x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#9b1c1c'; x.font = `800 ${h * 0.24}px Mukta, sans-serif`; x.fillText('रात्री १२ नंतर', w / 2, h * 0.32);
-        x.fillStyle = '#1a1a1a'; x.fillText('येथे थांबू नये.', w / 2, h * 0.62); x.font = `600 ${h * 0.1}px Inter, sans-serif`; x.fillStyle = '#555'; x.fillText('(do not linger here after midnight)', w / 2, h * 0.86); }, 'sw-patya'); }
+    }
     // the hawkers' carts: a painted body, bicycle wheels, a striped umbrella, the name on a board
     for (const [vu, vv, key, name, mr, price, , col] of W.vendors) {
       B.cbox(vu, 0.55, vv, 2.0, 0.7, 1.05, col); B.cbox(vu, 1.25, vv, 2.1, 0.06, 1.15, [0.75, 0.74, 0.7]);

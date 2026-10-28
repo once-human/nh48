@@ -220,7 +220,7 @@ export class Phone {
     } else if (cur === 'story') {
       title = 'Tasks';
       if (G.free) body = `<p class="ph-empty">Free roam. The story waits for you in Story mode.</p>`;
-      else { body = `<p class="ph-hint">Act 1 · Meter Down</p>`; for (const r of G.story.summary()) items.push({ t: r.t, s: r.s, dot: r.cur, act: null }); }
+      else { const rs = G.story.summary(); body = rs.length ? `<p class="ph-hint">Part One · Dark Store</p>` : `<p class="ph-empty">Part One, <b>Dark Store</b>, is on its way. Pune is yours till then.</p>`; for (const r of rs) items.push({ t: r.t, s: r.s, dot: r.cur, act: null }); }
     } else if (cur === 'weather') {
       title = 'Pune';
       const h = G.hour || 12, m = new Date().getMonth(), rain = m >= 5 && m <= 8, hot = m >= 2 && m <= 4;

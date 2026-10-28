@@ -165,7 +165,7 @@ export function buildBuildings(M, W) {
         } else {
           const tile = F[st.lane[rng.int(0, st.lane.length - 1)]];
           fb.quad(ax, az, bx, bz, BASE, BASE + gh, nx, nz, 0, bays, 0, 1, tile, tint, seed);
-          if (rng.chance(0.06)) patya(SB(ci), signs, rng, ax, az, bx, bz, nx, nz, BASE + 1.5);
+          if (false) patya(SB(ci), signs, rng, ax, az, bx, bz, nx, nz, BASE + 1.5);
         }
         // upper floors
         if (levels > 1) {
@@ -256,7 +256,7 @@ export function buildBuildings(M, W) {
 }
 
 function addSign(sb, signs, rng, ax, az, bx, bz, nx, nz, yTop, L) {
-  const s = rng.chance(0.08) ? signs.patya[rng.int(0, signs.patya.length - 1)] : signs.shops[rng.int(0, signs.shops.length - 1)];
+  const s = signs.shops[rng.int(0, signs.shops.length - 1)];
   const inset = 0.12;
   const dx = (bx - ax) / L, dz = (bz - az) / L;
   const w = L - 2 * inset;

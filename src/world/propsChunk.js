@@ -306,7 +306,7 @@ export function* buildPropsChunk(W, C, group) {
       u += L;
     }
     // now and then a Puneri patya on the wall by the gate, one on each face
-    if (signs.patya.length && hash1(p[0] * 3.7 + p[1] * 1.3) < 0.13) {
+    if (false && signs.patya.length && hash1(p[0] * 3.7 + p[1] * 1.3) < 0.13) {
       const ax = p[0], az = p[1], bx = p[2], bz = p[3], L = Math.hypot(bx - ax, bz - az);
       if (L > 2.4) {
         const tx = (bx - ax) / L, tz = (bz - az) / L, nx = tz, nz = -tx, at = Math.min(1.4, L / 2), w = 0.9, h = 0.45, y0 = BASE + 1.0;

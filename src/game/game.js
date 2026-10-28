@@ -32,7 +32,6 @@ import { Club } from './club.js';
 import { Lights } from './lights.js';
 import { Bag } from './bag.js';
 import { Phone } from './phone.js';
-import { Patya } from './patya.js';
 import { Eggs } from './eggs.js';
 import { Story } from './story.js';
 import { Strays } from '../people/strays.js';
@@ -154,7 +153,6 @@ export class Game {
     this.club = new Club(this);
     this.bag = new Bag(this);
     this.phone = new Phone(this);
-    this.patya = new Patya(this);
     this.eggs = new Eggs(this);
     this.story = new Story(this);
     this.lights = new Lights(this);
@@ -880,7 +878,6 @@ export class Game {
       this.gigs.update(dt, this.input);
       this.hustle.update(dt, this.input);
       this.strays.update(dt);
-      this.patya.update(dt);
       this.eggs.update(dt);
       this.story.update(dt);
       this.rig.drunk = this.life.s.drunk;
