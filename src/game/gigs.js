@@ -31,7 +31,7 @@ export class Gigs {
     const drop = this.pickDrop(shop.x, shop.z);
     if (!drop) { G.hud.toast('No orders right now', 'Try another place', 'warn', 2.4); return; }
     const km = drop.d * 1.3 / 1000;
-    const pay = Math.round((28 + km * 14) / 5) * 5;
+    const pay = Math.round((60 + km * 26) / 5) * 5;
     const limit = drop.d * 1.3 / 6.5 + 70;            // seconds: about 23 km/h door to door
     this.job = { from: shop.name, to: drop, pay, limit, t: 0, who: this.rng.pick(NAMES), flat: this.rng.pick(FLATS), state: 'drop' };
     G.setWaypoint({ x: drop.x, z: drop.z, name: `Zwiggy: ${this.job.who}`, gig: true });

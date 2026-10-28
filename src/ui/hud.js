@@ -441,7 +441,7 @@ export class HUD {
               <div class="row"><div class="rl">Your look, hair and name</div><div class="rc"><button class="btn" id="p-char">Change</button></div></div>
             </div>
             <div class="gt">Start over</div>
-            <div class="group danger"><div class="row"><div class="rl">Wipe everything<small>Money back to ₹5,000; vehicles, outfits, property, fines, people and where you are</small></div><div class="rc"><button class="btn bad" id="p-reset">Start over</button></div></div>
+            <div class="group danger"><div class="row"><div class="rl">Wipe everything<small>Money back to ₹10,000; vehicles, outfits, property, fines, people and where you are</small></div><div class="rc"><button class="btn bad" id="p-reset">Start over</button></div></div>
               <div class="confirm" id="p-reset-c" hidden><b>Sure? This can’t be undone.</b><button class="btn bad" id="p-reset-y">Yes, wipe it</button><button class="btn" id="p-reset-n">Keep playing</button></div></div>
             <div class="fine">Map data © OpenStreetMap contributors (ODbL); buildings and places from Overture Maps Foundation (ODbL, CDLA-Permissive-2.0), including Google Open Buildings and Microsoft footprints. Terrain: SRTM (NASA) via Terrain Tiles on AWS. Shop and place names are the real ones from OpenStreetMap and Overture; national and international chains appear as parodies. Pune Metro Line 3 opens 3 Nov 2026; fares on it are estimates. People and animals: Quaternius (CC0). Voices: Kokoro-82M (Apache-2.0) and Piper mr_IN, trained on Google’s crowdsourced Marathi speech (OpenSLR 64, CC BY-SA 4.0). Sounds: Freesound (CC0). Fines follow the MV Act as reported for Pune and may be out of date.</div>
           </section>

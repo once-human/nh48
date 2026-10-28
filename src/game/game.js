@@ -59,7 +59,7 @@ export class Game {
     const st0 = safeStorage();
     let saved = null; try { saved = st0 && st0.getItem('nh48_quality'); } catch (e) { /* ignore */ }
     this.userQuality = !!(this.params.get('q') || saved);
-    this.stats = { money: 5000, rides: 0, starSum: 0, rating: 0, grant: 2 };     // every new player starts with ₹5,000
+    this.stats = { money: 10000, rides: 0, starSum: 0, rating: 0, grant: 3 };    // every new player starts with ₹10,000
     this.test = {
       drive: parseFloat(this.params.get('drive') || '0'),
       steer: parseFloat(this.params.get('steer') || '0'),
@@ -78,7 +78,7 @@ export class Game {
   async init(progress) {
     const { W, player, traffic } = this;
     const st = safeStorage();
-    if (st) { try { const s = JSON.parse(st.getItem('nh48_stats') || 'null'); if (s) { Object.assign(this.stats, s); if ((s.grant || 0) < 2) { this.stats.money = Math.max(5000, this.stats.money); this.stats.grant = 2; } } } catch (e) { /* ignore */ } }
+    if (st) { try { const s = JSON.parse(st.getItem('nh48_stats') || 'null'); if (s) { Object.assign(this.stats, s); if ((s.grant || 0) < 3) { this.stats.money = Math.max(10000, this.stats.money); this.stats.grant = 3; } } } catch (e) { /* ignore */ } }
     // first time in: on the road by Shaniwar Wada's garden, the Delhi Darwaza in view (?spawn=FC Road etc. for others)
     const start = this.params.get('spawn') ? this.findStart(this.params.get('spawn')) : (this.wadaStart() || this.findStart('FC Road'));
     // where you were last time (position, vehicle, towed auto...)

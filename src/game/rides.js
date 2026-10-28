@@ -247,7 +247,8 @@ export class Rides {
     const onTime = c.elapsed <= c.limit;
     const mood = clamp(c.mood + (onTime ? 0.1 : -0.15), 0, 1.1);
     const stars = clamp(Math.round(1 + mood * 4.2), 1, 5);
-    let tip = mood > 0.85 ? Math.round(fare * (onTime ? 0.2 : 0.1) / 5) * 5 + 5 : mood > 0.6 ? 5 : 0;
+    // Pune tips for a good ride: a happy passenger rounds up generously (the meter itself stays the RTA tariff)
+    let tip = mood > 0.85 ? Math.round(fare * (onTime ? 0.45 : 0.25) / 5) * 5 + 20 : mood > 0.6 ? Math.round(fare * 0.12 / 5) * 5 + 10 : 0;
     // a speaker, leopard seat covers, a box of bakarwadi offered on the way: it all adds up
     const L = g.life, U = L ? L.s.upg : {};
     if (tip) tip = Math.round(tip * (1 + (U.speaker ? 0.15 : 0) + (U.seat ? 0.05 : 0)) / 5) * 5;
@@ -256,7 +257,11 @@ export class Rides {
       if (gift) { L.take(gift); const extra = { shrewsbury: 45, barfi: 50, bakarwadi: 40, gajra: 20 }[gift]; tip += extra; g.hud.toast('You offered them something sweet', `+₹${extra} on the tip, and a smile`, 'good', 2.6); }
       L.change('respect', stars >= 5 ? 0.5 : 0); L.change('mood', 0.02);
     }
-    g.stats.money += fare + tip;
+    // every fifth fare of a shift: the app's incentive (₹500)
+    this.shiftFares = (this.shiftFares || 0) + 1;
+    const bonus = this.shiftFares % 5 === 0 ? 500 : 0;
+    if (bonus) g.later(3.6, () => g.hud.toast('Shift bonus ₹500', `${this.shiftFares} fares this shift. Keep going`, 'meter', 3.2));
+    g.stats.money += fare + tip + bonus;
     g.stats.rides += 1;
     g.stats.starSum += stars;
     g.stats.rating = g.stats.starSum / g.stats.rides;
