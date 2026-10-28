@@ -1394,3 +1394,15 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16); color: #fff; font: 600 16px var(--font-ui); text-align: left; text-shadow: none; }
 .sd-ask button b { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; background: rgba(255, 255, 255, .14); font-size: 13px; }
 .sd-ask button.sel, .sd-ask button:hover { background: #ff8a1f; color: #111; } .sd-ask button.sel b, .sd-ask button:hover b { background: rgba(0, 0, 0, .18); }
+
+/* notifications, like iOS banners: a tinted rounded-square symbol, a semibold title, the detail under it */
+.toast { grid-template-columns: 32px 1fr !important; column-gap: 12px !important; align-items: center; padding: 11px 16px 11px 11px !important; }
+.toast::before { display: none !important; }
+.toast .tt-ic { grid-row: 1 / 3; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ic, #8e8e93) 100%, #fff 12%), var(--ic, #8e8e93)); box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .18); }
+.toast .tt-ic svg { width: 19px; height: 19px; }
+.toast:not(:has(.tt-sub)) .tt-ic { grid-row: 1; }
+.toast .tt-main { font-size: 14.5px !important; font-weight: 600 !important; letter-spacing: -0.01em; line-height: 1.25; }
+.toast .tt-sub { font-size: 13px !important; color: var(--tx2) !important; line-height: 1.35; margin-top: 1px; }
+.toast.info { --ic: #0a84ff; } .toast.warn { --ic: #ff9f0a; } .toast.bad { --ic: #ff453a; } .toast.challan { --ic: #ff453a; }
+.toast.good { --ic: #30d158; } .toast.meter { --ic: #30d158; }
