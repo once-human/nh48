@@ -667,7 +667,7 @@ export function buildProps(M, W) {
       const sl = Math.hypot(bx - ax, bz - az);
       if (sl < 0.2) continue;
       const mx = (ax + bx) / 2, mz = (az + bz) / 2;
-      if (constr && hash1(Math.round(mx) * 7 + Math.round(mz)) < 0.35) continue;   // gaps on the line under construction
+      if (constr === 1 && hash1(Math.round(mx) * 7 + Math.round(mz)) < 0.35) continue;   // gaps on the line under construction
       const ci = chunks.chunkOf(mx, mz); if (ci < 0) continue;
       const g = GBf(ci);
       const nx = (bz - az) / sl, nz = -(bx - ax) / sl;

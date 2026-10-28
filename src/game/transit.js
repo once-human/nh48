@@ -10,6 +10,7 @@ import { RNG } from '../core/util.js';
 import { fmt } from './shops.js';
 import { KbNav } from '../ui/kbnav.js';
 import T from './transit.json';
+import { lineOpen, opensOn } from './metroOpen.js';
 
 const metroFare = (km) => km <= 2 ? 10 : km <= 4 ? 15 : km <= 8 ? 20 : km <= 12 ? 25 : km <= 18 ? 30 : 35;
 const busFare = (km) => Math.min(120, 10 * Math.max(1, Math.ceil(km / 5)));
@@ -20,7 +21,7 @@ export class Transit {
     this.g = G; this.rng = new RNG(7171); this.open = false;
     const play = G.W.M.meta.play.map(v => v / 100), pad = 40;
     const inMap = (s) => s.x > play[0] - pad && s.x < play[2] + pad && s.z > play[1] - pad && s.z < play[3] + pad;
-    this.lines = T.metro.map(l => ({ ...l, stations: l.stations.map((s, i) => ({ ...s, i, line: l.id, here: inMap(s) })) }));
+    this.lines = T.metro.map(l => ({ ...l, open: lineOpen(l), stations: l.stations.map((s, i) => ({ ...s, i, line: l.id, here: inMap(s) })) }));
     this.stops = (G.W.M.buses || []).map(b => ({ x: b[0] / 100, z: b[1] / 100, name: b[3] || 'Bus stop', mr: b[4] || '' }));
     this.routes = T.bus.map(r => ({ ...r, stops: r.stops.filter(inMap) })).filter(r => r.stops.length >= 2);
     const el = document.createElement('div');
@@ -51,7 +52,7 @@ export class Transit {
     for (const s of this.stops) { const d = Math.hypot(s.x - x, s.z - z); if (d < 7 && d < bd) { bd = d; best = { kind: 'bus', s, name: `${s.name} bus stop`, x: s.x, z: s.z }; } }
     return best;
   }
-  label(n) { return n.kind === 'metro' ? `${n.s.name} · ${n.line.name}${n.line.open ? '' : ' (not open yet)'} · F` : `${n.s.name} · PMPML bus stop · F`; }
+  label(n) { return n.kind === 'metro' ? `${n.s.name} · ${n.line.name}${!n.line.open ? ` (opens ${opensOn(n.line)})` : n.s.soon ? ' (opens later)' : ''} · F` : `${n.s.name} · PMPML bus stop · F`; }
   show(n) {
     const G = this.g;
     this.open = true; G.state = 'shop'; this.n = n; this.back = null;
@@ -79,14 +80,15 @@ export class Transit {
   // ---------------------------------------------------------------- metro
   metroMenu(n) {
     const G = this.g, here = n.s, line = n.line;
-    this.head('Pune Metro · ' + line.name, here.name, here.mr, line.open ? `${here.ug ? 'Underground' : 'Elevated'} station · 6 am to 11 pm · ₹10 to ₹35` : 'This line isn’t open yet', line.color);
-    if (!line.open) { this.list([{ label: 'Line 3 isn’t running yet', note: 'Hinjewadi to Shivajinagar, opening soon', disabled: true }]); return; }
+    this.head('Pune Metro · ' + line.name, here.name, here.mr, line.open ? `${here.ug ? 'Underground' : 'Elevated'} station · 6 am to 11 pm · ₹10 to ₹35` : `Opens ${opensOn(line)}`, line.color);
+    if (!line.open) { this.list([{ label: `${line.name} opens ${opensOn(line)}`, note: 'Hinjewadi to Shivajinagar. Trains are on test runs till then', disabled: true }]); return; }
+    if (here.soon) { this.list([{ label: 'This station isn’t open yet', note: `${line.name} trains run through without stopping. Try the next station`, disabled: true }]); return; }
     if (G.hour >= 23 || G.hour < 6) { this.list([{ label: 'Station closed', note: 'Metro runs 6 am to 11 pm. Take an auto', disabled: true }]); return; }
     const dests = [];
     for (const l of this.lines) {
       if (!l.open) continue;
       for (const s of l.stations) {
-        if (!s.here || (l.id === line.id && s.i === here.i) || (s.name === here.name)) continue;
+        if (!s.here || s.soon || (l.id === line.id && s.i === here.i) || (s.name === here.name)) continue;
         const km = this.metroKm(here, line, s, l);
         if (km === null) continue;
         dests.push({ s, l, km, change: l.id !== line.id });

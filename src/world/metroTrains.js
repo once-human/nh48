@@ -32,11 +32,17 @@ export class MetroTrains {
   constructor(W, scene, M) {
     this.trains = []; this.scene = scene;
     // join the OSM ways into continuous lines (ends within 10 m)
-    const ways = (M.metro || []).filter(m => !m[0]).map(m => Array.from(cmRing(m[1]))).filter(p => p.length >= 4);
+    // running lines (flag 0) and Line 3 (flag 2: complete; on test runs till it opens, then in service).
+    // Each group is joined on its own so a Line 3 track never runs on into the Aqua Line's
     const chains = [];
+    // (Line 3's two tracks end ~5 m apart at every station, so its ways join only where they really meet)
+    for (const flag of [0, 2]) this.join((M.metro || []).filter(m => m[0] === flag).map(m => Array.from(cmRing(m[1]))).filter(p => p.length >= 4), chains, flag ? 1.5 : 10);
+    this.build(W, scene, chains);
+  }
+  join(ways, chains, tol) {
     const used = new Set();
     const end = (p, last) => last ? [p[p.length - 2], p[p.length - 1]] : [p[0], p[1]];
-    const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 10;
+    const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < tol;
     for (let i = 0; i < ways.length; i++) {
       if (used.has(i)) continue;
       used.add(i);
@@ -57,15 +63,18 @@ export class MetroTrains {
       }
       chains.push(pts);
     }
+  }
+  build(W, scene, chains) {
     // stations on the viaduct (the built station buildings), and each line's colour
     const stops = [];
-    for (const c of W.index.chunks) for (const st of c.mstations || []) { const p = st.pts; stops.push([(p[0] + p[p.length - 2]) / 2, (p[1] + p[p.length - 1]) / 2]); }
+    const soon = new Set(); for (const l of TRANSIT.metro) for (const s of l.stations) if (s.soon) soon.add(s.name);
+    for (const c of W.index.chunks) for (const st of c.mstations || []) { if (soon.has(st.name)) continue; const p = st.pts; stops.push([(p[0] + p[p.length - 2]) / 2, (p[1] + p[p.length - 1]) / 2]); }
     const lineCol = (x, z) => {
       let best = 0x7b3fa0, bd = 1e12;
       for (const l of TRANSIT.metro) for (const s of l.stations) { const d = (s.x - x) ** 2 + (s.z - z) ** 2; if (d < bd) { bd = d; best = parseInt(String(l.color).replace('#', ''), 16) || best; } }
       return best;
     };
-    const geos = new Map(), mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.25 });
+    const geos = new Map(), mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.25 }), paths = [];
     for (const pts of chains) {
       const seg = []; let L = 0;
       for (let k = 0; k + 3 < pts.length; k += 2) { const l = Math.hypot(pts[k + 2] - pts[k], pts[k + 3] - pts[k + 1]); seg.push(L); L += l; }
@@ -85,16 +94,45 @@ export class MetroTrains {
       }
       path.stops.sort((a, b) => a - b);
       const mid = this.at(path, L / 2, []);
-      const color = lineCol(mid[0], mid[1]);
-      if (!geos.has(color)) geos.set(color, carGeometry(color));
-      const geo = geos.get(color);
-      // a train each way for every ~3 km of line
-      const n = Math.max(1, Math.round(L / 3000));
-      for (let k = 0; k < n; k++) for (const dir of [1, -1]) {
-        const cars = [0, 1, 2].map(() => { const m = new THREE.Mesh(geo, mat); m.castShadow = false; m.matrixAutoUpdate = false; scene.add(m); return m; });
-        this.trains.push({ path, dir, s: (L * (k + (dir > 0 ? 0.15 : 0.6)) / n) % L, v: CRUISE * 0.6, dwell: 0, cars });
+      path.color = lineCol(mid[0], mid[1]); path.mid = mid;
+      paths.push(path);
+    }
+    // a double-track line comes as two ways side by side: pair them, and run trains on the left-hand track
+    // (India keeps left), crossing over to the other track at the end of the line
+    for (const P of paths) {
+      if (P.partner) continue;
+      const [mx, mz, tx, tz] = P.mid;
+      for (const Q of paths) {
+        if (Q === P || Q.partner || Q.color !== P.color || Math.min(P.L, Q.L) / Math.max(P.L, Q.L) < 0.8) continue;
+        const near = this.nearest(Q, mx, mz);
+        if (near.d > 12) continue;
+        const right = (near.x - mx) * -tz + (near.z - mz) * tx;          // the other track on this one's right going +s
+        P.partner = Q; Q.partner = P; P.pdir = right > 0 ? 1 : -1;
+        const q = this.at(Q, near.s, []); Q.pdir = (q[2] * tx + q[3] * tz) * P.pdir > 0 ? -1 : 1;   // the other way
+        break;
       }
     }
+    for (const path of paths) {
+      const L = path.L;
+      if (!geos.has(path.color)) geos.set(path.color, carGeometry(path.color));
+      const geo = geos.get(path.color);
+      // a train for every ~1.5 km of track; single-track ways get them both ways
+      const n = Math.max(1, Math.round(L / 3000)), dirs = path.partner ? [path.pdir, path.pdir] : [1, -1];
+      for (let k = 0; k < n; k++) for (let d = 0; d < 2; d++) {
+        const dir = dirs[d];
+        const cars = [0, 1, 2].map(() => { const m = new THREE.Mesh(geo, mat); m.castShadow = false; m.matrixAutoUpdate = false; scene.add(m); return m; });
+        this.trains.push({ path, dir, s: (L * (k + (d ? 0.6 : 0.15)) / n) % L, v: CRUISE * 0.6, dwell: 0, cars });
+      }
+    }
+  }
+  nearest(path, x, z) {
+    const { pts, seg } = path; let best = { d: 1e9, s: 0, x: 0, z: 0 };
+    for (let k = 0; k + 3 < pts.length; k += 2) {
+      const ax = pts[k], az = pts[k + 1], dx = pts[k + 2] - ax, dz = pts[k + 3] - az, L2 = dx * dx + dz * dz; if (L2 < 1e-3) continue;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)), px = ax + dx * t, pz = az + dz * t, d = Math.hypot(px - x, pz - z);
+      if (d < best.d) best = { d, s: seg[k / 2] + t * Math.sqrt(L2), x: px, z: pz };
+    }
+    return best;
   }
   // position and heading at distance s along a path
   at(path, s, out) {
@@ -122,16 +160,25 @@ export class MetroTrains {
         const vmax = Math.min(CRUISE, Math.sqrt(Math.max(0, 2 * ACC * target)));
         T.v = Math.min(vmax, T.v + ACC * dt);
         T.s += T.v * T.dir * dt;
-        if (target < 1.5 && T.v < 1.2) { T.v = 0; T.dwell = DWELL; if (endD < 2) { T.dir = -T.dir; T.left = undefined; } else T.left = T.s; }
+        if (target < 1.5 && T.v < 1.2) {
+          T.v = 0; T.dwell = DWELL;
+          if (endD < 2) {
+            if (P.partner) {          // over the crossover onto the other track, heading back
+              this.at(P, T.s, tmp); const n = this.nearest(P.partner, tmp[0], tmp[1]), Q = P.partner;
+              T.path = Q; T.dir = Q.pdir; T.s = Math.max(len / 2 + 1, Math.min(Q.L - len / 2 - 1, n.s));
+            } else T.dir = -T.dir;
+            T.left = undefined;
+          } else T.left = T.s;
+        }
       }
       // skip the maths for trains far from the camera
-      this.at(P, T.s, tmp);
+      this.at(T.path, T.s, tmp);
       const far = cam && Math.hypot(tmp[0] - cam.x, tmp[1] - cam.z) > 2600;
       for (let c = 0; c < 3; c++) {
         const m = T.cars[c]; m.visible = !far; if (far) continue;
         const sc0 = T.s + (c - 1) * (CAR + GAP) * T.dir;
-        this.at(P, sc0, tmp);
-        const hx = tmp[2] * T.dir, hz = tmp[3] * T.dir, off = TRACK * (T.dir > 0 ? 1 : -1);
+        this.at(T.path, sc0, tmp);
+        const hx = tmp[2] * T.dir, hz = tmp[3] * T.dir, off = T.path.partner ? 0 : TRACK * (T.dir > 0 ? 1 : -1);
         pos.set(tmp[0] - tmp[3] * off, DECK, tmp[1] + tmp[2] * off);
         q.setFromAxisAngle(up, Math.atan2(-hz, hx));
         m.matrix.copy(m4.compose(pos, q, sc)); m.matrixWorldNeedsUpdate = true;

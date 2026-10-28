@@ -18,6 +18,8 @@ import { Props } from './props.js';
 import { Gigs } from './gigs.js';
 import { Hustle } from './hustle.js';
 import { Transit } from './transit.js';
+import TRANSIT_DATA from './transit.json';
+import { justOpened, lineOpen, opensOn } from './metroOpen.js';
 import { Club } from './club.js';
 import { Lights } from './lights.js';
 import { Bag } from './bag.js';
@@ -324,6 +326,13 @@ export class Game {
     if (this.pendingHeat) { const h = this.pendingHeat; this.pendingHeat = 0; this.later(1.5, () => { for (const c of this.pendingCharges || []) this.police.charges.add(c); this.police.raiseHeat(h, 'Still wanted from before', null); }); }
     if (this.saved && !this.welcomed) { this.welcomed = true; this.hud.toast('Welcome back', 'Right where you left off', 'info', 2.6); }
     if (shift) this.hud.toast('Shift started', 'People waving for an auto show up green on the map', 'meter', 3.6);
+    // Pune Metro Line 3: news the first week it runs, a heads-up before that
+    if (!this._metroNews) {
+      this._metroNews = true;
+      const pink = TRANSIT_DATA.metro.find(l => l.id === 'pink');
+      if (justOpened(pink)) this.later(shift ? 4.5 : 1.2, () => this.hud.toast('Pink Line is open', 'Metro Line 3, Hinjewadi to Shivajinagar. Change at District Court', 'info', 5));
+      else if (pink && !lineOpen(pink)) this.later(shift ? 4.5 : 1.2, () => this.hud.toast(`Pink Line opens ${opensOn(pink)}`, 'Metro Line 3, Hinjewadi to Shivajinagar. Test runs on now', 'info', 4));
+    }
   }
   endShift() {
     this.togglePause(false);

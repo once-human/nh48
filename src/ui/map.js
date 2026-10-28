@@ -3,6 +3,8 @@
 // The minimap draws through the same tile cache, so both always agree with the streets you drive.
 import { versioned } from '../core/assets.js';
 import { cmRing } from '../world/geo.js';
+import TRANSIT from '../game/transit.json';
+import { lineOpen, opensOn } from '../game/metroOpen.js';
 
 const TILE = 256;
 const BASE_PPM = 0.25;            // pixels per metre at level 0
@@ -622,6 +624,50 @@ export class MapScreen {
     });
   }
   // ---------------------------------------------------------------- frame
+  // Pune Metro on the map, in each line's colour: the real viaducts (and straight runs between the underground
+  // stations), a dot for every station, names when zoomed in. A line not open yet is drawn dashed
+  metroLines() {
+    if (this._metro) return this._metro;
+    const M = this.g.W.M, lines = TRANSIT.metro.map(l => ({ ...l, open: lineOpen(l), runs: [] }));
+    const lineAt = (x, z) => { let b = null, bd = 1e18; for (const l of lines) for (const s of l.stations) { const d = (s.x - x) ** 2 + (s.z - z) ** 2; if (d < bd) { bd = d; b = l; } } return b; };
+    for (const [f, r] of M.metro || []) {
+      if (f === 1) continue;                                     // other lines still being built
+      const p = cmRing(r); if (p.length < 4) continue;
+      const k = (p.length >> 2) << 1, l = lineAt(p[k], p[k + 1]);
+      if (l) l.runs.push(p);
+    }
+    for (const l of lines) for (let i = 0; i + 1 < l.stations.length; i++) {
+      const a = l.stations[i], b = l.stations[i + 1];
+      if (a.ug || b.ug) l.runs.push([a.x, a.z, b.x, b.z]);
+    }
+    return (this._metro = lines);
+  }
+  drawMetro(x, T, z) {
+    const lines = this.metroLines(), w = Math.max(2.2, Math.min(5, 2.6 * Math.pow(z, 0.35)));
+    x.lineJoin = 'round'; x.lineCap = 'round';
+    for (const l of lines) {
+      x.setLineDash(l.open ? [] : [w * 2.2, w * 1.6]);
+      for (const pass of [0, 1]) {
+        x.strokeStyle = pass ? l.color : 'rgba(10,11,13,.55)'; x.lineWidth = pass ? w : w + 2.5; x.globalAlpha = l.open ? 1 : 0.8;
+        x.beginPath();
+        for (const q of l.runs) { const [X0, Y0] = T(q[0], q[1]); x.moveTo(X0, Y0); for (let k = 2; k < q.length; k += 2) { const [X, Y] = T(q[k], q[k + 1]); x.lineTo(X, Y); } }
+        x.stroke();
+      }
+    }
+    x.setLineDash([]); x.globalAlpha = 1;
+    if (z < 0.22) return;
+    const r = z < 0.6 ? 3 : 4.5;
+    x.font = '650 11px Inter, system-ui, sans-serif'; x.textAlign = 'left'; x.textBaseline = 'middle';
+    for (const l of lines) for (const s of l.stations) {
+      const [X, Y] = T(s.x, s.z);
+      x.fillStyle = s.soon || !l.open ? '#9aa0a8' : '#f4f1ea'; x.strokeStyle = l.color; x.lineWidth = 2;
+      x.beginPath(); x.arc(X, Y, r, 0, Math.PI * 2); x.fill(); x.stroke();
+      if (z >= 1.1) {
+        const t = s.name + (!l.open ? ` · opens ${opensOn(l)}` : s.soon ? ' · opens later' : '');
+        x.strokeStyle = 'rgba(16,18,22,.92)'; x.lineWidth = 3.5; x.strokeText(t, X + r + 4, Y); x.fillStyle = l.color; x.fillText(t, X + r + 4, Y);
+      }
+    }
+  }
   draw(dt) {
     const cv = this.cv, w = cv.clientWidth, h = cv.clientHeight;
     if (!w || !h) return;
@@ -652,6 +698,7 @@ export class MapScreen {
       const path = () => { x.beginPath(); for (let k = 0; k < pts.length; k += 2) { const [X, Y] = T(pts[k], pts[k + 1]); k ? x.lineTo(X, Y) : x.moveTo(X, Y); } };
       path(); x.stroke(); x.strokeStyle = col; x.lineWidth = wpx; path(); x.stroke();
     };
+    this.drawMetro(x, T, v.ppm);
     line(g.nav && g.nav.pts, '#5fd0ff', 4);
     line(g.rides && g.rides.routePts, '#f2b705', 4);
     // labels, most important first; each claims a box so nothing overlaps

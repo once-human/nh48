@@ -320,7 +320,7 @@ export function* buildPropsChunk(W, C, group) {
     const sl = Math.hypot(bx - ax, bz - az);
     if (sl < 0.2) continue;
     const mx = (ax + bx) / 2, mz = (az + bz) / 2;
-    if (constr && hash1(Math.round(mx) * 7 + Math.round(mz)) < 0.35) continue;
+    if (constr === 1 && hash1(Math.round(mx) * 7 + Math.round(mz)) < 0.35) continue;
     const nx = (bz - az) / sl, nz = -(bx - ax) / sl;
     const hw = 2.5, bw = 1.5, top = 12.6, bot = 11.2;
     const quad = (o0, y0, o1, y1) => {
