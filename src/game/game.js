@@ -85,6 +85,8 @@ export class Game {
     }
     player.reset(start.x, start.z, start.th);
     this.start = start;
+    // a brand new game: you step out of your auto onto the garden in front of the Delhi Darwaza, facing it
+    this.wadaIntro = (!this.saved && !this.resumed && !this.params.has('spawn') && !this.params.has('test')) || this.params.has('intro');
     this.settings = loadSettings();
     this.audio = new Audio(this.sounds);
     // browsers only allow sound after a gesture: start on the first click or key anywhere
@@ -343,6 +345,16 @@ export class Game {
     // drop focus from the menu button so Space (handbrake) can't press it again
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     this.state = 'play';
+    if (this.wadaIntro) {
+      this.wadaIntro = false;
+      const L = this.W.landmarks && this.W.landmarks.find(l => l.id === 'shaniwar');
+      if (L) {
+        const c = Math.cos(L.rot), s = Math.sin(L.rot), P = (u, v) => [L.x + u * c + v * s, L.z + u * s - v * c];
+        const [gx, gz] = P(2.7, -83), [x, z] = P(-4, -112);
+        try { this.player.teleportFoot(x, z, Math.atan2(gz - z, gx - x), this.traffic); this.rig.inited = false; } catch (e) { /* stay in the auto */ }
+        this.later(1.2, () => this.hud.toast('Shaniwar Wada', 'Seat of the Peshwas, 1732. Tickets ₹25 at the window by the gate. Your auto is on the road behind you', 'info', 5.5));
+      }
+    }
     this.goFullscreen();
     this.lockMouse && this.lockMouse();
     this.audio.start();
@@ -825,9 +837,17 @@ export class Game {
       P.setCockpit(false); this.rig.setNear(0.3);
       this.camera.up.set(0, 1, 0);
       const a = performance.now() / 1000 * 0.05 + 2.3;
-      const r = 11;
-      this.camera.position.set(P.x + Math.cos(a) * r, 3.2 + Math.sin(a * 0.7) * 0.5, P.z + Math.sin(a) * r);
-      this.camera.lookAt(P.x - Math.cos(a) * 6, 2.2, P.z - Math.sin(a) * 6);
+      const L = this.W.landmarks && this.W.landmarks.find(l => l.id === 'shaniwar');
+      if (L && Math.hypot(P.x - L.x, P.z - L.z) < 400) {
+        // by Shaniwar Wada: a slow drone shot round the fort, the Delhi Darwaza swinging past
+        const b = performance.now() / 1000 * 0.035 + 4.2, r2 = 175;
+        this.camera.position.set(L.x + Math.cos(b) * r2, 78 + Math.sin(b * 0.6) * 8, L.z + Math.sin(b) * r2);
+        this.camera.lookAt(L.x, 4, L.z);
+      } else {
+        const r = 11;
+        this.camera.position.set(P.x + Math.cos(a) * r, 3.2 + Math.sin(a * 0.7) * 0.5, P.z + Math.sin(a) * r);
+        this.camera.lookAt(P.x - Math.cos(a) * 6, 2.2, P.z - Math.sin(a) * 6);
+      }
       if (this.camera.fov !== 50) { this.camera.fov = 50; this.camera.updateProjectionMatrix(); }
       this.traffic.honks.length = 0;
     }
