@@ -1235,3 +1235,13 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .photo-ui .ph-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
 .photo-ui .ph-flash.go { animation: phflash .45s ease-out; }
 @keyframes phflash { 0% { opacity: .75; } 100% { opacity: 0; } }
+
+/* ---- one surface everywhere: the light see-through glass of the torch chip (Onkar, 28 Oct). A dark tint at
+   62% with a hairline edge; the big lists a touch denser so long text stays easy to read over the city */
+:root { --glass-1: rgba(24, 24, 28, .62); --glass-2: rgba(20, 20, 24, .74); --glass-edge: rgba(255, 255, 255, .14); }
+.toast, .sms, .prompt, .glass, .placecard, .vit, .ibtn, .lamp-ind, .photo-ui .ph-bar, .bm-card, .bm-top, .bm-filters button {
+  background: var(--glass-1) !important; border: .5px solid var(--glass-edge) !important; box-shadow: 0 10px 30px -12px rgba(0, 0, 0, .55) !important; }
+.toast, .sms, .placecard, .glass, .vit, .bm-card { border-radius: 14px !important; }
+.prompt, .lamp-ind, .ibtn { border-radius: 999px !important; }
+.jhola, .shop, .talk, .trial { background: var(--glass-2) !important; border: .5px solid var(--glass-edge) !important; border-radius: 18px !important; }
+.toast b, .prompt, .placecard, .glass { text-shadow: 0 1px 2px rgba(0, 0, 0, .45); }
