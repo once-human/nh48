@@ -34,6 +34,7 @@ import { Bag } from './bag.js';
 import { Phone } from './phone.js';
 import { Eggs } from './eggs.js';
 import { Story } from './story.js';
+import { Tutorial } from './tutorial.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { StreetApproach } from './approach.js';
@@ -152,6 +153,7 @@ export class Game {
     this.wada = new Wada(this);
     this.club = new Club(this);
     this.bag = new Bag(this);
+    this.tut = new Tutorial(this);
     this.phone = new Phone(this);
     this.eggs = new Eggs(this);
     this.story = new Story(this);
@@ -428,7 +430,7 @@ export class Game {
         const dd = this.player.dropped && this.player.dropped.find(q => q.veh === this.player.auto);
         if (dd) dd.safe = true;
         this.findAuto = true;
-        this.hud.intro?.(this.free);
+        this.tut.start();                   // the first minutes, taught by doing (once)
       }
     }
     this.goFullscreen();
@@ -703,6 +705,8 @@ export class Game {
   objective() {
     const r = this.rides, P = this.player;
     if (P.tipped) return { main: 'Auto tipped over!', sub: 'Hold on… getting it back on three wheels', urgent: true };
+    const tj = this.tut && this.tut.objective();
+    if (tj) return tj;
     const so = this.story && this.story.objective();
     if (so && !(r.current && r.current.state === 'onboard')) return so;
     const hj = this.hustle && this.hustle.objective();
@@ -838,6 +842,7 @@ export class Game {
   }
 
   frame(dt) {
+    if (this.state !== 'title' && this.tut) this.tut.update(dt);
     const P = this.player;
     if (this.state === 'photo') this.photo.update(dt);
     this.autoMarkerTick(dt);

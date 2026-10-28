@@ -7,7 +7,7 @@ import { safeStorage } from '../core/util.js';
 
 const KEY = 'nh48_save';
 // everything "Start over" wipes (graphics quality is a device setting, not progress)
-export const PROGRESS_KEYS = ['nh48_save', 'nh48_stats', 'nh48_police', 'nh48_life', 'nh48_char'];
+export const PROGRESS_KEYS = ['nh48_tut', 'nh48_save', 'nh48_stats', 'nh48_police', 'nh48_life', 'nh48_char'];
 
 const r2 = (v) => Math.round(v * 100) / 100;
 function vehOf(v, auto) {
