@@ -185,6 +185,11 @@ export class Story {
   swAt(u, v, name) { const W = this.g.W, L = W.landmarks && W.landmarks.find(l => l.id === 'shaniwar'); if (!L) return null; const c = Math.cos(L.rot), s = Math.sin(L.rot); return { x: L.x + u * c + v * s, z: L.z + u * s - v * c, name }; }
   text(who, mr, en) { const [n] = WHO[who] || [who]; this.g.phone.push(n, en ? `${mr}  (${en})` : mr); }
   save() { this.g.life.save(); }
+  summary() {
+    const ms = this.list(), st = this.st, out = [];
+    ms.forEach((m, i) => out.push({ t: `${i + 1}. ${m.title}`, s: i < st.m ? 'Done' : i === st.m ? (st.step >= 0 ? (typeof this.cur()?.obj === 'function' ? this.cur().obj() : this.cur()?.obj) || 'In progress' : 'Your phone will ring') : 'Locked', cur: i === st.m }));
+    return out;
+  }
 
   // ---------------------------------------------------------------- flow
   startMission() {
@@ -293,7 +298,7 @@ export class Story {
   // ---------------------------------------------------------------- the conversation
   talk(queue) {
     const G = this.g;
-    this.queue = queue; this.talking = true; this.asking = null;
+    this.queue = queue; this.talking = true; this.asking = null; this.hideMarker();
     this._was = G.state; G.state = 'shop'; G.audio.updateEngine?.(0, 0, false);
     const p = this.npcs[0]; if (p) { p.yaw = Math.atan2(G.player.x - p.x, G.player.z - p.z); }
     this.el.hidden = false; this.el.classList.remove('in'); void this.el.offsetWidth; this.el.classList.add('in');
@@ -329,7 +334,7 @@ export class Story {
   }
   endTalk() {
     const G = this.g;
-    this.talking = false; this.el.hidden = true;
+    this.talking = false; this.el.hidden = true; this._camOn = false; if (G.rig) G.rig.inited = false;
     if (G.state === 'shop') G.state = 'play';
     G.lockMouse?.();
     if (this.retry) { this.retry = 0; this.restart(); return; }
@@ -356,6 +361,18 @@ export class Story {
       G.setWaypoint({ x: c.pts[c.i].x, z: c.pts[c.i].z, name: `Checkpoint ${c.i + 1}`, gig: true });
     }
     if (c.left <= 0) { G.hud.toast('Failed', 'Too slow. The inspector sighs. Again', 'warn', 2.6); c.i = 0; c.left = this.cur().limit; G.setWaypoint({ x: c.pts[0].x, z: c.pts[0].z, name: 'Checkpoint 1', gig: true }); }
+  }
+  // over your shoulder, onto whoever's talking
+  cam(dt) {
+    const G = this.g, p = this.npcs[0], P = G.player, C = G.camera;
+    if (!p || !P.onFoot) return;
+    let dx = p.x - P.x, dz = p.z - P.z; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
+    const y0 = G.W.surf.height(P.x, P.z), tx = P.x - dx * 2.3 + dz * 1.1, tz = P.z - dz * 2.3 - dx * 1.1;
+    const k = 1 - Math.exp(-dt * 4);
+    if (!this._camOn) { C.position.set(tx, y0 + 1.75, tz); this._camOn = true; }
+    C.position.x += (tx - C.position.x) * k; C.position.z += (tz - C.position.z) * k; C.position.y += (y0 + 1.75 - C.position.y) * k;
+    C.lookAt(p.x, G.W.surf.height(p.x, p.z) + 1.5, p.z);
+    if (P.foot) P.foot.yaw = Math.atan2(dz, dx);
   }
   onPhoto(x, z) { if (this.cur() && this.cur().photo) this.photoAt = { x, z }; }
 

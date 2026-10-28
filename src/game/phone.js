@@ -20,6 +20,7 @@ const APPS = [
   ['garage', 'Garage', '#3a7bd5', '<path d="M5 15h14l-1.6-5H6.6z"/><circle cx="8" cy="17" r="1.6"/><circle cx="16" cy="17" r="1.6"/>'],
   ['shift', 'Rides', '#111111', '<path d="M4 15h16v3H4z"/><path d="M6 15l2-6h8l2 6"/>'],
   ['weather', 'Weather', '#2f8fe6', '<circle cx="9" cy="10" r="3.4"/><path d="M8 18h9a3 3 0 0 0 0-6 4.5 4.5 0 0 0-8.4 1.6A2.3 2.3 0 0 0 8 18z"/>'],
+  ['story', 'Tasks', '#ff8a1f', '<path d="M6 4v16M6 5h11l-2.5 4L17 13H6"/>'],
   ['snake', 'Snake', '#2d6a2d', '<path d="M6 17h6a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/><circle cx="17.5" cy="5" r="1"/>'],
 ];
 const DOCK = [
@@ -28,7 +29,7 @@ const DOCK = [
   ['camera', 'Camera', '#55565b', '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.6"/>'],
   ['msgs', 'Messages', '#2fa3f5', '<path d="M4 6h16v10H9l-5 4z"/>'],
 ];
-const KP_MENU = [['msgs', 'Messages'], ['contacts', 'Contacts'], ['snake', 'Snake'], ['clock', 'Clock'], ['about', 'Upgrade']];
+const KP_MENU = [['msgs', 'Messages'], ['story', 'Tasks'], ['contacts', 'Contacts'], ['snake', 'Snake'], ['clock', 'Clock'], ['about', 'Upgrade']];
 
 export class Phone {
   constructor(G) {
@@ -216,6 +217,10 @@ export class Phone {
       title = 'Rides';
       const R = G.rides;
       body = `<div class="ph-bal"><small>Status</small><b>${R.enabled ? 'On shift' : 'Off shift'}</b><small>Earned today</small><b>${fmt(G.stats.today || G.stats.shiftEarn || 0)}</b></div><p class="ph-empty">Get into any auto to go on shift. People waving for a ride show green on the map.</p>`;
+    } else if (cur === 'story') {
+      title = 'Tasks';
+      if (G.free) body = `<p class="ph-empty">Free roam. The story waits for you in Story mode.</p>`;
+      else { body = `<p class="ph-hint">Act 1 · Meter Down</p>`; for (const r of G.story.summary()) items.push({ t: r.t, s: r.s, dot: r.cur, act: null }); }
     } else if (cur === 'weather') {
       title = 'Pune';
       const h = G.hour || 12, m = new Date().getMonth(), rain = m >= 5 && m <= 8, hot = m >= 2 && m <= 4;

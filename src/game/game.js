@@ -910,6 +910,7 @@ export class Game {
     const night = this.sky.state ? this.sky.state.night : 0;
     this.lights.update(dt, night);
     if (this.state === 'play' || this.state === 'shop') this.phone.update(dt);
+    if (this.story.talking) this.story.cam(dt);
     if (this.lightPools) { this.lightPools.mesh.visible = night > 0.05; this.lightPools.mesh.material.opacity = night * 0.55; }
     this.people.render(P.x, P.z);
     if (this.crowd) { this.crowd.inView = this.inView; this.crowd.update(dt, this.camera.position.x, this.camera.position.z); }
