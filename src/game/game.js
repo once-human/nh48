@@ -26,6 +26,7 @@ import { Club } from './club.js';
 import { Lights } from './lights.js';
 import { Bag } from './bag.js';
 import { Phone } from './phone.js';
+import { Patya } from './patya.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { StreetApproach } from './approach.js';
@@ -145,6 +146,7 @@ export class Game {
     this.club = new Club(this);
     this.bag = new Bag(this);
     this.phone = new Phone(this);
+    this.patya = new Patya(this);
     this.lights = new Lights(this);
     this.strays = new Strays(this);
     this.interiors = new Interiors(this);
@@ -836,6 +838,7 @@ export class Game {
       this.gigs.update(dt, this.input);
       this.hustle.update(dt, this.input);
       this.strays.update(dt);
+      this.patya.update(dt);
       this.rig.drunk = this.life.s.drunk;
       if (this.post) this.post.drunk = this.interiors.inside && this.interiors.cur.R.tpl === 'club' ? Math.min(this.life.s.drunk, 0.5) : this.life.s.drunk;
       this.hud.lowHealth?.((P.hp ?? 100) / this.life.hpMax);
