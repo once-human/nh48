@@ -25,6 +25,7 @@ import { justOpened, lineOpen, opensOn } from './metroOpen.js';
 import { Club } from './club.js';
 import { Lights } from './lights.js';
 import { Bag } from './bag.js';
+import { Phone } from './phone.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { StreetApproach } from './approach.js';
@@ -143,6 +144,7 @@ export class Game {
     this.wada = new Wada(this);
     this.club = new Club(this);
     this.bag = new Bag(this);
+    this.phone = new Phone(this);
     this.lights = new Lights(this);
     this.strays = new Strays(this);
     this.interiors = new Interiors(this);
@@ -896,6 +898,7 @@ export class Game {
     // night lights
     const night = this.sky.state ? this.sky.state.night : 0;
     this.lights.update(dt, night);
+    if (this.state === 'play' || this.state === 'shop') this.phone.update(dt);
     if (this.lightPools) { this.lightPools.mesh.visible = night > 0.05; this.lightPools.mesh.material.opacity = night * 0.55; }
     this.people.render(P.x, P.z);
     if (this.crowd) { this.crowd.inView = this.inView; this.crowd.update(dt, this.camera.position.x, this.camera.position.z); }

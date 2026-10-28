@@ -27,6 +27,7 @@ export const ACTIONS = [
   { id: 'bag', label: 'Jhola', group: 'Menus', def: 'KeyE' },
   { id: 'stats', label: 'Your status', group: 'Menus', def: 'Tab' },
   { id: 'map', label: 'Map', group: 'Menus', def: 'KeyM' },
+  { id: 'phone', label: 'Phone', group: 'Menus', def: 'KeyT' },
   { id: 'photo', label: 'Photo mode', group: 'Menus', def: 'KeyK' },
   { id: 'pause', label: 'Pause (Esc always works)', group: 'Menus', def: 'KeyP' },
 ];

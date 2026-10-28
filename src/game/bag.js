@@ -13,7 +13,7 @@ import { guideHTML } from './guide.js';
 import { BUSINESSES as BIZ } from './hustle.js';
 import { levelOf, ASKS } from './date.js';
 
-const TABS = [['bag', 'Bag', 'झोळी', 'jhola'], ['me', 'Me', 'मी', 'person'], ['wear', 'Wardrobe', 'कपडे', 'shirt'], ['own', 'Owned', 'माझं', 'key'], ['near', 'Nearby', 'जवळ', 'compass'], ['ppl', 'Phone', 'फोन', 'phone'], ['guide', 'Guide', 'माहिती', 'guide']];
+const TABS = [['bag', 'Bag', 'झोळी', 'jhola'], ['me', 'Me', 'मी', 'person'], ['wear', 'Wardrobe', 'कपडे', 'shirt'], ['own', 'Owned', 'माझं', 'key'], ['near', 'Nearby', 'जवळ', 'compass'], ['guide', 'Guide', 'माहिती', 'guide']];
 const GROUPS = [['food', 'Food'], ['night', 'Night'], ['look', 'Look'], ['health', 'Health'], ['money', 'Money'], ['things', 'Shops'], ['vehicle', 'Vehicles'], ['place', 'Places'], ['homes', 'Homes for sale']];
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);

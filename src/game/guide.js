@@ -109,7 +109,7 @@ const PEOPLE = [
 
 const CONTROLS_DEF = [
   ['W A S D', 'Walk or drive'], ['Mouse', 'Look around (the game keeps the mouse; any key or click takes it back)'], ['Click', 'Punch'], ['C', 'On foot: roll. Driving: change camera'], ['Space', 'Handbrake; on foot, jump or climb'], ['Shift / Alt', 'Sprint / walk'], ['X', 'Punch (also)'],
-  ['F', 'Interact, enter, get in or out'], ['E', 'Jhola'], ['Tab', 'Your stats'], ['M', 'Map (or tap the minimap)'], ['H', 'Horn'], ['V', 'Camera (anytime)'], ['B', 'Look back'],
+  ['F', 'Interact, enter, get in or out'], ['E', 'Jhola'], ['Tab', 'Your stats'], ['M', 'Map (or tap the minimap)'], ['T', 'Phone'], ['H', 'Horn'], ['V', 'Camera (anytime)'], ['B', 'Look back'],
   ['R', 'Back on the road'], ['G', 'Pickpocket (on foot, next to someone)'], ['Y', 'Accept an offer on your phone'], ['Y', 'Accept a delivery'], ['1 to 9, W/S, Enter', 'Pick in any menu'], ['Esc or F', 'Close any menu'], ['Esc', 'Pause (the only time you get a cursor)'], ['F3', 'Performance info'],
 ];
 
