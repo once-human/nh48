@@ -21,6 +21,10 @@ NO_BOARD_STYLES = {6, 7, 8, 10, 11, 13}
 def nslots(L): return max(1, int(math.floor(L / SHOP_CELL)))
 
 P = json.load(open(os.path.join(ROOT, 'data/raw/osm/places_clean.json')))
+# landmarks whose map pin belongs at the gate you walk in by, not the middle of the outline
+PIN_AT = {'Shaniwar Wada': (-1012.9, 751.2)}
+for c in P:
+    if c['raw'] in PIN_AT: c['x'], c['z'] = PIN_AT[c['raw']]
 # names once
 for c in P:
     r = board_name(c['raw'], c['cat'] or 'generic') if c['board'] else None

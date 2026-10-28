@@ -19,6 +19,7 @@ import { Gigs } from './gigs.js';
 import { Hustle } from './hustle.js';
 import { Transit } from './transit.js';
 import { PhotoMode } from './photo.js';
+import { Wada } from './wada.js';
 import TRANSIT_DATA from './transit.json';
 import { justOpened, lineOpen, opensOn } from './metroOpen.js';
 import { Club } from './club.js';
@@ -69,7 +70,8 @@ export class Game {
     const { W, player, traffic } = this;
     const st = safeStorage();
     if (st) { try { const s = JSON.parse(st.getItem('nh48_stats') || 'null'); if (s) { Object.assign(this.stats, s); if ((s.grant || 0) < 2) { this.stats.money = Math.max(5000, this.stats.money); this.stats.grant = 2; } } } catch (e) { /* ignore */ } }
-    const start = this.findStart(this.params.get('spawn') || 'FC Road');
+    // first time in: on the road by Shaniwar Wada's garden, the Delhi Darwaza in view (?spawn=FC Road etc. for others)
+    const start = this.params.get('spawn') ? this.findStart(this.params.get('spawn')) : (this.wadaStart() || this.findStart('FC Road'));
     // where you were last time (position, vehicle, towed auto...)
     this.saved = this.params.has('test') || this.params.has('spawn') ? null : Save.load();
     const sp = Save.startPoint(this.saved);
@@ -136,6 +138,7 @@ export class Game {
     this.hustle = new Hustle(this);
     this.transit = new Transit(this);
     this.photo = new PhotoMode(this);
+    this.wada = new Wada(this);
     this.club = new Club(this);
     this.bag = new Bag(this);
     this.lights = new Lights(this);
@@ -287,6 +290,19 @@ export class Game {
     this.saveStats();
   }
 
+  wadaStart() {
+    const W = this.W, L = W.landmarks && W.landmarks.find(l => l.id === 'shaniwar');
+    if (!L) return null;
+    const c = Math.cos(L.rot), s = Math.sin(L.rot), P = (u, v) => [L.x + u * c + v * s, L.z + u * s - v * c];
+    const [gx, gz] = P(2.7, -83), [px, pz] = P(2.7, -128);
+    const near = W.graph.nearest(px, pz, 90, (e) => e.rank >= 3);
+    if (!near) return null;
+    const e = near.e, t = W.graph.at(e, Math.max(3, Math.min(e.len - 3, near.s)));
+    let hx = t[2], hz = t[3];
+    if (hx * (gx - t[0]) + hz * (gz - t[1]) < 0) { hx = -hx; hz = -hz; }
+    const lat = e.oneway ? e.w / 2 - 1.8 : (hx === t[2] ? 1.8 : -1.8);
+    return { x: t[0] + t[3] * lat, z: t[1] - t[2] * lat, th: Math.atan2(hz, hx) };
+  }
   findStart(roadName) {
     const { W } = this;
     const ids = new Set(W.graph.names.map((n, i) => (n[0] === roadName ? i : -1)).filter(i => i >= 0));
@@ -757,6 +773,7 @@ export class Game {
       this.tickTimers(dt);
       this.life.update(dt);
       this.shops.update(dt);
+      this.wada.update(dt);
       this.gigs.update(dt, this.input);
       this.hustle.update(dt, this.input);
       this.strays.update(dt);

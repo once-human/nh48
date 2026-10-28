@@ -432,7 +432,7 @@ export class People {
       if (p.anchor) {
         p.x = p.anchor.x; p.z = p.anchor.z;
         if (p.anchor.fx !== undefined) this.face(p, p.anchor.fx, p.anchor.fz, dt);
-        if (p.wait <= 0) { p.anchor = null; if (p.venue) { (p.clubber ? p.venue.clubCrowd-- : p.venue.crowd--); p.venue = null; } this.backToPath(p); }
+        if (p.wait <= 0) { const nx = p.anchorNext; p.anchor = null; p.anchorNext = null; if (p.venue) { (p.clubber ? p.venue.clubCrowd-- : p.venue.crowd--); p.venue = null; } if (nx) { p.mode = 'walk'; nx(p); } else this.backToPath(p); }
         return;
       }
       if (p.wait <= 0) p.mode = 'walk';

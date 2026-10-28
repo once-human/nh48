@@ -171,8 +171,9 @@ async function main() {
   window.__W = W; window.__updateProps = updateProps; window.__U = U;
 
   if (PUNE) {
-    // the tiles around where you'll start: your saved spot, or FC Road for a new game
-    let sx = -2450, sz = 1100;
+    // the tiles around where you'll start: your saved spot, or Shaniwar Wada for a new game (FC Road with ?spawn)
+    let sx = -1013, sz = 700;
+    if (params.has('spawn')) { sx = -2450; sz = 1100; }
     if (params.has('fly') && params.get('at')) { const a = params.get('at').split(',').map(Number); sx = a[0]; sz = a[1]; }
     try { if (params.has('fly')) throw 0; const sp = Save.startPoint(Save.load()); if (sp) { sx = sp.x; sz = sp.z; } } catch (e) { /* new game */ }
     try { const r = JSON.parse(sessionStorage.getItem('nh48_resume') || 'null'); if (r) { sx = r.x; sz = r.z; } } catch (e) { /* none */ }

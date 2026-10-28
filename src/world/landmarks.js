@@ -24,6 +24,23 @@ const C = { teak: [0.36, 0.22, 0.12], iron: [0.2, 0.2, 0.21], bronze: [0.28, 0.2
 const G = {};
 const geo = (k, f) => G[k] || (G[k] = f());
 
+// Shaniwar Wada's layout in its own frame (u across, v from the Delhi Darwaza side inward), from the OSM outline:
+// the gate sits between the two round bastions at u -2..7.6 on the north face. Shared with game/wada.js
+export const SW = (() => {
+  const GU = 2.73, GW = 9.6, GV = -83.2;
+  const U0 = -68, U1 = 64.5, V0 = -76, V1 = 77.3, cross = [-26, 28];
+  const trees = [];
+  for (let u = U0 + 7; u <= U1 - 7; u += 12.5) { if (Math.abs(u - GU) > 11) trees.push([u, V0 + 6.5, 3 + ((u * 7) % 3 + 3) % 3 * 0.4]); trees.push([u, V1 - 6.5, 3.3]); }
+  for (let v = V0 + 18; v <= V1 - 14; v += 13) { trees.push([U0 + 6.5, v, 3.2]); trees.push([U1 - 6.5, v, 3.4]); }
+  return {
+    GU, GW, GV, WU: GU + 1.7, U0, U1, V0, V1, cross, trees,
+    bastions: [[-6.7, -84.4, 4.4, 15], [12.4, -83.9, 4.6, 15], [71.9, -80.3, 6.9, 13], [74.2, 4.6, 6.0, 12.6], [70.3, 81.8, 5.6, 12.6], [-73.6, 81.8, 6.5, 13], [-75.9, -9.3, 4.8, 12.6], [-73.4, -81.5, 6.1, 13]],
+    plinths: [[-34, -52, 36, 28], [38, -52, 34, 28], [-34, 1, 36, 32], [38, 1, 34, 32], [-34, 54, 36, 30], [38, 54, 34, 30]],
+    karanje: [GU, -26], counter: [GU - 13, GV - 6], plaque: [GU + 13, GV - 5.5],
+    isGateSeg: (a, b) => Math.abs(a[1] - GV) < 0.3 && Math.abs(b[1] - GV) < 0.3 && Math.min(a[0], b[0]) > -3 && Math.max(a[0], b[0]) < 8.5,
+  };
+})();
+
 // ---------------------------------------------------------------- the per-landmark builder
 class LB {
   constructor(L, b) {
@@ -204,64 +221,110 @@ const BUILD = {
   // the Delhi Darwaza on the north with its spiked teak doors and the nagarkhana above, gardens and the
   // plinths of the burnt palace inside, the Hazari Karanje lotus fountain, Bajirao on horseback outside.
   shaniwar(B) {
-    const L = B.L, hw = L.w / 2, hd = L.d / 2, ring = L.outline;
-    const sA = B.A(WL.rubble, STONE), bA = B.A(WL.brick, BRICK), topA = B.A(WL.slab, STONE);
-    // the rampart along the real outline: outer face, inner face 3 m in, walkway on top
-    const inner = shrink(ring, 3.2);
+    const L = B.L, ring = L.outline, W = SW;
+    const sA = B.A(WL.rubble, STONE, 11, 2, 7.2), bA = B.A(WL.brick, BRICK, 11, 2, 10.6), topA = B.A(WL.slab, STONE);
+    // the rampart on the real outline (its round lobes are the bastions), stone below and brick above
     B.ring(ring, 0, 7.2, sA); B.ring(ring, 7.2, 10.6, bA);
-    B.ring(inner, 0, 10.6, B.A(WL.brick, BRICK), true);
-    for (let i = 0; i < ring.length; i++) { const j = (i + 1) % ring.length; B.flat([ring[i], ring[j], inner[j], inner[i]], 10.6, topA); }
+    const IN = [[W.U0, W.V0], [W.U1, W.V0], [W.U1, W.V1], [W.U0, W.V1]];
+    { const iA = B.A(WL.brick, BRICK, 11, 2, 10.6), g0 = W.GU - W.GW / 2 - 0.3, g1 = W.GU + W.GW / 2 + 0.3;      // inner faces, open at the gate
+      B.wall(W.U0, W.V0, g0, W.V0, 0, 10.6, 0, 1, iA); B.wall(g1, W.V0, W.U1, W.V0, 0, 10.6, 0, 1, iA);
+      B.wall(W.U1, W.V0, W.U1, W.V1, 0, 10.6, -1, 0, iA); B.wall(W.U1, W.V1, W.U0, W.V1, 0, 10.6, 0, -1, iA); B.wall(W.U0, W.V1, W.U0, W.V0, 0, 10.6, 1, 0, iA); }
+    { const o = []; for (const [u, v] of ring) { const [x, z] = B.P(u, v); o.push(x, z); }
+      const h = []; for (const [u, v] of IN) { const [x, z] = B.P(u, v); h.push(x, z); }
+      B.gb.poly([o, h], B.Y0 + 10.6, GL.concrete, 0.85); }
     B.merlons(ring, 10.6, C.brick, 2.4, 1.3, 1.0, 0.75);
-    // bastions: the corners, the middle of three sides, and the pair beside the gate
-    const gu = -8, gw = 14;
-    const bast = [[-hw + 3, -hd + 3], [hw - 3, -hd + 3], [hw - 3, hd - 3], [-hw + 3, hd - 3], [hw - 2, 0], [-hw + 2, 0], [0, hd - 2], [gu - gw / 2 - 5, -hd + 1], [gu + gw / 2 + 5, -hd + 1]];
-    bast.forEach(([u, v], k) => {
-      const r = k >= 7 ? 7.5 : 8.2, n = 16, H = k >= 7 ? 15 : 12.6, pts = [];
-      for (let i = 0; i < n; i++) pts.push([u + Math.cos(i / n * 6.283) * r, v + Math.sin(i / n * 6.283) * r]);
+    // the bastion towers standing up out of the lobes
+    for (const [u, v, r, H] of W.bastions) {
+      const pts = []; for (let i = 0; i < 18; i++) pts.push([u + Math.cos(i / 18 * 6.283) * r, v + Math.sin(i / 18 * 6.283) * r]);
       B.ring(pts, 0, 7.6, sA); B.ring(pts, 7.6, H, bA);
-      const cap = []; for (let i = 0; i < n; i++) cap.push(pts[i]);
-      for (let i = 0; i < n; i += 2) B.flat([[u, v], pts[i], pts[(i + 1) % n], pts[(i + 2) % n]], H, topA);
+      for (let i = 0; i < 18; i += 2) B.flat([[u, v], pts[i], pts[(i + 1) % 18], pts[(i + 2) % 18]], H, topA);
       B.merlons(pts, H, C.brick, 2.2, 1.2, 1.0, 0.7);
-      // arrow loops
-      for (let i = 0; i < n; i += 3) { const a = i / n * 6.283; B.cbox(u + Math.cos(a) * (r + 0.02), 9.5, v + Math.sin(a) * (r + 0.02), 0.25, 1.4, 0.1, C.dark, a + Math.PI / 2); }
+      for (let i = 0; i < 18; i += 3) { const a = i / 18 * 6.283; B.cbox(u + Math.cos(a) * (r + 0.02), H - 3, v + Math.sin(a) * (r + 0.02), 0.25, 1.4, 0.1, C.dark, a + Math.PI / 2); }
       B.hitc(u, v, r);
-    });
-    // Delhi Darwaza: the gate block between its two bastions, on the north face (v = -hd)
-    const gv = -hd, g0 = gu - gw / 2, g1 = gu + gw / 2;
-    B.box(gu, gv + 2, gw, 9, 0, 9.5, sA, null); B.box(gu, gv + 2, gw, 9, 9.5, 17.5, bA, B.A(WL.slab, STONE));
-    // the arched opening, the two teak doors, 72 spikes on each
-    B.arch(gu, gv - 2.55, 6.2, 9.4, 0, [0.12, 0.09, 0.07]);
+    }
+    // Delhi Darwaza between its two bastions: the gate block, the arch, the spiked teak doors with the
+    // small wicket door you go in by, the nagarkhana gallery and its eave, the saffron jaripatka on top
+    const gu = W.GU, gw = W.GW, gv = W.GV;
+    B.box(gu, gv + 4.4, gw + 0.6, 9, 0, 9.5, sA, null); B.box(gu, gv + 4.4, gw + 0.6, 9, 9.5, 17.5, bA, B.A(WL.slab, STONE));
+    B.arch(gu, gv - 0.12, 6.2, 9.4, 0, [0.12, 0.09, 0.07]);
+    B.arch(gu, gv + 9.0, 6.2, 9.4, 0, [0.12, 0.09, 0.07], false, Math.PI);                 // and its inner face, into the fort
     for (const side of [-1, 1]) {
       const du = gu + side * 1.5;
-      B.cbox(du, 0, gv - 2.62, 2.9, 7.6, 0.18, C.teak);
-      for (let r = 0; r < 4; r++) B.cbox(du, 1.1 + r * 1.7, gv - 2.73, 2.9, 0.09, 0.05, C.iron);
+      B.cbox(du, 0, gv - 0.2, 2.9, 7.6, 0.18, C.teak);
+      for (let r = 0; r < 4; r++) B.cbox(du, 1.1 + r * 1.7, gv - 0.31, 2.9, 0.09, 0.05, C.iron);
       for (let i = 0; i < 8; i++) for (let j = 0; j < 9; j++) {
         const su = du - 1.25 + (j + 0.5) * (2.5 / 9), sy = 3.0 + i * 0.32;
-        B.part(geo('spike', () => { const g = new THREE.ConeGeometry(0.045, 0.32, 5); g.rotateX(Math.PI / 2); return g; }), su, sy, gv - 2.88, C.iron);
+        B.part(geo('spike', () => { const g = new THREE.ConeGeometry(0.045, 0.32, 5); g.rotateX(Math.PI / 2); return g; }), su, sy, gv - 0.46, C.iron);
       }
     }
-    B.cbox(gu + 1.5, 0, gv - 2.75, 0.8, 1.7, 0.05, [0.2, 0.13, 0.07]);                 // the small wicket door
-    // upper gate: arched windows, the nagarkhana's wooden balcony and its eave
-    for (const k of [-1, 0, 1]) B.arch(gu + k * 3.6, gv - 2.55, 1.5, 2.6, 11.2, C.dark);
-    B.cbox(gu, 13.9, gv - 3.3, gw - 1.5, 2.6, 1.6, C.teak); B.cbox(gu, 16.4, gv - 3.4, gw - 0.6, 0.25, 2.0, [0.3, 0.18, 0.1]);
-    for (let k = -3; k <= 3; k++) B.cbox(gu + k * 1.9, 13.9, gv - 4.05, 0.18, 2.5, 0.18, [0.3, 0.18, 0.1]);
-    B.merlons([[g0, gv - 2.5], [g1, gv - 2.5]], 17.5, C.brick, 2.0, 1.2, 1.0, 0.7, false);
-    // inside: lawns, paths, the burnt palace's stone plinths, the lotus fountain
-    B.ground(inner, 0.03, GL.grass, 0.95);
-    B.ground([[-3, -hd + 3.3], [3, -hd + 3.3], [3, hd - 3.3], [-3, hd - 3.3]], 0.05, GL.pavers);
-    B.ground([[-hw + 3.3, -3], [hw - 3.3, -3], [hw - 3.3, 3], [-hw + 3.3, 3]], 0.05, GL.pavers);
-    const plinths = [[-45, -40, 34, 22, 1.2], [38, -45, 28, 18, 0.9], [-50, 35, 30, 26, 1.1], [42, 40, 36, 24, 1.3], [-12, 30, 22, 16, 0.8], [18, -18, 16, 12, 0.7], [-25, -10, 14, 18, 0.9]];
-    for (const [u, v, w, d, h] of plinths) { B.box(u, v, w, d, 0, h, B.A(WL.rubble, STONE), B.A(WL.slab, STONE)); for (const [a, b] of [[-w / 4, -d / 4], [w / 4, d / 4], [-w / 4, d / 4]]) B.cbox(u + a, h, v + b, 0.9, 0.35, 0.9, C.stone); }
-    { const u = 0, v = -hd * 0.35, pts = []; for (let i = 0; i < 32; i++) { const r = i % 2 ? 4.2 : 6.2, a = i / 32 * 6.283; pts.push([u + Math.cos(a) * r, v + Math.sin(a) * r]); }
-      B.ring(pts, 0, 0.75, B.A(WL.rubble, STONE)); B.ground(pts, 0.6, GL.concrete, 0.8); B.cyl(u, 0.62, v, 3.4, 0.05, C.water, 20); B.cyl(u, 0.6, v, 0.5, 1.2, C.stone, 8); }
-    // outside the gate: Bajirao I on horseback on a tall plinth, in a small garden
-    const sv = gv - 34;
-    B.ground([[gu - 16, sv - 14], [gu + 16, sv - 14], [gu + 16, sv + 14], [gu - 16, sv + 14]], 0.04, GL.grass, 0.9);
+    B.cbox(W.WU, 0, gv - 0.33, 1.25, 2.1, 0.06, [0.05, 0.04, 0.03]);                // the wicket, open
+    B.cbox(W.WU, 2.1, gv - 0.34, 1.35, 0.1, 0.08, C.iron);
+    for (const k of [-1, 0, 1]) B.arch(gu + k * 3.6, gv - 0.12, 1.5, 2.6, 11.2, C.dark);
+    B.cbox(gu, 13.9, gv - 0.9, gw - 1.5, 2.6, 1.6, C.teak); B.cbox(gu, 16.4, gv - 1.0, gw - 0.6, 0.25, 2.0, [0.3, 0.18, 0.1]);
+    for (let k = -3; k <= 3; k++) B.cbox(gu + k * 1.25, 13.9, gv - 1.65, 0.18, 2.5, 0.18, [0.3, 0.18, 0.1]);
+    B.merlons([[gu - gw / 2 - 0.3, gv - 0.1], [gu + gw / 2 + 0.3, gv - 0.1]], 17.5, C.brick, 2.0, 1.2, 1.0, 0.7, false);
+    flag(B, gu, gv + 4.4, 17.5, 7); flag(B, gu - 0.15, gv + 4.4, 17.5, 7);
+    // ---- inside: lawns, stone paths, the palace's plinths with their rooms and courtyards, Hazari Karanje
+    B.ground(IN, 0.03, GL.grass, 0.95);
+    const path = (u0, v0, u1, v1) => B.ground([[u0, v0], [u1, v0], [u1, v1], [u0, v1]], 0.05, GL.concrete, 0.9);
+    path(gu - 3, W.V0, gu + 3, W.V1);                                              // gate to the south wall
+    for (const v of W.cross) path(W.U0 + 3, v - 2.5, W.U1 - 3, v + 2.5);
+    path(W.U0, W.V0, W.U1, W.V0 + 3); path(W.U0, W.V1 - 3, W.U1, W.V1); path(W.U0, W.V0, W.U0 + 3, W.V1); path(W.U1 - 3, W.V0, W.U1, W.V1);
+    const plA = B.A(WL.rubble, STONE, 11, 2, 0.9), slab = B.A(WL.slab, T([0.62, 0.58, 0.52]));
+    for (const [u, v, w, d] of W.plinths) {
+      B.box(u, v, w, d, 0, 0.9, plA, slab);
+      const cw = w * 0.42, cd = d * 0.42;
+      B.ground([[u - cw / 2, v - cd / 2], [u + cw / 2, v - cd / 2], [u + cw / 2, v + cd / 2], [u - cw / 2, v + cd / 2]], 0.93, GL.grass, 0.9);
+      B.cbox(u, 0.9, v, 3.2, 0.35, 3.2, C.stone); B.cbox(u, 1.0, v, 2.6, 0.27, 2.6, C.water);          // the courtyard's little tank
+      // rooms: the courtyard's edge, the partitions out to the rim
+      for (const [a, b, c2, d2] of [[-cw / 2, -cd / 2, cw / 2, -cd / 2], [cw / 2, -cd / 2, cw / 2, cd / 2], [cw / 2, cd / 2, -cw / 2, cd / 2], [-cw / 2, cd / 2, -cw / 2, -cd / 2],
+        [-w / 2 + 0.3, -d / 2 + 0.3, w / 2 - 0.3, -d / 2 + 0.3], [w / 2 - 0.3, -d / 2 + 0.3, w / 2 - 0.3, d / 2 - 0.3], [w / 2 - 0.3, d / 2 - 0.3, -w / 2 + 0.3, d / 2 - 0.3], [-w / 2 + 0.3, d / 2 - 0.3, -w / 2 + 0.3, -d / 2 + 0.3]]) {
+        const L2 = Math.hypot(c2 - a, d2 - b); B.cbox(u + (a + c2) / 2, 0.9, v + (b + d2) / 2, L2 + 0.5, 0.5, 0.5, C.stone, Math.atan2(d2 - b, c2 - a));
+      }
+      for (let k = -2; k <= 2; k++) {
+        if (k === 0) continue;
+        const fu = k / 2.5 * (w / 2), fv = k / 2.5 * (d / 2);
+        B.cbox(u + fu, 0.9, v - (d / 2 + cd / 2) / 2, 0.5, 0.5, (d - cd) / 2 - 0.3, C.stone); B.cbox(u + fu, 0.9, v + (d / 2 + cd / 2) / 2, 0.5, 0.5, (d - cd) / 2 - 0.3, C.stone);
+        B.cbox(u - (w / 2 + cw / 2) / 2, 0.9, v + fv * 0.6, (w - cw) / 2 - 0.3, 0.5, 0.5, C.stone); B.cbox(u + (w / 2 + cw / 2) / 2, 0.9, v + fv * 0.6, (w - cw) / 2 - 0.3, 0.5, 0.5, C.stone);
+      }
+      for (let i = 0; i < 6; i++) for (const sv of [-1, 1]) B.cbox(u - cw / 2 + (i + 0.5) * cw / 6, 0.9, v + sv * (cd / 2 - 0.6), 0.55, 0.45, 0.55, C.stone);   // column stumps
+      const su = u < gu ? u + w / 2 : u - w / 2;
+      for (let k = 0; k < 3; k++) B.cbox(su + (u < gu ? 0.4 + k * 0.4 : -0.4 - k * 0.4), k * 0.3, v, 0.4, 0.3, 4, C.stone);         // steps up from the path
+    }
+    // Hazari Karanje: the sixteen-petal lotus fountain
+    { const [u, v] = W.karanje, pts = []; for (let i = 0; i < 32; i++) { const r = i % 2 ? 4.4 : 6.6, a = i / 32 * 6.283; pts.push([u + Math.cos(a) * r, v + Math.sin(a) * r]); }
+      B.ring(pts, 0, 0.75, B.A(WL.rubble, STONE, 11, 2, 0.75)); B.ground(pts, 0.6, GL.concrete, 0.8); B.cyl(u, 0.62, v, 3.6, 0.05, C.water, 20);
+      B.cyl(u, 0.6, v, 0.55, 1.3, C.stone, 8); B.cone(u, 1.9, v, 0.5, 0.6, C.stone, 8); B.hitc(u, v, 6); }
+    // big old trees along the walls
+    for (const [u, v, r] of W.trees) {
+      B.cyl(u, 0, v, r * 0.11, r * 1.1, [0.33, 0.24, 0.17], 7);
+      B.sphere(u, r * 1.55, v, r, [0.17, 0.3, 0.12]); B.sphere(u + r * 0.4, r * 1.25, v - r * 0.3, r * 0.75, [0.2, 0.34, 0.14]);
+      B.hitc(u, v, r * 0.13);
+    }
+    // ---- outside the gate: the garden, Bajirao I on his tall plinth, the ticket window, the plaque
+    const sv = gv - 36;
+    B.ground([[gu - 18, sv - 15], [gu + 18, sv - 15], [gu + 18, sv + 15], [gu - 18, sv + 15]], 0.04, GL.grass, 0.9);
+    path(gu - 2.5, sv + 15, gu + 2.5, gv - 0.4);
     B.box(gu, sv, 4.4, 7.2, 0, 3.4, B.A(WL.sandstone, STONE), B.A(WL.slab, STONE));
     horseman(B, gu, sv, 1.0, 0);
     B.hitBox(gu, sv, 4.6, 7.4);
-    // the rampart's collision: the outline, the gate closed
-    for (let i = 0; i < ring.length; i++) B.hit(...ring[i], ...ring[(i + 1) % ring.length]);
+    { const [ku, kv] = W.counter;
+      B.box(ku, kv, 3.4, 2.4, 0, 2.7, B.A(WL.plaster, T([0.93, 0.86, 0.7]), 2, 2, 2.7), null);
+      B.roof(ku, kv, 4.2, 3.2, 2.7, 0.9, B.A(WL.clayTiles, T(C.tile)), true);
+      B.cbox(ku, 1.0, kv - 1.22, 1.4, 0.9, 0.06, C.dark);
+      B.board(ku, 3.05, kv - 1.75, 3.2, 0.62, (x, w, h) => { x.fillStyle = '#7a1d12'; x.fillRect(0, 0, w, h); x.fillStyle = '#f6e7c8'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.font = `800 ${h * 0.46}px Mukta, sans-serif`; x.fillText('तिकीट घर', w * 0.3, h * 0.52); x.font = `700 ${h * 0.34}px Inter, sans-serif`; x.fillText('TICKETS  ₹25', w * 0.73, h * 0.53); }, 'sw-tickets');
+      B.hitBox(ku, kv, 3.4, 2.4); }
+    { const [pu, pv] = W.plaque;
+      B.box(pu, pv, 3.2, 0.5, 0, 2.2, B.A(WL.sandstone, STONE), B.A(WL.slab, STONE));
+      B.board(pu, 1.25, pv - 0.27, 2.8, 1.5, (x, w, h) => { x.fillStyle = '#2b2620'; x.fillRect(0, 0, w, h); x.fillStyle = '#e9dcc0'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.font = `800 ${h * 0.2}px Mukta, sans-serif`; x.fillText('शनिवारवाडा', w / 2, h * 0.24); x.font = `800 ${h * 0.15}px Inter, sans-serif`; x.fillText('SHANIWAR WADA', w / 2, h * 0.47);
+        x.font = `500 ${h * 0.09}px Inter, sans-serif`; x.fillText('Seat of the Peshwas · 1732', w / 2, h * 0.66); x.fillText('Open 8 am to 6:30 pm', w / 2, h * 0.8); }, 'sw-plaque');
+      B.hitBox(pu, pv, 3.2, 0.5); }
+    // collision: the rampart all round, the gate shut except the wicket
+    for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length]; if (W.isGateSeg(a, b)) continue; B.hit(...a, ...b); }
+    B.hit(gu - gw / 2 - 0.3, gv, W.WU - 0.7, gv); B.hit(W.WU + 0.7, gv, gu + gw / 2 + 0.3, gv);
+    B.hit(W.WU - 0.7, gv, W.WU - 0.7, gv + 8.8); B.hit(W.WU + 0.7, gv, W.WU + 0.7, gv + 8.8);
   },
 
   // Dagdusheth Halwai Ganpati: a white marble temple open to the street, gold everywhere, the idol lit inside
