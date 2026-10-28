@@ -264,7 +264,30 @@ async function main() {
   const pf = { t: 0, n: 0, worst: 0, cpu: 0, gpuish: 0, hitch: 0 };
   const fwd = new THREE.Vector3();
   const perf = window.__perf = { n: 0, upd: 0, rnd: 0, worst: 0 };
+  // watchdog: a frame that throws must not stop the game (the screen would freeze or go black). A run of
+  // failures, or a camera/player gone to NaN, or a city that never comes back: reload where you were
+  let bad = 0, lastGood = null, emptyT = 0;
   function frame(now) {
+    try { frame1(now); bad = 0; } catch (err) {
+      console.warn('frame', err);
+      if (++bad < 90) requestAnimationFrame(frame);
+      else { try { game.saveResume(); } catch (e2) { /* ignore */ } location.reload(); }
+      return;
+    }
+    // sanity: NaN anywhere in the camera or the player puts you back where you last were fine
+    const p = player, c = camera.position;
+    if (!Number.isFinite(p.x + p.z + c.x + c.y + c.z)) {
+      if (lastGood) { try { p.teleportFoot ? p.teleportFoot(lastGood.x, lastGood.z, lastGood.th, traffic) : null; } catch (e3) { /* below */ } }
+      if (!Number.isFinite(p.x + p.z)) { try { game.saveResume(); } catch (e2) { /* ignore */ } location.reload(); }
+    } else if ((frames & 63) === 0) lastGood = { x: p.x, z: p.z, th: p.th || 0 };
+    // the city around you gone (a tile failed to load, chunks dropped): fetch it again; still nothing: reload
+    if (game.state === 'play' && W.streamer && W.streamer.built.size === 0) {
+      emptyT += 1 / 60;
+      if (emptyT > 4 && emptyT < 4.02 && W.tiles) { W.tiles.ensure?.(p.x, p.z, 650).catch?.(() => {}); }
+      if (emptyT > 20) { try { game.saveResume(); } catch (e2) { /* ignore */ } location.reload(); }
+    } else emptyT = 0;
+  }
+  function frame1(now) {
     const t0 = performance.now();
     let dt = Math.min(0.1, (now - last) / 1000);
     last = now;
