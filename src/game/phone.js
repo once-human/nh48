@@ -167,8 +167,12 @@ export class Phone {
       body = `<div class="ph-thread">${th.slice().reverse().map(m => `<div class="ph-bub"><p>${esc(m.text)}</p><small>${DAYS[Math.floor(m.t / 24) % 7] || ''} ${hhmm(m.h)}</small></div>`).join('')}</div>`;
     } else if (cur === 'contacts' || cur === 'call') {
       title = cur === 'call' ? 'Recents' : 'Contacts';
-      for (const c of this.contacts()) items.push({ t: c.name, s: c.done ? 'Blocked you' : `${levelOf(c)} · met at ${c.met}`, av: c.name, act: () => this.go('contact', c.name) });
-      if (!items.length) body = `<p class="ph-empty">Nobody saved yet. In a café or a club, people with a small heart over them are up for a chat: get them talking, then ask for their number.</p>`;
+      // your people (family, and everyone the story brings into your life) first, then the people you've met
+      // around Pune, with a line between them
+      const story = [['Aai', 'Home · Sadashiv Peth'], ['Bapu Kaka', 'The auto stand · Shaniwar Wada'], ...(this.s.storyContacts || [])];
+      story.forEach(([n, sub], i) => items.push({ t: n, s: sub, av: n, sec: i === 0 ? 'Your people' : null, act: () => this.go('read', n) }));
+      this.contacts().forEach((c, i) => items.push({ t: c.name, s: c.done ? 'Blocked you' : `${levelOf(c)} · met at ${c.met}`, av: c.name, sec: i === 0 ? 'Met around Pune' : null, act: () => this.go('contact', c.name) }));
+      if (items.length === story.length) body = `<p class="ph-empty">Nobody saved yet. In a café or a club, people with a small heart over them are up for a chat: get them talking, then ask for their number.</p>`;
     } else if (cur === 'contact') {
       const c = this.contacts().find(q => q.name === this.arg);
       title = this.arg;
@@ -246,7 +250,7 @@ export class Phone {
       // the brick: green LCD, soft keys, a keypad
       let scr = '';
       if (this.cur === 'standby') scr = `<div class="kp-top"><span class="kp-sig"><i></i><i></i><i></i><i></i></span><span class="kp-bat"><i></i><i></i><i></i></span></div><div class="kp-op">PUNE NET</div><div class="kp-clock">${clock}</div>${this.unread() ? `<div class="kp-note">${this.unread()} new message${this.unread() > 1 ? 's' : ''}</div>` : ''}`;
-      else scr = `<div class="kp-title">${esc(title)}</div>${body}<div class="kp-list">${items.map((it, i) => `<div class="kp-row${i === this.sel ? ' sel' : ''}" data-i="${i}"><span>${i + 1}</span>${esc(it.t)}</div>`).join('')}</div>`;
+      else scr = `<div class="kp-title">${esc(title)}</div>${body}<div class="kp-list">${items.map((it, i) => `${it.sec ? `<div class="kp-sec">${esc(it.sec)}</div>` : ''}<div class="kp-row${i === this.sel ? ' sel' : ''}" data-i="${i}"><span>${i + 1}</span>${esc(it.t)}</div>`).join('')}</div>`;
       this.el.innerHTML = `<div class="kp-body"><div class="kp-ear"></div><div class="kp-lcd">${scr}</div>
         <div class="kp-soft"><span data-i="${this.sel}">${this.cur === 'standby' ? 'Menu' : 'Select'}</span><span data-back>${this.cur === 'standby' ? 'Close' : 'Back'}</span></div>
         <div class="kp-pad"><div class="kp-nav"><i></i></div><div class="kp-keys">${['1', '2 abc', '3 def', '4 ghi', '5 jkl', '6 mno', '7 pqrs', '8 tuv', '9 wxyz', '*', '0 ⎵', '#'].map(k => `<b>${k.split(' ')[0]}<small>${k.split(' ')[1] || ''}</small></b>`).join('')}</div></div>
@@ -258,7 +262,7 @@ export class Phone {
         const ic = (it, i) => `<button class="sp-app${i === this.sel ? ' sel' : ''}" data-i="${i}"><i style="background:${it.col}"><svg viewBox="0 0 24 24">${it.svg}</svg>${(it.id === 'chats' || it.id === 'msgs') && this.unread() ? `<em>${this.unread()}</em>` : ''}</i><span>${esc(it.t)}</span></button>`;
         scr = `<div class="sp-wall"><div class="sp-date">${DAYS[Math.floor((G.clock || 0) / 24) % 7]} · Pune</div><div class="sp-grid">${grid.map((it, i) => ic(it, i)).join('')}</div><div class="sp-dock">${dock.map((it, i) => ic(it, i + APPS.length)).join('')}</div></div>`;
       } else {
-        scr = `<div class="sp-page"><div class="sp-head"><button data-back>‹</button><b>${esc(title)}</b></div><div class="sp-scroll">${body}${items.map((it, i) => `<button class="sp-row${i === this.sel ? ' sel' : ''}${it.act ? '' : ' off'}" data-i="${i}">${it.av ? `<span class="ph-av">${esc(String(it.av).charAt(0))}</span>` : ''}<span class="nm"><b>${esc(it.t)}</b>${it.s ? `<small>${esc(it.s)}</small>` : ''}</span>${it.dot ? '<em></em>' : ''}</button>`).join('')}</div></div>`;
+        scr = `<div class="sp-page"><div class="sp-head"><button data-back>‹</button><b>${esc(title)}</b></div><div class="sp-scroll">${body}${items.map((it, i) => `${it.sec ? `<div class="sp-sec">${esc(it.sec)}</div>` : ''}<button class="sp-row${i === this.sel ? ' sel' : ''}${it.act ? '' : ' off'}" data-i="${i}">${it.av ? `<span class="ph-av">${esc(String(it.av).charAt(0))}</span>` : ''}<span class="nm"><b>${esc(it.t)}</b>${it.s ? `<small>${esc(it.s)}</small>` : ''}</span>${it.dot ? '<em></em>' : ''}</button>`).join('')}</div></div>`;
       }
       this.el.innerHTML = `<div class="sp-body"><div class="sp-screen"><span class="sp-island"></span><div class="sp-status"><b>${clock}</b><span class="sp-ic"><i></i><i></i><i></i><i></i><u></u></span></div>${scr}<div class="sp-home" data-back></div></div></div>
         <div class="sp-help">Arrows, Enter · ⌫ back · T close</div>`;

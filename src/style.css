@@ -1406,3 +1406,8 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .toast .tt-sub { font-size: 13px !important; color: var(--tx2) !important; line-height: 1.35; margin-top: 1px; }
 .toast.info { --ic: #0a84ff; } .toast.warn { --ic: #ff9f0a; } .toast.bad { --ic: #ff453a; } .toast.challan { --ic: #ff453a; }
 .toast.good { --ic: #30d158; } .toast.meter { --ic: #30d158; }
+/* phone lists: a section header between your people and the people you've met */
+.sp-sec { padding: 14px 16px 6px; font-size: 12px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: rgba(235, 235, 245, .5); }
+.sp-sec:first-child { padding-top: 6px; }
+.kp-sec { margin: 4px 0 1px; padding-top: 3px; border-top: 1px dashed currentColor; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; opacity: .7; }
+.kp-sec:first-child { border-top: 0; padding-top: 0; }
