@@ -16,7 +16,7 @@ from shapely.geometry import Polygon, Point
 from shapely.strtree import STRtree
 from shopnames import board_name, pin_name
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-SHOP_CELL, SNAP, NEAR_R = 3.6, 6.0, 20.0
+SHOP_CELL, SNAP, NEAR_R = 3.6, 6.0, 14.0     # a board goes on the building the place is in, or one within 14 m
 NO_BOARD_STYLES = {6, 7, 8, 10, 11, 13}
 def nslots(L): return max(1, int(math.floor(L / SHOP_CELL)))
 

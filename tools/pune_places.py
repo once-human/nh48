@@ -122,10 +122,12 @@ def km(a, b): return math.hypot((a[0] - b[0]) * MLON, (a[1] - b[1]) * MLAT) / 10
 drop = collections.Counter()
 ovt = []
 for lon, lat, nm, bc, tx, hier, conf, ff, pc in good:
-    if not (conf >= 0.75 or (conf >= 0.5 and ff)): drop['weak'] += 1; continue
-    if pc and pc in PC and km((lon, lat), PC[pc]) > 3.5: drop['pin code elsewhere'] += 1; continue
+    # nightlife is where wrong spots hurt most (people go looking for the bar): stricter for bars, pubs, clubs
+    night = (bc or '') in ('bar', 'pub', 'night_club', 'nightclub', 'lounge', 'cocktail_bar', 'wine_bar', 'beer_bar', 'brewery', 'sports_bar') or bool(re.search(r'\b(bar|pub|lounge|brew|club|taproom)\b', (nm or '').lower()))
+    if not (conf >= (0.82 if night else 0.75) or (conf >= (0.65 if night else 0.5) and ff)): drop['weak'] += 1; continue
+    if pc and pc in PC and km((lon, lat), PC[pc]) > (2.5 if night else 3.5): drop['pin code elsewhere'] += 1; continue
     L = loc_of(nm) or loc_of(ff)
-    if L and L in LC and km((lon, lat), LC[L]) > 3.0: drop['locality elsewhere'] += 1; continue
+    if L and L in LC and km((lon, lat), LC[L]) > (1.8 if night else 3.0): drop['locality elsewhere'] += 1; continue
     x, z = proj(lat, lon)
     cat = TAX.get(tx) or BASIC.get(bc)
     if cat == '?': cat = kw_cat(nm)
