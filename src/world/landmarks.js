@@ -269,8 +269,59 @@ const BUILD = {
   shaniwar(B) {
     const L = B.L, ring = L.outline, W = SW;
     const sA = B.A(WL.rubble, STONE, 11, 2, 7.2), bA = B.A(WL.brick, BRICK, 11, 2, 10.6), topA = B.A(WL.slab, STONE);
-    // the rampart on the real outline (its round lobes are the bastions), stone below and brick above
-    B.ring(ring, 0, 7.2, sA); B.ring(ring, 7.2, 10.6, bA);
+    // the rampart on the real outline (its round lobes are the bastions), stone below and brick above, laid in
+    // panels that each weathered their own way (rebuilt patches, sun-bleached runs, monsoon-darkened bays)
+    const hsh = (k) => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+    let area = 0; for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length]; area += a[0] * b[1] - b[0] * a[1]; }
+    const sg = area > 0 ? 1 : -1, segs = [];
+    { let ru = 0, pk = 0;
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i], b = ring[(i + 1) % ring.length], du = b[0] - a[0], dv = b[1] - a[1], Ls = Math.hypot(du, dv);
+        if (Ls < 0.01) continue;
+        const nu = sg * dv / Ls, nv = -sg * du / Ls; segs.push({ a, b, du: du / Ls, dv: dv / Ls, L: Ls, nu, nv, gate: W.isGateSeg(a, b) });
+        const n = Math.max(1, Math.round(Ls / 6.5));
+        for (let k = 0; k < n; k++) {
+          const t0 = k / n, t1 = (k + 1) / n, ua = a[0] + du * t0, va = a[1] + dv * t0, ub = a[0] + du * t1, vb = a[1] + dv * t1;
+          const r1 = hsh(++pk), r2 = hsh(pk + 0.5), r3 = hsh(pk + 0.25);
+          const ks = 0.86 + r1 * 0.26, kb = 0.84 + r2 * 0.3, warm = (r3 - 0.5) * 0.1;
+          B.wall(ua, va, ub, vb, 0, 7.2, nu, nv, { ...sA, tint: [STONE[0] * ks * (1 + warm * 0.5), STONE[1] * ks, STONE[2] * ks * (1 - warm * 0.4)] }, ru);
+          B.wall(ua, va, ub, vb, 7.2, 10.6, nu, nv, { ...bA, tint: [BRICK[0] * kb * (1 + warm), BRICK[1] * kb, BRICK[2] * kb * (1 - warm)] }, ru);
+          ru += Ls / n;
+        }
+      } }
+    // a dressed-stone string course where the stone gives way to brick, damp grime at the foot, arrow slits
+    // in the brick, and rain streaks running down from the merlons
+    { let q = 0;
+      for (const S of segs) {
+        const mu = (S.a[0] + S.b[0]) / 2, mv = (S.a[1] + S.b[1]) / 2, yaw = Math.atan2(S.dv, S.du);
+        B.cbox(mu + S.nu * 0.16, 7.02, mv + S.nv * 0.16, S.L + 0.25, 0.34, 0.32, [0.62, 0.58, 0.52], yaw);
+        B.cbox(mu + S.nu * 0.04, 0, mv + S.nv * 0.04, S.L + 0.05, 0.3 + hsh(q + 9) * 0.3, 0.05, [0.42, 0.41, 0.36], yaw);
+        if (S.gate || S.L < 9) { q++; continue; }
+        for (let d = 3; d < S.L - 2; d += 4.6) {
+          const r = hsh(++q), pu = S.a[0] + S.du * d, pv = S.a[1] + S.dv * d;
+          B.cbox(pu + S.nu * 0.03, 8.1, pv + S.nv * 0.03, 0.16, 0.95, 0.06, [0.08, 0.06, 0.05], yaw);
+          if (r < 0.55) { const l = 1.2 + hsh(q + 3) * 2.6, w = 0.3 + hsh(q + 4) * 0.5, o = (hsh(q + 5) - 0.5) * 1.6;
+            B.cbox(pu + S.du * o + S.nu * 0.025, 10.6 - l, pv + S.dv * o + S.nv * 0.025, w, l, 0.04, [0.36, 0.2, 0.15], yaw); }
+          if (r > 0.7) { const l = 0.8 + hsh(q + 6) * 2.4, o = (hsh(q + 7) - 0.5) * 2;
+            B.cbox(pu + S.du * o + S.nu * 0.025, 7.0 - l, pv + S.dv * o + S.nv * 0.025, 0.4 + hsh(q + 8) * 0.6, l, 0.04, [0.27, 0.27, 0.25], yaw); }
+        }
+      } }
+    // the four lesser gates of the wada: Mastani (Alibahadur) on the north, Khidki on the east, Ganesh and
+    // Narayan (Jambhul) on the south; arched, with studded teak doors, shut, their names on a stone above
+    const lesser = [[42, -79.2, 0, -1, 'मस्तानी दरवाजा', 'MASTANI DARWAZA', -76], [68.9, -36, 1, 0, 'खिडकी दरवाजा', 'KHIDKI DARWAZA', 64.5], [30, 81.05, 0, 1, 'गणेश दरवाजा', 'GANESH DARWAZA', 77.3], [-38, 81.0, 0, 1, 'नारायण दरवाजा', 'NARAYAN DARWAZA', 77.3]];
+    for (const [pu, pv, nu, nv, mr, en, inner] of lesser) {
+      for (const side of [1, -1]) {
+        const fu = side > 0 ? pu : nu ? inner : pu, fv = side > 0 ? pv : nv ? inner : pv, su = nu * side, sv2 = nv * side;
+        const yaw = Math.atan2(su, -sv2), tu = -sv2, tv = su;                 // tangent along the wall
+        const at = (o, t) => [fu + su * o + tu * t, fv + sv2 * o + tv * t];
+        { const [a, b] = at(0.2, 0); B.cbox(a, 0, b, 5.4, 6.4, 0.4, [0.5, 0.46, 0.41], yaw); }
+        { const [a, b] = at(0.42, 0); B.cbox(a, 0, b, 3.3, 3.9, 0.06, [0.07, 0.05, 0.04], yaw); B.part(geo('rarch', () => archHead(false)), a, 3.9, b, [0.07, 0.05, 0.04], yaw, 1.65, 1.65, 1); }
+        for (const t of [-0.76, 0.76]) { const [a, b] = at(0.47, t); B.cbox(a, 0, b, 1.48, 4.6, 0.1, C.teak, yaw);
+          for (let i = 0; i < 6; i++) for (let j = 0; j < 4; j++) { const [c2, d2] = at(0.54, t - 0.54 + j * 0.36); B.part(geo('stud', () => new THREE.SphereGeometry(0.045, 6, 4)), c2, 0.6 + i * 0.66, d2, C.iron, yaw); } }
+        if (side > 0) { const [a, b] = at(0.43, 0); B.board(a, 5.75, b, 3.0, 0.5, (x, w, h) => { x.fillStyle = '#5b544a'; x.fillRect(0, 0, w, h); x.fillStyle = '#efe4cc'; x.textAlign = 'center'; x.textBaseline = 'middle';
+          x.font = `800 ${h * 0.42}px Mukta, sans-serif`; x.fillText(mr, w * 0.3, h * 0.52); x.font = `700 ${h * 0.28}px Inter, sans-serif`; x.fillText(en, w * 0.72, h * 0.54); }, 'sw-g-' + en, yaw); }
+      }
+    }
     const IN = [[W.U0, W.V0], [W.U1, W.V0], [W.U1, W.V1], [W.U0, W.V1]];
     { const iA = B.A(WL.brick, BRICK, 11, 2, 10.6), g0 = W.GU - W.GW / 2 - 0.3, g1 = W.GU + W.GW / 2 + 0.3;      // inner faces, open at the gate
       B.wall(W.U0, W.V0, g0, W.V0, 0, 10.6, 0, 1, iA); B.wall(g1, W.V0, W.U1, W.V0, 0, 10.6, 0, 1, iA);
@@ -278,13 +329,13 @@ const BUILD = {
     { const o = []; for (const [u, v] of ring) { const [x, z] = B.P(u, v); o.push(x, z); }
       const h = []; for (const [u, v] of IN) { const [x, z] = B.P(u, v); h.push(x, z); }
       B.gb.poly([o, h], B.Y0 + 10.6, GL.concrete, 0.85); }
-    B.merlons(ring, 10.6, C.brick, 2.4, 1.3, 1.0, 0.75);
+    B.merlons(ring, 10.6, [0.47, 0.26, 0.2], 2.4, 1.3, 1.0, 0.75);
     // the bastion towers standing up out of the lobes
     for (const [u, v, r, H] of W.bastions) {
       const pts = []; for (let i = 0; i < 18; i++) pts.push([u + Math.cos(i / 18 * 6.283) * r, v + Math.sin(i / 18 * 6.283) * r]);
       B.ring(pts, 0, 7.6, sA); B.ring(pts, 7.6, H, bA);
       for (let i = 0; i < 18; i += 2) B.flat([[u, v], pts[i], pts[(i + 1) % 18], pts[(i + 2) % 18]], H, topA);
-      B.merlons(pts, H, C.brick, 2.2, 1.2, 1.0, 0.7);
+      B.merlons(pts, H, [0.47, 0.26, 0.2], 2.2, 1.2, 1.0, 0.7);
       for (let i = 0; i < 18; i += 3) { const a = i / 18 * 6.283; B.cbox(u + Math.cos(a) * (r + 0.02), H - 3, v + Math.sin(a) * (r + 0.02), 0.25, 1.4, 0.1, C.dark, a + Math.PI / 2); }
       B.hitc(u, v, r);
     }
