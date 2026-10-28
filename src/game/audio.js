@@ -42,7 +42,8 @@ export class Audio {
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -16; comp.ratio.value = 5;
     this.master.connect(comp).connect(ctx.destination);
-    for (const k of BUSES) { const g = this.buses[k] = ctx.createGain(); g.gain.value = this.vols[k] ?? 1; g.connect(this.bus()); }
+    // every bus straight into the master (the fx bus used to be wired into itself, so punches, clicks and UI sounds never came out)
+    for (const k of BUSES) { const g = this.buses[k] = ctx.createGain(); g.gain.value = this.vols[k] ?? 1; g.connect(this.master); }
     this.noise = this.makeNoise(2);
     this.buildEngine();
     this.buildAmbient();
