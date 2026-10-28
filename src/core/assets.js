@@ -74,7 +74,7 @@ export class Loader {
       for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
     }
     if (b[0] === 0x1f && b[1] === 0x8b) {
-      if (typeof DecompressionStream === 'undefined') throw new Error('This browser is too old to unpack NH48. Please update it.');
+      if (typeof DecompressionStream === 'undefined') throw new Error('This browser is too old to unpack Puneri. Please update it.');
       const stream = new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'));
       b = new Uint8Array(await new Response(stream).arrayBuffer());
     }

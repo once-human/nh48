@@ -100,7 +100,7 @@ export class PhotoMode {
     const where = street && street !== area ? `${street}, ${area}` : area;
     x.save();
     x.font = `800 ${30 * s}px Archivo, Inter, system-ui, sans-serif`;
-    const t1 = 'NH48: Pune', w1 = x.measureText(t1).width;
+    const t1 = 'Puneri', w1 = x.measureText(t1).width;
     x.font = `600 ${17 * s}px Inter, system-ui, sans-serif`;
     const w2 = x.measureText(where).width, bw = Math.max(w1, w2) + 70 * s, bh = 86 * s, bx = pad, by = H - pad - bh;
     x.fillStyle = 'rgba(12,13,16,.62)';
@@ -114,15 +114,15 @@ export class PhotoMode {
     x.font = `800 ${30 * s}px Archivo, Inter, system-ui, sans-serif`; x.fillText(t1, bx + 60 * s, by + 40 * s);
     x.fillStyle = 'rgba(244,241,234,.78)'; x.font = `600 ${17 * s}px Inter, system-ui, sans-serif`; x.fillText(where, bx + 60 * s, by + 66 * s);
     x.textAlign = 'right'; x.fillStyle = 'rgba(244,241,234,.8)'; x.font = `700 ${16 * s}px Inter, system-ui, sans-serif`;
-    x.fillText('nh48.vercel.app', W - pad, H - pad);
+    x.fillText('pune.onkar.buzz', W - pad, H - pad);
     const fl = this.el.querySelector('.ph-flash'); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
-    const name = 'NH48 Pune ' + where.replace(/[^\w ,.-]+/g, '').slice(0, 40) + '.jpg';
+    const name = 'Puneri ' + where.replace(/[^\w ,.-]+/g, '').slice(0, 40) + '.jpg';
     cv.toBlob((b) => {
       if (!b) return;
       const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-      G.hud && G.hud.toast && G.hud.toast('Photo saved', 'In your downloads. Tag it #NH48Pune', 'info', 2.6);
+      G.hud && G.hud.toast && G.hud.toast('Photo saved', 'In your downloads. Tag it #PuneriGame', 'info', 2.6);
     }, 'image/jpeg', 0.92);
   }
 }

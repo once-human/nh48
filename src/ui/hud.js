@@ -143,7 +143,7 @@ export class HUD {
     t.innerHTML = `
       <div class="pz ttl">
         <div class="pz-l">
-          <div class="ttl-brand">${STONE}<b>NH48</b><span>Pune <span lang="mr">पुणे</span></span></div>
+          <div class="ttl-brand">${STONE}<b>PUNERI</b><span>Pune <span lang="mr">पुणे</span></span></div>
           <div class="pz-head ttl-head"><span class="pz-k">An open-world game</span><b>Pune</b><span class="ttl-mr" lang="mr">पुणे</span>
             <p class="ttl-sub">Start at Shaniwar Wada. Run an auto on the meter, misal on FC Road, a date in Baner. Shops shut 1 to 4, obviously.</p></div>
           <nav class="pz-menu">
@@ -346,7 +346,7 @@ export class HUD {
 
   buildPhoneNotice() {
     const n = el('div', 'ov phone', `<div class="glass card" role="dialog" aria-labelledby="ph-t">
-      <h3 id="ph-t">NH48 is made for computers</h3>
+      <h3 id="ph-t">Puneri is made for computers</h3>
       <p>It isn’t optimised for phones yet, controls are basic and it may run slowly. If you have a laptop or desktop, open this link there.</p>
       <button class="btn primary" id="ph-ok">Play anyway</button></div>`);
     this.root.appendChild(n);
@@ -400,7 +400,7 @@ export class HUD {
             <button class="pz-i" id="p-resume">Resume</button>
             <button class="pz-i" id="p-map">Map</button>
             <button class="pz-i" id="p-photo">Photo mode</button>
-            <button class="pz-i" id="p-share">Share NH48</button>
+            <button class="pz-i" id="p-share">Share Puneri</button>
             <button class="pz-i" data-pane="guide">Guide</button>
             <button class="pz-i" data-pane="set">Settings</button>
             <button class="pz-i" data-pane="ctrl">Controls</button>
@@ -449,10 +449,10 @@ export class HUD {
     p.querySelector('#p-resume').onclick = () => { this.game.goFullscreen?.(); this.game.togglePause(false); };
     p.querySelector('#p-map').onclick = () => { this.game.togglePause(false); this.game.toggleMap(true); };
     p.querySelector('#p-share').onclick = async () => {
-      const text = 'I\u2019m driving around Pune in my browser. FC Road, Shaniwar Wada, Parvati, autos on the meter.', url = 'https://nh48.vercel.app';
-      try { if (navigator.share) { await navigator.share({ title: 'NH48: Pune', text, url }); return; } } catch (e) { /* closed the sheet */ return; }
-      try { await navigator.clipboard.writeText(`${text} ${url}`); this.toast('Link copied', 'Paste it anywhere. #NH48Pune', 'info', 2.4); }
-      catch (e) { this.toast('nh48.vercel.app', 'Share this link', 'info', 3); }
+      const text = 'I\u2019m driving around Pune in my browser. FC Road, Shaniwar Wada, Parvati, autos on the meter.', url = 'https://pune.onkar.buzz';
+      try { if (navigator.share) { await navigator.share({ title: 'Puneri', text, url }); return; } } catch (e) { /* closed the sheet */ return; }
+      try { await navigator.clipboard.writeText(`${text} ${url}`); this.toast('Link copied', 'Paste it anywhere. #PuneriGame', 'info', 2.4); }
+      catch (e) { this.toast('pune.onkar.buzz', 'Share this link', 'info', 3); }
     };
     p.querySelector('#p-photo').onclick = () => { this.game.togglePause(false); this.game.photo && this.game.photo.open(); };
     p.querySelector('#p-title').onclick = () => { this.game.endShift(); this.syncTitle(); };
@@ -468,7 +468,7 @@ export class HUD {
   }
   syncPause() {
     const pw = this.pause && this.pause.querySelector('#p-who'), sv = savedCharacter();
-    if (pw) { pw.textContent = sv ? sv.name : 'Paused'; this.pause.querySelector('.pz-k').textContent = sv ? 'Paused' : 'NH48 · Pune'; }
+    if (pw) { pw.textContent = sv ? sv.name : 'Paused'; this.pause.querySelector('.pz-k').textContent = sv ? 'Paused' : 'Puneri · Pune'; }
     const g = this.game;
     const area = this.$('h-area')?.textContent || 'Pune', street = this.$('h-street')?.textContent || '';
     this.pause.querySelector('#p-meta').innerHTML = `<span>${street || area}</span><span>${this.$('h-clock')?.textContent || ''}</span><span>${fmtRupees(g.stats?.money ?? 0)}</span>`;

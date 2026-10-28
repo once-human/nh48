@@ -83,7 +83,7 @@ const SOUNDS = ['horn_car', 'horn_beep', 'horn_truck', 'horn_truck_short', 'dog_
 async function main() {
   // Start over asked for a clean slate on this load
   try { if (sessionStorage.getItem('nh48_wipe')) { Save.wipe(); sessionStorage.removeItem('nh48_wipe'); } } catch (e) { /* ignore */ }
-  if (!document.createElement('canvas').getContext('webgl2')) throw new Error('This browser has no WebGL 2. NH48 needs a recent Chrome, Edge, Firefox or Safari.');
+  if (!document.createElement('canvas').getContext('webgl2')) throw new Error('This browser has no WebGL 2. Puneri needs a recent Chrome, Edge, Firefox or Safari.');
   const quality = pickQuality();
   installAtmosphere();
   const canvas = document.getElementById('gl');

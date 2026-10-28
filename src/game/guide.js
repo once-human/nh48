@@ -126,7 +126,7 @@ export function guideHTML() {
     ['People and dating', cards(PEOPLE)],
     ['Controls', `<div class="gd-keys">${CONTROLS_DEF.map(([k, d]) => [k === 'W A S D' ? ['W', 'A', 'S', 'D'].map(keyLabel).join(' ') : k.split(' / ').map(x => keyLabel(x === 'Shift' ? 'ShiftLeft' : x === 'Alt' ? 'AltLeft' : x)).join(' / '), d]).map(([k, d]) => `<div><span>${k.split(/ (?:or|to|\/) /).map(x => `<span class="kbd">${esc(x)}</span>`).join('')}</span><p>${esc(d)}</p></div>`).join('')}</div>`],
   ];
-  return `<p class="gd-intro">Everything in NH48 Pune, in one place. Real shops from the map are all over the city; Nearby and the map (M) show what’s around you.</p>
+  return `<p class="gd-intro">Everything in Puneri, in one place. Real shops from the map are all over the city; Nearby and the map (M) show what’s around you.</p>
     ${T.map((_, k) => `<input type="radio" name="gd" id="gd-${k}" class="gd-r"${k ? '' : ' checked'}>`).join('')}
     <div class="gd-nav">${T.map(([t], k) => `<label for="gd-${k}">${esc(t)}</label>`).join('')}</div>
     <div class="gd-panes">${T.map(([, b], k) => `<section class="gd-p gd-p${k}">${b}</section>`).join('')}</div>`;
