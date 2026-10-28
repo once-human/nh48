@@ -119,23 +119,38 @@ export class Wada {
     G.later(3.6, () => G.hud.say && G.hud.say('…', 'काका, मला वाचवा!', '“Uncle, save me!”', 4));
     G.later(5.5, () => G.hud.toast('Did you hear that?', 'Shaniwar Wada after midnight. Narayanrao Peshwa, 1773. Puneri dadis still won’t walk past here at night', 'info', 6));
   }
-  // in the arch of the Delhi Darwaza, for a breath: a boy in white, there and gone
+  // in the arch of the Delhi Darwaza, for a breath: a boy in white, there and gone. A real figure (the people's own
+  // body, a boy's size with a child's bigger head), barefoot in a white kurta and pyjama, pale and see-through,
+  // standing still and looking at you
   apparition() {
-    const G = this.g;
-    if (!this.ghost) {
-      const m = new THREE.MeshBasicMaterial({ color: 0xe8f0ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
-      const g = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.34, 1.15, 12), m); body.position.y = 0.75; g.add(body);
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), m); head.position.y = 1.48; g.add(head);
-      g.visible = false; G.scene.add(g); this.ghost = { g, m };
+    const G = this.g, kit = G.people && G.people.kit;
+    if (!this.ghost && kit) {
+      const c = (h) => new THREE.Color(h).convertSRGBToLinear();
+      const look = kit.randomLook({ next: () => 0.37, chance: () => false, range: (a, b) => (a + b) / 2, pick: (a) => a[0], int: (a) => a }, { female: false });
+      Object.assign(look, { female: false, top: c(0xf2f0ea), bottom: c(0xf6f4ee), skin: c(0xd9cfc4), shoe: c(0xd9cfc4), hair: c(0x14110f),
+        cut: new THREE.Vector4(0.9, 0.55, 0.85, 1), style: 'hair_simpleparted', beard: false, glasses: false, acc: null, scale: 0.66 });
+      const H = kit.create(look);
+      const head = H.root.getObjectByName('Head'), step = H.mixer.update;
+      H.mixer.update = (dt) => { const r = step(dt); if (head) head.scale.setScalar(1.28); return r; };   // a child's head on a small body
+      const mats = new Set();
+      H.root.traverse((o) => { if (o.isMesh) { o.castShadow = false; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => mats.add(m)); } });
+      for (const m of mats) { m.transparent = true; m.depthWrite = false; m.opacity = 0; if (m.emissive) { m.emissive.set(0x9fb6d8); m.emissiveIntensity = 0.55; } }
+      H.play('idle', { fade: 0 });
+      H.holder.visible = false; G.scene.add(H.holder);
+      this.ghost = { H, mats: [...mats] };
     }
-    const { g, m } = this.ghost, at = this.P(SW.GU, SW.GV - 1.2), t0 = performance.now() + 3600;
-    g.position.set(at.x, 0.15, at.z); g.visible = true;
+    if (!this.ghost) return;
+    const { H, mats } = this.ghost, at = this.P(SW.GU, SW.GV - 0.9), P = G.player, t0 = performance.now() + 3600;
+    H.holder.position.set(at.x, G.W.surf.height(at.x, at.z), at.z);
+    H.holder.rotation.set(0, -Math.atan2(P.z - at.z, P.x - at.x), 0);
+    H.holder.visible = true;
+    let last = performance.now();
     const tick = () => {
-      const t = (performance.now() - t0) / 1000;
-      m.opacity = t < 0 ? 0 : t < 0.25 ? t * 1.6 : t < 1.4 ? 0.4 + Math.random() * 0.15 : Math.max(0, 0.4 - (t - 1.4) * 0.8);
-      g.position.y = 0.15 + Math.max(0, t) * 0.05;
-      if (t < 2.0) requestAnimationFrame(tick); else { g.visible = false; m.opacity = 0; }
+      const now = performance.now(), t = (now - t0) / 1000;
+      H.mixer.update(Math.min(0.05, (now - last) / 1000) * 0.35); last = now;     // barely breathing
+      const o = t < 0 ? 0 : t < 0.35 ? t / 0.35 * 0.55 : t < 1.6 ? 0.5 + Math.sin(t * 31) * 0.06 : Math.max(0, 0.55 - (t - 1.6) * 0.9);
+      for (const m of mats) m.opacity = o;
+      if (t < 2.4) requestAnimationFrame(tick); else { H.holder.visible = false; for (const m of mats) m.opacity = 0; }
     };
     requestAnimationFrame(tick);
     G.later(3.7, () => G.rig && G.rig.shake && G.rig.shake(0.25));
