@@ -415,7 +415,7 @@ export class MapScreen {
         <div class="bm-c-b" id="bm-c-b"></div>
         <div class="bm-c-act"><button class="btn primary small" id="bm-c-go">Set waypoint</button><button class="btn small" id="bm-c-ft">Take a rickshaw</button><button class="btn small" id="bm-c-x">Close</button></div>
       </div>
-      <div class="bm-foot"><span class="bm-scale" id="bm-scale"><i></i><b></b></span><span class="bm-hint">Drag to move · scroll to zoom · right-click to drop a pin · <span class="kbd" data-k="M">M</span> close</span></div>`;
+      <div class="bm-foot"><span class="bm-scale" id="bm-scale"><i></i><b></b></span><span class="bm-hint">Drag to move · scroll to zoom · right-click to drop a pin · <span class="kbd" data-k="M">M</span> close</span><span class="bm-credit">© OpenStreetMap contributors · Overture Maps · SRTM terrain</span></div>`;
     root.appendChild(m);
     this.el = m;
     this.cv = m.querySelector('.bm-canvas');

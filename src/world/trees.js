@@ -432,7 +432,7 @@ export class TreeField {
     const kit = createTreeKit(renderer, quality, tex);
     Object.assign(this, kit);
     // per-tree data, bucketed in a 64 m grid; trees arrive and leave with their tile
-    this.x = []; this.z = []; this.k = []; this.s = []; this.r = []; this.tag = [];
+    this.x = []; this.z = []; this.y = []; this.k = []; this.s = []; this.r = []; this.tag = [];
     this.cell = 64;
     this.grid = new Map();
     this.n = 0;
@@ -481,7 +481,7 @@ export class TreeField {
     for (const t of T) {
       const i = this.x.length;
       const x = t[0] / 100, z = t[1] / 100, k = t[2];
-      this.x.push(x); this.z.push(z); this.k.push(k); this.s.push(t[3] * (0.85 + hash1(i * 1.7) * 0.3)); this.r.push(hash1(t[0] * 7 + t[1]) * 6.283); this.tag.push(tag);
+      this.x.push(x); this.z.push(z); this.y.push(W.hills ? W.hills.height(x, z) : 0); this.k.push(k); this.s.push(t[3] * (0.85 + hash1(i * 1.7) * 0.3)); this.r.push(hash1(t[0] * 7 + t[1]) * 6.283); this.tag.push(tag);
       const key = Math.floor(x / this.cell) + ',' + Math.floor(z / this.cell);
       let l = this.grid.get(key); if (!l) this.grid.set(key, l = []); l.push(i);
       W.collision.addCircle(x, z, this.arch[k].trunkR * this.s[i] + 0.1, 1);
@@ -525,7 +525,7 @@ export class TreeField {
           if (c[lod] >= mb.instanceMatrix.count) continue;
           E.set(0, this.r[t], 0); Q.setFromEuler(E);
           const sx = s * (0.92 + hash1(t * 3.3) * 0.16), sy = s * (0.9 + hash1(t * 5.1) * 0.2);
-          m.compose(V.set(this.x[t], 0.12, this.z[t]), Q, S.set(sx, sy, sx));
+          m.compose(V.set(this.x[t], 0.12 + this.y[t], this.z[t]), Q, S.set(sx, sy, sx));
           m.toArray(mb.instanceMatrix.array, c[lod] * 16);
           m.toArray(ml.instanceMatrix.array, c[lod] * 16);
           c[lod]++;
@@ -554,7 +554,7 @@ export class TreeField {
         const dx = this.x[t] - cx, dz = this.z[t] - cz, d2 = dx * dx + dz * dz;
         if (d2 > f2 || d2 < in2 || fb >= capFar) continue;
         const s = this.s[t];
-        m.makeScale(s, s, s); m.setPosition(this.x[t], 0.12, this.z[t]);
+        m.makeScale(s, s, s); m.setPosition(this.x[t], 0.12 + this.y[t], this.z[t]);
         m.toArray(this.bb.instanceMatrix.array, fb * 16);
         this.bbCell.array[fb] = this.k[t];
         fb++;

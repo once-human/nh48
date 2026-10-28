@@ -112,6 +112,7 @@ export class TileManager {
     const bOff = M.buildings.length;
     for (const b of D.buildings) M.buildings.push(b);
     T.bOff = bOff; T.bN = D.buildings.length;
+    for (const [bi, d] of D.hillB || []) if (M.buildings[bOff + bi]) M.buildings[bOff + bi].y = d / 10;   // up on a hillside
     D.buses = []; D.pois = []; D.places = [];
     W.index.addTile(D, bOff, rect, tag);
     yield;
@@ -129,6 +130,7 @@ export class TileManager {
       for (const s of D.stalls) C.addCircle(s[0] / 100, s[1] / 100, 0.9, 2);
     });
     yield;
+    if (W.hills) W.hills.addTile(D, rect, tag);
     tagged(() => W.trees.addTile(D.trees, tag));
     yield;
     tagged(() => addStreetProps(W, D, tag, g.nodes));
@@ -162,6 +164,7 @@ export class TileManager {
     W.collision.removeTag(tag, T.rect);
     yield;
     W.trees.removeTile(tag);
+    if (W.hills) W.hills.removeTile(tag);
     yield;
     removeStreetProps(W, tag);
     yield;

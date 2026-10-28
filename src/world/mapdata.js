@@ -315,7 +315,7 @@ export class Surfaces {
   }
   isRoad(x, z) { return this.test(this.road, x, z); }
   isWater(x, z) { return this.test(this.water, x, z); }
-  height(x, z) { return this.isRoad(x, z) ? 0 : 0.15; }
+  height(x, z) { const b = this.isRoad(x, z) ? 0 : 0.15; return this.hills ? b + this.hills.height(x, z) : b; }
 }
 
 // ---------------------------------------------------------------- static collision

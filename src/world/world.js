@@ -17,6 +17,7 @@ import { cmRing } from './geo.js';
 import { buildFarCity } from './farCity.js';
 import { TreeField } from './trees.js';
 import { GrassField } from './grass.js';
+import { Hills } from './hills.js';
 
 export async function buildWorld(M, T, renderer, scene, quality, progress) {
   const W = { M, scene, renderer, quality, T };
@@ -63,6 +64,8 @@ export async function buildWorld(M, T, renderer, scene, quality, progress) {
     sign: new THREE.MeshStandardMaterial({ map: W.boards.tex, emissiveMap: W.boards.tex, emissive: 0xffffff, emissiveIntensity: 0.05, roughness: 0.55, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }),
     oldSign: new THREE.MeshStandardMaterial({ map: W.signs.tex, emissiveMap: W.signs.tex, emissive: 0xffffff, emissiveIntensity: 0.05, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }),
   };
+  W.hills = new Hills(W, scene);
+  W.surf.hills = W.hills;
   W.signMats = new Set();           // per-chunk board materials (follow the night glow too)
   W.nearBoards = new NearBoards(renderer, scene, W.mats.sign, W.index ? W.index.shopNames : (M.shopNames || []));
   W.signMats.add(W.nearBoards.mat);

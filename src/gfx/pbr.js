@@ -44,12 +44,12 @@ export function groundMaterial(T) {
     Object.assign(sh.uniforms, { tGAlb: { value: T.groundAlb }, tGNrm: { value: T.groundNrm }, tGArm: { value: T.groundArm },
       uGScale: { value: GROUND_SCALE }, uGNorm: { value: GROUND_NORMAL }, uNight: U.uNight });
     sh.vertexShader = rep(sh.vertexShader, '#include <common>', `attribute vec2 guv; attribute float glayer; attribute float gshade;
-      varying vec2 vGuv; varying float vLayer; varying float vShade; varying vec3 vWP;`);
-    sh.vertexShader = rep(sh.vertexShader, '#include <project_vertex>', `vGuv = guv; vLayer = glayer; vShade = gshade;
+      varying vec2 vGuv; varying float vLayer; varying float vShade; varying vec3 vWP; varying float vUp;`);
+    sh.vertexShader = rep(sh.vertexShader, '#include <project_vertex>', `vGuv = guv; vLayer = glayer; vShade = gshade; vUp = normalize(mat3(modelMatrix) * objectNormal).y;
       vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
     sh.fragmentShader = rep(sh.fragmentShader, '#include <common>', `uniform highp sampler2DArray tGAlb, tGNrm, tGArm;
       uniform float uGScale[11]; uniform float uGNorm[11]; uniform float uNight;
-      varying vec2 vGuv; varying float vLayer; varying float vShade; varying vec3 vWP;
+      varying vec2 vGuv; varying float vLayer; varying float vShade; varying vec3 vWP; varying float vUp;
       ${NOISE}
       float gLayer; vec2 gUV; vec4 gArm; float gPaint;`);
     // albedo: anti-tiled sampling (two scales blended by noise) + macro variation; kerb paint
@@ -62,6 +62,13 @@ export function groundMaterial(T) {
       if (L > 23.5) {                                  // building compounds: concrete / tiles / pavers / bare soil patches
         float r = nhNoise(vWP.xz * 0.021 + 11.0) + (nhNoise(vWP.xz * 0.45) - 0.5) * 0.06;
         baseL = r < 0.44 ? 7.0 : r < 0.62 ? 3.0 : r < 0.72 ? 2.0 : r < 0.95 ? 6.0 : 4.0;   // mostly concrete and tiles, some garden, little bare soil
+      }
+      float hillT = 0.0;
+      if (L > 24.5) {                                  // Pune's hills after the rains: dry grass, scrub, red laterite and rock on the steep bits
+        float r = nhNoise(vWP.xz * 0.013 + 4.0) + (nhNoise(vWP.xz * 0.21) - 0.5) * 0.12;
+        float steep = 1.0 - vUp;
+        baseL = steep > 0.34 ? 10.0 : steep > 0.2 ? 8.0 : r < 0.5 ? 6.0 : r < 0.8 ? 5.0 : 8.0;
+        hillT = 1.0;
       }
       int li = int(baseL);
       float sc = uGScale[li];
@@ -94,6 +101,11 @@ export function groundMaterial(T) {
       }
       float macro = mix(0.86, 1.1, nhFbm(vWP.xz * 0.045 + 3.0));
       vec3 col = alb.rgb * macro;
+      if (hillT > 0.5) {                               // golden October grass, greener in the folds, a rust tint on the bare ground
+        float dry = smoothstep(0.3, 0.75, nhFbm(vWP.xz * 0.006 + 9.0));
+        col *= mix(vec3(0.98, 1.04, 0.86), vec3(1.16, 1.02, 0.72), dry);
+        if (baseL > 7.5) col *= vec3(1.12, 0.94, 0.84);
+      }
       if (L > 19.5 && L < 20.5) {      // black & yellow kerb paint (alternating 0.6 m blocks)
         float band = step(0.5, fract(vGuv.x / 1.2));
         vec3 paint = mix(vec3(0.03, 0.03, 0.03), vec3(0.85, 0.62, 0.05), band);

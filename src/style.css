@@ -375,6 +375,7 @@ input[type=range] { width: 100%; accent-color: var(--stone); }
   padding: 0 max(18px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px)); }
 .bm-hint { font-size: 12px; color: var(--paper-3); text-align: right; }
 .bm-hint .kbd { height: 20px; min-width: 20px; font-size: 10.5px; background: rgba(244, 241, 234, .12); color: var(--paper); box-shadow: none; }
+.bm-credit { font-size: 10px; color: var(--paper-2); opacity: .55; margin-left: auto; }
 .bm-scale { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: var(--paper-2); font-variant-numeric: tabular-nums; }
 .bm-scale i { display: block; height: 6px; border: 1.5px solid var(--paper-2); border-top: 0; }
 @media (max-width: 700px) { .bm-hint { display: none; } }

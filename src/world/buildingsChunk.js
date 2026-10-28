@@ -214,9 +214,15 @@ export function* buildBuildingsChunk(W, C, group) {
   W.sliceLabel = 'bld';
   const footprints = [];
   C.doors = [];                    // shop fronts people can walk into
+  // a building up on a hillside (tools/bake_hills.py sets B.y on load): built as usual, then lifted whole
+  let pend = null;
+  const lift = () => { if (pend) for (const [bld, k0] of pend.s) for (let k = k0 + 1; k < bld.p.length; k += 3) bld.p[k] += pend.dy; pend = null; };
   for (const bi of C.bld) {
     yield;
+    lift();
     const B = M.buildings[bi];
+    const dy = B.y || 0;
+    pend = dy ? { dy, s: [[fb, fb.p.length], [rb, rb.p.length], [cb, cb.p.length], [sb, sb.p.length], [ob, ob.p.length]] } : null;
     const [, ringCm, levels, styleId, roof, flags, , hoard, peth, district] = B;
     const p = cmRing(ringCm);
     const n = p.length / 2;
@@ -241,7 +247,7 @@ export function* buildBuildingsChunk(W, C, group) {
     const parapet = fort ? 1.4 : pitched ? 0 : styleId === 6 ? 0.15 : 0.95;
     const top = BASE + H;
     const wallTop = top + parapet;
-    footprints.push({ bi, p, h: wallTop });
+    footprints.push({ bi, p, h: wallTop + dy });
     let u = 0;
     const shopsHere = index.shopsByBld.get(bi);
     for (let i = 0; i < n; i++) {
@@ -353,6 +359,7 @@ export function* buildBuildingsChunk(W, C, group) {
       else if (styleId !== 6) rooftop(cb, rng, p, normals, top, levels, Math.abs(area));
     }
   }
+  lift();
   // rooftop hoardings facing chowks
   W.sliceLabel = 'hoard';
   for (const h of C.hoardings) {
