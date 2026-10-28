@@ -1259,3 +1259,14 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 #gl { transition: filter .6s; }
 #ui.intro ~ #gl, body:has(#ui.intro) #gl { filter: blur(5px) brightness(.7); }
 @keyframes icIn { from { opacity: 0; transform: translate(-50%, -46%); } }
+
+/* pause: Map, Photo, Share as quick tiles, apart from the text menu */
+.pz-quick { display: flex; gap: 10px; margin: 10px 0 14px; animation: pzup .5s var(--ease) .06s both; }
+.pz-i.pz-q { flex-direction: column; justify-content: center; gap: 8px; width: 104px; height: 92px; padding: 0; border-radius: 16px; transform: none; animation: none;
+  background: rgba(255, 255, 255, .07); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1); font: 700 13px var(--font-ui); letter-spacing: .04em; text-transform: none; color: rgba(245, 245, 247, .8); }
+.pz-i.pz-q::before { display: none; }
+.pz-i.pz-q:last-child { margin-top: 0; font-size: 13px; }
+.pz-i.pz-q svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; }
+.pz-i.pz-q em { position: absolute; top: 7px; right: 9px; font: 700 10px var(--font-ui); font-style: normal; color: rgba(245, 245, 247, .45); }
+.pz-i.pz-q:hover, .pz-i.pz-q.sel { transform: translateY(-2px); background: var(--acc); color: #0b0b0d; box-shadow: 0 10px 24px rgba(0, 0, 0, .35); }
+.pz-i.pz-q.sel em, .pz-i.pz-q:hover em { color: rgba(11, 11, 13, .55); }

@@ -401,9 +401,11 @@ export class HUD {
           <div class="pz-head"><span class="pz-k">Paused</span><b id="p-who">Paused</b><div class="pz-meta" id="p-meta"></div></div>
           <nav class="pz-menu">
             <button class="pz-i" id="p-resume">Resume</button>
-            <button class="pz-i" id="p-map">Map</button>
-            <button class="pz-i" id="p-photo">Photo mode</button>
-            <button class="pz-i" id="p-share">Share Puneri</button>
+            <div class="pz-quick">
+              <button class="pz-i pz-q" id="p-map"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zm0 0v14m6-12v14"/></svg><span>Map</span><em>M</em></button>
+              <button class="pz-i pz-q" id="p-photo"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></svg><span>Photo</span><em>K</em></button>
+              <button class="pz-i pz-q" id="p-share"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="6" r="2.6"/><circle cx="18" cy="18" r="2.6"/><path d="m8.3 10.8 7.4-3.6m-7.4 6 7.4 3.6"/></svg><span>Share</span></button>
+            </div>
             <button class="pz-i" data-pane="guide">Guide</button>
             <button class="pz-i" data-pane="set">Settings</button>
             <button class="pz-i" data-pane="ctrl">Controls</button>
