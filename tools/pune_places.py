@@ -130,6 +130,35 @@ for lon, lat, nm, bc, tx, hier, conf, ff, pc in good:
     cat = TAX.get(tx) or BASIC.get(bc)
     if cat == '?': cat = kw_cat(nm)
     ovt.append(dict(x=round(x, 2), z=round(z, 2), raw=nm.strip(), mr='', cat=cat, pin=ovt_pin(bc, hier), src=2, conf=round(conf, 3), board=cat is not None))
+# ---------------------------------------------------------------- famous places: one real location
+# Overture repeats famous names at wrong spots ("Sassoon General Hospital" in Shivajinagar). Where OpenStreetMap
+# has the place, an Overture listing of the same name more than 1.5 km from it goes.
+FAMOUS = [r'(b ?j medical college and )?(david )?sassoon( general)? hospital', r'shaniwar ?wada( fort)?',
+    r'(shreemant |shrimant )?dagdu ?sheth( halwai)?( ganpati)?( temple| mandir)?', r'aga ?khan palace', r'parvati( hill| temple| mandir| devasthan)+',
+    r'(shri |sri )?saras ?baug( ganpati| ganesh)?( temple| mandir| garden)?', r'fergusson college', r'(coep|college of engineering pune|coep technological university)',
+    r'(savitribai phule pune university|university of pune|pune university|sppu)( main building)?', r'lal mahal', r'(shri )?kasba ganpati( temple| mandir)?',
+    r'tulshi ?baug( ram mandir)?', r'(mahatma phule )?mandai', r'(shri )?chat(u|ur)sh?r(i|u)ng(i|hi)( devi)?( temple| mandir)?', r'(mahadji )?shinde ch?hatri',
+    r'pataleshwar( cave)?( temple| caves)?', r'raja dinkar kelkar museum', r'vishram ?b(a|au)g ?wada', r'osho (international meditation resort|ashram|teerth park)',
+    r'pune (railway station|junction)', r'phoenix market ?city', r'empress (botanical )?garden', r'(rajiv gandhi zoological park|katraj zoo)',
+    r'bal ?gandharva (rang ?mandir|theatre)', r'jehangir hospital', r'(deenanath|dinanath) mangeshkar hospital', r'kem hospital', r'ruby hall clinic',
+    r'omkareshwar( temple| mandir)?', r'national war museum', r'pu ?la deshpande (garden|udyan)', r'sambhaji (park|udyan)', r'(chhatrapati )?shivaji (stadium|park)']
+FAMOUS = [re.compile(x) for x in FAMOUS]
+def fnorm(n):
+    n = re.sub(r'[^a-z0-9]+', ' ', (n or '').lower()).strip()
+    return re.sub(r'( pune| pune maharashtra| maharashtra)+$', '', n).strip()
+ref = collections.defaultdict(list)
+for c in out:
+    k = fnorm(c['raw'])
+    for i, rx in enumerate(FAMOUS):
+        if rx.fullmatch(k): ref[i].append((c['x'], c['z']))
+kept = []
+for c in ovt:
+    k = fnorm(c['raw']); bad = False
+    for i, rx in enumerate(FAMOUS):
+        if ref[i] and rx.fullmatch(k) and min(math.hypot(c['x'] - x, c['z'] - z) for x, z in ref[i]) > 1500: bad = True; break
+    if bad: drop['famous name, wrong place'] += 1
+    else: kept.append(c)
+ovt = kept
 print('overture dropped', dict(drop), 'kept', len(ovt))
 # ---------------------------------------------------------------- duplicates
 grid = collections.defaultdict(list)

@@ -399,6 +399,8 @@ export class HUD {
           <nav class="pz-menu">
             <button class="pz-i" id="p-resume">Resume</button>
             <button class="pz-i" id="p-map">Map</button>
+            <button class="pz-i" id="p-photo">Photo mode</button>
+            <button class="pz-i" id="p-share">Share NH48</button>
             <button class="pz-i" data-pane="guide">Guide</button>
             <button class="pz-i" data-pane="set">Settings</button>
             <button class="pz-i" data-pane="ctrl">Controls</button>
@@ -435,7 +437,7 @@ export class HUD {
             <div class="gt">Start over</div>
             <div class="group danger"><div class="row"><div class="rl">Wipe everything<small>Money back to ₹5,000; vehicles, outfits, property, fines, people and where you are</small></div><div class="rc"><button class="btn bad" id="p-reset">Start over</button></div></div>
               <div class="confirm" id="p-reset-c" hidden><b>Sure? This can’t be undone.</b><button class="btn bad" id="p-reset-y">Yes, wipe it</button><button class="btn" id="p-reset-n">Keep playing</button></div></div>
-            <div class="fine">Map data © OpenStreetMap contributors (ODbL); buildings and places from Overture Maps Foundation (ODbL, CDLA-Permissive-2.0), including Google Open Buildings and Microsoft footprints. All business names are fictional parodies of real places. People and animals: Quaternius (CC0). Voices: Kokoro-82M (Apache-2.0) and Piper mr_IN, trained on Google’s crowdsourced Marathi speech (OpenSLR 64, CC BY-SA 4.0). Sounds: Freesound (CC0). Fines follow the MV Act as reported for Pune and may be out of date.</div>
+            <div class="fine">Map data © OpenStreetMap contributors (ODbL); buildings and places from Overture Maps Foundation (ODbL, CDLA-Permissive-2.0), including Google Open Buildings and Microsoft footprints. Terrain: SRTM (NASA) via Terrain Tiles on AWS. Shop and place names are the real ones from OpenStreetMap and Overture; national and international chains appear as parodies. Pune Metro Line 3 opens 3 Nov 2026; fares on it are estimates. People and animals: Quaternius (CC0). Voices: Kokoro-82M (Apache-2.0) and Piper mr_IN, trained on Google’s crowdsourced Marathi speech (OpenSLR 64, CC BY-SA 4.0). Sounds: Freesound (CC0). Fines follow the MV Act as reported for Pune and may be out of date.</div>
           </section>
         </div>
         <div class="pz-keys"><span><span class="kbd">W</span><span class="kbd">S</span> Select</span><span><span class="kbd">A</span><span class="kbd">D</span> Change</span><span><span class="kbd">Enter</span> Open</span><span><span class="kbd">Esc</span> Resume</span></div>
@@ -446,6 +448,13 @@ export class HUD {
     p.addEventListener('click', (e) => { if (e.target === p) this.game.togglePause(false); });
     p.querySelector('#p-resume').onclick = () => { this.game.togglePause(false); this.game.lockMouse?.(); this.game.goFullscreen?.(); };
     p.querySelector('#p-map').onclick = () => { this.game.togglePause(false); this.game.toggleMap(true); };
+    p.querySelector('#p-share').onclick = async () => {
+      const text = 'I\u2019m driving around Pune in my browser. FC Road, Shaniwar Wada, Parvati, autos on the meter.', url = 'https://nh48.vercel.app';
+      try { if (navigator.share) { await navigator.share({ title: 'NH48: Pune', text, url }); return; } } catch (e) { /* closed the sheet */ return; }
+      try { await navigator.clipboard.writeText(`${text} ${url}`); this.toast('Link copied', 'Paste it anywhere. #NH48Pune', 'info', 2.4); }
+      catch (e) { this.toast('nh48.vercel.app', 'Share this link', 'info', 3); }
+    };
+    p.querySelector('#p-photo').onclick = () => { this.game.togglePause(false); this.game.photo && this.game.photo.open(); };
     p.querySelector('#p-title').onclick = () => { this.game.endShift(); this.syncTitle(); };
     p.querySelector('#p-char').onclick = () => this.showPicker();
     p.querySelector('#p-reset').onclick = () => { p.querySelector('#p-reset-c').hidden = false; p.querySelector('#p-reset').hidden = true; };

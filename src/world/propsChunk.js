@@ -117,6 +117,16 @@ export function buildGlobalProps(W) {
     }, 10);
   }
   addLandmarks(W);
+  // landmarks seen from across the city (Parvati on its hill) are built once and stay
+  for (const L of W.landmarks) {
+    if (!L.far) continue;
+    const cb = new ColorBuilder(), gb = new GB(), fb = new FacadeB(), group = new THREE.Group(), mm = new THREE.Matrix4();
+    try { buildLandmark(W, L.id, { fb, gb, cb, group, mm }); } catch (e) { console.warn('landmark', L.id, e); continue; }
+    if (!cb.empty) { const m = new THREE.Mesh(cb.build(), W.mats.prop); m.castShadow = true; m.receiveShadow = true; group.add(m); }
+    if (!gb.empty) { const m = new THREE.Mesh(gb.build(), W.mats.ground); m.receiveShadow = true; group.add(m); }
+    if (!fb.empty) { const m = new THREE.Mesh(fb.build(), W.mats.facade); m.castShadow = true; m.receiveShadow = true; group.add(m); }
+    group.name = 'landmark-' + L.id; W.scene.add(group);
+  }
 }
 
 // one tile's lamps, poles (with cables into the chunks) and signal heads; nmap turns the tile's own graph
@@ -294,6 +304,18 @@ export function* buildPropsChunk(W, C, group) {
       const y = BASE + wallH, c = 0.14;
       fb.flat([[ax + nx * c, y, az + nz * c], [bx + nx * c, y, bz + nz * c], [bx - nx * c, y, bz - nz * c], [ax - nx * c, y, az - nz * c]], 1, { ...A, layer: WL.concrete, flags: 6 });
       u += L;
+    }
+    // now and then a Puneri patya on the wall by the gate, one on each face
+    if (signs.patya.length && hash1(p[0] * 3.7 + p[1] * 1.3) < 0.13) {
+      const ax = p[0], az = p[1], bx = p[2], bz = p[3], L = Math.hypot(bx - ax, bz - az);
+      if (L > 2.4) {
+        const tx = (bx - ax) / L, tz = (bz - az) / L, nx = tz, nz = -tx, at = Math.min(1.4, L / 2), w = 0.9, h = 0.45, y0 = BASE + 1.0;
+        for (const side of [1, -1]) {
+          const s = signs.patya[Math.floor(hash1(p[0] + p[1] * 7 + side) * signs.patya.length)];
+          const ox = nx * side, oz = nz * side, cx = ax + tx * at + ox * 0.125, cz = az + tz * at + oz * 0.125, rx = oz, rz = -ox;
+          sb.quad([cx - rx * w / 2, y0, cz - rz * w / 2], [cx + rx * w / 2, y0, cz + rz * w / 2], [cx + rx * w / 2, y0 + h, cz + rz * w / 2], [cx - rx * w / 2, y0 + h, cz - rz * w / 2], [ox, 0, oz], s.u0, s.v0, s.u1, s.v1);
+        }
+      }
     }
     const ends = [[p[0], p[1], p[2], p[3]], [p[p.length - 2], p[p.length - 1], p[p.length - 4], p[p.length - 3]]];
     for (const [ex, ez, ox, oz] of ends) {

@@ -10,7 +10,7 @@ usage: python3 tools/landmarks_bake.py   (after reshop.py)"""
 import gzip, json, glob, math, os
 from shapely.geometry import Polygon, Point, box
 from shapely import affinity
-import duckdb
+import duckdb, shapely
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 LAT0, LON0, MLAT, MLON = 18.527, 73.865, 110686.0, 105589.0
 def proj(lon, lat): return ((lon - LON0) * MLON, -(lat - LAT0) * MLAT)
@@ -25,6 +25,16 @@ out, claims = [], []
 for s in spec:
     if 'way' in s:
         poly = Polygon([proj(*p) for p in ways[s['way']]['pts']]).buffer(0)
+    elif 'ovt' in s:                 # the biggest footprint the open building data has within r m of a point
+        lat, lon, rr = s['ovt']; px, pz = proj(lon, lat)
+        best = None
+        for (g,) in con.sql(f"""select ST_AsWKB(geometry) from '{ROOT}/data/raw/pune/building.parquet'
+                              where bbox.xmin < {lon + 0.002} and bbox.xmax > {lon - 0.002} and bbox.ymin < {lat + 0.002} and bbox.ymax > {lat - 0.002}""").fetchall():
+            gg = shapely.from_wkb(bytes(g))
+            if gg.geom_type != 'Polygon': continue
+            q = Polygon([proj(x, y) for x, y in gg.exterior.coords]).buffer(0)
+            if q.centroid.distance(Point(px, pz)) <= rr and (best is None or q.area > best.area): best = q
+        poly = best
     else:
         n = nodes[s['node']]; x, z = proj(n['lon'], n['lat']); w, d = s['size']
         poly = box(x - w / 2, z - d / 2, x + w / 2, z + d / 2)
@@ -59,8 +69,15 @@ for s in spec:
     ox, oz = (max(lx) + min(lx)) / 2, (max(lz) + min(lz)) / 2
     cx, cz = c.x + ox * xx + oz * zx, c.y + ox * xz + oz * zz
     w, d = max(lx) - min(lx), max(lz) - min(lz)
-    out.append(dict(id=s['id'], name=s['name'], x=round(cx, 2), z=round(cz, 2), rot=round(rot, 4), w=round(w, 2), d=round(d, 2),
-                    outline=[[round(p[0] - ox, 2), round(p[1] - oz, 2)] for p in loc]))
+    rec = dict(id=s['id'], name=s['name'], x=round(cx, 2), z=round(cz, 2), rot=round(rot, 4), w=round(w, 2), d=round(d, 2),
+               outline=[[round(p[0] - ox, 2), round(p[1] - oz, 2)] for p in loc])
+    for k in ('hill', 'far'):
+        if s.get(k): rec[k] = True
+    # named points inside, in the local frame (Parvati's temple courtyard within the hilltop)
+    for k, a in (s.get('anchors') or {}).items():
+        ap = Polygon([proj(*p) for p in ways[a]['pts']]).centroid if isinstance(a, int) else Point(*proj(a[1], a[0]))
+        rec.setdefault('anchors', {})[k] = [round((ap.x - cx) * xx + (ap.y - cz) * xz, 2), round((ap.x - cx) * zx + (ap.y - cz) * zz, 2)]
+    out.append(rec)
     claims.append((s['id'], poly.buffer(s.get('claim', 2))))
     if s.get('plaza'):           # open ground in front (Shaniwar Wada's lawn and statue): no trees, no boxes
         claims.append((s['id'] + ':plaza', Polygon([(c.x + ox * xx + oz * zx + pu * xx + pv * zx, c.y + ox * xz + oz * zz + pu * xz + pv * zz) for pu, pv in s['plaza']])))

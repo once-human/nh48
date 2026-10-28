@@ -30,6 +30,7 @@ class LB {
     Object.assign(this, b);                    // fb (facades), gb (ground), cb (coloured), group, mm
     this.L = L; this.c = Math.cos(L.rot); this.s = Math.sin(L.rot);
     this.seed = Math.abs(Math.round(L.x * 7 + L.z * 3)) % 251;
+    this.Y0 = BASE + (L.y || 0);                // up on its hill (Parvati), or at street level
   }
   // local (u, v) -> world [x, z]; +u along the width, +v toward the back
   P(u, v) { return [this.L.x + u * this.c + v * this.s, this.L.z + u * this.s - v * this.c]; }
@@ -39,7 +40,7 @@ class LB {
   wall(ua, va, ub, vb, y0, y1, nu, nv, A, u0 = 0) {
     const [ax, az] = this.P(ua, va), [bx, bz] = this.P(ub, vb), [nx, nz] = this.N(nu, nv);
     const L = Math.hypot(bx - ax, bz - az) || 1;
-    this.fb.wall(ax, az, bx, bz, BASE + y0, BASE + y1, nx, nz, u0, { ...A, eu: u0, eL: L, tx: (bx - ax) / L, tz: (bz - az) / L, top: y1 });
+    this.fb.wall(ax, az, bx, bz, this.Y0 + y0, this.Y0 + y1, nx, nz, u0, { ...A, eu: u0, eL: L, tx: (bx - ax) / L, tz: (bz - az) / L, top: y1 });
   }
   // a closed ring of walls (local points), faces outward (or inward)
   ring(pts, y0, y1, A, inward = false) {
@@ -60,22 +61,22 @@ class LB {
   }
   // a horizontal face (4 local points) at height y
   flat(q, y, A, down = false) {
-    this.fb.flat(q.map(([u, v]) => { const [x, z] = this.P(u, v); return [x, BASE + y, z]; }), down ? -1 : 1, A);
+    this.fb.flat(q.map(([u, v]) => { const [x, z] = this.P(u, v); return [x, this.Y0 + y, z]; }), down ? -1 : 1, A);
   }
   // any quad (local [u, y, v] points, in order) with the facade material, facing away from `ref` (a local
   // [u, y, v] point inside the solid; default: straight below the quad's middle, so roofs face up)
   quad(q, A, ref) {
-    const w = q.map(([u, y, v]) => { const [x, z] = this.P(u, v); return [x, BASE + y, z]; });
+    const w = q.map(([u, y, v]) => { const [x, z] = this.P(u, v); return [x, this.Y0 + y, z]; });
     const ax = w[1][0] - w[0][0], ay = w[1][1] - w[0][1], az = w[1][2] - w[0][2];
     let bx = w[3][0] - w[0][0], by = w[3][1] - w[0][1], bz = w[3][2] - w[0][2];
     if (Math.hypot(bx, by, bz) < 1e-6) { bx = w[2][0] - w[0][0]; by = w[2][1] - w[0][1]; bz = w[2][2] - w[0][2]; }
     let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx; const L = Math.hypot(nx, ny, nz) || 1; nx /= L; ny /= L; nz /= L;
     const mx = (w[0][0] + w[1][0] + w[2][0] + w[3][0]) / 4, my = (w[0][1] + w[1][1] + w[2][1] + w[3][1]) / 4, mz = (w[0][2] + w[1][2] + w[2][2] + w[3][2]) / 4;
     let rx = mx, ry = my - 10, rz = mz;
-    if (ref) { const [x, z] = this.P(ref[0], ref[2]); rx = x; ry = BASE + ref[1]; rz = z; }
+    if (ref) { const [x, z] = this.P(ref[0], ref[2]); rx = x; ry = this.Y0 + ref[1]; rz = z; }
     const flip = (mx - rx) * nx + (my - ry) * ny + (mz - rz) * nz < 0;
     if (flip) { nx = -nx; ny = -ny; nz = -nz; }
-    const vs = w.map(p => this.fb.v(p[0], p[1], p[2], nx, ny, nz, p[0] * 0.7 + p[2] * 0.7, p[1] - BASE, A));
+    const vs = w.map(p => this.fb.v(p[0], p[1], p[2], nx, ny, nz, p[0] * 0.7 + p[2] * 0.7, p[1] - this.Y0, A));
     if (flip) this.fb.i.push(vs[0], vs[2], vs[1], vs[0], vs[3], vs[2]); else this.fb.i.push(vs[0], vs[1], vs[2], vs[0], vs[2], vs[3]);
   }
   // a gabled or hipped roof over a local box, in tiles: ridge along u
@@ -87,13 +88,13 @@ class LB {
   }
   ground(pts, y, layer, shade = 1) {
     const flat = []; for (const [u, v] of pts) { const [x, z] = this.P(u, v); flat.push(x, z); }
-    this.gb.poly([flat], BASE + y, layer, shade);
+    this.gb.poly([flat], this.Y0 + y, layer, shade);
   }
   // coloured parts: geometry placed at local (u, y, v), turned by yaw (radians, about the up axis;
   // the geometry's own +z faces the landmark's front)
   part(g, u, y, v, col, yaw = 0, sx = 1, sy = 1, sz = 1, glow = 0) {
     const [x, z] = this.P(u, v);
-    this.cb.addGeo(g, compose(x, BASE + y, z, -this.L.rot + yaw, sx, sy, sz, 0, 0, this.mm), col, glow);
+    this.cb.addGeo(g, compose(x, this.Y0 + y, z, -this.L.rot + yaw, sx, sy, sz, 0, 0, this.mm), col, glow);
   }
   cbox(u, y, v, w, h, d, col, yaw = 0, glow = 0) { this.part(geo('box', () => new THREE.BoxGeometry(1, 1, 1)), u, y + h / 2, v, col, yaw, w, h, d, glow); }
   cyl(u, y, v, r, h, col, n = 12, glow = 0) { this.part(geo('cyl' + n, () => new THREE.CylinderGeometry(1, 1, 1, n)), u, y + h / 2, v, col, 0, r, h, r, glow); }
@@ -131,7 +132,7 @@ class LB {
     }
     const m = new THREE.Mesh(geo('plane', () => new THREE.PlaneGeometry(1, 1)), mat);
     const [x, z] = this.P(u, v);
-    m.position.set(x, BASE + y, z); m.rotation.y = -this.L.rot + yaw; m.scale.set(w, h, 1);
+    m.position.set(x, this.Y0 + y, z); m.rotation.y = -this.L.rot + yaw; m.scale.set(w, h, 1);
     m.updateMatrix(); m.matrixAutoUpdate = false;
     this.group.add(m);
   }
@@ -161,6 +162,40 @@ function horseman(B, u, v, s, yaw) {
   { const [a, b] = rot(0, 1.2); B.part(geo('tail', () => { const g = new THREE.CylinderGeometry(0.05, 0.12, 0.9, 6); g.rotateX(0.5); return g; }), a, y0 + 1.5 * s, b, br, yaw, s, s, s); }
   { const [a, b] = rot(0, -0.1); B.cbox(a, y0 + 2.25 * s, b, 0.5 * s, 0.9 * s, 0.4 * s, br, yaw); B.sphere(a, y0 + 3.35 * s, b, 0.2 * s, br); B.cone(a, y0 + 3.5 * s, b, 0.22 * s, 0.35 * s, br, 8); }
   { const [a, b] = rot(0.35, -0.3); B.part(geo('sword', () => { const g = new THREE.BoxGeometry(0.05, 1.1, 0.05); g.rotateX(-0.5); return g; }), a, y0 + 3.4 * s, b, C.iron, yaw, s, s, s); }
+}
+
+// a Nagara spire: tiers narrowing upward with small corner spirelets, an amalaka, a gold kalash. Returns the top
+function shikhara(B, u, v, y, r, n, col, yaw = Math.PI / 4) {
+  for (let k = 0; k < n; k++) {
+    const h = Math.max(0.9, r * 0.5);
+    B.part(geo('stier', () => new THREE.CylinderGeometry(0.86, 1, 1, 4)), u, y + h / 2, v, col, yaw, r, h, r);
+    if (k < n - 2) for (let i = 0; i < 4; i++) { const a = i / 4 * 6.283 + yaw; B.cone(u + Math.cos(a) * r * 0.78, y + h, v + Math.sin(a) * r * 0.78, Math.max(0.2, r * 0.14), h * 0.9, col, 6); }
+    y += h; r *= 0.84;
+  }
+  B.part(geo('amalaka', () => new THREE.CylinderGeometry(1, 1, 1, 16)), u, y + 0.25, v, col, 0, r * 1.25, 0.5, r * 1.25);
+  B.sphere(u, y + 0.75, v, Math.max(0.3, r * 0.45), C.gold, 0.35); B.cone(u, y + 0.9, v, Math.max(0.12, r * 0.18), r * 1.2 + 0.6, C.gold, 8, 0.35);
+  return y + r * 1.2 + 1.5;
+}
+// a saffron pennant on a pole
+function flag(B, u, v, y, h = 3) {
+  B.cyl(u, y, v, 0.05, h, C.iron, 5);
+  B.part(geo('pennant', () => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, -0.35, 0, 0, -0.7, 0, 0, 0, 0, 0, -0.7, 0, 1, -0.35, 0], 3)); g.computeVertexNormals(); return g; }), u, y + h, v, C.saffron, 0.6, 1.6, 1.6, 1);
+}
+// a chhatri: a domed kiosk on four pillars
+function chhatri(B, u, v, y, s, col, dome = col) {
+  for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) B.cyl(u + a * s * 0.42, y, v + b * s * 0.42, s * 0.07, s * 1.1, col, 6);
+  B.cbox(u, y + s * 1.1, v, s * 1.05, s * 0.14, s * 1.05, col);
+  B.dome(u, y + s * 1.24, v, s * 0.5, s * 0.55, dome); B.cone(u, y + s * 1.75, v, s * 0.07, s * 0.35, C.gold, 6);
+}
+// a roof with its ridge along v (the gable ends face the front and the back)
+function roofV(B, u, v, w, d, y, rise, A) {
+  const x0 = u - w / 2, x1 = u + w / 2, z0 = v - d / 2, z1 = v + d / 2, r = y + rise;
+  B.quad([[x0, y, z0], [x0, y, z1], [u, r, z1], [u, r, z0]], A, [u, y - 1, v]);
+  B.quad([[x1, y, z1], [x1, y, z0], [u, r, z0], [u, r, z1]], A, [u, y - 1, v]);
+}
+// a triangular gable wall at the end of roofV, facing -v (front) or +v
+function gable(B, u, v, w, y, rise, A, back = false) {
+  B.quad([[u - w / 2, y, v], [u + w / 2, y, v], [u, y + rise, v], [u, y + rise, v]], A, [u, y, v + (back ? -1 : 1)]);
 }
 
 // ---------------------------------------------------------------- the landmarks
@@ -494,6 +529,166 @@ const BUILD = {
     B.hitBox(0, fv + d / 2 + 4, w, d);
   },
 
+  // Parvati: the Peshwas' hilltop temples over the city. Basalt walls round the summit, the Devdeveshwar temple
+  // (a panchayatan: Shiva's spire with four smaller shrines at the corners of its court), the Vishnu, Vitthal and
+  // Kartikeya temples, the Peshwa museum, and the nagarkhana gateway where the 108 steps come up
+  parvati(B) {
+    const L = B.L, ring = L.outline, hw = L.w / 2, hd = L.d / 2;
+    const sA = B.A(WL.rubble, STONE, 11, 2, 5), wA = B.A(WL.stucco, WHITE, 11, 2, 6);
+    B.ring(ring, -4, 4.2, sA);
+    B.merlons(ring, 4.2, C.stone, 2.6, 1.2, 0.9, 0.6);
+    for (let i = 0; i < ring.length; i++) {
+      const p = ring[(i - 1 + ring.length) % ring.length], c = ring[i], q = ring[(i + 1) % ring.length];
+      const a1 = Math.atan2(c[1] - p[1], c[0] - p[0]), a2 = Math.atan2(q[1] - c[1], q[0] - c[0]);
+      let t = Math.abs(a2 - a1); if (t > Math.PI) t = 2 * Math.PI - t;
+      if (t > 0.5) { B.cyl(c[0], -4, c[1], 4, 10, C.stone, 14); B.merlons(Array.from({ length: 12 }, (_, k) => [c[0] + Math.cos(k / 12 * 6.283) * 4, c[1] + Math.sin(k / 12 * 6.283) * 4]), 6, C.stone, 2.1, 1.0, 0.8, 0.5); B.hitc(c[0], c[1], 4); }
+    }
+    B.ground(ring, 0.05, GL.concrete, 0.95);
+    // Devdeveshwar in its court
+    const [tu, tv] = L.anchors && L.anchors.temple ? L.anchors.temple : [0, 0];
+    B.ring([[tu - 17, tv - 19], [tu + 17, tv - 19], [tu + 17, tv + 19], [tu - 17, tv + 19]], 0, 5, wA);
+    B.merlons([[tu - 17, tv - 19], [tu + 17, tv - 19], [tu + 17, tv + 19], [tu - 17, tv + 19]], 5, C.white, 2.0, 0.9, 0.8, 0.5);
+    B.cbox(tu, 0, tv - 19.1, 3.6, 4.2, 0.3, C.dark);                                   // the court's gate
+    B.cbox(tu, 0, tv + 2, 13, 1.4, 18, C.black);                                       // black stone plinth
+    B.box(tu, tv - 3, 9, 8, 1.4, 6.6, B.A(WL.rubble, T([0.3, 0.29, 0.28]), 11, 2, 6.6), null);
+    B.dome(tu, 6.6, tv - 3, 3.6, 2.6, C.white); B.cone(tu, 9.1, tv - 3, 0.3, 1.2, C.gold, 8, 0.3);
+    B.box(tu, tv + 5, 7, 7, 1.4, 7.6, B.A(WL.rubble, T([0.3, 0.29, 0.28]), 11, 2, 7.6), null);
+    const top = shikhara(B, tu, tv + 5, 7.6, 4.0, 10, C.white);
+    flag(B, tu, tv + 5, top - 0.6, 3.5);
+    for (const [a, b] of [[-11, -12], [11, -12], [11, 13], [-11, 13]]) { B.box(tu + a, tv + b, 4.4, 4.4, 0, 4.2, wA, null); shikhara(B, tu + a, tv + b, 4.2, 2.1, 6, C.white); }
+    B.hitBox(tu, tv, 34, 38);
+    // the other temples and the museum across the hilltop
+    const sp = (fu, fv) => [Math.max(-hw + 12, Math.min(hw - 12, fu)), Math.max(-hd + 10, Math.min(hd - 10, fv))];
+    { const [u, v] = sp(tu - 55, tv + 6); B.box(u, v, 9, 9, 0, 5.5, B.A(WL.rubble, STONE, 11, 2, 5.5), null); shikhara(B, u, v, 5.5, 3.2, 8, C.cream); B.hitBox(u, v, 9, 9); }      // Vishnu
+    { const [u, v] = sp(tu - 85, tv - 4); B.box(u, v, 7, 7, 0, 4.8, wA, null); shikhara(B, u, v, 4.8, 2.6, 7, C.white); B.hitBox(u, v, 7, 7); }                                    // Vitthal
+    { const [u, v] = sp(tu + 60, tv + 10); B.box(u, v, 7, 7, 0, 5, wA, null); B.dome(u, 5, v, 3.4, 4.2, C.white); B.cone(u, 9.2, v, 0.3, 1.4, C.gold, 8, 0.3); flag(B, u, v, 10, 3); B.hitBox(u, v, 7, 7); }   // Kartikeya
+    { const [u, v] = sp(tu + 32, tv - 22); B.box(u, v, 20, 9, 0, 6, B.A(WL.plaster, CREAM, 2, 0, 6), null); B.roof(u, v, 21, 10, 6, 2.6, B.A(WL.clayTiles, T(C.tile)), true); B.hitBox(u, v, 20, 9); }   // Peshwa museum
+    // the nagarkhana: the gateway on the city side, a drum gallery over the arch
+    { const [u] = sp(tu, 0), v = -hd + 4;
+      B.box(u, v, 11, 8, -4, 8.5, sA, null); B.arch(u, v - 4.05, 4.2, 6, 0, C.dark);
+      B.box(u, v, 11.5, 8.5, 8.5, 11.5, B.A(WL.plaster, CREAM, 2, 2, 11.5), null);
+      for (let k = -2; k <= 2; k++) B.arch(u + k * 2.1, v - 4.3, 1.2, 2.2, 8.9, C.dark);
+      B.roof(u, v, 12.6, 9.6, 11.5, 2.4, B.A(WL.clayTiles, T(C.tile)), true);
+      for (const k of [-1, 1]) B.hitBox(u + k * 4.5, v, 2, 8); }
+    for (let i = 0; i < ring.length; i++) B.hit(...ring[i], ...ring[(i + 1) % ring.length]);
+  },
+
+  // Shinde Chhatri (Wanowrie): Mahadji Shinde's memorial, Rajasthani in yellow sandstone. A two-storey hall
+  // with cusped arches, little domed chhatris along the parapet, the Shiva temple's spire behind, and
+  // Mahadji's own domed samadhi to one side, in a walled garden
+  shinde(B) {
+    const L = B.L, hd = L.d / 2, ring = L.outline;
+    const SAND = T([0.93, 0.8, 0.56]), sand = [0.93, 0.8, 0.56], sA = B.A(WL.sandstone, SAND, 11, 2, 6);
+    B.ring(ring, 0, 1.8, sA); B.ground(ring, 0.04, GL.tiles, 0.95);
+    const w = Math.min(30, L.w * 0.45), v0 = 2;
+    B.box(0, v0, w, 16, 0, 6.5, sA, null);
+    for (let k = -4; k <= 4; k++) B.arch(k * (w / 9.5), v0 - 8.05, 2.4, 4.6, 0.3, C.dark, true);
+    B.cbox(0, 6.5, v0, w + 1, 0.5, 17, sand);
+    B.box(0, v0 + 1, w - 4, 13, 7, 11.5, sA, B.A(WL.slab, SAND));
+    for (let k = -4; k <= 4; k++) B.arch(k * ((w - 4) / 9.5), v0 + 1 - 6.55, 1.5, 3, 7.6, C.dark, true);
+    B.merlons([[-w / 2, v0 - 8], [w / 2, v0 - 8]], 7, sand, 1.6, 0.6, 0.7, 0.4, false);
+    for (const [a, b] of [[-w / 2 + 1.5, v0 - 6.5], [w / 2 - 1.5, v0 - 6.5], [-w / 2 + 1.5, v0 + 7], [w / 2 - 1.5, v0 + 7], [-w / 4, v0 - 7], [w / 4, v0 - 7]]) chhatri(B, a, b, 7, 2.2, sand, C.cream);
+    B.box(0, v0 + 4, 8, 8, 11.5, 14, sA, null);
+    const top = shikhara(B, 0, v0 + 4, 14, 4.2, 9, sand);
+    flag(B, 0, v0 + 4, top - 0.6, 3);
+    // Mahadji's samadhi: a platform and a big chhatri
+    const su = -w / 2 - 10, sv = v0 + 2;
+    B.box(su, sv, 8, 8, 0, 1.4, sA, B.A(WL.slab, T(C.marble)));
+    chhatri(B, su, sv, 1.4, 6, sand, C.cream);
+    // the gate in the garden wall
+    B.box(0, -hd + 1, 5, 2.4, 0, 5, sA, null); B.arch(0, -hd - 0.25, 2.6, 3.6, 0, C.dark, true); chhatri(B, 0, -hd + 1, 5, 1.8, sand, C.cream);
+    B.hitBox(0, v0, w, 16); B.hitBox(su, sv, 8, 8);
+    for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length]; if (Math.abs(a[1] + hd) + Math.abs(b[1] + hd) > 2) B.hit(...a, ...b); }
+  },
+
+  // Omkareshwar (1740s), on the river by Shaniwar Wada: a basalt temple with one of the old city's tallest
+  // spires, a domed hall in front, a Nandi pavilion, all inside a stone wall
+  omkareshwar(B) {
+    const L = B.L, ring = L.outline, hd = L.d / 2;
+    const DARK = T([0.36, 0.33, 0.3]), dA = B.A(WL.rubble, DARK, 11, 2, 7), dark = [0.36, 0.33, 0.3];
+    B.ring(ring, 0, 3.4, B.A(WL.rubble, STONE, 11, 2, 3.4)); B.ground(ring, 0.04, GL.concrete, 0.95);
+    B.cbox(0, 0, 2, 14, 1.2, 24, dark);
+    B.box(0, -4, 10, 10, 1.2, 6.8, dA, null); B.dome(0, 6.8, -4, 4.2, 3, dark); B.cone(0, 9.7, -4, 0.3, 1.4, C.gold, 8, 0.3);
+    for (const [a, b] of [[-4.6, -8.6], [4.6, -8.6], [-4.6, 0.4], [4.6, 0.4]]) B.dome(a, 6.8, b, 0.9, 0.9, dark);
+    B.arch(0, -9.05, 2.6, 4, 1.2, C.dark);
+    B.box(0, 6, 8, 8, 1.2, 8, dA, null);
+    const top = shikhara(B, 0, 6, 8, 4.0, 11, [0.46, 0.43, 0.4]);
+    flag(B, 0, 6, top - 0.6, 3);
+    { const v = -hd + 7; for (const [a, b] of [[-1.6, -1.6], [1.6, -1.6], [1.6, 1.6], [-1.6, 1.6]]) B.cyl(a, 0.8, v + b, 0.25, 3, C.stone, 8); B.cbox(0, 0, v, 4.4, 0.8, 4.4, dark); B.dome(0, 3.8, v, 2.3, 1.8, dark); B.cbox(0, 0.8, v, 1.0, 1.0, 1.8, C.black); }
+    B.hitBox(0, 2, 14, 24);
+    for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length]; if (Math.abs(a[1] + hd) + Math.abs(b[1] + hd) > 2) B.hit(...a, ...b); }
+  },
+
+  // St. Mary's Church (1825), the oldest in the Deccan: white Gothic with a square tower and spire in front
+  stmary(B) {
+    const L = B.L, hd = L.d / 2, w = Math.min(14, L.w - 4), d = L.d - 10;
+    const cA = B.A(WL.stucco, T([0.96, 0.94, 0.88]), 10, 2, 10);
+    B.box(0, 3, w, d, 0, 10, cA, null);
+    roofV(B, 0, 3, w + 1, d + 0.6, 10, 5.5, B.A(WL.slab, T([0.32, 0.3, 0.3])));
+    gable(B, 0, 3 + d / 2, w, 10, 5.5, cA, true);
+    for (const side of [-1, 1]) for (let k = 0; k < 5; k++) B.arch(side * (w / 2 + 0.05), 3 - d / 2 + 3 + k * (d - 6) / 4, 1.4, 4.6, 3, C.dark, true, side * Math.PI / 2);
+    const tv = -hd + 4.2;
+    B.box(0, tv, 6.6, 6.6, 0, 21, B.A(WL.stucco, T([0.97, 0.95, 0.9]), 10, 2, 21), B.A(WL.slab, T(C.white)));
+    for (const [a, b] of [[-3.3, -3.3], [3.3, -3.3], [3.3, 3.3], [-3.3, 3.3]]) B.cone(a, 21, tv + b, 0.45, 2.6, C.white, 6);
+    B.part(geo('spire', () => new THREE.ConeGeometry(1, 1, 8)), 0, 21 + 7, tv, C.white, Math.PI / 8, 2.9, 14, 2.9);
+    B.cyl(0, 35, tv, 0.06, 1.6, C.iron, 4); B.cbox(0, 35.9, tv, 0.9, 0.08, 0.08, C.iron);
+    B.part(geo('clock', () => new THREE.CircleGeometry(1.5, 24)), 0, 17, tv - 3.35, C.white, 0, 0.8, 0.8, 1, 0.4);
+    B.arch(0, tv - 3.35, 2.4, 4.4, 0, C.dark, true); B.arch(0, tv - 3.35, 1.1, 3, 9, C.dark, true);
+    B.hitBox(0, 3, w, d); B.hitBox(0, tv, 6.6, 6.6);
+  },
+
+  // Vishrambaug Wada (1807), Bajirao II's mansion on Bajirao Road: a long three-storey front with the famous
+  // carved teak balcony over the gate, teak pillars along the street, a tiled roof
+  vishrambaug(B) {
+    const L = B.L, hd = L.d / 2, w = L.w, fv = -hd;
+    B.box(0, 0, w, L.d, 0, 11.2, B.A(WL.plaster, T([0.93, 0.87, 0.74]), 2, 0, 11.2), null);
+    B.roof(0, 0, w + 1.2, L.d + 1.2, 11.2, 3, B.A(WL.clayTiles, T(C.tile)), true);
+    for (let k = 0; k <= Math.floor(w / 3); k++) { const u = -w / 2 + 0.4 + k * (w - 0.8) / Math.floor(w / 3); B.cbox(u, 0, fv - 0.6, 0.4, 3.9, 0.4, C.teak); }
+    B.cbox(0, 3.9, fv - 0.6, w, 0.45, 0.7, C.teak); B.cbox(0, 4.3, fv - 0.9, w + 0.4, 0.15, 1.4, [0.3, 0.18, 0.1]);
+    // the balcony: carved teak, its own little roof, brackets under
+    const bw = Math.min(13, w * 0.3);
+    B.cbox(0, 4.5, fv - 1.1, bw, 3.9, 1.8, [0.33, 0.2, 0.1]);
+    for (let k = 0; k < 22; k++) B.cbox(-bw / 2 + 0.3 + k * (bw - 0.6) / 21, 5.1, fv - 2.05, 0.12, 2.6, 0.08, [0.22, 0.13, 0.07]);
+    for (let k = -2; k <= 2; k++) { B.arch(k * bw / 5.2, fv - 2.1, 1.2, 2.2, 5.4, [0.12, 0.08, 0.05]); B.cbox(k * bw / 5.2, 4.1, fv - 1.6, 0.25, 0.4, 1.2, C.teak); }
+    B.quad([[-bw / 2 - 0.4, 8.6, fv - 2.4], [bw / 2 + 0.4, 8.6, fv - 2.4], [bw / 2 + 0.4, 9.4, fv - 0.2], [-bw / 2 - 0.4, 9.4, fv - 0.2]], B.A(WL.clayTiles, T(C.tile)));
+    B.arch(0, fv - 0.05, 3.4, 3.8, 0, C.teak);
+    for (let f = 0; f < 2; f++) for (let k = -7; k <= 7; k++) { if (Math.abs(k) < 3) continue; B.cbox(k * w / 15.5, 5 + f * 3.1, fv - 0.06, 1.0, 1.7, 0.1, [0.18, 0.11, 0.06]); }
+    B.hitBox(0, 0, w, L.d);
+  },
+
+  // Fergusson College's main building: grey basalt, two storeys of pointed arches, a central tower
+  fergusson(B) {
+    const L = B.L, w = Math.min(L.w, 60), d = Math.min(L.d, 16), fv = -L.d / 2;
+    const sA = B.A(WL.rubble, T([0.5, 0.48, 0.45]), 10, 2, 11);
+    B.box(0, fv + d / 2, w, d, 0, 11, sA, null);
+    B.roof(0, fv + d / 2, w + 1, d + 1, 11, 3.6, B.A(WL.clayTiles, T([0.55, 0.28, 0.2])), true);
+    for (let f = 0; f < 2; f++) for (let k = -9; k <= 9; k++) B.arch(k * (w / 19.5), fv - 0.05, 1.5, 3.4, 0.8 + f * 5.2, C.dark, true);
+    const tv = fv + 3.5;
+    B.box(0, tv, 8, 8, 0, 23, B.A(WL.rubble, T([0.5, 0.48, 0.45]), 10, 2, 23), null);
+    B.arch(0, tv - 4.05, 3, 5, 0, C.dark, true);
+    B.part(geo('clock', () => new THREE.CircleGeometry(1.5, 24)), 0, 19, tv - 4.06, C.white, 0, 1, 1, 1, 0.4);
+    B.merlons([[-4, tv - 4], [4, tv - 4], [4, tv + 4], [-4, tv + 4]], 23, C.stone, 1.6, 0.7, 0.8, 0.5);
+    B.roof(0, tv, 8.4, 8.4, 23.8, 4.5, B.A(WL.slab, T(C.slate)), true);
+    for (const [a, b] of [[-4, tv - 4], [4, tv - 4], [4, tv + 4], [-4, tv + 4]]) B.cone(a, 23.8, b, 0.4, 2.4, C.stone, 6);
+    B.hitBox(0, fv + d / 2, w, d); B.hitBox(0, tv, 8, 8);
+  },
+
+  // Chaturshringi: the goddess's temple up the hillside on Senapati Bapat Road, a white and saffron spire over
+  // a pillared hall, steps down the slope
+  chaturshringi(B) {
+    const L = B.L, hd = L.d / 2, w = Math.min(L.w, 26), d = Math.min(L.d, 26);
+    const wA = B.A(WL.stucco, WHITE, 11, 2, 7);
+    B.ground([[-L.w / 2, -hd], [L.w / 2, -hd], [L.w / 2, hd], [-L.w / 2, hd]], 0.05, GL.tiles, 0.95);
+    B.box(0, -d / 4, w, d / 2, 0, 6, wA, null);
+    for (let k = -3; k <= 3; k++) B.arch(k * w / 7.5, -d / 2 - 0.05, 1.8, 3.8, 0.4, C.dark);
+    for (const a of [-w / 3, 0, w / 3]) { B.dome(a, 6, -d / 4, 2.2, 2, C.white); B.cone(a, 8, -d / 4, 0.2, 1, C.gold, 6, 0.3); }
+    B.box(0, d / 4, 10, 10, 0, 8, wA, null);
+    const top = shikhara(B, 0, d / 4, 8, 5, 10, [0.97, 0.66, 0.3]);
+    flag(B, 0, d / 4, top - 0.6, 3.5);
+    for (let k = 0; k < 18; k++) B.cbox(0, -0.45 * (k + 1), -hd - 0.8 * k - 0.4, 6, 0.45, 0.8, C.stone);
+    B.hitBox(0, 0, w, d);
+  },
+
   // Osho's meditation resort: black buildings in a garden, the great black pyramid auditorium
   osho(B) {
     const s = Math.min(B.L.w, B.L.d) * 0.6;
@@ -532,7 +727,7 @@ export function addLandmarks(W) {
     const ci = index.chunkOf(L.x, L.z);
     if (ci < 0) continue;
     const c = index.chunks[ci];
-    c.extras.push({ kind: 'landmark', id: L.id });
+    if (!L.far) c.extras.push({ kind: 'landmark', id: L.id });     // the far ones are built once, for good (propsChunk)
     W.landmarks.push(L);
     // collision is worked out once by a dry run of the builder
     const col = [];

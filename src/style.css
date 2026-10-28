@@ -1224,3 +1224,14 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .keybtn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
 .keybtn.wait { background: #ffb224; color: #1a1408; animation: keywait 1s ease-in-out infinite; }
 @keyframes keywait { 50% { box-shadow: 0 0 0 4px rgba(255, 178, 36, .25); } }
+
+/* photo mode: everything but the bar (and the toasts) goes; the bar sits low and small */
+#ui.photo > :not(.photo-ui):not(.toasts) { visibility: hidden !important; }
+.photo-ui { position: absolute; inset: 0; pointer-events: none; z-index: 40; }
+.photo-ui .ph-bar { position: absolute; left: 50%; bottom: max(22px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; align-items: center; gap: 14px;
+  padding: 10px 12px 10px 18px; pointer-events: auto; font-size: 12.5px; color: var(--paper-2, #cfcac0); white-space: nowrap; border-radius: 999px; }
+.photo-ui .ph-bar b { color: var(--paper, #f4f1ea); font-weight: 750; letter-spacing: .02em; }
+.photo-ui .ph-bar .kbd { margin: 0 1px; }
+.photo-ui .ph-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.photo-ui .ph-flash.go { animation: phflash .45s ease-out; }
+@keyframes phflash { 0% { opacity: .75; } 100% { opacity: 0; } }

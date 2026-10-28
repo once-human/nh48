@@ -102,6 +102,62 @@
    "name": "Osho International Meditation Resort",
    "way": 264403539,
    "claim": 3
+  },
+  {
+   "id": "parvati",
+   "name": "Parvati",
+   "way": 197954182,
+   "claim": 3,
+   "front": [
+    0,
+    -1
+   ],
+   "hill": true,
+   "far": true,
+   "anchors": {
+    "temple": 264282504
+   }
+  },
+  {
+   "id": "shinde",
+   "name": "Shinde Chhatri",
+   "way": 53350109,
+   "claim": 2
+  },
+  {
+   "id": "omkareshwar",
+   "name": "Omkareshwar Mandir",
+   "way": 215535660,
+   "claim": 2
+  },
+  {
+   "id": "stmary",
+   "name": "St. Mary's Church",
+   "way": 105455078,
+   "claim": 3
+  },
+  {
+   "id": "vishrambaug",
+   "name": "Vishrambaug Wada",
+   "way": 264444882,
+   "claim": 1
+  },
+  {
+   "id": "fergusson",
+   "name": "Fergusson College",
+   "way": 282003231,
+   "claim": 2
+  },
+  {
+   "id": "chaturshringi",
+   "name": "Chaturshringi Temple",
+   "ovt": [
+    18.53942,
+    73.82929,
+    60
+   ],
+   "claim": 3,
+   "hill": true
   }
  ]
 }

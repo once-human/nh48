@@ -138,7 +138,18 @@ const body = tpl
   .replace('/*MANIFEST*/', () => JSON.stringify({ ...sizes, __voices: voiceIndex, __v: hashes, __pv: PV }))
   .replace('/*JS*/', () => js.replace(/<\/script/gi, '<\\/script'));
 fs.writeFileSync(path.join(dist, 'index.html'), body);
-fs.writeFileSync(path.join(dist, 'test.html'), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:dark}body{margin:0}[hidden]{display:none!important}</style></head><body>${body}</body></html>`);
+// the deployed page (vercel copies test.html to index.html): what a link shows when it's shared on WhatsApp,
+// Instagram, X: the title, a line, the picture (assets/og.jpg, 1200x630)
+const SITE = 'https://nh48.vercel.app';
+const DESC = 'Drive real Pune in your browser. FC Road, Shaniwar Wada, Parvati, the metro, autos on the meter. Free, nothing to install.';
+const ICON = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 52"><path d="M4 22a16 16 0 0 1 32 0v26H4z" fill="#F4F1EA"/><path d="M4 22a16 16 0 0 1 32 0z" fill="#F2B705"/><rect x="4" y="44" width="32" height="4" fill="#C9C4B8"/></svg>')}`;
+const HEAD = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">`
+  + `<title>NH48: Pune</title><meta name="description" content="${DESC}"><meta name="theme-color" content="#101216"><link rel="icon" href="${ICON}">`
+  + `<meta property="og:type" content="website"><meta property="og:site_name" content="NH48"><meta property="og:url" content="${SITE}/">`
+  + `<meta property="og:title" content="NH48: Pune"><meta property="og:description" content="${DESC}">`
+  + `<meta property="og:image" content="${SITE}/assets/og.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Shaniwar Wada in NH48: Pune">`
+  + `<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="NH48: Pune"><meta name="twitter:description" content="${DESC}"><meta name="twitter:image" content="${SITE}/assets/og.jpg">`;
+fs.writeFileSync(path.join(dist, 'test.html'), `<!doctype html><html lang="en"><head>${HEAD}<style>:root{color-scheme:dark}body{margin:0}[hidden]{display:none!important}</style></head><body>${body}</body></html>`);
 const kb = (n) => (n / 1024).toFixed(0) + 'KB';
 const assetTotal = Object.values(sizes).reduce((a, b) => a + b, 0);
 console.log(`built in ${Date.now() - t0}ms  page ${kb(body.length)} (js ${kb(js.length)}, fonts ${kb(fontCss.length)})  assets ${kb(assetTotal)} in ${Object.keys(sizes).length} files`);

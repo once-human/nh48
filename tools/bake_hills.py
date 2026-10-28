@@ -67,11 +67,13 @@ for f in tiles:
             if len(rings[0]) >= 6: dr.polygon(px(rings[0]), fill=1)
     for ci, rings in T['water']:
         if len(rings[0]) >= 6: dr.polygon(px(rings[0]), fill=1)
-# the landmark models stand on level ground
-for L in json.load(open(os.path.join(ROOT, 'src/world/landmarks.json'))):
+# the landmark models stand on level ground; the ones on a hilltop (Parvati) get the hilltop levelled under them
+LMS = json.load(open(os.path.join(ROOT, 'src/world/landmarks.json')))
+def lm_ring(L):
     c, s_ = math.cos(L['rot']), math.sin(L['rot'])
-    ring = [((L['x'] + u * c - v * s_ - VX0) / S, (L['z'] + u * s_ + v * c - VZ0) / S) for u, v in L['outline']]
-    dr.polygon(ring, fill=1)
+    return [((L['x'] + u * c + v * s_ - VX0) / S, (L['z'] + u * s_ - v * c - VZ0) / S) for u, v in L['outline']]
+for L in LMS:
+    if not L.get('hill'): dr.polygon(lm_ring(L), fill=1)
 dev = np.asarray(img, dtype=bool)
 # buildings are not cut out of the hills: the ones on a hillside get lifted onto it (below)
 lab_img = Image.new('I', (NX, NZ), 0); dl = ImageDraw.Draw(lab_img)
@@ -100,12 +102,26 @@ comp, nc = ndimage.label(hill > 0.5)
 keep = np.zeros(nc + 1, bool); keep[1:] = ndimage.maximum(hill, comp, np.arange(1, nc + 1)) > 12
 hill[~keep[comp]] = 0
 del comp
+# a landmark on a hilltop (Parvati): its outline levelled, and the slopes around built up to meet it (no cliff)
+for L in LMS:
+    if not L.get('hill'): continue
+    li = Image.new('L', (NX, NZ), 0); ImageDraw.Draw(li).polygon(lm_ring(L), fill=1)
+    m = np.asarray(li, dtype=bool)
+    y = float(np.percentile(hill[m], 75)) if m.any() else 0.0
+    m2 = ndimage.binary_dilation(m, iterations=2)
+    dpad = ndimage.distance_transform_edt(~m2).astype(np.float32) * S
+    fill = np.maximum(y - 0.7 * dpad, 0) * sstep(6, 50, dist)
+    hill = np.maximum(hill, fill); hill[m2] = y
+    L['y'] = round(y, 2)
+    print('landmark', L['id'], 'stands', round(y, 1), 'm up', flush=True)
+    del dpad, fill
 # buildings on a slope: lifted to the lowest ground under them (the uphill side sits into the hill), and the
 # ground under them (and a step around) levelled to that
 nb = len(bids)
 bmin = ndimage.minimum(hill, lab, np.arange(nb)); bmin = np.where(np.isfinite(bmin), bmin, 0); bmin[0] = 0
 pad = ndimage.grey_dilation(lab, size=3)
 hill = np.where(pad > 0, bmin[pad], hill).astype(np.float32)
+json.dump(LMS, open(os.path.join(ROOT, 'src/world/landmarks.json'), 'w'), separators=(',', ':'))
 lift = {}
 for k in np.nonzero(bmin >= 0.3)[0]:
     f, bi = bids[k]; lift.setdefault(f, []).append([bi, int(round(bmin[k] * 10))])

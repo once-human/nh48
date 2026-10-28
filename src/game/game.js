@@ -18,6 +18,7 @@ import { Props } from './props.js';
 import { Gigs } from './gigs.js';
 import { Hustle } from './hustle.js';
 import { Transit } from './transit.js';
+import { PhotoMode } from './photo.js';
 import TRANSIT_DATA from './transit.json';
 import { justOpened, lineOpen, opensOn } from './metroOpen.js';
 import { Club } from './club.js';
@@ -134,6 +135,7 @@ export class Game {
     this.gigs = new Gigs(this);
     this.hustle = new Hustle(this);
     this.transit = new Transit(this);
+    this.photo = new PhotoMode(this);
     this.club = new Club(this);
     this.bag = new Bag(this);
     this.lights = new Lights(this);
@@ -719,6 +721,7 @@ export class Game {
 
   frame(dt) {
     const P = this.player;
+    if (this.state === 'photo') this.photo.update(dt);
     if (this.state === 'play') { this.hour = (this.hour + dt * this.timeScale) % 24; this.clock += dt * this.timeScale; }
     // shop panels, the jhola and conversations keep the mouse (they're all number keys and arrows);
     // the pause menu, the map and the title get the cursor
