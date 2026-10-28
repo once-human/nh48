@@ -465,17 +465,21 @@ export class People {
       if (!opts.length || node.portal) { p.dir = -p.dir; p.s = clamp(p.s, 0, p.e.len); }
       else {
         const e = this.rng.pick(opts);
+        // round the corner on the same side of the street (picking a side at random teleported people
+        // across the road: they seemed to vanish mid-step)
+        const handed = p.side * p.dir;
         p.e = e;
         p.dir = e.a === nodeIdx ? 1 : -1;
         p.s = p.dir > 0 ? 0.5 : e.len - 0.5;
-        p.side = this.rng.chance(0.5) ? 1 : -1;
+        p.side = handed * p.dir;
         p.lat = p.latT = this.sidewalkLat(e, p.side);
       }
     }
     // pop into a shop now and then
-    if (!p.kid && this.rng.next() < dt * 0.05) {
-      const d = this.doorNear(p.x, p.z, 7, p);
-      if (d) { d.n++; this.goTo(p, d.x, d.z, (q) => { q.mode = 'inside'; q.hidden = true; q.door = d; q.wait = this.rng.range(6, 35); }); return; }
+    if (!p.kid && this.rng.next() < dt * 0.02) {
+      const d = this.doorNear(p.x, p.z, 4.5, p);
+      // only a door just ahead of them, so they walk in rather than turn round and blink out
+      if (d && (d.x - p.x) * p.hx + (d.z - p.z) * p.hz > 0.5) { d.n++; this.goTo(p, d.x, d.z, (q) => { q.mode = 'inside'; q.hidden = true; q.door = d; q.wait = this.rng.range(6, 35); }); return; }
     }
     // occasionally cross the road wherever (very Pune)
     if (this.rng.next() < dt * 0.012 && p.e.rank <= 5) {
