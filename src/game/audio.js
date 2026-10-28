@@ -118,6 +118,27 @@ export class Audio {
   setLoop(name, v, tc = 0.4) { const l = this.loops[name]; if (l) l.g.gain.setTargetAtTime(v, this.ctx.currentTime, tc); }
 
   // ---------------------------------------------------------------- voices (TTS lines, see lines.json)
+  // a clip that isn't here yet: read just its bytes from its pack (or the whole pack once, from a server that
+  // can't do ranges), then say it if it's still timely
+  fetchVoice(id, then) {
+    const R = this.remote, e = R && R.idx[id];
+    if (!e) return false;
+    const name = 'v_' + id, [off, len, pk] = e, url = R.urls[pk || 0];
+    if (!url) return false;
+    this.fetching = this.fetching || {};
+    if (this.fetching[name]) return true;
+    this.fetching[name] = true;
+    const asked = this.ctx.currentTime, whole = (R.whole = R.whole || {});
+    const got = (ab) => { this.raw[name] = ab; delete this.fetching[name]; if (this.ctx.currentTime - asked < 1.5) then(); };
+    if (whole[url]) { whole[url].then((b) => b && got(b.slice(off, off + len))); return true; }
+    fetch(url, { headers: { Range: `bytes=${off}-${off + len - 1}` } }).then(async (r) => {
+      if (r.status === 206) return got(await r.arrayBuffer());
+      if (!r.ok) throw new Error(r.status);
+      const all = r.arrayBuffer(); whole[url] = all;
+      got((await all).slice(off, off + len));
+    }).catch(() => { delete this.fetching[name]; });
+    return true;
+  }
   voice(id, vol = 1, pan = 0, radio = false, pri = 2) {
     // one voice at a time, and not everyone at once: idle chatter (pri 0) waits for silence, a
     // reaction (pri 1: someone you knocked over, hit, or whose car you took) won't talk over another
@@ -131,7 +152,7 @@ export class Audio {
     const name = 'v_' + id;
     if (!this.buf[name]) {
       const raw = this.raw[name];
-      if (!raw) return false;
+      if (!raw) return this.fetchVoice(id, () => this.voice(id, vol, pan, radio, pri));
       this.decoding = this.decoding || {};
       if (!this.decoding[name]) {
         this.decoding[name] = true;

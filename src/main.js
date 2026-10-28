@@ -63,6 +63,10 @@ function pickQuality() {
   try { const s = localStorage.getItem('nh48_quality'); if (s && QUALITY[s]) return { ...QUALITY[s] }; } catch (e) { /* storage blocked */ }
   if (GPU === 'soft') return { ...QUALITY.lite };
   if (GPU === 'weak') return { ...QUALITY.low };
+  // laptop graphics (Intel UHD / Iris, Radeon Vega): Medium's look at the screen's own resolution with a
+  // lighter shadow map, grass and crowd, so it holds a steady frame rate instead of swinging between 30 and 60
+  if (GPU === 'integrated') return { ...QUALITY.med, pixelRatio: 1.0, shadowSize: 1024, grassRange: 32, grassCap: 3800, treeNearRange: 45, treeMidRange: 170,
+    treeNearCap: 200, treeMidCap: 1400, treeFarCap: 8000, streamRadius: 440, streamBudget: 2, propRange: 140, traffic: 100, peds: 150 };
   return { ...QUALITY.med };
 }
 
@@ -215,9 +219,12 @@ async function main() {
       const list = JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
       W.cityMap && W.cityMap.addPins(list);
     }).catch(() => { /* the map fills in as you go */ }), 9000);
-    setTimeout(async () => { await pack(VOICE_BIN, 0); await new Promise(r => setTimeout(r, 8000)); await pack('assets/voices_k.mp3', 1); await pack('assets/voices_d.mp3', 2); }, 4000);
+    // the voice lines (about 40 MB in all) aren't downloaded up front any more: each clip is fetched the first
+    // time someone says it (a ranged read from its pack), so the game stays light in memory
+    game.voiceRemote = { idx, urls: [VOICE_BIN, 'assets/voices_k.mp3', 'assets/voices_d.mp3'] }; void pack;
   }
   await game.init(progress);
+  if (game.audio && game.voiceRemote) game.audio.remote = game.voiceRemote;
   // warm the chunks around the start before the first frame
   await progress('Building the streets', 0.86);
   const sx = player.x, sz = player.z;
@@ -255,7 +262,7 @@ async function main() {
   const sphere = new THREE.Sphere(new THREE.Vector3(), 12);
   const inView = (x, z) => { sphere.center.set(x, 4, z); return frustum.intersectsSphere(sphere); };
   game.inView = inView;
-  let last = performance.now(), acc = 0, propT = 0, frames = 0;
+  let last = performance.now(), acc = 0, propT = 0, frames = 0, dtS = 1 / 60;
   const STEP = 1 / 60;
   // F3: performance overlay
   const perfBox = document.createElement('div');
@@ -292,6 +299,10 @@ async function main() {
     const t0 = performance.now();
     let dt = Math.min(0.1, (now - last) / 1000);
     last = now;
+    // frame pacing: small wobbles in frame time (16, 17, 15, 18 ms) are smoothed so motion doesn't judder;
+    // a real hitch still counts in full so nothing drifts from the clock
+    dtS = Math.abs(dt - dtS) < 0.012 ? dtS + (dt - dtS) * 0.2 : dt;
+    dt = dtS;
     if (TEST) dt = 1 / 30;
     renderer.info.reset();
     // tests can simulate several frames per rendered frame (?simx=4), software GL is slow
@@ -402,6 +413,10 @@ async function runFly({ W, renderer, scene, camera, sky, post, quality, progress
   function frame(now) {
     let dt = Math.min(0.1, (now - last) / 1000);
     last = now;
+    // frame pacing: small wobbles in frame time (16, 17, 15, 18 ms) are smoothed so motion doesn't judder;
+    // a real hitch still counts in full so nothing drifts from the clock
+    dtS = Math.abs(dt - dtS) < 0.012 ? dtS + (dt - dtS) * 0.2 : dt;
+    dt = dtS;
     if (TEST) dt = 1 / 30;
     renderer.info.reset();
     const sp = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 60 : 14) * dt;
