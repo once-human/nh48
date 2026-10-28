@@ -21,7 +21,7 @@ export class Wada {
   }
   P(u, v) { const L = this.L; return { x: L.x + u * this.c + v * this.s, z: L.z + u * this.s - v * this.c }; }
   local(x, z) { const dx = x - this.L.x, dz = z - this.L.z; return [dx * this.c + dz * this.s, dx * this.s - dz * this.c]; }
-  isOpen() { const h = this.g.hour; return h >= OPEN && h < CLOSE; }
+  isOpen() { const h = this.g.hour; return h >= OPEN && h < CLOSE || h >= 19 && h < 19.75; }   // and for the Light and Sound show
   hasTicket() { const t = this.g.life && this.g.life.s.wadaTicket; return t !== undefined && (this.g.clock || 0) - t < 10; }
   // the ticket window, for the F prompt
   near(x, z) {
@@ -34,7 +34,7 @@ export class Wada {
     return null;
   }
   label(n) {
-    if (n && n.act === 'in') return !this.isOpen() ? 'Delhi Darwaza · Shut for the night · opens 8 am' : this.hasTicket() ? 'Go in through the Delhi Darwaza · F' : `Delhi Darwaza · Ticket first, ${fmt(PRICE)} at the window on the left`;
+    if (n && n.act === 'in') return !this.isOpen() ? (this.g.hour >= CLOSE && this.g.hour < 19 ? 'Delhi Darwaza · Light and Sound show at 7:15 pm' : 'Delhi Darwaza · Shut for the night · opens 8 am') : this.hasTicket() ? 'Go in through the Delhi Darwaza · F' : `Delhi Darwaza · Ticket first, ${fmt(PRICE)} at the window on the left`;
     if (n && n.act === 'out') return 'Leave by the Delhi Darwaza · F';
     if (n && n.act === 'vendor') return this.g.hour >= 8 && this.g.hour < 22.5 ? `${n.V[3]} · ${fmt(n.V[5])} · F` : `${n.V[3]} · packed up for the night`;
     if (!this.isOpen()) return 'Shaniwar Wada · Ticket window shut · opens 8 am';
