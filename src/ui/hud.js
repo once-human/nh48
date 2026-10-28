@@ -65,7 +65,7 @@ export class HUD {
     R.appendChild(el('div', 'free-tips', '<span class="kbd">[</span><span class="kbd">]</span> time of day<i></i><span class="kbd">K</span> photo<i></i><span class="kbd">M</span> map<i></i><span class="kbd">Esc</span> pause'));
     this.loc = el('div', 'h loc', `
       <div class="loc-area cap"><i class="tick"></i><span id="h-area">Deccan</span></div>
-      <div class="loc-street" id="h-street">FC Road</div>
+      <div class="loc-street" id="h-street"></div>
       <div class="loc-mr" lang="mr" id="h-street-mr"></div>
       <div class="loc-time"><span id="h-clock">4:30 PM</span><i class="dot"></i><span id="h-mode">Free roam</span></div>`);
     this.wallet = el('div', 'h wallet', `

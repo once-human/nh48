@@ -4,6 +4,12 @@ import * as THREE from 'three';
 import { clamp, lerp, RNG, safeStorage, wrapAngle, damp } from '../core/util.js';
 import { HUD } from '../ui/hud.js';
 import { CityMap } from '../ui/map.js';
+import { SW } from '../world/landmarks.js';
+
+const LM_MR = { shaniwar: 'शनिवारवाडा', dagdusheth: 'श्रीमंत दगडूशेठ हलवाई गणपती', mandai: 'महात्मा फुले मंडई', station: 'पुणे रेल्वे स्टेशन',
+  agakhan: 'आगाखान पॅलेस', lalmahal: 'लाल महाल', ohel: 'लाल देऊळ', tulshibaug: 'तुळशीबाग राम मंदिर', kasba: 'कसबा गणपती', sppu: 'सावित्रीबाई फुले पुणे विद्यापीठ',
+  coep: 'सीओईपी', osho: 'ओशो आश्रम', parvati: 'पर्वती', shinde: 'शिंदे छत्री', omkareshwar: 'ओंकारेश्वर मंदिर', stmary: 'सेंट मेरी चर्च',
+  vishrambaug: 'विश्रामबाग वाडा', fergusson: 'फर्ग्युसन कॉलेज', chaturshringi: 'चतुःशृंगी मंदिर' };
 import { Rides, fareFor } from './rides.js';
 import { Audio } from './audio.js';
 import { People } from '../people/peds.js';
@@ -330,8 +336,38 @@ export class Game {
     const e = near.e, t = W.graph.at(e, Math.max(3, Math.min(e.len - 3, near.s)));
     let hx = t[2], hz = t[3];
     if (hx * (gx - t[0]) + hz * (gz - t[1]) < 0) { hx = -hx; hz = -hz; }
+    // the auto stand: off the carriageway on the Wada side of the road, clear of trees, carts and the
+    // footpath's busiest line, parallel to the road and as close to it as that allows (never towed there)
+    const S = this.standSpot(L, P, e, t);
+    if (S) { this.stand = S; return S; }
     const lat = e.oneway ? e.w / 2 - 1.8 : (hx === t[2] ? 1.8 : -1.8);
     return { x: t[0] + t[3] * lat, z: t[1] - t[2] * lat, th: Math.atan2(hz, hx) };
+  }
+  standSpot(L, P, e, t) {
+    const W = this.W, T = W.trees, busy = [...SW.vendors.map(q => P(q[0], q[1])), P(...SW.counter), P(...SW.plaque), P(SW.GU, SW.GV - 36)];
+    const tx = t[2], tz = t[3];
+    let best = null;
+    for (let u = -40; u <= 46; u += 2) for (let v = -150; v <= -92; v += 2) {
+      const [x, z] = P(u, v);
+      // the whole footprint (3 m long, 1.5 m wide) off the road and out of buildings
+      let ok = true;
+      for (const [a, b] of [[0, 0], [1.8, 0], [-1.8, 0], [0, 1.1], [0, -1.1], [1.8, 1.1], [-1.8, -1.1]]) {
+        const qx = x + tx * a - tz * b, qz = z + tz * a + tx * b;
+        if (W.surf.isRoad(qx, qz) || W.surf.inBuilding(qx, qz) || W.surf.isWater(qx, qz)) { ok = false; break; }
+      }
+      if (!ok) continue;
+      if (Math.abs(u - SW.GU) < 20 && v > SW.GV - 52) continue;                 // the garden and the statue lawn
+      if (busy.some(([bx, bz]) => Math.hypot(bx - x, bz - z) < 4.5)) continue;
+      if (T) { let near = false; for (let i = 0; i < T.x.length && !near; i++) near = Math.abs(T.x[i] - x) < 4.5 && Math.abs(T.z[i] - z) < 4.5; if (near) continue; }
+      // closest to the road (but at least a car's width off its edge), then closest to the gate
+      const n = W.graph.nearest(x, z, 40, (q) => q.rank >= 2);
+      if (!n) continue;
+      const q = W.graph.at(n.e, Math.max(0, Math.min(n.e.len, n.s))), dRoad = Math.hypot(q[0] - x, q[1] - z) - n.e.w / 2;
+      if (dRoad < 2.2) continue;
+      const score = dRoad * 3 + Math.hypot(u - SW.GU, v - SW.GV) * 0.15;
+      if (!best || score < best.score) best = { x, z, th: Math.atan2(q[3], q[2]), score };
+    }
+    return best;
   }
   findStart(roadName) {
     const { W } = this;
@@ -947,6 +983,15 @@ export class Game {
   }
 
   // is there a road under (x, z) that you may drive along in direction (hx, hz)?
+  landmarkAt(x, z) {
+    for (const L of this.W.landmarks || []) {
+      if (!L.w || !L.d) continue;
+      const dx = x - L.x, dz = z - L.z, c = Math.cos(L.rot), s = Math.sin(L.rot);
+      const u = dx * c + dz * s, v = dx * s - dz * c;
+      if (Math.abs(u) < L.w / 2 + 2 && Math.abs(v) < L.d / 2 + 2) return L;
+    }
+    return null;
+  }
   rightWayHere(x, z, hx, hz) {
     const G = this.W.graph;
     for (const e of G.gridQuery(x, z, 20)) {
@@ -970,6 +1015,9 @@ export class Game {
     // up on a flyover the streets below don't apply (no signals, no wrong way checks against them)
     const veh = !P.onFoot && P.cur, deck = veh && veh.deck >= 0 ? this.W.fly.decks[veh.deck] : null;
     if (deck) { const mr = (this.W.M.names.find(n => n[0] === deck.name) || [])[1]; this.hud.showStreet(mr || 'उड्डाणपूल', deck.name || 'Flyover'); return; }
+    // inside a landmark's grounds (Shaniwar Wada's lawns, Aga Khan Palace's garden) its name, not a street's
+    const lm = this.landmarkAt(P.x, P.z);
+    if (lm) { this.hud.showStreet(LM_MR[lm.id] || lm.name, lm.name); return; }
     const near = G.nearest(P.x, P.z, 14);
     if (!near) return;
     const e = near.e;

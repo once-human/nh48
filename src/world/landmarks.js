@@ -43,7 +43,7 @@ export const SW = (() => {
       [GU + 24, GV - 14, 'chai', 'Amruttulya chai', 'अमृततुल्य चहा', 15, 'Cutting, strong, sweet', [0.55, 0.3, 0.12]],
       [GU + 26, GV - 24, 'butta', 'Bhutta', 'भाजलेलं कणीस', 40, 'Roasted corn, lime and chilli', [0.9, 0.75, 0.15]],
       [GU - 28, GV - 34, 'ganne', 'Sugarcane juice', 'उसाचा रस', 30, 'Pressed while you wait, with ginger', [0.3, 0.6, 0.2]],
-      [GU + 28, GV - 34, 'kulfi', 'Kulfi', 'कुल्फी', 50, 'Malai kulfi on a stick', [0.95, 0.9, 0.8]]],
+      [GU - 27, GV - 44, 'kulfi', 'Kulfi', 'कुल्फी', 50, 'Malai kulfi on a stick', [0.95, 0.9, 0.8]]],
     isGateSeg: (a, b) => Math.abs(a[1] - GV) < 0.3 && Math.abs(b[1] - GV) < 0.3 && Math.min(a[0], b[0]) > -3 && Math.max(a[0], b[0]) < 8.5,
   };
 })();

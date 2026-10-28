@@ -572,7 +572,8 @@ export class Police {
     this._twT = 1;
     for (const d of [...P.dropped]) {
       if (d.towed || d.safe) continue;            // safe: the parking spot by Shaniwar Wada you start from
-      const v = d.veh;
+      const v = d.veh, S = G.stand;
+      if (S && Math.hypot(v.x - S.x, v.z - S.z) < 14) continue;   // the auto stand by the Wada is always legal
       const far = Math.hypot(v.x - P.x, v.z - P.z) > 75;
       let illegal = false;
       if (this.W.surf.isRoad(v.x, v.z)) {
