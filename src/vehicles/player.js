@@ -278,11 +278,11 @@ export class PlayerAuto {
         const vx = hx * this.v - hz * this.vl, vz = hz * this.v + hx * this.vl;
         const vn = vx * res.nx + vz * res.nz;
         if (vn < 0) {
-          const k = 1.15;
+          // a crunch, not a bounce: the normal speed goes into the metal, a hard hit kills most of the rest too
+          const k = 1.0, hard = Math.min(1, Math.max(0, (-vn - 3) / 9));
           const nvx = vx - res.nx * vn * k, nvz = vz - res.nz * vn * k;
-          this.v = nvx * hx + nvz * hz;
-          this.vl = -nvx * hz + nvz * hx;
-          this.vl *= 0.5;
+          this.v = (nvx * hx + nvz * hz) * (1 - hard * 0.6);
+          this.vl = (-nvx * hz + nvz * hx) * 0.4;
           if (-vn > 2.2) this.events.push({ type: 'crash', speed: -vn, kind: res.kind, x: cx, z: cz });
           else if (-vn > 0.6) this.events.push({ type: 'scrape', speed: -vn, kind: res.kind });
           if (res.kind === 3) this.events.push({ type: 'boundary' });

@@ -411,6 +411,22 @@ export class Audio {
     this.env(og, t, 0.005, clamp(strength * 0.3, 0.05, 0.6), 0.02, 0.2);
     o.start(t); o.stop(t + 0.3);
   }
+  // a blast: a deep thump, a roar of filtered noise rolling off, debris rattling down
+  boom() {
+    if (!this.ctx) return;
+    try {
+      const ctx = this.ctx, t = ctx.currentTime, out = this.sfx || this.master || ctx.destination;
+      const len = ctx.sampleRate * 3, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) { const k = i / len; d[i] = (Math.random() * 2 - 1) * Math.pow(1 - k, 2.2); }
+      const n = ctx.createBufferSource(); n.buffer = buf;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(2400, t); lp.frequency.exponentialRampToValueAtTime(140, t + 2.6);
+      const g = ctx.createGain(); g.gain.setValueAtTime(1.1, t); g.gain.exponentialRampToValueAtTime(0.001, t + 3);
+      n.connect(lp); lp.connect(g); g.connect(out); n.start(t); n.stop(t + 3);
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.8);
+      const og = ctx.createGain(); og.gain.setValueAtTime(1.2, t); og.gain.exponentialRampToValueAtTime(0.001, t + 1);
+      o.connect(og); og.connect(out); o.start(t); o.stop(t + 1.1);
+    } catch (e) { /* silent */ }
+  }
   crash(strength) { this.thud(strength); this.tone('square', [180 + Math.random() * 120, 260], 0.1, 0.06 * strength, 0, 0.02); }
   crow() {
     if (!this.ctx) return;

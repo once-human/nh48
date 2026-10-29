@@ -35,6 +35,7 @@ import { Phone } from './phone.js';
 import { Eggs } from './eggs.js';
 import { Story } from './story.js';
 import { Tutorial } from './tutorial.js';
+import { Smoke } from '../gfx/smoke.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { StreetApproach } from './approach.js';
@@ -108,6 +109,8 @@ export class Game {
     this.people.isClub = (d) => { if (d.club === undefined) { const inf = d.shop >= 0 && this.shops && this.shops.infoOf(d); d.club = !!(inf && inf.kind === 'bar' && this.shops.isClub(inf)); } return d.club; };
     this.crowd = new Crowd(this.people, W.kit, this.scene, W, this.quality);
     this.fauna = new Fauna(this.people, W.animalKit, this.scene, W);
+    this.smoke = new Smoke(this.scene);
+    this.wrecks = [];
     this.traffic.peds = this.people;
     this.city = new CityMap(W);
     this.city.warm(0);
@@ -285,8 +288,80 @@ export class Game {
     if (was > 0.12 && v.fuel <= 0.12) this.hud.toast('Fuel low', `Under 12%. Nearest pump: ${this.nearestPump()}`, 'warn', 4);
     if (was > 0 && v.fuel <= 0) this.hud.toast('Out of fuel', 'The engine coughs. You can crawl to a pump', 'bad', 4);
     const fuelMul = v.fuel > 0 ? 1 : 0.22;
-    v.powerMul = (v.tune || 1) * fuelMul * (1 - Math.min(0.8, v.dmg) * 0.4);
+    // a beaten engine: weaker and weaker, smoking, then burning, then gone
+    v.powerMul = v.dead ? 0 : (v.tune || 1) * fuelMul * (1 - Math.min(0.95, v.dmg) * 0.6);
+    this.engineState(v, dt);
     if (v === P.auto) { this.life.s.autoFuel = Math.round(v.fuel * 1000) / 1000; this.life.s.autoDmg = Math.round(v.dmg * 1000) / 1000; }
+  }
+  // damage you can see and hear: soot on the paint, grey smoke past half, black smoke and a warning at 80%,
+  // flames and a last warning at 90% (the fire keeps eating it), and at 100% it goes up
+  engineState(v, dt) {
+    const P = this.player, d = v.dmg || 0, w = v._dw || 0;
+    this.paintDamage(v);
+    if (d >= 0.8 && w < 0.8) this.hud.toast('Engine smoking', 'Under 20% left. Get it to a garage before it catches fire', 'warn', 4.5);
+    if (d >= 0.9 && w < 0.9) { this.hud.toast('It’s going to blow!', 'Flames under the engine. Get out and get clear (F)', 'bad', 5); this.audio.crash && this.audio.crash(0.3); }
+    v._dw = d;
+    if (d >= 0.9 && !v.dead) v.dmg = Math.min(1, d + dt * 0.035);                // the fire spreads
+    if (v.dmg >= 1 && !v.dead) { this.explode(v); return; }
+    this.smokeFrom(v, dt);
+  }
+  smokeFrom(v, dt) {
+    const d = v.dmg || 0;
+    if (d < 0.45) return;
+    v._smT = (v._smT || 0) - dt;
+    if (v._smT > 0) return;
+    v._smT = d > 0.9 ? 0.04 : d > 0.75 ? 0.08 : 0.18;
+    const hx = Math.cos(v.th || 0), hz = Math.sin(v.th || 0), back = v === this.player.auto ? -1.1 : 1.4;
+    const x = v.x + hx * back, z = v.z + hz * back, y = (v.y || 0) + 1.0;
+    this.smoke.emit(x, y, z, d > 0.75 ? 'black' : 'smoke', 0.4);
+    if (d > 0.9) this.smoke.emit(x, y - 0.2, z, 'fire', 0.5);
+  }
+  paintDamage(v) {
+    const d = v.dead ? 1 : v.dmg || 0;
+    if (Math.abs((v._pd ?? -1) - d) < 0.02) return;
+    v._pd = d;
+    (v.root || v.tilt)?.traverse?.((o) => {
+      if (!o.isInstancedMesh || !o.instanceColor) return;
+      const a = o.instanceColor.array;
+      if (!o.userData.paint0) o.userData.paint0 = Array.from(a);
+      const k = v.dead ? 0.08 : 1 - Math.max(0, d - 0.2) * 0.55;
+      for (let i = 0; i < a.length; i++) a[i] = o.userData.paint0[i] * k + (v.dead ? 0.02 : 0);
+      o.instanceColor.needsUpdate = true;
+    });
+  }
+  explode(v) {
+    const P = this.player;
+    v.dead = true; v.dmg = 1; v.v = 0; v.powerMul = 0;
+    this.paintDamage(v);
+    this.smoke.explode(v.x, (v.y || 0) + 0.8, v.z);
+    this.rig.shake(1.2); this.audio.crash && this.audio.crash(1); this.audio.boom && this.audio.boom();
+    if (!P.onFoot && P.cur === v) { P.exit(this.traffic, true); P.downT = 3.5; if (P.human) P.human.play('knockback', { once: true, fade: 0.06 }); P.hp = Math.max(5, (P.hp ?? 100) - 35); }
+    else if (P.onFoot && Math.hypot(P.x - v.x, P.z - v.z) < 7) { P.downT = 3; if (P.human) P.human.play('knockback', { once: true, fade: 0.06 }); }
+    for (const p of this.people.list) { const dd = Math.hypot(p.x - v.x, p.z - v.z); if (dd < 9 && !p.fixed) { p.fallen = 4 + Math.random() * 3; } else if (dd < 40 && p.flee !== undefined) p.flee = 6; }
+    this.police && this.police.offence && this.police.offence('explosion', v.x, v.z, {});
+    this.wrecks.push({ v, t: 0 });
+    this.hud.toast('It went up', v === P.auto ? 'Your auto is a burnt shell' : 'That vehicle is a burnt shell', 'bad', 4);
+    if (v === P.auto) this.later(18, () => this.rebuildAuto());
+  }
+  burnWrecks(dt) {
+    for (const w of this.wrecks) {
+      w.t += dt; const v = w.v;
+      if (w.t > 70) continue;
+      w.e = (w.e || 0) - dt; if (w.e > 0) continue;
+      w.e = w.t < 25 ? 0.06 : 0.25;
+      this.smoke.emit(v.x, (v.y || 0) + 1.2, v.z, 'black', 1.2);
+      if (w.t < 25) this.smoke.emit(v.x, (v.y || 0) + 0.6, v.z, 'fire', 1.4);
+    }
+    this.wrecks = this.wrecks.filter(w => w.t <= 70);
+  }
+  // Bapu Kaka sorts it out: the shell is towed, a rebuilt auto waits at the stand by Shaniwar Wada
+  rebuildAuto() {
+    const A = this.player.auto, cost = 6000, paid = Math.min(cost, Math.max(0, this.stats.money));
+    this.stats.money -= paid; this.saveStats?.();
+    A.dead = false; A.dmg = 0; A.fuel = 1; A._pd = -1; this.paintDamage(A);
+    const S = this.stand || this.wadaStart();
+    if (S) this.player.moveAuto(S.x, S.z, S.th, this.traffic);
+    this.hud.sms('Bapu Kaka', `रिक्षा पुन्हा उभी केली. ₹${paid.toLocaleString('en-IN')} लागले. स्टँडवर आहे. आता तरी सावकाश चालव.`, '', 'Rebuilt your auto. It’s at the stand by Shaniwar Wada. Drive slowly this time.');
   }
   nearestPump() {
     const P = this.player;
@@ -809,7 +884,7 @@ export class Game {
     for (const ev of evs) {
       if (ev.type === 'crash') {
         this.rig.shake(Math.min(0.5, ev.speed * 0.06)); this.audio.crash(Math.min(1, ev.speed / 8));
-        if (!P.onFoot && ev.speed > 3) { const v = P.cur; v.dmg = Math.min(1, (v.dmg || 0) + (ev.speed - 3) * 0.006); if (v.dmg > 0.6 && !this._dmgWarn) { this._dmgWarn = true; this.date && this.date.event('crash'); this.hud.toast('Your vehicle is badly damaged', 'It’s slower now. Any garage can fix it', 'warn', 3.4); } if (v.dmg < 0.3) this._dmgWarn = false; }
+        if (!P.onFoot && ev.speed > 3) { const v = P.cur; v.dmg = Math.min(1, (v.dmg || 0) + (ev.speed - 3) * 0.022); if (v.dmg > 0.6 && !this._dmgWarn) { this._dmgWarn = true; this.date && this.date.event('crash'); this.hud.toast('Your vehicle is badly damaged', 'It’s slower now. Any garage can fix it', 'warn', 3.4); } if (v.dmg < 0.3) this._dmgWarn = false; }
         if (ev.kind === 3) this.hud.toast('End of the shift area', 'Turn back, the map ends here', 'warn', 2);
       }
       if (ev.type === 'scrape') this.audio.thud(0.15);
@@ -842,6 +917,7 @@ export class Game {
   }
 
   frame(dt) {
+    if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); }
     if (this.state !== 'title' && this.tut) this.tut.update(dt);
     const P = this.player;
     if (this.state === 'photo') this.photo.update(dt);
