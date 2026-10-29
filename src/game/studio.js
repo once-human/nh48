@@ -7,7 +7,7 @@ export class Studio {
   constructor(G, w, h, opts = {}) {
     this.g = G; this.w = w; this.h = h; this.opts = opts;
     const sc = this.sc = new THREE.Scene();
-    sc.background = new THREE.Color(opts.bg ?? 0x16181d);
+    sc.background = opts.bg === null ? null : new THREE.Color(opts.bg ?? 0x16181d);     // null: see-through, for cut-outs
     sc.add(new THREE.HemisphereLight(0xffffff, 0x3a3630, opts.hemi ?? 1.15));
     const key = new THREE.DirectionalLight(0xfff3e2, 1.7); key.position.set(1.4, 2.6, 2.8); sc.add(key);
     const fill = new THREE.DirectionalLight(0xdfe8ff, 0.5); fill.position.set(-2.4, 1.4, 1.8); sc.add(fill);
@@ -43,11 +43,17 @@ export class Studio {
     this.sc.updateMatrixWorld(true);
     const hd = H.root.getObjectByName('Head'), hp = new THREE.Vector3(0, 1.6, 0); if (hd) hd.getWorldPosition(hp);
     const C = this.cam;
-    if (frame === 'head') { C.fov = 26; C.position.set(hp.x, hp.y - 0.05, hp.z + 1.6); C.lookAt(hp.x, hp.y - 0.17, hp.z); }
+    // one piece of clothing, the way a shop shoots it on a mannequin: the top, a long kurta, a saree, the bottoms, the shoes
+    const PIECE = { top: [0.74, 1.95], long: [0.6, 2.7], saree: [0.5, 3.6], bottom: [0.3, 2.6] }[frame];
+    if (PIECE) { C.fov = 24; const y = hp.y * PIECE[0]; C.position.set(0, y + 0.12, PIECE[1]); C.lookAt(0, y, 0); }
+    else if (frame === 'shoe') { C.fov = 24; C.position.set(0.5, 0.5, 0.78); C.lookAt(0, 0.07, 0.05); }
+    else if (frame === 'head') { C.fov = 26; C.position.set(hp.x, hp.y - 0.05, hp.z + 1.6); C.lookAt(hp.x, hp.y - 0.17, hp.z); }
     else { C.fov = this.opts.fov ?? 24; const mid = hp.y * 0.53; C.position.set(0, mid + 0.25, 5.4); C.lookAt(0, mid, 0); }
     C.aspect = this.w / this.h; C.updateProjectionMatrix(); C.updateMatrixWorld();
     const prev = R.getRenderTarget(), ex = R.toneMappingExposure;
+    const cc = R.getClearColor(new THREE.Color()), ca = R.getClearAlpha(); if (this.sc.background === null) R.setClearColor(0x000000, 0);
     R.toneMappingExposure = 1; R.setRenderTarget(this.rt); R.render(this.sc, C); R.setRenderTarget(prev); R.toneMappingExposure = ex;
+    R.setClearColor(cc, ca);
     R.readRenderTargetPixels(this.rt, 0, 0, this.w, this.h, this.buf);
     const D = this.img.data, W4 = this.w * 4;
     for (let y = 0; y < this.h; y++) D.set(this.buf.subarray((this.h - 1 - y) * W4, (this.h - y) * W4), y * W4);
