@@ -492,7 +492,8 @@ export class People {
         const dead = kmh > 70 ? R < 0.8 : kmh > 50 ? R < 0.4 : kmh > 35 ? R < 0.08 : false;
         const ko = dead || kmh > 25;
         p.dodge = 0.3; p.dodgeVX = phx * pv * 0.55; p.dodgeVZ = phz * pv * 0.55;       // thrown along your path
-        p.fallen = dead ? 1e6 : ko ? 8 + kmh * 0.25 + R * 6 : 3 + kmh * 0.12; p.ko = ko; p.corpse = dead; p.v = 0;
+        // knocked out by a vehicle: they don't get up on their own (the ambulance takes them); a knock, they do
+        p.fallen = dead || ko ? 1e6 : 3 + kmh * 0.12; p.ko = ko; p.corpse = dead; p.unconscious = ko && !dead; p.v = 0;
         this.remember(p, dead ? 'dead' : 'hit');
         this.events.push({ type: 'pedHit', p, speed: pv, x: p.x, z: p.z, sev: dead ? 'dead' : ko ? 'ko' : 'knock' });
         return;
@@ -897,7 +898,7 @@ export class People {
     p.act = null; p.anim = null;
     if (p.hp <= 0) {
       // out cold
-      p.ko = true; p.fallen = this.rng.range(14, 26); p.v = 0; p.stun = 0;
+      p.ko = true; p.fallen = this.rng.range(40, 75); p.v = 0; p.stun = 0;          // beaten out cold: a long while before they stir
       // a big last blow on someone already in a bad way can kill (rarely)
       if (M && M.dmg >= 20 && p.hp < -p.hp0 * 0.35 && this.rng.next() < 0.18) { p.corpse = true; p.fallen = 1e6; this.events.push({ type: 'pedDied', p, x: p.x, z: p.z }); }
       this.events.push({ type: 'pedKO', p, x: p.x, z: p.z });
@@ -1162,11 +1163,14 @@ export class People {
       if (p.gyX === undefined || Math.abs(p.x - p.gyX) + Math.abs(p.z - p.gyZ) > 1.5) { p.gyX = p.x; p.gyZ = p.z; p.gy = this.W.surf.height(p.x, p.z); }
       const y = p.gy;
       const s = p.scale;
-      const swing = p.mode === 'stand' || p.pax ? 0 : Math.sin(p.phase) * 0.5;
+      // the legs swing with the ground they actually cover (never a slide: a glide, a push or a stop all show)
+      if (p.lpx !== undefined) { const m = Math.hypot(p.x - p.lpx, p.z - p.lpz); if (m < 3) { p.rphase = (p.rphase || 0) + m * 4.2; p.rv = (p.rv || 0) * 0.85 + m * 0.15 * 60; } }
+      p.lpx = p.x; p.lpz = p.z;
+      const swing = p.pax || !(p.rv > 0.25) ? 0 : Math.sin(p.rphase) * 0.5 * Math.min(1, p.rv / 0.8);
       // body
       E.set(p.fallen > 0 ? 0 : 0, -p.yaw, p.fallen > 0 ? -1.45 : 0, 'YXZ');
       Q.setFromEuler(E);
-      P3.set(p.x, y + (p.fallen > 0 ? 0.15 : Math.abs(Math.sin(p.phase)) * 0.03), p.z);
+      P3.set(p.x, y + (p.fallen > 0 ? 0.15 : Math.abs(swing) * 0.06), p.z);
       S3.set(s, s, s);
       M4.compose(P3, Q, S3);
       const body = p.female ? mf : mm;

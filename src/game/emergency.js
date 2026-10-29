@@ -18,19 +18,22 @@ export class Emergency {
     if ((victim && victim.corpse) || kind === 'blast') this.later(26 + Math.random() * 14, () => this.spawn('police', x, z, null));
   }
   later(s, f) { this.g.later(s, f); }
-  spawn(type, x, z, victim) {
+  spawn(type, x, z, victim, tries = 0) {
     const G = this.g, W = G.W, P = G.player;
     if (this.list.length >= 3 || G.state === 'title') return;
     // start on a road 220–360 m from the scene, out of your view
+    // start on a road a few hundred metres off, out of your view; if the streets that far haven't loaded, closer in,
+    // on any road, still out of sight
     let st = null;
-    for (let k = 0; k < 30 && !st; k++) {
-      const a = Math.random() * 6.283, r = 220 + Math.random() * 140, n = W.graph.nearest(x + Math.cos(a) * r, z + Math.sin(a) * r, 60, (e) => e.rank >= 3);
+    for (let k = 0; k < 60 && !st; k++) {
+      const wide = k < 30, a = Math.random() * 6.283, r = wide ? 220 + Math.random() * 140 : 90 + Math.random() * 120;
+      const n = W.graph.nearest(x + Math.cos(a) * r, z + Math.sin(a) * r, wide ? 60 : 90, wide ? (e) => e.rank >= 3 : (e) => e.rank >= 2);
       if (!n) continue;
       const t = W.graph.at(n.e, Math.max(0, Math.min(n.e.len, n.s)));
-      if (G.inView && G.inView(t[0], t[1]) && Math.hypot(t[0] - P.x, t[1] - P.z) < 200) continue;
+      if (G.inView && G.inView(t[0], t[1]) && Math.hypot(t[0] - P.x, t[1] - P.z) < (wide ? 200 : 160)) continue;
       st = { x: t[0], z: t[1], th: Math.atan2(t[3], t[2]) };
     }
-    if (!st) return;
+    if (!st) { if (tries < 6) this.later(5, () => this.spawn(type, x, z, victim, tries + 1)); return; }      // the roads aren't there yet: soon
     const amb = type === 'ambulance';
     const v = new Vehicle(W, G.scene, G.vmats, amb ? 'tempo' : 'suv', [0.95, 0.95, 0.93]);
     v.reset(st.x, st.z, th0(st)); v.y = W.surf.height(st.x, st.z);

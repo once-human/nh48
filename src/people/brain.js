@@ -25,7 +25,7 @@ export class Brain {
   }
   // something happened: kind 'down' (someone knocked out or killed), 'fight', 'blast', 'crash', 'theft'; byYou: the player did it
   incident(kind, x, z, o = {}) {
-    if ((kind === 'down' || kind === 'blast') && this.g.emergency && !this.g.free) this.g.emergency.dispatch(kind, x, z, o.victim || null);
+    if ((kind === 'down' || kind === 'blast') && this.g.emergency) this.g.emergency.dispatch(kind, x, z, o.victim || null);
     this.inc.push({ kind, x, z, t: 0, victim: o.victim || null, byYou: !!o.byYou, helpers: 0, reported: false }); if (this.inc.length > 12) this.inc.shift();
     // you did it: the neighbourhood remembers, and whoever saw it remembers your face
     if (o.byYou) {

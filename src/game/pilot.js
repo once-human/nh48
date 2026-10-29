@@ -207,7 +207,10 @@ export class Pilot {
       if (F.y <= gy && F.vy < 0) {
         F.y = gy; F.air = false;
         if (wet) { this.landT = 0; F.vy = 0; F.swim = true; this.audio?.thud?.(0.5); this.audio?.whoosh?.(1); this.events.push({ type: 'splash' }); }
-        else this.landT = 0.35, this.human.play('jump_land', { once: true, fade: 0.06 });
+        // a standing landing plays the landing; landing on the move goes straight back into the stride (the landing
+        // clip has no legs moving, so you'd glide across the ground in it)
+        else if (Math.hypot(F.vx || 0, F.vz || 0) < 1.2) { this.landT = 0.35; this.human.play('jump_land', { once: true, fade: 0.06 }); }
+        else this.landT = 0;
         if (F.vy < -7.5 && !wet) { this.downT = 2.2; this.human.play('knockback', { once: true, fade: 0.08 }); this.events.push({ type: 'gotHit', speed: -F.vy, who: 'fall' }); }
         F.vy = 0;
       }

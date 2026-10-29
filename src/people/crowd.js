@@ -134,11 +134,11 @@ export class Crowd {
       this.dress(s, p.look);
       if (p.kid) s.H.root.scale.setScalar(p.look.scale * 0.7);
       s.p = p; p.body = s;
-      s.cur = null;
+      s.cur = null; s.lx = undefined; s.vel = p.v || 0;
       s.H.holder.visible = true; if (!s.H.holder.parent) this.scene.add(s.H.holder);
     }
   }
-  animFor(p) {
+  animFor(p, vel) {
     if (p.rideOf) return [p.sideSaddle ? 'sit' : 'drive', 1];
     if (p.fallen > 0) return p.ko ? [p.fallen > 1.6 ? 'death' : 'getup', 1, true] : [p.fallen > 1.3 ? 'knockback' : 'getup', 1, true];
     if (p.act) return [p.act.clip, p.act.speed || 1, true];
@@ -148,9 +148,10 @@ export class Crowd {
     if (p.angry > 0) return ['no', 1];
     if (p.pax) return ['wave', 1];
     if (p.cop) return [(performance.now() / 1000 + p.id % 17) % 14 < 4 ? 'wave' : 'arms_folded', 1];
-    if (p.mode === 'stand' || p.mode === 'watch' || p.v < 0.15) return [idleFor(p), 1];
-    if (p.v > 2.2) return ['jog', clamp(p.v / NAT.jog, 0.7, 1.4)];
-    return [walkFor(p, this.people), clamp(p.v / NAT.walk, 0.7, 1.4)];
+    const v = vel ?? p.v;
+    if (v < 0.25 && (p.mode === 'stand' || p.mode === 'watch' || p.v < 0.15 || v < 0.12)) return [idleFor(p), 1];
+    if (v > 2.2) return ['jog', clamp(v / NAT.jog, 0.6, 1.5)];
+    return [walkFor(p, this.people), clamp(v / NAT.walk, 0.55, 1.5)];
   }
   drive(s, dt, cx, cz) {
     const p = s.p, H = s.H;
@@ -167,7 +168,9 @@ export class Crowd {
       H.holder.position.set(p.x, this.W.surf.height(p.x, p.z), p.z);
       H.holder.rotation.set(0, -p.yaw, 0);
     }
-    const [name, speed, once] = this.animFor(p);
+    // how fast they're really moving over the ground (the walk follows it, so feet never slide)
+    if (!p.rideOf) { const m = s.lx === undefined ? 0 : Math.hypot(p.x - s.lx, p.z - s.lz); if (m < 3 && dt > 0) s.vel = (s.vel || 0) + (m / dt - (s.vel || 0)) * Math.min(1, dt * 8); s.lx = p.x; s.lz = p.z; }
+    const [name, speed, once] = this.animFor(p, s.vel);
     // a new punch or flinch restarts its clip even if the last one was the same
     const restart = p.actId !== s.actId; s.actId = p.actId;
     H.play(name, { speed, once, fade: p.act || p.mode === 'fight' ? 0.08 : 0.25, restart: restart && !!p.act });
