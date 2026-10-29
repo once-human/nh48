@@ -180,6 +180,7 @@ export class Home {
       } catch (e) { /* keep going */ }
     }
   }
+  markers() { return this.door ? [{ kind: 'prop', owned: true, x: this.door.x, z: this.door.z, label: 'Home' }] : []; }
   // where the story's "home" is
   spot() { return this.door ? { x: this.door.x, z: this.door.z } : null; }
 }

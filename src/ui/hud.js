@@ -878,7 +878,7 @@ export class HUD {
       const [, col, gl] = CATS[l.c];
       drawPin(x, X, Y, col, gl, (l.c === 'landmark' ? 8 : 6.5) * k);
     }
-    const marks = [...(g.story && g.story.markers ? g.story.markers() : []), ...(g.rides ? g.rides.markers() : []), ...(g.police ? g.police.markers() : []), ...(g.props ? g.props.markers() : [])];
+    const marks = [...(g.home && g.home.markers ? g.home.markers() : []), ...(g.story && g.story.markers ? g.story.markers() : []), ...(g.rides ? g.rides.markers() : []), ...(g.police ? g.police.markers() : []), ...(g.props ? g.props.markers() : [])];
     if (g.waypoint) marks.push({ kind: 'wp', x: g.waypoint.x, z: g.waypoint.z });
     for (const m of marks) {
       let [X, Y] = toS(m.x, m.z);
