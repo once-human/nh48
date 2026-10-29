@@ -210,24 +210,45 @@ export class Law {
   // ---------------------------------------------------------------- arrest: cuffs, the booking, the lock-up, a court date
   // a real mugshot: you, as you are right now, from the front, against the station's height chart
   mugshot() {
-    const G = this.g, P = G.player, R = G.renderer;
+    // taken at the chowki, not in the street: you as you were brought in (your face, your hair, the clothes you were
+    // wearing, the helmet off), square to the camera against the station's plain wall, under flat light. A copy of
+    // you is posed in a little studio of its own and drawn once, off-screen
+    const G = this.g, P = G.player, R = G.renderer, kit = P.kit, look = P.look || (P.human && P.human.look);
+    if (!kit || !look) return null;
+    let H = null, rt = null;
+    const W = 240, Hh = 300;
     try {
-      const F = P.foot, fx = Math.cos(F.yaw), fz = Math.sin(F.yaw), hy = (F.y || 0) + 1.52;
-      const cam = new THREE.PerspectiveCamera(28, 0.8, 0.1, 50);
-      cam.position.set(F.x + fx * 1.25, hy + 0.02, F.z + fz * 1.25); cam.lookAt(F.x, hy - 0.06, F.z); cam.updateMatrixWorld();
-      const was = P.human && P.human.holder.visible; if (P.human) P.human.holder.visible = true;
-      // through the game's own final pass, so it uses the shaders already built (straight to the screen they'd compile)
-      if (G.post) { const pc = G.post.camera; G.post.camera = cam; G.post.render(); G.post.camera = pc; } else R.render(G.scene, cam);
-      const src = R.domElement, w = src.width, h = src.height, cw = Math.round(h * 0.8);
-      const c = document.createElement('canvas'); c.width = 240; c.height = 300; const x = c.getContext('2d');
-      x.drawImage(src, (w - cw) / 2, 0, cw, h, 0, 0, 240, 300);
-      if (P.human) P.human.holder.visible = was;
-      // the height chart over the background, and a grey wash so it reads as a station photo
-      x.fillStyle = 'rgba(190, 186, 176, .28)'; x.fillRect(0, 0, 240, 300);
+      H = kit.create({ ...look, acc: null, hat: false, helmet: false });
+      const sc = new THREE.Scene(); sc.background = new THREE.Color(0.6, 0.58, 0.54);
+      sc.add(new THREE.HemisphereLight(0xffffff, 0x7a746c, 1.5));
+      const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(0.5, 2.4, 3); sc.add(key);
+      const fill = new THREE.DirectionalLight(0xffffff, 0.45); fill.position.set(-2, 1.4, 2); sc.add(fill);
+      H.holder.rotation.y = -Math.PI / 2;                      // facing the camera (+z)
+      sc.add(H.holder);
+      H.play('idle', { fade: 0 }); H.mixer.update(0.05);
+      sc.updateMatrixWorld(true);
+      const hd = H.root.getObjectByName('Head'), hp = new THREE.Vector3(0, 1.55 * (look.scale || 1), 0); if (hd) hd.getWorldPosition(hp);
+      const cam = new THREE.PerspectiveCamera(26, W / Hh, 0.1, 20);
+      cam.position.set(hp.x, hp.y - 0.05, hp.z + 1.6); cam.lookAt(hp.x, hp.y - 0.17, hp.z); cam.updateMatrixWorld();
+      // tone-mapped and colour-encoded exactly as on the screen (an XR-flagged target), stored as plain bytes
+      rt = new THREE.WebGLRenderTarget(W, Hh, { samples: 4 });
+      rt.isXRRenderTarget = true; rt.texture.colorSpace = THREE.SRGBColorSpace; rt.texture.internalFormat = 'RGBA8';
+      const prev = R.getRenderTarget(), ex = R.toneMappingExposure;
+      R.toneMappingExposure = 1; R.setRenderTarget(rt); R.render(sc, cam); R.setRenderTarget(prev); R.toneMappingExposure = ex;
+      const buf = new Uint8Array(W * Hh * 4); R.readRenderTargetPixels(rt, 0, 0, W, Hh, buf);
+      const c = document.createElement('canvas'); c.width = W; c.height = Hh; const x = c.getContext('2d');
+      const img = x.createImageData(W, Hh), D = img.data;
+      for (let y = 0; y < Hh; y++) { D.set(buf.subarray((Hh - 1 - y) * W * 4, (Hh - y) * W * 4), y * W * 4); }     // (rows come bottom-up)
+      for (let i = 3; i < D.length; i += 4) D[i] = 255;
+      x.putImageData(img, 0, 0);
+      // the height chart on the wall behind
       x.strokeStyle = 'rgba(30, 30, 30, .5)'; x.fillStyle = 'rgba(30, 30, 30, .7)'; x.font = '9px monospace';
       for (let i = 0; i < 12; i++) { const y = 18 + i * 22; x.beginPath(); x.moveTo(0, y); x.lineTo(i % 2 ? 10 : 18, y); x.moveTo(240, y); x.lineTo(i % 2 ? 230 : 222, y); x.stroke(); if (!(i % 2)) x.fillText(String(190 - i * 5), 20, y + 3); }
-      return c.toDataURL('image/jpeg', 0.85);
-    } catch (e) { return null; }
+      return c.toDataURL('image/jpeg', 0.88);
+    } catch (e) { return null; } finally {
+      if (H) { if (H.holder.parent) H.holder.parent.remove(H.holder); H.dispose(); }
+      if (rt) rt.dispose();
+    }
   }
   booking(o) {
     const G = this.g, el = document.createElement('div'), shot = this.mugshot();
