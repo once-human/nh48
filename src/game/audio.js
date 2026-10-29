@@ -23,6 +23,15 @@ const busOf = (name) => name.startsWith('v_') ? 'voice'
   : /^(horn_|car_idle|diesel_idle|auto_start|amb_traffic|amb_auto_ride)/.test(name) ? 'traffic'
   : /^(amb_|crow|dog_bark|cow_moo|temple_bells)/.test(name) ? 'world' : 'fx';
 
+// how each kind of engine sounds: waveform, idle and top pitch (Hz), the speed (m/s) at full revs, the low-pass, the
+// firing pulse (a fraction of the pitch) and how strongly it shakes the volume, and how loud it is
+const ENG = {
+  scooter: { wave: 'triangle', idle: 62, max: 150, top: 14, lp: 1300, pulse: 0.5, depth: 0.18, vol: 0.05 },
+  bike: { wave: 'sawtooth', idle: 38, max: 112, top: 17, lp: 850, pulse: 0.5, depth: 0.55, vol: 0.055 },
+  auto: { wave: 'square', idle: 26, max: 64, top: 11, lp: 620, pulse: 0.5, depth: 0.7, vol: 0.05 },
+  car: { wave: 'sawtooth', idle: 30, max: 92, top: 20, lp: 420, pulse: 0.5, depth: 0.12, vol: 0.04 },
+  diesel: { wave: 'square', idle: 21, max: 52, top: 13, lp: 300, pulse: 0.5, depth: 0.45, vol: 0.07 },
+};
 export class Audio {
   constructor(raw) {
     this.ctx = null; this.enabled = true; this.volume = 0.8;
@@ -466,16 +475,17 @@ export class Audio {
     if (!this.ctx) return;
     const ctx = this.ctx, t = ctx.currentTime;
     if (!this.teng) {
+      // three voices, each an engine (one oscillator) with its firing pulse (a second, slow one shaking its volume):
+      // a scooter's smooth CVT whine, a bike's single-cylinder thump, an auto's putt-putt, a car's hum, a bus's diesel
       this.teng = [];
-      // three voices, one oscillator each: the ambient loop carries the rest of the traffic
       for (let i = 0; i < 3; i++) {
-        const o = ctx.createOscillator(); o.type = 'sawtooth';
-        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600; lp.Q.value = 0.9;
-        const g = ctx.createGain(); g.gain.value = 0;
+        const o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), am = ctx.createGain(), g = ctx.createGain(), lfo = ctx.createOscillator(), depth = ctx.createGain();
+        lp.type = 'lowpass'; lp.Q.value = 0.8; am.gain.value = 1; g.gain.value = 0; depth.gain.value = 0; lfo.type = 'sine';
         const pn = this.panner({ x: 0, y: 0.8, z: 0 }, 5);
-        o.connect(lp); lp.connect(g); g.connect(pn).connect(this.bus('traffic'));
-        o.start();
-        this.teng.push({ o, lp, g, pn, v: null, f: 0, on: true });
+        o.connect(lp); lp.connect(am); am.connect(g); g.connect(pn).connect(this.bus('traffic'));
+        lfo.connect(depth); depth.connect(am.gain);
+        o.start(); lfo.start();
+        this.teng.push({ o, lp, am, g, pn, lfo, depth, v: null, f: 0, on: true, kind: '', sp0: 0 });
       }
     }
     const near = [];
@@ -483,15 +493,20 @@ export class Audio {
     near.sort((a, b) => a[0] - b[0]);
     this.teng.forEach((E, i) => {
       const v = near[i] && near[i][1];
-      if (!v) { if (E.on) { E.on = false; E.g.gain.setTargetAtTime(0, t, 0.2); } return; }
+      if (!v) { if (E.on) { E.on = false; E.g.gain.setTargetAtTime(0, t, 0.25); } return; }
       E.on = true;
       const ty = v.type || '', sp = Math.abs(v.v || 0);
-      const base = /^(scooter|bike)/.test(ty) ? 55 : /^auto/.test(ty) ? 30 : /bus|tempo/.test(ty) ? 24 : 34;
-      const f = base * (1 + sp / (/^(scooter|bike)/.test(ty) ? 9 : 14));
-      if (Math.abs(f - E.f) > 1) { E.f = f; E.o.frequency.setTargetAtTime(f, t, 0.1); }
-      if (E.v !== v) { E.v = v; E.lp.frequency.setTargetAtTime(/bus|tempo/.test(ty) ? 380 : /^(scooter|bike)/.test(ty) ? 1000 : 650, t, 0.2); }
-      E.g.gain.setTargetAtTime((/bus|tempo/.test(ty) ? 0.16 : 0.1) * (0.4 + Math.min(1, sp / 10) * 0.6), t, 0.15);
-      if (E.pn.positionX) { E.pn.positionX.setTargetAtTime(v.x, t, 0.08); E.pn.positionZ.setTargetAtTime(v.z, t, 0.08); } else E.pn.setPosition(v.x, 0.8, v.z);
+      const kind = /^scooter/.test(ty) ? 'scooter' : /^bike/.test(ty) ? 'bike' : /^auto/.test(ty) ? 'auto' : /bus|tempo/.test(ty) ? 'diesel' : 'car';
+      const K = ENG[kind];
+      if (E.kind !== kind) { E.kind = kind; E.o.type = K.wave; E.lp.frequency.setTargetAtTime(K.lp, t, 0.1); }
+      // pitch with speed (an idle chug when stopped), the pulse follows the revs, louder pulling away than cruising
+      const rev = Math.min(1, sp / K.top), accel = Math.max(0, sp - (E.v === v ? E.sp0 : sp));
+      E.sp0 = sp; E.v = v;
+      const f = K.idle + (K.max - K.idle) * Math.sqrt(rev);
+      if (Math.abs(f - E.f) > 0.8) { E.f = f; E.o.frequency.setTargetAtTime(f, t, 0.12); E.lfo.frequency.setTargetAtTime(f * K.pulse, t, 0.12); }
+      E.depth.gain.setTargetAtTime(K.depth * (1 - rev * 0.5), t, 0.2);
+      E.g.gain.setTargetAtTime(K.vol * (0.45 + rev * 0.4 + Math.min(0.3, accel * 0.6)), t, 0.18);
+      if (E.pn.positionX) { E.pn.positionX.setTargetAtTime(v.rx ?? v.x, t, 0.08); E.pn.positionZ.setTargetAtTime(v.rz ?? v.z, t, 0.08); } else E.pn.setPosition(v.x, 0.8, v.z);
     });
   }
   // a small bird in a tree near you: a few quick rising trills (bulbuls, sparrows, the koel in summer)
