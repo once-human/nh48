@@ -122,6 +122,10 @@ export class Traffic {
     if (h >= 23.5 || h < 5) return { bus: 0.1, tempo: 0.5, cycle: 0.2, taxi: 3.5, auto: 1.3, scooterP: 0.6, suv: 1.4, sedan: 1.3 };
     if (h < 7) return { bus: 0.6, tempo: 1.8, cycle: 2.5, taxi: 1.5 };
     if (h >= 21) return { bus: 0.6, taxi: 2.2, tempo: 0.6, cycle: 0.5, auto: 1.15 };
+    // the school runs: the school autos and vans, a parent with a child on the back of the scooter
+    if ((h >= 7 && h < 8.75) || (h >= 12.5 && h < 13.75)) return { auto: 1.5, scooterP: 1.7, cycle: 1.4, bus: 1.2 };
+    // the evening rush home: everyone on two wheels
+    if (h >= 17.5 && h < 20.5) return { scooter: 1.25, bike: 1.25, scooterP: 1.2, cycle: 0.7 };
     return {};
   }
   randomLink(px, pz, rMin, rMax) {

@@ -291,6 +291,10 @@ export class People {
       const hr = this.hour ?? 12, rush = (hr > 8 && hr < 10.5) || (hr > 17.5 && hr < 20.5);
       const dress = rush && /kaka|dada|tai|bhaiya/.test(p.persona || '') && r.chance(0.45) ? 'office' : DRESS[p.persona];
       p.look = this.kit.randomLook(new RNG(p.id), { female, dress, persona: p.persona });
+      // the school and junior-college runs: the college crowd in uniform, white shirts and navy
+      if (/college/.test(p.persona || '') && ((hr >= 7 && hr < 9) || (hr >= 12.5 && hr < 14)) && r.chance(0.6)) {
+        p.look.top.setRGB(0.83, 0.85, 0.88); p.look.bottom.setRGB(0.02, 0.035, 0.11); p.look.pat = 0;
+      }
       p.shirt = [p.look.top.r, p.look.top.g, p.look.top.b];
       p.lower = [p.look.bottom.r, p.look.bottom.g, p.look.bottom.b];
       p.skin = [p.look.skin.r, p.look.skin.g, p.look.skin.b];
@@ -1117,8 +1121,9 @@ export class People {
       const n = this.rng.int(0, 3);
       this.stallsUsed.set(k, n);
       // the vendor, behind the stall, facing the street (in their hours)
-      const V = VENDOR[st[3]] || VENDOR[0], hr = this.hour ?? 12;
-      if (hr >= V[2] && hr < V[3]) {
+      // about one tapri in four is the late-night one (near the station, a hospital, a college): open till 3
+      const V = VENDOR[st[3]] || VENDOR[0], hr = this.hour ?? 12, late = (st[3] || 0) === 0 && k % 4 === 0;
+      if ((hr >= V[2] && hr < V[3]) || (late && (hr >= V[2] || hr < 3))) {
         const a = st[2] - Math.PI / 2, vx = x + Math.cos(a) * 0.95, vz = z + Math.sin(a) * 0.95;
         const near = this.g.nearest(vx, vz, 30, e => e.rank >= 2);
         if (near) {
