@@ -66,7 +66,8 @@ function pickQuality() {
   if (GPU === 'weak') return { ...QUALITY.low };
   // laptop graphics (Intel UHD / Iris, Radeon Vega): Medium's look at the screen's own resolution with a
   // lighter shadow map, grass and crowd, so it holds a steady frame rate instead of swinging between 30 and 60
-  if (GPU === 'integrated') return { ...QUALITY.med, pixelRatio: 1.0, shadowSize: 1024, grassRange: 32, grassCap: 3800, treeNearRange: 45, treeMidRange: 170,
+  // (and the edges smoothed after the frame rather than by 4x MSAA, which alone was a third of the frame there)
+  if (GPU === 'integrated') return { ...QUALITY.med, msaa: false, fxaa: true, pixelRatio: 1.0, shadowSize: 1024, grassRange: 32, grassCap: 3800, treeNearRange: 45, treeMidRange: 170,
     treeNearCap: 200, treeMidCap: 1400, treeFarCap: 8000, streamRadius: 440, streamBudget: 2, propRange: 140, traffic: 100, peds: 150 };
   return { ...QUALITY.med };
 }
@@ -90,9 +91,10 @@ async function main() {
   try { if (sessionStorage.getItem('nh48_wipe')) { Save.wipe(); sessionStorage.removeItem('nh48_wipe'); } } catch (e) { /* ignore */ }
   if (!document.createElement('canvas').getContext('webgl2')) throw new Error('This browser has no WebGL 2. Puneri needs a recent Chrome, Edge, Firefox or Safari.');
   const quality = pickQuality();
+  if (params.has('fxaa')) { quality.fxaa = params.get('fxaa') === '1'; if (quality.fxaa && !params.has('msaa')) quality.msaa = false; }
   installAtmosphere();
   const canvas = document.getElementById('gl');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !!quality.msaa, powerPreference: 'high-performance', stencil: false, depth: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: params.has('msaa') ? params.get('msaa') === '1' : !!quality.msaa, powerPreference: 'high-performance', stencil: false, depth: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatio));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.shadowMap.enabled = quality.shadows;
@@ -176,6 +178,12 @@ async function main() {
   sky.setShadows(quality.shadows, quality.shadowSize);
   W.sky = sky;
   const post = new Post(renderer, scene, camera, quality);
+  // with the after-frame smoothing the city is drawn into the pass's picture, whose shaders differ from the screen's:
+  // every precompile (loading screen, police, ambulance, people) builds those, so none compile mid-game
+  if (post.fxaa) {
+    const compile = renderer.compile.bind(renderer);
+    renderer.compile = (s, c, t) => { const prev = renderer.getRenderTarget(); renderer.setRenderTarget(post.target()); try { return compile(s, c, t); } finally { renderer.setRenderTarget(prev); } };
+  }
   window.__W = W; window.__updateProps = updateProps; window.__U = U;
 
   if (PUNE) {
