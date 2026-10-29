@@ -604,12 +604,44 @@ export class People {
   // ---------------------------------------------------------------- off-path movement
   // walk straight to (tx, tz), then call then(p)
   goTo(p, tx, tz, then, hurry = false) {
-    p.mode = 'free'; p.goal = { x: tx, z: tz, then, hurry, t: 0 };
+    p.mode = 'free'; p.goal = { x: tx, z: tz, then, hurry, t: 0, path: this.walkPath(p.x, p.z, tx, tz), k: 0, prog: 0, best: 1e9 };
+  }
+  // how a person gets somewhere: straight there if nothing's in the way, otherwise along the streets on the footpath
+  // (the route's centreline pushed out to the side of the road they're on), never through a building
+  walkPath(x0, z0, x1, z1) {
+    const surf = this.W.surf, d = Math.hypot(x1 - x0, z1 - z0), n = Math.ceil(d / 1.5);
+    let clear = true;
+    if (surf.inBuilding) for (let i = 1; i < n && clear; i++) { const t = i / n; if (surf.inBuilding(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t)) clear = false; }
+    if (clear) return null;
+    const G = this.g, a = G.nearest(x0, z0, 50), b = G.nearest(x1, z1, 50);
+    if (!a || !b) return null;
+    const r = G.route(a, b, true); if (!r) return null;
+    const pl = G.routePolyline(r, a, b); if (!pl || pl.length < 4) return null;
+    // which side of the road they start on, kept the whole way (people stay on their footpath)
+    const sx = pl[2] - pl[0], sz = pl[3] - pl[1], sl = Math.hypot(sx, sz) || 1, side = Math.sign((x0 - pl[0]) * (sz / sl) - (z0 - pl[1]) * (sx / sl)) || 1;
+    const off = Math.max(3.2, (a.e.w || 7) / 2 + 1.2), out = [];
+    for (let i = 0; i + 1 < pl.length; i += 2) {
+      const j = Math.min(pl.length - 2, i + 2), k = Math.max(0, i - 2), tx = pl[j] - pl[k], tz = pl[j + 1] - pl[k + 1], tl = Math.hypot(tx, tz) || 1;
+      let px = pl[i] + (tz / tl) * off * side, pz = pl[i + 1] - (tx / tl) * off * side;
+      if (surf.inBuilding && surf.inBuilding(px, pz)) { px = pl[i] + (tz / tl) * (off - 1.5) * side; pz = pl[i + 1] - (tx / tl) * (off - 1.5) * side; }
+      out.push(px, pz);
+    }
+    out.push(x1, z1);
+    return out;
   }
   stepFree(p, dt) {
-    const g = p.goal, dx = g.x - p.x, dz = g.z - p.z, d = Math.hypot(dx, dz);
+    const g = p.goal;
     g.t += dt;
-    if (d < 0.3 || g.t > 25) { p.goal = null; g.then(p); return; }
+    // the next point on the way (or the goal itself)
+    let gx = g.x, gz = g.z;
+    if (g.path) {
+      while (g.k < g.path.length - 2 && Math.hypot(g.path[g.k] - p.x, g.path[g.k + 1] - p.z) < 1.4) g.k += 2;
+      gx = g.path[g.k]; gz = g.path[g.k + 1];
+    }
+    const dx = gx - p.x, dz = gz - p.z, d = Math.hypot(dx, dz), dGoal = Math.hypot(g.x - p.x, g.z - p.z);
+    // getting nowhere for a few seconds (something in the way): stop trying, carry on from here
+    if (dGoal < g.best - 0.5) { g.best = dGoal; g.prog = 0; } else g.prog += dt;
+    if (dGoal < 0.3 || g.t > 60 || g.prog > 3.5) { p.goal = null; g.then(p); return; }
     const sp = p.speed * (g.hurry ? 1.9 : 1);
     const st = Math.min(d, sp * dt);
     const surf = this.W.surf, ox = p.x, oz = p.z;

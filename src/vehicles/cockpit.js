@@ -5,7 +5,7 @@ import { ColorBuilder } from '../world/geo.js';
 import { loft } from './loft.js';
 import { carSpec } from './models.js';
 
-const DASH = [0.17, 0.16, 0.15], SOFT = [0.28, 0.26, 0.24], WHEEL = [0.07, 0.07, 0.075], METAL = [0.55, 0.56, 0.58];
+const DASH = [0.17, 0.16, 0.15], SOFT = [0.58, 0.53, 0.45], WHEEL = [0.07, 0.07, 0.075], METAL = [0.55, 0.56, 0.58];
 const MATTE = -1;
 const DRIVER_Z = 0.36;          // the driver sits on the right (+z)
 
@@ -34,11 +34,11 @@ export function buildCarCockpit(kind, mats) {
   group.add(new THREE.Mesh(hoodGeo, mats.solid));
   // steering column
   const col = new ColorBuilder();
-  const cylG = new THREE.CylinderGeometry(0.035, 0.045, 0.4, 10);
+  const cylG = new THREE.CylinderGeometry(0.035, 0.05, 0.5, 10);
   const ax = new THREE.Vector3(-0.91, 0.41, 0).normalize();
   const qa = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), ax);
-  const wc = new THREE.Vector3(xf0 - 0.62, belt + 0.03, DRIVER_Z);
-  col.addGeo(cylG, new THREE.Matrix4().compose(wc.clone().addScaledVector(ax, -0.2), qa, new THREE.Vector3(1, 1, 1)), WHEEL);
+  const wc = new THREE.Vector3(xf0 - 0.8, belt - 0.03, DRIVER_Z);
+  col.addGeo(cylG, new THREE.Matrix4().compose(wc.clone().addScaledVector(ax, -0.26), qa, new THREE.Vector3(1, 1, 1)), WHEEL);
   group.add(new THREE.Mesh(col.build(), mats.solid));
   // the wheel itself on a pivot: rim, three spokes, hub with a little badge
   const w = new ColorBuilder();
@@ -149,12 +149,20 @@ export function buildCarCockpit(kind, mats) {
     for (const zz of [-0.1, 0.1]) bx(xf0 - 0.635, belt - 0.1, zz - 0.045, xf0 - 0.62, belt - 0.05, zz + 0.045, [0.04, 0.04, 0.045, 0, MATTE]);
     for (const zz of [-0.06, 0, 0.06]) bx(xf0 - 0.64, belt - 0.29, zz - 0.018, xf0 - 0.615, belt - 0.255, zz + 0.018, METAL.concat([0, 0.4]));
     bx(xf0 - 0.5, belt - 0.2, -hw + 0.25, xf0 - 0.48, belt - 0.19, -0.25, [0.1, 0.095, 0.09, 0, MATTE]);
+    // the lower dash facing you: a silver trim line across, the driver's vents, the knee panel with the
+    // ignition, the gear lever on the console
+    bx(xf0 - 0.63, belt - 0.14, -hw + 0.12, xf0 - 0.615, belt - 0.125, hw - 0.12, METAL.concat([0, 0.35]));
+    for (const zz of [hw - 0.2, DRIVER_Z - 0.25]) bx(xf0 - 0.64, belt - 0.11, zz - 0.06, xf0 - 0.62, belt - 0.04, zz + 0.06, [0.05, 0.05, 0.055, 0, MATTE]);
+    bx(xf0 - 0.66, fl + 0.3, DRIVER_Z - 0.24, xf0 - 0.6, belt - 0.2, DRIVER_Z + 0.24, SOFT.concat([0, MATTE]));
+    bx(xf0 - 0.665, belt - 0.27, DRIVER_Z + 0.16, xf0 - 0.655, belt - 0.24, DRIVER_Z + 0.19, METAL.concat([0, 0.4]));
+    bx(xf0 - 1.02, fl + 0.3, -0.02, xf0 - 0.98, fl + 0.58, 0.02, [0.12, 0.12, 0.12, 0, MATTE]);
+    { const kn = new THREE.SphereGeometry(0.035, 10, 8); kn.translate(xf0 - 1.0, fl + 0.6, 0); c.addGeo(kn, new THREE.Matrix4(), [0.1, 0.1, 0.1], 0, MATTE); }
     group.add(new THREE.Mesh(c.build(), mats.solid));
     const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.14), new THREE.MeshBasicMaterial({ color: 0x2a4a6e, toneMapped: false }));
     scr.position.set(xf0 - 0.64, belt - 0.17, 0); scr.rotation.y = -Math.PI / 2; group.add(scr);
   }
   return {
-    group, eye: [xf0 - 1.2, belt + 0.23, DRIVER_Z],
+    group, eye: [xf0 - 1.25, belt + 0.19, DRIVER_Z],
     update(steer, kmh, gear, rpm, night) {
       spin.rotation.z = steer * 7.5;          // ~15:1 rack: the wheel turns much further than the tyres
       draw(kmh, gear, rpm, night);

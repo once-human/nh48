@@ -372,7 +372,10 @@ function carBody(b, gl, spec) {
     { x: hl, w: hw - 0.12, yb: sill + 0.07, yt: beltY - 0.23, n: 3.6 },
   ];
   const INSIDE = [0.16, 0.15, 0.14, 0, MATTE], HEADLINER = [0.62, 0.6, 0.56, 0, MATTE];
-  loft(b, lower, (seg, q) => q.inside ? (q.y > spec.sill + 0.15 ? INSIDE : null) : q.ny < -0.55 ? [...UNDER, 0] : [1, 1, 1, 1],
+  // with an interior, the cabin is open from above between the windscreen and the rear seat (no painted lid at the
+  // sill hiding the seats, the console and the bottom of the wheel from the driver's seat)
+  const cabinTop = (q) => spec.interior && q.ny > 0.6 && q.x < hl - hood - 0.02 && q.x > -hl + tail + 0.15 && Math.abs(q.z) < hw - 0.1;
+  loft(b, lower, (seg, q) => q.inside ? (q.y > spec.sill + 0.15 ? INSIDE : null) : cabinTop(q) ? null : q.ny < -0.55 ? [...UNDER, 0] : [1, 1, 1, 1],
     spec.interior ? { ring: 28, inner: 0.03, innerColor: true } : { ring: 28 });
   // greenhouse: rear window base -> roof -> windscreen base
   const gw = hw - 0.06, xr0 = -hl + tail, xf0 = hl - hood, xb = (roofF + roofR) / 2;

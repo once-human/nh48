@@ -110,7 +110,7 @@ export class Vehicle {
       gear: 1, rpm: 0.15, shiftT: 0, reverse: false, revT: 0, throttle: 0, brake: 0, prevH: [0, 0], onFootpath: false, load: 0 });
     this.sync();
   }
-  setCockpit(on) { this.inCockpit = on; if (this.cockpit) this.cockpit.group.visible = on; }
+  setCockpit(on) { this.inCockpit = on; if (this.cockpit) this.cockpit.group.visible = true; }   // the cabin shows from outside too, through the glass
   get gearCount() { return this.spec.gears.length + 1; }
 
   heightAt(x, z) {
