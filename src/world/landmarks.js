@@ -472,18 +472,26 @@ const BUILD = {
     // ---- the rampart walk: up two flights of stone steps inside the north wall, round the top of the walls,
     // with the old cannons on their carriages looking out over the city
     B.deckBand(ring, [[W.U0, W.V0], [W.U1, W.V0], [W.U1, W.V1], [W.U0, W.V1]], 10.6, [gu - gw / 2 - 0.5, gu + gw / 2 + 0.5, gv + 9.2]);
-    for (const sgn of [1, -1]) {
-      const ua = gu + sgn * 13, ub = gu + sgn * 43, vv = W.V0 + 1.7, n = 30;
-      const stA = B.A(WL.rubble, STONE, 11, 2, 10.6), trA = B.A(WL.slab, T([0.7, 0.65, 0.57]));
-      for (let k = 0; k < n; k++) { const t = (k + 0.5) / n, h = 10.6 * (k + 1) / n; B.box(ua + (ub - ua) * t, vv, Math.abs(ub - ua) / n + 0.02, 3.2, 0, h, stA, trA); }
-      for (let k = 0; k < n; k += 2) { const t = (k + 1) / n, h = 10.6 * (k + 1) / n; B.box(ua + (ub - ua) * t, vv + 1.75, Math.abs(ub - ua) * 2 / n + 0.04, 0.3, h - 0.2, h + 0.85, stA, trA); }
+    // a flight of stone steps along the inside of a wall, from ua at the lawn up to ub on the wall walk; inward: +1
+    // when the fort's inside is towards +v (the north wall), -1 for the south wall
+    const stA = B.A(WL.rubble, STONE, 11, 2, 10.6), trA = B.A(WL.slab, T([0.7, 0.65, 0.57]));
+    const flight = (ua, ub, vv, inward) => {
+      const sgn = Math.sign(ub - ua), len = Math.abs(ub - ua), n = Math.round(len);
+      for (let k = 0; k < n; k++) { const t = (k + 0.5) / n, h = 10.6 * (k + 1) / n; B.box(ua + (ub - ua) * t, vv, len / n + 0.02, 3.2, 0, h, stA, trA); }
+      for (let k = 0; k < n; k += 2) { const t = (k + 1) / n, h = 10.6 * (k + 1) / n; B.box(ua + (ub - ua) * t, vv + inward * 1.75, len * 2 / n + 0.04, 0.3, h - 0.2, h + 0.85, stA, trA); }
       B.deckRamp(ua, vv, ub, vv, 3.2, 0, 10.6);
-      B.hitk(ua, vv + 1.6, ub, vv + 1.6, 0);
+      B.hitk(ua, vv + inward * 1.6, ub, vv + inward * 1.6, 0);
       // a stone parapet across the top end of the flight: you step off onto the wall walk, not into the air
       B.box(ub + sgn * 0.2, vv, 0.35, 3.4, 10.4, 11.5, stA, trA); B.hitk(ub + sgn * 0.25, vv - 1.7, ub + sgn * 0.25, vv + 1.7, 0);
-    }
-    // the inner edge of the rampart walk: a parapet all round (open where the two flights arrive), so nobody
-    // walks off the wall into the lawns ten metres down
+    };
+    // two inside the north wall either side of the Delhi Darwaza, two inside the south wall between the Narayan and
+    // Ganesh gates
+    for (const sgn of [1, -1]) flight(gu + sgn * 13, gu + sgn * 43, W.V0 + 1.7, 1);
+    const back = [[-6, -30], [7, 26.5]];
+    for (const [ua, ub] of back) flight(ua, ub, W.V1 - 1.7, -1);
+    // the inner edge of the rampart walk: a parapet all round, open where the flights arrive, and broken down in a
+    // few places (fallen stones on the walk and on the lawn below): you can drop to the lawns there, ten metres
+    // (it hurts), but there's no climbing back up that way
     { const pA = B.A(WL.rubble, STONE, 11, 2, 11.5), pT = B.A(WL.slab, T([0.7, 0.65, 0.57]));
       const run = (a0, b0, a1, b1) => { const L2 = Math.hypot(a1 - a0, b1 - b0); if (L2 < 0.5) return;
         const n = Math.max(1, Math.round(L2 / 6));
@@ -491,9 +499,25 @@ const BUILD = {
           B.box((ua2 + ub2) / 2, (va2 + vb2) / 2, Math.max(0.35, Math.abs(ub2 - ua2)), Math.max(0.35, Math.abs(vb2 - va2)), 10.6, 11.45, pA, pT); }
         B.hitk(a0, b0, a1, b1, 0); };
       const e = 0.2, U0 = W.U0 + e, U1 = W.U1 - e, V0 = W.V0 + e, V1 = W.V1 - e;
-      const gaps = [[gu - 47, gu - 41], [gu - gw / 2 - 0.5, gu + gw / 2 + 0.5], [gu + 41, gu + 47]].sort((a, b) => a[0] - b[0]);
-      let u = U0; for (const [g0, g1] of gaps) { run(u, V0, g0, V0); u = g1; } run(u, V0, U1, V0);
-      run(U1, V0, U1, V1); run(U1, V1, U0, V1); run(U0, V1, U0, V0); }
+      const RUB = [0.56, 0.52, 0.46];
+      // along: 'u' (a wall at v = at) or 'v' (a wall at u = at); inn: which way is the lawn; breaks: centres
+      const side = (along, at, lo, hi, gaps, breaks, inn) => {
+        const P = (c, o, y) => along === 'u' ? [c, at + inn * o] : [at + inn * o, c];
+        const all = gaps.concat(breaks.map(c => [c - 1.4, c + 1.4])).sort((a, b) => a[0] - b[0]);
+        let c = lo;
+        for (const [g0, g1] of all) { if (g0 > c) (along === 'u' ? run(c, at, g0, at) : run(at, c, at, g0)); c = Math.max(c, g1); }
+        if (hi > c) (along === 'u' ? run(c, at, hi, at) : run(at, c, at, hi));
+        // the broken bits: jagged stubs either side, a few stones fallen on the walk and down on the lawn
+        breaks.forEach((bc, i) => {
+          for (const d of [-1.55, 1.55]) { const [u2, v2] = P(bc + d, 0); B.cbox(u2, 10.6, v2, 0.45, 0.3 + ((i * 7 + (d > 0 ? 3 : 0)) % 5) * 0.08, 0.4, RUB, i + d); }
+          for (let k = 0; k < 3; k++) { const [u2, v2] = P(bc + (k - 1) * 0.7, -0.8 - k * 0.3); B.cbox(u2, 10.6, v2, 0.35 + k * 0.1, 0.18, 0.3, RUB, k * 1.3 + i); }
+          for (let k = 0; k < 4; k++) { const [u2, v2] = P(bc + (k - 1.5) * 0.9, 1.4 + (k % 2) * 1.3); B.cbox(u2, 0, v2, 0.5 + (k % 3) * 0.15, 0.3 + (k % 2) * 0.15, 0.45, RUB, k * 0.9 + i); }
+        });
+      };
+      side('u', V0, U0, U1, [[gu - 47, gu - 41], [gu - gw / 2 - 0.5, gu + gw / 2 + 0.5], [gu + 41, gu + 47]], [-60, 56], 1);
+      side('v', U1, V0, V1, [], [-20, 45], -1);
+      side('u', V1, U0, U1, [[-34, -28], [24.5, 30.5]], [-55, 48], -1);
+      side('v', U0, V0, V1, [], [-45, 30], 1); }
     const cannon = (u, v, yaw) => {
       const fx = Math.sin(yaw), fz = -Math.cos(yaw), at = (a, b) => [u + a * Math.cos(yaw) - b * Math.sin(yaw), v + a * Math.sin(yaw) + b * Math.cos(yaw)];
       B.cbox(u, 10.6, v, 1.2, 0.55, 2.2, C.teak, yaw);

@@ -21,6 +21,8 @@ export class VoiceBank {
     if (mom === 'chat') { const G = this.g, h = G.hour ?? 12, m = new Date().getMonth(), r = Math.random();
       if (G.weather && G.weather.cur && G.weather.cur.rain > 0.25 && r < 0.6) mom = 'rain'; else if ((h >= 22 || h < 5) && r < 0.5) mom = 'night';
       else if (m >= 2 && m <= 4 && h >= 12 && h < 17 && r < 0.5) mom = 'heat'; else if ((m === 7 || m === 8) && r < 0.4) mom = 'fest'; else if (r < 0.25) mom = 'patya'; }
+    // honked at while it's all crawling: the jam talk instead
+    if (mom === 'honked' && Math.abs(this.g.player.v || 0) < 3 && Math.random() < 0.55) mom = 'jam';
     const L = T[mom]; if (!L || !L.length) return false;
     let i = pick(L.length); const key = 'v2' + p.persona + mom; if (this.last[key] === i) i = (i + 1) % L.length; this.last[key] = i;
     const id = `vb2_${p.persona}_${mom}_${i}`;
