@@ -27,6 +27,8 @@ const WEST_TOP = [0xf4f2ee, 0x16161a, 0xe9dccb, 0xf2c6cf, 0xc9b8e3, 0xb7c9a8, 0x
 const WEST_BOT = [0x3e5f8a, 0x2c4568, 0x16161a, 0xf2f0ea, 0xcbb89a, 0x6b7f99, 0x5a4636];
 const TAIL = { pony: 'hair_buzzedfemale', braid: 'hair_buzzedfemale' };
 const c = (h) => new THREE.Color(h).convertSRGBToLinear();
+// helmet shells: black mostly, then white, red, navy, grey, matte olive
+const HELM_COL = [0x15161a, 0x15161a, 0x15161a, 0xeeeeea, 0xa8161c, 0x1b2a4a, 0x6c7076, 0x3d4535].map(h => new THREE.Color(h).convertSRGBToLinear());
 
 // bind-pose landmarks (metres, glTF y-up, the body faces +z)
 const BODY = {
@@ -461,7 +463,10 @@ export class HumanKit {
     if (X) {
       H.xtra = {};
       for (const [n, geo] of Object.entries(X.geo)) {
-        const m = new THREE.Mesh(geo, n === 'glasses' || n === 'lens' ? this.glassMat : n === 'bindi' ? this.bindiMat : n === 'cap' ? new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 }) : hairMat);
+        const mat2 = n === 'helm' ? new THREE.MeshStandardMaterial({ color: 0x1b1d22, roughness: 0.28, metalness: 0.08 })
+          : n === 'visor' ? new THREE.MeshStandardMaterial({ color: 0x0e1216, roughness: 0.05, metalness: 0.5, transparent: true, opacity: 0.8, side: THREE.DoubleSide })
+          : n === 'hband' ? new THREE.MeshStandardMaterial({ color: 0x1d3f8f, roughness: 0.4, side: THREE.DoubleSide }) : null;
+        const m = new THREE.Mesh(geo, mat2 || (n === 'glasses' || n === 'lens' ? this.glassMat : n === 'bindi' ? this.bindiMat : n === 'cap' ? new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 }) : hairMat));
         m.matrixAutoUpdate = false; m.matrix.copy(X.local); m.castShadow = false; m.visible = false;
         head.add(m); H.xtra[n] = m;
       }
@@ -544,9 +549,18 @@ export class HumanKit {
     const crown = new THREE.SphereGeometry(0.105, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2); crown.scale(1, 0.75, 1.08); crown.translate(cx, top - 0.06, (cap.min.z + cap.max.z) / 2);
     const brim = new THREE.CylinderGeometry(0.085, 0.085, 0.008, 18, 1, false, -Math.PI / 2, Math.PI); brim.scale(1, 1, 0.9); brim.translate(cx, top - 0.06, (cap.min.z + cap.max.z) / 2 + 0.07);
     const capG = merge([crown, brim]);
+    // a helmet: a glossy open-face shell, down over the ears at the back and sides, a smoked visor in front; a band
+    // round it for the police
+    const hcz = (cap.min.z + cap.max.z) / 2 - 0.004, hcy = top - 0.088, R = 0.138;
+    const shellTop = new THREE.SphereGeometry(R, 24, 12, 0, Math.PI * 2, 0, 1.56); shellTop.scale(1, 1.0, 1.1);
+    const shellLow = new THREE.SphereGeometry(R, 24, 6, Math.PI / 2 + 0.95, Math.PI * 2 - 1.9, 1.56, 0.62); shellLow.scale(1, 1.0, 1.1);
+    const rimT = new THREE.TorusGeometry(R * 1.0, 0.007, 6, 24, Math.PI * 2 - 1.9); rimT.rotateX(Math.PI / 2); rimT.rotateY(-(Math.PI / 2 + 0.95)); rimT.scale(1, 1, 1.1); rimT.translate(0, -0.012, 0);
+    const helm = merge([shellTop, shellLow, rimT]); helm.translate(cx, hcy, hcz);
+    const visor = new THREE.SphereGeometry(R * 1.045, 20, 6, Math.PI / 2 - 0.98, 1.96, 1.08, 0.78); visor.scale(1, 1, 1.1); visor.translate(cx, hcy, hcz);
+    const hband = new THREE.CylinderGeometry(R * 1.012, R * 1.018, 0.035, 24, 1, true); hband.scale(1, 1, 1.1); hband.translate(cx, hcy + 0.035, hcz);
     // rest pose -> Head bone space
     const toHead = new THREE.Matrix4().copy(head.matrixWorld).invert();
-    return (this._xtra[k] = { geo: { pony, braid, glasses, bindi, lens, cap: capG }, local: toHead });
+    return (this._xtra[k] = { geo: { pony, braid, glasses, bindi, lens, cap: capG, helm, visor, hband }, local: toHead });
   }
   // dress a body (also used when the crowd hands a pooled body to someone else)
   applyLook(H, look, accOnly = false) {
@@ -580,7 +594,7 @@ export class HumanKit {
       else if (n === 'cloth_shoes') o.visible = true;
       else if (n === 'hair_beard') o.visible = !!look.beard;
       else if (n.startsWith('hair')) o.visible = !helmet && n === (cap ? 'hair_buzzed' : TAIL[look.style] || look.style);
-      else if (n === 'helmet') o.visible = helmet;
+      else if (n === 'helmet') o.visible = helmet && !H.xtra;          // (the built helmet below replaces the model's own)
       else if (n === 'cap_police') o.visible = cap;
       else o.visible = false;
     }
@@ -591,6 +605,10 @@ export class HumanKit {
       if (H.xtra.lens) H.xtra.lens.visible = !!look.shades && !helmet;
       if (H.xtra.cap) { H.xtra.cap.visible = !!look.hat && !helmet && !cap; if (look.hat) H.xtra.cap.material.color.copy(look.hatCol || look.top); }
       H.xtra.bindi.visible = !!look.bindi && !!look.female;
+      if (H.xtra.helm) {
+        H.xtra.helm.visible = helmet; H.xtra.visor.visible = helmet; H.xtra.hband.visible = helmet && !!look.helmetBand;
+        if (helmet) H.xtra.helm.material.color.copy(look.helmetCol || HELM_COL[(look.top.r * 97 + look.top.g * 31) * 10 % HELM_COL.length | 0]);
+      }
     }
     if (helmet) H.acc.color.copy(look.helmetCol || new THREE.Color(0x1b1d22));
     else if (cap) H.acc.color.set(0xf4f4f0);

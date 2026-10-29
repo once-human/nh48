@@ -730,7 +730,7 @@ class Marshal {
       // a crisp light-khaki shirt, long sleeves, darker trousers, black shoes: reads as a cop from across the road
       look.top = new THREE.Color(0xc9ae76).convertSRGBToLinear(); look.bottom = new THREE.Color(0x6a5735).convertSRGBToLinear();
       look.cut = new THREE.Vector4(0.92, 1, 0.6, 0); look.shoe = new THREE.Color(0x111111);
-      look.acc = 'helmet'; look.helmetCol = new THREE.Color(0xf6f6f6);
+      look.acc = 'helmet'; look.helmetCol = new THREE.Color(0xf2f2ee).convertSRGBToLinear(); look.helmetBand = true;
       this.H = W.kit.create(look);
       this.H.acc.color.set(0xf2f2f2);
       G.scene.add(this.H.holder);
