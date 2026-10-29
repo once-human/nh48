@@ -9,7 +9,7 @@
 //  · Leave a vehicle on a main road and the tow van takes it. Your auto ends up at the chowki.
 // Fines follow the Motor Vehicles Act as amended in 2019, as applied in Pune (see FINES).
 import * as THREE from 'three';
-import { Vehicle, specOf } from '../vehicles/vehicle.js';
+import { Vehicle, specOf, makeService } from '../vehicles/vehicle.js';
 import { ikArm, leanRider, RIDER_HIPS, RIDER_LEAN } from '../people/humans.js';
 import { buildPoliceJeep } from '../vehicles/emodels.js';
 import { clamp, wrapAngle, RNG, safeStorage, fmtRupees } from '../core/util.js';
@@ -493,7 +493,7 @@ export class Police {
       m.update(dt);
       const d = m.catchDist();
       if (m.sees) { seen = true; this.lastSeen = { x: P.x, z: P.z }; }
-      if (d < nearest) { nearest = d; this.sirenAt = { x: m.veh.x, z: m.veh.z }; const hx = Math.cos(P.th), hz = Math.sin(P.th); sirenPan = clamp((-(m.veh.x - P.x) * hz + (m.veh.z - P.z) * hx) / (d || 1), -1, 1); }
+      if (m.pursuing && m.mode === 'drive' && d < nearest) { nearest = d; this.sirenAt = { x: m.veh.x, z: m.veh.z }; const hx = Math.cos(P.th), hz = Math.sin(P.th); sirenPan = clamp((-(m.veh.x - P.x) * hz + (m.veh.z - P.z) * hx) / (d || 1), -1, 1); }
       if ((this.heat === 0 && d > 90) || d > 520) { m.dispose(); this.marshals.splice(i, 1); continue; }
       // caught?
       if (this.heat > 0 && !this.stop && m.stunT <= 0) {
@@ -502,7 +502,7 @@ export class Police {
         if (m.catchT > (P.onFoot ? 0.4 : 1.2)) this.caught(m);
       }
     }
-    const pl = this.heat > 0 && this.marshals.length ? clamp(1.4 - nearest / 160, 0, 1) : 0, em = G.emSiren || 0;
+    const pl = this.heat > 0 && nearest < 1e8 ? clamp(1.4 - nearest / 160, 0, 1) : 0, em = G.emSiren || 0;
     G.audio.sirenAt = em > pl ? G.emSirenAt : this.sirenAt;
     G.audio.siren(Math.max(pl, em), em > pl ? G.emPan || 0 : sirenPan);
     if (this.heat > 0) {
@@ -756,6 +756,7 @@ class Marshal {
     box.position.set(-0.98, 0.95, 0); this.veh.tilt.add(box);
     const bd = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.15), Marshal.board); bd.position.set(-1.155, 0.95, 0); bd.rotation.y = -Math.PI / 2; this.veh.tilt.add(bd);
     for (const sd of [1, -1]) { const sb = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.12), Marshal.board); sb.position.set(-0.98, 0.95, sd * 0.212); sb.rotation.y = sd > 0 ? 0 : Math.PI; this.veh.tilt.add(sb); }
+    makeService(this.veh);
     this.agent = this.veh.agent;
     G.traffic.extra = G.traffic.extra || [];
     G.traffic.extra.push(this.agent);
@@ -766,7 +767,7 @@ class Marshal {
     const G = this.G, W = this.W, v = this.veh;
     for (const c of v.tilt.children) c.visible = false;
     const md = this.md = buildPoliceJeep(); v.tilt.add(md.group);
-    v.spec.L = md.dims.L; v.spec.W = md.dims.W; v.agent.L = md.dims.L; v.agent.W = md.dims.W;
+    v.spec.L = md.dims.L; v.spec.W = md.dims.W; v.agent.L = md.dims.L; v.agent.W = md.dims.W; makeService(v);
     this.cop = { name: 'Patrol', x: v.x, z: v.z, mood: police.rng.next() * 0.6, corrupt: police.rng.chance(0.3), bribes: 0, busyT: 0, post: { x: v.x, z: v.z } };
     this.stunT = 0; this.routeT = 0; this.route = null; this.stuckT = 0; this.revT = 0; this.sees = false; this.spotT = 0;
     this.crew = [];
@@ -794,7 +795,7 @@ class Marshal {
     if (this.sees && !this.wasSeeing && this.spotT <= 0 && de < 60) { police.say(Math.random() < 0.75 ? 'spot_' + police.topCharge() : 'm_spot2', this); this.spotT = 12; }
     this.spotT -= dt;
     this.wasSeeing = this.sees;
-    const pursuing = police.heat > 0 && (this.sees || police.unseenT < 8);
+    const pursuing = this.pursuing = police.heat > 0 && (this.sees || police.unseenT < 8);
     if (this.mode === 'foot') { this.footTick(dt); this.animate(dt, false); return; }
     // you're on foot and they've seen you close: out of the saddle (or the jeep) and after you
     // (close, or as close as the road gets them: you're off it, or they've come to a stop)
@@ -867,7 +868,7 @@ class Marshal {
       const blocked = (lat) => {
         let b = 99;
         G.traffic.near(v.x + hx * 7, v.z + hz * 7, 10, (o) => { if (o === v.agent || (!o.T && !o.parked) || o.isPlayer) return; const rx = o.x - v.x, rz = o.z - v.z, al = rx * hx + rz * hz, ac = -rx * hz + rz * hx, w = (o.T ? o.T.W : o.W || 1.8) / 2 + (this.jeep ? 1.2 : 0.6); if (al > 0.8 && al < 14 && Math.abs(ac - lat) < w) b = Math.min(b, al); });
-        for (const p of G.people.list) { if (!p.onRoad || p.cop) continue; const rx = p.x - v.x, rz = p.z - v.z, al = rx * hx + rz * hz, ac = -rx * hz + rz * hx; if (al > 0.8 && al < 10 && Math.abs(ac - lat) < 1.3) b = Math.min(b, al); }
+        for (const p of G.people.list) { if (p.hidden || p.cop || p.crew) continue; const rx = p.x - v.x, rz = p.z - v.z, al = rx * hx + rz * hz, ac = -rx * hz + rz * hx; if (al > 0.5 && al < 11 && Math.abs(ac - lat) < (this.jeep ? 1.7 : 1.2)) b = Math.min(b, al); }
         return b;
       };
       this.block = close ? 99 : blocked(0); this.off = 0;

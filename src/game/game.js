@@ -114,7 +114,8 @@ export class Game {
     const unlock = () => { this.audio.start(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
     window.addEventListener('pointerdown', unlock); window.addEventListener('keydown', unlock);
     this.people = new People(W, this.scene, this.vmats.body, this.quality);
-    this.people.cars = () => this.traffic ? this.traffic.list : null;      // people step out of the way of cars, never through them
+    this.people.cars = () => this.traffic ? this.traffic.list : null;
+    this.people.servicesOf = () => { const L = []; if (this.police) for (const m of this.police.marshals) if (m.mode === 'drive') L.push(m.veh); if (this.emergency) for (const R of this.emergency.list) L.push(R.v); return L; };      // people step out of the way of cars, never through them
     // which shop fronts are clubs (they get a crowd out front at night)
     this.people.isClub = (d) => { if (d.club === undefined) { const inf = d.shop >= 0 && this.shops && this.shops.infoOf(d); d.club = !!(inf && inf.kind === 'bar' && this.shops.isClub(inf)); } return d.club; };
     this.crowd = new Crowd(this.people, W.kit, this.scene, W, this.quality);
@@ -440,7 +441,9 @@ export class Game {
       this.smoke.emit(v.x, (v.y || 0) + 1.2, v.z, 'black', 1.2);
       if (w.t < 25) this.smoke.emit(v.x, (v.y || 0) + 0.6, v.z, 'fire', 1.4);
     }
-    this.wrecks = this.wrecks.filter(w => w.t <= 70);
+    // a burnt-out vehicle in the traffic is towed away a couple of minutes later, once you're not watching
+    for (const w of this.wrecks) if (w.v.wreck && w.t > 110 && !(this.inView && this.inView(w.v.x, w.v.z))) { w.v.alive = false; w.gone = true; }
+    this.wrecks = this.wrecks.filter(w => !w.gone && (w.t <= 70 || (w.v.wreck && w.v.alive)));
   }
   // Bapu Kaka sorts it out: the shell is towed, a rebuilt auto waits at the stand by Shaniwar Wada
   rebuildAuto() {
@@ -1087,6 +1090,7 @@ export class Game {
     // a dark base under the whole city: any hairline crack between ground pieces shows asphalt, not the bright sky
     if (!this.under) { this.under = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshLambertMaterial({ color: 0x2b2b2d })); this.under.rotation.x = -Math.PI / 2; this.under.receiveShadow = false; this.scene.add(this.under); }
     this.under.position.set(Math.round(this.camera.position.x / 50) * 50, -0.03, Math.round(this.camera.position.z / 50) * 50);
+    this.W.playerVeh = this.player.onFoot ? null : this.player.cur;      // (only your driving wrecks the traffic)
     if (this.blood) this.blood.update(dt);
     if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); if (this.traffic && this.state === 'play') this.trafficDamage(dt); }
     this.stepRefuel(dt);

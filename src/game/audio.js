@@ -268,6 +268,28 @@ export class Audio {
     if (S.p.positionX) { S.p.positionX.setTargetAtTime(sp.x, t, 0.05); S.p.positionY.setTargetAtTime(1.8, t, 0.05); S.p.positionZ.setTargetAtTime(sp.z, t, 0.05); } else S.p.setPosition(sp.x, 1.8, sp.z);
   }
 
+  // the 108's siren: a two-tone hi-lo (not the police wail), from the ambulance
+  ambSiren(level, at) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if (!this.asir) {
+      if (level <= 0) return;
+      const o = ctx.createOscillator(); o.type = 'triangle';
+      const o2 = ctx.createOscillator(); o2.type = 'square';
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 0.9;
+      const g = ctx.createGain(); g.gain.value = 0; const m = ctx.createGain(); m.gain.value = 0.18;
+      const p = this.panner({ x: 0, y: 2, z: 0 }, 14);
+      o.connect(bp); o2.connect(m).connect(bp); bp.connect(g); g.connect(p).connect(this.bus('traffic'));
+      o.start(); o2.start();
+      this.asir = { o, o2, g, p, ph: 0 };
+    }
+    const S = this.asir;
+    S.ph = (S.ph + 1 / 60) % 1.1;
+    const f = S.ph < 0.55 ? 960 : 760;
+    S.o.frequency.setTargetAtTime(f, t, 0.008); S.o2.frequency.setTargetAtTime(f * 1.005, t, 0.008);
+    S.g.gain.setTargetAtTime(level > 0 ? 0.26 : 0, t, 0.15);
+    if (at) { if (S.p.positionX) { S.p.positionX.setTargetAtTime(at.x, t, 0.05); S.p.positionY.setTargetAtTime(2, t, 0.05); S.p.positionZ.setTargetAtTime(at.z, t, 0.05); } else S.p.setPosition(at.x, 2, at.z); }
+  }
   // ---------------------------------------------------------------- engine (single-cylinder 4-stroke putter)
   buildEngine() {
     const ctx = this.ctx;

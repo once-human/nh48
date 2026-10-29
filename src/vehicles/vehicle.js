@@ -55,6 +55,11 @@ export function defaultPaint(type, rng) {
   return pick(PAINTS.car);
 }
 
+// a police or emergency vehicle: solid to everyone (traffic, you), not 'the player'
+export function makeService(v, mass) {
+  v.service = true; v.agent.isPlayer = false; v.agent.service = true;
+  v.agent.T = { L: v.spec.L, W: v.spec.W, mass: mass || v.spec.mass || 1500, two: !!v.spec.two, honk: 'car' };
+}
 export class Vehicle {
   constructor(W, scene, vmats, type, paint) {
     this.W = W; this.type = type; this.spec = specOf(type);
@@ -101,6 +106,7 @@ export class Vehicle {
     this.circles = [];
     for (let k = 0; k < n; k++) this.circles.push([n === 1 ? 0 : -S.L / 2 + S.W / 2 + (S.L - S.W) * k / (n - 1), S.W / 2 + 0.04]);
     this.agent = { x: 0, z: 0, hx: 1, hz: 0, v: 0, W: S.W, L: S.L, isPlayer: true };
+    this.service = false;
     this.events = [];
     this.reset(0, 0, 0);
   }
@@ -228,7 +234,8 @@ export class Vehicle {
     const hx = Math.cos(this.th), hz = Math.sin(this.th);
     const mine = this.circles.map(([o, r]) => [this.x + hx * o, this.z + hz * o, r]);
     traffic.near(this.x, this.z, S.L / 2 + 8, (o) => {
-      if (o.isPlayer || o === this.agent || o.T === undefined && !o.parked) return;
+      // (a police or emergency vehicle bumps into you too, and you into it: they're solid both ways)
+      if ((o.isPlayer && !this.service) || o === this.agent || o.T === undefined && !o.parked) return;
       const T = o.T || { L: o.L, W: o.W, mass: 1000, two: false };
       const n = Math.max(1, Math.round(T.L / T.W));
       for (let k = 0; k < n; k++) {
@@ -251,7 +258,8 @@ export class Vehicle {
             if (!o.parked) {
               o.v = Math.max(0, o.v - imp * (1 - share) * 0.8);
               o.angry = 6;
-              if (imp > 2) o.dmg = Math.min(1.2, (o.dmg || 0) + (imp - 2) * (T.two ? 0.05 : 0.035));     // every vehicle can be wrecked
+              // every vehicle can be wrecked, but only by you (the police nudging through traffic used to set half the city smoking)
+              if (imp > 2 && this.W.playerVeh === this) o.dmg = Math.min(1.2, (o.dmg || 0) + (imp - 2) * (T.two ? 0.05 : 0.035));
               if (T.two && imp > 3.0 && !o.fallen) { o.fallen = 3.5; this.events.push({ type: 'knock', who: 'two', speed: imp, x: o.x, z: o.z }); }
               else if (imp > 1.5) this.events.push({ type: 'hit', who: o.type, speed: imp, x: o.x, z: o.z });
               if (!(o.honkT > 0)) { o.honkT = 2.5; traffic.honks.push({ x: o.x, z: o.z, kind: T.honk, n: 2 }); }   // once per bump, not every frame of contact

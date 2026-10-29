@@ -408,6 +408,7 @@ export class People {
       if (p && this.rng.chance(0.18 + 0.55 * this.nightHere)) { p.mode = 'stand'; p.wait = this.rng.range(15, 90) * (1 + this.nightHere * 2); }
     }
     if ((this.venueT = (this.venueT || 0) - dt) <= 0) { this.venueT = 0.7; this.venueCrowds(px, pz, avoidView); this.clubCrowds(px, pz, avoidView); }
+    this.svc = this.servicesOf ? this.servicesOf() : null;
     this.talkTick(dt, player);
     if ((this._vcT = (this._vcT || 0) - dt) <= 0) { this._vcT = 0.5; this.vendorCalls(0.5, player); }
     const pv = Math.abs(player.v);
@@ -509,6 +510,12 @@ export class People {
         this.events.push({ type: 'pedHit', p, speed: pv, x: p.x, z: p.z, sev: dead ? 'dead' : ko ? 'ko' : 'knock' });
         return;
       }
+    }
+    // a police bike, a jeep or an ambulance coming at them: out of the way (they brake too, but nobody waits to see)
+    if (this.svc && !p.cop && !p.crew && !(p.dodge > 0) && !p.fixed) for (const o of this.svc) {
+      const ex = p.x - o.x, ez = p.z - o.z; if (Math.abs(ex) > 8 || Math.abs(ez) > 8 || Math.abs(o.v) < 2) continue;
+      const hx = Math.cos(o.th), hz = Math.sin(o.th), al = ex * hx + ez * hz, sd = -ex * hz + ez * hx;
+      if (al > -1 && al < 3 + Math.abs(o.v) * 0.8 && Math.abs(sd) < 1.8) { const s2 = Math.sign(sd) || 1; p.dodge = 0.5; p.dodgeVX = -hz * s2 * 3.2; p.dodgeVZ = hx * s2 * 3.2; p.yaw = Math.atan2(hx * s2, -hz * s2); break; }
     }
     if (p.mode === 'free') return this.stepFree(p, dt);
     if (p.mode === 'chase' && p.chase) return this.stepChase(p, dt);
