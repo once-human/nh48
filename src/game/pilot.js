@@ -525,8 +525,9 @@ export class Pilot {
   }
 
   // ---------------------------------------------------------------- the driver you pulled out
-  spawnAngryDriver(o) {
-    if (!this.kit) return;
+  // mode: 'carjack' (you took it) or 'bump' (you hit it): returns the person when they're one of the street's people
+  spawnAngryDriver(o, mode = 'carjack') {
+    if (!this.kit) return null;
     // the same person who was riding it: their shirt and helmet colours carry over from the traffic model
     const two = o.T && o.T.two, shown = two || o.type === 'auto';
     const look = this.kit.randomLook(this.rng, { female: shown ? false : this.rng.chance(0.25), helmet: two && o.type !== 'cycle', avoid: this.look });
@@ -542,8 +543,8 @@ export class Pilot {
       const p = this.makePed(look, x, z, persona);
       if (p) {
         p.react = 2.6; p.reactAt = { x: o.x, z: o.z }; p.reactAnim = 'no'; p.angry = 3; p.grudge = 40;
-        if (this.speakAs) this.speakAs('carjack_' + cls, p);
-        return;
+        if (this.speakAs) this.speakAs(mode === 'bump' ? 'bump' : 'carjack_' + cls, p);
+        return p;
       }
     }
     const H = this.kit.create(look);
@@ -557,6 +558,7 @@ export class Pilot {
     else if (this.speak) this.speak(this.rng.pick(['sh1', 'sh2', 'sh3', 'sh4', 'sh5']), { x, z });
     else { const [line, tr] = this.rng.pick(SHOUTS); this.hud?.say('Driver', line, tr, 3.6); }
     this.npcs.push({ H, x, z, t: 0, yaw: Math.atan2(this.foot.z - z, this.foot.x - x) });
+    return null;
   }
   updateNpcs(dt) {
     for (let i = this.npcs.length - 1; i >= 0; i--) {

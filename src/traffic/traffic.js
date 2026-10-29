@@ -403,6 +403,7 @@ export class Traffic {
     const T = v.T;
     if (v.wreck) { v.v = 0; v.rich = false; return; }                 // a burnt shell: just an obstacle now
     if (v.fallen > 0) { v.fallen -= dt; v.v = 0; return; }
+    if (v.argue > 0) { v.argue -= dt; v.v = 0; return; }            // its driver's out, having words with you
     if (v.ignoreT > 0) v.ignoreT -= dt;
     if (v.angry > 0) v.angry -= dt;
     if (v.honkT > 0) v.honkT -= dt;

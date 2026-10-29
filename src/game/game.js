@@ -361,6 +361,31 @@ export class Game {
     for (const s of shown) { s.H.holder.visible = false; if (kit) kit.applyLook(s.H, s.H.look); }
     for (const v of tmp) v.dispose();
   }
+  // a dent means a discussion, in Pune: the car you hit stops, its driver gets out, comes round to your window and
+  // has his say (the people on the footpath have theirs), then goes back and drives off. Drive away if you like
+  fenderBender(o) {
+    if (this.free || (this._argT || 0) > this.t || o.argue > 0) return;
+    this._argT = this.t + 40;
+    o.argue = 22; o.v = 0;
+    this.later(1.4, () => {
+      const P = this.player, p = P.spawnAngryDriver(o, 'bump');
+      if (!p) { o.argue = 0; return; }
+      p.busy = 22;
+      const sd = (P.spec && P.spec.W ? P.spec.W / 2 : 0.8) + 0.9;
+      this.people.goTo(p, P.x - Math.sin(P.th) * sd, P.z + Math.cos(P.th) * sd, (q) => {
+        this.people.watch(q, P.x, P.z, 10); q.anim = 'no';
+        this.people.speakAs('fight', q, 1, 2);
+        this.later(4.5, () => this.people.speakAs('bump', q, 1, 2));
+        this.later(7, () => { for (const r of this.people.list) if (r !== q && !r.cop && !r.hidden && r.mode === 'watch' && Math.abs(r.x - q.x) < 14 && Math.abs(r.z - q.z) < 14) { this.people.speakAs('crowd', r, 1, 3); break; } });
+      }, true);
+      this.later(15, () => {
+        if (!this.people.list.includes(p)) { o.argue = 0; return; }
+        p.anim = null; p.busy = 10;
+        this.people.goTo(p, o.x, o.z, (q) => { this.people.remove(q); o.argue = 0; o.angry = 4; });
+        this.later(12, () => { if (o.argue > 0) { if (this.people.list.includes(p)) this.people.remove(p); o.argue = 0; } });
+      });
+    });
+  }
   // knocked down in the street: what happens next depends on who you are round here. Where they like you someone
   // comes over, helps you up and gives you water; where you've a bad name they step round you, and someone may
   // help themselves to your wallet
@@ -1167,6 +1192,7 @@ export class Game {
         if (!P.onFoot && ev.speed > 3) { const v = P.cur; v.dmg = Math.min(1, (v.dmg || 0) + (ev.speed - 3) * 0.022); if (v.dmg > 0.6 && !this._dmgWarn) { this._dmgWarn = true; this.date && this.date.event('crash'); this.hud.toast('Your vehicle is badly damaged', 'It’s slower now. Any garage can fix it', 'warn', 3.4); } if (v.dmg < 0.3) this._dmgWarn = false; }
         if (ev.kind === 3) this.hud.toast('End of the shift area', 'Turn back, the map ends here', 'warn', 2);
       }
+      if (ev.type === 'hit' && ev.o && !P.onFoot && ev.speed > 2.5 && ev.speed < 12 && ev.o.T && !ev.o.T.two && !ev.o.service) this.fenderBender(ev.o);
       if (ev.type === 'scrape') this.audio.thud(0.15);
       if (ev.type === 'pedDied' && ev.bled) { this.hud.toast('They didn’t make it', 'Nobody got them to a hospital in time', 'bad', 4); }
       else if (ev.type === 'pedDied' && this.blood) this.blood.spill(ev.x, ev.z, 0.9, 30);
