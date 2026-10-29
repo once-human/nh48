@@ -32,6 +32,7 @@ import VLINES from './vendor_lines.json';
 import { Rep } from '../people/rep.js';
 import { Blood } from '../gfx/blood.js';
 import { Duty } from './duty.js';
+import { VoiceBank } from './voicebank.js';
 import { ikArm, bendBone } from '../people/humans.js';
 const _cufT = new THREE.Vector3(), _cufP = new THREE.Vector3();
 import { justOpened, lineOpen, opensOn } from './metroOpen.js';
@@ -180,7 +181,9 @@ export class Game {
     this.people.say = (id, src) => this.police.say(id, src);
     // a vendor's cry: heard from the stall, subtitled when you're close enough to make it out
     this.people.sayVendor = (p, kind, d) => {
-      const L = VLINES[kind]; if (!L || this.state !== 'play') return;
+      if (this.state !== 'play') return;
+      if (this.vb && this.vb.vendor(kind, p, d)) return;          // the voice bank first
+      const L = VLINES[kind]; if (!L) return;
       const i = Math.floor(Math.random() * L.length), id = `vd_${kind}_${i}`;
       this.audio.callAt(id, p.x, p.z, clamp(1.1 - d / 60, 0.35, 1));
       if (d < 13 && !(this.audio.voiceBusy && this.audio.voiceBusy())) this.hud.say(['Chaha', 'Paanwala', 'Vadapav', 'Phalwala', 'Phoolwali', 'Rasvanti'][kind] || 'Vendor', L[i][1], L[i][2], 2.6);
@@ -190,6 +193,7 @@ export class Game {
     this.rep = new Rep(this); this.people.rep = this.rep;
     this.blood = new Blood(this.scene, W);
     this.duty = new Duty(this);
+    this.vb = new VoiceBank(this); this.people.vb = this.vb;
     // police bikes and jeeps, ambulances: yours to take when they're stopped (a crime, if their crew is right there)
     player.servicesNear = () => {
       const L = [];
@@ -404,6 +408,7 @@ export class Game {
   }
   explode(v) {
     const P = this.player;
+    this.shout('fire', v.x, v.z);
     v.dead = true; v.dmg = 1; v.v = 0; v.powerMul = 0;
     this.paintDamage(v);
     this.smoke.explode(v.x, (v.y || 0) + 0.8, v.z);
@@ -446,8 +451,16 @@ export class Game {
       if (d > 0.85) this.smoke.emit(o.x + hx * back, (o.y || 0) + 0.6, o.z + hz * back, 'fire', 0.4);
     }
   }
+  // someone nearby shouts what's happening (from the voice bank)
+  shout(moment, x, z) {
+    if (!this.vb) return;
+    let best = null, bd = 25;
+    for (const q of this.people.list) { if (q.hidden || q.cop || q.crew || q.fallen > 0) continue; const d = Math.hypot(q.x - x, q.z - z); if (d < bd) { bd = d; best = q; } }
+    if (best) this.later(0.5 + Math.random() * 0.6, () => this.vb.street(best, moment, { pri: 2 }));
+  }
   explodeAgent(o) {
     const P = this.player;
+    this.shout('fire', o.x, o.z);
     o.wreck = true; o.v = 0; o.dmg = 1; o.rich = false;
     this.smoke.explode(o.x, (o.y || 0) + 0.8, o.z);
     const d = Math.hypot(P.x - o.x, P.z - o.z);
@@ -466,7 +479,7 @@ export class Game {
   }
   burnHurt(n, why) {
     const P = this.player;
-    P.hp = (P.hp ?? 100) - n; this.hud.hurt && this.hud.hurt();
+    P.hp = (P.hp ?? 100) - n; this.hud.hurt && this.hud.hurt(); this.vb && this.vb.you('hurt', n > 25);
     if (P.hp <= 0) { P.hp = 0; this.blackout && this.blackout(why || 'Burns'); }
   }
   fireTick(dt) {

@@ -109,8 +109,9 @@ if (fs.existsSync(voiceDir)) {
   // three packs: the street, police and passengers load with the game; the shopkeepers (k_) and the
   // people you talk to (d_) arrive in the background once you're playing
   // (and pk_, the character screen's eight lines, ride with the game itself so the menu can speak)
-  const packOf = (id) => id.startsWith('pk_') ? 3 : id.startsWith('d_') ? 2 : id.startsWith('k_') ? 1 : 0, names = ['voices.mp3', 'voices_k.mp3', 'voices_d.mp3', 'voices_pk.mp3'];
-  const parts = [[], [], [], []], off = [0, 0, 0, 0];
+  // (and vb_, the voice bank of the street, police, radio and vendors: its own pack, read a clip at a time)
+  const packOf = (id) => id.startsWith('vb_') ? 4 : id.startsWith('pk_') ? 3 : id.startsWith('d_') ? 2 : id.startsWith('k_') ? 1 : 0, names = ['voices.mp3', 'voices_k.mp3', 'voices_d.mp3', 'voices_pk.mp3', 'voices_vb.mp3'];
+  const parts = [[], [], [], [], []], off = [0, 0, 0, 0, 0];
   for (const f of fs.readdirSync(voiceDir).filter(f => f.endsWith('.mp3')).sort()) {
     const b = fs.readFileSync(path.join(voiceDir, f)), id = f.replace(/\.mp3$/, ''), k = packOf(id);
     voiceIndex[id] = k ? [off[k], b.length, k] : [off[k], b.length]; parts[k].push(b); off[k] += b.length;

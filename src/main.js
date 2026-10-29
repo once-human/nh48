@@ -225,7 +225,7 @@ async function main() {
     }).catch(() => { /* the map fills in as you go */ }), 9000);
     // the voice lines (about 40 MB in all) aren't downloaded up front any more: each clip is fetched the first
     // time someone says it (a ranged read from its pack), so the game stays light in memory
-    game.voiceRemote = { idx, urls: [VOICE_BIN, 'assets/voices_k.mp3', 'assets/voices_d.mp3'] }; void pack;
+    game.voiceRemote = { idx, urls: [VOICE_BIN, 'assets/voices_k.mp3', 'assets/voices_d.mp3', 'assets/voices_pk.mp3', 'assets/voices_vb.mp3'] }; void pack;
   }
   await game.init(progress);
   if (game.audio && game.voiceRemote) game.audio.remote = game.voiceRemote;

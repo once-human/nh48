@@ -65,6 +65,7 @@ export class Law {
     best.calling = { t, n, why, charge, x, z, desc: this.descNow() };
     best.act = { clip: 'phone', t: 0, dur: t + 2 }; best.mode = 'watch'; best.watch = { x: P.x, z: P.z }; best.wait = t + 2; best.anim = 'phone';
     this.calls.push(best);
+    const vb = G.vb; if (vb) { vb.street(best, 'calling'); if (o.victim && charge === 'pickpocket') G.later(0.4, () => vb.street(o.victim, 'thief', { pri: 2 })); }
     G.hud.toast('Someone’s on the phone', 'A witness is calling 112. Get away, or get to them first', 'warn', 3);
   }
   callsTick(dt) {
@@ -75,7 +76,7 @@ export class Law {
       // you walk up to them: most hang up and back off (the tough ones don't)
       if (P.onFoot && Math.hypot(P.x - q.x, P.z - q.z) < 3 && !C.faced) {
         C.faced = true;
-        if (Math.random() < 0.65) { q.calling = null; q.act = null; q.anim = null; this.calls.splice(i, 1); G.people.flee && G.people.flee(q, P.x, P.z, 18); G.hud.toast('They hang up', 'The phone goes back in the pocket. They back away', 'meter', 2.4); continue; }
+        if (Math.random() < 0.65) { G.vb && G.vb.street(q, 'hangup', { pri: 2 }); q.calling = null; q.act = null; q.anim = null; this.calls.splice(i, 1); G.people.flee && G.people.flee(q, P.x, P.z, 18); G.hud.toast('They hang up', 'The phone goes back in the pocket. They back away', 'meter', 2.4); continue; }
       }
       C.t -= dt;
       if (C.t <= 0) {
@@ -107,7 +108,7 @@ export class Law {
       if ((pol.heat > 0 && this.desc && dsc.plate && this.desc.plate === dsc.plate) || (P.cur.stolen && P.cur.reported)) {
         pol.lastSeen = { x: P.x, z: P.z }; pol.unseenT = 0;
         if (!pol.heat) pol.raiseHeat(1, 'A camera read the stolen plate', 'theft');
-        this.radio(`ANPR hit at ${where}: ${dsc.text}. Units, respond.`);
+        this.radio(`ANPR hit at ${where}: ${dsc.text}. Units, respond.`); G.vb && G.vb.radio(8, c.n.x, c.n.z);
       }
     }
   }
@@ -121,6 +122,7 @@ export class Law {
   }
   radioDesc() {
     const pol = this.p, d = this.desc || this.descNow(), L = pol.lastSeen || this.g.player;
+    if (this.g.vb) this.g.vb.radio(d.key.startsWith('foot') ? 1 : 2, L.x, L.z);
     const lvl = ['', 'Noticed', 'Wanted', 'Pursuit', 'Nakabandi', 'Manhunt'][pol.heat] || '';
     this.radio(`${lvl ? lvl + ': ' : ''}suspect ${d.text}, last seen ${pol.whereName(L.x, L.z)}.`);
   }
@@ -155,7 +157,7 @@ export class Law {
     for (const m of pol.marshals) for (const q of m.foot) {
       const d = Math.hypot(q.x - P.x, q.z - P.z);
       if (d < 1.15 && (P.foot.v || 0) > 2.4 && (q.tackleT = (q.tackleT || 0) - dt) <= 0 && ((q.tackleT = 2.5), Math.random() < 0.45)) {
-        P.downT = 2.4; if (P.human) P.human.play('knockback', { once: true, fade: 0.05 }); G.rig && G.rig.shake(0.5); G.audio.thud && G.audio.thud(0.7);
+        P.downT = 2.4; if (P.human) P.human.play('knockback', { once: true, fade: 0.05 }); G.vb && (G.vb.police(m.role, 'tackle', q) || 0); G.vb && G.later(0.5, () => G.vb.you('fall', true)); G.rig && G.rig.shake(0.5); G.audio.thud && G.audio.thud(0.7);
         G.hud.toast('Tackled', 'Down on the road with a knee in your back', 'bad', 2.4);
         G.later(1.2, () => { if (!pol.stop && pol.heat > 0) pol.caught(m); });
         return;
@@ -192,7 +194,7 @@ export class Law {
       if (d > 40 || (m.shotT = (m.shotT || 0) - dt) > 0) continue;
       m.shotT = m.warned ? 2.2 + Math.random() * 1.5 : 3;
       this.shot(src);
-      if (!m.warned) { m.warned = true; G.hud.toast('Warning shot', '“Ruk ja! Nahi toh goli chalegi!”', 'bad', 3); this.radio('QRT: warning shot fired. Suspect not stopping.'); continue; }
+      if (!m.warned) { m.warned = true; G.vb && G.vb.police('qrt', 'warn', src); G.hud.toast('Warning shot', '“Ruk ja! Nahi toh goli chalegi!”', 'bad', 3); this.radio('QRT: warning shot fired. Suspect not stopping.'); continue; }
       const hit = Math.random() < (P.onFoot ? 0.22 : 0.3) * (1 - d / 60);
       if (!hit) continue;
       if (P.onFoot) { P.hp = Math.max(1, (P.hp ?? 100) - 18); G.hud.hurt && G.hud.hurt(); G.hud.toast('Hit', 'A round in the leg. You can barely run', 'bad', 3); P.limpT = 30; }

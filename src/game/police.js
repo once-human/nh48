@@ -430,6 +430,7 @@ export class Police {
       s.opts = [0.25, 0.5, 0.85, 1.3].map(k => ({ id: 'offer', amt: r50(base * k), t: fmtRupees(r50(base * k)), s: k < 0.3 ? '“Saheb, chai-pani…”' : k < 0.6 ? 'Folded, under the licence' : k < 1 ? '“Adjust kara na, saheb”' : 'More than the fine, to make it go away' }));
       s.opts.push({ id: 'back', t: 'Never mind', s: 'Pay the fine properly instead' });
       G.hud.openStop({ ...s.view, line: 'Bol. Kiti?', tr: 'Go on. How much?', opts: s.opts, onPick: (i) => this.choose(i), mood: cop.mood, neg: true });
+      G.vb && G.vb.police(cop.marshal ? cop.marshal.role : 'traffic', 'bribehint', cop.ped || cop, { quiet: true });
       return;
     } else if (o.id === 'back') {
       s.neg = null; const paid = this.charge(s.kind, s.total); res = `Paid ${fmtRupees(paid)}`; sub = 'Properly, with a receipt. He looks almost disappointed.'; line = 'r_pay'; G.audio.cash();
@@ -453,6 +454,7 @@ export class Police {
         // close: he names his number
         N.tries = 1; const c = Math.max(amt + 100, Math.round(N.R / 50) * 50);
         s.opts = [{ id: 'counter_yes', amt: c, t: `Pay ${fmtRupees(c)}`, s: 'His number, final' }, { id: 'back', t: 'Too much', s: 'Pay the fine instead' }];
+        G.vb && G.vb.police(cop.marshal ? cop.marshal.role : 'traffic', 'counter', cop.ped || cop, { quiet: true });
         G.hud.openStop({ ...s.view, line: `Itna nahi chalega. ${c}. Bas.`, tr: `That won’t do. ${c}. That’s it.`, opts: s.opts, onPick: (i) => this.choose(i), mood: cop.mood, neg: true });
         return;
       } else {
@@ -626,6 +628,7 @@ export class Police {
       cops.push(p);
     }
     this.naka = { x: t[0], z: t[1], group, tag, cops, lights: jeep.lights, t: 0 };
+    G.vb && G.vb.radio(6, t[0], t[1]);
     G.hud.toast('Nakabandi ahead', 'Checkpoints going up on the roads around you', 'bad', 3.2);
   }
   nakaTick(dt) {
@@ -670,7 +673,7 @@ export class Police {
     // of them there are); otherwise it's the cuffs. Only a minor matter gets a conversation
     if ((this.heat >= 2 || ['murder', 'assault', 'hitrun', 'blast'].some(c => this.charges.has(c))) && !this.grab) {
       this.grab = { m, t: 0, need: 4 + this.marshals.reduce((n, u) => n + (u.catchDist() < 10 ? 2 : 0), 0), got: 0 };
-      P.busy = 999; G.hud.grab && G.hud.grab(true, 0); G.audio.thud && G.audio.thud(0.5);
+      P.busy = 999; G.hud.grab && G.hud.grab(true, 0); G.audio.thud && G.audio.thud(0.5); G.vb && G.vb.you('caught', true);
       this.law.radio('Hands on the suspect.');
       return;
     }
@@ -690,7 +693,7 @@ export class Police {
     if (R.got >= R.need) {
       this.grab = null; P.busy = 0; G.hud.grab && G.hud.grab(false);
       R.m.stunT = 3; for (const q of R.m.foot) { q.fallen = 1.8; } this.raiseHeat(1, 'Broke free from arrest', 'fled');
-      G.hud.toast('You wrench free', 'Shoved him off. Run!', 'meter', 2.2); return;
+      G.hud.toast('You wrench free', 'Shoved him off. Run!', 'meter', 2.2); G.vb && G.vb.you('flee', true); return;
     }
     if (R.t > 3) {
       this.grab = null; G.hud.grab && G.hud.grab(false);
@@ -786,9 +789,12 @@ export class Police {
   say(id, who, radio = false, pri) {
     // police lines have variants (id, id.1, id.2): pick one so the same stop doesn't sound canned
     if (LINES[id + '.1']) { const n = LINES[id + '.2'] ? 3 : 2, k = Math.floor(this.rng.next() * n); if (k) id = id + '.' + k; }
+    const G = this.g, P = G.player;
+    // the voice bank: the same moment, said by this officer's kind of police (traffic, marshal, patrol, QRT)
+    const vm = VBM[id] || (/^spot_/.test(id) ? 'chase' : null);
+    if (G.vb && vm && !radio) { const src0 = who && (who.ped || who.veh || who); const role = who && who.marshal ? who.marshal.role : who && who.role ? who.role : 'traffic'; if (src0 && src0.x !== undefined && G.vb.police(role, vm, src0)) return id; }
     const L = LINES[id];
     if (!L) return;
-    const G = this.g, P = G.player;
     let vol = 1, pan = 0;
     const src = who && (who.ped || who.veh || who);
     if (src && src.x !== undefined && !radio) {
@@ -820,6 +826,8 @@ export class Police {
 // ---------------------------------------------------------------- a beat marshal on a motorcycle
 const _g = new THREE.Vector3(), _pl = new THREE.Vector3();
 const LEVELS = ['', 'Noticed', 'Wanted', 'Pursuit', 'Nakabandi', 'Manhunt'];
+// the old police line ids → the voice bank's moments
+const VBM = { stop_wave: 'wave', stop_check: 'docs', stop_helmet: 'docs', stop_signal: 'fine', stop_speed: 'fine', stop_wrong: 'fine', stop_horn: 'fine', r_pay: 'fine', r_plead_no: 'pleadno', r_plead_ok: 'pleadok', r_bribe_ok: 'bribeok', r_bribe_more: 'bribeok', r_bribe_no: 'bribeno', m_spot2: 'chase', m_caught: 'cuffs', cop_fight: 'chase', r_argue_no: 'pleadno', r_argue_ok: 'pleadok', r_clear: 'pleadok' };
 // who comes for what: traffic police (hi-vis vests) for the road, beat marshals for street crime, armed QRT in black
 // at a Manhunt for something violent
 const TRAFFIC_CH = new Set(['signal', 'speed', 'rash', 'helmet', 'horn', 'disobey', 'suspended', 'wrongway']);

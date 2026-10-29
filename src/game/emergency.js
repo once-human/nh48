@@ -26,6 +26,7 @@ export class Emergency {
   dispatch(kind, x, z, victim) {
     const G = this.g;
     if (this.list.length >= 3 || !G.W.graph) return;
+    if (G.vb && (kind === 'down' || kind === 'blast')) G.later(2, () => G.vb.radio(4, x, z));
     if (kind === 'down' || kind === 'blast') this.later(kind === 'blast' ? 10 : 18 + Math.random() * 12, () => this.spawn('ambulance', x, z, victim));
     if ((victim && victim.corpse) || kind === 'blast') this.later(26 + Math.random() * 14, () => this.spawn('police', x, z, null));
   }
@@ -183,13 +184,13 @@ export class Emergency {
       step(A, fa.x, fa.z, 2, R.myaw); step(B, fb.x, fb.z, 2, R.myaw);
       if (R.ph === 'carry' && q) { q.x = R.mid.x; q.z = R.mid.z; q.liftY = 0.86; q.yaw = R.myaw; }
       if (e < 0.3) {
-        if (R.ph === 'out') { R.ph = 'treat'; R.pt = 0; }
+        if (R.ph === 'out') { R.ph = 'treat'; R.pt = 0; G.vb && G.vb.medic(Math.random() < 0.5 ? 4 : 0, A, false); }
         else {
           R.ph = 'loaded';
           if (q) { const i = G.people.list.indexOf(q); if (i >= 0) { if (q.body) q.body.release(); G.people.list.splice(i, 1); } }
           R.str.parent && R.str.parent.remove(R.str); R.str = null; for (const p of M) p.hands = null;
           this.crewIn(R); R.medics = null;
-          G.audio.thud && G.audio.thud(0.4);
+          G.audio.thud && G.audio.thud(0.4); G.vb && G.vb.medic(5, A, false);
           G.later(2, () => { if (R.state === 'scene') this.leave(R); });
         }
       }
@@ -203,7 +204,7 @@ export class Emergency {
         step(p, q.x - s2 * side, q.z + c * side, 1.2, Math.atan2(q.z - p.z, q.x - p.x));
         p.anim = 'crouch'; p.hands = [{ x: q.x + (Math.random() - 0.5) * 0.02, y: (G.W.surf.height(q.x, q.z)) + 0.28, z: q.z }, { x: q.x + c * 0.25, y: G.W.surf.height(q.x, q.z) + 0.3, z: q.z + s2 * 0.25 }];
       });
-      if (R.pt > 6) { R.ph = 'lift'; R.pt = 0; if (Math.hypot(P.x - v.x, P.z - v.z) < 50) G.hud.toast(q && q.corpse ? 'Taken away' : 'Taken to Sassoon', q && q.corpse ? 'They cover the body and lift it. Police will want to know who did it' : 'The paramedics lift them onto the stretcher', 'info', 3); }
+      if (R.pt > 6) { R.ph = 'lift'; R.pt = 0; G.vb && G.vb.medic(3, A, false); if (Math.hypot(P.x - v.x, P.z - v.z) < 50) G.hud.toast(q && q.corpse ? 'Taken away' : 'Taken to Sassoon', q && q.corpse ? 'They cover the body and lift it. Police will want to know who did it' : 'The paramedics lift them onto the stretcher', 'info', 3); }
     } else if (R.ph === 'lift') {
       // onto the stretcher, and up: from a crouch at the handles to standing with it at the waist
       R.pt += dt; const k = Math.min(1, R.pt / 1.6), yaw = R.ay || 0;
@@ -212,7 +213,7 @@ export class Emergency {
       step(A, fa.x, fa.z, 1.5, yaw); step(B, fb.x, fb.z, 1.5, yaw);
       A.anim = B.anim = k < 0.55 ? 'crouch' : null;
       q.liftY = 0.3 + 0.56 * k; q.yaw = yaw;
-      if (k >= 1) { R.ph = 'carry'; }
+      if (k >= 1) { R.ph = 'carry'; G.vb && G.later(1.5, () => G.vb.medic(7, B, true)); }
     }
   }
   stretcher() {

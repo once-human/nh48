@@ -249,3 +249,18 @@ for j in out:
 json.dump(uniq, open(os.path.join(ROOT, 'tools/voice_bank.json'), 'w'), ensure_ascii=False, indent=0)
 from collections import Counter
 print(len(uniq), 'lines'); print(Counter(j['cat'] for j in uniq)); print(Counter(j['speaker'] for j in uniq).most_common())
+
+# the game's copy of the words (subtitles), compact: the game builds a line's subtitle from its id
+lines = {
+  'personas': {k: [v[0], v[1]] for k, v in P.items()},
+  'st': {m: {L: [[t[1] or t[0], t[2]] for t in ls] for L, ls in v[3].items()} for m, v in M.items()},
+  'stctx': {m: v[2] for m, v in M.items()}, 'sttakes': {m: len(v[1]) for m, v in M.items()},
+  'ctx': {k: ({L: [f[1] or f[0], f[2]] for L, f in v[0].items()} if v[0] else None) for k, v in CTX.items()},
+  'roles': {k: v[0] for k, v in ROLE.items()},
+  'po': {m: {L: [[t[1], t[2]] for t in ls] for L, ls in v[1].items()} for m, v in PL.items()},
+  'radio': [t for t, _ in RT], 'places': PLACES, 'veh': VEH,
+  'vd': {k: [[t[1], t[2]] for t in v[1]] for k, v in VEND.items()}, 'haggle': [[h[1], h[2]] for h in HAGGLE],
+  'med': [[t[1], t[2]] for t in MED], 'crowd': [[t[1], t[2]] for t in CROWD], 'you': {k: [v[1], v[2]] for k, v in YOU.items()},
+}
+json.dump(lines, open(os.path.join(ROOT, 'src/game/voice_bank_lines.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
+print('lines table written')
