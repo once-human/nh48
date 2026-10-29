@@ -3,6 +3,10 @@
 // pool of skinned bodies is re-dressed and handed from person to person as you move.
 import * as THREE from 'three';
 import { clamp, RNG } from '../core/util.js';
+import { ikArm } from './humans.js';
+import { hasUmbrella, umbrellaColor, umbrellaGeo, umbrellaMat } from './umbrella.js';
+const _sh = new THREE.Vector3(), _tg = new THREE.Vector3(), _pl = new THREE.Vector3(), _hd = new THREE.Vector3();
+let UGEO = null;
 
 const RANGE = 48;            // metres from the camera
 const NAT = { walk: 1.25, jog: 3.0 };
@@ -23,6 +27,7 @@ function idleFor(p) {
 export class Crowd {
   constructor(people, kit, scene, W, quality) {
     this.people = people; this.kit = kit; this.scene = scene; this.W = W;
+    this.rain = 0;
     this.cap = quality.name === 'lite' ? 18 : quality.name === 'low' ? 27 : quality.name === 'med' ? 50 : 72; this.range = (quality.crowdRange || RANGE) * 1.8;
     this.pool = [];
     this.t = 0;
@@ -41,7 +46,7 @@ export class Crowd {
     const accs = [];
     H.root.traverse(o => { if (o.isSkinnedMesh && !o.name.startsWith('body')) accs.push(o); });
     const s = { H, female, p: null, accs, dtAcc: 0 };
-    s.release = () => { if (s.p) s.p.body = null; s.p = null; H.holder.visible = false; };
+    s.release = () => { if (s.p) s.p.body = null; s.p = null; H.holder.visible = false; if (s.umb) s.umb.visible = false; };
     this.pool.push(s);
     return s;
   }
@@ -148,6 +153,26 @@ export class Crowd {
     s.k = ((s.k || 0) + 1) & 3;
     // off-screen and not close: no animation at all (it catches up the moment they're in view)
     if (seen ? (dd < 30 || (s.k & 1) === 0) : (dd < 12 && s.k === 0)) { H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; }
+    // in the rain: the umbrella up in the right hand, held at the chest, the canopy over the head
+    const umb = this.rain > 0.2 && !p.rideOf && !(p.fallen > 0) && !p.act && p.mode !== 'fight' && dd < 60 && (seen || dd < 12) && hasUmbrella(p);
+    if (umb) {
+      if (!s.umb) { UGEO = UGEO || umbrellaGeo(); s.umb = new THREE.Mesh(UGEO, umbrellaMat()); s.umb.castShadow = true; this.scene.add(s.umb); }
+      if (s.umbFor !== p) { s.umbFor = p; s.umb.material.color.setHex(umbrellaColor(p)); }
+      H.holder.updateMatrixWorld(true);
+      const up = H.root.getObjectByName('upperarm_r'), hand = H.root.getObjectByName('hand_r');
+      if (up && hand) {
+        const fx = Math.cos(p.yaw), fz = Math.sin(p.yaw), rx = -fz, rz = fx;
+        up.getWorldPosition(_sh);
+        _tg.set(_sh.x + fx * 0.24 - rx * 0.12, _sh.y - 0.2, _sh.z + fz * 0.24 - rz * 0.12);
+        _pl.set(rx * 0.6, -0.8, rz * 0.6).normalize();
+        ikArm(H, 'r', _tg, _pl, 1);
+        hand.getWorldPosition(_hd);
+        s.umb.position.copy(_hd);
+        // tipped a touch into the walk (and the wind)
+        s.umb.rotation.set(0, 0, 0); s.umb.rotateOnWorldAxis(_pl.set(rx, 0, rz), (p.v || 0) > 0.3 ? -0.12 : -0.04);
+        s.umb.visible = true;
+      }
+    } else if (s.umb) s.umb.visible = false;
     const sh = dd < 22;
     if (s.sh !== sh) { s.sh = sh; H.root.traverse(o => { if (o.isMesh) o.castShadow = sh; }); }
     H.holder.visible = seen || dd < 12;

@@ -3,6 +3,7 @@
 // People also pop into shops and come back out, stand around chai stalls, glare when you honk,
 // get up angry when you knock them over, and crowd round (phones out) when something happens.
 import * as THREE from 'three';
+import { hasUmbrella, umbrellaColor, umbrellaGeo, umbrellaMat } from './umbrella.js';
 import { ColorBuilder, lin } from '../world/geo.js';
 import { RNG, clamp, lerp, wrapAngle } from '../core/util.js';
 import STREET from '../game/street_lines.json';
@@ -105,6 +106,7 @@ function buildParts() {
   return P;
 }
 
+const UC = new THREE.Color();
 function instMesh(scene, geo, mat, cap, extra = true) {
   const g = geo.clone();
   const m = new THREE.InstancedMesh(g, mat, cap);
@@ -132,6 +134,11 @@ export class People {
     this.mArm = instMesh(scene, P.arm, mat, cap * 2);
     this.mCow = instMesh(scene, P.cow, mat, 24);
     this.mDog = instMesh(scene, P.dog, mat, 48);
+    // the far figures' umbrellas (in the rain)
+    this.mUmb = new THREE.InstancedMesh(umbrellaGeo(), umbrellaMat(), cap);
+    this.mUmb.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3);
+    this.mUmb.frustumCulled = false; this.mUmb.count = 0; this.mUmb.castShadow = true; scene.add(this.mUmb);
+    this.rain = 0;
     this.events = [];
     this.crossers = [];
     this.kit = W.kit;
@@ -1063,7 +1070,8 @@ export class People {
 
   // ---------------------------------------------------------------- render
   render(cx, cz) {
-    let nm = 0, nf = 0, nl = 0, na = 0;
+    let nm = 0, nf = 0, nl = 0, na = 0, nu = 0;
+    const umb = this.rain > 0.2;
     const mm = this.mMale, mf = this.mFemale, ml = this.mLeg, ma = this.mArm;
     for (const p of this.list) {
       if (p.body || p.hidden) continue;    // drawn up close by crowd.js, or inside a shop
@@ -1089,6 +1097,10 @@ export class People {
       body.geometry.attributes.aColC.setXYZ(bi, p.skin[0], p.skin[1], p.skin[2]);
       BASE.copy(M4);
       if (p.fallen > 0) continue;
+      if (umb && hasUmbrella(p) && nu < this.cap) {
+        P3.set(p.x + p.hx * 0.22, y + 1.02, p.z + p.hz * 0.22); S3.set(1, 1, 1); Q.identity();
+        M4.compose(P3, Q, S3); this.mUmb.setMatrixAt(nu, M4); UC.setHex(umbrellaColor(p)).convertSRGBToLinear(); this.mUmb.instanceColor.setXYZ(nu, UC.r, UC.g, UC.b); nu++;
+      }
       // legs (men only; saree hides them)
       if (!p.female) for (const sd of [-1, 1]) {
         TA.makeTranslation(0, 0.95, sd * 0.09); RA.makeRotationZ(swing * sd);
@@ -1111,6 +1123,7 @@ export class People {
         na++;
       }
     }
+    this.mUmb.count = nu; if (nu) { this.mUmb.instanceMatrix.needsUpdate = true; this.mUmb.instanceColor.needsUpdate = true; }
     for (const [m, n] of [[mm, nm], [mf, nf], [ml, nl], [ma, na]]) {
       m.count = n; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true;
       m.geometry.attributes.aColB.needsUpdate = true; m.geometry.attributes.aColC.needsUpdate = true;
