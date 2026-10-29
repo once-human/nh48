@@ -763,7 +763,21 @@ export class People {
   // ---------------------------------------------------------------- fights (see fight.js)
   // someone gets hit (by you, usually)
   hurt(p, dmg, sx, sz, M, byPlayer) {
-    if (p.fallen > 0 && p.ko) return;
+    if (p.corpse) return;
+    // putting the boot in on someone already out cold: enough of it and they don't get up again
+    if (p.fallen > 0 && p.ko) {
+      p.over = (p.over || 0) + dmg; p.fallen = Math.max(p.fallen, 14);
+      if (p.over > 45) {
+        p.corpse = true; p.fallen = 1e6;
+        this.events.push({ type: 'pedDied', p, x: p.x, z: p.z });
+        if (this.brain) this.brain.incident('down', p.x, p.z, { victim: p, byYou: !!byPlayer });
+      }
+      return;
+    }
+    // a fighter who sees it coming blocks: most of the blow is taken on the arms
+    if (p.mode === 'fight' && p.fightT > 0.6 && !p.act && this.rng.next() < (p.cop ? 0.35 : 0.22) + (TOUGH[p.persona] || 0.05) * 0.3) {
+      p.act = { kind: 'block', clip: 'block', speed: 1.4, t: 0, dur: 0.45 }; p.actId = (p.actId || 0) + 1; dmg *= 0.25;
+    }
     if (p.hp0 === undefined) { p.hp0 = p.cop ? 130 : HP[p.persona] || 60; p.hp = p.hp0; }
     p.hp -= dmg;
     const dx = p.x - sx, dz = p.z - sz, d = Math.hypot(dx, dz) || 1;
@@ -775,8 +789,11 @@ export class People {
     p.act = null; p.anim = null;
     if (p.hp <= 0) {
       // out cold
-      p.ko = true; p.fallen = this.rng.range(6, 9); p.v = 0; p.stun = 0;
+      p.ko = true; p.fallen = this.rng.range(14, 26); p.v = 0; p.stun = 0;
+      // a big last blow on someone already in a bad way can kill (rarely)
+      if (M && M.dmg >= 20 && p.hp < -p.hp0 * 0.35 && this.rng.next() < 0.18) { p.corpse = true; p.fallen = 1e6; this.events.push({ type: 'pedDied', p, x: p.x, z: p.z }); }
       this.events.push({ type: 'pedKO', p, x: p.x, z: p.z });
+      if (this.brain) this.brain.incident('down', p.x, p.z, { victim: p, byYou: !!byPlayer });
       const L = byPlayer && this.brawl && this.brawl.g.life;
       if (L) {
         // beating someone who fought back earns street cred; beating someone who didn't costs karma

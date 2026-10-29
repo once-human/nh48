@@ -17,9 +17,10 @@ const MOVES = {
   punch: { clip: 'punch', speed: 1.6, dur: 0.5, hit: 0.2, dmg: 10, reach: 1.25, push: 0.22 },
   cross: { clip: 'cross', speed: 1.55, dur: 0.6, hit: 0.26, dmg: 14, reach: 1.3, push: 0.35 },
   hook: { clip: 'hook', speed: 0.9, dur: 0.62, hit: 0.32, dmg: 22, reach: 1.25, push: 0.6, down: 0.45 },
+  push: { clip: 'push', speed: 1.2, dur: 0.7, hit: 0.3, dmg: 4, reach: 1.2, push: 1.4 },
 };
 const COMBO = ['punch', 'cross', 'hook'];
-const NPC_MOVES = ['punch', 'punch', 'cross', 'cross', 'hook'];
+const NPC_MOVES = ['punch', 'punch', 'cross', 'cross', 'hook', 'push'];
 
 export class Brawl {
   constructor(game) {
@@ -332,14 +333,21 @@ export class Brawl {
       if (res && res.kind !== 3) { p.x += res.nx * res.depth; p.z += res.nz * res.depth; }
       p.v = sp; p.phase += dt * sp * 4.2;
     } else {
-      p.v = 0;
+      // circle: a fighter doesn't stand still in front of you, they side-step and look for an opening
+      p.circ = (p.circ ?? (this.rng.next() < 0.5 ? 1 : -1)); if (this.rng.next() < dt * 0.4) p.circ = -p.circ;
+      const sx = -dz / d * p.circ, sz = dx / d * p.circ, cs = 0.9 * dt;
+      p.x += sx * cs; p.z += sz * cs; p.v = 0.9;
+      const res2 = ppl.W.collision.resolve(p.x, p.z, 0.25); if (res2 && res2.kind !== 3) { p.x += res2.nx * res2.depth; p.z += res2.nz * res2.depth; }
       if (d < want - 0.3) { p.x -= dx / d * dt * 1.2; p.z -= dz / d * dt * 1.2; }
+      // your swing coming: back off out of reach (the quick ones)
+      if (P.act && P.act.t < 0.15 && this.rng.next() < 0.25 * (POWER[p.persona] || 0.9)) { p.x -= dx / d * 0.5; p.z -= dz / d * 0.5; }
       p.atkT -= dt;
       if (p.atkT <= 0) {
         const name = this.rng.pick(NPC_MOVES), M = MOVES[name];
         p.act = { kind: 'atk', clip: M.clip, speed: M.speed * 0.92, t: 0, dur: M.dur / 0.92, hit: M.hit / 0.92, M, done: false };
         p.actId = (p.actId || 0) + 1;
-        p.atkT = this.rng.range(0.9, 1.9) / (POWER[p.persona] || 0.9);
+        // sometimes a quick follow-up (one-two), sometimes a pause to breathe
+        p.atkT = (this.rng.next() < 0.3 ? this.rng.range(0.35, 0.55) : this.rng.range(0.9, 1.9)) / (POWER[p.persona] || 0.9);
         if (this.rng.next() < 0.12) ppl.speakAs('fight', p, 1, 5);
       }
     }

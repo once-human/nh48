@@ -935,6 +935,9 @@ export class Game {
         if (ev.kind === 3) this.hud.toast('End of the shift area', 'Turn back, the map ends here', 'warn', 2);
       }
       if (ev.type === 'scrape') this.audio.thud(0.15);
+      if (ev.type === 'pedDied') {
+        if (!this.free) { this.hud.toast('You killed someone', 'Murder is BNS s.103. There were witnesses', 'bad', 5); this.life.change('karma', -30); this.police && this.police.raiseHeat && this.police.raiseHeat(3, 'Killed someone in a fight', null); }
+      }
       if (ev.type === 'pet') {
         const a = ev.a; a.moving = false; a.rest = 8; this.life.change('mood', 0.06);
         const L = a.cow ? ['Touch the cow for luck', 'She doesn’t care. A kaku nearby approves.'] : a.kind === 'cat' ? ['The cat allows it', 'Three seconds, then a look that says enough.'] : ['Good dog', 'The tail goes like a fan. A friend for life, or till the next vada pav.'];
