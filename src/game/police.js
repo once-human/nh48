@@ -10,6 +10,7 @@
 // Fines follow the Motor Vehicles Act as amended in 2019, as applied in Pune (see FINES).
 import * as THREE from 'three';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
+import { ikArm } from '../people/humans.js';
 import { clamp, wrapAngle, RNG, safeStorage, fmtRupees } from '../core/util.js';
 import LINES from './lines.json';
 import { POLICE_MUL } from './settings.js';
@@ -643,7 +644,7 @@ export class Police {
 }
 
 // ---------------------------------------------------------------- a beat marshal on a motorcycle
-const KHAKI = 0x9b8456;
+const _g = new THREE.Vector3(), _pl = new THREE.Vector3();
 class Marshal {
   constructor(police, x, z, th) {
     const G = police.g, W = police.W;
@@ -659,8 +660,10 @@ class Marshal {
     // rider: khaki uniform, white helmet
     if (W.kit) {
       const look = W.kit.randomLook(police.rng, { role: 'police' });
-      look.top = new THREE.Color(KHAKI).convertSRGBToLinear(); look.bottom = look.top.clone().multiplyScalar(0.92);
-      look.acc = 'helmet';
+      // a crisp light-khaki shirt, long sleeves, darker trousers, black shoes: reads as a cop from across the road
+      look.top = new THREE.Color(0xc9ae76).convertSRGBToLinear(); look.bottom = new THREE.Color(0x6a5735).convertSRGBToLinear();
+      look.cut = new THREE.Vector4(0.92, 1, 0.6, 0); look.shoe = new THREE.Color(0x111111);
+      look.acc = 'helmet'; look.helmetCol = new THREE.Color(0xf6f6f6);
       this.H = W.kit.create(look);
       this.H.acc.color.set(0xf2f2f2);
       G.scene.add(this.H.holder);
@@ -792,6 +795,10 @@ class Marshal {
       this.H.holder.rotation.set(0, -v.th, 0);
       this.H.holder.rotateX(v.lean || 0);
       this.H.mixer.update(dt);
+      // hands on the grips, elbows out, like you ride
+      this.H.holder.updateMatrixWorld(true);
+      const m = v.tilt.matrixWorld;
+      for (const sd of [1, -1]) { _g.set(0.6, 1.08, 0.34 * sd).applyMatrix4(m); _pl.set(-0.2, -0.7, sd).transformDirection(m); ikArm(this.H, sd > 0 ? 'r' : 'l', _g, _pl, 1); }
     }
   }
   los(x, z) { return this.W.collision.ray(this.veh.x, this.veh.z, x, z) > 0.97; }

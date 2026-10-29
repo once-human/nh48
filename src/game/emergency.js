@@ -5,29 +5,9 @@
 import * as THREE from 'three';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { clamp, wrapAngle } from '../core/util.js';
+import { buildAmbulance, buildPoliceJeep } from '../vehicles/emodels.js';
 
-// a band of colour with the words in Marathi and English, on both sides of the vehicle
-const LIV = {};
-function livery(v, amb) {
-  const key = amb ? 'amb' : 'pol';
-  if (!LIV[key]) {
-    const c = document.createElement('canvas'); c.width = 1024; c.height = 160;
-    const x = c.getContext('2d');
-    x.fillStyle = amb ? '#c81e1e' : '#1d3f8f'; x.fillRect(0, 0, 1024, 160);
-    x.fillStyle = amb ? '#ffffff' : '#ffd23a'; x.fillRect(0, 0, 1024, 12); x.fillRect(0, 148, 1024, 12);
-    x.fillStyle = '#ffffff'; x.textBaseline = 'middle';
-    x.font = '800 74px Mukta, sans-serif'; x.fillText(amb ? 'रुग्णवाहिका' : 'पोलीस', 40, 84);
-    x.font = '800 70px Inter, Arial, sans-serif'; x.textAlign = 'right'; x.fillText(amb ? 'AMBULANCE 108' : 'POLICE  100', 990, 84);
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
-    LIV[key] = new THREE.MeshStandardMaterial({ map: t, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -2 });
-  }
-  const S = v.spec, L = (S.L || 4) * 0.82, W = (S.W || 1.7) / 2 + 0.012, h = amb ? 1.05 : 0.86;
-  for (const sd of [1, -1]) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(L, L * 160 / 1024), LIV[key]);
-    m.position.set(-0.1, h, sd * W); m.rotation.y = sd > 0 ? 0 : Math.PI;
-    v.tilt.add(m);
-  }
-}
+const th0 = (st) => st.th;
 export class Emergency {
   constructor(G) { this.g = G; this.list = []; this.cool = 0; }
   // called by the brain when something happens
@@ -52,20 +32,30 @@ export class Emergency {
     }
     if (!st) return;
     const amb = type === 'ambulance';
-    const v = new Vehicle(W, G.scene, G.vmats, amb ? 'tempo' : 'suv', amb ? [0.95, 0.95, 0.93] : [0.93, 0.93, 0.95]);
-    v.reset(st.x, st.z, st.th); v.y = W.surf.height(st.x, st.z);
-    v.spec = { ...specOf(amb ? 'tempo' : 'suv'), acc: 3.6, vTop: 22, mass: 30000 };
-    // lights: a bar on the roof, red and blue (the ambulance gets a red stripe down the side too)
-    const lg = new THREE.BoxGeometry(0.22, 0.12, 0.5), y = amb ? 2.35 : 1.95;
-    const r = new THREE.Mesh(lg, new THREE.MeshBasicMaterial({ color: 0xff2020, toneMapped: false })), b = new THREE.Mesh(lg, new THREE.MeshBasicMaterial({ color: amb ? 0xff6060 : 0x2050ff, toneMapped: false }));
-    r.position.set(0.2, y, 0.3); b.position.set(0.2, y, -0.3); v.tilt.add(r, b);
-    if (amb) for (const sd of [1, -1]) { const s = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, 0.02), new THREE.MeshBasicMaterial({ color: 0xc81e1e })); s.position.set(-0.1, 1.05, sd * 0.79); v.tilt.add(s); }
-    // livery: a bilingual band down each side, a dark base under the light bar, a real flashing light for the night
-    livery(v, amb);
-    const base = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 1.25), new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.6 }));
-    base.position.set(0.2, y - 0.08, 0); v.tilt.add(base); r.scale.z = b.scale.z = 1.15;
-    const light = new THREE.PointLight(0xff2020, 0, 22, 2); light.position.set(0.2, y + 0.3, 0); v.tilt.add(light);
-    const R = { type, v, r, b, light, x, z, victim, state: 'go', t: 0, routeT: 0, route: null, stuckT: 0 };
+    const v = new Vehicle(W, G.scene, G.vmats, amb ? 'tempo' : 'suv', [0.95, 0.95, 0.93]);
+    v.reset(st.x, st.z, th0(st)); v.y = W.surf.height(st.x, st.z);
+    // its own model (a 108 van, a police jeep) in place of the stock body
+    for (const c of v.tilt.children) c.visible = false;
+    const md = amb ? buildAmbulance() : buildPoliceJeep();
+    v.tilt.add(md.group);
+    v.spec = { ...specOf(amb ? 'tempo' : 'suv'), acc: 3.6, vTop: 22, mass: 30000, L: md.dims.L, W: md.dims.W };
+    const n = Math.max(1, Math.round(md.dims.L / md.dims.W));
+    v.circles = []; for (let k = 0; k < n; k++) v.circles.push([-md.dims.L / 2 + md.dims.W / 2 + (md.dims.L - md.dims.W) * k / (n - 1), md.dims.W / 2 + 0.04]);
+    v.agent.L = md.dims.L; v.agent.W = md.dims.W;
+    const light = new THREE.PointLight(0xff2020, 0, 22, 2); light.position.set(0.5, 3, 0); v.tilt.add(light);
+    // the crew, seated and fully dressed: two constables in khaki, or the 108 pilot and the EMT in navy
+    const crew = [];
+    if (W.kit) for (const [sx, sy, sz, role] of md.seats) {
+      const rng = { next: Math.random, chance: (q) => Math.random() < q, range: (a, b) => a + Math.random() * (b - a), pick: (a) => a[Math.floor(Math.random() * a.length)], int: (a, b) => a + Math.floor(Math.random() * (b - a + 1)), weighted: null };
+      const look = amb ? W.kit.randomLook(rng, { female: role === 'mate' && Math.random() < 0.35, dress: 'modern' }) : W.kit.randomLook(rng, { role: 'police' });
+      if (amb) { look.top = new THREE.Color(0x24345a).convertSRGBToLinear(); look.bottom = new THREE.Color(0x1e2433).convertSRGBToLinear(); look.cut = new THREE.Vector4(0.42, 1, 0.6, 0); }
+      const H = W.kit.create(look);
+      H.holder.position.set(sx - 0.05, sy - 0.62, sz);
+      v.tilt.add(H.holder);
+      H.play(role === 'driver' ? 'drive' : 'sit');
+      crew.push({ H, look, role, x: sx, z: sz });
+    }
+    const R = { type, v, md, light, crew, x, z, victim, state: 'go', t: 0, routeT: 0, route: null, stuckT: 0, out: [] };
     G.traffic.extra = G.traffic.extra || []; G.traffic.extra.push(v.agent);
     this.list.push(R);
   }
@@ -74,8 +64,15 @@ export class Emergency {
     let siren = 0, pan = 0;
     for (const R of this.list) {
       const v = R.v; R.t += dt;
-      const flash = Math.floor(R.t * 6) % 2 === 0;
-      R.r.visible = R.state !== 'gone' && flash; R.b.visible = R.state !== 'gone' && !flash;
+      // the bar: red and blue in turns, the off lenses showing between
+      const flash = Math.floor(R.t * 6) % 2 === 0, Lg = R.md.lights;
+      Lg.red.visible = flash; Lg.redOff.visible = !flash; Lg.blue.visible = !flash; Lg.blueOff.visible = flash;
+      if (Lg.red2) { Lg.red2.visible = !flash; Lg.red2Off.visible = flash; }
+      // wheels roll and the fronts steer; the crew breathe only when you're near enough to see
+      for (const w of R.md.wheels) { w.spin.rotation.z -= (v.v || 0) * dt / w.r; if (w.front) w.steer.rotation.y = -(v.steer || 0); }
+      const near = Math.hypot(v.x - P.x, v.z - P.z) < 70;
+      if (near) for (const c of R.crew) if (c.H.holder.visible) c.H.mixer.update(dt);
+      this.crewOut(R);
       const night = G.sky && G.sky.state ? G.sky.state.night : 0;
       R.light.intensity = night > 0.2 ? 40 * night : 0; R.light.color.setHex(flash ? 0xff2020 : (R.type === 'police' ? 0x2050ff : 0xff6060));
       let tx = R.x, tz = R.z, want = 16;
@@ -83,7 +80,7 @@ export class Emergency {
       if (R.state === 'go' && d < 14) { R.state = 'scene'; R.t = 0; }
       if (R.state === 'scene') {
         want = 0;
-        if (R.type === 'ambulance' && R.t > 7 && R.victim && !R.loaded) {
+        if (R.type === 'ambulance' && R.t > 11 && R.victim && !R.loaded) {
           R.loaded = true; const q = R.victim, i = G.people.list.indexOf(q);
           if (i >= 0) { if (q.body) q.body.release(); G.people.list.splice(i, 1); }
           if (Math.hypot(P.x - v.x, P.z - v.z) < 40) G.hud.toast(q.corpse ? 'Taken away' : 'Taken to Sassoon', q.corpse ? 'The ambulance takes the body. Police will want to know who did it' : 'The paramedics load them into the ambulance', 'info', 3);
@@ -95,9 +92,44 @@ export class Emergency {
       this.drive(R, tx, tz, want, dt);
       if (R.state !== 'scene' || R.type === 'police') { const dd = Math.hypot(v.x - P.x, v.z - P.z); const lv = clamp(1.3 - dd / 220, 0, 1); if (lv > siren) { siren = lv; pan = clamp((v.x - P.x) / 80, -1, 1); G.emSirenAt = { x: v.x, z: v.z }; } }
     }
-    for (const R of this.list.filter(q => q.state === 'gone')) { R.v.root.parent && R.v.root.parent.remove(R.v.root); const ex = G.traffic.extra || []; const k = ex.indexOf(R.v.agent); if (k >= 0) ex.splice(k, 1); }
+    for (const R of this.list.filter(q => q.state === 'gone')) { this.crewIn(R); for (const c of R.crew) c.H.dispose && c.H.dispose(); R.v.root.parent && R.v.root.parent.remove(R.v.root); const ex = G.traffic.extra || []; const k = ex.indexOf(R.v.agent); if (k >= 0) ex.splice(k, 1); }
     this.list = this.list.filter(q => q.state !== 'gone');
     G.emSiren = siren; G.emPan = pan;
+  }
+  // at the scene the crew get out: the constables stand guard over it, the paramedics go to whoever's down and
+  // kneel by them until they're loaded; when it's time to go they get back in
+  crewOut(R) {
+    const G = this.g, ppl = G.people, v = R.v;
+    if (R.state === 'scene' && R.t > 1.6 && !R.isOut && ppl) {
+      R.isOut = true;
+      const hx = Math.cos(v.th), hz = Math.sin(v.th);
+      R.crew.forEach((c, i) => {
+        const sd = c.z > 0 ? 1 : -1;
+        const x = v.x + hx * c.x - hz * sd * 1.4, z = v.z + hz * c.x + hx * sd * 1.4;
+        const p = ppl.spawnAt(c.look, x, z, R.type === 'police' ? 'kaka' : 'bhaiya');
+        if (!p) return;
+        c.H.holder.visible = false;
+        p.fixed = false; p.crew = true; if (R.type === 'police') p.cop = true;
+        const q = R.victim && !R.victim.hidden ? R.victim : null;
+        if (R.type === 'ambulance' && q) {
+          const a = Math.random() * 6.283;
+          ppl.goTo(p, q.x + Math.cos(a) * 0.8, q.z + Math.sin(a) * 0.8, (w) => { w.mode = 'watch'; w.watch = { x: q.x, z: q.z }; w.wait = 30; w.anim = 'crouch'; w.v = 0; });
+        } else {
+          const a = i * 2.4 + Math.random(), tx = R.x + Math.cos(a) * 3, tz = R.z + Math.sin(a) * 3;
+          ppl.goTo(p, tx, tz, (w) => { w.mode = 'watch'; w.watch = { x: R.x, z: R.z }; w.wait = 60; w.anim = null; w.v = 0; });
+        }
+        R.out.push(p);
+      });
+    }
+    if (R.isOut && (R.state === 'leave' || R.state === 'gone')) this.crewIn(R);
+  }
+  crewIn(R) {
+    if (!R.isOut) return;
+    R.isOut = false;
+    const L = this.g.people && this.g.people.list;
+    for (const p of R.out) { if (p.body) p.body.release(); const i = L ? L.indexOf(p) : -1; if (i >= 0) L.splice(i, 1); }
+    R.out = [];
+    for (const c of R.crew) c.H.holder.visible = true;
   }
   // like the marshals: follow a road route, weave round what's blocking, cars ahead pull over for the siren
   drive(R, tx, tz, want, dt) {

@@ -342,7 +342,7 @@ export class HumanKit {
       style: female ? rng.pick(HAIR_F) : rng.pick(HAIR_M), beard: !female && rng.chance(0.3),
       glasses: rng.chance(female ? 0.12 : 0.16), bindi: female && rng.chance(0.3) };
     if (opts.role === 'police') {
-      Object.assign(L, { female: false, top: c(0xa08a5c), bottom: c(0x8f7b52), cut: new THREE.Vector4(0.42, 1, 0.6, 0), acc: 'cap_police', style: 'hair_buzzed', shoe: c(0x1a1715) });
+      Object.assign(L, { female: false, top: c(0xc2a873), bottom: c(0x6f5c3a), cut: new THREE.Vector4(0.42, 1, 0.6, 0), acc: 'cap_police', style: 'hair_buzzed', shoe: c(0x1a1715) });
       return L;
     }
     // opts.dress: 'modern' (jeans and tops), 'traditional' (saree / kurta), or anything
