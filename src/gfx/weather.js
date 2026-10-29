@@ -4,6 +4,7 @@
 // thunder a few seconds later. In free roam you pick it (pause → Settings); in your story it follows Pune's year:
 // the monsoon from June to September, winter mornings in fog, summer afternoons in haze.
 import * as THREE from 'three';
+import { U } from './materials.js';
 
 export const WEATHERS = {
   clear: { cloud: 0.1, rain: 0, fog: 0, haze: 0 },
@@ -77,6 +78,10 @@ export class Weather {
       this.lines.geometry.attributes.position.needsUpdate = true;
     }
     if (this.audio && this.audio.rain) this.audio.rain(c.rain);
+    // the roads: soaked within a minute of rain, dry over a few minutes after it stops
+    const wetT = c.rain > 0.1 ? Math.min(1, c.rain * 1.4) : 0;
+    this.wet = (this.wet || 0) + (wetT - (this.wet || 0)) * (1 - Math.exp(-dt * (wetT > (this.wet || 0) ? 0.08 : 0.012)));
+    U.uWet.value = this.wet;
   }
 }
 const _grey = new THREE.Color(), _haze = new THREE.Color();

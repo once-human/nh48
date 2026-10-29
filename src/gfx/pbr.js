@@ -42,13 +42,13 @@ export function groundMaterial(T) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
   return patch(m, 'nh-ground', (sh) => {
     Object.assign(sh.uniforms, { tGAlb: { value: T.groundAlb }, tGNrm: { value: T.groundNrm }, tGArm: { value: T.groundArm },
-      uGScale: { value: GROUND_SCALE }, uGNorm: { value: GROUND_NORMAL }, uNight: U.uNight });
+      uGScale: { value: GROUND_SCALE }, uGNorm: { value: GROUND_NORMAL }, uNight: U.uNight, uWet: U.uWet });
     sh.vertexShader = rep(sh.vertexShader, '#include <common>', `attribute vec2 guv; attribute float glayer; attribute float gshade;
       varying vec2 vGuv; varying float vLayer; varying float vShade; varying vec3 vWP; varying float vUp;`);
     sh.vertexShader = rep(sh.vertexShader, '#include <project_vertex>', `vGuv = guv; vLayer = glayer; vShade = gshade; vUp = normalize(mat3(modelMatrix) * objectNormal).y;
       vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
     sh.fragmentShader = rep(sh.fragmentShader, '#include <common>', `uniform highp sampler2DArray tGAlb, tGNrm, tGArm;
-      uniform float uGScale[11]; uniform float uGNorm[11]; uniform float uNight;
+      uniform float uGScale[11]; uniform float uGNorm[11]; uniform float uNight; uniform float uWet;
       varying vec2 vGuv; varying float vLayer; varying float vShade; varying vec3 vWP; varying float vUp;
       ${NOISE}
       float gLayer; vec2 gUV; vec4 gArm; float gPaint;`);
@@ -116,10 +116,16 @@ export function groundMaterial(T) {
       } else if (L > 21.5 && L < 22.5) {   // median: whitewash with grime
         col = mix(col, vec3(0.85), 0.35);
       }
-      diffuseColor.rgb *= col * vShade;`);
+      diffuseColor.rgb *= col * vShade;
+      // wet: the ground darkens and turns glossy, and puddles collect in the low spots
+      float wetM = uWet * smoothstep(0.3, 0.8, vUp);
+      float puddle = wetM * smoothstep(0.56, 0.74, nhNoise(vWP.xz * 0.16)) * step(L, 9.5);
+      diffuseColor.rgb *= 1.0 - 0.34 * wetM - 0.18 * puddle;`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <roughnessmap_fragment>', `
       float roughnessFactor = clamp(gArm.g * 1.05, 0.35, 1.0);
-      if (gPaint > 0.5) roughnessFactor = 0.6;`);
+      if (gPaint > 0.5) roughnessFactor = 0.6;
+      roughnessFactor = mix(roughnessFactor, 0.2, wetM * 0.8);
+      roughnessFactor = mix(roughnessFactor, 0.04, puddle);`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <metalnessmap_fragment>', 'float metalnessFactor = 0.0;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', `
       {

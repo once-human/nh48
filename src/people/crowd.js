@@ -8,14 +8,7 @@ const RANGE = 48;            // metres from the camera
 const NAT = { walk: 1.25, jog: 3.0 };
 
 // how someone walks: the office crowd walks formal at rush hour, kakus and aunties often carry the shopping
-function walkFor(p, people) {
-  if (p.walkClip === undefined) {
-    const h = people && people.act ? people.act._h || 12 : 12, rush = (h > 8 && h < 10.5) || (h > 17 && h < 20);
-    const R = (p.id % 100) / 100;
-    p.walkClip = /kpguy|kpgirl|dada|collegegirl/.test(p.persona || '') && rush && R < 0.5 ? 'walk_formal' : 'walk';
-  }
-  return p.walkClip;
-}
+function walkFor(p, people) { void people; return 'walk'; }   // one walk for everyone (the formal-walk clip faces the wrong way)
 // someone standing around doesn't hold one pose: the phone, a chat, a sip of chai, arms folded, a nod
 const IDLES = { young: ['phone', 'phone', 'talk', 'idle', 'arms_folded'], old: ['idle', 'arms_folded', 'talk', 'idle'], any: ['idle', 'talk', 'phone', 'arms_folded', 'drink'] };
 function idleFor(p) {

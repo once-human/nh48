@@ -11,6 +11,7 @@ export const U = {
   uWindowLit: { value: 0.0 },    // fraction of windows lit (evening ramps up)
   uShopsOpen: { value: 1.0 },    // shutters up 1 .. down 0 (late night)
   uWind: { value: 1.0 },
+  uWet: { value: 0.0 },           // rain on the roads: 0 dry .. 1 soaked (gfx/weather.js)
 };
 
 function inject(shader, decl, vertexMain, fragDecl, fragMap) {
