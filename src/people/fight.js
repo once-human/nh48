@@ -193,7 +193,7 @@ export class Brawl {
     if (!o.T.two || knocked) {
       const T = G.traffic, idx = T.list.indexOf(o);
       if (idx >= 0) {
-        const v = new (G.debugSave.Vehicle)(G.W, G.scene, G.vmats, o.type, o.col);
+        const v = new (G.debugSave.Vehicle)(G.W, G.scene, G.vmats, o.type.replace(/P$/, ''), o.col);       // the riders are off it now
         v.reset(o.x, o.z, Math.atan2(o.hz, o.hx)); v.y = G.W.surf.height(o.x, o.z);
         v.plate = P.randomPlate(); v.stolen = true; v.dmg = o.dmg || 0; v.helmet = false;
         T.despawn(idx); P.addDropped(v, T);
@@ -201,6 +201,13 @@ export class Brawl {
     }
     p.grudge = 40; p.wait = 0.4;
     if (knocked) { p.fallen = 1.6; }
+    // two on the scooter: the one on the back comes off too (side-saddle, usually a woman), on the other side
+    if (/P$/.test(o.type)) {
+      const look2 = kit.randomLook(this.rng, { female: o.type === 'scooterP' ? this.rng.chance(0.75) : this.rng.chance(0.2), avoid: P.look });
+      const x2 = o.x - o.hx * 0.7 + o.hz * 0.9 * side, z2 = o.z - o.hz * 0.7 - o.hx * 0.9 * side;
+      const q = ppl.spawnAt(look2, x2, z2, ppl.pickPersona(look2.female, x2, z2));
+      if (q) { if (knocked) { q.fallen = 2.4; q.fallBy = 'foot'; } q.angry = 6; q.wait = 0.4; if (this.rng.next() < 0.5) q.grudge = 30; }
+    }
     ppl.hurt(p, M.dmg * 0.4, P.x, P.z, null, true);
     this.started(p);
   }
@@ -350,6 +357,13 @@ export class Brawl {
         p.atkT = (this.rng.next() < 0.3 ? this.rng.range(0.35, 0.55) : this.rng.range(0.9, 1.9)) / (POWER[p.persona] || 0.9);
         if (this.rng.next() < 0.12) ppl.speakAs('fight', p, 1, 5);
       }
+    }
+    // personal space: two people fighting you don't stand inside each other; they spread round you
+    for (const q of ppl.list) {
+      if (q === p || q.mode !== 'fight' || q.fallen > 0) continue;
+      const ex = p.x - q.x, ez = p.z - q.z, e = Math.hypot(ex, ez);
+      if (e < 0.8 && e > 1e-4) { const k = (0.8 - e) * 0.5; p.x += ex / e * k; p.z += ez / e * k; q.x -= ex / e * k; q.z -= ez / e * k; }
+      else if (e <= 1e-4) { p.x += 0.4; }
     }
     p.onRoad = ppl.W.surf.isRoad(p.x, p.z);
   }
