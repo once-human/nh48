@@ -10,7 +10,7 @@
 // Fines follow the Motor Vehicles Act as amended in 2019, as applied in Pune (see FINES).
 import * as THREE from 'three';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
-import { ikArm } from '../people/humans.js';
+import { ikArm, leanRider, RIDER_HIPS, RIDER_LEAN } from '../people/humans.js';
 import { clamp, wrapAngle, RNG, safeStorage, fmtRupees } from '../core/util.js';
 import LINES from './lines.json';
 import { POLICE_MUL } from './settings.js';
@@ -790,7 +790,7 @@ class Marshal {
     this.lightR.visible = Math.sin(t * 14) > 0; this.lightB.visible = !this.lightR.visible;
     if (this.H) {
       v.tilt.updateWorldMatrix(true, false);
-      const p = new THREE.Vector3(-0.33, 0.95 - 0.62, 0).applyMatrix4(v.tilt.matrixWorld);
+      const p = new THREE.Vector3(-0.12 + RIDER_HIPS, 0.95 - 0.62, 0).applyMatrix4(v.tilt.matrixWorld);
       this.H.holder.position.copy(p);
       this.H.holder.rotation.set(0, -v.th, 0);
       this.H.holder.rotateX(v.lean || 0);
@@ -798,6 +798,7 @@ class Marshal {
       // hands on the grips, elbows out, like you ride
       this.H.holder.updateMatrixWorld(true);
       const m = v.tilt.matrixWorld;
+      leanRider(this.H, _pl.set(0, 0, 1).transformDirection(m), RIDER_LEAN.bike);
       for (const sd of [1, -1]) { _g.set(0.6, 1.08, 0.34 * sd).applyMatrix4(m); _pl.set(-0.2, -0.7, sd).transformDirection(m); ikArm(this.H, sd > 0 ? 'r' : 'l', _g, _pl, 1); }
     }
   }

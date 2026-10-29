@@ -6,8 +6,9 @@ import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { flyResolve } from '../world/flyover.js';
 import { clamp, damp, dampAngle, wrapAngle, RNG } from '../core/util.js';
 import { lookOf, savedCharacter } from '../people/characters.js';
-import { ikArm } from '../people/humans.js';
+import { ikArm, leanRider, RIDER_HIPS, RIDER_LEAN } from '../people/humans.js';
 // handlebar grips in each vehicle's own frame: [forward, up, half width]
+const _side = new THREE.Vector3();
 const GRIPS = { auto: [0.72, 1.07, 0.33], scooter: [0.62, 1.0, 0.3], bike: [0.6, 1.08, 0.34], cycle: [0.44, 1.0, 0.28] };
 const _grip = new THREE.Vector3(), _pole = new THREE.Vector3();
 import { WATER_Y } from '../world/groundChunk.js';
@@ -421,7 +422,10 @@ export class Pilot {
     const v = this.riderShown, H = this.human;
     const seat = this.seat || [-0.3, 0.8, 0];
     v.tilt.updateWorldMatrix(true, false);
-    const p = new THREE.Vector3(seat[0] - 0.05, seat[1] - 0.62, seat[2] || 0).applyMatrix4(v.tilt.matrixWorld);
+    // on a two-wheeler: the hips on the seat (the seated clip carries them behind the body's origin), leaning into the bars
+    const two = v !== this.auto && v.spec && v.spec.two && v.type !== 'cycle';
+    const sx = two ? (/^bike/.test(v.type) ? -0.12 : -0.06) + RIDER_HIPS : seat[0] - 0.05;
+    const p = new THREE.Vector3(sx, seat[1] - 0.62, seat[2] || 0).applyMatrix4(v.tilt.matrixWorld);
     H.holder.position.copy(p);
     H.holder.rotation.set(0, -v.th, 0);
     H.root.rotation.x = 0;
@@ -431,6 +435,7 @@ export class Pilot {
     const g = GRIPS[v === this.auto ? 'auto' : v.type];
     if (g) {
       const m = v.tilt.matrixWorld;
+      if (two) { H.holder.updateMatrixWorld(true); leanRider(H, _side.set(0, 0, 1).transformDirection(m), RIDER_LEAN[/^bike/.test(v.type) ? 'bike' : 'scooter']); }
       for (const sd of [1, -1]) {
         _grip.set(g[0], g[1], g[2] * sd).applyMatrix4(m);
         _pole.set(-0.2, -0.7, sd).transformDirection(m);

@@ -73,7 +73,7 @@ export class Traffic {
     const cap = Math.max(8, Math.ceil(this.max * 0.6));
     for (const k of [...TYPE_NAMES, 'scooterE', 'bikeE', 'autoE']) {
       const m = models[k];
-      const c = /E$/.test(k) ? 10 : k === 'bus' ? Math.max(4, Math.ceil(this.max * 0.08)) : cap;
+      const c = /E$/.test(k) ? 16 : k === 'bus' ? Math.max(4, Math.ceil(this.max * 0.08)) : cap;
       const body = new THREE.InstancedMesh(m.body.clone(), mats.body, c);
       body.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3);
       body.geometry.setAttribute('aColB', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));
@@ -97,7 +97,7 @@ export class Traffic {
       scene.add(low);
       this.inst[k] = { body, glass, low, cap: c, n: 0, nl: 0 };
     }
-    this.lodDist = 58;
+    this.lodDist = 80;          // the simple far model only past this (it used to swap in plain view)
     this.cam = new THREE.Vector3();
     this.mtx = new THREE.Matrix4();
     this.q = new THREE.Quaternion();
@@ -297,7 +297,21 @@ export class Traffic {
     }
     this._seen = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 160 : null;
     this.buildGrid();
-    for (const v of this.list) this.step(v, dt);
+    for (const v of this.list) {
+      const px = v.x, pz = v.z;
+      this.step(v, dt);
+      // what you see moves smoothly even when the simulation shifts lanes or snaps onto a junction curve in one
+      // step: the jump becomes an offset that fades out in a fraction of a second; the heading eases after the sim's
+      if (v.rx === undefined || v._fresh !== v.id) { v._fresh = v.id; v.offX = v.offZ = 0; v.ryaw = v.yaw; }
+      else {
+        const sp = Math.abs(v.v || 0) * dt, hx = Math.cos(v.yaw), hz = Math.sin(v.yaw), dx = v.x - px, dz = v.z - pz;
+        const jx = dx - hx * sp * Math.sign(v.v || 1), jz = dz - hz * sp * Math.sign(v.v || 1), j = Math.hypot(jx, jz);
+        if (j > 0.06 && j < 6) { v.offX -= jx; v.offZ -= jz; } else if (j >= 6) { v.offX = v.offZ = 0; v.ryaw = v.yaw; }
+        const k = Math.exp(-dt * 7); v.offX *= k; v.offZ *= k;
+        v.ryaw += Math.atan2(Math.sin(v.yaw - v.ryaw), Math.cos(v.yaw - v.ryaw)) * (1 - Math.exp(-dt * 14));
+      }
+      v.rx = v.x + v.offX; v.rz = v.z + v.offZ;
+    }
     this.render();
   }
   prefill(px, pz) {
@@ -523,17 +537,19 @@ export class Traffic {
     // the riders you're right next to (close, slow): real people on an empty model instead of the baked figures
     let nr = 0;
     for (const v of this.list) {
-      const near = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) < 16 * 16 && Math.abs(v.v || 0) < 5.6 && /^(scooter|bike|auto)/.test(v.type) && !(v.fallen > 0);
-      v.rich = near && nr < 6 ? (nr++, true) : false;
+      // every two-wheeler and auto within the radius (no speed or count limit; 14 at most, a safety net)
+      const R = this.richR || 28;
+      const near = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) < R * R && /^(scooter|bike|auto)/.test(v.type) && !(v.fallen > 0);
+      v.rich = near && nr < 14 ? (nr++, true) : false;
     }
     for (const v of this.list) {
       const seated = v.rich && v._riders && v._riders.every(r => r.body);
       const I = this.inst[seated ? v.type.replace(/P$/, '') + 'E' : v.type] || this.inst[v.type];
       const far = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) > L2;
       const roll = v.fallen > 0 ? 1.3 : v.roll;
-      e.set(roll, -v.yaw, v.pitch, 'YXZ');
+      e.set(roll, -(v.ryaw ?? v.yaw), v.pitch, 'YXZ');
       q.setFromEuler(e);
-      p.set(v.x, (v.y || 0) + (v.fallen > 0 ? 0.3 : 0), v.z);
+      p.set(v.rx ?? v.x, (v.y || 0) + (v.fallen > 0 ? 0.3 : 0), v.rz ?? v.z);
       m.compose(p, q, s);
       const mesh = far ? I.low : I.body;
       const i = far ? I.nl : I.n;

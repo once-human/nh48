@@ -24,7 +24,7 @@ const WHO = {
 // a line's voice clip id: 'st_<who>_<FNV-1a of the text>' (tools/story_jobs.py makes the same ids)
 function voiceId(who, text) { let h = 0x811c9dc5; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return `st_${who}_${h.toString(16).padStart(8, '0')}`; }
 const FEMALE = new Set(['aai', 'meera', 'khushi', 'tara', 'shinde', 'ira']);
-const STORY_ON = true;
+const STORY_ON = false;          // Part One is written (part1.js) but held back while the story is reworked
 // the step types beyond go-there-and-talk: see Story.update
 const STYLE = `.sd.mem .sd-box{background:rgba(40,30,15,.72);border-color:rgba(232,217,176,.35)} .sd.mem .sd-line{font-style:italic}
 body.nh-mem canvas{filter:sepia(.75) contrast(.92) brightness(.9) blur(.6px);transition:filter .6s}

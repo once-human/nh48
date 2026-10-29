@@ -3,9 +3,25 @@
 // pool of skinned bodies is re-dressed and handed from person to person as you move.
 import * as THREE from 'three';
 import { clamp, RNG } from '../core/util.js';
-import { ikArm } from './humans.js';
+import { ikArm, leanRider } from './humans.js';
 import { hasUmbrella, umbrellaColor, umbrellaGeo, umbrellaMat } from './umbrella.js';
 const _sh = new THREE.Vector3(), _tg = new THREE.Vector3(), _pl = new THREE.Vector3(), _hd = new THREE.Vector3();
+const _e = new THREE.Euler(0, 0, 0, 'YXZ'), _q = new THREE.Quaternion(), _v = new THREE.Vector3();
+// where the hands go: the handlebar grips (vehicle frame, as you hold them), by model
+const GRIPS = { auto: [0.72, 1.07, 0.33], scooter: [0.62, 1.0, 0.3], bike: [0.6, 1.08, 0.34] };
+// everyone within this many metres is a fully dressed, animated person (by quality); riders within FULL * 0.7
+const FULL = { lite: 25, low: 32, med: 40, high: 48 };
+// the seated clips put the hips this far behind the body's origin
+const HIPS = 0.31;
+// how far a rider leans into the bars (radians): a motorcycle, a scooter, an auto; a pillion a little
+const LEAN = { bike: 0.8, scooter: 0.66, auto: 0.42, pillion: 0.3 };
+const _ax = new THREE.Vector3(), _pq = new THREE.Quaternion(), _dq = new THREE.Quaternion();
+function bend(bone, axisWorld, angle) {
+  if (!bone || !bone.parent) return;
+  bone.parent.getWorldQuaternion(_pq);
+  _ax.copy(axisWorld).applyQuaternion(_pq.invert());
+  bone.quaternion.premultiply(_dq.setFromAxisAngle(_ax, angle));
+}
 let UGEO = null;
 
 const RANGE = 48;            // metres from the camera
@@ -28,15 +44,16 @@ export class Crowd {
   constructor(people, kit, scene, W, quality) {
     this.people = people; this.kit = kit; this.scene = scene; this.W = W;
     this.rain = 0;
-    this.cap = quality.name === 'lite' ? 18 : quality.name === 'low' ? 27 : quality.name === 'med' ? 50 : 72; this.range = (quality.crowdRange || RANGE) * 1.8;
+    this.setQuality(quality);
     this.pool = [];
     this.t = 0;
     // build the pool up front: creating a skinned body mid-game is a visible hitch
     // a starter set up front (the rest are made as more people come close)
-    const pre = Math.min(this.cap, 26);
-    if (kit) { for (let i = 0; i < Math.ceil(pre * 0.65); i++) this.makeSkin(false); for (let i = 0; i < Math.ceil(pre * 0.45); i++) this.makeSkin(true); }
+    const pre = Math.min(this.cap, quality.name === 'lite' ? 22 : 40);
+    if (kit) { for (let i = 0; i < Math.ceil(pre * 0.6); i++) this.makeSkin(false); for (let i = 0; i < Math.ceil(pre * 0.45); i++) this.makeSkin(true); }
   }
-  setQuality(q) { this.cap = q.name === 'lite' ? 18 : q.name === 'low' ? 27 : q.name === 'med' ? 50 : 72; this.range = (q.crowdRange || RANGE) * 1.8; }
+  // a radius, not a count: everyone near you is a real person; the cap is only a safety net for a packed crowd
+  setQuality(q) { this.range = FULL[q.name] || 40; this.cap = q.name === 'lite' ? 40 : q.name === 'low' ? 60 : 110; if (this.traffic) this.traffic.richR = this.range * 0.7; }
   makeSkin(female) {
     const kit = this.kit;
     const look = kit.randomLook(new RNG(this.pool.length + 1), { female });
@@ -74,8 +91,9 @@ export class Crowd {
         const two = !/^auto/.test(o.type), pil = /P$/.test(o.type), rng = { next: Math.random, chance: (q) => Math.random() < q, range: (a, b) => a + Math.random() * (b - a), pick: (a) => a[Math.floor(Math.random() * a.length)], int: (a, b) => a + Math.floor(Math.random() * (b - a + 1)), weighted: null };
         // the seats as the models have them (x along, height of the seat; the body sits 0.62 below the seat, like yours)
         const bike = /^bike/.test(o.type);
-        const seats = two ? [[bike ? -0.33 : -0.35, 0, false, bike ? 0.95 : 0.8]] : [[0.31, 0, false, 0.8]];
-        if (pil) seats.push([bike ? -0.62 : -0.72, 0, o.type === 'scooterP', bike ? 0.97 : 0.84]);
+        // [hips x, z, side-saddle, seat height] in the vehicle's frame: the hips on the seat, not behind it
+        const seats = two ? [[bike ? -0.12 : -0.06, 0, false, bike ? 0.95 : 0.8]] : [[0.22, 0, false, 0.8]];
+        if (pil) seats.push([bike ? -0.5 : -0.56, 0, o.type === 'scooterP', bike ? 0.97 : 0.84]);
         o._riders = seats.map(([a, b, side, sy], i) => {
           const female = i === 1 ? (side ? Math.random() < 0.75 : Math.random() < 0.2) : Math.random() < 0.15;
           const look = this.kit.randomLook(rng, { female, helmet: two && i === 0 && o.type !== 'scooterP' });
@@ -84,7 +102,7 @@ export class Crowd {
           if (!two) look.bottom = look.top.clone().multiplyScalar(0.9);
           else if (i === 1 && side && female) { look.bottom = look.top.clone().multiplyScalar(0.85); look.cut = look.cut.clone().set(0.3, 1, 0.9, 2); }
           if (o.colC) { if (look.acc === 'helmet') look.helmetCol = look.top.clone().setRGB(o.colC[0], o.colC[1], o.colC[2]); else if (i === 1) look.hair = look.top.clone().setRGB(o.colC[0], o.colC[1], o.colC[2]); }
-          return { id: (o.id || 0) * 4 + i + 1e7, look, female, rideOf: o, seat: [a, b], seatY: sy - 0.62, sideSaddle: side, x: o.x, z: o.z, yaw: 0, v: 0, mode: 'ride', persona: female ? 'tai' : 'dada' };
+          return { id: (o.id || 0) * 4 + i + 1e7, look, female, rideOf: o, seat: [a, b], seatY: sy - 0.62, sideSaddle: side, seatIdx: i, drvX: seats[0][0], x: o.x, z: o.z, yaw: 0, v: 0, mode: 'ride', persona: female ? 'tai' : 'dada' };
         });
       }
       for (const r of o._riders) { const hx = o.hx ?? Math.cos(o.yaw || 0), hz = o.hz ?? Math.sin(o.yaw || 0); r.x = o.x + hx * r.seat[0] - hz * r.seat[1]; r.z = o.z + hz * r.seat[0] + hx * r.seat[1]; r.yaw = Math.atan2(hz, hx); r.y = o.y || 0; out.push(r); }
@@ -97,19 +115,21 @@ export class Crowd {
     for (const p of this.people.list) {
       if (p.hidden || !p.look) continue;
       const d = Math.hypot(p.x - cx, p.z - cz);
-      const R0 = this.range || RANGE, r = p.cop || p.ctl ? R0 + 14 : R0;
-      // the people you can actually see come first; behind the camera only the very close
-      const seen = !this.inView || d < 6 || this.inView(p.x, p.z);
-      if (d < r) cand.push([d - (p.cop || p.ctl ? 12 : 0) + (seen ? 0 : 30), p]);
+      const R0 = this.range || RANGE, r = p.cop || p.ctl || p.story ? R0 + 14 : R0;
+      // everyone inside the radius (nearest first); the ones you can see win only if the safety cap bites
+      const seen = !this.inView || d < 8 || this.inView(p.x, p.z);
+      if (d < r) cand.push([d - (p.cop || p.ctl ? 12 : 0) + (seen ? 0 : 15), p]);
     }
     cand.sort((a, b) => a[0] - b[0]);
     const want = new Set(cand.slice(0, this.cap).map(c => c[1]));
     for (const s of this.pool) if (s.p && (!want.has(s.p) || s.p.hidden)) s.release();
+    let made = 0;
     for (const p of want) {
       if (p.body) continue;
       const fem = !!p.look.female;
       let s = this.pool.find(q => !q.p && q.female === fem);
-      if (!s && this.pool.length < this.cap + 4) s = this.makeSkin(fem);
+      // a new body is a few ms: at most two per tick so a crowd arriving never stutters
+      if (!s && this.pool.length < this.cap + 8 && made < 2) { s = this.makeSkin(fem); made++; }
       if (!s) continue;
       this.dress(s, p.look);
       if (p.kid) s.H.root.scale.setScalar(p.look.scale * 0.7);
@@ -135,11 +155,18 @@ export class Crowd {
   drive(s, dt, cx, cz) {
     const p = s.p, H = s.H;
     // riders follow their vehicle every frame (not only when bodies are handed out), so they ride smoothly with it
-    if (p.rideOf) { const o = p.rideOf, hx = o.hx ?? Math.cos(o.yaw || 0), hz = o.hz ?? Math.sin(o.yaw || 0);
-      p.x = o.x + hx * p.seat[0] - hz * p.seat[1]; p.z = o.z + hz * p.seat[0] + hx * p.seat[1]; p.yaw = Math.atan2(hz, hx); p.y = o.y || 0; }
-    const y = p.rideOf ? (p.y || 0) + (p.seatY ?? 0.2) + (p.sideSaddle ? 0.04 : 0) : this.W.surf.height(p.x, p.z);
-    H.holder.position.set(p.x, y, p.z);
-    H.holder.rotation.set(0, -p.yaw + (p.rideOf && p.sideSaddle ? Math.PI / 2 : 0), 0);   // (p.side is a pedestrian's side of the road, not side-saddle)
+    if (p.rideOf) {
+      // on the seat as the vehicle is drawn: its smoothed position, heading, lean and pitch (so they ride with it)
+      const o = p.rideOf, yaw = o.ryaw ?? o.yaw ?? Math.atan2(o.hz, o.hx);
+      _e.set(o.fallen > 0 ? 1.3 : (o.roll || 0), -yaw, o.pitch || 0, 'YXZ'); _q.setFromEuler(_e);
+      _v.set(p.seat[0] + (p.sideSaddle ? 0 : HIPS), (p.seatY ?? 0.2) + (p.sideSaddle ? 0.04 : 0), p.seat[1] - (p.sideSaddle ? HIPS : 0)).applyQuaternion(_q);
+      p.x = (o.rx ?? o.x) + _v.x; p.z = (o.rz ?? o.z) + _v.z; p.yaw = yaw; p.y = o.y || 0;
+      H.holder.position.set(p.x, p.y + _v.y, p.z);
+      H.holder.quaternion.copy(_q); if (p.sideSaddle) H.holder.rotateY(Math.PI / 2);   // (p.side is a pedestrian's side of the road, not side-saddle)
+    } else {
+      H.holder.position.set(p.x, this.W.surf.height(p.x, p.z), p.z);
+      H.holder.rotation.set(0, -p.yaw, 0);
+    }
     const [name, speed, once] = this.animFor(p);
     // a new punch or flinch restarts its clip even if the last one was the same
     const restart = p.actId !== s.actId; s.actId = p.actId;
@@ -151,7 +178,26 @@ export class Crowd {
     const dd = Math.abs(p.x - cx) + Math.abs(p.z - cz), seen = !this.inView || dd < 8 || this.inView(p.x, p.z);
     s.k = ((s.k || 0) + 1) & 3;
     // off-screen and not close: no animation at all (it catches up the moment they're in view)
-    if (seen ? (dd < 30 || (s.k & 1) === 0) : (dd < 12 && s.k === 0)) { H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; }
+    let upd = false;
+    if (seen ? (dd < 30 || (s.k & 1) === 0) : (dd < 12 && s.k === 0)) { H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; }
+    // riders' hands: on the grips (the driver), round the rider's waist (a pillion astride)
+    // (only on a frame the clip has just posed: the bend goes on top of the clip's pose, never on top of itself)
+    if (p.rideOf && upd && (seen || dd < 12) && dd < 70) {
+      const o = p.rideOf, base = /^bike/.test(o.type) ? 'bike' : /^auto/.test(o.type) ? 'auto' : 'scooter';
+      const g = p.seatIdx === 0 ? GRIPS[base] : !p.sideSaddle ? [p.drvX + 0.04, (p.seatY ?? 0.2) + 0.62 + 0.22, 0.16] : null;
+      if (g) {
+        H.holder.updateMatrixWorld(true);
+        // lean into the bars from the lower back, head up to watch the road
+        const lean = p.seatIdx === 0 ? LEAN[base] : LEAN.pillion, side = _sh.set(0, 0, 1).applyQuaternion(_q);
+        leanRider(H, side, lean);
+        const ox = o.rx ?? o.x, oy = o.y || 0, oz = o.rz ?? o.z;
+        for (const sd of [1, -1]) {
+          _tg.set(g[0], g[1], g[2] * sd).applyQuaternion(_q); _tg.x += ox; _tg.y += oy; _tg.z += oz;
+          _pl.set(-0.2, -0.7, sd).applyQuaternion(_q);
+          ikArm(H, sd > 0 ? 'r' : 'l', _tg, _pl, 1);
+        }
+      }
+    }
     // in the rain: the umbrella up in the right hand, held at the chest, the canopy over the head
     const umb = this.rain > 0.2 && !p.rideOf && !(p.fallen > 0) && !p.act && p.mode !== 'fight' && dd < 60 && (seen || dd < 12) && hasUmbrella(p);
     if (umb) {

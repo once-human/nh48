@@ -592,3 +592,20 @@ export class HumanKit {
     else if (cap) H.acc.color.set(0xf4f4f0);
   }
 }
+
+// a rider on a two-wheeler or in an auto leans into the bars from the lower back, head up to the road. Applied on
+// top of the seated clip's pose (call it right after the mixer has posed the body, then reach the hands)
+const _rx = new THREE.Vector3(), _rq = new THREE.Quaternion(), _rd = new THREE.Quaternion();
+function bendBone(bone, axisWorld, angle) {
+  if (!bone || !bone.parent) return;
+  bone.parent.getWorldQuaternion(_rq);
+  _rx.copy(axisWorld).applyQuaternion(_rq.invert());
+  bone.quaternion.premultiply(_rd.setFromAxisAngle(_rx, angle));
+  bone.updateMatrixWorld(true);
+}
+export const RIDER_HIPS = 0.31;            // the seated clips put the hips this far behind the body's origin
+export const RIDER_LEAN = { bike: 0.8, scooter: 0.66, auto: 0.42, pillion: 0.3 };
+export function leanRider(H, sideWorld, lean) {
+  const b = H._rb || (H._rb = { s1: H.root.getObjectByName('spine_01'), s2: H.root.getObjectByName('spine_02'), nk: H.root.getObjectByName('neck_01') });
+  bendBone(b.s1, sideWorld, -lean * 0.6); bendBone(b.s2, sideWorld, -lean * 0.4); bendBone(b.nk, sideWorld, lean * 0.75);
+}
