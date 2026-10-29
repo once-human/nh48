@@ -28,6 +28,7 @@ import { Transit } from './transit.js';
 import { PhotoMode } from './photo.js';
 import { Wada } from './wada.js';
 import TRANSIT_DATA from './transit.json';
+import VLINES from './vendor_lines.json';
 import { justOpened, lineOpen, opensOn } from './metroOpen.js';
 import { Club } from './club.js';
 import { Lights } from './lights.js';
@@ -175,6 +176,13 @@ export class Game {
     player.speak = (id, src) => this.police.say(id, src);
     player.speakAs = (sc, who) => { this.people.lineT = 0; return this.people.speakAs(sc, who, 1, 4); };
     this.people.say = (id, src) => this.police.say(id, src);
+    // a vendor's cry: heard from the stall, subtitled when you're close enough to make it out
+    this.people.sayVendor = (p, kind, d) => {
+      const L = VLINES[kind]; if (!L || this.state !== 'play') return;
+      const i = Math.floor(Math.random() * L.length), id = `vd_${kind}_${i}`;
+      this.audio.callAt(id, p.x, p.z, clamp(1.1 - d / 60, 0.35, 1));
+      if (d < 13 && !(this.audio.voiceBusy && this.audio.voiceBusy())) this.hud.say(['Chaha', 'Paanwala', 'Vadapav', 'Phalwala', 'Phoolwali', 'Rasvanti'][kind] || 'Vendor', L[i][1], L[i][2], 2.6);
+    };
     this.brawl = new Brawl(this); this.people.brawl = this.brawl;
     this.brain = new Brain(this.people, this); this.people.brain = this.brain;
     this.emergency = new Emergency(this);
@@ -1159,7 +1167,7 @@ export class Game {
     if (this.story.talking) this.story.cam(dt);
     if (this.lightPools) { this.lightPools.mesh.visible = night > 0.05; this.lightPools.mesh.material.opacity = night * 0.55; }
     this.people.render(P.x, P.z);
-    { const rn = this.weather && !(this.interiors && this.interiors.inside) ? this.weather.cur.rain : 0; this.people.rain = rn; if (this.crowd) this.crowd.rain = rn; }
+    { const rn = this.weather && !(this.interiors && this.interiors.inside) ? this.weather.cur.rain : 0; this.people.rain = rn; this.people.hour = this.hour; if (this.crowd) this.crowd.rain = rn; }
     if (this.crowd) { this.crowd.inView = this.inView; this.crowd.update(dt, this.camera.position.x, this.camera.position.z); }
     if (this.fauna) this.fauna.update(Math.min(dt, 0.05), this.camera.position.x, this.camera.position.z);
     if (this.state === 'play' || this.state === 'pause' || this.state === 'map' || this.state === 'shop') this.hud.update(dt);

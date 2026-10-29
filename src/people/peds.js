@@ -4,6 +4,9 @@
 // get up angry when you knock them over, and crowd round (phones out) when something happens.
 import * as THREE from 'three';
 import { hasUmbrella, umbrellaColor, umbrellaGeo, umbrellaMat } from './umbrella.js';
+
+// who runs which stall (0 tapri, 1 paan, 2 vada pav cart, 3 fruit cart, 4 flowers, 5 sugarcane juice) and the hours they're out
+const VENDOR = { 0: ['bhaiya', false, 5.5, 23], 1: ['bhaiya', false, 10, 24], 2: ['kaka', false, 7, 22.5], 3: ['bhaiya', false, 8, 21], 4: ['kaku', true, 6, 21], 5: ['kaka', false, 10, 20.5] };
 import { ColorBuilder, lin } from '../world/geo.js';
 import { RNG, clamp, lerp, wrapAngle } from '../core/util.js';
 import STREET from '../game/street_lines.json';
@@ -376,6 +379,7 @@ export class People {
     }
     if ((this.venueT = (this.venueT || 0) - dt) <= 0) { this.venueT = 0.7; this.venueCrowds(px, pz, avoidView); this.clubCrowds(px, pz, avoidView); }
     this.talkTick(dt, player);
+    if ((this._vcT = (this._vcT || 0) - dt) <= 0) { this._vcT = 0.5; this.vendorCalls(0.5, player); }
     const pv = Math.abs(player.v);
     const phx = Math.cos(player.th), phz = Math.sin(player.th);
     this.lineT -= dt;
@@ -1040,6 +1044,18 @@ export class People {
       if (d > 110 || d < 30 || (this.g_inView && this.g_inView(x, z) && d < 100)) continue;
       const n = this.rng.int(0, 3);
       this.stallsUsed.set(k, n);
+      // the vendor, behind the stall, facing the street (in their hours)
+      const V = VENDOR[st[3]] || VENDOR[0], hr = this.hour ?? 12;
+      if (hr >= V[2] && hr < V[3]) {
+        const a = st[2] - Math.PI / 2, vx = x + Math.cos(a) * 0.95, vz = z + Math.sin(a) * 0.95;
+        const near = this.g.nearest(vx, vz, 30, e => e.rank >= 2);
+        if (near) {
+          const p = this.make(near.e, near.s, near.side || 1, { mode: 'stand', female: V[1] });
+          if (this.kit) { p.persona = V[0]; p.look = this.kit.randomLook(new RNG(p.id), { female: V[1], dress: 'traditional' }); p.shirt = [p.look.top.r, p.look.top.g, p.look.top.b]; p.lower = [p.look.bottom.r, p.look.bottom.g, p.look.bottom.b]; }
+          p.anchor = { x: vx, z: vz, fx: x + Math.cos(st[2] + Math.PI / 2) * 4, fz: z + Math.sin(st[2] + Math.PI / 2) * 4 }; p.x = vx; p.z = vz;
+          p.wait = 1e9; p.vendor = { kind: st[3] in VENDOR ? st[3] : 0, t: 2 + this.rng.next() * 10 }; p.idle = this.rng.pick(['arms_folded', 'talk', 'idle']); p.crew = true;
+        }
+      }
       for (let i = 0; i < n; i++) {
         const a = st[2] + Math.PI / 2 + (this.rng.next() - 0.5) * 2.2, r = 1.3 + this.rng.next() * 0.7;
         let sx = x + Math.cos(a) * r, sz = z + Math.sin(a) * r;
@@ -1054,6 +1070,20 @@ export class People {
     }
   }
 
+  // vendors call out now and then (more when people are passing), each from their own stall
+  vendorCalls(dt, player) {
+    this.callGap = (this.callGap || 0) - dt;
+    for (const p of this.list) {
+      const V = p.vendor; if (!V || p.hidden) continue;
+      const d = Math.hypot(p.x - player.x, p.z - player.z);
+      if (d > 40) continue;
+      V.t -= dt * (1 + Math.min(2, (this.actHere || 10) / 14));
+      if (V.t > 0 || this.callGap > 0) continue;
+      V.t = 9 + this.rng.next() * 14; this.callGap = 2.5;
+      if (this.sayVendor) this.sayVendor(p, V.kind, d);
+      p.act = { clip: 'talk', t: 0, dur: 2.2 };
+    }
+  }
   // traffic police at some signalised junctions: khaki uniform, standing at the corner
   addCops(cops, heads) {
     for (const c of cops) {

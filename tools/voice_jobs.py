@@ -89,6 +89,15 @@ for lid, voice, lang, text in jobs:
     if not t: continue
     out.append({'id': lid, 'lang': L, 'speaker': spk, 'text': t, 'desc': describe(spk, pitch, pace, who, emo)})
 
+# street vendors calling their wares (src/game/vendor_lines.json): loud, sing-song hawkers' cries
+VEND = {'0': ('Varun', 'a tea-stall boy calling to passers-by'), '1': ('Nikhil', 'a paan-shop man calling to passers-by'), '2': ('Sanjay', 'a vada pav cart owner calling to passers-by'),
+        '3': ('Varun', 'a fruit-cart seller calling to passers-by'), '4': ('Sunita', 'a flower seller with gajras calling to passers-by'), '5': ('Sanjay', 'a sugarcane-juice stall owner calling to passers-by')}
+for kind, L in json.load(open(os.path.join(ROOT, 'src/game/vendor_lines.json'))).items():
+    if kind == '_': continue
+    spk, who = VEND[kind]
+    for i, (t, _r, _e) in enumerate(L):
+        out.append({'id': f'vd_{kind}_{i}', 'lang': 'mr', 'speaker': spk, 'text': t,
+                    'desc': f"{spk} calls out loudly in a sing-song hawker's cry, raised and carrying, at a brisk pace: {who} on a busy Pune street. Expressive and natural, not read aloud. The recording is of very high quality, with the voice sounding clear and close up, almost no background noise."})
 dst = os.path.join(ROOT, 'tools/voice_jobs.json')
 json.dump(out, open(dst, 'w'), ensure_ascii=False, indent=0)
 from collections import Counter

@@ -166,6 +166,22 @@ export class Audio {
     }).catch(() => { delete this.fetching[name]; });
     return true;
   }
+  // a call from somewhere in the street (a vendor's cry): its own channel, never cuts in on a conversation, heard
+  // where it comes from
+  callAt(id, x, z, vol = 0.9) {
+    if (!this.ctx) return false;
+    const name = 'v_' + id;
+    if (!this.buf[name]) {
+      const raw = this.raw[name];
+      if (!raw) { this.fetchVoice(id, () => {}); return false; }
+      this.decoding = this.decoding || {};
+      if (!this.decoding[name]) { this.decoding[name] = true; this.ctx.decodeAudioData(raw.slice(0)).then((b) => { this.buf[name] = b; this.keepVoice(name); }).catch(() => {}).finally(() => { delete this.decoding[name]; }); }
+      return false;
+    }
+    this.keepVoice(name);
+    this._hrtf = true;
+    try { return !!this.at(x, z, () => this.play(name, { vol, bus: 'voice' }), 1.6); } finally { this._hrtf = false; }
+  }
   voice(id, vol = 1, pan = 0, radio = false, pri = 2) {
     // one voice at a time, and not everyone at once: idle chatter (pri 0) waits for silence, a
     // reaction (pri 1: someone you knocked over, hit, or whose car you took) won't talk over another
