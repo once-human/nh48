@@ -3,7 +3,7 @@
 // pool of skinned bodies is re-dressed and handed from person to person as you move.
 import * as THREE from 'three';
 import { clamp, RNG } from '../core/util.js';
-import { ikArm, leanRider } from './humans.js';
+import { ikArm, leanRider, UPPER } from './humans.js';
 import { hasUmbrella, umbrellaColor, umbrellaGeo, umbrellaMat, umbrellaKind } from './umbrella.js';
 const _sh = new THREE.Vector3(), _tg = new THREE.Vector3(), _pl = new THREE.Vector3(), _hd = new THREE.Vector3();
 const _e = new THREE.Euler(0, 0, 0, 'YXZ'), _q = new THREE.Quaternion(), _v = new THREE.Vector3();
@@ -65,7 +65,7 @@ export class Crowd {
     const accs = [];
     H.root.traverse(o => { if (o.isSkinnedMesh && !o.name.startsWith('body')) accs.push(o); });
     const s = { H, female, p: null, accs, dtAcc: 0 };
-    s.release = () => { if (s.p) s.p.body = null; s.p = null; H.holder.visible = false; if (H.holder.parent) this.scene.remove(H.holder); if (s.umb) s.umb.visible = false; };
+    s.release = () => { if (s.p) s.p.body = null; H.upper && H.upper(null); s.p = null; H.holder.visible = false; if (H.holder.parent) this.scene.remove(H.holder); if (s.umb) s.umb.visible = false; };
     this.pool.push(s);
     return s;
   }
@@ -160,7 +160,7 @@ export class Crowd {
     if (p.rideOf) return [p.sideSaddle ? 'sit' : 'drive', 1];
     if (p.fallen > 0) return p.ko ? [p.fallen > 1.6 ? 'death' : 'getup', 1, true] : [p.fallen > 1.3 ? 'knockback' : 'getup', 1, true];
     if (p.act) return [p.act.clip, p.act.speed || 1, true];
-    if (p.mode === 'fight') return p.v > 2.2 ? ['jog', clamp(p.v / NAT.jog, 0.7, 1.4)] : p.v > 0.2 ? ['walk', 1.3] : [p.fightT < 1.6 ? 'no' : 'idle', 1.3];
+    if (p.mode === 'fight') return p.v > 2.2 ? ['jog', clamp(p.v / NAT.jog, 0.7, 1.4)] : p.v > 0.2 ? ['walk', clamp(p.v / NAT.walk, 0.5, 1.5)] : [p.fightT < 1.6 ? 'no' : 'idle', 1.3];
     if (p.anim) return [p.anim, 1];
     if (p.react > 0 && p.reactAnim) return [p.reactAnim, 1, p.reactAnim === 'hit'];
     if (p.angry > 0) return ['no', 1];
@@ -169,7 +169,7 @@ export class Crowd {
     const v = vel ?? p.v;
     if (v < 0.25 && (p.mode === 'stand' || p.mode === 'watch' || p.v < 0.15 || v < 0.12)) return [idleFor(p), 1];
     if (v > 2.2) return ['jog', clamp(v / NAT.jog, 0.6, 1.5)];
-    return [walkFor(p, this.people), clamp(v / NAT.walk, 0.55, 1.5)];
+    return [walkFor(p, this.people), clamp(v / NAT.walk, 0.4, 1.5)];
   }
   drive(s, dt, cx, cz) {
     const p = s.p, H = s.H;
@@ -191,8 +191,16 @@ export class Crowd {
     let [name, speed, once] = this.animFor(p, s.vel);
     // nobody slides: anyone actually covering ground walks or runs, whatever pose they were in (a head-shake, a
     // wave, the phone, arms folded); only real actions (a punch, carrying, falling) and riders keep their clip
+    // anyone covering ground has legs that walk or run with it; whatever they were doing (the phone, a chat, a
+    // head-shake, a wave, arms folded) carries on above the hips
     const mv = p.rideOf ? 0 : (s.vel || 0);
-    if (mv > 0.6 && !once && !LOCO.has(name)) { if (mv > 2.2) { name = 'jog'; speed = clamp(mv / NAT.jog, 0.6, 1.5); } else { name = 'walk'; speed = clamp(mv / NAT.walk, 0.55, 1.5); } }
+    let up = null;
+    if (mv > 0.3 && !once && !LOCO.has(name)) {
+      if (UPPER.has(name)) up = name;
+      if (mv > 2.2) { name = 'jog'; speed = clamp(mv / NAT.jog, 0.6, 1.5); } else { name = 'walk'; speed = clamp(mv / NAT.walk, 0.4, 1.5); }
+      if (up) name += '@low';
+    }
+    H.upper && H.upper(up);
     // a new punch or flinch restarts its clip even if the last one was the same
     const restart = p.actId !== s.actId; s.actId = p.actId;
     H.play(name, { speed, once, fade: p.act || p.mode === 'fight' ? 0.08 : 0.25, restart: restart && !!p.act });

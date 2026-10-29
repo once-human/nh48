@@ -334,6 +334,8 @@ function fitShoes(o) {
   geo.setAttribute('bpos', new THREE.BufferAttribute(b, 3));
 }
 
+// the upper-body gestures that can ride on top of a walk
+export const UPPER = new Set(['phone', 'talk', 'no', 'arms_folded', 'wave', 'yes', 'point', 'clap', 'cheer', 'shrug', 'pray', 'drink', 'eat']);
 export class HumanKit {
   constructor(gM, gF) {
     this.src = { m: gM, f: gF };
@@ -346,6 +348,11 @@ export class HumanKit {
       if (cl.name === 'wave') cl.tracks = cl.tracks.filter(t => /clavicle|arm|hand|index|middle|pinky|ring|thumb|neck|head/i.test(t.name) && !/position/.test(t.name));
       this.clips[cl.name] = cl;
     }
+    // layered: the legs walk or run (the '@low' copies, hips down), the body above does its own thing (the '@up'
+    // copies: the phone, a chat, a head-shake, a wave, arms folded): anyone covering ground has feet that move with it
+    const UP = /spine|neck|head|clavicle|upperarm|lowerarm|hand|index|middle|pinky|ring|thumb/i;
+    for (const n of ['walk', 'jog', 'sprint']) { const c = this.clips[n]; if (c) { const l = c.clone(); l.name = n + '@low'; l.tracks = l.tracks.filter(t => !UP.test(t.name)); this.clips[l.name] = l; } }
+    for (const n of UPPER) { const c = this.clips[n]; if (c) { const u = c.clone(); u.name = n + '@up'; u.tracks = u.tracks.filter(t => UP.test(t.name) && !/position/.test(t.name)); this.clips[u.name] = u; } }
     this.bindM = {}; this.maps = {}; this.hairMat = {}; this.eyeMat = {};
     for (const [k, g] of Object.entries(this.src)) {
       g.scene.updateMatrixWorld(true);
@@ -533,6 +540,17 @@ export class HumanKit {
       if (H.cur) H.cur.crossFadeTo(a, fade, false);
       H.cur = a;
       return a;
+    };
+    // a gesture on the upper body over whatever the legs are doing (null: the whole body follows the main clip)
+    H.upper = (name) => {
+      const key = name && this.clips[name + '@up'] ? name + '@up' : null;
+      if (H.upName === key) return;
+      if (H.upAct) H.upAct.fadeOut(0.25);
+      H.upName = key; H.upAct = null;
+      if (!key) return;
+      const a = H.actions[key] || (H.actions[key] = mixer.clipAction(this.clips[key]));
+      a.reset(); a.setLoop(THREE.LoopRepeat, Infinity); a.setEffectiveWeight(1); a.fadeIn(0.25); a.play();
+      H.upAct = a;
     };
     H.setAcc = (name) => { H.look = Object.assign({}, H.look, { acc: name }); this.applyLook(H, H.look, true); };
     H.dispose = () => { mat.dispose(); acc.dispose(); hairMat.dispose(); H.tieMat?.dispose(); topMat.dispose(); botMat.dispose(); skirtMat.dispose(); kurtaMat.dispose(); mixer.stopAllAction(); };
