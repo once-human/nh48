@@ -527,7 +527,8 @@ export class Traffic {
       v.rich = near && nr < 6 ? (nr++, true) : false;
     }
     for (const v of this.list) {
-      const I = this.inst[v.rich ? v.type.replace(/P$/, '') + 'E' : v.type] || this.inst[v.type];
+      const seated = v.rich && v._riders && v._riders.every(r => r.body);
+      const I = this.inst[seated ? v.type.replace(/P$/, '') + 'E' : v.type] || this.inst[v.type];
       const far = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) > L2;
       const roll = v.fallen > 0 ? 1.3 : v.roll;
       e.set(roll, -v.yaw, v.pitch, 'YXZ');

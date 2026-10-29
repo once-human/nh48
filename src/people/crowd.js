@@ -52,6 +52,11 @@ export class Crowd {
   update(dt, cx, cz) {
     if (!this.kit) return;
     this.t -= dt;
+    // a vehicle just came close enough for real riders: seat them now, not at the next quarter-second (the baked
+    // figures stay until they're seated, so nobody blinks out); one that's gone back to baked figures lets go at once
+    const T = this.traffic;
+    if (T && this.t > 0.05) for (const o of T.list) if (o.rich && (!o._riders || o._riders.some(r => !r.body))) { this.t = 0; break; }
+    for (const s of this.pool) if (s.p && s.p.rideOf && !s.p.rideOf.rich) s.release();
     if (this.t <= 0) { this.t = 0.25; this.assign(cx, cz); }
     for (const s of this.pool) if (s.p) this.drive(s, dt, cx, cz);
   }
@@ -70,7 +75,11 @@ export class Crowd {
         o._riders = seats.map(([a, b, side, sy], i) => {
           const female = i === 1 ? (side ? Math.random() < 0.75 : Math.random() < 0.2) : Math.random() < 0.15;
           const look = this.kit.randomLook(rng, { female, helmet: two && i === 0 && o.type !== 'scooterP' });
-          if (!two) { look.top = look.top.setRGB(0.42, 0.36, 0.22); look.bottom = look.top.clone().multiplyScalar(0.9); }
+          // dressed as the baked figure was (its shirt is the vehicle's colB, helmet / hair colC): no change of clothes up close
+          if (o.colB) look.top = look.top.setRGB(o.colB[0], o.colB[1], o.colB[2]);
+          if (!two) look.bottom = look.top.clone().multiplyScalar(0.9);
+          else if (i === 1 && side && female) { look.bottom = look.top.clone().multiplyScalar(0.85); look.cut = look.cut.clone().set(0.3, 1, 0.9, 2); }
+          if (o.colC) { if (look.acc === 'helmet') look.helmetCol = look.top.clone().setRGB(o.colC[0], o.colC[1], o.colC[2]); else if (i === 1) look.hair = look.top.clone().setRGB(o.colC[0], o.colC[1], o.colC[2]); }
           return { id: (o.id || 0) * 4 + i + 1e7, look, female, rideOf: o, seat: [a, b], seatY: sy - 0.62, sideSaddle: side, x: o.x, z: o.z, yaw: 0, v: 0, mode: 'ride', persona: female ? 'tai' : 'dada' };
         });
       }

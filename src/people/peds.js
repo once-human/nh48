@@ -293,7 +293,15 @@ export class People {
     const x = TMP[0] + TMP[3] * p.lat, z = TMP[1] - TMP[2] * p.lat;
     let hx = TMP[2] * p.dir, hz = TMP[3] * p.dir;
     if (p.mode === 'cross') { hx = TMP[3] * -Math.sign(p.lat - p.latT) * -1; hz = -TMP[2] * -Math.sign(p.lat - p.latT) * -1; }
-    p.x = x + p.dodgeX; p.z = z + p.dodgeZ;
+    // never a jump: when the path hands them on (a corner onto the next street's footpath, back from a detour),
+    // the gap is carried as an offset that closes at a walking pace instead of a snap
+    let ox = p.offX || 0, oz = p.offZ || 0;
+    const ol = Math.hypot(ox, oz);
+    if (ol > 0.001) { const k = Math.max(0, ol - Math.max(ol * 2.2, 1.6) * (this._dt || 0.016)) / ol; ox *= k; oz *= k; }
+    const nx = x + p.dodgeX, nz = z + p.dodgeZ;
+    if (p.placed) { const jx = p.x - (nx + ox), jz = p.z - (nz + oz), j = Math.hypot(jx, jz); if (j > 0.3 && j < 14) { ox += jx; oz += jz; } else if (j >= 14) { ox = oz = 0; } }
+    p.placed = true; p.offX = ox; p.offZ = oz;
+    p.x = nx + ox; p.z = nz + oz;
     if ((p.mode !== 'stand' || !p.faced) && !(p.dodge > 0)) {          // while scrambling clear they face where they run
       const yaw = Math.atan2(hz, hx);
       p.yaw = p.yaw + wrapAngle(yaw - p.yaw) * 0.25;
@@ -317,6 +325,7 @@ export class People {
   // ---------------------------------------------------------------- update
   update(dt, player, avoidView) {
     const px = player.x, pz = player.z;
+    this._dt = dt;
     this.g_inView = avoidView;
     // population
     for (let i = this.list.length - 1; i >= 0; i--) {
@@ -1054,7 +1063,8 @@ export class People {
       if (p.body || p.hidden) continue;    // drawn up close by crowd.js, or inside a shop
       if (nm >= this.cap - 1 || nf >= this.cap - 1) break;
       if (Math.abs(p.x - cx) > 130 || Math.abs(p.z - cz) > 130) continue;
-      const y = this.W.surf.height(p.x, p.z) * 0 + (p.onRoad ? 0 : 0.15);
+      if (p.gyX === undefined || Math.abs(p.x - p.gyX) + Math.abs(p.z - p.gyZ) > 1.5) { p.gyX = p.x; p.gyZ = p.z; p.gy = this.W.surf.height(p.x, p.z); }
+      const y = p.gy;
       const s = p.scale;
       const swing = p.mode === 'stand' || p.pax ? 0 : Math.sin(p.phase) * 0.5;
       // body
