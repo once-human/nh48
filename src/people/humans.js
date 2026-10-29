@@ -117,7 +117,8 @@ function patchCloth(mat, which) {
       // the long shell as a skirt: nothing below the hem
       if (uWhich > 1.5 && uWhich < 2.5 && uStyle.y > 0.01 && p.y < uStyle.y * uFit.w) discard;
       if (uWhich < 0.5 && abs(p.x) > uArm.x && p.y > uArm.z && (abs(p.x) - uArm.x) / (uArm.y - uArm.x) > uArm.w + 0.012) discard;
-      if (uWhich < 0.5 && (uFit.z < 0.5 || uFit.z > 2.5) && p.y < uFit.x - 0.015) discard;
+      // the shirt shell stops at the waist under anything (a kurta's or saree's long shell takes over below it, one piece)
+      if (uWhich < 0.5 && p.y < uFit.x - (uFit.z > 0.5 && uFit.z < 2.5 ? 0.06 : 0.015)) discard;
       if (uWhich > 0.5 && uWhich < 1.5 && (uFit.z > 0.5 && uFit.z < 1.5 && p.y > uFit.y + 0.04)) discard;
       if (uWhich < 0.5 || uWhich > 2.5) {
         if (pt > 0.5 && pt < 1.5) diffuseColor.rgb = mix(diffuseColor.rgb, uPat, step(0.5, fract(p.y * 16.0)));
@@ -132,7 +133,7 @@ function patchCloth(mat, which) {
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.35, smoothstep(0.03, 0.12, p.z) * smoothstep(0.45, 0.75, p.y) * 0.5);
       }`);
   };
-  mat.customProgramCacheKey = () => 'nh-cloth4-' + which;
+  mat.customProgramCacheKey = () => 'nh-cloth5-' + which;
   return mat;
 }
 
@@ -360,7 +361,7 @@ export class HumanKit {
     } else if (female) {
       let s = rng.next();
       if (D === 'modern') s = 0.72 + s * 0.28; else if (D === 'traditional') s *= 0.72;
-      if (s < 0.35) { L.top = c(rng.pick(SAREE)); L.bottom = L.top.clone().multiplyScalar(0.85); L.cut = new THREE.Vector4(0.3, 1, 0.9, 2); L.style = rng.pick(['hair_buns', 'hair_buns', 'hair_long', 'braid']); L.bindi = rng.chance(0.75); }   // saree
+      if (s < 0.35) { L.top = c(rng.pick(SAREE)); L.bottom = L.top.clone(); /* a saree is one length of cloth: one colour */ L.cut = new THREE.Vector4(0.3, 1, 0.9, 2); L.style = rng.pick(['hair_buns', 'hair_buns', 'hair_long', 'braid']); L.bindi = rng.chance(0.75); }   // saree
       else if (s < 0.72) { L.top = c(rng.pick(KURTA)); L.bottom = c(rng.pick(SALWAR)); L.cut = new THREE.Vector4(rng.chance(0.5) ? 0.4 : 0.85, 0.55, 0.8, 1); } // kurta + salwar
       else { L.top = c(rng.pick(SHIRT)); L.bottom = c(rng.pick(PANTS)); L.cut = new THREE.Vector4(rng.chance(0.6) ? 0.35 : 0.9, 1, 0.5, 0); }           // jeans + top
     } else {
@@ -553,6 +554,9 @@ export class HumanKit {
       const u = H.mat.userData;
       u.top.copy(look.top); u.bottom.copy(look.bottom); u.skin.copy(look.skin); u.shoe.copy(look.shoe); u.cut.copy(look.cut);
       H.hairMat.color.copy(look.hair).multiplyScalar(1.8);
+      // under a kurta or a saree the shirt shell sits behind the long one (it used to win and break through it in patches)
+      const longCloth = look.cut.w > 0.5 && look.cut.w < 2.5;
+      H.topMat.polygonOffsetFactor = longCloth ? 2 : -1; H.topMat.polygonOffsetUnits = longCloth ? 3 : -2;
       H.topMat.color.copy(look.top); H.kurtaMat?.color.copy(look.top); H.botMat.color.copy(look.bottom); H.shoeMat.color.copy(look.shoe);
       // a saree's shell is the saree's colour; a skirt's is the skirt's
       if (H.skirtMat) H.skirtMat.color.copy(look.cut.w > 2.5 ? look.bottom : look.top);
@@ -596,11 +600,17 @@ export class HumanKit {
 // a rider on a two-wheeler or in an auto leans into the bars from the lower back, head up to the road. Applied on
 // top of the seated clip's pose (call it right after the mixer has posed the body, then reach the hands)
 const _rx = new THREE.Vector3(), _rq = new THREE.Quaternion(), _rd = new THREE.Quaternion();
+// (a bone the clip has no keys for keeps whatever was last set: so each bend starts from the pose before the last
+// bend, never on top of it, or riders slowly spin)
 function bendBone(bone, axisWorld, angle) {
   if (!bone || !bone.parent) return;
+  const u = bone.userData;
+  if (u.bentQ && bone.quaternion.equals(u.bentQ)) bone.quaternion.copy(u.baseQ);
+  (u.baseQ || (u.baseQ = bone.quaternion.clone())).copy(bone.quaternion);
   bone.parent.getWorldQuaternion(_rq);
   _rx.copy(axisWorld).applyQuaternion(_rq.invert());
   bone.quaternion.premultiply(_rd.setFromAxisAngle(_rx, angle));
+  (u.bentQ || (u.bentQ = bone.quaternion.clone())).copy(bone.quaternion);
   bone.updateMatrixWorld(true);
 }
 export const RIDER_HIPS = 0.31;            // the seated clips put the hips this far behind the body's origin
