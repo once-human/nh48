@@ -108,8 +108,10 @@ export class Fauna {
     for (const [a, m] of this.models) {
       if (a.gone) { this.scene.remove(m.holder); m.dispose(); this.models.delete(a); continue; }
       const d = Math.abs(a.x - cx) + Math.abs(a.z - cz);
-      m.holder.visible = d < 120;
-      if (!m.holder.visible) continue;
+      // out of the scene while far (a hidden model's bones still get worked out every frame if it's in it)
+      const vis = d < 120;
+      if (vis !== m.holder.visible || vis !== !!m.holder.parent) { m.holder.visible = vis; if (vis) this.scene.add(m.holder); else this.scene.remove(m.holder); }
+      if (!vis) continue;
       const sh = d < 50;
       if (m.sh !== sh) { m.sh = sh; m.root.traverse(o => { if (o.isMesh) o.castShadow = sh; }); }
       // being petted: turned to you; a dog bounces and its whole back end wags, a cat leans in and settles
