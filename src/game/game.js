@@ -62,6 +62,7 @@ import { Trial } from './trial.js';
 import { Fauna } from '../people/animals.js';
 import { Puddles } from './puddles.js';
 import { Cutscene } from './cutscene.js';
+import { Home } from './home.js';
 
 export class Game {
   constructor(ctx) {
@@ -132,6 +133,7 @@ export class Game {
     this.smoke = new Smoke(this.scene);
     this.puddles = new Puddles(this);
     this.cut = new Cutscene(this);
+    this.home = new Home(this);
     player.animalsNear = () => this.people.animals;
     // on foot your head (and a little of your body) turns to where the camera looks, so looking back you look back;
     // the torch arm goes on top
@@ -1286,6 +1288,7 @@ export class Game {
     if (this.blood) this.blood.update(dt);
     if (this.state === 'play') this.fireTick(dt);
     if (this.puddles) this.puddles.update(dt);
+    if (this.home && this.state === 'play' && !this.free) this.home.update(dt);
     // where the traffic slows to gawk: the last minute's crashes, fights and people down in the road
     if ((this._gawkT = (this._gawkT || 0) - dt) <= 0 && this.brain && this.traffic) {
       this._gawkT = 1; const L = [];

@@ -340,6 +340,8 @@ export class Shops {
     if (tr && (!best || Math.hypot(tr.x - P.x, tr.z - P.z) < bd + 3)) { best = tr; bd = 3; }
     const wd = P.onFoot && this.g.wada && this.g.wada.near(P.x, P.z);
     if (wd) { best = wd; bd = 2; }
+    const hm = P.onFoot && this.g.home && this.g.home.near(P.x, P.z);
+    if (hm) { best = hm; bd = 1.5; }
     const sn = P.onFoot && this.g.story && this.g.story.near(P.x, P.z);
     if (sn) { best = sn; bd = 1; }
     const prop = this.g.props && this.g.props.near(P.x, P.z, P.onFoot ? 7 : 0);
@@ -359,6 +361,7 @@ export class Shops {
     if (this.near.kind === 'animal') { this.g.strays.interact(this.near.a); this.scanT = 0.5; return true; }
     if (this.near.kind === 'wada') { this.g.wada.use(this.near); this.scanT = 0.5; return true; }
     if (this.near.kind === 'story') { this.g.story.use(this.near); this.scanT = 0.5; return true; }
+    if (this.near.kind === 'homeDoor') { this.g.home.use(); this.scanT = 0.5; return true; }
     if (this.near.kind === 'metro' || this.near.kind === 'bus') { this.g.transit.show(this.near); return true; }
     const I = this.g.interiors;
     if (this.near.kind === 'ispot') { I.use(this.near.s); this.scanT = 0.3; return true; }
@@ -381,6 +384,7 @@ export class Shops {
     if (n.kind === 'animal') return this.g.strays.label(n.a);
     if (n.kind === 'wada') return this.g.wada.label(n);
     if (n.kind === 'story') return this.g.story.label(n);
+    if (n.kind === 'homeDoor') return 'Go home · काळे सदन';
     if (n.kind === 'metro' || n.kind === 'bus') return this.g.transit.label(n);
     if (n.kind === 'ispot') return n.s.label;
     const oh = n.door && openNow(n, this.g.hour);

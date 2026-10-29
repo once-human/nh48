@@ -1,3 +1,4 @@
+import { castLook } from '../people/castLooks.js';
 // Walking into a shop: you go inside a real room, not a menu. Rooms are built procedurally and
 // reused; which room you get depends on the kind of place and the name on the board (designOf):
 //   look     chains and posh places get a designed interior: minimal (pale oak, white, pendants),
@@ -29,14 +30,14 @@ const TEMPLATE = {
   tapri: 'eatery', misal: 'eatery', thali: 'eatery', biryani: 'eatery', southindian: 'eatery', chinese: 'eatery', fastfood: 'eatery', food: 'eatery',
   cafe: 'cafe', bakery: 'cafe', sweets: 'cafe', juice: 'cafe', icecream: 'cafe',
   bar: 'club', barber: 'salon', clothes: 'boutique', shoes: 'boutique', optician: 'boutique', bank: 'bank',
-  pharmacy: 'shop', kirana: 'shop', mobile: 'shop', electronics: 'shop', books: 'shop', florist: 'shop', paan: 'shop', jeweller: 'shop',
+  home: 'home', pharmacy: 'shop', kirana: 'shop', mobile: 'shop', electronics: 'shop', books: 'shop', florist: 'shop', paan: 'shop', jeweller: 'shop',
   clinic: 'clinic', gym: 'gym', dealer: 'showroom', lodge: 'lodge', chowki: 'chowki', estate: 'office',
 };
 // How big each kind of room is (w across, d deep, h tall) before the brand scales it
 const ROOM = {
   eatery: [20, 15, 3.8], cafe: [18, 13, 3.7], club: [28, 22, 6], salon: [16, 11, 3.5], boutique: [22, 16, 4],
   bank: [20, 14, 4.2], shop: [16, 12, 3.6], clinic: [16, 12, 3.4], gym: [22, 15, 4.8], showroom: [26, 17, 6],
-  lodge: [14, 11, 3.4], chowki: [13, 10, 3.4], office: [14, 10, 3.4],
+  lodge: [14, 11, 3.4], chowki: [13, 10, 3.4], office: [14, 10, 3.4], home: [14, 12, 3.3],
 };
 // A place's look. The brand picks it: the chains and posh places get a designed interior (minimal,
 // bold, industrial, heritage, luxe, pastel), the local places a cuisine look or the plain Pune shop.
@@ -73,6 +74,7 @@ const hash = (s) => { let h = 2166136261; for (const c of s || '') { h ^= c.char
 const BOLD = (h) => 'bold' + (h % 4);
 // pick a room: template, look, layout and size from the kind and the name on the board
 export function designOf(ctx) {
+  if (ctx.kind === 'home') return { tpl: 'home', aes: 'heritage', layout: 'home', scale: 1, kind: '', key: 'home:kale' };
   const k = ctx.kind, tpl = TEMPLATE[k], n = (ctx.name || '').toLowerCase(), h = hash(n), pick = (a) => a[h % a.length];
   const tier = ctx.tier || tierOf(k, ctx.name, ctx.flag), chain = ctx.flag === 'brand' || tier === 'chain' || tier === 'brand';
   let aes = 'local', layout = 'grid', scale = 1;
@@ -165,6 +167,11 @@ export class Interiors {
     box(B, 0, (2.45 + H) / 2, -0.1, 1.8, H - 2.45, 0.2, wall);        // wall over the door, all the way up
     // the door: a dark aluminium frame, two leaves of tinted glass over a kick plate, push bars, a lit EXIT sign
     const fr = 0x2a2c30, glass = 0x33414c;
+    if (tpl === 'home') {
+      // the inside of the carved teak front door, shut, its brass bolt and the toran over it
+      box(B, 0, 1.22, -0.12, 1.84, 2.44, 0.12, 0x5a3519); for (const sx of [-1, 1]) { box(B, sx * 0.45, 1.2, -0.05, 0.8, 2.3, 0.03, 0x7a4a22); } box(B, 0.12, 1.2, -0.02, 0.2, 0.05, 0.05, 0xc9a24a);
+      for (let i = 0; i < 9; i++) box(B, -0.9 + i * 0.225, 2.42, -0.02, 0.09, 0.16, 0.02, i % 2 ? 0xf2a12a : 0x2f7a2a);
+    } else {
     box(B, -0.88, 1.225, -0.12, 0.08, 2.45, 0.14, fr); box(B, 0.88, 1.225, -0.12, 0.08, 2.45, 0.14, fr); box(B, 0, 2.41, -0.12, 1.84, 0.08, 0.14, fr);
     for (const sx of [-1, 1]) {
       const cx = sx * 0.43;
@@ -175,8 +182,9 @@ export class Interiors {
     }
     box(B, 0, 1.22, -0.13, 0.03, 2.36, 0.05, fr);                      // where the leaves meet
     box(GL, 0, 2.62, -0.0, 0.62, 0.2, 0.03, 0x22d36f);                 // EXIT
+    }
     // shopfront windows either side of the door
-    if (tpl !== 'club') for (const s of [-1, 1]) box(GL, s * (W / 4 + 0.45), 1.5, 0.005, W / 2 - 2.4, 1.6, 0.02, 0xd8e6ee);
+    if (tpl !== 'club' && tpl !== 'home') for (const s of [-1, 1]) box(GL, s * (W / 4 + 0.45), 1.5, 0.005, W / 2 - 2.4, 1.6, 0.02, 0xd8e6ee);
     for (const s of [-1, 1]) box(B, s * W / 2, 0.06, D / 2, 0.04, 0.12, D, accent);
     box(B, 0, 0.06, D, W, 0.12, 0.04, accent);
     // the look on the walls
@@ -430,6 +438,54 @@ export class Interiors {
       kp(W / 2 - 2, D - 0.5, -Math.PI / 2, 'idle', 'keeper');
       spot(W / 2 - 2, D - 2.1, 1.2, 'counter', 'Talk to the salesman');
       R.customers = 2;
+    } else if (tpl === 'home') {
+      // ---- the Kales' house: Kota stone floor, the diwan and the TV, Baba's photo with a sandalwood garland, the
+      // jhula in the middle, the devghar in the corner, Aai's kitchen, the dining table, your room
+      box(B, 0, 0.004, D / 2, W, 0.006, D, 0x8f8b72);
+      for (let i = 1; i < W / 0.6; i++) box(B, -W / 2 + i * 0.6, 0.008, D / 2, 0.01, 0.002, D, 0x75715c);
+      sofa(-6.25, 3.2, 0, 2.8, 0x7a2a22); box(B, -6.25, 0.58, 3.2, 0.7, 0.08, 2.7, 0xd9c49a);                 // the diwan and its gaadi
+      box(B, -4.7, 0.22, 3.2, 0.8, 0.44, 1.3, 0x5a3519); solid(-4.7, 3.2, 0.8, 1.3, 2);                       // the low table
+      box(B, -4.7, 0.47, 3.0, 0.22, 0.05, 0.22, 0xc8ccd2); box(B, -4.6, 0.5, 3.45, 0.1, 0.1, 0.1, 0xf2efe6);   // a steel plate, a cup
+      box(B, -2.2, 0.35, 3.2, 0.45, 0.7, 1.7, 0x6b4a32); box(B, -2.17, 1.35, 3.2, 0.05, 0.75, 1.3, 0x121418); box(GL, -2.2, 1.35, 3.2, 0.03, 0.66, 1.18, 0x1c2a3a); solid(-2.2, 3.2, 0.45, 1.7, 2);
+      box(B, -W / 2 + 0.03, 1.95, 6.4, 0.04, 0.78, 0.62, 0x3a2416); box(B, -W / 2 + 0.05, 1.95, 6.4, 0.03, 0.62, 0.46, 0x9a8a70);   // Baba's photo
+      for (let i = 0; i < 14; i++) { const a = i / 13 * Math.PI; box(GL, -W / 2 + 0.07, 1.95 - 0.36 + Math.sin(a) * -0.02 + (i / 13) * 0, 6.4 - 0.36 + i * 0.055, 0.03, 0.05, 0.05, i % 2 ? 0xf0a83a : 0xf6e2b0); }
+      box(B, 0, 2.6, D - 0.03, 0.42, 0.42, 0.04, 0x3a2416); box(B, 0, 2.6, D - 0.06, 0.34, 0.34, 0.02, 0xf2efe6);   // the wall clock
+      // the jhula: a teak plank on four chains from the beam, the classic wada swing
+      box(B, 0, 0.55, 5.6, 1.7, 0.08, 0.7, 0x6b3a1c); for (const [a, b] of [[-0.78, -0.3], [0.78, -0.3], [-0.78, 0.3], [0.78, 0.3]]) box(B, a, (0.6 + H) / 2, 5.6 + b, 0.025, H - 0.6, 0.025, 0x2a2a2a);
+      box(B, 0, H - 0.1, 5.6, 2.4, 0.2, 0.25, 0x4a2a14);
+      R.seats.push({ x: O.x, z: O.z + 5.6, yaw: -Math.PI / 2, table: { x: O.x, z: O.z + 3.6 }, used: false }); spot(0, 4.7, 1.0, 'seat', 'Sit on the jhula', { seat: R.seats[R.seats.length - 1] });
+      C.addCircle(O.x, O.z + 5.6, 0.7, 2);
+      // the devghar: a carved teak shrine, the lamp lit, a rangoli in front
+      box(B, 5.9, 0.45, D - 0.45, 1.3, 0.9, 0.6, 0x5a3519); box(B, 5.9, 1.45, D - 0.45, 1.3, 1.1, 0.6, 0x6b4020); box(B, 5.9, 2.1, D - 0.45, 1.45, 0.25, 0.65, 0x4a2a14);
+      box(GL, 5.9, 1.45, D - 0.76, 0.9, 0.8, 0.02, 0xffc070); box(B, 5.9, 1.2, D - 0.6, 0.18, 0.25, 0.12, 0xd4a22a); box(GL, 5.75, 1.15, D - 0.72, 0.05, 0.08, 0.05, 0xffa030);
+      for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283; box(B, 5.9 + Math.cos(a) * 0.45, 0.009, D - 1.6 + Math.sin(a) * 0.45, 0.14, 0.004, 0.14, [0xe63946, 0xf4a261, 0xffffff, 0x2a9d8f][i % 4]); }
+      solid(5.9, D - 0.45, 1.3, 0.6);
+      // the kitchen: a black granite platform along the back wall, the stove, steel, the fridge, the filter
+      box(B, -4.4, 0.42, D - 0.4, 5.0, 0.84, 0.62, 0x6b5a4a); box(B, -4.4, 0.87, D - 0.4, 5.1, 0.06, 0.68, 0x1c1c1e); solid(-4.4, D - 0.4, 5.0, 0.62);
+      box(B, -4.0, 0.94, D - 0.45, 0.7, 0.08, 0.42, 0x111111); for (const x of [-4.2, -3.8]) box(B, x, 0.99, D - 0.45, 0.16, 0.02, 0.16, 0x3a3a3a);
+      for (let i = 0; i < 5; i++) box(B, -6.3 + i * 0.38, 1.05 + (i % 2) * 0.04, D - 0.35, 0.26, 0.24 + (i % 2) * 0.08, 0.26, 0xc8ccd2);   // steel vessels
+      for (let i = 0; i < 7; i++) box(B, -6.4 + i * 0.32, 1.85, D - 0.18, 0.26, 0.26, 0.24, 0xd0d4d8);       // the dabba shelf
+      box(B, -4.4, 1.7, D - 0.2, 4.6, 0.04, 0.3, 0x5a3519);
+      box(B, -6.55, 0.95, 8.6, 0.75, 1.9, 0.72, 0xdfe3e8); box(B, -6.17, 1.2, 8.6, 0.02, 0.5, 0.04, 0x9aa0a6); solid(-6.55, 8.6, 0.75, 0.72);
+      box(B, -2.3, 1.6, D - 0.08, 0.32, 0.42, 0.14, 0xf4f6f8); box(GL, -2.3, 1.72, D - 0.16, 0.12, 0.04, 0.02, 0x3aa0ff);
+      kp(-4.0, D - 1.05, -Math.PI / 2, 'idle', 'aai');
+      spot(-4.0, D - 2.2, 1.3, 'aai', 'Talk to Aai');
+      // the dining table
+      table4(2.0, 7.4); spot(2.0, 8.6, 1.0, 'eat', 'Eat with Aai');
+      // your room: a partition with a doorway, the bed, your desk and laptop, the cupboard
+      box(B, 2.45, H / 2, 2.75, 0.12, H, 5.5, 0xefe3c8); solid(2.45, 2.75, 0.12, 5.5);
+      box(B, 2.95, H / 2, 5.5, 1.0, H, 0.12, 0xefe3c8); box(B, 5.95, H / 2, 5.5, 2.1, H, 0.12, 0xefe3c8); solid(2.95, 5.5, 1.0, 0.12); solid(5.95, 5.5, 2.1, 0.12);
+      box(B, 4.4, 2.6, 5.5, 1.0, H - 2.2, 0.12, 0xefe3c8);
+      box(B, 5.9, 0.25, 2.3, 1.95, 0.5, 1.45, 0x6b4a32); box(B, 5.9, 0.56, 2.3, 1.85, 0.14, 1.35, 0xe8e2d6); box(B, 6.6, 0.68, 2.3, 0.4, 0.1, 0.9, 0xf4f2ee); box(B, 5.6, 0.64, 2.3, 1.1, 0.04, 1.37, 0x2b4a7a);
+      solid(5.9, 2.3, 1.95, 1.45, 2); spot(5.0, 2.3, 1.1, 'sleep', 'Sleep till morning');
+      box(B, 3.3, 0.74, 1.0, 1.2, 0.05, 0.6, 0x8a6a4a); box(B, 3.3, 0.37, 1.0, 1.1, 0.74, 0.04, 0x5a3a26); solid(3.3, 1.0, 1.2, 0.6, 2);
+      box(B, 3.3, 0.9, 1.0, 0.4, 0.02, 0.28, 0x2a2c30); box(GL, 3.3, 1.02, 0.9, 0.38, 0.22, 0.01, 0x9ec6ff);   // the laptop
+      box(B, 6.6, 1.05, 4.7, 0.6, 2.1, 1.3, 0x7a5a3a); box(B, 6.29, 1.05, 4.38, 0.02, 1.9, 0.02, 0xc9a24a); solid(6.6, 4.7, 0.6, 1.3);
+      spot(5.9, 4.6, 1.0, 'wardrobe', 'Your cupboard: change clothes');
+      // a ceiling fan over the living room
+      box(B, -4.5, H - 0.25, 3.5, 0.06, 0.5, 0.06, 0x2a2a2a); box(B, -4.5, H - 0.52, 3.5, 0.3, 0.12, 0.3, 0x6b6e72);
+      for (let i = 0; i < 3; i++) box(B, -4.5, H - 0.55, 3.5, 1.3, 0.02, 0.16, 0x8a8e92, i * 2.094);
+      R.customers = 0;
     } else if (tpl === 'shop') {
       const cw = Math.min(W * 0.45, 7);
       if (lay === 'cases') {
@@ -620,7 +676,10 @@ export class Interiors {
     const taken = new Set(G.date && G.date.pending ? [G.date.pending.ct.name] : []);
     const name = (q) => { const c = pickCast(rng, q.female, taken, R.tpl); if (c) { taken.add(c.name); castAs(q, c, kit); } return q; };
     this._name = name;
-    for (const k of R.people) make(k.x, k.z, k.yaw, k.anim, k.role === 'teller' ? rng.chance(0.6) : rng.chance(0.25), { police: R.tpl === 'chowki' && k.role === 'keeper' });
+    for (const k of R.people) {
+      const p = make(k.x, k.z, k.yaw, k.anim, k.role === 'aai' ? true : k.role === 'teller' ? rng.chance(0.6) : rng.chance(0.25), { police: R.tpl === 'chowki' && k.role === 'keeper', persona: k.role === 'aai' ? 'kaku' : undefined });
+      if (k.role === 'aai') { const L = castLook(kit, 'aai'); if (L) { p.look = L; p.shirt = [L.top.r, L.top.g, L.top.b]; p.lower = [L.bottom.r, L.bottom.g, L.bottom.b]; p.skin = [L.skin.r, L.skin.g, L.skin.b]; } p.name = 'Aai'; p.aai = true; R.aai = p; }
+    }
     for (const s of R.seats) s.used = false;
     // customers at tables, eating and chatting
     const free = R.seats.filter(s => !s.salon);
@@ -737,6 +796,10 @@ export class Interiors {
       case 'dance': this.dance(true); return;
       case 'undance': this.dance(false); return;
       case 'workout': G.shops.show({ ...ctx, kind: 'gym', inside: true }); return;
+      case 'sleep': if (G.sleep) G.sleep(); return;
+      case 'wardrobe': G.bag && (G.bag.cat = 'clothes', G.bag.show('bag')); return;
+      case 'aai': this.aaiTalk(); return;
+      case 'eat': { const L = G.life; L.change('hunger', 0.6); L.change('thirst', 0.3); L.change('mood', 0.15); G.hud.toast('Varan-bhaat, bhaji, poli', 'Aai’s food. Nothing in Pune comes close', 'good', 3); if (C.R.aai) C.R.aai.act = { clip: 'talk', t: 0, dur: 2 }; return; }
       case 'vehicle': G.shops.show({ ...ctx, kind: 'dealer', inside: true }); return;
       case 'talk':
         if (C.dancing) this.dance(false);
@@ -744,6 +807,22 @@ export class Interiors {
         if (s.p.dateWith && !C.seat) { const seat = this.dateSeatFor(s.p); if (seat) { seat.used = false; this.sit(seat); } }
         G.date && G.date.talk(s.p, C); return;
     }
+  }
+  // Aai: what she says depends on the hour, what you've been up to, and how you've treated her
+  aaiTalk() {
+    const G = this.g, h = G.hour ?? 12, L = G.life.s, F = (G.story && G.story.flags) || {}, p = this.cur && this.cur.R.aai;
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    let line;
+    if (h < 10) line = pick([['चहा घे. उपाशीपोटी बाहेर पडायचं नाही.', 'Have your tea. You don’t go out on an empty stomach.'], ['आज लवकर ये. भाजी आणायची आहे.', 'Come back early today. We need vegetables.']]);
+    else if (h >= 22 || h < 5) line = pick([['इतक्या रात्री? कुठे होतास?', 'This late? Where were you?'], ['जेवलास का? ताट वाढून ठेवलंय.', 'Have you eaten? I’ve kept a plate for you.']]);
+    else line = pick([['दुपारी झोप जरा. डोळे बघ तुझे.', 'Take a nap this afternoon. Look at your eyes.'], ['शेजारच्या जोशी काकू विचारत होत्या तुझ्याबद्दल.', 'Joshi kaku next door was asking about you.'], ['बाबा असते तर तुझ्या रिक्षेत बसले असते. पहिले.', 'If Baba were here he’d have been the first to ride in your auto.']]);
+    if (G.police && G.police.heat) line = ['पोलीस आले होते. तुझं नाव घेत होते. काय केलंस?', 'The police came. They were asking for you. What did you do?'];
+    else if ((L.karma || 0) < -25) line = ['लोक बोलतायत तुझ्याबद्दल. मला ऐकवत नाही.', 'People are talking about you. I can’t bear to hear it.'];
+    else if ((L.karma || 0) > 25 && Math.random() < 0.4) line = ['देवळात लोक तुझं नाव घेऊन आशीर्वाद देत होते. मला अभिमान वाटला.', 'At the temple people were blessing you by name. I felt proud.'];
+    if (F.paidAai && Math.random() < 0.2) line = ['बिलं भरली. तू पैसे दिलेस म्हणून. देव तुझं भलं करो.', 'The bills are paid. Because you gave the money. God bless you.'];
+    if (p) { p.act = { clip: 'talk', t: 0, dur: 2.6 }; p.yaw = Math.atan2(G.player.z - p.z, G.player.x - p.x); }
+    G.hud.say('Aai', line[0], line[1], 4.5);
+    G.life.change('mood', 0.05);
   }
   // where you sit on a date: across the table from them, or beside them if there's no chair opposite
   dateSeatFor(p) {

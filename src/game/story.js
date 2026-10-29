@@ -223,6 +223,8 @@ export class Story {
   // a place by name: a landmark id, an area, one of the famous places, or anything on the map; (dx, dz) metres off it
   at(name, label, dx = 0, dz = 0) {
     const G = this.g, W = G.W;
+    // home is the Kales' own house (game/home.js) once it stands
+    if (name === 'Sadashiv Peth' && G.home && G.home.door) return { x: G.home.door.x + dx * 0.2, z: G.home.door.z + dz * 0.2, name: label || 'Home' };
     let p = (W.landmarks || []).find(l => l.id === name);
     if (!p) p = G.people.areas.list.find(a => a.name === name);
     if (!p) p = FAMOUS.find(f => f.name === name);
