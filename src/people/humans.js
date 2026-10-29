@@ -369,6 +369,39 @@ export class HumanKit {
       if (s < 0.12) { L.top = c(rng.pick(KURTA)); L.bottom = c(rng.pick([0xf4f1ea, 0xe8e0cc, 0x2f2f33])); L.cut = new THREE.Vector4(0.9, 0.55, 0.7, 1); }   // kurta pyjama
       else { L.top = c(rng.pick(SHIRT)); L.bottom = c(rng.pick(PANTS)); L.cut = new THREE.Vector4(rng.chance(0.55) ? 0.38 : 0.92, 1, rng.chance(0.5) ? 0.6 : 0.3, 0); }
     }
+    // what they're wearing, the way Pune dresses: men in checked and striped shirts, jeans, the young in printed tees and
+    // polos; women in printed and colour-block kurtis, western tops with prints, the odd skirt; office wear at rush hour;
+    // a cap or sunglasses on some
+    const young = /college|kp|dada|tai/.test(opts.persona || '') || D === 'modern' || D === 'western';
+    if (D === 'office') {
+      if (!female) { L.top = c(rng.pick([0xf4f3ef, 0xdfe8f2, 0xbfd3ea, 0xf0dcdc, 0xe4e4e4, 0xd8e6d4])); L.bottom = c(rng.pick([0x1d1f26, 0x2a2d35, 0x3a3832, 0x4a4b50])); L.cut = new THREE.Vector4(rng.chance(0.75) ? 0.95 : 0.4, 1, 0.45, 0); L.shoe = c(rng.pick([0x141210, 0x2a1d14])); if (rng.chance(0.25)) { L.pat = 1; L.patCol = c(rng.pick([0x9fb6d6, 0xc9c9c9])); } }
+      else if (rng.chance(0.6)) { L.top = c(rng.pick([0xf2e6d8, 0xc9d6e8, 0x6d5a8a, 0x2f4a6b, 0xb8475a, 0xe8d3a8])); L.bottom = c(rng.pick([0xf4f1ea, 0x26262c, 0xd9c7a3])); L.cut = new THREE.Vector4(rng.chance(0.6) ? 0.85 : 0.4, 0.55, 0.8, 1); }
+      else { L.top = c(rng.pick([0xf4f2ee, 0xd5dfee, 0xe9d4d8, 0x2c3a52])); L.bottom = c(rng.pick([0x1d1f26, 0x2a2d35, 0x4a4b50])); L.cut = new THREE.Vector4(0.9, 1, 0.5, 0); }
+    } else if (!female && L.cut.w < 0.5) {
+      const r = rng.next();
+      if (r < 0.3) { L.pat = 2; L.patCol = c(rng.pick([0x141414, 0xf2efe8, 0x2b3550, 0x7a1f24, 0x3f5d40])); L.cut.x = rng.chance(0.6) ? 0.95 : 0.4; }   // checked shirt
+      else if (r < 0.42) { L.pat = 1; L.patCol = c(rng.pick([0xf2efe8, 0x1d2a4a, 0x9fb6d6, 0x16161a])); }                                       // stripes
+      else if (r < 0.52 && young) { L.pat = 4; L.patCol = c(rng.pick([0xffb224, 0xf2efe8, 0xe63946, 0x8ecae6])); L.cut.x = 0.38; }               // a printed tee
+      else if (r < 0.6 && young) { L.pat = 6; L.patCol = c(rng.pick([0xf2efe8, 0x16161a, 0x2b3550])); L.cut.x = 0.4; }                          // colour block / a polo
+      if (young ? rng.chance(0.7) : rng.chance(0.25)) { L.denim = true; L.bottom = c(rng.pick([0x2c4568, 0x3e5f8a, 0x1f2f4a, 0x4a6d96, 0x16161a])); }
+      if (young && rng.chance(0.12)) { L.hat = true; L.hatCol = c(rng.pick([0x16161a, 0xf2efe8, 0x2b3550, 0x7a1f24, 0xc8553d])); }
+    } else if (female && L.cut.w > 0.5 && L.cut.w < 1.5) {
+      // kurtis: printed, a border colour, or plain
+      const r = rng.next();
+      if (r < 0.35) { L.pat = 4; L.patCol = c(rng.pick([0xf4f1ea, 0xffd166, 0x2a2a2a, 0xe76f51, 0x2a9d8f])); }
+      else if (r < 0.55) { L.pat = 6; L.patCol = c(rng.pick([0xffd166, 0xf4f1ea, 0x9d0208, 0x1d4e89])); }
+      else if (r < 0.65) { L.pat = 1; L.patCol = c(rng.pick([0xf4f1ea, 0x3d405b])); }
+      if (young && rng.chance(0.35)) { L.denim = true; L.bottom = c(rng.pick([0x2c4568, 0x3e5f8a, 0x16161a])); }
+    } else if (female && L.cut.w < 0.5) {
+      const r = rng.next();
+      if (r < 0.25) { L.pat = 4; L.patCol = c(rng.pick([0xf4f1ea, 0x16161a, 0xe5989b, 0xffd166])); }
+      else if (r < 0.37) { L.pat = 1; L.patCol = c(rng.pick([0x1d2a4a, 0x16161a, 0xf4f1ea])); }
+      else if (r < 0.45) { L.pat = 6; L.patCol = c(rng.pick([0xf2e6cf, 0x16161a])); }
+      if (rng.chance(0.6)) { L.denim = true; if (!rng.chance(0.2)) L.bottom = c(rng.pick([0x2c4568, 0x3e5f8a, 0x4a6d96, 0x16161a, 0x6b7f99])); }
+      // a skirt now and then (KP, the college crowd)
+      if (D === 'western' && rng.chance(0.18)) { L.denim = false; L.cut = new THREE.Vector4(L.cut.x, 1, 0.55, 3); L.hem = rng.range(0.52, 0.72); L.bottom = c(rng.pick([0x16161a, 0xf2efe8, 0x8c1d2c, 0x3e5f8a, 0xcbb89a, 0x2a9d8f])); }
+    }
+    if (young && rng.chance(0.07)) L.shades = true;
     if (opts.helmet) L.acc = 'helmet';
     // nobody in the city wears exactly what you wear, with your hair
     const A = opts.avoid || this.player;

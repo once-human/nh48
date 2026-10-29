@@ -254,7 +254,10 @@ export class People {
     // the dressed look used up close; the far figure takes its colours from it
     if (!kid && !opts.pax) { this.g.at(e, s, TMP); p.persona = this.pickPersona(female, TMP[0], TMP[1]); }
     if (this.kit) {
-      p.look = this.kit.randomLook(new RNG(p.id), { female, dress: DRESS[p.persona] });
+      // rush hour: a good share of the working crowd in office wear
+      const hr = this.hour ?? 12, rush = (hr > 8 && hr < 10.5) || (hr > 17.5 && hr < 20.5);
+      const dress = rush && /kaka|dada|tai|bhaiya/.test(p.persona || '') && r.chance(0.45) ? 'office' : DRESS[p.persona];
+      p.look = this.kit.randomLook(new RNG(p.id), { female, dress, persona: p.persona });
       p.shirt = [p.look.top.r, p.look.top.g, p.look.top.b];
       p.lower = [p.look.bottom.r, p.look.bottom.g, p.look.bottom.b];
       p.skin = [p.look.skin.r, p.look.skin.g, p.look.skin.b];
