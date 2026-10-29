@@ -42,6 +42,7 @@ import { bagOrder } from './bag.js';
 import { Brain } from '../people/brain.js';
 import { Emergency } from './emergency.js';
 import { Weather } from '../gfx/weather.js';
+import { ikArm } from '../people/humans.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { StreetApproach } from './approach.js';
@@ -412,6 +413,33 @@ export class Game {
     R.t += dt; const k = Math.min(1, R.t / R.dur);
     R.v.fuel = R.from + (R.to - R.from) * k; R.v.powerMul = 0;
     if (k >= 1) { this.refuel = null; this.hud.toast('Tank filled', `${R.units.toFixed(1)} ${R.cng ? 'kg CNG' : 'litres'} · ₹${R.price}. “Chala, bye!”`, 'good', 3); }
+  }
+  // petting: you turn to it and crouch (a cow you just reach up to), your hand goes to its back and strokes, a few
+  // seconds; it turns to you and wags (a dog), leans in and settles (a cat), or just lets you (a cow)
+  petAnimal(a) {
+    const P = this.player, F = P.foot, H = P.human;
+    if (!P.onFoot || !H) return;
+    F.yaw = Math.atan2(a.z - F.z, a.x - F.x); F.vx = F.vz = 0;
+    a.petT = 3.2; a.petPh = 0; a.petX = F.x; a.petZ = F.z;
+    const cow = a.cow || a.kind === 'cow', dur = 3.0;
+    if (!cow) H.play('crouch', { fade: 0.25 });
+    P.act = { kind: 'hurt', t: 0, dur };
+    const tgt = new THREE.Vector3(), pole = new THREE.Vector3();
+    let t = 0;
+    const prev = P.postPose;
+    P.postPose = (H2, dt) => {
+      t += dt;
+      if (prev) prev(H2, dt);
+      const k = Math.min(1, t * 3) * Math.min(1, Math.max(0, (dur - t) * 3));
+      const fx = Math.cos(F.yaw), fz = Math.sin(F.yaw), stroke = Math.sin(t * 5.5) * 0.14;
+      const back = cow ? 1.05 : a.kind === 'cat' ? 0.28 : 0.42;
+      tgt.set(a.x - fx * 0.05 + fx * stroke, this.W.surf.height(a.x, a.z) + back, a.z - fz * 0.05 + fz * stroke);
+      pole.set(-fz, -0.6, fx).normalize();
+      ikArm(H2, 'r', tgt, pole, k);
+      if (t >= dur) { P.postPose = prev || null; if (!cow) H2.play('idle', { fade: 0.3 }); }
+    };
+    if (a.kind === 'cat') this.later(0.6, () => this.audio && this.audio.purr && this.audio.purr());
+    else if (!cow) this.later(0.4, () => this.audio && this.audio.bark && this.audio.bark(0.25));
   }
   nearestPump() {
     const P = this.player;
@@ -945,6 +973,7 @@ export class Game {
       }
       if (ev.type === 'pet') {
         const a = ev.a; a.moving = false; a.rest = 8; this.life.change('mood', 0.06);
+        this.petAnimal(a);
         const L = a.cow ? ['Touch the cow for luck', 'She doesn’t care. A kaku nearby approves.'] : a.kind === 'cat' ? ['The cat allows it', 'Three seconds, then a look that says enough.'] : ['Good dog', 'The tail goes like a fan. A friend for life, or till the next vada pav.'];
         this.hud.toast(L[0], L[1], 'good', 2.6); if (!a.cow && a.kind !== 'cat') this.audio.bark && this.audio.bark(0.3);
       }

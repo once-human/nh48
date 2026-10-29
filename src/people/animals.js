@@ -110,8 +110,17 @@ export class Fauna {
       if (!m.holder.visible) continue;
       const sh = d < 50;
       if (m.sh !== sh) { m.sh = sh; m.root.traverse(o => { if (o.isMesh) o.castShadow = sh; }); }
-      m.holder.position.set(a.x, this.W.surf.height(a.x, a.z), a.z);
-      m.holder.rotation.set(0, -a.yaw, 0);
+      // being petted: turned to you; a dog bounces and its whole back end wags, a cat leans in and settles
+      let hy = 0, yaw = a.yaw, roll = 0;
+      if (a.petT > 0) {
+        a.petT -= dt; a.petPh = (a.petPh || 0) + dt;
+        if (a.petX !== undefined) yaw = Math.atan2(a.petZ - a.z, a.petX - a.x);
+        if (a.kind === 'dog' || (!a.kind && !a.cow)) { hy = Math.abs(Math.sin(a.petPh * 9)) * 0.06; roll = Math.sin(a.petPh * 18) * 0.12; }
+        else if (a.kind === 'cat') { hy = -0.03; roll = Math.sin(a.petPh * 3) * 0.05; }
+        else { roll = Math.sin(a.petPh * 2) * 0.04; }
+      }
+      m.holder.position.set(a.x, this.W.surf.height(a.x, a.z) + hy, a.z);
+      m.holder.rotation.set(0, -yaw, roll);
       const lie = !a.moving && a.kind !== 'cow' && !a.cow;
       m.play(a.moving ? (a.cow ? 'WalkSlow' : 'Walk') : 'Idle', a.moving ? (a.cow ? 0.9 : Math.min(2.6, Math.max(1, a.v / 1.1))) : 1);
       m.root.position.y = lie && a.lie ? -0.05 : 0;

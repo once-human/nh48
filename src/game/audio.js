@@ -411,6 +411,17 @@ export class Audio {
     this.env(og, t, 0.005, clamp(strength * 0.3, 0.05, 0.6), 0.02, 0.2);
     o.start(t); o.stop(t + 0.3);
   }
+  // a cat purring: a low rumble, pulsing
+  purr() {
+    if (!this.ctx) return;
+    try {
+      const ctx = this.ctx, t = ctx.currentTime, o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), g = ctx.createGain(), lp = ctx.createBiquadFilter();
+      o.type = 'sawtooth'; o.frequency.value = 26; lp.type = 'lowpass'; lp.frequency.value = 180;
+      lfo.frequency.value = 2.2; lg.gain.value = 0.05; lfo.connect(lg); lg.connect(g.gain);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.08, t + 0.3); g.gain.linearRampToValueAtTime(0.08, t + 2.2); g.gain.linearRampToValueAtTime(0, t + 2.8);
+      o.connect(lp); lp.connect(g); g.connect(this.master || ctx.destination); o.start(t); lfo.start(t); o.stop(t + 2.9); lfo.stop(t + 2.9);
+    } catch (e) { /* silent */ }
+  }
   // rain on the roofs and the road: filtered noise, louder with the rain
   rain(level) {
     if (!this.ctx) return;
