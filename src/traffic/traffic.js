@@ -384,6 +384,7 @@ export class Traffic {
 
   step(v, dt) {
     const T = v.T;
+    if (v.wreck) { v.v = 0; v.rich = false; return; }                 // a burnt shell: just an obstacle now
     if (v.fallen > 0) { v.fallen -= dt; v.v = 0; return; }
     if (v.ignoreT > 0) v.ignoreT -= dt;
     if (v.angry > 0) v.angry -= dt;
@@ -543,7 +544,7 @@ export class Traffic {
       v.rich = near && nr < 14 ? (nr++, true) : false;
     }
     for (const v of this.list) {
-      const seated = v.rich && v._riders && v._riders.every(r => r.body);
+      const seated = v.wreck || (v.rich && v._riders && v._riders.every(r => r.body));
       const I = this.inst[seated ? v.type.replace(/P$/, '') + 'E' : v.type] || this.inst[v.type];
       const far = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) > L2;
       const roll = v.fallen > 0 ? 1.3 : v.roll;
@@ -555,9 +556,11 @@ export class Traffic {
       const i = far ? I.nl : I.n;
       if (i >= I.cap) continue;
       mesh.setMatrixAt(i, m);
-      mesh.instanceColor.setXYZ(i, v.col[0], v.col[1], v.col[2]);
-      mesh.geometry.attributes.aColB.setXYZ(i, v.colB[0], v.colB[1], v.colB[2]);
-      mesh.geometry.attributes.aColC.setXYZ(i, v.colC[0], v.colC[1], v.colC[2]);
+      // damage shows: soot past a fifth, a burnt shell when it's gone up
+      const dk = v.wreck ? 0.07 : v.dmg > 0.2 ? 1 - (v.dmg - 0.2) * 0.55 : 1;
+      mesh.instanceColor.setXYZ(i, v.col[0] * dk, v.col[1] * dk, v.col[2] * dk);
+      mesh.geometry.attributes.aColB.setXYZ(i, v.colB[0] * dk, v.colB[1] * dk, v.colB[2] * dk);
+      mesh.geometry.attributes.aColC.setXYZ(i, v.colC[0] * dk, v.colC[1] * dk, v.colC[2] * dk);
       if (far) I.nl++;
       else { if (I.glass) I.glass.setMatrixAt(i, m); I.n++; }
     }

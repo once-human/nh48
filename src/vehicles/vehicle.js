@@ -251,6 +251,7 @@ export class Vehicle {
             if (!o.parked) {
               o.v = Math.max(0, o.v - imp * (1 - share) * 0.8);
               o.angry = 6;
+              if (imp > 2) o.dmg = Math.min(1.2, (o.dmg || 0) + (imp - 2) * (T.two ? 0.05 : 0.035));     // every vehicle can be wrecked
               if (T.two && imp > 3.0 && !o.fallen) { o.fallen = 3.5; this.events.push({ type: 'knock', who: 'two', speed: imp, x: o.x, z: o.z }); }
               else if (imp > 1.5) this.events.push({ type: 'hit', who: o.type, speed: imp, x: o.x, z: o.z });
               if (!(o.honkT > 0)) { o.honkT = 2.5; traffic.honks.push({ x: o.x, z: o.z, kind: T.honk, n: 2 }); }   // once per bump, not every frame of contact

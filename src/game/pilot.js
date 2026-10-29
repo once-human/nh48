@@ -295,6 +295,7 @@ export class Pilot {
     // own auto + vehicles you left
     for (const d of this.dropped) {
       const v = d.veh, S = v === this.auto ? specOf('auto') : v.spec;
+      if (v.dead) continue;                                  // a burnt shell isn't going anywhere
       const dist = this.distToBox(F.x, F.z, v.x, v.z, Math.cos(v.th), Math.sin(v.th), S.L, S.W);
       if (dist < 1.6) consider(dist, { kind: 'dropped', d, label: d.towed ? `Pay ₹${d.towed.fee} and take your auto` : v === this.auto ? 'Get in your auto' : S.two ? `Get on the ${S.name.toLowerCase()}` : `Get in the ${S.name.toLowerCase()}`, key: 'F' });
     }
@@ -320,7 +321,7 @@ export class Pilot {
     }
     // traffic: slow or stopped vehicles can be taken from their driver
     if (traffic) traffic.near(F.x, F.z, 8, (o) => {
-      if (!o.T || o.isPlayer || o.parked || o.fallen > 0) return;
+      if (!o.T || o.isPlayer || o.parked || o.fallen > 0 || o.wreck) return;
       const dist = this.distToBox(F.x, F.z, o.x, o.z, o.hx, o.hz, o.T.L, o.T.W);
       if (dist < 1.4 && o.v < 3.5) consider(dist + 0.4, { kind: 'traffic', o, label: `Take the ${specOf(o.type).name.toLowerCase()} from its driver`, key: 'F' });
     });

@@ -404,6 +404,31 @@ export class Game {
     this.hud.toast('It went up', v === P.auto ? 'Your auto is a burnt shell' : 'That vehicle is a burnt shell', 'bad', 4);
     if (v === P.auto) this.later(18, () => this.rebuildAuto());
   }
+  // the traffic's damage: smoke past half, black smoke and flames near the end, then it goes up like yours
+  trafficDamage(dt) {
+    if ((this._tdT = (this._tdT || 0) - dt) > 0) return;
+    this._tdT = 0.1;
+    for (const o of this.traffic.list) {
+      const d = o.dmg || 0;
+      if (d < 0.5 || o.wreck) continue;
+      if (d >= 0.85) o.dmg = d + 0.1 * 0.03;                                            // once it's burning, it keeps burning
+      if (o.dmg >= 1) { this.explodeAgent(o); continue; }
+      const T = o.T || {}, back = (T.L || 3) * 0.35, hx = o.hx ?? Math.cos(o.yaw || 0), hz = o.hz ?? Math.sin(o.yaw || 0);
+      if (Math.random() < (d > 0.85 ? 1 : d > 0.7 ? 0.6 : 0.3)) this.smoke.emit(o.x + hx * back, (o.y || 0) + 0.9, o.z + hz * back, d > 0.7 ? 'black' : 'smoke', 0.35);
+      if (d > 0.85) this.smoke.emit(o.x + hx * back, (o.y || 0) + 0.6, o.z + hz * back, 'fire', 0.4);
+    }
+  }
+  explodeAgent(o) {
+    const P = this.player;
+    o.wreck = true; o.v = 0; o.dmg = 1; o.rich = false;
+    this.smoke.explode(o.x, (o.y || 0) + 0.8, o.z);
+    const d = Math.hypot(P.x - o.x, P.z - o.z);
+    this.rig.shake(Math.max(0.2, 1.2 - d / 40)); this.audio.at(o.x, o.z, () => { this.audio.crash && this.audio.crash(1); this.audio.boom && this.audio.boom(); });
+    if (P.onFoot && d < 7) { P.downT = 3; if (P.human) P.human.play('knockback', { once: true, fade: 0.06 }); }
+    for (const p of this.people.list) { const dd = Math.hypot(p.x - o.x, p.z - o.z); if (dd < 8 && !p.fixed && !(p.fallen > 0)) p.fallen = 4 + Math.random() * 3; }
+    this.wrecks.push({ v: o, t: 0 });
+    this.brain && this.brain.incident('blast', o.x, o.z, { byYou: true });
+  }
   burnWrecks(dt) {
     for (const w of this.wrecks) {
       w.t += dt; const v = w.v;
@@ -1055,7 +1080,7 @@ export class Game {
     // a dark base under the whole city: any hairline crack between ground pieces shows asphalt, not the bright sky
     if (!this.under) { this.under = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshLambertMaterial({ color: 0x2b2b2d })); this.under.rotation.x = -Math.PI / 2; this.under.receiveShadow = false; this.scene.add(this.under); }
     this.under.position.set(Math.round(this.camera.position.x / 50) * 50, -0.03, Math.round(this.camera.position.z / 50) * 50);
-    if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); }
+    if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); if (this.traffic && this.state === 'play') this.trafficDamage(dt); }
     this.stepRefuel(dt);
     if (this.brain && this.state !== 'title') this.brain.update(dt, this.player);
     if (this.emergency && this.state !== 'title') this.emergency.update(dt);

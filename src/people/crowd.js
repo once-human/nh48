@@ -180,7 +180,7 @@ export class Crowd {
       H.holder.position.set(p.x, p.y + _v.y, p.z);
       H.holder.quaternion.copy(_q); if (p.sideSaddle) H.holder.rotateY(Math.PI / 2);   // (p.side is a pedestrian's side of the road, not side-saddle)
     } else {
-      H.holder.position.set(p.x, this.W.surf.height(p.x, p.z), p.z);
+      H.holder.position.set(p.x, this.W.surf.height(p.x, p.z) + (p.liftY || 0), p.z);
       H.holder.rotation.set(0, -p.yaw, 0);
     }
     // how fast they're really moving over the ground (the walk follows it, so feet never slide)
