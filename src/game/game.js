@@ -37,6 +37,7 @@ import { Story } from './story.js';
 import { Tutorial } from './tutorial.js';
 import { Smoke } from '../gfx/smoke.js';
 import { Photowalk } from './photowalk.js';
+import { bagOrder } from './bag.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { StreetApproach } from './approach.js';
@@ -160,6 +161,15 @@ export class Game {
     this.bag = new Bag(this);
     this.tut = new Tutorial(this);
     this.photowalk = new Photowalk(this);
+    // the hotbar: 1 to 5 use the jhola's top row while you play
+    window.addEventListener('keydown', (e) => {
+      const m = /^Digit([1-5])$/.exec(e.code);
+      if (!m || this.state !== 'play' || e.repeat || (this.police && this.police.stop) || (this.story && this.story.talking)) return;
+      const id = bagOrder(this)[+m[1] - 1];
+      if (!id) return;
+      const r = this.life.use(id);
+      if (r) this.hud.toast(r, '', 'good', 1.8);
+    });
     this.phone = new Phone(this);
     this.eggs = new Eggs(this);
     this.story = new Story(this);

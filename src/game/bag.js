@@ -19,6 +19,13 @@ const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const dist = (d) => d < 1000 ? `${Math.round(d / 10) * 10} m` : `${(d / 1000).toFixed(1)} km`;
 
+// the order things sit in the bag: tools first (the torch), then food and drink, then the rest. The first five
+// are the hotbar (keys 1 to 5 while you play)
+export function bagOrder(G) {
+  const inv = G.life.s.inv, ids = Object.keys(inv).filter(k => inv[k] > 0 && ITEMS[k]);
+  const order = (id) => ITEMS[id].tool ? 0 : ITEMS[id].use && (ITEMS[id].use.hunger || ITEMS[id].use.thirst) ? 1 : 2;
+  return ids.sort((a, b) => order(a) - order(b) || a.localeCompare(b));
+}
 export class Bag {
   constructor(G) {
     this.g = G; this.tab = 'bag'; this.group = 'food';
@@ -73,21 +80,24 @@ export class Bag {
     const B = this.el.querySelector('.jh-body');
     let h = '';
     if (this.tab === 'bag') {
-      const ids = Object.keys(s.inv).filter(k => s.inv[k] > 0 && ITEMS[k]);
-      if (!ids.length) h += `<p class="jh-empty">Nothing in here. A kirana sells water, Parle-G and bananas; any eatery will pack you a parcel.</p>`;
-      else {
-        // tools first (the torch), then food and drink, then the rest
-        const order = (id) => ITEMS[id].tool ? 0 : ITEMS[id].use && (ITEMS[id].use.hunger || ITEMS[id].use.thirst) ? 1 : 2;
-        ids.sort((a, b) => order(a) - order(b));
-        const torchOn = G.lights && G.lights.torchOn;
-        h += '<div class="jh-grid">';
-        for (const id of ids) {
-          const it = ITEMS[id], on = it.tool && torchOn;
-          const what = it.tool ? (on ? 'On. Tap to switch off' : 'Tap to switch on') : it.scratch ? 'Scratch it' : it.feed ? (it.feed === 'dog' ? 'Eat, or feed a dog' : 'Eat, or feed a cow') : describe(it.use);
-          h += `<button class="jh-item${it.tool ? ' tool' : ''}${on ? ' on' : ''}" data-act="use" data-arg="${id}" title="${esc(it.note || describe(it.use))}"><span class="pk">${icon(ITEM_ICON[id] || 'parcel')}</span><b>${esc(it.name)}</b><small>${esc(what)}</small>${it.tool ? `<em>${on ? 'ON' : 'OFF'}</em>` : `<i>×${s.inv[id]}</i>`}</button>`;
-        }
-        h += '</div>';
+      // a bag with room in it: you on the left, the slots on the right (empty ones too), the first five on the
+      // hotbar (1 to 5 use them while you play, no need to open the jhola)
+      const ids = bagOrder(G), torchOn = G.lights && G.lights.torchOn, P = G.player;
+      const bar = (lab, v, col) => `<div class="jb-bar"><span>${lab}</span><i><b style="width:${Math.round(Math.max(0, Math.min(1, v)) * 100)}%;background:${col}"></b></i></div>`;
+      h += `<div class="jb"><div class="jb-me"><div class="jb-name">${esc((G.hud.charName && G.hud.charName()) || 'You')}</div>
+        ${bar('Health', (P.hp ?? 100) / L.hpMax, '#ff375f')}${bar('Food', s.hunger, '#ffb224')}${bar('Water', s.thirst, '#40c8ff')}${bar('Energy', s.energy, '#a8e43a')}
+        <div class="jb-cash"><small>Cash</small><b>${fmt(G.stats.money)}</b>${s.bank ? `<small>Bank</small><b>${fmt(s.bank)}</b>` : ''}</div>
+        <p class="jb-tip"><span class="kbd">1</span>–<span class="kbd">5</span> use the top row while you play</p></div>
+        <div class="jb-slots">`;
+      for (let k = 0; k < Math.max(24, Math.ceil(ids.length / 6) * 6); k++) {
+        const id = ids[k];
+        if (!id) { h += `<div class="jb-slot empty${k < 5 ? ' hot' : ''}">${k < 5 ? `<em>${k + 1}</em>` : ''}</div>`; continue; }
+        const it = ITEMS[id], on = it.tool && torchOn, n = s.inv[id];
+        const what = it.tool ? (on ? 'On · use to switch off' : 'Use to switch on') : it.feed ? (it.feed === 'dog' ? 'Eat, or feed a dog' : 'Eat, or feed a cow') : describe(it.use);
+        h += `<button class="jh-item jb-slot${k < 5 ? ' hot' : ''}${on ? ' on' : ''}" data-act="use" data-arg="${id}" title="${esc(it.name)} · ${esc(what)}">${k < 5 ? `<em>${k + 1}</em>` : ''}<span class="pk">${icon(ITEM_ICON[id] || 'parcel')}</span><b>${esc(it.name)}</b>${n > 1 ? `<i>${n}</i>` : ''}</button>`;
       }
+      h += '</div></div>';
+      if (!ids.length) h += `<p class="jh-empty">Nothing in here yet. A kirana sells water, Parle-G and bananas; any eatery will pack you a parcel.</p>`;
       if (s.vehicles.length) h += `<div class="jh-sub">Keys</div>` + s.vehicles.map(v => this.row('key', `${cap(v.type)}`, v.plate, '', null)).join('');
     } else if (this.tab === 'me') {
       const P = G.player, st = L.style(), re = L.reaction(), hp = (P.hp ?? 100) / L.hpMax;
