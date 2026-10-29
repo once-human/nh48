@@ -628,7 +628,10 @@ export class Shops {
     const fuel = v.fuel ?? 1, need = 1 - fuel;
     const tank = isAuto ? 8 : v.spec.two ? 5 : 35, per = cng ? 92 : 106;          // kg of CNG or litres of petrol; ₹ per unit
     const cost = Math.max(10, Math.round(need * tank * per));
-    out.push({ label: `Fill up ${cng ? 'CNG' : 'petrol'}, ${isAuto ? 'your auto' : v.spec.name.toLowerCase()}`, note: `Tank at ${Math.round(fuel * 100)}% · ${cng ? '₹92/kg' : '₹106/litre'}`, price: cost, disabled: need < 0.03 ? 'Full' : '', act: () => { if (!this.spend(cost)) return false; v.fuel = 1; if (isAuto) L.s.autoFuel = 1; return 'Tank full'; } });
+    // "kiti cha bharu?": full, or a round amount; the attendant fills while the engine's off and the meter runs
+    const fill = (add, price) => () => { if (!this.spend(price)) return false; this.g.startRefuel(v, add, price, cng, tank); return `Filling ${cng ? 'CNG' : 'petrol'}…`; };
+    out.push({ label: `Fill it up, ${cng ? 'CNG' : 'petrol'}`, note: `Tank at ${Math.round(fuel * 100)}% · ${cng ? '₹92/kg' : '₹106/litre'}`, price: cost, disabled: need < 0.03 ? 'Full' : '', act: fill(need, cost) });
+    for (const amt of [500, 200]) if (amt < cost - 20) out.push({ label: `₹${amt} of ${cng ? 'CNG' : 'petrol'}`, note: `${(amt / per).toFixed(1)} ${cng ? 'kg' : 'litres'}`, price: amt, act: fill(amt / per / tank, amt) });
     out.push({ label: 'Air in the tyres', note: 'Free, the guy smiles', price: 0, act: () => { L.change('karma', 0.5); return 'Pressure checked'; } });
     out.push({ label: 'Water bottle', note: 'From the pump’s kiosk', price: 20, act: () => { if (!this.spend(20)) return false; L.add('water'); return 'In your bag'; } });
   }

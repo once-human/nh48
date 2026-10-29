@@ -323,7 +323,7 @@ export class Game {
     if (was > 0 && v.fuel <= 0) this.hud.toast('Out of fuel', 'The engine coughs. You can crawl to a pump', 'bad', 4);
     const fuelMul = v.fuel > 0 ? 1 : 0.22;
     // a beaten engine: weaker and weaker, smoking, then burning, then gone
-    v.powerMul = v.dead ? 0 : (v.tune || 1) * fuelMul * (1 - Math.min(0.95, v.dmg) * 0.6);
+    v.powerMul = v.dead || (this.refuel && this.refuel.v === v) ? 0 : (v.tune || 1) * fuelMul * (1 - Math.min(0.95, v.dmg) * 0.6);
     this.engineState(v, dt);
     if (v === P.auto) { this.life.s.autoFuel = Math.round(v.fuel * 1000) / 1000; this.life.s.autoDmg = Math.round(v.dmg * 1000) / 1000; }
   }
@@ -396,6 +396,14 @@ export class Game {
     const S = this.stand || this.wadaStart();
     if (S) this.player.moveAuto(S.x, S.z, S.th, this.traffic);
     this.hud.sms('Bapu Kaka', `रिक्षा पुन्हा उभी केली. ₹${paid.toLocaleString('en-IN')} लागले. स्टँडवर आहे. आता तरी सावकाश चालव.`, '', 'Rebuilt your auto. It’s at the stand by Shaniwar Wada. Drive slowly this time.');
+  }
+  // at the pump: the engine stays off and the meter runs up while the attendant fills, then you're off
+  startRefuel(v, add, price, cng, tank) { this.refuel = { v, from: v.fuel ?? 0, to: Math.min(1, (v.fuel ?? 0) + add), t: 0, dur: 2.5 + add * 9, price, cng, units: add * tank }; }
+  stepRefuel(dt) {
+    const R = this.refuel; if (!R) return;
+    R.t += dt; const k = Math.min(1, R.t / R.dur);
+    R.v.fuel = R.from + (R.to - R.from) * k; R.v.powerMul = 0;
+    if (k >= 1) { this.refuel = null; this.hud.toast('Tank filled', `${R.units.toFixed(1)} ${R.cng ? 'kg CNG' : 'litres'} · ₹${R.price}. “Chala, bye!”`, 'good', 3); }
   }
   nearestPump() {
     const P = this.player;
@@ -814,6 +822,7 @@ export class Game {
   objective() {
     const r = this.rides, P = this.player;
     if (P.tipped) return { main: 'Auto tipped over!', sub: 'Hold on… getting it back on three wheels', urgent: true };
+    if (this.refuel) { const R = this.refuel, k = Math.min(1, R.t / R.dur); return { main: 'Filling up · engine off', sub: `₹${Math.round(R.price * k)} · ${(R.units * k).toFixed(1)} ${R.cng ? 'kg' : 'L'}` }; }
     const tj = this.tut && this.tut.objective();
     if (tj) return tj;
     const so = this.story && this.story.objective();
@@ -977,6 +986,7 @@ export class Game {
 
   frame(dt) {
     if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); }
+    this.stepRefuel(dt);
     if (this.state !== 'title' && this.tut) this.tut.update(dt);
     const P = this.player;
     if (this.state === 'photo') this.photo.update(dt);
