@@ -1128,7 +1128,8 @@ export class Game {
       if (this.params.get('police')) this.testPolice(tt);
     }
     // a police stop holds you in place
-    if (this.police.holding()) { inp.throttle = 0; inp.brake = Math.abs(this.player.v) > 0.5 ? 1 : 0; inp.steer = 0; inp.handbrake = true; inp.horn = false; }
+    // (until you put your foot down: then you're just driving off, and it's leaving a police stop)
+    if (this.police.holding() && !(inp.throttle > 0.05 || Math.abs(inp.steer) > 0.2)) { inp.throttle = 0; inp.brake = Math.abs(this.player.v) > 0.5 ? 1 : 0; inp.steer = 0; inp.handbrake = true; inp.horn = false; }
     // a few drinks in, the steering wanders
     const dr = this.life ? this.life.s.drunk : 0;
     if (dr > 0.4 && !this.player.onFoot) { this._wob = (this._wob || 0) + dt; inp.steer = Math.max(-1, Math.min(1, inp.steer + Math.sin(this._wob * 1.3) * Math.sin(this._wob * 0.37) * (dr - 0.4) * 0.6)); }

@@ -674,8 +674,13 @@ export class Police {
     // after a chase, or for anything serious: hands on you, no talking. You can try to wrench free (harder the more
     // of them there are); otherwise it's the cuffs. Only a minor matter gets a conversation
     if ((this.heat >= 2 || ['murder', 'assault', 'hitrun', 'blast'].some(c => this.charges.has(c))) && !this.grab) {
-      this.grab = { m, t: 0, need: 4 + this.marshals.reduce((n, u) => n + (u.catchDist() < 10 ? 2 : 0), 0), got: 0 };
-      P.busy = 999; G.hud.grab && G.hud.grab(true, 0); G.audio.thud && G.audio.thud(0.5); G.vb && G.vb.you('caught', true);
+      // how hard it is to wrench free: easy at one or two stars, a real fight at three, very hard at four, and at
+      // five they've got you for good. Every extra officer close by makes it harder still
+      const lv = Math.max(1, this.heat), more = this.marshals.reduce((n, u) => n + (u !== m && u.catchDist() < 10 ? 2 : 0), 0);
+      const need = lv >= 5 ? Infinity : [0, 7, 9, 13, 24][lv] + more;
+      this.grab = { m, t: 0, need, got: 0, dur: lv >= 4 ? 3 : 3.5 };
+      if (!this._grabKey) { this._grabKey = true; addEventListener('keydown', (e) => { if (this.grab && e.code === 'KeyF' && !e.repeat) this.grab.got++; }, true); }
+      P.busy = 999; G.hud.grab && G.hud.grab(true, 0, 1, need === Infinity ? 'No way out: five stars, they’ve got you' : lv >= 4 ? 'Mash F as hard as you can' : null); G.audio.thud && G.audio.thud(0.5); G.vb && G.vb.you('caught', true);
       this.law.radio('Hands on the suspect.');
       return;
     }
@@ -690,14 +695,16 @@ export class Police {
   grabTick(dt) {
     const G = this.g, P = G.player, R = this.grab; if (!R) return;
     R.t += dt;
-    if (G.input.took('KeyF')) { R.got++; G.audio.thud && G.audio.thud(0.15); }
-    G.hud.grab && G.hud.grab(true, Math.min(1, R.got / R.need), 1 - R.t / 3);
+    // (F presses are counted straight off the keyboard: the game's own F handlers used to eat them)
+    G.input.took('KeyF');
+    if (R.got !== R.seen) { R.seen = R.got; G.audio.thud && G.audio.thud(0.15); }
+    G.hud.grab && G.hud.grab(true, R.need === Infinity ? 0 : Math.min(1, R.got / R.need), 1 - R.t / R.dur);
     if (R.got >= R.need) {
       this.grab = null; P.busy = 0; G.hud.grab && G.hud.grab(false);
       R.m.stunT = 3; for (const q of R.m.foot) { q.fallen = 1.8; } this.raiseHeat(1, 'Broke free from arrest', 'fled');
       G.hud.toast('You wrench free', 'Shoved him off. Run!', 'meter', 2.2); G.vb && G.vb.you('flee', true); return;
     }
-    if (R.t > 3) {
+    if (R.t > R.dur) {
       this.grab = null; G.hud.grab && G.hud.grab(false);
       // what happens now depends on what you did: a beating if you fought them, then the cuffs
       if (this.charges.has('assault') || this.heat >= 4) { P.hp = Math.max(8, (P.hp ?? 100) - 18); G.audio.punch?.(); G.rig && G.rig.shake(0.4); G.hud.toast('Lathi charge', 'They don’t ask twice when you’ve fought them', 'bad', 2.6); }

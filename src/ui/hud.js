@@ -780,10 +780,11 @@ export class HUD {
     box.querySelector('.st-go').onclick = () => this.game.police && this.game.police.stop && this.game.police.finishTalk();
   }
   // being grabbed: mash F to break free, a bar for your effort and one for the time left
-  grab(on, effort = 0, left = 1) {
+  grab(on, effort = 0, left = 1, note) {
     let g = this._grab;
-    if (!g) { g = this._grab = el('div', 'grab', '<b>Grabbed!</b><span>Mash <span class="kbd">F</span> to break free</span><i class="ge"><b></b></i><i class="gt"><b></b></i>'); this.root.appendChild(g); }
+    if (!g) { g = this._grab = el('div', 'grab', '<b>Grabbed!</b><span class="gn">Mash <span class="kbd">F</span> to break free</span><i class="ge"><b></b></i><i class="gt"><b></b></i>'); this.root.appendChild(g); }
     this.Hd(g, !on); if (!on) return;
+    if (note !== undefined) g.querySelector('.gn').innerHTML = note ? note.replace('F', '<span class="kbd">F</span>') : 'Mash <span class="kbd">F</span> to break free';
     g.querySelector('.ge b').style.width = Math.round(effort * 100) + '%'; g.querySelector('.gt b').style.width = Math.round(Math.max(0, left) * 100) + '%';
   }
   closeStop() { this.stopEl.hidden = true; this.lower.classList.remove('dim'); }
