@@ -1182,7 +1182,7 @@ export class People {
       BASE.copy(M4);
       if (p.fallen > 0) continue;
       if (umb && hasUmbrella(p) && nu < this.cap) {
-        P3.set(p.x + p.hx * 0.22, y + 1.02, p.z + p.hz * 0.22); S3.set(1, 1, 1); Q.identity();
+        P3.set(p.x + p.hx * 0.2, y + 1.08, p.z + p.hz * 0.2); S3.set(1, 1, 1); Q.identity();
         M4.compose(P3, Q, S3); this.mUmb.setMatrixAt(nu, M4); UC.setHex(umbrellaColor(p)).convertSRGBToLinear(); this.mUmb.instanceColor.setXYZ(nu, UC.r, UC.g, UC.b); nu++;
       }
       // legs (men only; saree hides them)

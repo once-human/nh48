@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { clamp, RNG } from '../core/util.js';
 import { ikArm, leanRider } from './humans.js';
-import { hasUmbrella, umbrellaColor, umbrellaGeo, umbrellaMat } from './umbrella.js';
+import { hasUmbrella, umbrellaColor, umbrellaGeo, umbrellaMat, umbrellaKind } from './umbrella.js';
 const _sh = new THREE.Vector3(), _tg = new THREE.Vector3(), _pl = new THREE.Vector3(), _hd = new THREE.Vector3();
 const _e = new THREE.Euler(0, 0, 0, 'YXZ'), _q = new THREE.Quaternion(), _v = new THREE.Vector3();
 // where the hands go: the handlebar grips (vehicle frame, as you hold them), by model
@@ -219,14 +219,14 @@ export class Crowd {
     // in the rain: the umbrella up in the right hand, held at the chest, the canopy over the head
     const umb = this.rain > 0.2 && !p.rideOf && !(p.fallen > 0) && !p.act && p.mode !== 'fight' && dd < 60 && (seen || dd < 12) && hasUmbrella(p);
     if (umb) {
-      if (!s.umb) { UGEO = UGEO || umbrellaGeo(); s.umb = new THREE.Mesh(UGEO, umbrellaMat()); s.umb.castShadow = true; this.scene.add(s.umb); }
-      if (s.umbFor !== p) { s.umbFor = p; s.umb.material.color.setHex(umbrellaColor(p)); }
+      if (!s.umb) { s.umb = new THREE.Mesh(umbrellaGeo(0), umbrellaMat()); s.umb.castShadow = true; this.scene.add(s.umb); }
+      if (s.umbFor !== p) { s.umbFor = p; s.umb.material.color.setHex(umbrellaColor(p)); s.umb.geometry = umbrellaGeo(umbrellaKind(p)); }
       H.holder.updateMatrixWorld(true);
       const up = H.root.getObjectByName('upperarm_r'), hand = H.root.getObjectByName('hand_r');
       if (up && hand) {
         const fx = Math.cos(p.yaw), fz = Math.sin(p.yaw), rx = -fz, rz = fx;
         up.getWorldPosition(_sh);
-        _tg.set(_sh.x + fx * 0.24 - rx * 0.12, _sh.y - 0.2, _sh.z + fz * 0.24 - rz * 0.12);
+        _tg.set(_sh.x + fx * 0.22 - rx * 0.12, _sh.y - 0.26, _sh.z + fz * 0.22 - rz * 0.12);
         _pl.set(rx * 0.6, -0.8, rz * 0.6).normalize();
         ikArm(H, 'r', _tg, _pl, 1);
         hand.getWorldPosition(_hd);
