@@ -272,6 +272,7 @@ export function* buildPropsChunk(W, C, group) {
 
   W.sliceLabel = 'pBus';
   for (const b of C.buses) {
+    yield;
     const x = b[0] / 100, z = b[1] / 100, a = b[2];
     const dx = Math.cos(a), dz = Math.sin(a);
     const ry = Math.atan2(dx, dz);
@@ -282,6 +283,7 @@ export function* buildPropsChunk(W, C, group) {
       [Math.sin(ry), 0, Math.cos(ry)], s.u0, s.v0, s.u1, s.v1);
   }
   for (const s of C.stalls) {
+    yield;
     const x = s[0] / 100, z = s[1] / 100, a = s[2], t = s[3];
     const proto = P['stall' + t] || P.stall0;
     const ry = Math.atan2(Math.cos(a), Math.sin(a));
@@ -295,6 +297,7 @@ export function* buildPropsChunk(W, C, group) {
     }
   }
   for (const ex of C.extras) {
+    yield;
     if (ex.kind === 'street' || ex.kind === 'banner') {
       const { x, z, fx, fz } = ex;
       const ry = Math.atan2(-fx, -fz);
@@ -503,10 +506,10 @@ export function* buildPropsChunk(W, C, group) {
   // emit
   yield;
   W.sliceLabel = 'pEmitC';
-  if (!cb.empty) { const m = new THREE.Mesh(cb.build(), mats.prop); m.castShadow = true; m.receiveShadow = true; group.add(m); }
+  if (!cb.empty) { const m = new THREE.Mesh(yield* cb.buildSliced(), mats.prop); m.castShadow = true; m.receiveShadow = true; group.add(m); }
   yield;
   W.sliceLabel = 'pEmitS';
-  if (!sb.empty) { const m = new THREE.Mesh(sb.build(), mats.oldSign); m.receiveShadow = true; group.add(m); }
+  if (!sb.empty) { const m = new THREE.Mesh(yield* sb.buildSliced(), mats.oldSign); m.receiveShadow = true; group.add(m); }
   yield;
   W.sliceLabel = 'pEmitG';
   if (!gb.empty) { const m = new THREE.Mesh(gb.build(), mats.ground); m.castShadow = true; m.receiveShadow = true; group.add(m); }

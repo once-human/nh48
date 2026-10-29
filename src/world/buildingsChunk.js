@@ -3,7 +3,7 @@
 // ramparts, rooftop clutter (Sintex tanks, stair cabins, dishes, solar heaters), Diwali lanterns,
 // shop boards and rooftop hoardings.
 import * as THREE from 'three';
-import { cmRing, triangulate, ColorBuilder, QuadBuilder, lin } from './geo.js';
+import { cmRing, triangulate, ColorBuilder, QuadBuilder, lin, toTyped, boundsSliced, drain } from './geo.js';
 import { STYLE_PARAMS, WL } from '../gfx/pbr.js';
 import { RNG, hash1 } from '../core/util.js';
 
@@ -85,8 +85,8 @@ export class FacadeB {
     g.setAttribute('fstyle', new THREE.BufferAttribute(new Uint8Array(this.s), 4, false));
     g.setAttribute('ftan', new THREE.BufferAttribute(q(this.tn, 127, Int8Array), 2, true));
     g.setAttribute('ftop', new THREE.BufferAttribute(new Float32Array(this.top), 1)); yield;
-    g.setIndex(new THREE.BufferAttribute(this.c > 65535 ? new Uint32Array(this.i) : new Uint16Array(this.i), 1));
-    g.computeBoundingSphere(); g.computeBoundingBox();
+    g.setIndex(new THREE.BufferAttribute(yield* toTyped(this.i, this.c > 65535 ? Uint32Array : Uint16Array), 1)); yield;
+    yield* boundsSliced(g);
     return g;
   }
   buildOld() {
@@ -129,15 +129,17 @@ export class RoofB {
     if (flip) this.i.push(ia, ic, ib); else this.i.push(ia, ib, ic);
   }
   get empty() { return this.c === 0; }
-  build() {
+  build() { return drain(this.buildSliced()); }
+  *buildSliced() {
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
-    g.setAttribute('ruv', new THREE.Float32BufferAttribute(this.uv, 2));
-    g.setAttribute('rlayer', new THREE.BufferAttribute(new Uint8Array(this.l), 1));
-    g.setAttribute('rtint', new THREE.BufferAttribute(new Uint8Array(this.t.map(v => Math.min(255, Math.round(v * 255)))), 3, true));
-    g.setIndex(new THREE.BufferAttribute(this.c > 65535 ? new Uint32Array(this.i) : new Uint16Array(this.i), 1));
-    g.computeBoundingSphere(); g.computeBoundingBox();
+    g.setAttribute('position', new THREE.BufferAttribute(yield* toTyped(this.p), 3)); yield;
+    g.setAttribute('normal', new THREE.BufferAttribute(yield* toTyped(this.n), 3)); yield;
+    g.setAttribute('ruv', new THREE.BufferAttribute(yield* toTyped(this.uv), 2));
+    g.setAttribute('rlayer', new THREE.BufferAttribute(new Uint8Array(this.l), 1)); yield;
+    const t = new Uint8Array(this.t.length); for (let i = 0; i < t.length; i++) t[i] = Math.min(255, Math.round(this.t[i] * 255));
+    g.setAttribute('rtint', new THREE.BufferAttribute(t, 3, true)); yield;
+    g.setIndex(new THREE.BufferAttribute(yield* toTyped(this.i, this.c > 65535 ? Uint32Array : Uint16Array), 1)); yield;
+    yield* boundsSliced(g);
     return g;
   }
 }
@@ -363,6 +365,7 @@ export function* buildBuildingsChunk(W, C, group) {
   // rooftop hoardings facing chowks
   W.sliceLabel = 'hoard';
   for (const h of C.hoardings) {
+    yield;
     const x = h[2] / 100, z = h[3] / 100, ang = h[4];
     const f = footprints.find(f => insideRing(x, z, f.p));
     if (f && f.h > 6) hoarding(cb, sb, signs, x, f.h, z, ang, h[0]);
@@ -374,17 +377,19 @@ export function* buildBuildingsChunk(W, C, group) {
   if (!fb.empty) { const m = new THREE.Mesh(yield* fb.buildSliced(), mats.facade); m.castShadow = true; m.receiveShadow = true; group.add(m); }
   yield;
   W.sliceLabel = 'emitR';
-  if (!rb.empty) { const m = new THREE.Mesh(rb.build(), mats.roof); m.castShadow = true; m.receiveShadow = true; group.add(m); }
+  if (!rb.empty) { const m = new THREE.Mesh(yield* rb.buildSliced(), mats.roof); m.castShadow = true; m.receiveShadow = true; group.add(m); }
   yield;
   W.sliceLabel = 'emitC';
-  if (!cb.empty) { const m = new THREE.Mesh(cb.build(), mats.prop); m.castShadow = true; m.receiveShadow = true; group.add(m); }
-  if (!sb.empty) { const m = new THREE.Mesh(sb.build(), mats.sign); m.receiveShadow = true; group.add(m); }
+  if (!cb.empty) { const m = new THREE.Mesh(yield* cb.buildSliced(), mats.prop); m.castShadow = true; m.receiveShadow = true; group.add(m); }
+  yield;
+  if (!sb.empty) { const m = new THREE.Mesh(yield* sb.buildSliced(), mats.sign); m.receiveShadow = true; group.add(m); }
+  yield;
   let localMat = null;
   if (!ob.empty && local.tex) {
     localMat = mats.sign.clone();
     localMat.map = local.tex; localMat.emissiveMap = local.tex;
     W.signMats.add(localMat);
-    const m = new THREE.Mesh(ob.build(), localMat); m.receiveShadow = true; group.add(m);
+    const m = new THREE.Mesh(yield* ob.buildSliced(), localMat); m.receiveShadow = true; group.add(m);
   }
   if (W.nearBoards) W.nearBoards.addChunk(C.ci, C.cx, C.cz, nearRecs);
   return () => {

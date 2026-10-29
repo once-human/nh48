@@ -39,6 +39,35 @@ export function triangulate(rings) {
   return { coords, tris };
 }
 
+// a plain array into a typed one a slice at a time, then the bounds the same way (a dense chunk has hundreds of
+// thousands of values: done at once that was a 20-60 ms frame)
+export function* toTyped(src, T = Float32Array) {
+  const o = new T(src.length), S = 60000;
+  for (let i = 0; i < src.length; i += S) { const e = Math.min(src.length, i + S); for (let k = i; k < e; k++) o[k] = src[k]; if (e < src.length) yield; }
+  return o;
+}
+export function* boundsSliced(g) {
+  const p = g.attributes.position.array, S = 90000;
+  let a = Infinity, b = Infinity, c = Infinity, d = -Infinity, e = -Infinity, f = -Infinity;
+  for (let i = 0; i < p.length; i += 3) {
+    const x = p[i], y = p[i + 1], z = p[i + 2];
+    if (x < a) a = x; if (y < b) b = y; if (z < c) c = z; if (x > d) d = x; if (y > e) e = y; if (z > f) f = z;
+    if (i % S === S - 3) yield;
+  }
+  g.boundingBox = new THREE.Box3(new THREE.Vector3(a, b, c), new THREE.Vector3(d, e, f));
+  const cx = (a + d) / 2, cy = (b + e) / 2, cz = (c + f) / 2; let r2 = 0;
+  for (let i = 0; i < p.length; i += 3) { const q = (p[i] - cx) ** 2 + (p[i + 1] - cy) ** 2 + (p[i + 2] - cz) ** 2; if (q > r2) r2 = q; if (i % S === S - 3) yield; }
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, cy, cz), Math.sqrt(r2));
+}
+// attrs: [name, plain array, item size]; one attribute per step
+export function* geometrySliced(attrs, index, count) {
+  const g = new THREE.BufferGeometry();
+  for (const [name, arr, size] of attrs) { g.setAttribute(name, new THREE.BufferAttribute(yield* toTyped(arr), size)); yield; }
+  g.setIndex(new THREE.BufferAttribute(yield* toTyped(index, count > 65535 ? Uint32Array : Uint16Array), 1)); yield;
+  yield* boundsSliced(g);
+  return g;
+}
+export const drain = (it) => { let st; while (!(st = it.next()).done) { /* all at once */ } return st.value; };
 function finishIndex(geo, index, count) {
   const I = count > 65535 ? new Uint32Array(index) : new Uint16Array(index);
   geo.setIndex(new THREE.BufferAttribute(I, 1));
@@ -213,16 +242,11 @@ export class ColorBuilder {
     else for (let k = 0; k < pos.count; k++) this.i.push(base + k);
   }
   get empty() { return this.c === 0; }
-  build() {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
-    g.setAttribute('glow', new THREE.Float32BufferAttribute(this.g, 1));
-    if (this.paint) g.setAttribute('paint', new THREE.Float32BufferAttribute(this.paint, 1));
-    finishIndex(g, this.i, this.c);
-    g.computeBoundingSphere(); g.computeBoundingBox();
-    return g;
+  build() { return drain(this.buildSliced()); }
+  *buildSliced() {
+    const a = [['position', this.p, 3], ['normal', this.n, 3], ['color', this.col, 3], ['glow', this.g, 1]];
+    if (this.paint) a.push(['paint', this.paint, 1]);
+    return yield* geometrySliced(a, this.i, this.c);
   }
 }
 
@@ -261,15 +285,8 @@ export class QuadBuilder {
       [0, 1, 0], uvr[0], uvr[1], uvr[2], uvr[3]);
   }
   get empty() { return this.c === 0; }
-  build() {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
-    finishIndex(g, this.i, this.c);
-    g.computeBoundingSphere(); g.computeBoundingBox();
-    return g;
-  }
+  build() { return drain(this.buildSliced()); }
+  *buildSliced() { return yield* geometrySliced([['position', this.p, 3], ['normal', this.n, 3], ['uv', this.uv, 2]], this.i, this.c); }
 }
 
 // polyline utilities
