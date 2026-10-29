@@ -450,6 +450,11 @@ const BUILD = {
         x.font = `800 ${h * 0.2}px Mukta, sans-serif`; x.fillText('शनिवारवाडा', w / 2, h * 0.24); x.font = `800 ${h * 0.15}px Inter, sans-serif`; x.fillText('SHANIWAR WADA', w / 2, h * 0.47);
         x.font = `500 ${h * 0.09}px Inter, sans-serif`; x.fillText('Seat of the Peshwas · 1732', w / 2, h * 0.66); x.fillText('Open 8 am to 6:30 pm', w / 2, h * 0.8); }, 'sw-plaque');
       B.hitBox(pu, pv, 3.2, 0.5);
+      // and, being Pune, a patya on its post next to it: the warning about after midnight
+      B.cyl(pu + 3.2, 0, pv, 0.06, 1.9, C.iron, 6);
+      B.board(pu + 3.2, 1.75, pv - 0.08, 1.3, 0.62, (x, w, h) => { x.fillStyle = '#f6f3ea'; x.fillRect(0, 0, w, h); x.strokeStyle = '#9b1c1c'; x.lineWidth = h * 0.05; x.strokeRect(h * 0.05, h * 0.05, w - h * 0.1, h - h * 0.1);
+        x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#9b1c1c'; x.font = `800 ${h * 0.24}px Mukta, sans-serif`; x.fillText('रात्री १२ नंतर', w / 2, h * 0.32);
+        x.fillStyle = '#1a1a1a'; x.fillText('येथे थांबू नये.', w / 2, h * 0.62); x.font = `600 ${h * 0.1}px Inter, sans-serif`; x.fillStyle = '#555'; x.fillText('(do not linger here after midnight)', w / 2, h * 0.86); }, 'sw-patya');
     }
     // the hawkers' carts: a painted body, bicycle wheels, a striped umbrella, the name on a board
     for (const [vu, vv, key, name, mr, price, , col] of W.vendors) {
@@ -473,8 +478,22 @@ const BUILD = {
       for (let k = 0; k < n; k++) { const t = (k + 0.5) / n, h = 10.6 * (k + 1) / n; B.box(ua + (ub - ua) * t, vv, Math.abs(ub - ua) / n + 0.02, 3.2, 0, h, stA, trA); }
       for (let k = 0; k < n; k += 2) { const t = (k + 1) / n, h = 10.6 * (k + 1) / n; B.box(ua + (ub - ua) * t, vv + 1.75, Math.abs(ub - ua) * 2 / n + 0.04, 0.3, h - 0.2, h + 0.85, stA, trA); }
       B.deckRamp(ua, vv, ub, vv, 3.2, 0, 10.6);
-      B.hitk(ua, vv + 1.6, ub, vv + 1.6, 5);
+      B.hitk(ua, vv + 1.6, ub, vv + 1.6, 0);
+      // a stone parapet across the top end of the flight: you step off onto the wall walk, not into the air
+      B.box(ub + sgn * 0.2, vv, 0.35, 3.4, 10.4, 11.5, stA, trA); B.hitk(ub + sgn * 0.25, vv - 1.7, ub + sgn * 0.25, vv + 1.7, 0);
     }
+    // the inner edge of the rampart walk: a parapet all round (open where the two flights arrive), so nobody
+    // walks off the wall into the lawns ten metres down
+    { const pA = B.A(WL.rubble, STONE, 11, 2, 11.5), pT = B.A(WL.slab, T([0.7, 0.65, 0.57]));
+      const run = (a0, b0, a1, b1) => { const L2 = Math.hypot(a1 - a0, b1 - b0); if (L2 < 0.5) return;
+        const n = Math.max(1, Math.round(L2 / 6));
+        for (let k = 0; k < n; k++) { const t0 = k / n, t1 = (k + 1) / n, ua2 = a0 + (a1 - a0) * t0, va2 = b0 + (b1 - b0) * t0, ub2 = a0 + (a1 - a0) * t1, vb2 = b0 + (b1 - b0) * t1;
+          B.box((ua2 + ub2) / 2, (va2 + vb2) / 2, Math.max(0.35, Math.abs(ub2 - ua2)), Math.max(0.35, Math.abs(vb2 - va2)), 10.6, 11.45, pA, pT); }
+        B.hitk(a0, b0, a1, b1, 0); };
+      const e = 0.2, U0 = W.U0 + e, U1 = W.U1 - e, V0 = W.V0 + e, V1 = W.V1 - e;
+      const gaps = [[gu - 47, gu - 41], [gu - gw / 2 - 0.5, gu + gw / 2 + 0.5], [gu + 41, gu + 47]].sort((a, b) => a[0] - b[0]);
+      let u = U0; for (const [g0, g1] of gaps) { run(u, V0, g0, V0); u = g1; } run(u, V0, U1, V0);
+      run(U1, V0, U1, V1); run(U1, V1, U0, V1); run(U0, V1, U0, V0); }
     const cannon = (u, v, yaw) => {
       const fx = Math.sin(yaw), fz = -Math.cos(yaw), at = (a, b) => [u + a * Math.cos(yaw) - b * Math.sin(yaw), v + a * Math.sin(yaw) + b * Math.cos(yaw)];
       B.cbox(u, 10.6, v, 1.2, 0.55, 2.2, C.teak, yaw);
@@ -482,8 +501,9 @@ const BUILD = {
       B.part(geo('barrel', () => { const g = new THREE.CylinderGeometry(0.17, 0.26, 2.6, 12); g.rotateX(Math.PI / 2); return g; }), u + fx * 0.3, 11.35, v + fz * 0.3, [0.13, 0.13, 0.14], yaw);
       void fx;
     };
-    for (const u of [gu - 26, gu + 26, -52, 50]) cannon(u, -77.6, 0);
-    for (const v of [-45, 40]) { cannon(-69.8, v, -Math.PI / 2); cannon(66.2, v, Math.PI / 2); }
+    // the cannons stand forward at the outer parapet, solid, with room to walk behind them along the wall
+    for (const u of [gu - 26, gu + 26, -52, 50]) { cannon(u, -80.6, 0); B.hitc(u, -80.6, 1.25); }
+    for (const v of [-45, 40]) { cannon(-72.2, v, -Math.PI / 2); B.hitc(-72.2, v, 1.25); cannon(68.6, v, Math.PI / 2); B.hitc(68.6, v, 1.25); }
   },
 
   // Dagdusheth Halwai Ganpati: a white marble temple open to the street, gold everywhere, the idol lit inside
