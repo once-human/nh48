@@ -130,7 +130,28 @@ export function buildCarCockpit(kind, mats) {
     bx(xf0 - 1.65, fl, -0.1, xf0 - 0.55, fl + 0.3, 0.1, TRIM);                                  // console
     bx(xf0 - 1.3, fl + 0.3, -0.03, xf0 - 1.1, fl + 0.38, 0.03, DASH.concat([0, MATTE]));          // handbrake
     if (S.L > 3.8) { bx(xb + 0.05, fl + 0.2, -hw + 0.15, xb + 0.55, fl + 0.36, hw - 0.15, CLOTH); bx(xb - 0.02, fl + 0.36, -hw + 0.15, xb + 0.1, fl + 0.95, hw - 0.15, CLOTH); }
+    // the windscreen's two pillars, dash corner to roof, in trim (the body's own pillars aren't drawn from inside)
+    const roofX = hl - S.roofF - S.hood * 0 , H = S.H;
+    for (const sd of [-1, 1]) {
+      const a = new THREE.Vector3(xf0 - 0.05, belt + 0.02, sd * (hw - 0.12)), b2 = new THREE.Vector3(Math.min(xf0 - 0.6, xf0 - (H - belt) * 0.9), H - 0.08, sd * (hw - 0.22));
+      const len = a.distanceTo(b2), g = new THREE.BoxGeometry(0.06, len, 0.07);
+      g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b2.clone().sub(a).normalize()));
+      g.translate((a.x + b2.x) / 2, (a.y + b2.y) / 2, (a.z + b2.z) / 2);
+      c.addGeo(g, new THREE.Matrix4(), TRIM.slice(0, 3), 0, MATTE);
+    }
+    void roofX;
+    // the rear-view mirror at the top of the windscreen
+    const mx = xf0 - 0.42;
+    bx(mx - 0.015, H - 0.17, -0.09, mx + 0.015, H - 0.12, 0.09, [0.08, 0.08, 0.085, 0, MATTE]);
+    bx(mx - 0.008, H - 0.12, -0.01, mx + 0.008, H - 0.07, 0.01, [0.08, 0.08, 0.085, 0, MATTE]);
+    // the centre stack: vents, a screen, the AC knobs; the glovebox line on the passenger side
+    bx(xf0 - 0.62, belt - 0.32, -0.16, xf0 - 0.5, belt - 0.02, 0.16, DASH.concat([0, MATTE]));
+    for (const zz of [-0.1, 0.1]) bx(xf0 - 0.635, belt - 0.1, zz - 0.045, xf0 - 0.62, belt - 0.05, zz + 0.045, [0.04, 0.04, 0.045, 0, MATTE]);
+    for (const zz of [-0.06, 0, 0.06]) bx(xf0 - 0.64, belt - 0.29, zz - 0.018, xf0 - 0.615, belt - 0.255, zz + 0.018, METAL.concat([0, 0.4]));
+    bx(xf0 - 0.5, belt - 0.2, -hw + 0.25, xf0 - 0.48, belt - 0.19, -0.25, [0.1, 0.095, 0.09, 0, MATTE]);
     group.add(new THREE.Mesh(c.build(), mats.solid));
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.14), new THREE.MeshBasicMaterial({ color: 0x2a4a6e, toneMapped: false }));
+    scr.position.set(xf0 - 0.64, belt - 0.17, 0); scr.rotation.y = -Math.PI / 2; group.add(scr);
   }
   return {
     group, eye: [xf0 - 1.2, belt + 0.23, DRIVER_Z],

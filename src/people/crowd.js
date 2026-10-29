@@ -68,13 +68,15 @@ export class Crowd {
       if (!o.rich) { o._riders = null; continue; }
       if (!o._riders) {
         const two = !/^auto/.test(o.type), pil = /P$/.test(o.type), rng = { next: Math.random, chance: (q) => Math.random() < q, range: (a, b) => a + Math.random() * (b - a), pick: (a) => a[Math.floor(Math.random() * a.length)], int: (a, b) => a + Math.floor(Math.random() * (b - a + 1)), weighted: null };
-        const seats = two ? [[0, 0, false]] : [[0.32, 0, false]];
-        if (pil) seats.push([o.type === 'scooterP' ? -0.36 : -0.3, 0, o.type === 'scooterP']);
-        o._riders = seats.map(([a, b, side], i) => {
+        // the seats as the models have them (x along, height of the seat; the body sits 0.62 below the seat, like yours)
+        const bike = /^bike/.test(o.type);
+        const seats = two ? [[bike ? -0.33 : -0.35, 0, false, bike ? 0.95 : 0.8]] : [[0.31, 0, false, 0.8]];
+        if (pil) seats.push([bike ? -0.62 : -0.72, 0, o.type === 'scooterP', bike ? 0.97 : 0.84]);
+        o._riders = seats.map(([a, b, side, sy], i) => {
           const female = i === 1 ? (side ? Math.random() < 0.75 : Math.random() < 0.2) : Math.random() < 0.15;
           const look = this.kit.randomLook(rng, { female, helmet: two && i === 0 && o.type !== 'scooterP' });
           if (!two) { look.top = look.top.setRGB(0.42, 0.36, 0.22); look.bottom = look.top.clone().multiplyScalar(0.9); }
-          return { id: (o.id || 0) * 4 + i + 1e7, look, female, rideOf: o, seat: [a, b], side, x: o.x, z: o.z, yaw: 0, v: 0, mode: 'ride', persona: female ? 'tai' : 'dada' };
+          return { id: (o.id || 0) * 4 + i + 1e7, look, female, rideOf: o, seat: [a, b], seatY: sy - 0.62, side, x: o.x, z: o.z, yaw: 0, v: 0, mode: 'ride', persona: female ? 'tai' : 'dada' };
         });
       }
       for (const r of o._riders) { const hx = o.hx ?? Math.cos(o.yaw || 0), hz = o.hz ?? Math.sin(o.yaw || 0); r.x = o.x + hx * r.seat[0] - hz * r.seat[1]; r.z = o.z + hz * r.seat[0] + hx * r.seat[1]; r.yaw = Math.atan2(hz, hx); r.y = o.y || 0; out.push(r); }
@@ -124,7 +126,7 @@ export class Crowd {
   }
   drive(s, dt, cx, cz) {
     const p = s.p, H = s.H;
-    const y = p.rideOf ? (p.y || 0) + (p.side ? 0.38 : 0) : this.W.surf.height(p.x, p.z);
+    const y = p.rideOf ? (p.y || 0) + (p.seatY ?? 0.2) + (p.side ? 0.04 : 0) : this.W.surf.height(p.x, p.z);
     H.holder.position.set(p.x, y, p.z);
     H.holder.rotation.set(0, -p.yaw + (p.side ? Math.PI / 2 : 0), 0);
     const [name, speed, once] = this.animFor(p);

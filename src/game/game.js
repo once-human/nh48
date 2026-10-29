@@ -137,7 +137,8 @@ export class Game {
         // a pure turn about the vertical: the world's up taken into each bone's parent frame (a world axis used
         // directly in a rotated rig tips the body forward or back instead of turning it)
         H.root.updateMatrixWorld(true);
-        for (const [b, a] of [[sp, -rot.yS], [hd, -rot.yH]]) {
+        void sp;
+        for (const [b, a] of [[hd, -rot.yH - rot.yS * 0.5]]) {          // the head only: the body stays upright
           if (!b || !b.parent || Math.abs(a) < 1e-4) continue;
           b.parent.getWorldQuaternion(_pq); _ax.copy(Y_UP).applyQuaternion(_pq.invert());
           _rq.setFromAxisAngle(_ax, a); b.quaternion.premultiply(_rq);

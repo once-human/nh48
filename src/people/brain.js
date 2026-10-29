@@ -160,7 +160,6 @@ export class Brain {
     }
     // a wave across the road, a dropped coin, a sit at the bus stop
     if (r < 0.02) { p.act = { clip: 'wave', t: 0, dur: 1.8 }; ppl.speakAs('greet', p, 0.25, 6); return; }
-    if (r < 0.03) { this.watch(p, p.x + Math.cos(p.yaw), p.z + Math.sin(p.yaw), 1.8, 'pickup'); return; }
     if (r < 0.045 && (h > 20 || h < 7 || /ajoba|aaji|kaka/.test(p.persona || ''))) this.sitAtStop(p);
   }
   watch(p, x, z, secs, anim) { p.mode = 'watch'; p.watch = { x, z }; p.wait = secs; p.anim = anim; p.v = 0; p.busy = Math.max(p.busy || 0, secs); }
