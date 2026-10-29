@@ -60,6 +60,7 @@ import { loadSettings, applySettings } from './settings.js';
 import { refreshChips } from './keys.js';
 import { Trial } from './trial.js';
 import { Fauna } from '../people/animals.js';
+import { Puddles } from './puddles.js';
 
 export class Game {
   constructor(ctx) {
@@ -128,6 +129,7 @@ export class Game {
     this.people.signalsOf = () => this.traffic && this.traffic.signals;
     this.fauna = new Fauna(this.people, W.animalKit, this.scene, W);
     this.smoke = new Smoke(this.scene);
+    this.puddles = new Puddles(this);
     player.animalsNear = () => this.people.animals;
     // on foot your head (and a little of your body) turns to where the camera looks, so looking back you look back;
     // the torch arm goes on top
@@ -1251,6 +1253,7 @@ export class Game {
     }
     if (this.blood) this.blood.update(dt);
     if (this.state === 'play') this.fireTick(dt);
+    if (this.puddles) this.puddles.update(dt);
     if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); if (this.traffic && this.state === 'play') this.trafficDamage(dt); }
     this.stepRefuel(dt);
     if (this.brain && this.state !== 'title') this.brain.update(dt, this.player);

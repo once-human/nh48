@@ -24,9 +24,18 @@ export class Smoke {
     this.k = 0;
     this.light = new THREE.PointLight(0xffa040, 0, 40, 2); scene.add(this.light); this.flash = 0;
   }
-  // kind: 'smoke' (grey), 'black', 'fire'
-  emit(x, y, z, kind = 'smoke', spread = 0.3) {
+  // kind: 'smoke' (grey), 'black', 'fire', 'spray' (water thrown off a wheel, thrown out at speed v and falling back)
+  emit(x, y, z, kind = 'smoke', spread = 0.3, v = 0) {
     const p = this.list[this.k = (this.k + 1) % this.list.length], R = Math.random;
+    if (kind === 'spray') {
+      p.s.position.set(x + (R() - 0.5) * spread, y, z + (R() - 0.5) * spread);
+      const k = 0.4 + Math.min(1, v / 15); p.vx = (R() - 0.5) * 2.4 * k; p.vz = (R() - 0.5) * 2.4 * k; p.vy = (1.4 + R() * 1.6) * k;
+      p.life = 0; p.max = 0.45 + R() * 0.35; p.size0 = 0.18 + R() * 0.12; p.size1 = 0.7 + R() * 0.5 * k; p.op = 0.5; p.fire = false; p.spray = true;
+      p.m.color.setHex(0xd2d8dd); p.m.blending = THREE.NormalBlending;
+      p.s.visible = true; if (!p.s.parent) this.scene.add(p.s);
+      return;
+    }
+    p.spray = false;
     const fire = kind === 'fire';
     p.s.position.set(x + (R() - 0.5) * spread, y, z + (R() - 0.5) * spread);
     p.vx = (R() - 0.5) * 0.6; p.vz = (R() - 0.5) * 0.6; p.vy = fire ? 1.8 + R() * 1.2 : 0.9 + R() * 0.8;
@@ -50,7 +59,7 @@ export class Smoke {
       const t = p.life / p.max;
       if (t >= 1) { p.s.visible = false; p.m.opacity = 0; this.scene.remove(p.s); continue; }
       p.s.position.x += p.vx * dt; p.s.position.y += p.vy * dt; p.s.position.z += p.vz * dt;
-      p.vy *= p.fire ? 1 : 0.995;
+      if (p.spray) p.vy -= 7 * dt; else p.vy *= p.fire ? 1 : 0.995;
       const sz = p.size0 + (p.size1 - p.size0) * Math.sqrt(t);
       p.s.scale.set(sz, sz, 1);
       p.m.opacity = p.op * (t < 0.12 ? t / 0.12 : 1 - (t - 0.12) / 0.88);

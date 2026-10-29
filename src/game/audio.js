@@ -280,6 +280,16 @@ export class Audio {
     if (at) this.at(at.x, at.z, () => this.out3(g, 0, this.bus('fx'))); else g.connect(this.bus('fx'));
     s.start();
   }
+  // water slapped up off a wheel or a foot (one noise buffer, made once, played at a different pitch each time)
+  splash(vol = 0.5) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    if (!this._splB) { const n = Math.floor(ctx.sampleRate * 0.45), b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) { const t = i / n; d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.2) * (t < 0.02 ? t / 0.02 : 1); } this._splB = b; }
+    const s = ctx.createBufferSource(); s.buffer = this._splB; s.playbackRate.value = 0.8 + Math.random() * 0.5;
+    const bp = ctx.createBiquadFilter(); bp.type = 'lowpass'; bp.frequency.value = 1800 + Math.random() * 1200;
+    const g = ctx.createGain(); g.gain.value = 0.32 * vol;
+    s.connect(bp).connect(g).connect(this.bus('fx')); s.start();
+  }
   squelch() { this.noiseBurst(0.18, 1900, 1.2, 0.05); setTimeout(() => this.noiseBurst(0.08, 2400, 2, 0.035), 320); }
   cuffs() { this.noiseBurst(0.05, 4200, 6, 0.25); setTimeout(() => this.noiseBurst(0.05, 3800, 6, 0.22), 140); }
   gunshot() { this.noiseBurst(0.35, 900, 0.4, 0.9, this._at); this.boom && setTimeout(() => this.noiseBurst(0.6, 300, 0.5, 0.25, this._at), 30); }
