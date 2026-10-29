@@ -64,7 +64,7 @@ export class Emergency {
       if (R.state === 'leave') { tx = R.lx; tz = R.lz; want = 13; if (R.t > 50 || (Math.hypot(v.x - P.x, v.z - P.z) > 180 && !(G.inView && G.inView(v.x, v.z)))) R.state = 'gone'; }
       if (R.state === 'gone') continue;
       this.drive(R, tx, tz, want, dt);
-      if (R.state !== 'scene' || R.type === 'police') { const dd = Math.hypot(v.x - P.x, v.z - P.z); const lv = clamp(1.3 - dd / 220, 0, 1); if (lv > siren) { siren = lv; pan = clamp((v.x - P.x) / 80, -1, 1); } }
+      if (R.state !== 'scene' || R.type === 'police') { const dd = Math.hypot(v.x - P.x, v.z - P.z); const lv = clamp(1.3 - dd / 220, 0, 1); if (lv > siren) { siren = lv; pan = clamp((v.x - P.x) / 80, -1, 1); G.emSirenAt = { x: v.x, z: v.z }; } }
     }
     for (const R of this.list.filter(q => q.state === 'gone')) { R.v.root.parent && R.v.root.parent.remove(R.v.root); const ex = G.traffic.extra || []; const k = ex.indexOf(R.v.agent); if (k >= 0) ex.splice(k, 1); }
     this.list = this.list.filter(q => q.state !== 'gone');

@@ -488,7 +488,7 @@ export class Police {
       m.update(dt);
       const d = Math.hypot(m.veh.x - P.x, m.veh.z - P.z);
       if (m.sees) { seen = true; this.lastSeen = { x: P.x, z: P.z }; }
-      if (d < nearest) { nearest = d; const hx = Math.cos(P.th), hz = Math.sin(P.th); sirenPan = clamp((-(m.veh.x - P.x) * hz + (m.veh.z - P.z) * hx) / (d || 1), -1, 1); }
+      if (d < nearest) { nearest = d; this.sirenAt = { x: m.veh.x, z: m.veh.z }; const hx = Math.cos(P.th), hz = Math.sin(P.th); sirenPan = clamp((-(m.veh.x - P.x) * hz + (m.veh.z - P.z) * hx) / (d || 1), -1, 1); }
       if ((this.heat === 0 && d > 90) || d > 520) { m.dispose(); this.marshals.splice(i, 1); continue; }
       // caught?
       if (this.heat > 0 && !this.stop && m.stunT <= 0) {
@@ -498,6 +498,7 @@ export class Police {
       }
     }
     const pl = this.heat > 0 && this.marshals.length ? clamp(1.4 - nearest / 160, 0, 1) : 0, em = G.emSiren || 0;
+    G.audio.sirenAt = em > pl ? G.emSirenAt : this.sirenAt;
     G.audio.siren(Math.max(pl, em), em > pl ? G.emPan || 0 : sirenPan);
     if (this.heat > 0) {
       if (seen) this.unseenT = 0; else this.unseenT += dt;
@@ -624,7 +625,8 @@ export class Police {
     // street chatter waits its turn; reactions don't talk over each other; police get through
     if (pri === undefined) pri = id.startsWith('s_') ? (/_(fall|hit|fight|flee|carjack_\w+)\d+$/.test(id) ? 1 : 0)
       : /^(sh|f)\d/.test(id) ? 1 : /^(d|h|c|b)\d/.test(id) ? 0 : 2;
-    if (!G.audio.voice(id, vol, pan, radio, pri)) return null;
+    const spoken = src && src.x !== undefined && !radio ? G.audio.at(src.x, src.z, () => G.audio.voice(id, 1, 0, radio, pri), 1.6) : G.audio.voice(id, vol, pan, radio, pri);
+    if (!spoken) return null;
     G.hud.say(L[0] === 'Traffic police' && who && who.name ? who.name : L[0], L[4], L[5], 4.2);
     return id;
   }

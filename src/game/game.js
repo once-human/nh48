@@ -6,7 +6,7 @@ import { HUD } from '../ui/hud.js';
 import { CityMap } from '../ui/map.js';
 import { SW } from '../world/landmarks.js';
 
-const Y_UP = new THREE.Vector3(0, 1, 0);
+const Y_UP = new THREE.Vector3(0, 1, 0), _pq = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _ax = new THREE.Vector3();
 const LM_MR = { shaniwar: 'शनिवारवाडा', dagdusheth: 'श्रीमंत दगडूशेठ हलवाई गणपती', mandai: 'महात्मा फुले मंडई', station: 'पुणे रेल्वे स्टेशन',
   agakhan: 'आगाखान पॅलेस', lalmahal: 'लाल महाल', ohel: 'लाल देऊळ', tulshibaug: 'तुळशीबाग राम मंदिर', kasba: 'कसबा गणपती', sppu: 'सावित्रीबाई फुले पुणे विद्यापीठ',
   coep: 'सीओईपी', osho: 'ओशो आश्रम', parvati: 'पर्वती', shinde: 'शिंदे छत्री', omkareshwar: 'ओंकारेश्वर मंदिर', stmary: 'सेंट मेरी चर्च',
@@ -134,8 +134,14 @@ export class Game {
           rot.yS += (Math.max(-1.25, Math.min(1.25, d)) * 0.38 - rot.yS) * k;     // the chest the rest
         }
         const sp = H.root.getObjectByName('spine_03'), hd = H.root.getObjectByName('Head');
-        if (sp) sp.rotateOnWorldAxis(Y_UP, -rot.yS);
-        if (hd) hd.rotateOnWorldAxis(Y_UP, -rot.yH);
+        // a pure turn about the vertical: the world's up taken into each bone's parent frame (a world axis used
+        // directly in a rotated rig tips the body forward or back instead of turning it)
+        H.root.updateMatrixWorld(true);
+        for (const [b, a] of [[sp, -rot.yS], [hd, -rot.yH]]) {
+          if (!b || !b.parent || Math.abs(a) < 1e-4) continue;
+          b.parent.getWorldQuaternion(_pq); _ax.copy(Y_UP).applyQuaternion(_pq.invert());
+          _rq.setFromAxisAngle(_ax, a); b.quaternion.premultiply(_rq);
+        }
         if (P.torchArm) P.torchArm(H);
       };
     }
@@ -376,7 +382,7 @@ export class Game {
     v.dead = true; v.dmg = 1; v.v = 0; v.powerMul = 0;
     this.paintDamage(v);
     this.smoke.explode(v.x, (v.y || 0) + 0.8, v.z);
-    this.rig.shake(1.2); this.audio.crash && this.audio.crash(1); this.audio.boom && this.audio.boom();
+    this.rig.shake(1.2); this.audio.at(v.x, v.z, () => { this.audio.crash && this.audio.crash(1); this.audio.boom && this.audio.boom(); });
     if (!P.onFoot && P.cur === v) { P.exit(this.traffic, true); P.downT = 3.5; if (P.human) P.human.play('knockback', { once: true, fade: 0.06 }); P.hp = Math.max(5, (P.hp ?? 100) - 35); }
     else if (P.onFoot && Math.hypot(P.x - v.x, P.z - v.z) < 7) { P.downT = 3; if (P.human) P.human.play('knockback', { once: true, fade: 0.06 }); }
     for (const p of this.people.list) { const dd = Math.hypot(p.x - v.x, p.z - v.z); if (dd < 9 && !p.fixed) { p.fallen = 4 + Math.random() * 3; } else if (dd < 40 && p.flee !== undefined) p.flee = 6; }
@@ -993,7 +999,7 @@ export class Game {
         if ((this._gatherT || 0) < this.t) { this._gatherT = this.t + 8; this.people.gather(ev.x, ev.z, 8); }
         if (kmh > 25 && this.police && this.police.raiseHeat) this.police.raiseHeat(1, 'Hit a cow', null);
       }
-      if (ev.type === 'bark' || ev.type === 'dogChase') { const d = Math.hypot(ev.x - P.x, ev.z - P.z); if (d < 60) this.audio.bark(Math.min(0.9, 12 / (d + 6))); }
+      if (ev.type === 'bark' || ev.type === 'dogChase') { const d = Math.hypot(ev.x - P.x, ev.z - P.z); if (d < 60) this.audio.at(ev.x, ev.z, () => this.audio.bark(0.7, 0)); }
       if (ev.type === 'dogChase' && (this._dogT || 0) < this.t) { this._dogT = this.t + 30; this.hud.toast('A street dog is chasing you', 'Classic. Keep going, it’ll give up.', 'info', 2.4); }
       if (ev.type === 'bump') { this.rig.shake(Math.min(0.25, ev.strength * 0.03)); this.audio.thud(Math.min(0.6, ev.strength * 0.12)); }
       if (ev.type === 'tip') { this.rig.shake(0.5); this.audio.crash(0.8); this.hud.toast('Auto tipped over!', 'Corner slower, autos lift a wheel easily', 'warn', 3); }
@@ -1028,6 +1034,7 @@ export class Game {
   }
 
   frame(dt) {
+    if (this.audio && this.audio.listen) this.audio.listen(this.camera);
     if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); }
     this.stepRefuel(dt);
     if (this.brain && this.state !== 'title') this.brain.update(dt, this.player);
@@ -1277,8 +1284,8 @@ export class Game {
     for (const h of this.traffic.honks) {
       const dx = h.x - P.x, dz = h.z - P.z, d = Math.hypot(dx, dz);
       if (d > 90 || n > 2) continue;
-      const side = (-dx * hz + dz * hx) / (d || 1);
-      A.horn(h.kind, Math.min(1, 9 / (d + 6)), side, h.n || 1);
+      void hx; void hz;
+      A.at(h.x, h.z, () => A.horn(h.kind, 0.85, 0, h.n || 1));          // from where the horn is (3D audio)
       n++;
     }
     this.traffic.honks.length = 0;

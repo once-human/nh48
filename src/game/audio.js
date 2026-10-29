@@ -70,6 +70,30 @@ export class Audio {
     return b;
   }
   // ---------------------------------------------------------------- samples
+  // ---------------------------------------------------------------- 3D: where you hear things from
+  // the listener rides the camera (set every frame); anything played inside at(x, z, fn) comes from that spot: the
+  // right ear or the left, in front or behind, and quieter with distance (so far traffic is a murmur)
+  listen(cam) {
+    if (!this.ctx || !cam) return;
+    const L = this.ctx.listener, p = cam.position, f = this._fwd || (this._fwd = cam.position.clone());
+    cam.getWorldDirection(f);
+    if (L.positionX) { const t = this.ctx.currentTime; L.positionX.setTargetAtTime(p.x, t, 0.02); L.positionY.setTargetAtTime(p.y, t, 0.02); L.positionZ.setTargetAtTime(p.z, t, 0.02);
+      L.forwardX.setTargetAtTime(f.x, t, 0.02); L.forwardY.setTargetAtTime(f.y, t, 0.02); L.forwardZ.setTargetAtTime(f.z, t, 0.02); L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }
+    else if (L.setPosition) { L.setPosition(p.x, p.y, p.z); L.setOrientation(f.x, f.y, f.z, 0, 1, 0); }
+    this.lis = { x: p.x, z: p.z };
+  }
+  at(x, z, fn, y = 1.2) { const was = this._at; this._at = { x, y, z }; try { return fn(); } finally { this._at = was; } }
+  panner(pos, ref = 6) {
+    const ctx = this.ctx, pn = ctx.createPanner();
+    pn.panningModel = 'HRTF'; pn.distanceModel = 'inverse'; pn.refDistance = ref; pn.rolloffFactor = 1.15; pn.maxDistance = 400;
+    if (pn.positionX) { pn.positionX.value = pos.x; pn.positionY.value = pos.y; pn.positionZ.value = pos.z; } else pn.setPosition(pos.x, pos.y, pos.z);
+    return pn;
+  }
+  out3(g, pan, out) {
+    const ctx = this.ctx;
+    if (this._at) { g.connect(this.panner(this._at)).connect(out); return; }
+    if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p).connect(out); } else g.connect(out);
+  }
   play(name, { vol = 0.5, pan = 0, rate = 1, delay = 0, offset = 0, dur, filter, bus } = {}) {
     const b = this.buf[name];
     if (!this.ctx || !b) return null;
@@ -84,7 +108,7 @@ export class Audio {
     }
     node.connect(g);
     const out = this.bus(bus || this._bus || busOf(name));
-    if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p).connect(out); } else g.connect(out);
+    this.out3(g, pan, out);
     src.start(t, offset, dur);
     return { src, g };
   }
@@ -152,14 +176,15 @@ export class Audio {
     const name = 'v_' + id;
     if (!this.buf[name]) {
       const raw = this.raw[name];
-      if (!raw) return this.fetchVoice(id, () => this.voice(id, vol, pan, radio, pri));
+      const at0 = this._at, again = () => at0 ? this.at(at0.x, at0.z, () => this.voice(id, vol, pan, radio, pri), at0.y) : this.voice(id, vol, pan, radio, pri);
+      if (!raw) return this.fetchVoice(id, again);
       this.decoding = this.decoding || {};
       if (!this.decoding[name]) {
         this.decoding[name] = true;
         const asked = now;
         this.ctx.decodeAudioData(raw.slice(0)).then((b) => {
           this.buf[name] = b; this.keepVoice(name);
-          if (this.ctx.currentTime - asked < 1.2) this.voice(id, vol, pan, radio, pri);
+          if (this.ctx.currentTime - asked < 1.2) again();
         }).catch(() => { /* bad clip: stays silent */ }).finally(() => { delete this.decoding[name]; });
       }
       return true;
@@ -196,11 +221,11 @@ export class Audio {
       const o2 = ctx.createOscillator(); o2.type = 'square';
       const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1300; bp.Q.value = 0.7;
       const g = ctx.createGain(); g.gain.value = 0;
-      const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      const p = this.panner({ x: 0, y: 2, z: 0 }, 14);
       const m = ctx.createGain(); m.gain.value = 0.35;
       o.connect(bp); o2.connect(m).connect(bp); bp.connect(g);
       const out = this.bus('traffic');
-      if (p) g.connect(p).connect(out); else g.connect(out);
+      g.connect(p).connect(out);
       o.start(); o2.start();
       this.sir = { o, o2, g, p, ph: 0 };
     }
@@ -208,8 +233,10 @@ export class Audio {
     S.ph = (S.ph + 1 / 60) % 3.2;
     const f = 620 + 760 * Math.sin(Math.PI * S.ph / 3.2);    // up and down over ~3 s
     S.o.frequency.setTargetAtTime(f, t, 0.03); S.o2.frequency.setTargetAtTime(f * 1.006, t, 0.03);
-    S.g.gain.setTargetAtTime(level * 0.11, t, 0.15);
-    if (S.p) S.p.pan.setTargetAtTime(clamp(pan, -1, 1) * 0.7, t, 0.1);
+    S.g.gain.setTargetAtTime(level > 0 ? 0.32 : 0, t, 0.15);       // loudness comes from distance now
+    // the siren is where the nearest siren-vehicle is (police.js / emergency.js set sirenAt)
+    const sp = this.sirenAt || (this.lis ? { x: this.lis.x + pan * 20, z: this.lis.z } : { x: 0, z: 0 });
+    if (S.p.positionX) { S.p.positionX.setTargetAtTime(sp.x, t, 0.05); S.p.positionY.setTargetAtTime(1.8, t, 0.05); S.p.positionZ.setTargetAtTime(sp.z, t, 0.05); } else S.p.setPosition(sp.x, 1.8, sp.z);
   }
 
   // ---------------------------------------------------------------- engine (single-cylinder 4-stroke putter)
@@ -282,7 +309,7 @@ export class Audio {
     const duck = this.duckUntil && t < this.duckUntil ? this.duckLevel : 1;
     this.amb.g.gain.setTargetAtTime((0.02 + density * 0.03) * duck, t, 0.5);
     this.setLoop('street', (0.22 + density * 0.18) * (1 - night * 0.55) * duck, 0.25);
-    this.setLoop('traffic', (0.08 + density * 0.22) * (1 - night * 0.6) * duck, 0.25);
+    this.setLoop('traffic', (0.05 + density * 0.13) * (1 - night * 0.6) * duck, 0.25);        // the far traffic hum, quieter: close vehicles are heard where they are
     this.setLoop('ride', clamp(rideSpeed / 12, 0, 1) * 0.16, 0.25);
     // crows by day, dogs more at night
     if (Math.random() < 0.003 * (1 - night)) this.crow();
@@ -347,9 +374,8 @@ export class Audio {
     if (!this.ctx) return;
     const ctx = this.ctx, t = ctx.currentTime + delay;
     const g = ctx.createGain();
-    const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
     const out = this.bus();
-    if (p) { p.pan.value = clamp(pan, -1, 1); g.connect(p).connect(out); } else g.connect(out);
+    this.out3(g, pan, out);
     const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freqs[0] * 2.2; bp.Q.value = 0.7;
     bp.connect(g);
     for (const f of freqs) {
