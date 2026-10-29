@@ -92,6 +92,12 @@ export class Audio {
     else if (L.setPosition) { L.setPosition(p.x, p.y, p.z); L.setOrientation(f.x, f.y, f.z, 0, 1, 0); }
     this.lis = { x: p.x, z: p.z };
   }
+  // how a voice from (x, z) reaches you: too far and they don't say it at all; past a few metres it's muffled
+  // (not just quieter); the words are subtitled only if you could make them out, idle chatter's in small
+  hear(x, z, pri = 1) {
+    const L = this.lis || { x, z }, d = Math.hypot(x - L.x, z - L.z);
+    return { d, ok: d <= (pri >= 2 ? 60 : pri >= 1 ? 40 : 24), lp: d > 7 ? Math.max(1100, 14000 * Math.pow(7 / d, 1.5)) : 0, sub: d < (pri >= 1 ? 30 : 14), small: pri === 0 };
+  }
   at(x, z, fn, y = 1.2) { const was = this._at; this._at = { x, y, z }; try { return fn(); } finally { this._at = was; } }
   panner(pos, ref = 6) {
     const ctx = this.ctx, pn = ctx.createPanner();
@@ -103,7 +109,7 @@ export class Audio {
   }
   out3(g, pan, out) {
     const ctx = this.ctx;
-    if (this._at) { g.connect(this.panner(this._at)).connect(out); return; }
+    if (this._at) { g.connect(this.panner(this._at, this._vref || 6)).connect(out); return; }
     if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p).connect(out); } else g.connect(out);
   }
   play(name, { vol = 0.5, pan = 0, rate = 1, delay = 0, offset = 0, dur, filter, bus } = {}) {
@@ -191,7 +197,7 @@ export class Audio {
     this._hrtf = true;
     try { return !!this.at(x, z, () => this.play(name, { vol, bus: 'voice' }), 1.6); } finally { this._hrtf = false; }
   }
-  voice(id, vol = 1, pan = 0, radio = false, pri = 2) {
+  voice(id, vol = 1, pan = 0, radio = false, pri = 2, lp = 0) {
     // one voice at a time, and not everyone at once: idle chatter (pri 0) waits for silence, a
     // reaction (pri 1: someone you knocked over, hit, or whose car you took) won't talk over another
     // reaction, and the police / your passenger (pri 2) always get through
@@ -204,7 +210,7 @@ export class Audio {
     const name = 'v_' + id;
     if (!this.buf[name]) {
       const raw = this.raw[name];
-      const at0 = this._at, again = () => at0 ? this.at(at0.x, at0.z, () => this.voice(id, vol, pan, radio, pri), at0.y) : this.voice(id, vol, pan, radio, pri);
+      const at0 = this._at, again = () => at0 ? this.at(at0.x, at0.z, () => this.voice(id, vol, pan, radio, pri, lp), at0.y) : this.voice(id, vol, pan, radio, pri, lp);
       if (!raw) return this.fetchVoice(id, again);
       this.decoding = this.decoding || {};
       if (!this.decoding[name]) {
@@ -219,8 +225,8 @@ export class Audio {
     }
     this.keepVoice(name);
     if (this.curVoice) { try { this.curVoice.g.gain.setTargetAtTime(0, now, 0.04); this.curVoice.src.stop(now + 0.15); } catch (e) { /* already stopped */ } }
-    this._hrtf = true;
-    let v; try { v = this.play('v_' + id, { vol: 0.95 * vol, pan, filter: radio ? { type: 'bandpass', f: 1500, q: 0.9 } : undefined }); } finally { this._hrtf = false; }
+    this._hrtf = true; this._vref = 9;            // (voices carry a little further than other sounds)
+    let v; try { v = this.play('v_' + id, { vol: 0.95 * vol, pan, filter: radio ? { type: 'bandpass', f: 1500, q: 0.9 } : lp ? { type: 'lowpass', f: lp, q: 0.7 } : undefined }); } finally { this._hrtf = false; this._vref = 0; }
     if (!v) return false;
     this.curVoice = v; this.voicePri = pri; this.voiceEnd = now + v.src.buffer.duration;
     this.duck(radio ? 0.75 : 0.55, Math.min(4, v.src.buffer.duration + 0.3));

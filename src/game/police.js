@@ -733,7 +733,8 @@ export class Police {
     this.later(2.6, () => {
       // booked: a card, a night in the lock-up for anything serious, a court date
       const court = serious ? this.law.setCourt(list) : 'None, fine paid';
-      this.law.booking({ chowki: ch.name, charges: list, bail: fine, night: serious, court });
+      // the black screen first (taken in, and the night if it's a serious one), then the booking card with your photo
+      setTimeout(() => this.law.booking({ chowki: ch.name, charges: list, bail: fine, night: serious, court }), 4300);
       if (serious && G.setHour) { G.clock = (Math.floor((G.clock || 0) / 24) + 1) * 24 + 9; G.setHour(9); }
       G.hud.flash(`Taken to ${ch.name}`, `${FINES[kind].name} (${FINES[kind].law}). ${why}. ${serious ? 'A night in the lock-up, then out' : 'Out'} on bail · ${fmtRupees(fine)}`);
       // you walk out of the chowki; your auto has been brought round
@@ -814,9 +815,11 @@ export class Police {
     // street chatter waits its turn; reactions don't talk over each other; police get through
     if (pri === undefined) pri = id.startsWith('s_') ? (/_(fall|hit|fight|flee|carjack_\w+)\d+$/.test(id) ? 1 : 0)
       : /^(sh|f)\d/.test(id) ? 1 : /^(d|h|c|b)\d/.test(id) ? 0 : 2;
-    const spoken = src && src.x !== undefined && !radio ? G.audio.at(src.x, src.z, () => G.audio.voice(id, 1, 0, radio, pri), 1.6) : G.audio.voice(id, vol, pan, radio, pri);
+    const h = src && src.x !== undefined && !radio && G.audio.hear ? G.audio.hear(src.x, src.z, pri) : null;
+    if (h && !h.ok) return null;
+    const spoken = h ? G.audio.at(src.x, src.z, () => G.audio.voice(id, 1.25, 0, radio, pri, h.lp), 1.6) : G.audio.voice(id, vol, pan, radio, pri);
     if (!spoken) return null;
-    G.hud.say(L[0] === 'Traffic police' && who && who.name ? who.name : L[0], L[4], L[5], 4.2);
+    if (!h || h.sub) G.hud.say(L[0] === 'Traffic police' && who && who.name ? who.name : L[0], L[4], L[5], 4.2, !!(h && h.small));
     return id;
   }
   markers() {

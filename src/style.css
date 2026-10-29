@@ -251,6 +251,7 @@ body { margin: 0; font-family: var(--font-ui); font-size: 14px; -webkit-font-smo
 .subt .who { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--stone); }
 .subt .line { font-size: 19px; font-weight: 600; line-height: 1.35; text-wrap: balance; }
 .subt .tr { font-size: 15px; color: var(--paper-2); text-wrap: balance; }
+.subt.small .who { font-size: 10px; } .subt.small .line { font-size: 15px; } .subt.small .tr { font-size: 12.5px; }   /* people talking among themselves */
 
 /* toasts (top centre, under the objective) */
 .toasts { top: calc(78px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); display: grid; gap: 8px; justify-items: center; width: min(420px, calc(100vw - 48px)); }
@@ -1483,7 +1484,7 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .stop .st-say { margin-top: 10px; }
 .stop.neg .st-opts { grid-template-columns: repeat(2, 1fr); }
 /* the radio feed, quiet, under the wanted badge */
-.radio-feed { position: fixed; right: 18px; top: 128px; max-width: 330px; padding: 7px 11px; border-radius: 10px; background: rgba(18, 20, 26, .62); backdrop-filter: blur(8px);
+.radio-feed { position: fixed; right: max(22px, env(safe-area-inset-right, 0px)); top: calc(214px + env(safe-area-inset-top, 0px)); max-width: 330px; padding: 7px 11px; border-radius: 10px; background: rgba(18, 20, 26, .62); backdrop-filter: blur(8px);
   border-left: 3px solid #2f6bff; color: rgba(255, 255, 255, .82); font-size: 12px; line-height: 1.35; z-index: 6; display: grid; gap: 2px; }
 .radio-feed b { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #8fb8ff; }
 .radio-feed.in { animation: radioin .3s ease-out; } @keyframes radioin { from { opacity: 0; transform: translateX(14px); } }

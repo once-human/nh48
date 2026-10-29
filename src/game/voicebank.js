@@ -43,9 +43,11 @@ export class VoiceBank {
   // play a clip from (x, z) (or as yourself / over the radio), with its subtitle
   play(id, src, who, sub, en, o = {}) {
     if (!this.has(id)) return false;
-    const A = this.g.audio, pri = o.pri ?? 1;
-    const ok = src ? A.at(src.x, src.z, () => A.voice(id, o.vol ?? 1, 0, !!o.radio, pri), 1.6) : A.voice(id, o.vol ?? 1, 0, !!o.radio, pri);
-    if (ok && sub && !o.quiet) this.g.hud.say(who, sub, en === sub ? '' : en, o.life ?? 3.6);
+    const A = this.g.audio, pri = o.pri ?? 1, h = src && A.hear ? A.hear(src.x, src.z, pri) : null;
+    if (h && !h.ok) return false;                       // too far to hear: they keep it to themselves
+    const vol = (o.vol ?? 1) * 1.25;
+    const ok = src ? A.at(src.x, src.z, () => A.voice(id, vol, 0, !!o.radio, pri, h ? h.lp : 0), 1.6) : A.voice(id, vol, 0, !!o.radio, pri);
+    if (ok && sub && !o.quiet && (!h || h.sub)) this.g.hud.say(who, sub, en === sub ? '' : en, o.life ?? 3.6, !!(h && h.small));
     return ok;
   }
   // a street person: persona, moment (bank or old scenario name), where; hard = the angrier take
@@ -76,7 +78,7 @@ export class VoiceBank {
     const vi = VB.radio[tpl].includes('{v}') ? (veh ?? 2 * pick(5)) : 0, id = has(vi);
     if (!id) return false;
     const t = VB.radio[tpl].replace('{p}', VB.places[P]).replace('{v}', VB.veh[vi]);
-    void G; return this.play(id, null, 'Control room', t, t, { radio: true, vol: 0.55, pri: 1, quiet: true });
+    void G; return this.play(id, null, tpl === 4 ? 'Control room · 108' : 'Control room', t, t, { radio: true, vol: 0.55, pri: 1 });
   }
   placeAt(x, z) {
     if (!this._pl) {

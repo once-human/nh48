@@ -672,9 +672,10 @@ export class HUD {
     while (this.toasts.length > 3) { const o = this.toasts.shift(); o.el.remove(); }
   }
   // subtitles: speaker, line as spoken, English translation
-  say(who, line, tr, life = 4.5) {
+  say(who, line, tr, life = 4.5, small = false) {
     const subs = this.game.settings ? this.game.settings.subs : 'both';
     if (subs === 'off') return;
+    this.C('h-sub', 'small', !!small);
     if (subs === 'line') tr = '';
     this.$('h-sub-who').textContent = who || '';
     this.$('h-sub-line').textContent = line || '';
