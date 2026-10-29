@@ -79,7 +79,7 @@ export class Gigs {
     const onTime = J.t <= J.limit;
     const tip = onTime ? Math.round(this.rng.range(10, 45) / 5) * 5 : 0;
     const pay = Math.round(J.pay * (onTime ? 1 : 0.75));
-    G.stats.money += pay + tip; G.saveStats(); G.audio.cash();
+    G.stats.money += pay + tip; G.stats.drops = (G.stats.drops || 0) + 1; G.saveStats(); G.audio.cash();
     L.s.tally.deliveries++; L.change('respect', 0.4); L.change('mood', 0.03);
     this.job = null; G.setWaypoint(null);
     G.hud.toast(`Delivered to ${J.who} · +${fmt(pay)}${tip ? ` · ${fmt(tip)} tip` : ''}`, onTime ? 'Still hot. Five stars' : 'Late, the food was cold', 'money', 3.6);

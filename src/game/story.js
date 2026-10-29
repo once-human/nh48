@@ -8,13 +8,29 @@
 // conversation with choices), do fares, pass a driving course, take a photo, lose the police.
 import * as THREE from 'three';
 import { fmt } from './shops.js';
+import { PART1 } from './part1.js';
+import { Vehicle, specOf } from '../vehicles/vehicle.js';
+import FAMOUS from '../world/famous.json';
+import { wrapAngle } from '../core/util.js';
 
 const WHO = {
   aai: ['Aai', '#f4a3c0'], bapu: ['Bapu Kaka', '#ffd166'], pappu: ['Pappu RTO', '#7bdff2'], joshi: ['Joshi Kaka', '#b8e0a8'],
   raghu: ['Raghu Bhau', '#ff6b6b'], salim: ['Salim', '#c3a6ff'], mohan: ['Mohan Sheth', '#ffb38a'], meera: ['Meera Kulkarni', '#9be7ff'],
-  shinde: ['Insp. Shinde', '#d0d0d0'], you: ['You', '#ffffff'], unk: ['Unknown number', '#aaaaaa'],
+  shinde: ['ACP Shinde', '#d0d0d0'], you: ['You', '#ffffff'], unk: ['Unknown number', '#aaaaaa'],
+  tj: ['TJ', '#7bdff2'], khushi: ['Khushi', '#ff9ec7'], kunal: ['Kunal', '#9ec7ff'], tara: ['Tara', '#ffb38a'], veer: ['Veer', '#ffb38a'],
+  ira: ['Ira Kulkarni', '#c3a6ff'], bhau: ['Bhau Jagtap', '#ff6b6b'], kabir: ['Kabir', '#e0e0e0'], barista: ['Barista', '#b8e0a8'],
+  warkari: ['Warkari', '#ffd166'], harish: ['Harish Malhotra', '#d0b080'], sunny: ['Sunny', '#b8e0a8'], mem: ['', '#e8d9b0'],
 };
-const STORY_ON = false;
+const FEMALE = new Set(['aai', 'meera', 'khushi', 'tara', 'shinde', 'ira']);
+const STORY_ON = true;
+// the step types beyond go-there-and-talk: see Story.update
+const STYLE = `.sd.mem .sd-box{background:rgba(40,30,15,.72);border-color:rgba(232,217,176,.35)} .sd.mem .sd-line{font-style:italic}
+body.nh-mem canvas{filter:sepia(.75) contrast(.92) brightness(.9) blur(.6px);transition:filter .6s}
+.rh{position:fixed;left:50%;bottom:22%;transform:translateX(-50%);width:min(560px,86vw);height:64px;border-radius:32px;background:rgba(12,12,14,.55);backdrop-filter:blur(8px);overflow:hidden;z-index:40}
+.rh .ln{position:absolute;left:18%;top:8px;bottom:8px;width:4px;border-radius:2px;background:#ff8a1f}
+.rh .bt{position:absolute;top:16px;width:32px;height:32px;margin-left:-16px;border-radius:50%;background:#f4f1ea;box-shadow:0 0 0 3px rgba(255,138,31,.5)}
+.rh .bt.ok{background:#7bd88f} .rh .bt.miss{background:#ff5d5d;opacity:.5}
+.rh .sc{position:absolute;right:20px;top:20px;color:#fff;font:700 18px Inter,sans-serif}`;
 const inHours = (h, a, b) => a <= b ? h >= a && h < b : h >= a || h < b;
 const hm = (h) => { const H = Math.floor(h) % 24, M = Math.floor((h % 1) * 60); return `${H % 12 || 12}:${String(M).padStart(2, '0')} ${H < 12 ? 'am' : 'pm'}`; };
 
@@ -169,6 +185,8 @@ export class Story {
     el.className = 'sd'; el.hidden = true;
     el.innerHTML = '<div class="sd-bar top"></div><div class="sd-bar bot"></div><div class="sd-box"><div class="sd-who"></div><div class="sd-line"></div><div class="sd-tr"></div><div class="sd-ask"></div><div class="sd-next"><span class="kbd">F</span> next</div></div>';
     (document.getElementById('ui') || document.body).appendChild(el);
+    const st = document.createElement('style'); st.textContent = STYLE; document.head.appendChild(st);
+    window.addEventListener('keydown', (e) => { if (this.rh && e.code === 'Space') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) this.rhHit(); } }, true);
     el.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) this.pick(+b.dataset.k); else if (!this.asking) this.next(); });
     window.addEventListener('keydown', (e) => {
       if (!this.talking) return;
@@ -178,10 +196,25 @@ export class Story {
       if (e.code === 'KeyF' || e.code === 'Enter' || e.code === 'Space' || e.code === 'Escape') this.next();
     }, true);
   }
-  get st() { const s = this.g.life.s; return s.story || (s.story = { m: 0, step: -1, flags: {}, nextAt: 0 }); }
+  get st() { const s = this.g.life.s; return s.story1 || (s.story1 = { m: 0, step: -1, flags: {}, nextAt: 0 }); }
+  get flags() { const st = this.st; return st.flags || (st.flags = {}); }
+  get fem() { const L = this.g.player.look; return !!(L && L.female); }
+  name(who) { return (WHO[who] || [who])[0]; }
+  whoOf(s) { return typeof s.who === 'function' ? s.who() : s.who; }
+  contact(name, sub) { const s = this.g.phone.s; const L = s.storyContacts || (s.storyContacts = []); if (!L.some(c => c[0] === name)) L.push([name, sub]); this.save(); }
+  // a place by name: a landmark id, an area, one of the famous places, or anything on the map; (dx, dz) metres off it
+  at(name, label, dx = 0, dz = 0) {
+    const G = this.g, W = G.W;
+    let p = (W.landmarks || []).find(l => l.id === name);
+    if (!p) p = G.people.areas.list.find(a => a.name === name);
+    if (!p) p = FAMOUS.find(f => f.name === name);
+    if (!p && G.city && G.city.places) p = G.city.places.find(q => q.n === name) || G.city.places.find(q => q.n && q.n.startsWith(name));
+    if (!p) return null;
+    return { x: p.x + dx, z: p.z + dz, name: label || name };
+  }
   get on() { return !this.g.free && this.g.state !== 'title'; }
   // the old Act 1 is retired: Part One, Dark Store, is being written on this engine
-  list() { return this._ms || (this._ms = STORY_ON ? MISSIONS(this) : []); }
+  list() { return this._ms || (this._ms = STORY_ON ? PART1(this) : MISSIONS(this).slice(0, 0)); }
   mission() { return this.list()[this.st.m] || null; }
   cur() { const m = this.mission(); return m && this.st.step >= 0 ? m.steps[this.st.step] : null; }
   swAt(u, v, name) { const W = this.g.W, L = W.landmarks && W.landmarks.find(l => l.id === 'shaniwar'); if (!L) return null; const c = Math.cos(L.rot), s = Math.sin(L.rot); return { x: L.x + u * c + v * s, z: L.z + u * s - v * c, name }; }
@@ -197,13 +230,15 @@ export class Story {
   startMission() {
     const m = this.mission(); if (!m) return;
     this.st.step = 0; this.st.base = this.g.stats.rides || 0; this.save(); this._entered = true;
-    this.g.hud.flash(m.title, `${m.mr} · Act 1, mission ${this.st.m + 1} of ${this.list().length}`);
-    for (const [w, mr, en] of m.texts || []) this.g.later(1.5, () => this.text(w, mr, en));
+    const n = this.list().filter(q => q.act === m.act), k = n.indexOf(m) + 1;
+    if (!m.steps.some(q => q.flash)) this.g.hud.flash(m.title, `${m.mr} · ${m.act ? `Act ${m.act}, ${k} of ${n.length}` : 'Prologue'}`);
+    const tx = []; for (const t of m.texts || []) { if (t.fn) tx.push(...t.fn()); else tx.push(t); }
+    for (const [w, mr, en] of tx) this.g.later(1.5, () => this.text(w, mr, en));
     this.enterStep();
   }
   enterStep() {
     const G = this.g, s = this.cur(); if (!s) return;
-    this.dropNpcs(); this.arrived = false; this.course = null; this.photoAt = null; this.retry = 0; this.skip = 0; this.again = 0; this._entered = true;
+    this.dropNpcs(); this.dropTarget(); this.dropGuards(); this.rhStop(); this.arrived = false; this.course = null; this.photoAt = null; this.retry = 0; this.skip = 0; this.again = 0; this._entered = true;
     if (s.skip && s.skip()) { this.advance(); return; }
     s.enter && s.enter(this);
     const w = s.where && s.where();
@@ -211,12 +246,19 @@ export class Story {
     if (w && !s.who) G.setWaypoint({ x: w.x, z: w.z, name: w.name, gig: true });
     else if (!w) G.setWaypoint(null);
     if (s.rides) this.st.base = G.stats.rides || 0;
+    if (s.drops) this.st.base = G.stats.drops || 0;
     if (s.course) this.makeCourse(s);
+    this.tgtWait = null;
+    if (s.tail || s.chase) this.makeTarget(s);
+    if (s.escort) this.esc = { dmg: (G.player.cur && G.player.cur.dmg) || 0, over: 0 };
+    if (s.sneak) this.makeGuards(s);
+    if (s.rhythm) this.rhStart(s.rhythm);
+    if (s.flash) G.later(0.6, () => { document.body.classList.add('nh-mem'); this.el.classList.add('mem'); this.talk(s.flash.slice()); });
   }
   advance() {
     const G = this.g, m = this.mission(), s = this.cur();
     s && s.after && s.after(this);
-    this.dropNpcs();
+    this.dropNpcs(); this.dropTarget(); this.dropGuards(); this.rhStop(); this.esc = null;
     this.st.step++;
     if (this.skip) { this.skip = 0; while (this.cur() && this.cur().course) this.st.step++; }
     if (this.st.step >= m.steps.length) {
@@ -249,12 +291,19 @@ export class Story {
     if (w) { const d = Math.hypot(w.x - P.x, w.z - P.z); if (d < (s.r || 30)) this.arrived = true; }
     // characters stand where the scene is, once you're close enough to see them
     if (s.who && w && !this.npcs.length && Math.hypot(w.x - P.x, w.z - P.z) < 220) this.spawnNpcs(s, w);
+    if (s.flash || this.rh) { this.hideMarker(); }
     if (s.who && w && Math.hypot(w.x - P.x, w.z - P.z) > 120 && (!G.waypoint || G.waypoint.x !== w.x)) G.setWaypoint({ x: w.x, z: w.z, name: w.name, gig: true });
     // the marker: over the person to talk to, or over the place
     const tgt = this.npcs[0] || (w && Math.hypot(w.x - P.x, w.z - P.z) < 160 ? w : null);
     if (tgt && !this.talking) this.showMarker(tgt.x, tgt.z); else this.hideMarker();
     if (this.talking) return;
     if (s.course) { this.courseTick(dt); return; }
+    if (s.drops) { if ((G.stats.drops || 0) - (st.base || 0) >= s.drops) this.advance(); return; }
+    if (s.tail || s.chase) { this.targetTick(s, dt); return; }
+    if (s.sneak) { this.sneakTick(s, dt); return; }
+    if (s.rhythm) { this.rhTick(dt); return; }
+    if (s.flash) return;
+    if (s.escort) this.escortTick(s, dt);
     if (s.photo) { if (this.photoAt && w && Math.hypot(this.photoAt.x - w.x, this.photoAt.z - w.z) < s.photo) { this.photoAt = null; G.hud.toast('Got it', 'Clear as day. Now get out of here', 'good', 2.4); this.advance(); } return; }
     if (s.rides) { if ((G.stats.rides || 0) - (st.base || 0) >= s.rides) this.advance(); return; }
     if (s.talk) return;                               // waits for F
@@ -267,6 +316,12 @@ export class Story {
     const main = typeof s.obj === 'function' ? s.obj() : s.obj;
     let sub = typeof s.sub === 'function' ? s.sub() : s.sub;
     if (s.rides) sub = `${Math.max(0, (G.stats.rides || 0) - (this.st.base || 0))} of ${s.rides} done · people waving show green on the map`;
+    if (s.drops) sub = `${Math.max(0, (G.stats.drops || 0) - (this.st.base || 0))} of ${s.drops} delivered · orders ping on your phone`;
+    if ((s.tail || s.chase) && !this.tgt && this.tgtWait) { const d = Math.hypot(this.tgtWait.x - G.player.x, this.tgtWait.z - G.player.z); sub = d > 950 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d / 10) * 10} m`; }
+    if ((s.tail || s.chase) && this.tgt) { const d = Math.hypot(this.tgt.v.x - G.player.x, this.tgt.v.z - G.player.z); sub = `${Math.round(d)} m away` + (this.tgt.lostT > 0 ? ' · losing them!' : this.tgt.closeT > 0 ? ' · too close!' : ''); }
+    if (s.escort && this.esc && this.esc.over > 0) sub = 'Slow down!';
+    if (s.sneak && this.guards) sub = this.alert > 0.05 ? `They’re looking this way… ${Math.round(this.alert * 100)}%` : (G.player.onFoot ? 'Out of their sight' : 'Get out and go on foot');
+    if (s.rhythm && this.rh) sub = `${this.rh.hits} hits · need ${this.rh.need}`;
     if (s.course && this.course) sub = `Checkpoint ${this.course.i + 1} of ${this.course.pts.length} · ${Math.max(0, Math.ceil(this.course.left))} s`;
     if (!sub && this.where) { const d = Math.hypot(this.where.x - G.player.x, this.where.z - G.player.z); sub = d > 950 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d / 10) * 10} m`; }
     return { main: `${m.title} · ${main}`, sub: sub || '', urgent: !!(s.course && this.course && this.course.left < 15) };
@@ -274,12 +329,12 @@ export class Story {
 
   // ---------------------------------------------------------------- people
   spawnNpcs(s, w) {
-    const G = this.g, n = s.who === 'goons' ? 3 : s.who === 'shinde' ? 2 : 1;
+    const G = this.g, who = this.whoOf(s), n = who === 'goons' ? 3 : 1;
     for (let i = 0; i < n; i++) {
       const spot = G.safeDrop(w.x + i * 2.2, w.z + i * 1.4) || w;
       const near = G.W.graph.nearest(spot.x, spot.z, 160); if (!near) return;
-      const p = G.people.make(near.e, near.s, near.side || 1, { mode: 'stand', female: s.who === 'meera' });
-      p.x = spot.x + i * 1.6; p.z = spot.z + i * 0.9; p.fixed = true; p.anchor = { x: p.x, z: p.z }; p.wait = 1e9; p.idle = s.who === 'goons' ? 'arms_folded' : 'talk'; p.story = s.who;
+      const p = G.people.make(near.e, near.s, near.side || 1, { mode: 'stand', female: FEMALE.has(who) });
+      p.x = spot.x + i * 1.6; p.z = spot.z + i * 0.9; p.fixed = true; p.anchor = { x: p.x, z: p.z }; p.wait = 1e9; p.idle = who === 'goons' ? 'arms_folded' : 'talk'; p.story = who; p.crew = true;
       G.people.list.push(p); this.npcs.push(p);
     }
   }
@@ -292,7 +347,7 @@ export class Story {
   near(x, z) {
     const s = this.cur(); if (!s || !s.talk || !this.npcs.length || this.talking) return null;
     const p = this.npcs[0]; if (Math.hypot(p.x - x, p.z - z) > 3) return null;
-    return { kind: 'story', name: (WHO[s.who] || [s.who])[0], x: p.x, z: p.z };
+    return { kind: 'story', name: this.name(this.whoOf(s)), x: p.x, z: p.z };
   }
   label(n) { return `Talk to ${n.name} · F`; }
   use() { const s = this.cur(); if (s && s.talk) this.talk(s.talk.slice()); }
@@ -320,7 +375,7 @@ export class Story {
     const q = (c) => this.el.querySelector(c);
     if (it) {
       const [w, line, tr] = it, [name, col] = WHO[w] || [w, '#fff'];
-      q('.sd-who').textContent = name; q('.sd-who').style.color = col;
+      q('.sd-who').textContent = w === 'you' ? (this.fem ? 'Saee' : 'Sid') : this.name(w) || name; q('.sd-who').style.color = col;
       q('.sd-line').textContent = line; q('.sd-tr').textContent = tr || '';
       q('.sd-line').lang = /[ऀ-ॿ]/.test(line) ? 'mr' : 'en';
     }
@@ -336,6 +391,7 @@ export class Story {
   }
   endTalk() {
     const G = this.g;
+    document.body.classList.remove('nh-mem'); this.el.classList.remove('mem');
     this.talking = false; this.el.hidden = true; this._camOn = false; if (G.rig) G.rig.inited = false;
     if (G.state === 'shop') G.state = 'play';
     G.lockMouse?.();
@@ -377,6 +433,139 @@ export class Story {
     if (P.foot) P.foot.yaw = Math.atan2(dz, dx);
   }
   onPhoto(x, z) { if (this.cur() && this.cur().photo) this.photoAt = { x, z }; }
+
+  // ---------------------------------------------------------------- tailing and chasing a vehicle
+  // tail: keep it in sight (lose it for 6 s and it's gone; too close for too long and they've seen you), till it
+  // gets where it's going. chase: get alongside it for a moment before it gets away
+  makeTarget(s) {
+    const G = this.g, W = G.W, o = s.tail || s.chase;
+    this.dropTarget();
+    const a = o.from(), b = o.to(); if (!a || !b) { this.advance(); return; }
+    // it starts when you're near enough to see it (and its streets have loaded): till then, a waypoint
+    const P = G.player, n = Math.hypot(a.x - P.x, a.z - P.z) < 200 && W.graph.nearest(a.x, a.z, 120);
+    if (!n) { this.tgtWait = a; G.setWaypoint({ x: a.x, z: a.z, name: s.chase ? 'Where they were last seen' : 'Where it starts', gig: true }); return; }
+    this.tgtWait = null;
+    const t = W.graph.at(n.e, Math.max(0, Math.min(n.e.len, n.s)));
+    const v = new Vehicle(W, G.scene, G.vmats, o.type || 'suv', o.paint ? o.paint.map(c => c * c) : [0.1, 0.1, 0.1]);
+    v.reset(t[0], t[1], Math.atan2(t[3], t[2])); v.y = W.surf.height(t[0], t[1]);
+    v.spec = { ...specOf(o.type || 'suv'), acc: 3, vTop: (o.speed || 11) + 3 };
+    G.traffic.extra = G.traffic.extra || []; G.traffic.extra.push(v.agent);
+    this.tgt = { v, dest: b, speed: o.speed || 11, routeT: 0, route: null, lostT: 0, closeT: 0, nearT: 0, stuckT: 0 };
+    G.setWaypoint(null);
+  }
+  dropTarget() {
+    const T = this.tgt; if (!T) return; const G = this.g;
+    if (T.v.root.parent) T.v.root.parent.remove(T.v.root);
+    const ex = G.traffic.extra || [], k = ex.indexOf(T.v.agent); if (k >= 0) ex.splice(k, 1);
+    this.tgt = null;
+  }
+  targetTick(s, dt) {
+    const G = this.g, W = G.W, P = G.player;
+    if (!this.tgt) { if (this.tgtWait && Math.hypot(this.tgtWait.x - P.x, this.tgtWait.z - P.z) < 200) this.makeTarget(s); return; }
+    const T = this.tgt;
+    const v = T.v, d = Math.hypot(v.x - P.x, v.z - P.z), toEnd = Math.hypot(v.x - T.dest.x, v.z - T.dest.z);
+    // it drives its own route (a chase: faster when you're on it)
+    T.routeT -= dt;
+    if (T.routeT <= 0) { T.routeT = 1.5; T.route = null; const a = W.graph.nearest(v.x, v.z, 40), b = W.graph.nearest(T.dest.x, T.dest.z, 80); if (a && b) { const r = W.graph.route(a, b, true); if (r) T.route = W.graph.routePolyline(r, a, b); } }
+    let ax = T.dest.x, az = T.dest.z;
+    if (T.route && T.route.length >= 4) { let bi = 0, bd = 1e9; for (let i = 0; i < T.route.length; i += 2) { const q = (T.route[i] - v.x) ** 2 + (T.route[i + 1] - v.z) ** 2; if (q < bd) { bd = q; bi = i; } } const look = Math.min(T.route.length - 2, bi + 4); ax = T.route[look]; az = T.route[look + 1]; }
+    const want = s.chase ? T.speed * (d < 30 ? 1.25 : 0.85) : T.speed * (d > 90 ? 0.6 : 1);
+    const diff = wrapAngle(Math.atan2(az - v.z, ax - v.x) - v.th), inp = { throttle: 0, brake: 0, steer: Math.max(-1, Math.min(1, diff * 2.2)), handbrake: false };
+    if (v.v < want) inp.throttle = Math.abs(diff) < 0.5 ? 1 : 0.5; if (v.v > want + 1.5 || (Math.abs(diff) > 1.1 && v.v > 6)) { inp.brake = 1; inp.throttle = 0; }
+    if (inp.throttle > 0.3 && Math.abs(v.v) < 0.4) T.stuckT += dt; else T.stuckT = Math.max(0, T.stuckT - dt);
+    T.ghost = (T.ghost || 0) - dt; if (T.stuckT > 2.5) { T.ghost = 2; T.stuckT = 0; }
+    v.update(dt, inp, T.ghost > 0 ? null : G.traffic);
+    this.showMarker(v.x, v.z);
+    const fail = (why) => { G.hud.toast('Lost them', why, 'warn', 2.6); this.enterStep(); };
+    if (s.tail) {
+      T.lostT = d > 140 ? T.lostT + dt : 0;
+      if (T.lostT > 6) { if (s.endOnLose) { this.lastTail = { x: P.x + 4, z: P.z + 3, name: 'Here' }; this.advance(); } else fail('Too far behind. Again, from the start'); return; }
+      T.closeT = s.tooClose && d < s.tooClose ? T.closeT + dt : Math.max(0, T.closeT - dt * 0.5);
+      if (T.closeT > 3) { fail('They saw you. Keep your distance'); return; }
+      if (toEnd < 25) { if (d < 120) { this.lastTail = { x: v.x + 4, z: v.z + 3, name: 'Here' }; this.advance(); } else fail('They got there without you'); }
+    } else {
+      T.nearT = d < 7 ? T.nearT + dt : Math.max(0, T.nearT - dt * 0.5);
+      if (T.nearT > 1.6) { G.hud.toast('Got it!', 'They pull over; the driver runs into the crowd', 'good', 2.6); this.advance(); return; }
+      if (toEnd < 25 || d > 260) fail('It got away. Again');
+    }
+  }
+  // ---------------------------------------------------------------- careful driving
+  escortTick(s, dt) {
+    const G = this.g, P = G.player, E = this.esc; if (!E || P.onFoot) return;
+    const kmh = Math.abs(P.v || 0) * 3.6, dmg = (P.cur && P.cur.dmg) || 0;
+    E.over = kmh > s.escort.kmh + 3 ? E.over + dt : Math.max(0, E.over - dt);
+    if (dmg - E.dmg > s.escort.dmg || E.over > 3) { G.hud.toast(E.over > 3 ? 'Too fast' : 'A knock', 'Again. Gently this time', 'warn', 2.6); E.over = 0; E.dmg = dmg; this.restartStepFromPrev(); }
+  }
+  restartStepFromPrev() { if (this.st.step > 0) this.st.step--; this.save(); this.enterStep(); }
+  // ---------------------------------------------------------------- sneaking
+  makeGuards(s) {
+    const G = this.g, g = s.sneak.goal(); if (!g) { this.advance(); return; }
+    this.dropGuards(); this.guards = []; this.goal = g; this.alert = 0;
+    G.setWaypoint({ x: g.x, z: g.z, name: g.name, gig: true });
+    for (let i = 0; i < s.sneak.guards; i++) {
+      const a = i / s.sneak.guards * 6.283 + 0.4, r = 7 + i * 2.5, x = g.x + Math.cos(a) * r, z = g.z + Math.sin(a) * r;
+      const near = G.W.graph.nearest(x, z, 120); if (!near) continue;
+      const p = G.people.make(near.e, near.s, near.side || 1, { mode: 'stand', female: false });
+      p.x = x; p.z = z; p.fixed = true; p.anchor = { x, z }; p.wait = 1e9; p.idle = i === 0 ? 'phone' : 'arms_folded'; p.crew = true; p.story = 'guard';
+      p.yaw0 = a + Math.PI; p.yaw = p.yaw0; p.sweep = 0.9 + i * 0.3;
+      G.people.list.push(p); this.guards.push(p);
+    }
+  }
+  dropGuards() { const L = this.g.people.list; for (const p of this.guards || []) { const i = L.indexOf(p); if (i >= 0) { if (p.body) p.body.release(); L.splice(i, 1); } } this.guards = null; }
+  sneakTick(s, dt) {
+    const G = this.g, P = G.player; if (!this.guards) return;
+    const t = performance.now() / 1000;
+    let seen = false;
+    for (const p of this.guards) {
+      p.yaw = p.yaw0 + Math.sin(t * 0.5 * p.sweep + p.sweep) * 1.1; p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
+      const dx = P.x - p.x, dz = P.z - p.z, d = Math.hypot(dx, dz);
+      if (d > 15) continue;
+      const ang = Math.abs(wrapAngle(Math.atan2(dz, dx) - p.yaw));
+      if ((ang < 0.6 || d < 2.2) && G.W.collision.ray(p.x, p.z, P.x, P.z) > 0.97) seen = true;
+    }
+    this.alert = Math.max(0, this.alert + (seen ? dt * (P.onFoot && Math.hypot(P.foot.vx || 0, P.foot.vz || 0) > 3 ? 2.2 : 1.3) : -dt * 0.6));
+    if (this.alert > 1) {
+      G.hud.toast('Spotted', '“Oye! Kon ahe tithe?” Back out and try again', 'warn', 2.8);
+      const g = this.goal, a = Math.atan2(P.z - g.z, P.x - g.x), back = G.safeDrop(g.x + Math.cos(a) * 32, g.z + Math.sin(a) * 32);
+      if (back && P.onFoot && P.teleportFoot) P.teleportFoot(back.x, back.z, a + Math.PI, G.traffic);
+      this.alert = 0; return;
+    }
+    if (P.onFoot && Math.hypot(P.x - this.goal.x, P.z - this.goal.z) < 2.6) this.advance();
+  }
+  // ---------------------------------------------------------------- the dhol: Space on the beat
+  rhStart(o) {
+    this.rhStop();
+    const el = document.createElement('div'); el.className = 'rh'; el.innerHTML = '<div class="ln"></div><div class="sc"></div>';
+    (document.getElementById('ui') || document.body).appendChild(el);
+    const sp = 60 / o.bpm, beats = [];
+    // a dhol-tasha pattern: steady, then the double strokes
+    let tb = 2;
+    for (let i = 0; i < o.beats; i++) { tb += (i % 8 === 6 || i % 8 === 7) ? sp / 2 : sp; const b = document.createElement('div'); b.className = 'bt'; el.appendChild(b); beats.push({ t: tb, el: b, done: 0 }); }
+    this.rh = { el, beats, t: 0, hits: 0, need: o.need, o };
+  }
+  rhStop() { if (this.rh) { this.rh.el.remove(); this.rh = null; } }
+  rhHit() {
+    const R = this.rh; if (!R) return;
+    let best = null, bd = 0.16;
+    for (const b of R.beats) { if (b.done) continue; const d = Math.abs(b.t - R.t); if (d < bd) { bd = d; best = b; } }
+    if (best) { best.done = 1; best.el.className = 'bt ok'; R.hits++; this.g.audio.boom ? this.g.audio.play('punch', { vol: 0.5, rate: 0.6 }) : this.g.audio.blip?.(); }
+    else this.g.audio.blip?.();
+  }
+  rhTick(dt) {
+    const R = this.rh; if (!R) return;
+    R.t += dt;
+    const W = R.el.clientWidth || 500, hitX = W * 0.18, pxs = W * 0.42;
+    for (const b of R.beats) {
+      const x = hitX + (b.t - R.t) * pxs; b.el.style.left = x + 'px'; b.el.style.display = x < -40 || x > W + 40 ? 'none' : '';
+      if (!b.done && R.t - b.t > 0.18) { b.done = 2; b.el.className = 'bt miss'; }
+    }
+    R.el.querySelector('.sc').textContent = `${R.hits} / ${R.need}`;
+    const last = R.beats[R.beats.length - 1];
+    if (R.t > last.t + 0.6) {
+      if (R.hits >= R.need) { this.g.hud.toast('Kadak!', 'The whole pathak is grinning', 'good', 2.4); this.advance(); }
+      else { this.g.hud.toast('Off the beat', 'Again, listen to the tasha', 'warn', 2.4); this.rhStart(R.o); }
+    }
+  }
 
   // ---------------------------------------------------------------- the saffron marker
   showMarker(x, z) {
