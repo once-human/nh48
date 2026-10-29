@@ -41,12 +41,11 @@ export class Crowd {
     const kit = this.kit;
     const look = kit.randomLook(new RNG(this.pool.length + 1), { female });
     const H = kit.create(look);
-    H.holder.visible = false;
-    this.scene.add(H.holder);
+    H.holder.visible = false;          // in the scene only while it's someone (a hidden body's ~60 bones still cost every frame)
     const accs = [];
     H.root.traverse(o => { if (o.isSkinnedMesh && !o.name.startsWith('body')) accs.push(o); });
     const s = { H, female, p: null, accs, dtAcc: 0 };
-    s.release = () => { if (s.p) s.p.body = null; s.p = null; H.holder.visible = false; if (s.umb) s.umb.visible = false; };
+    s.release = () => { if (s.p) s.p.body = null; s.p = null; H.holder.visible = false; if (H.holder.parent) this.scene.remove(H.holder); if (s.umb) s.umb.visible = false; };
     this.pool.push(s);
     return s;
   }
@@ -116,7 +115,7 @@ export class Crowd {
       if (p.kid) s.H.root.scale.setScalar(p.look.scale * 0.7);
       s.p = p; p.body = s;
       s.cur = null;
-      s.H.holder.visible = true;
+      s.H.holder.visible = true; if (!s.H.holder.parent) this.scene.add(s.H.holder);
     }
   }
   animFor(p) {
@@ -175,6 +174,7 @@ export class Crowd {
     } else if (s.umb) s.umb.visible = false;
     const sh = dd < 22;
     if (s.sh !== sh) { s.sh = sh; H.root.traverse(o => { if (o.isMesh) o.castShadow = sh; }); }
-    H.holder.visible = seen || dd < 12;
+    const vis = seen || dd < 12;
+    if (vis !== H.holder.visible) { H.holder.visible = vis; if (vis) { if (!H.holder.parent) this.scene.add(H.holder); } else if (H.holder.parent) this.scene.remove(H.holder); }
   }
 }

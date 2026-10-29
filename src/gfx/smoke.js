@@ -14,10 +14,11 @@ function puffTexture() {
 export class Smoke {
   constructor(scene, n = 160) {
     const tex = puffTexture();
+    this.scene = scene;
     this.list = [];
     for (let i = 0; i < n; i++) {
       const m = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0, color: 0x777777, fog: true });
-      const s = new THREE.Sprite(m); s.visible = false; scene.add(s);
+      const s = new THREE.Sprite(m); s.visible = false;        // in the scene only while it's a live puff
       this.list.push({ s, m, life: 0, max: 1, vx: 0, vy: 0, vz: 0, size0: 1, size1: 2, op: 0.5, fire: false });
     }
     this.k = 0;
@@ -35,7 +36,7 @@ export class Smoke {
     p.fire = fire;
     p.m.color.setHex(fire ? (R() < 0.5 ? 0xffa53a : 0xff6a1a) : kind === 'black' ? 0x1b1b1b : 0x8a8a88);
     p.m.blending = fire ? THREE.AdditiveBlending : THREE.NormalBlending;
-    p.s.visible = true;
+    p.s.visible = true; if (!p.s.parent) this.scene.add(p.s);
   }
   explode(x, y, z) {
     for (let i = 0; i < 46; i++) this.emit(x, y + Math.random() * 1.2, z, 'fire', 2.6);
@@ -47,7 +48,7 @@ export class Smoke {
       if (!p.s.visible) continue;
       p.life += dt;
       const t = p.life / p.max;
-      if (t >= 1) { p.s.visible = false; p.m.opacity = 0; continue; }
+      if (t >= 1) { p.s.visible = false; p.m.opacity = 0; this.scene.remove(p.s); continue; }
       p.s.position.x += p.vx * dt; p.s.position.y += p.vy * dt; p.s.position.z += p.vz * dt;
       p.vy *= p.fire ? 1 : 0.995;
       const sz = p.size0 + (p.size1 - p.size0) * Math.sqrt(t);
