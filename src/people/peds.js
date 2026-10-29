@@ -398,21 +398,33 @@ export class People {
       }
     }
     if (p.angry > 0) p.angry -= dt;
+    if (p.froze > 0) { p.froze -= dt; p.v = 0; }
     // react to the player's auto
     const dx = p.x - player.x, dz = p.z - player.z;
     const d = Math.hypot(dx, dz);
     if (d < 6 && !player.tipped) {
       const along = dx * phx + dz * phz;                  // in front of the auto?
       const side = -dx * phz + dz * phx;
-      if (along > -1.5 && along < 2 + pv * 0.9 && Math.abs(side) < 1.6 && pv > 2.2 && p.dodge <= 0) {
-        // jump out of the way, sideways from the auto's path
-        const s = Math.sign(side) || 1;
-        p.dodge = 0.45; p.dodgeVX = -phz * s * 4.2; p.dodgeVZ = phx * s * 4.2;
-        this.events.push({ type: 'dodge', p, x: p.x, z: p.z });
+      if (along > -1.5 && along < 2 + pv * 0.9 && Math.abs(side) < 1.6 && pv > 2.2 && p.dodge <= 0 && !p.froze) {
+        // see it coming? Everyone reacts at their own speed: the old, and anyone on their phone, are slow;
+        // if there isn't time, they freeze (and get hit) instead of gliding sideways out of it
+        const react = p.react || (p.react = (OLD.has(p.persona) ? 0.75 : 0.42) + (p.idle === 'phone' ? 0.25 : 0) + this.rng.next() * 0.3);
+        const tti = Math.max(0, along) / Math.max(0.1, pv);
+        if (tti > react) {
+          const s = Math.sign(side) || 1;
+          p.dodge = 0.6; p.dodgeVX = -phz * s * 3.4; p.dodgeVZ = phx * s * 3.4;
+          p.yaw = Math.atan2(phx * s, -phz * s); p.v = 3.4;                  // a scramble, facing where they run
+          this.events.push({ type: 'dodge', p, x: p.x, z: p.z });
+        } else { p.froze = 0.8; this.events.push({ type: 'dodge', p, x: p.x, z: p.z }); }
       }
       if (d < 1.15 && pv > 2.0) {
-        p.fallen = 2.6; p.dodge = 0;
-        this.events.push({ type: 'pedHit', p, speed: pv, x: p.x, z: p.z });
+        // how bad it is depends on how fast you were going: a knock, knocked out, or killed
+        const kmh = pv * 3.6, R = this.rng.next();
+        const dead = kmh > 70 ? R < 0.8 : kmh > 50 ? R < 0.4 : kmh > 35 ? R < 0.08 : false;
+        const ko = dead || kmh > 25;
+        p.dodge = 0.3; p.dodgeVX = phx * pv * 0.55; p.dodgeVZ = phz * pv * 0.55;       // thrown along your path
+        p.fallen = dead ? 1e6 : ko ? 8 + kmh * 0.25 + R * 6 : 3 + kmh * 0.12; p.ko = ko; p.corpse = dead; p.v = 0;
+        this.events.push({ type: 'pedHit', p, speed: pv, x: p.x, z: p.z, sev: dead ? 'dead' : ko ? 'ko' : 'knock' });
         return;
       }
     }

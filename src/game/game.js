@@ -894,7 +894,12 @@ export class Game {
       if (ev.type === 'tip') { this.rig.shake(0.5); this.audio.crash(0.8); this.hud.toast('Auto tipped over!', 'Corner slower, autos lift a wheel easily', 'warn', 3); }
       if (ev.type === 'hit') { this.audio.crash(Math.min(1, ev.speed / 6)); }
       if (ev.type === 'knock') { this.audio.crash(0.7); this.hud.toast('You knocked over a two-wheeler', 'They’re fine. Very, very angry, but fine.', 'warn', 2.6); }
-      if (ev.type === 'pedHit') { this.audio.thud(0.4); this.hud.toast('Watch the pedestrians!', 'They’re fine, just furious', 'warn', 2.4); this.stats.money = Math.max(0, this.stats.money - 50); }
+      if (ev.type === 'pedHit') {
+        this.audio.thud(ev.sev === 'knock' ? 0.4 : 0.8); this.rig.shake(ev.sev === 'knock' ? 0.15 : 0.35);
+        if (ev.sev === 'dead') { this.hud.toast('You killed someone', 'Hit and run is BNS s.106: up to ten years. Every cop in Pune is looking for you', 'bad', 5); this.life.change('karma', -25); this.police && this.police.raiseHeat && this.police.raiseHeat(3, 'Killed a pedestrian', null); }
+        else if (ev.sev === 'ko') { this.hud.toast('You knocked someone out', 'They’re not getting up. People are calling the police', 'bad', 3.6); this.life.change('karma', -6); this.police && this.police.raiseHeat && this.police.raiseHeat(1, 'Hit a pedestrian', null); }
+        else { this.hud.toast('Watch the pedestrians!', 'They’re hurt and furious', 'warn', 2.4); this.stats.money = Math.max(0, this.stats.money - 50); }
+      }
       if (ev.type === 'dodge') { if (this.rng.chance(0.35) && (this._dodgeT || 0) < this.t) { this._dodgeT = this.t + 4; if (!(ev.p && this.people.speakAs('dodge', ev.p, 1, 4))) this.police.say(this.rng.pick(['d1', 'd2', 'd3', 'd4']), ev); } }
       if (ev.type === 'recovered') this.hud.toast('Back on three wheels', '', 'info', 1.6);
       if ((ev.type === 'jump' && this.rng.chance(0.3)) || ev.type === 'climb') this.people.onStunt(P);
