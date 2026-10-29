@@ -501,7 +501,7 @@ export class Interiors {
   // a printed sign: dark board, white capitals, a stripe in the shop's colour (both faces)
   sign(R, text, x, y, z, ry, w = 2, accent = 0xc9a227) {
     const cv = document.createElement('canvas'); cv.width = 512; cv.height = 112;
-    const g = cv.getContext('2d');
+    const g = cv.getContext('2d', { willReadFrequently: true });
     g.fillStyle = '#16171b'; g.fillRect(0, 0, 512, 112);
     g.fillStyle = '#' + accent.toString(16).padStart(6, '0'); g.fillRect(0, 98, 512, 14);
     g.fillStyle = '#f4f2ee'; g.font = '700 46px Archivo, Inter, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -521,7 +521,7 @@ export class Interiors {
     if (!R.board) return;
     const ids = MENUS[ctx.kind] || AREA_FOOD[this.areaKind(ctx)] || MENUS.misal;
     const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 352;
-    const x = cv.getContext('2d');
+    const x = cv.getContext('2d', { willReadFrequently: true });
     x.fillStyle = '#16301f'; x.fillRect(0, 0, 1024, 352);
     x.strokeStyle = '#c9b77a'; x.lineWidth = 8; x.strokeRect(8, 8, 1008, 336);
     x.fillStyle = '#f4ecd0'; x.font = '700 46px Archivo, Inter, sans-serif'; x.textAlign = 'center';
@@ -666,7 +666,7 @@ export class Interiors {
   // a heart over everyone you could talk to: pink for someone new, blue for someone you're talking to or
   // seeing, black for your partner (and bigger over the one you're here to meet)
   heartTex(fill, line) {
-    const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d');
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d', { willReadFrequently: true });
     x.fillStyle = fill; x.strokeStyle = line; x.lineWidth = 4;
     x.beginPath(); x.moveTo(32, 54); x.bezierCurveTo(4, 34, 8, 8, 32, 20); x.bezierCurveTo(56, 8, 60, 34, 32, 54); x.closePath(); x.stroke(); x.fill();
     const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;

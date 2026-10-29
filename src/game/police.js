@@ -604,7 +604,7 @@ export class Police {
     const t = W.graph.at(n.e, n.s), rx = -t[3], rz = t[2], hw = n.e.w / 2;
     if (G.inView && G.inView(t[0], t[1]) && Math.hypot(t[0] - P.x, t[1] - P.z) < 120) return;
     const tag = 7.7e6 + Math.floor(this.rng.next() * 1e5), group = new THREE.Group(), stripes = Marshal.stripes || (Marshal.stripes = (() => {
-      const c = document.createElement('canvas'); c.width = 128; c.height = 32; const x = c.getContext('2d');
+      const c = document.createElement('canvas'); c.width = 128; c.height = 32; const x = c.getContext('2d', { willReadFrequently: true });
       for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? '#f2f2f2' : '#d42020'; x.beginPath(); x.moveTo(i * 16, 0); x.lineTo(i * 16 + 16, 0); x.lineTo(i * 16, 32); x.lineTo(i * 16 - 16, 32); x.fill(); }
       const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; tx.wrapS = THREE.RepeatWrapping; return new THREE.MeshStandardMaterial({ map: tx, roughness: 0.6 });
     })());
@@ -876,7 +876,7 @@ class Marshal {
     this.lightR.scale.z = this.lightB.scale.z = 0.8;
     // a POLICE board on the carrier box behind the rider
     if (!Marshal.board) {
-      const c = document.createElement('canvas'); c.width = 256; c.height = 96; const x = c.getContext('2d');
+      const c = document.createElement('canvas'); c.width = 256; c.height = 96; const x = c.getContext('2d', { willReadFrequently: true });
       x.fillStyle = '#1d3f8f'; x.fillRect(0, 0, 256, 96); x.fillStyle = '#ffd23a'; x.fillRect(0, 84, 256, 12);
       x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = '800 30px Mukta, sans-serif'; x.fillText('पोलीस', 128, 30); x.font = '800 30px Inter, Arial, sans-serif'; x.fillText('POLICE', 128, 64);
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;

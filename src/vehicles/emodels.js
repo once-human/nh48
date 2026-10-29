@@ -31,7 +31,7 @@ const TEX = {};
 function canvasMat(key, w, h, draw, opts = {}) {
   if (TEX[key]) return TEX[key];
   const c = document.createElement('canvas'); c.width = w; c.height = h;
-  draw(c.getContext('2d'), w, h);
+  draw(c.getContext('2d', { willReadFrequently: true }), w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return (TEX[key] = new THREE.MeshStandardMaterial({ map: t, roughness: 0.35, transparent: !!opts.transparent, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
 }

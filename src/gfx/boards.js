@@ -267,7 +267,7 @@ export class Boards {
     const bw = BASE_W, bh = BASE_H, cols = 8, rows = Math.ceil(list.length / cols);
     const cv = document.createElement('canvas');
     cv.width = cols * bw; cv.height = rows * bh;
-    const ctx = cv.getContext('2d');
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
     for (let k = 0; k < list.length; k++) {
       const s = list[k];
       const cx = k % cols, cy = Math.floor(k / cols);
@@ -306,8 +306,9 @@ export class NearBoards {
     this.tex = tex;
     this.scratch = document.createElement('canvas');
     this.scratch.width = NCW; this.scratch.height = NCH;
-    this.sctx = this.scratch.getContext('2d');
+    this.sctx = this.scratch.getContext('2d', { willReadFrequently: true });
     this.stex = new THREE.CanvasTexture(this.scratch);
+    this._at = new THREE.Vector2();
     this.stex.colorSpace = THREE.SRGBColorSpace;
     this.mat = baseMat.clone();
     this.mat.map = tex; this.mat.emissiveMap = tex;
@@ -365,9 +366,15 @@ export class NearBoards {
       ctx.clearRect(0, 0, NCW, NCH);
       drawBoard(ctx, NCW, NCH, this.names[r.s[3]] || EMPTY, boardRng(r.s));
       const cx = sl % NCOLS, cy = Math.floor(sl / NCOLS);
-      this.renderer.copyTextureToTexture(this.stex, this.tex, null, new THREE.Vector2(cx * NCW, cy * NCH));
+      this.tex.generateMipmaps = false;        // (the 2048² atlas's smaller copies: once below, not per board)
+      this.renderer.copyTextureToTexture(this.stex, this.tex, null, this._at.set(cx * NCW, cy * NCH));
+      this.tex.generateMipmaps = true;
       this.recOf[sl] = r; this.slotOf.set(r, sl); this.lastUse[sl] = now;
       drawn++; this.dirty = true;
+    }
+    if (drawn) {
+      const gl = this.renderer.getContext(), t = this.renderer.properties.get(this.tex).__webglTexture;
+      if (t) { this.renderer.state.bindTexture(gl.TEXTURE_2D, t); gl.generateMipmap(gl.TEXTURE_2D); }
     }
     if (!this.dirty) return;
     this.dirty = false;

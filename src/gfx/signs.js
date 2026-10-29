@@ -117,7 +117,7 @@ export function makeSignAtlas(scale = 1) {
   const W = 4096 * scale, H = 2048 * scale;
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
-  const x = c.getContext('2d');
+  const x = c.getContext('2d', { willReadFrequently: true });
   x.scale(scale, scale);
   const pk = new Packer(4096, 2048);
   const rng = new RNG(2026);

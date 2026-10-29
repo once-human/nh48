@@ -78,7 +78,7 @@ export class PlayerAuto {
     // blurred as soon as the chase camera pulled back at speed)
     {
       const c = document.createElement('canvas'); c.width = 1024; c.height = 208;
-      const x = c.getContext('2d');
+      const x = c.getContext('2d', { willReadFrequently: true });
       let T = 'आई तुझा आशीर्वाद';
       const paint = () => {
         x.fillStyle = '#0c0b0a'; x.fillRect(0, 0, 1024, 208);
