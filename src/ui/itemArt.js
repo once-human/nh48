@@ -62,3 +62,19 @@ export function itemArt(id, size = 160) {
   const url = c.toDataURL('image/png'); CACHE.set(k, url); return url;
 }
 export const hasArt = (id) => !!ART[id];
+// a garment on a hanger in its own colour (clothes you own): top, bottom, saree, kurta or shoes
+export function garmentArt(kind, hex, size = 128) {
+  const k = 'g:' + kind + hex + '@' + size; if (CACHE.has(k)) return CACHE.get(k);
+  const c = document.createElement('canvas'); c.width = c.height = size; const x = c.getContext('2d'); x.scale(size / 160, size / 160);
+  const col = '#' + (hex >>> 0).toString(16).padStart(6, '0');
+  const body = (path) => { x.save(); x.fillStyle = col; path(); x.fill(); x.globalCompositeOperation = 'source-atop'; x.fillStyle = lin(x, 30, 0, 130, 0, [[0, 'rgba(0,0,0,.28)'], [0.45, 'rgba(255,255,255,.14)'], [1, 'rgba(0,0,0,.32)']]); x.fillRect(0, 0, 160, 160); x.restore(); };
+  shadow(x, 80, 148, 46, 7);
+  if (kind === 'shoe') { body(() => { x.beginPath(); x.moveTo(30, 120); x.quadraticCurveTo(34, 86, 66, 88); x.lineTo(96, 104); x.quadraticCurveTo(132, 108, 134, 124); x.lineTo(132, 134); x.lineTo(30, 134); x.closePath(); }); x.fillStyle = 'rgba(0,0,0,.45)'; x.fillRect(30, 130, 102, 6); }
+  else {
+    x.strokeStyle = '#9aa0a6'; x.lineWidth = 3; x.beginPath(); x.moveTo(80, 30); x.quadraticCurveTo(88, 16, 80, 12); x.moveTo(44, 46); x.lineTo(80, 30); x.lineTo(116, 46); x.stroke();
+    if (kind === 'bottom') body(() => { x.beginPath(); x.moveTo(50, 44); x.lineTo(110, 44); x.lineTo(118, 146); x.lineTo(88, 146); x.lineTo(80, 80); x.lineTo(72, 146); x.lineTo(42, 146); x.closePath(); });
+    else if (kind === 'saree') body(() => { x.beginPath(); x.moveTo(44, 46); x.lineTo(116, 46); x.quadraticCurveTo(128, 100, 122, 148); x.lineTo(38, 148); x.quadraticCurveTo(32, 100, 44, 46); x.closePath(); });
+    else body(() => { x.beginPath(); x.moveTo(44, 46); x.lineTo(66, 40); x.quadraticCurveTo(80, 52, 94, 40); x.lineTo(116, 46); x.lineTo(134, 76); x.lineTo(116, 84); x.lineTo(112, kind === 'kurta' ? 146 : 124); x.lineTo(48, kind === 'kurta' ? 146 : 124); x.lineTo(44, 84); x.lineTo(26, 76); x.closePath(); });
+  }
+  const url = c.toDataURL('image/png'); CACHE.set(k, url); return url;
+}

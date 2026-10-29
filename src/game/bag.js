@@ -12,10 +12,11 @@ import { refreshChips } from './keys.js';
 import { guideHTML } from './guide.js';
 import { BUSINESSES as BIZ } from './hustle.js';
 import { levelOf, ASKS } from './date.js';
-import { itemArt } from '../ui/itemArt.js';
+import { itemArt, garmentArt } from '../ui/itemArt.js';
+import { CLOTHES, SHOES } from './shops.js';
 import { Studio } from './studio.js';
 
-const TABS = [['bag', 'Inventory', 'झोळी', 'jhola'], ['me', 'Character', 'मी', 'person'], ['story', 'Missions', 'कथा', 'pin'], ['ppl', 'Phone', 'फोन', 'phone'], ['own', 'Owned', 'माझं', 'key'], ['near', 'Nearby', 'जवळ', 'compass'], ['guide', 'Guide', 'माहिती', 'guide']];
+const TABS = [['bag', 'Inventory', 'झोळी', 'jhola'], ['story', 'Missions', 'कथा', 'pin'], ['own', 'Owned', 'माझं', 'key'], ['near', 'Nearby', 'जवळ', 'compass'], ['guide', 'Guide', 'माहिती', 'guide']];
 const GROUPS = [['food', 'Food'], ['night', 'Night'], ['look', 'Look'], ['health', 'Health'], ['money', 'Money'], ['things', 'Shops'], ['vehicle', 'Vehicles'], ['place', 'Places'], ['homes', 'Homes for sale']];
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -23,6 +24,13 @@ const dist = (d) => d < 1000 ? `${Math.round(d / 10) * 10} m` : `${(d / 1000).to
 
 // the order things sit in the bag: tools first (the torch), then food and drink, then the rest. The first five
 // are the hotbar (keys 1 to 5 while you play)
+const ART2 = {};
+function phoneArt() { if (ART2.p) return ART2.p; const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+  const g = x.createLinearGradient(40, 0, 88, 0); g.addColorStop(0, '#1b1d22'); g.addColorStop(0.5, '#3a3e46'); g.addColorStop(1, '#16181c'); x.fillStyle = g; x.beginPath(); x.roundRect(40, 14, 48, 100, 9); x.fill();
+  const s = x.createLinearGradient(0, 20, 0, 108); s.addColorStop(0, '#2b5fd9'); s.addColorStop(1, '#8a3fd1'); x.fillStyle = s; x.beginPath(); x.roundRect(44, 20, 40, 88, 6); x.fill(); x.fillStyle = 'rgba(255,255,255,.25)'; x.fillRect(46, 22, 10, 84); return (ART2.p = c.toDataURL()); }
+function keyArt() { if (ART2.k) return ART2.k; const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 30, 0, 100); g.addColorStop(0, '#e8e2c8'); g.addColorStop(1, '#9a8f6a'); x.strokeStyle = g; x.lineWidth = 8; x.beginPath(); x.arc(46, 54, 18, 0, 6.283); x.stroke();
+  x.fillStyle = g; x.fillRect(60, 50, 44, 8); x.fillRect(90, 58, 6, 12); x.fillRect(78, 58, 6, 9); x.fillStyle = '#c0281f'; x.beginPath(); x.roundRect(22, 74, 26, 34, 6); x.fill(); return (ART2.k = c.toDataURL()); }
 export function bagOrder(G) {
   const inv = G.life.s.inv, ids = Object.keys(inv).filter(k => inv[k] > 0 && ITEMS[k]);
   const order = (id) => ITEMS[id].tool ? 0 : ITEMS[id].use && (ITEMS[id].use.hunger || ITEMS[id].use.thirst) ? 1 : 2;
@@ -41,7 +49,7 @@ export class Bag {
     (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
     this.nav = new KbNav(el.querySelector('.jh-body'), '.jh-item, .jh-row[data-act], .jh-chips.sel button, .gd-sec > summary');
-    el.addEventListener('pointerover', (e) => { const it = e.target.closest('.jh-item[data-arg]'); if (it && this.tab === 'bag' && it.dataset.arg !== this.sel) { this.sel = it.dataset.arg; this.detail(); } });
+    el.addEventListener('pointerover', (e) => { const it = e.target.closest('[data-tip]'); if (it && this.tab === 'bag' && it.dataset.tip !== this.sel) { this.sel = it.dataset.tip; this.detail(); } });
     // drag your character round on the character screen
     let dg = null;
     el.addEventListener('pointerdown', (e) => { if (e.target.closest('.gm-portrait')) { dg = e.clientX; e.preventDefault(); } });
@@ -54,8 +62,8 @@ export class Bag {
     });
     window.addEventListener('keydown', (e) => {
       if (!this.open) return;
-      if (e.code === 'Escape' || e.code === 'KeyE' || (e.code === 'Tab' && this.tab === 'me')) { e.preventDefault(); e.stopImmediatePropagation(); this.close(); }
-      else if (e.code === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); this.tab = 'me'; this.render(); }
+      if (e.code === 'Escape' || e.code === 'KeyE' || (e.code === 'Tab' && this.tab === 'bag')) { e.preventDefault(); e.stopImmediatePropagation(); this.close(); }
+      else if (e.code === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); this.tab = 'bag'; this.render(); }
       else if (/^(KeyA|KeyD|ArrowLeft|ArrowRight|KeyQ)$/.test(e.code)) {
         e.preventDefault(); e.stopImmediatePropagation();
         const k = TABS.findIndex(t => t[0] === this.tab), n = TABS.length;
@@ -88,25 +96,46 @@ export class Bag {
     const B = this.el.querySelector('.jh-body');
     let h = '';
     if (this.tab === 'bag') {
-      // a bag with room in it: you on the left, the slots on the right (empty ones too), the first five on the
-      // hotbar (1 to 5 use them while you play, no need to open the jhola)
-      const ids = bagOrder(G), torchOn = G.lights && G.lights.torchOn, P = G.player;
-      const bar = (lab, v, col) => `<div class="jb-bar"><span>${lab}</span><i><b style="width:${Math.round(Math.max(0, Math.min(1, v)) * 100)}%;background:${col}"></b></i></div>`;
-      h += `<div class="jb"><div class="jb-me"><div class="jb-name">${esc((G.hud.charName && G.hud.charName()) || 'You')}</div>
-        ${bar('Health', (P.hp ?? 100) / L.hpMax, '#ff375f')}${bar('Food', s.hunger, '#ffb224')}${bar('Water', s.thirst, '#40c8ff')}${bar('Energy', s.energy, '#a8e43a')}
-        <div class="jb-cash"><small>Cash</small><b>${fmt(G.stats.money)}</b>${s.bank ? `<small>Bank</small><b>${fmt(s.bank)}</b>` : ''}</div>
-        <p class="jb-tip"><span class="kbd">1</span>–<span class="kbd">5</span> use the top row while you play</p></div>
-        <div class="jb-slots">`;
-      for (let k = 0; k < Math.max(24, Math.ceil(ids.length / 6) * 6); k++) {
-        const id = ids[k];
-        if (!id) { h += `<div class="jb-slot empty${k < 5 ? ' hot' : ''}">${k < 5 ? `<em>${k + 1}</em>` : ''}</div>`; continue; }
-        const it = ITEMS[id], on = it.tool && torchOn, n = s.inv[id];
-        const what = it.tool ? (on ? 'On · use to switch off' : 'Use to switch on') : it.feed ? (it.feed === 'dog' ? 'Eat, or feed a dog' : 'Eat, or feed a cow') : describe(it.use);
-        h += `<button class="jh-item jb-slot${k < 5 ? ' hot' : ''}${on ? ' on' : ''}${this.sel === id ? ' sel' : ''}" data-act="use" data-arg="${id}" title="${esc(it.name)} · ${esc(what)}">${k < 5 ? `<em>${k + 1}</em>` : ''}<img class="art" alt="" src="${itemArt(id, 128)}"><b>${esc(it.name)}</b>${n > 1 ? `<i>${n}</i>` : ''}</button>`;
+      // left: the categories and the grid; centre: you, with what you have on and in hand round you; right: how
+      // you are, and the tooltip for whatever you point at
+      const ids = bagOrder(G), torchOn = G.lights && G.lights.torchOn, P = G.player, cat = this.cat || 'all';
+      const CATS_ = [['all', 'All', 'jhola'], ['food', 'Food & drink', 'food'], ['health', 'Health', 'health'], ['things', 'Things', 'parcel'], ['clothes', 'Clothes', 'shirt']];
+      const kindOf = (id) => { const it = ITEMS[id]; return it.tool || ['book', 'lottery', 'gajra'].includes(id) ? 'things' : it.use && (it.use.hp || it.use.health) && !it.use.hunger ? 'health' : 'food'; };
+      const tiles = [];
+      if (cat !== 'clothes') for (const id of ids) if (cat === 'all' || kindOf(id) === cat) tiles.push(`<button class="gi-tile${this.sel === id ? ' sel' : ''}${ITEMS[id].tool && torchOn ? ' on' : ''}" data-act="use" data-arg="${id}" data-tip="${id}"><img alt="" src="${itemArt(id, 128)}">${s.inv[id] > 1 ? `<i>${s.inv[id]}</i>` : ''}</button>`);
+      if (cat === 'clothes' || cat === 'all') {
+        for (const w of s.wardrobe) {
+          const c = CLOTHES.find(q => q[0] === w), sh = w.startsWith('shoe_') && SHOES.find(q => 'shoe_' + q[0] === w);
+          const P_ = c && c[4], kind = sh ? 'shoe' : P_ && P_.cut && P_.cut.w === 2 ? 'saree' : P_ && P_.cut && P_.cut.w === 1 ? 'kurta' : P_ && P_.bottom !== undefined && P_.top === undefined ? 'bottom' : 'top';
+          const hex = sh ? sh[4] : P_ ? (P_.top ?? P_.bottom ?? 0x888888) : 0x888888;
+          tiles.push(`<button class="gi-tile" data-act="wear" data-arg="${esc(w)}" data-tip="w:${esc(w)}"><img alt="" src="${garmentArt(kind, hex, 128)}"></button>`);
+        }
       }
-      h += '</div><div class="gm-detail" id="gm-detail"></div></div>';
-      if (!ids.length) h += `<p class="jh-empty">Nothing in here yet. A kirana sells water, Parle-G and bananas; any eatery will pack you a parcel.</p>`;
-      if (s.vehicles.length) h += `<div class="jh-sub">Keys</div>` + s.vehicles.map(v => this.row('key', `${cap(v.type)}`, v.plate, '', null)).join('');
+      while (tiles.length < 30) tiles.push('<span class="gi-tile empty"></span>');
+      const slot = (key, label, img, act, arg, note) => `<button class="gi-slot" ${act ? `data-act="${act}"` : 'disabled'} ${arg !== undefined ? `data-arg="${esc(arg)}"` : ''} data-tip="s:${key}"><span class="dia">${img ? `<img alt="" src="${img}">` : '<em></em>'}</span><b>${label}</b>${note ? `<small>${esc(note)}</small>` : ''}</button>`;
+      const look = P.look || {}, hx = (c) => c && c.getHex ? c.getHex() : 0x888888;
+      const saree = look.cut && look.cut.w === 2, kurta = look.cut && look.cut.w === 1;
+      const bar = (lab, v, col) => `<div class="gs-bar"><span>${lab}</span><i><b style="width:${Math.round(Math.max(0, Math.min(1, v)) * 100)}%;background:${col}"></b></i><em>${Math.round(Math.max(0, Math.min(1, v)) * 100)}</em></div>`;
+      const st = G.rep ? G.rep.standing(P.x, P.z) : 0;
+      h += `<div class="gi">
+        <div class="gi-left"><div class="gi-rail">${CATS_.map(([k, l, ic]) => `<button data-act="cat" data-arg="${k}" title="${l}" class="${cat === k ? 'on' : ''}">${icon(ic)}</button>`).join('')}</div>
+          <div class="gi-list"><div class="gi-h">${CATS_.find(c => c[0] === cat)[1]}</div><div class="gi-grid">${tiles.join('')}</div></div></div>
+        <div class="gi-mid">
+          <div class="gi-col l">${slot('top', saree ? 'Saree' : kurta ? 'Kurta' : 'Top', garmentArt(saree ? 'saree' : kurta ? 'kurta' : 'top', hx(look.top)), 'cat', 'clothes', 'Change')}
+            ${slot('bottom', 'Bottom', saree ? null : garmentArt('bottom', hx(look.bottom)), 'cat', 'clothes')}
+            ${slot('shoe', 'Footwear', garmentArt('shoe', hx(look.shoe)), 'cat', 'clothes')}</div>
+          <div class="gm-portrait gi-me" title="Drag to turn"><div class="gm-name">${esc((G.hud.charName && G.hud.charName()) || G.playerName || 'You')}<small>${st > 0.45 ? 'One of ours' : st > 0.15 ? 'Liked round here' : st < -0.45 ? 'Trouble' : st < -0.15 ? 'Watched round here' : 'Just another Punekar'}</small></div></div>
+          <div class="gi-col r">${slot('hand', 'Left hand', s.inv.torch ? itemArt('torch', 128) : null, s.inv.torch ? 'use' : null, 'torch', s.inv.torch ? (torchOn ? 'On' : 'Torch') : 'Empty')}
+            ${slot('pocket', 'Pocket', phoneArt(), 'phone', '', 'Open phone')}
+            ${slot('keys', 'Keys', keyArt(), 'tab', 'own', `${1 + s.vehicles.length} vehicle${s.vehicles.length ? 's' : ''}`)}</div>
+        </div>
+        <div class="gi-right"><div class="gi-h">Condition</div>
+          ${bar('Health', (P.hp ?? 100) / L.hpMax, '#ff375f')}${bar('Food', s.hunger, '#ffb224')}${bar('Water', s.thirst, '#40c8ff')}${bar('Energy', s.energy, '#a8e43a')}${bar('Stamina', P.stam ?? 1, '#30e0b0')}${bar('Mood', s.mood, '#c58cff')}
+          <div class="gi-h">Standing</div>
+          <div class="gs-kv"><span>Respect</span><b>${Math.round(s.respect)}</b></div><div class="gs-kv"><span>Karma</span><b>${Math.round(s.karma)}</b></div>
+          <div class="gs-kv"><span>Wanted</span><b>${G.police.heat ? '★'.repeat(G.police.heat) : 'No'}</b></div><div class="gs-kv"><span>Challans</span><b>${fmt(G.police.duesTotal)}</b></div>
+          <div class="gm-detail gi-tip" id="gm-detail"></div></div>
+      </div>`;
     } else if (this.tab === 'me') {
       const P = G.player, st = L.style(), re = L.reaction(), hp = (P.hp ?? 100) / L.hpMax;
       const ring = (ic, label, v, note) => {
@@ -200,24 +229,27 @@ export class Bag {
     }
     B.innerHTML = h;
     B.dataset.tab = this.tab;
-    if (this.tab === 'bag') { if (!this.sel || !s.inv[this.sel]) this.sel = bagOrder(G)[0]; this.detail(); }
-    if (this.tab === 'me') this.portrait();
+    if (this.tab === 'bag') { if (!this.sel || (!s.inv[this.sel] && !/^[ws]:/.test(this.sel))) this.sel = bagOrder(G)[0]; this.detail(); this.portrait(); }
     this.nav.paint();
   }
   // the item you're pointing at, big, with what it does
   detail() {
     const D = this.el.querySelector('#gm-detail'); if (!D) return;
-    const id = this.sel, it = id && ITEMS[id], s = this.life.s;
+    const id = this.sel || '', s = this.life.s;
+    if (id.startsWith('w:')) { const w = id.slice(2), c = CLOTHES.find(q => q[0] === w), sh = SHOES.find(q => 'shoe_' + q[0] === w); const nm = c ? c[1] : sh ? sh[1] : w, nt = c ? c[2] : sh ? sh[2] : ''; D.innerHTML = `<div class="dn">${esc(nm)}</div><div class="dq">Clothes · yours</div><p class="dd">${esc(nt)}</p><p class="dk"><span class="kbd">Click</span> put it on</p>`; return; }
+    if (id.startsWith('s:')) { const k = id.slice(2), T = { top: ['What you’re wearing', 'Pick something from Clothes to change.'], bottom: ['What you’re wearing', 'Pick something from Clothes to change.'], shoe: ['On your feet', 'Pick from Clothes.'], hand: ['Torch', s.inv.torch ? 'Click to switch it on or off. L does the same while you play.' : 'Any hardware shop sells one.'], pocket: ['Your phone', 'A smartphone: chats, UPI, Zwiggy, homes, garage. Click to open it (T while you play).'], keys: ['Keys', 'Your auto and everything you own: click to see them.'] }[k] || ['', ''];
+      D.innerHTML = `<div class="dn">${esc(T[0])}</div><p class="dd">${esc(T[1])}</p>`; return; }
+    const it = ITEMS[id];
     if (!it) { D.innerHTML = '<p class="jh-empty">Point at something to look at it.</p>'; return; }
     const on = it.tool && this.g.lights && this.g.lights.torchOn;
     const what = it.tool ? (on ? 'On. Use to switch it off.' : 'Use to switch it on.') : it.feed ? (it.feed === 'dog' ? 'Eat it, or feed a street dog.' : 'Eat it, or feed a cow.') : describe(it.use);
-    D.innerHTML = `<img class="big" alt="" src="${itemArt(id, 320)}"><div class="dn">${esc(it.name)}</div><div class="dq">× ${s.inv[id] || 0} in your jhola</div><p class="dd">${esc(what)}</p><button class="btn primary" data-act="use" data-arg="${id}">${it.tool ? (on ? 'Switch off' : 'Switch on') : 'Use'}</button>`;
+    D.innerHTML = `<img class="big" alt="" src="${itemArt(id, 320)}"><div class="dn">${esc(it.name)}</div><div class="dq">× ${s.inv[id] || 0} in your jhola</div><p class="dd">${esc(what)}</p><p class="dk"><span class="kbd">Click</span> ${it.tool ? (on ? 'switch off' : 'switch on') : 'use'}</p>`;
   }
   // you, in a studio light, as you're dressed now (drag to turn)
   portrait() {
-    const box = this.el.querySelector('.gm-portrait'); if (!box) return;
+    const box = this.el.querySelector('.gi-me'); if (!box) return;
     const P = this.g.player;
-    if (!this.studio) { this.studio = new Studio(this.g, 380, 600, { bg: 0x101217, fov: 22 }); this.studio.dress(P.look); }
+    if (!this.studio) { this.studio = new Studio(this.g, 440, 760, { bg: 0x0e1014, fov: 22 }); this.studio.dress(P.look); }
     this.studio.shoot('full');
     box.appendChild(this.studio.canvas);
   }
@@ -249,6 +281,9 @@ export class Bag {
     }
     if (a === 'meet') { const c = (L.s.contacts || []).find(q => q.name === arg); if (c && G.date.askToMeet(c)) this.close(); return; }
     if (a === 'reply') { const [n, i] = arg.split('|'); const c = (L.s.contacts || []).find(q => q.name === n); if (c) { G.date.reply(c, +i); this.render(); } return; }
+    if (a === 'cat') { this.cat = arg; this.render(); return; }
+    if (a === 'tab') { this.tab = arg; this.render(); return; }
+    if (a === 'phone') { this.close(); G.phone && G.phone.open && G.phone.open(); return; }
     if (a === 'track') { const t = G.story && G.story.trackNow && G.story.trackNow(); if (t) { G.hud.toast('Tracking', t.name, 'meter', 2); this.close(); } return; }
     if (a === 'contact') { this.contactSel = arg; this.render(); return; }
     if (a === 'contacts') { this.contactSel = null; this.render(); return; }

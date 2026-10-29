@@ -44,10 +44,11 @@ export class Life {
     this.g = G;
     this.s = Object.assign({
       hunger: 0.85, thirst: 0.85, energy: 0.9, mood: 0.7, respect: 0, karma: 0, fitness: 0, drunk: 0,
-      inv: { water: 1, biscuit: 2, torch: 1 }, bank: 0, gold: 0, props: [], vehicles: [], wardrobe: [], look: null, upg: {}, phone: false, zwiggy: false,
+      inv: { water: 1, biscuit: 2, torch: 1 }, bank: 0, gold: 0, props: [], vehicles: [], wardrobe: [], look: null, upg: {}, phone: true, zwiggy: true,
       tally: { deliveries: 0, fightsWon: 0, knockedOut: 0, fed: 0, meals: 0, rentEarned: 0 }, lastRentDay: -1,
     }, this.load() || {});
     // older saves start with a torch too
+    if (!this.s.phone) { this.s.phone = true; this.s.zwiggy = true; }      // everyone has a smartphone now
     if (!this.s.torchGiven) { this.s.torchGiven = 1; if (!this.s.inv.torch) this.s.inv.torch = 1; }
     // karma and respect used to swing hard: a save from then is brought to where the slower rules would have it
     if (!this.s.repSlow) { this.s.repSlow = 1; this.s.karma = Math.round((this.s.karma || 0) * 0.35); this.s.respect = Math.round((this.s.respect || 0) * 0.35); }

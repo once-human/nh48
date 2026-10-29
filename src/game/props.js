@@ -56,7 +56,7 @@ export class Props {
       out.push({ label: 'Sleep till morning', note: 'Full energy and health, wake at 7 AM. Saves you a lodge', price: 0, act: () => { G.shops.close(); G.sleep(); return ''; } });
       out.push({ label: 'Eat at home', note: 'Varan bhaat, toop, limbu. Free: the kitchen is stocked', price: 0, act: () => { L.apply({ hunger: 0.7, thirst: 0.2, mood: 0.06 }); return 'Aai would approve'; } });
       out.push({ label: 'Water from the filter', note: 'A glass now and a bottle for the road. Free', price: 0, act: () => { L.apply({ thirst: 0.6 }); L.add('water'); return 'A bottle in your jhola'; } });
-      out.push({ label: 'Wardrobe', note: 'Change into anything you own', price: 0, act: () => { G.shops.close(); G.bag && G.bag.show('wear'); return ''; } });
+      out.push({ label: 'Wardrobe', note: 'Change into anything you own', price: 0, act: () => { G.shops.close(); G.bag && (G.bag.cat = 'clothes', G.bag.show('bag')); return ''; } });
       const missing = L.s.vehicles.filter(v => !G.player.dropped.some(d => d.veh.owned && d.veh.owned.id === v.id) && !(G.player.cur && G.player.cur.owned && G.player.cur.owned.id === v.id));
       for (const v of missing) out.push({ label: `Bring out your ${v.type}`, note: 'From the parking downstairs', price: 0, act: () => { G.shops.respawnOwned(v, p); return 'It’s outside'; } });
       // park what you own (and rode here) in the garage: safe from towing, theft and the rain

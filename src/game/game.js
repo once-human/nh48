@@ -287,7 +287,7 @@ export class Game {
       if (e.code === 'KeyM' && (this.state === 'play' || this.state === 'map')) this.toggleMap();
       if (this.free && this.state === 'play' && (e.code === 'BracketLeft' || e.code === 'BracketRight')) this.setHour((this.hour + (e.code === 'BracketRight' ? 1 : 23)) % 24);
       if (e.code === 'KeyE' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.bag.show('bag'); }
-      if (e.code === 'Tab' && this.state === 'play') { e.preventDefault(); this.bag.show('me'); }
+      if (e.code === 'Tab' && this.state === 'play') { e.preventDefault(); this.bag.show('bag'); }
       if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space') && !(this.hud.pickerOpen)) this.begin();
     });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'play') this.togglePause(true); });
