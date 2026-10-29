@@ -23,13 +23,15 @@ function idleFor(p) {
 export class Crowd {
   constructor(people, kit, scene, W, quality) {
     this.people = people; this.kit = kit; this.scene = scene; this.W = W;
-    this.cap = quality.name === 'lite' ? 10 : quality.name === 'low' ? 15 : quality.name === 'med' ? 28 : 40; this.range = quality.crowdRange || RANGE;
+    this.cap = quality.name === 'lite' ? 18 : quality.name === 'low' ? 27 : quality.name === 'med' ? 50 : 72; this.range = (quality.crowdRange || RANGE) * 1.8;
     this.pool = [];
     this.t = 0;
     // build the pool up front: creating a skinned body mid-game is a visible hitch
-    if (kit) { for (let i = 0; i < Math.ceil(this.cap * 0.65); i++) this.makeSkin(false); for (let i = 0; i < Math.ceil(this.cap * 0.45); i++) this.makeSkin(true); }
+    // a starter set up front (the rest are made as more people come close)
+    const pre = Math.min(this.cap, 26);
+    if (kit) { for (let i = 0; i < Math.ceil(pre * 0.65); i++) this.makeSkin(false); for (let i = 0; i < Math.ceil(pre * 0.45); i++) this.makeSkin(true); }
   }
-  setQuality(q) { this.cap = q.name === 'lite' ? 10 : q.name === 'low' ? 15 : q.name === 'med' ? 28 : 40; this.range = q.crowdRange || RANGE; }
+  setQuality(q) { this.cap = q.name === 'lite' ? 18 : q.name === 'low' ? 27 : q.name === 'med' ? 50 : 72; this.range = (q.crowdRange || RANGE) * 1.8; }
   makeSkin(female) {
     const kit = this.kit;
     const look = kit.randomLook(new RNG(this.pool.length + 1), { female });
@@ -119,6 +121,9 @@ export class Crowd {
   }
   drive(s, dt, cx, cz) {
     const p = s.p, H = s.H;
+    // riders follow their vehicle every frame (not only when bodies are handed out), so they ride smoothly with it
+    if (p.rideOf) { const o = p.rideOf, hx = o.hx ?? Math.cos(o.yaw || 0), hz = o.hz ?? Math.sin(o.yaw || 0);
+      p.x = o.x + hx * p.seat[0] - hz * p.seat[1]; p.z = o.z + hz * p.seat[0] + hx * p.seat[1]; p.yaw = Math.atan2(hz, hx); p.y = o.y || 0; }
     const y = p.rideOf ? (p.y || 0) + (p.seatY ?? 0.2) + (p.side ? 0.04 : 0) : this.W.surf.height(p.x, p.z);
     H.holder.position.set(p.x, y, p.z);
     H.holder.rotation.set(0, -p.yaw + (p.side ? Math.PI / 2 : 0), 0);
@@ -127,9 +132,14 @@ export class Crowd {
     const restart = p.actId !== s.actId; s.actId = p.actId;
     H.play(name, { speed, once, fade: p.act || p.mode === 'fight' ? 0.08 : 0.25, restart: restart && !!p.act });
     // people further away animate at half rate
+    // cheaper the further and the less seen: full rate close up, half rate past 30 m, a quarter off-screen;
+    // shadows only from the people near you
     s.dtAcc += dt;
-    const far = Math.abs(p.x - cx) + Math.abs(p.z - cz) > 30;
-    if (!far || s.flip) { H.mixer.update(s.dtAcc); s.dtAcc = 0; }
-    s.flip = !s.flip;
+    const dd = Math.abs(p.x - cx) + Math.abs(p.z - cz), seen = !this.inView || dd < 8 || this.inView(p.x, p.z);
+    s.k = ((s.k || 0) + 1) & 3;
+    if (seen ? (dd < 30 || (s.k & 1) === 0) : s.k === 0) { H.mixer.update(s.dtAcc); s.dtAcc = 0; }
+    const sh = dd < 22;
+    if (s.sh !== sh) { s.sh = sh; H.root.traverse(o => { if (o.isMesh) o.castShadow = sh; }); }
+    H.holder.visible = seen || dd < 12;
   }
 }

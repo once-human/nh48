@@ -1035,6 +1035,7 @@ export class Game {
   }
 
   frame(dt) {
+    if (this.audio) this.audio.hour = this.hour;
     if (this.audio && this.audio.listen) { this.audio.listen(this.camera); if (this.state === 'play' && this.traffic) this.audio.engines(this.traffic.list, this.camera.position.x, this.camera.position.z); }
     if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); }
     this.stepRefuel(dt);

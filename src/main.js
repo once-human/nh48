@@ -97,6 +97,9 @@ async function main() {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.shadowMap.enabled = quality.shadows;
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  // the shadow map is redrawn every other frame (the sun moves slowly; people and cars at 30 updates a second look
+  // the same), which takes a big share of the GPU's work off half the frames
+  renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
   renderer.info.autoReset = false;
   // If the GPU driver resets (out of memory, a too-long frame) the browser drops the WebGL context
   // and the canvas goes black. Recover: remember where the player was, then reload into the same spot.
@@ -338,6 +341,7 @@ async function main() {
     if (propT <= 0) { updateProps(W, camera.position.x, camera.position.z); W.fly?.update?.(camera.position.x, camera.position.z); propT = 0.2; }
     const t1 = performance.now();
     // the map covers the screen, and while paused the last frame just sits there (blurred by CSS): no rendering at all
+    if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = (frames & 1) === 0;
     if (compiled && game.state !== 'map' && !(game.state === 'pause' && !game.livePause && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);
     const t2 = performance.now();
     perf.n++; perf.upd += t1 - t0; perf.rnd += t2 - t1; perf.worst = Math.max(perf.worst, t1 - t0);

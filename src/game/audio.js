@@ -44,6 +44,15 @@ export class Audio {
     this.master.connect(comp).connect(ctx.destination);
     // every bus straight into the master (the fx bus used to be wired into itself, so punches, clicks and UI sounds never came out)
     for (const k of BUSES) { const g = this.buses[k] = ctx.createGain(); g.gain.value = this.vols[k] ?? 1; g.connect(this.master); }
+    // a street's reverb: the walls throw sound back (a short, dense tail, a little slap), sent from the city's buses
+    try {
+      const len = Math.floor(ctx.sampleRate * 1.6), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) { const t = i / ctx.sampleRate; d[i] = (Math.random() * 2 - 1) * Math.exp(-t * 3.4) * (t < 0.012 ? 0 : 1) + (Math.abs(t - 0.09 - c * 0.013) < 0.002 ? 0.35 : 0); } }
+      const cv = ctx.createConvolver(); cv.buffer = ir;
+      const wet = ctx.createGain(); wet.gain.value = 0.22; cv.connect(wet).connect(this.master);
+      for (const k of ['world', 'traffic', 'voice', 'fx']) if (this.buses[k]) { const sgain = ctx.createGain(); sgain.gain.value = k === 'voice' ? 0.12 : 0.3; this.buses[k].connect(sgain).connect(cv); }
+      this.verb = wet;
+    } catch (e) { /* no reverb */ }
     this.noise = this.makeNoise(2);
     this.buildEngine();
     this.buildAmbient();
@@ -311,9 +320,12 @@ export class Audio {
     this.setLoop('street', (0.22 + density * 0.18) * (1 - night * 0.55) * duck, 0.25);
     this.setLoop('traffic', (0.05 + density * 0.13) * (1 - night * 0.6) * duck, 0.25);        // the far traffic hum, quieter: close vehicles are heard where they are
     this.setLoop('ride', clamp(rideSpeed / 12, 0, 1) * 0.16, 0.25);
-    // crows by day, dogs more at night
-    if (Math.random() < 0.003 * (1 - night)) this.crow();
-    if (Math.random() < 0.0015 * (0.3 + night)) this.bark(0.3);
+    // nature: crows and small birds all day, most in the morning and the quiet afternoon (less traffic to drown them);
+    // at night only the odd dog
+    const h = this.hour ?? 12, birds = night > 0.6 ? 0 : (h > 5.5 && h < 10 ? 1.4 : h >= 12 && h < 17 ? 1.8 : 0.8) * (1.2 - density * 0.6);
+    if (Math.random() < 0.003 * birds) this.crow();
+    if (Math.random() < 0.006 * birds) this.chirp();
+    if (Math.random() < 0.0015 * (0.3 + night)) this.at(this.lis ? this.lis.x + (Math.random() - 0.5) * 120 : 0, this.lis ? this.lis.z + (Math.random() - 0.5) * 120 : 0, () => this.bark(0.5, 0));
   }
 
   // ---------------------------------------------------------------- horns
@@ -437,14 +449,14 @@ export class Audio {
     this.env(og, t, 0.005, clamp(strength * 0.3, 0.05, 0.6), 0.02, 0.2);
     o.start(t); o.stop(t + 0.3);
   }
-  // the vehicles around you, each heard where it is: the four nearest get an engine voice (a scooter's buzz, an
+  // the vehicles around you, each heard where it is: the ten nearest get an engine voice (a scooter's buzz, an
   // auto's putter, a car's hum, a bus's diesel), pitched by its speed, moving with it, fading as it goes
   engines(list, lx, lz) {
     if (!this.ctx) return;
     const ctx = this.ctx, t = ctx.currentTime;
-    if (!this.eng) {
-      this.eng = [];
-      for (let i = 0; i < 4; i++) {
+    if (!this.teng) {
+      this.teng = [];
+      for (let i = 0; i < 10; i++) {
         const o = ctx.createOscillator(); o.type = 'sawtooth';
         const o2 = ctx.createOscillator(); o2.type = 'square';
         const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600; lp.Q.value = 1.2;
@@ -453,11 +465,11 @@ export class Audio {
         const pn = this.panner({ x: 0, y: 0.8, z: 0 }, 5);
         o.connect(lp); o2.connect(m2).connect(lp); lp.connect(g); g.connect(pn).connect(this.bus('traffic'));
         o.start(); o2.start();
-        this.eng.push({ o, o2, lp, g, pn, v: null });
+        this.teng.push({ o, o2, lp, g, pn, v: null });
       }
     }
-    const near = list.filter(v => Math.abs(v.x - lx) < 45 && Math.abs(v.z - lz) < 45).sort((a, b) => ((a.x - lx) ** 2 + (a.z - lz) ** 2) - ((b.x - lx) ** 2 + (b.z - lz) ** 2)).slice(0, 4);
-    this.eng.forEach((E, i) => {
+    const near = list.filter(v => Math.abs(v.x - lx) < 70 && Math.abs(v.z - lz) < 70).sort((a, b) => ((a.x - lx) ** 2 + (a.z - lz) ** 2) - ((b.x - lx) ** 2 + (b.z - lz) ** 2)).slice(0, 10);
+    this.teng.forEach((E, i) => {
       const v = near[i];
       if (!v) { E.g.gain.setTargetAtTime(0, t, 0.2); return; }
       const ty = v.type || '', sp = Math.abs(v.v || 0);
@@ -468,6 +480,21 @@ export class Audio {
       E.g.gain.setTargetAtTime((/bus|tempo/.test(ty) ? 0.16 : 0.1) * (0.4 + Math.min(1, sp / 10) * 0.6), t, 0.15);
       if (E.pn.positionX) { E.pn.positionX.setTargetAtTime(v.x, t, 0.05); E.pn.positionY.setTargetAtTime(0.8, t, 0.05); E.pn.positionZ.setTargetAtTime(v.z, t, 0.05); } else E.pn.setPosition(v.x, 0.8, v.z);
     });
+  }
+  // a small bird in a tree near you: a few quick rising trills (bulbuls, sparrows, the koel in summer)
+  chirp() {
+    if (!this.ctx || !this.lis) return;
+    const a = Math.random() * 6.283, r = 10 + Math.random() * 35, koel = Math.random() < 0.15;
+    this.at(this.lis.x + Math.cos(a) * r, this.lis.z + Math.sin(a) * r, () => {
+      const ctx = this.ctx, t0 = ctx.currentTime, n = koel ? 3 : 2 + Math.floor(Math.random() * 4);
+      for (let k = 0; k < n; k++) {
+        const t = t0 + k * (koel ? 0.45 : 0.11 + Math.random() * 0.05), o = ctx.createOscillator(), g = ctx.createGain();
+        const f0 = koel ? 700 + k * 120 : 2800 + Math.random() * 1600;
+        o.type = 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * (koel ? 1.5 : 1.25), t + (koel ? 0.3 : 0.07));
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(koel ? 0.09 : 0.05, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0008, t + (koel ? 0.38 : 0.09));
+        o.connect(g); this.out3(g, 0, this.bus('world')); o.start(t); o.stop(t + 0.42);
+      }
+    }, 7);
   }
   // a cat purring: a low rumble, pulsing
   purr() {
@@ -528,6 +555,8 @@ export class Audio {
   crash(strength) { this.thud(strength); this.tone('square', [180 + Math.random() * 120, 260], 0.1, 0.06 * strength, 0, 0.02); }
   crow() {
     if (!this.ctx) return;
+    // from a tree somewhere around you, up high (not just a random ear)
+    if (this.lis && !this._at && !this._crowing) { const a = Math.random() * 6.283, r = 15 + Math.random() * 30; this._crowing = true; try { return this.at(this.lis.x + Math.cos(a) * r, this.lis.z + Math.sin(a) * r, () => this.crow(), 9); } finally { this._crowing = false; } }
     if (this.buf.crow) { this.play('crow', { vol: 0.1 + Math.random() * 0.1, pan: Math.random() * 1.6 - 0.8, offset: Math.random() * 2.6, dur: 0.8 + Math.random() * 1.2, rate: 0.95 + Math.random() * 0.1 }); return; }
     const ctx = this.ctx, t = ctx.currentTime;
     const n = 1 + Math.floor(Math.random() * 3);

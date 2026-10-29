@@ -20,7 +20,8 @@ export const PROFILE = {
 // people on the street per real place of each kind (a bar spills onto the pavement; an office mostly keeps its people inside)
 const WEIGHT = { night: 10, food: 2.0, retail: 0.8, office: 0.45, edu: 1.2, worship: 1.0, leisure: 1.0, health: 0.6, transit: 2.5 };
 // vehicles on the road, all of Pune, by hour: morning and evening peaks, quiet from 1 to 5 am
-export const TRAFFIC = H([0.3, 0.22, 0.18, 0.16, 0.18, 0.28, 0.45, 0.7, 0.92, 1, 0.95, 0.85, 0.8, 0.8, 0.78, 0.8, 0.88, 0.97, 1, 1, 0.92, 0.75, 0.55, 0.4]);
+// Pune's day: the office rush 8:30 to 10:30 and 5:30 to 8, a lull through the afternoon (lunch, the 1 to 4 nap), empty late
+export const TRAFFIC = H([0.2, 0.14, 0.1, 0.09, 0.11, 0.22, 0.42, 0.72, 0.95, 1, 0.9, 0.72, 0.6, 0.5, 0.44, 0.5, 0.66, 0.9, 1, 1, 0.86, 0.64, 0.44, 0.3]);
 const PETH_SHUT = H([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.6, 0.35, 0.4, 0.85, 1, 1, 1, 1, 1, 1, 1]);
 
 export function curve(arr, hour) {
