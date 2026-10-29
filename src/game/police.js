@@ -506,7 +506,8 @@ export class Police {
         if (m.catchT > (P.onFoot ? 0.4 : 1.2)) this.caught(m);
       }
     }
-    const pl = this.heat > 0 && nearest < 1e8 ? clamp(1.4 - nearest / 160, 0, 1) : 0, em = G.emSiren || 0;
+    let pl = this.heat > 0 && nearest < 1e8 ? clamp(1.4 - nearest / 160, 0, 1) : 0; const em = G.emSiren || 0;
+    if (G.dutySiren && G.dutySiren > pl) { pl = G.dutySiren; this.sirenAt = { x: G.player.x, z: G.player.z }; }     // your own siren, on police duty
     G.audio.sirenAt = em > pl ? G.emSirenAt : this.sirenAt;
     G.audio.siren(Math.max(pl, em), em > pl ? G.emPan || 0 : sirenPan);
     if (this.heat > 0) {

@@ -31,6 +31,7 @@ import TRANSIT_DATA from './transit.json';
 import VLINES from './vendor_lines.json';
 import { Rep } from '../people/rep.js';
 import { Blood } from '../gfx/blood.js';
+import { Duty } from './duty.js';
 import { justOpened, lineOpen, opensOn } from './metroOpen.js';
 import { Club } from './club.js';
 import { Lights } from './lights.js';
@@ -190,6 +191,15 @@ export class Game {
     this.brain = new Brain(this.people, this); this.people.brain = this.brain;
     this.rep = new Rep(this); this.people.rep = this.rep;
     this.blood = new Blood(this.scene, W);
+    this.duty = new Duty(this);
+    // police bikes and jeeps, ambulances: yours to take when they're stopped (a crime, if their crew is right there)
+    player.servicesNear = () => {
+      const L = [];
+      for (const m of this.police ? this.police.marshals : []) if (!m.taken) L.push({ veh: m.veh, kind: 'pol', unit: m, label: m.jeep ? 'Take the police jeep' : 'Take the police bike' });
+      for (const R of this.emergency ? this.emergency.list : []) if (!R.taken) L.push({ veh: R.v, kind: R.type === 'ambulance' ? 'amb' : 'pol', R, label: R.type === 'ambulance' ? 'Take the ambulance' : 'Take the police jeep' });
+      return L;
+    };
+    player.onService = (sv) => this.takeService(sv);
     this.emergency = new Emergency(this);
     this.weather = new Weather(this.scene, this.audio);
     player.makePed = (look, x, z, per) => this.people.spawnAt(look, x, z, per);
@@ -406,6 +416,21 @@ export class Game {
     this.brain && this.brain.incident('blast', v.x, v.z, { byYou: !this.player.onFoot || this.player.cur === v });
     this.hud.toast('It went up', v === P.auto ? 'Your auto is a burnt shell' : 'That vehicle is a burnt shell', 'bad', 4);
     if (v === P.auto) this.later(18, () => this.rebuildAuto());
+  }
+  // taking a service vehicle: it stops being theirs (no more AI driving it); with its crew watching it's a theft of
+  // government property, and they come after you; on duty, its calls come to you
+  takeService(sv) {
+    const v = sv.veh, G = this, ex = this.traffic.extra || [];
+    v.serviceKind = sv.kind; v.service = true; v.stolen = true; v.agent.isPlayer = true;
+    if (sv.unit) { const P = this.police, i = P.marshals.indexOf(sv.unit); sv.unit.taken = true; if (i >= 0) P.marshals.splice(i, 1);
+      // the crew on foot stay as they are (furious); the rider on the bike gets off
+      if (sv.unit.H) sv.unit.H.holder.visible = false; for (const c of sv.unit.crew || []) c.H.holder.visible = c !== sv.unit.crew[0]; }
+    if (sv.R) { sv.R.taken = true; const L = this.emergency.list, i = L.indexOf(sv.R); if (i >= 0) L.splice(i, 1); for (const c of sv.R.crew) c.H.holder.visible = c.role !== 'driver'; }
+    const k = ex.indexOf(v.agent); if (k >= 0) ex.splice(k, 1);
+    v.seatOverride = v.spec.two ? null : sv.kind === 'amb' ? [1.32, 1.18, 0.42] : [0.05, 0.82, 0.38];
+    const crewNear = (this.police && this.police.marshals.some(m => m.foot.some(p => Math.hypot(p.x - v.x, p.z - v.z) < 25))) || (sv.unit && sv.unit.foot && sv.unit.foot.length);
+    if (!this.free && (crewNear || sv.kind === 'pol')) this.police.raiseHeat(2, sv.kind === 'amb' ? 'Stole an ambulance' : 'Stole a police vehicle', 'theft');
+    G.hud.toast(sv.kind === 'amb' ? '108 · on duty' : 'Police · on patrol', 'Calls will come to you. Siren comes on when you’re on one', 'meter', 3.4);
   }
   // the traffic's damage: smoke past half, black smoke and flames near the end, then it goes up like yours
   trafficDamage(dt) {
@@ -910,6 +935,8 @@ export class Game {
     if (this.refuel) { const R = this.refuel, k = Math.min(1, R.t / R.dur); return { main: 'Filling up · engine off', sub: `₹${Math.round(R.price * k)} · ${(R.units * k).toFixed(1)} ${R.cng ? 'kg' : 'L'}` }; }
     const tj = this.tut && this.tut.objective();
     if (tj) return tj;
+    const dj = this.duty && this.duty.objective();
+    if (dj) return dj;
     const so = this.story && this.story.objective();
     if (so && !(r.current && r.current.state === 'onboard')) return so;
     const hj = this.hustle && this.hustle.objective();
@@ -1096,6 +1123,7 @@ export class Game {
     this.stepRefuel(dt);
     if (this.brain && this.state !== 'title') this.brain.update(dt, this.player);
     if (this.emergency && this.state !== 'title') this.emergency.update(dt);
+    if (this.duty && this.state === 'play') this.duty.update(dt);
     // in your story the weather follows Pune's year (free roam: whatever you picked)
     if (this.weather && !this.free) { const day = Math.floor((this.clock || 0) / 24), hb = Math.floor(this.hour || 0); if (day !== this._wDay || hb !== this._wHr) { this._wDay = day; this._wHr = hb; this.weather.auto(day, this.hour || 12); } }
     if (this.state !== 'title' && this.tut) this.tut.update(dt);

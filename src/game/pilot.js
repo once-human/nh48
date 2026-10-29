@@ -18,6 +18,7 @@ const WALK = 1.55, JOG = 3.4, SPRINT = 6.2;
 // where you sit (vehicle-local: x forward, y up, z to the right; Indian cars are right-hand drive)
 const SEATS = { auto: [0.36, 0.8, 0], hatch: [-0.2, 0.57, 0.36], sedan: [-0.55, 0.56, 0.36], taxi: [-0.55, 0.56, 0.36], suv: [-0.3, 0.7, 0.38], tempo: [0.75, 0.95, 0.32] };
 function seatFor(veh, S, isAuto) {
+  if (veh.seatOverride) return veh.seatOverride;
   if (S.two) return [S.seat ? S.seat[0] : -0.3, S.seat ? S.seat[1] : 0.8, 0];
   if (isAuto) return SEATS.auto;
   if (veh.type === 'bus') return [S.L / 2 - 1.2, 1.25, 0.75];
@@ -319,6 +320,11 @@ export class Pilot {
         if (dist < 1.3) consider(dist + 0.2, { kind: 'parked', r, label: `Take the parked ${S.name.toLowerCase()}`, key: 'F' });
       }
     }
+    // a police bike or jeep, an ambulance: stopped, or left while the crew is out
+    if (this.servicesNear) for (const sv of this.servicesNear()) {
+      const v = sv.veh, dist = this.distToBox(F.x, F.z, v.x, v.z, Math.cos(v.th), Math.sin(v.th), v.spec.L, v.spec.W);
+      if (dist < 1.6 && Math.abs(v.v) < 1.5) consider(dist + 0.1, { kind: 'service', sv, label: sv.label, key: 'F' });
+    }
     // traffic: slow or stopped vehicles can be taken from their driver
     if (traffic) traffic.near(F.x, F.z, 8, (o) => {
       if (!o.T || o.isPlayer || o.parked || o.fallen > 0 || o.wreck) return;
@@ -353,6 +359,9 @@ export class Pilot {
       veh.helmet = ((Math.abs(r.x * 7.31 + r.z * 3.17) | 0) % 2) === 0;
       veh.stolen = true; veh.plate = this.randomPlate();
       this.events.push({ type: 'stoleParked', veh, name: veh.spec.name.toLowerCase(), x: r.x, z: r.z });
+    } else if (offer.kind === 'service') {
+      veh = offer.sv.veh;
+      if (this.onService) this.onService(offer.sv);
     } else if (offer.kind === 'traffic') {
       const o = offer.o;
       veh = new Vehicle(this.W, this.scene, this.vmats, o.type, o.col);
