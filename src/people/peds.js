@@ -933,6 +933,8 @@ export class People {
       p.act = { kind: 'block', clip: 'block', speed: 1.4, t: 0, dur: 0.45 }; p.actId = (p.actId || 0) + 1; dmg *= 0.25;
     }
     if (p.hp0 === undefined) { p.hp0 = p.cop ? 130 : HP[p.persona] || 60; p.hp = p.hp0; }
+    // a paramedic with a patient doesn't drop them for you: a shout, and it's assault on someone at work
+    if (p.duty) { if (byPlayer) { this.speakAs('fight', p, 1, 3); if (!p.dutyHit && this.brain) { p.dutyHit = true; this.brain.incident('fight', p.x, p.z, { byYou: true }); } } return; }
     p.hp -= dmg;
     const dx = p.x - sx, dz = p.z - sz, d = Math.hypot(dx, dz) || 1;
     p.x += dx / d * (M ? M.push : 0.3); p.z += dz / d * (M ? M.push : 0.3);
@@ -1094,6 +1096,8 @@ export class People {
   // you, on foot, walking into people
   bumpPlayer(P) {
     for (const p of this.list) {
+      // paramedics at work are a wall: you're the one who gets moved
+      if (p.duty && !p.hidden) { const dx = p.x - P.x, dz = p.z - P.z, d = Math.hypot(dx, dz); if (d < 0.62 && d > 1e-3 && P.foot) { P.foot.x -= dx / d * (0.62 - d); P.foot.z -= dz / d * (0.62 - d); } continue; }
       if (p.hidden || p.fallen > 0 || p.ctl) continue;
       const dx = p.x - P.x, dz = p.z - P.z;
       if (Math.abs(dx) > 0.8 || Math.abs(dz) > 0.8) continue;

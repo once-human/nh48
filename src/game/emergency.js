@@ -27,11 +27,22 @@ export class Emergency {
     const G = this.g;
     if (this.list.length >= 3 || !G.W.graph) return;
     if (G.vb && (kind === 'down' || kind === 'blast')) G.later(2, () => G.vb.radio(4, x, z));
-    if (kind === 'down' || kind === 'blast') this.later(kind === 'blast' ? 10 : 18 + Math.random() * 12, () => this.spawn('ambulance', x, z, victim));
+    // one ambulance to a scene, taking up to two patients; a second only when there are more than that, and never
+    // more than three to one place
+    if (kind === 'down' || kind === 'blast') {
+      this.pending = this.pending || [];
+      const near = [...this.list.filter(R => R.type === 'ambulance' && R.state !== 'leave' && R.state !== 'gone'), ...this.pending].filter(R => Math.hypot(R.x - x, R.z - z) < 45);
+      const room = victim && near.find(R => (R.victims || (R.victims = R.victim ? [R.victim] : [])).length < 2);
+      if (room) { if (!room.victims.includes(victim)) room.victims.push(victim); if (!room.victim) room.victim = victim; }
+      else if (near.length < 3) {
+        const ticket = { x, z, victim, victims: victim ? [victim] : [] }; this.pending.push(ticket);
+        this.later(kind === 'blast' ? 10 : 18 + Math.random() * 12, () => { this.pending.splice(this.pending.indexOf(ticket), 1); this.spawn('ambulance', x, z, ticket.victim, 0, ticket.victims); });
+      }
+    }
     if ((victim && victim.corpse) || kind === 'blast') this.later(26 + Math.random() * 14, () => this.spawn('police', x, z, null));
   }
   later(s, f) { this.g.later(s, f); }
-  spawn(type, x, z, victim, tries = 0) {
+  spawn(type, x, z, victim, tries = 0, victims = null) {
     const G = this.g, W = G.W, P = G.player;
     if (this.list.length >= 3 || G.state === 'title') return;
     // start on a road 220–360 m from the scene, out of your view
@@ -46,7 +57,7 @@ export class Emergency {
       if (G.inView && G.inView(t[0], t[1]) && Math.hypot(t[0] - P.x, t[1] - P.z) < (wide ? 200 : 160)) continue;
       st = { x: t[0], z: t[1], th: Math.atan2(t[3], t[2]) };
     }
-    if (!st) { if (tries < 6) this.later(5, () => this.spawn(type, x, z, victim, tries + 1)); return; }      // the roads aren't there yet: soon
+    if (!st) { if (tries < 6) this.later(5, () => this.spawn(type, x, z, victim, tries + 1, victims)); return; }      // the roads aren't there yet: soon
     const amb = type === 'ambulance';
     const v = new Vehicle(W, G.scene, G.vmats, amb ? 'tempo' : 'suv', [0.95, 0.95, 0.93]);
     v.reset(st.x, st.z, th0(st)); v.y = W.surf.height(st.x, st.z);
@@ -71,7 +82,7 @@ export class Emergency {
       H.play(role === 'driver' ? 'drive' : 'sit');
       crew.push({ H, look, role, x: sx, z: sz });
     }
-    const R = { type, v, md, light, crew, x, z, victim, state: 'go', t: 0, routeT: 0, route: null, stuckT: 0, out: [] };
+    const R = { type, v, md, light, crew, x, z, victim, victims: victims || (victim ? [victim] : []), state: 'go', t: 0, routeT: 0, route: null, stuckT: 0, out: [] };
     G.traffic.extra = G.traffic.extra || []; G.traffic.extra.push(v.agent);
     this.list.push(R);
   }
@@ -95,7 +106,7 @@ export class Emergency {
       const d = Math.hypot(v.x - R.x, v.z - R.z);
       // pull up beside the scene (or as close as the street lets it, if it's been stuck near it a while)
       if (d < (R.bestD ?? 1e9) - 1) { R.bestD = d; R.nearT = 0; } else R.nearT = (R.nearT || 0) + (d < 45 ? dt : 0);
-      if (R.state === 'go' && (d < 16 || R.nearT > 4)) { R.state = 'scene'; R.t = 0; }
+      if (R.state === 'go' && (d < 16 || (R.nearT > 4 && d < 26) || R.nearT > 12)) { R.state = 'scene'; R.t = 0; }
       if (R.state === 'go' && d < 60) want = 6;
       if (R.state === 'scene') {
         want = 0;
@@ -104,7 +115,10 @@ export class Emergency {
       }
       if (R.state === 'leave') { tx = R.lx; tz = R.lz; want = 12; if (R.t > 50 || (Math.hypot(v.x - P.x, v.z - P.z) > 180 && !(G.inView && G.inView(v.x, v.z)))) R.state = 'gone'; }
       if (R.state === 'gone') continue;
-      this.drive(R, tx, tz, want, dt);
+      // at the scene it's parked: engine off, going nowhere until the crew are back in (the driving brain read a
+      // standing van as stuck and started backing it up and turning it round, with the stretcher still out)
+      if (R.state === 'scene') { v.v = 0; v.throttle = 0; }
+      else this.drive(R, tx, tz, want, dt);
       // the siren only on the way (at the scene the lights stay on, quiet; going back it's just a vehicle)
       if (R.state === 'go') { const dd = Math.hypot(v.x - P.x, v.z - P.z), lv = clamp(1.3 - dd / 220, 0, 1);
         if (R.type === 'ambulance') { if (lv > amb) { amb = lv; ambAt = { x: v.x, z: v.z }; } }
@@ -156,7 +170,7 @@ export class Emergency {
       R.crew.forEach((c, i) => {
         const p = ppl.spawnAt(c.look, rear.x - hz * (i ? 0.45 : -0.45), rear.z + hx * (i ? 0.45 : -0.45), 'bhaiya');
         if (!p) return;
-        c.H.holder.visible = false; p.fixed = false; p.crew = true; p.ctl = true; p.mode = 'stand'; p.v = 0;
+        c.H.holder.visible = false; p.fixed = false; p.crew = true; p.ctl = true; p.duty = true; p.mode = 'stand'; p.v = 0;
         R.medics.push(p); R.out.push(p);
       });
       R.isOut = true;
@@ -191,7 +205,10 @@ export class Emergency {
           R.str.parent && R.str.parent.remove(R.str); R.str = null; for (const p of M) p.hands = null;
           this.crewIn(R); R.medics = null;
           G.audio.thud && G.audio.thud(0.4); G.vb && G.vb.medic(5, A, false);
-          G.later(2, () => { if (R.state === 'scene') this.leave(R); });
+          // another patient here? out again for them; otherwise, off to Sassoon
+          const next = (R.victims || []).find(w => w !== q && G.people.list.includes(w) && w.fallen > 0);
+          if (next) { R.victim = next; R.ph = 'wait'; R.t = 0; R.mid = null; R.ay = 0; R.myaw = undefined; }
+          else G.later(2, () => { if (R.state === 'scene') this.leave(R); });
         }
       }
       if (R.ph === 'out' && !R.ay && q) R.ay = Math.atan2(q.z - rear.z, q.x - rear.x);
