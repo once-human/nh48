@@ -538,8 +538,10 @@ input[type=range] { width: 100%; accent-color: var(--stone); }
 .cl-acts button:hover { background: rgba(255, 255, 255, .13); } .cl-acts small { color: var(--paper-3); font-size: 12px; }
 .cl-stat { font-size: 12px; color: var(--paper-3); }
 .dash .fuel { display: flex; gap: 8px; justify-content: flex-end; align-items: center; font: 600 11px var(--font-ui); letter-spacing: .08em; color: var(--paper-2); text-transform: uppercase; }
-.dash .fuel i { display: block; width: 70px; height: 5px; border-radius: 99px; background: rgba(244, 241, 234, .15); overflow: hidden; }
-.dash .fuel i b { display: block; height: 100%; background: var(--paper); } .dash .fuel.low i b { background: var(--stop); } .dash .fuel em { font-style: normal; color: var(--warn); }
+.dash .fuel { font-size: 12px !important; color: var(--paper) !important; padding: 5px 10px; border-radius: 99px; background: rgba(10, 11, 13, .55); }
+.dash .fuel i { display: block !important; width: 96px; height: 7px; border-radius: 99px; background: rgba(244, 241, 234, .18); overflow: hidden; }
+.dash .fuel .fp { min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; } .dash .fuel.low .fp, .dash .fuel.low span { color: #ff6a5f; }
+.dash .fuel i b { display: block; height: 100%; background: #30e0b0; } .dash .fuel.low i b { background: var(--stop); } .dash .fuel em { font-style: normal; color: var(--warn); }
 .dash.foot .fuel { display: none; }
 .vitals { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; font: 600 11px var(--font-ui); color: var(--paper-2); }
 .vitals span { display: flex; gap: 4px; align-items: center; } .vitals span.low { color: #ffb4ab; }

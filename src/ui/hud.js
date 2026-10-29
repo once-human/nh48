@@ -108,7 +108,7 @@ export class HUD {
       <div class="veh cap"><span id="h-veh">Bajaj RE · Auto rickshaw</span></div>
       <div class="speed"><span class="v num" id="h-speed">0</span><span class="u"><span class="gear" id="h-gear">N</span><span class="unit">KM/H</span></span></div>
       <div class="rpm" id="h-rpm"><i></i></div>
-      <div class="fuel" id="h-fuel"><span id="h-fuel-k">CNG</span><i><b></b></i><em id="h-dmg" hidden></em></div>`);
+      <div class="fuel" id="h-fuel"><span id="h-fuel-k">CNG</span><i><b></b></i><span class="fp" id="h-fuel-p">100%</span><em id="h-dmg" hidden></em></div>`);
     this.lower = el('div', 'h lower', `
       <div class="glass prompt" id="h-prompt"><span class="kbd" id="h-prompt-k">F</span><span id="h-prompt-t"></span></div>
       <div class="subt" id="h-sub"><div class="who" id="h-sub-who"></div><div class="line" id="h-sub-line"></div><div class="tr" id="h-sub-tr"></div></div>`);
@@ -574,7 +574,7 @@ export class HUD {
     // fuel and damage of whatever you're driving
     if (!foot && p.cur) {
       const v = p.cur, f = v.fuel ?? 1, fe = this.$('h-fuel');
-      this.Wd(fe.querySelector('b'), Math.round(f * 100) + '%');
+      this.Wd(fe.querySelector('b'), Math.round(f * 100) + '%'); this.T('h-fuel-p', Math.round(f * 100) + '%');
       this.C(fe, 'low', f < 0.15);
       const S = p.spec || {}, k = S.name === 'Bicycle' ? '' : (p.inAuto || v.type === 'taxi' || v.type === 'bus') ? 'CNG' : 'Petrol';
       if (this._fk !== k) { this._fk = k; this.$('h-fuel-k').textContent = k; fe.hidden = !k; }
