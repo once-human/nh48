@@ -22,5 +22,7 @@ export function vehicleMaterials() {
   const body = glowable(paintable(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.1, envMapIntensity: 0.8 }), 'veh'), 'veh');
   const solid = glowable(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.05, envMapIntensity: 0.45 }), 'solid');
   const glass = new THREE.MeshStandardMaterial({ color: 0x15191d, roughness: 0.05, metalness: 0.3, envMapIntensity: 1.4 });
-  return { body, solid, glass };
+  // the instanced traffic and parked cars get their own glass: one material on both instanced and single meshes
+  // makes the renderer swap shaders back and forth on every draw
+  return { body, solid, glass, glassI: glass.clone() };
 }

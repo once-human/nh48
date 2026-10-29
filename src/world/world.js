@@ -58,6 +58,7 @@ export async function buildWorld(M, T, renderer, scene, quality, progress) {
     facade: facadeMaterial(T),
     roof: roofMaterial(T),
     prop: propMaterial(),
+    propI: propMaterial(),       // (the instanced lamps, poles and signals: their own, see vehmat's glassI)
     propDS: propMaterial({ side: THREE.DoubleSide }),
     water: waterMaterial(),
     decal: new THREE.MeshStandardMaterial({ map: W.tex.decal, transparent: true, depthWrite: false, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -6 }),

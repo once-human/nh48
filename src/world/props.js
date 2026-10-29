@@ -421,7 +421,7 @@ export function buildProps(M, W) {
   for (const S of tSets) sets.push(S.trunk, S.crown, S.far, ...(S.cards ? [S.cards] : []));
 
   // --- lamps
-  const lampSet = new InstancedSet(scene, P.lamp, mats.prop, 700, q.propRange, { cast: q.shadows });
+  const lampSet = new InstancedSet(scene, P.lamp, mats.propI || mats.prop, 700, q.propRange, { cast: q.shadows });
   sets.push(lampSet);
   W.lampPositions = [];
   for (const l of M.lamps) {
@@ -434,7 +434,7 @@ export function buildProps(M, W) {
   }
 
   // --- electric poles + wires
-  const poleSet = new InstancedSet(scene, P.pole, mats.prop, 600, q.propRange, { cast: q.shadows });
+  const poleSet = new InstancedSet(scene, P.pole, mats.propI || mats.prop, 600, q.propRange, { cast: q.shadows });
   sets.push(poleSet);
   const byRoad = new Map();
   for (const p of M.poles) {
@@ -481,7 +481,7 @@ export function buildProps(M, W) {
   }
 
   // --- signals: poles + bulbs (bulb states driven by traffic)
-  const sigSet = new InstancedSet(scene, P.signal, mats.prop, Math.max(1, M.signals.length), q.propRange * 1.5, { cast: q.shadows });
+  const sigSet = new InstancedSet(scene, P.signal, mats.propI || mats.prop, Math.max(1, M.signals.length), q.propRange * 1.5, { cast: q.shadows });
   sets.push(sigSet);
   const bulbMat = new THREE.MeshBasicMaterial({ toneMapped: false });
   const bulbs = new THREE.InstancedMesh(P.bulb, bulbMat, Math.max(1, M.signals.length * 3));

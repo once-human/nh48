@@ -83,7 +83,7 @@ export class Traffic {
       scene.add(body);
       let glass = null;
       if (m.glass.attributes.position.count) {
-        glass = new THREE.InstancedMesh(m.glass, mats.glass, c);
+        glass = new THREE.InstancedMesh(m.glass, mats.glassI || mats.glass, c);
         glass.frustumCulled = false; glass.count = 0;
         scene.add(glass);
       }

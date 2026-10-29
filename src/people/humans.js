@@ -501,13 +501,16 @@ export class HumanKit {
     const head = root.getObjectByName('Head'), X = head && this.extras(k);
     if (X) {
       H.xtra = {};
+      // the ponytail and plait aren't skinned: on the hair's own material the renderer would swap its shader on
+      // every draw (skinned hair, plain plait, skinned, plain…). Their own copy, sharing the hair's colours
+      const tieMat = hairMat.clone(); tieMat.color = hairMat.color; tieMat.sheenColor = hairMat.sheenColor; H.tieMat = tieMat;
       for (const [n, geo] of Object.entries(X.geo)) {
         const mat2 = n === 'helm' ? new THREE.MeshStandardMaterial({ color: 0x1b1d22, roughness: 0.28, metalness: 0.08 })
           : n === 'visor' ? new THREE.MeshStandardMaterial({ color: 0x0e1216, roughness: 0.05, metalness: 0.5, transparent: true, opacity: 0.8, side: THREE.DoubleSide })
           : n === 'hband' ? new THREE.MeshStandardMaterial({ color: 0x1d3f8f, roughness: 0.4, side: THREE.DoubleSide }) : null;
-        const m = new THREE.Mesh(geo, mat2 || (n === 'glasses' || n === 'lens' ? this.glassMat : n === 'bindi' ? this.bindiMat : n === 'cap' ? new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 }) : hairMat));
+        const m = new THREE.Mesh(geo, mat2 || (n === 'glasses' || n === 'lens' ? this.glassMat : n === 'bindi' ? this.bindiMat : n === 'cap' ? new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 }) : tieMat));
         // whatever sits on the head or face wins the depth test over the hair and skin under it (no flicker)
-        if (n !== 'pony' && n !== 'braid' && m.material !== hairMat) { m.material.polygonOffset = true; m.material.polygonOffsetFactor = -3; m.material.polygonOffsetUnits = -8; }
+        if (n !== 'pony' && n !== 'braid' && m.material !== tieMat) { m.material.polygonOffset = true; m.material.polygonOffsetFactor = -3; m.material.polygonOffsetUnits = -8; }
         m.matrixAutoUpdate = false; m.matrix.copy(X.local); m.castShadow = false; m.visible = false;
         head.add(m); H.xtra[n] = m;
       }
@@ -532,7 +535,7 @@ export class HumanKit {
       return a;
     };
     H.setAcc = (name) => { H.look = Object.assign({}, H.look, { acc: name }); this.applyLook(H, H.look, true); };
-    H.dispose = () => { mat.dispose(); acc.dispose(); hairMat.dispose(); topMat.dispose(); botMat.dispose(); skirtMat.dispose(); kurtaMat.dispose(); mixer.stopAllAction(); };
+    H.dispose = () => { mat.dispose(); acc.dispose(); hairMat.dispose(); H.tieMat?.dispose(); topMat.dispose(); botMat.dispose(); skirtMat.dispose(); kurtaMat.dispose(); mixer.stopAllAction(); };
     return H;
   }
   // geometry for the head-bone extras, built once per body in the rig's rest pose and carried into the

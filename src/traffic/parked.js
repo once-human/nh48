@@ -19,7 +19,7 @@ export function buildParked(W, scene, vmats, quality) {
     const sN = new InstancedSet(scene, geoNear, vmats.body, cap, near, { cast: quality.shadows, color: true });
     const sF = new InstancedSet(scene, low, vmats.body, capFar, far, { minRange: near, color: true });
     let sG = null;
-    if (glassGeo && glassGeo.attributes.position.count) sG = new InstancedSet(scene, glassGeo, vmats.glass, cap, near, {});
+    if (glassGeo && glassGeo.attributes.position.count) sG = new InstancedSet(scene, glassGeo, vmats.glassI || vmats.glass, cap, near, {});
     for (const s of [sN, sF]) {
       s.mesh.geometry = s.mesh.geometry.clone();
       s.mesh.geometry.setAttribute('aColB', new THREE.InstancedBufferAttribute(new Float32Array(s.capacity * 3).fill(1), 3));

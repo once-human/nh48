@@ -27,13 +27,13 @@ export function buildGlobalProps(W) {
 
   // ---- street lamps, electric poles and their cables, signals: per tile (addStreetProps)
   const dyn = !!M.meta.tiles;
-  W.lampSet = new InstancedSet(scene, P.lamp, W.mats.prop, 900, q.propRange, { cast: q.shadows });
-  W.poleSet = new InstancedSet(scene, P.pole, W.mats.prop, 900, q.propRange, { cast: q.shadows });
+  W.lampSet = new InstancedSet(scene, P.lamp, W.mats.propI, 900, q.propRange, { cast: q.shadows });
+  W.poleSet = new InstancedSet(scene, P.pole, W.mats.propI, 900, q.propRange, { cast: q.shadows });
   sets.push(W.lampSet, W.poleSet);
   W.lampPositions = [];
   W.wireMat = new THREE.LineBasicMaterial({ color: 0x151515 });
   const nSig = dyn ? 1500 : Math.max(1, M.signals.length);
-  W.sigSet = new InstancedSet(scene, P.signal, W.mats.prop, nSig, q.propRange * 1.5, { cast: q.shadows });
+  W.sigSet = new InstancedSet(scene, P.signal, W.mats.propI, nSig, q.propRange * 1.5, { cast: q.shadows });
   sets.push(W.sigSet);
   const bulbs = new THREE.InstancedMesh(P.bulb, new THREE.MeshBasicMaterial({ toneMapped: false }), nSig * 3);
   bulbs.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(nSig * 3 * 3 + 3), 3);
