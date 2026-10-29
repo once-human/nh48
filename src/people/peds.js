@@ -494,7 +494,7 @@ export class People {
     // stop and glare at whoever just honked
     if (p.react > 0 && p.mode === 'walk' && p.reactAt) { p.v = 0; this.face(p, p.reactAt.x, p.reactAt.z, dt); return; }
     if (p.mode === 'cross') {
-      const sp = p.speed * (p.hurry ? 1.9 : 1.0);
+      const sp = p.speed * (p.hurry ? 1.9 : p.zebra ? 1.15 : 1.0);
       const dl = p.latT - p.lat;
       const step = Math.sign(dl) * Math.min(Math.abs(dl), sp * dt);
       p.lat += step;
@@ -502,9 +502,29 @@ export class People {
       p.phase += dt * sp * 4.2;
       // hurry if something is coming
       p.hurry = false;
-      if (Math.abs(p.lat - p.latT) < 0.05) { p.mode = 'walk'; p.side = Math.sign(p.latT); }
+      if (Math.abs(p.lat - p.latT) < 0.05) { p.mode = 'walk'; p.side = Math.sign(p.latT); p.zebra = false; }
       this.placeCross(p);
       return;
+    }
+    // a signal ahead: about half the people wait at the kerb and cross on the zebra when the cars on this road have
+    // a red (the rest turn the corner, or cross wherever like everyone else)
+    if (!this.signals && this.signalsOf) this.signals = this.signalsOf();
+    if (this.signals && p.e.rank >= 3) {
+      const nodeIdx = p.dir > 0 ? p.e.b : p.e.a, node = this.g.nodes[nodeIdx], toNode = p.dir > 0 ? p.e.len - p.s : p.s;
+      const J = node && node.signal && this.signals.j.get(nodeIdx);
+      if (J && p.sigNode !== nodeIdx && toNode < (node.jr || 6) + 3 && toNode > (node.jr || 6) - 1) {
+        p.sigNode = nodeIdx;
+        if (this.rng.next() < 0.55) p.sigWait = { key: p.e.i * 2 + (p.dir > 0 ? 1 : 0), J, t: 0 };
+      }
+      if (p.sigWait) {
+        const w = p.sigWait; w.t += dt; p.v = 0;
+        // face across the road while waiting
+        this.g.at(p.e, p.s, TMP); const sd = -Math.sign(p.lat) || 1, yaw = Math.atan2(-TMP[2] * sd, TMP[3] * sd);
+        p.yaw += wrapAngle(yaw - p.yaw) * Math.min(1, dt * 4); p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
+        const red = this.signals.phaseState(w.J, w.key) === 'r' && (w.J.t > 1.5 || w.J.phases[w.J.cur].links.has(w.key) === false);
+        if (red || w.t > 45) { p.sigWait = null; p.mode = 'cross'; p.zebra = true; p.latT = this.sidewalkLat(p.e, -p.side); }
+        return;
+      }
     }
     // walk along the footpath
     p.s += p.dir * p.speed * dt;
