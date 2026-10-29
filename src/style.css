@@ -378,6 +378,7 @@ input[type=range] { width: 100%; accent-color: var(--stone); }
 .chip:hover { border-color: rgba(244, 241, 234, .3); }
 @media (max-width: 980px) { .bm-filters { left: max(18px, env(safe-area-inset-left, 0px)); right: 18px; top: calc(74px + env(safe-area-inset-top, 0px)); } }
 .bm-close { position: absolute; top: calc(18px + env(safe-area-inset-top, 0px)); right: max(18px, env(safe-area-inset-right, 0px)); }
+.bm-track { position: absolute; top: calc(18px + env(safe-area-inset-top, 0px)); right: calc(max(18px, env(safe-area-inset-right, 0px)) + 120px); }
 .bm-tools { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(70px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 6px; }
 .bm-tools .ibtn { width: 42px; height: 42px; border-radius: 12px; font: 600 20px/1 var(--font-ui); background: rgba(16, 18, 22, .82); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .bm-card { position: absolute; left: max(18px, env(safe-area-inset-left, 0px)); bottom: calc(60px + env(safe-area-inset-bottom, 0px)); width: min(360px, calc(100vw - 36px));

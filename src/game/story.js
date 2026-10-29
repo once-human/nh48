@@ -204,6 +204,18 @@ export class Story {
   name(who) { return (WHO[who] || [who])[0]; }
   whoOf(s) { return typeof s.who === 'function' ? s.who() : s.who; }
   contact(name, sub) { const s = this.g.phone.s; const L = s.storyContacts || (s.storyContacts = []); if (!L.some(c => c[0] === name)) L.push([name, sub]); this.save(); }
+  // where the current objective is (the person to talk to, or the place), for the minimap, the map and tracking
+  target() {
+    if (!this.on) return null;
+    const s = this.cur(); if (!s || s.flash) return null;
+    const p = this.npcs && this.npcs[0], w = this.where;
+    if (p) return { x: p.x, z: p.z, name: this.name(this.whoOf(s)) };
+    if (this.tgtWait) return { x: this.tgtWait.x, z: this.tgtWait.z, name: 'Where it starts' };
+    return w ? { x: w.x, z: w.z, name: w.name } : null;
+  }
+  markers() { const t = this.target(); return t ? [{ kind: 'story', x: t.x, z: t.z, label: t.name }] : []; }
+  // the map's Track mission: the route to the objective, and it stays set (put back if anything clears it)
+  trackNow() { const t = this.target(); this.tracked = true; if (t) this.g.setWaypoint({ x: t.x, z: t.z, name: t.name, gig: true }); return t; }
   // a place by name: a landmark id, an area, one of the famous places, or anything on the map; (dx, dz) metres off it
   at(name, label, dx = 0, dz = 0) {
     const G = this.g, W = G.W;
@@ -295,6 +307,8 @@ export class Story {
     if (s.who && w && !this.npcs.length && Math.hypot(w.x - P.x, w.z - P.z) < 220) this.spawnNpcs(s, w);
     if (s.flash || this.rh) { this.hideMarker(); }
     if (s.who && w && Math.hypot(w.x - P.x, w.z - P.z) > 120 && (!G.waypoint || G.waypoint.x !== w.x)) G.setWaypoint({ x: w.x, z: w.z, name: w.name, gig: true });
+    // tracked: if a ride, a gig or the map cleared the route, it comes back to the objective
+    if (this.tracked !== false && !G.waypoint && (this._trkT = (this._trkT || 0) - dt) <= 0) { this._trkT = 2; const t = this.target(); if (t && Math.hypot(t.x - P.x, t.z - P.z) > 25) G.setWaypoint({ x: t.x, z: t.z, name: t.name, gig: true }); }
     // the marker: over the person to talk to, or over the place
     const tgt = this.npcs[0] || (w && Math.hypot(w.x - P.x, w.z - P.z) < 160 ? w : null);
     if (tgt && !this.talking) this.showMarker(tgt.x, tgt.z); else this.hideMarker();
@@ -333,7 +347,7 @@ export class Story {
   spawnNpcs(s, w) {
     const G = this.g, who = this.whoOf(s), n = who === 'goons' ? 3 : 1;
     for (let i = 0; i < n; i++) {
-      const spot = G.safeDrop(w.x + i * 2.2, w.z + i * 1.4) || w;
+      const spot = { x: w.x + i * 2.2, z: w.z + i * 1.4 };
       const near = G.W.graph.nearest(spot.x, spot.z, 160); if (!near) return;
       const p = G.people.make(near.e, near.s, near.side || 1, { mode: 'stand', female: FEMALE.has(who) });
       p.x = spot.x + i * 1.6; p.z = spot.z + i * 0.9; p.fixed = true; p.anchor = { x: p.x, z: p.z }; p.wait = 1e9; p.idle = who === 'goons' ? 'arms_folded' : 'talk'; p.story = who; p.crew = true;

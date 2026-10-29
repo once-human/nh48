@@ -22,7 +22,7 @@ export function PART1(S) {
     { id: 'p_home', act: 0, title: 'Shivneri', mr: 'शिवनेरी',
       texts: [['aai', 'बस पोचली का? बापू तुला शनिवारवाड्यापाशी भेटेल. उशीर करू नकोस.', 'Has the bus reached? Bapu will meet you at Shaniwar Wada. Don’t be late.']],
       steps: [
-        { obj: 'Find Bapu Kaka at the auto stand', sub: 'By the Wada’s garden', who: 'bapu', where: at('shaniwar', 'Bapu Kaka, the auto stand', 8, -112), talk: [
+        { obj: 'Find Bapu Kaka at the auto stand', sub: 'By the Wada’s garden', who: 'bapu', where: () => { const A = G.player.auto; return A ? { x: A.x + Math.cos(A.th || 0) * 2.6 - Math.sin(A.th || 0) * 1.8, z: A.z + Math.sin(A.th || 0) * 2.6 + Math.cos(A.th || 0) * 1.8, name: 'Bapu Kaka, by your auto' } : S.at('shaniwar', 'Bapu Kaka, the auto stand', 8, -112); }, talk: [
           L('bapu', 'आलास! पावसात, रात्री पावणेबारा वाजता. बंगलोरहून सगळे असेच येतात का?', 'आलीस! पावसात, रात्री पावणेबारा वाजता. बंगलोरहून सगळे असेच येतात का?', 'You’re here! In the rain, at a quarter to twelve. Does everyone come back from Bangalore like this?'),
           L('you', 'काका, सगळं गेलं. कंपनी, नोकरी, पैसे. दहा हजार उरलेत.', 'काका, सगळं गेलं. कंपनी, नोकरी, पैसे. दहा हजार उरलेत.', 'Kaka, it’s all gone. The company, the job, the money. Ten thousand left.'),
           ['bapu', 'माहीत आहे. पेपरमध्ये वाचलं. Blink10, दहा मिनिटांत डिलिव्हरी. आणि आता दहा मिनिटांत गायब.', 'I know. I read it in the paper. Blink10, delivery in ten minutes. And gone in ten minutes.'],

@@ -25,6 +25,7 @@ function markColor(m) {
   if (m.kind === 'cop') return '#5aa2ff';
   if (m.kind === 'marshal' || m.kind === 'footcop') return (performance.now() / 250 | 0) % 2 ? '#ff4b3e' : '#4b7bff';
   if (m.kind === 'naka') return '#ff3b30';
+  if (m.kind === 'story') return '#ff9933';
   return '#f2b705';
 }
 function clock(h, h24) {
@@ -877,7 +878,7 @@ export class HUD {
       const [, col, gl] = CATS[l.c];
       drawPin(x, X, Y, col, gl, (l.c === 'landmark' ? 8 : 6.5) * k);
     }
-    const marks = [...(g.rides ? g.rides.markers() : []), ...(g.police ? g.police.markers() : []), ...(g.props ? g.props.markers() : [])];
+    const marks = [...(g.story && g.story.markers ? g.story.markers() : []), ...(g.rides ? g.rides.markers() : []), ...(g.police ? g.police.markers() : []), ...(g.props ? g.props.markers() : [])];
     if (g.waypoint) marks.push({ kind: 'wp', x: g.waypoint.x, z: g.waypoint.z });
     for (const m of marks) {
       let [X, Y] = toS(m.x, m.z);

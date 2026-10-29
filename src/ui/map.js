@@ -417,6 +417,7 @@ export class MapScreen {
         <button class="ibtn" id="bm-in" title="Zoom in (+)">+</button><button class="ibtn" id="bm-out" title="Zoom out (−)">−</button>
         <button class="ibtn" id="bm-me" title="Centre on me (Space)"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="3" fill="currentColor"/><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
       </div>
+      <button class="btn primary small bm-track" id="bm-track" title="Route to your current mission">◆ Track mission</button>
       <button class="btn small bm-close" id="bm-close">Close <span class="kbd" data-k="M">M</span></button>
       <div class="bm-card glass" id="bm-card" hidden>
         <div class="bm-c-cat" id="bm-c-cat"></div><div class="bm-c-n" id="bm-c-n"></div><div class="bm-c-mr" lang="mr" id="bm-c-mr"></div>
@@ -438,6 +439,7 @@ export class MapScreen {
       F.appendChild(b);
     }
     this.$('bm-close').onclick = () => this.g.toggleMap(false);
+    this.$('bm-track').onclick = () => { const st = this.g.story, t = st && st.trackNow ? st.trackNow() : null; if (t) { this.view.x = t.x; this.view.z = t.z; this.g.hud.toast('Tracking', t.name, 'meter', 2); } else this.g.hud.toast('No mission right now', 'Your phone will ring when there is one', 'info', 2.4); };
     this.$('bm-in').onclick = () => this.zoomAt(1.6);
     this.$('bm-out').onclick = () => this.zoomAt(1 / 1.6);
     this.$('bm-me').onclick = () => this.centerOnMe();
@@ -799,10 +801,10 @@ export class MapScreen {
     }
     this.visiblePlaces = vis;
     // ride and police markers
-    for (const m of [...(g.rides ? g.rides.markers() : []), ...(g.police ? g.police.markers() : []), ...(g.props ? g.props.markers() : [])]) {
+    for (const m of [...(g.story && g.story.markers ? g.story.markers() : []), ...(g.rides ? g.rides.markers() : []), ...(g.police ? g.police.markers() : []), ...(g.props ? g.props.markers() : [])]) {
       const [X, Y] = T(m.x, m.z);
       const prop = m.kind === 'prop', pc = prop ? (m.owned ? '#33d17a' : '#c58cff') : null;
-      drawPin(x, X, Y, prop ? pc : m.kind === 'pax' ? '#33d17a' : m.kind === 'cop' ? '#5aa2ff' : m.kind === 'marshal' || m.kind === 'footcop' ? '#ff4b3e' : m.kind === 'naka' ? '#ff3b30' : '#f2b705', m.kind === 'tow' ? 'auto' : prop ? (m.owned ? 'home' : 'rupee') : null, m.kind === 'tow' || prop ? 8 : 6);
+      drawPin(x, X, Y, prop ? pc : m.kind === 'pax' ? '#33d17a' : m.kind === 'cop' ? '#5aa2ff' : m.kind === 'marshal' || m.kind === 'footcop' ? '#ff4b3e' : m.kind === 'naka' ? '#ff3b30' : m.kind === 'story' ? '#ff9933' : '#f2b705', m.kind === 'tow' ? 'auto' : prop ? (m.owned ? 'home' : 'rupee') : null, m.kind === 'tow' || prop || m.kind === 'story' ? 9 : 6);
       if (m.label) { x.textAlign = 'left'; x.textBaseline = 'middle'; } if (m.label) text(m.label, X + 11, Y, '700 11px Inter, system-ui, sans-serif', pc || '#f2b705');
     }
     // waypoint + selection
