@@ -295,19 +295,23 @@ export class People {
     if (p.mode === 'cross') { hx = TMP[3] * -Math.sign(p.lat - p.latT) * -1; hz = -TMP[2] * -Math.sign(p.lat - p.latT) * -1; }
     // never a jump: when the path hands them on (a corner onto the next street's footpath, back from a detour),
     // the gap is carried as an offset that closes at a walking pace instead of a snap
-    let ox = p.offX || 0, oz = p.offZ || 0;
-    const ol = Math.hypot(ox, oz);
-    if (ol > 0.001) { const k = Math.max(0, ol - Math.max(ol * 2.2, 1.6) * (this._dt || 0.016)) / ol; ox *= k; oz *= k; }
-    const nx = x + p.dodgeX, nz = z + p.dodgeZ;
-    if (p.placed) { const jx = p.x - (nx + ox), jz = p.z - (nz + oz), j = Math.hypot(jx, jz); if (j > 0.3 && j < 14) { ox += jx; oz += jz; } else if (j >= 14) { ox = oz = 0; } }
-    p.placed = true; p.offX = ox; p.offZ = oz;
-    p.x = nx + ox; p.z = nz + oz;
+    this.settle(p, x + p.dodgeX, z + p.dodgeZ);
     if ((p.mode !== 'stand' || !p.faced) && !(p.dodge > 0)) {          // while scrambling clear they face where they run
       const yaw = Math.atan2(hz, hx);
       p.yaw = p.yaw + wrapAngle(yaw - p.yaw) * 0.25;
       p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
     }
     p.onRoad = Math.abs(p.lat) < p.e.w / 2 + 0.1;
+  }
+  // move someone to where the path says they are, without a jump: any gap is carried as an offset that closes
+  // at a walking pace
+  settle(p, nx, nz) {
+    let ox = p.offX || 0, oz = p.offZ || 0;
+    const ol = Math.hypot(ox, oz);
+    if (ol > 0.001) { const k = Math.max(0, ol - Math.max(ol * 2.2, 1.6) * (this._dt || 0.016)) / ol; ox *= k; oz *= k; }
+    if (p.placed) { const jx = p.x - (nx + ox), jz = p.z - (nz + oz), j = Math.hypot(jx, jz); if (j > 0.3 && j < 16) { ox += jx; oz += jz; } else if (j >= 16) { ox = oz = 0; } }
+    p.placed = true; p.offX = ox; p.offZ = oz;
+    p.x = nx + ox; p.z = nz + oz;
   }
   placeAnimal(a) {
     this.g.at(a.e, a.s, TMP);
@@ -531,7 +535,7 @@ export class People {
   }
   placeCross(p) {
     this.g.at(p.e, p.s, TMP);
-    p.x = TMP[0] + TMP[3] * p.lat + p.dodgeX; p.z = TMP[1] - TMP[2] * p.lat + p.dodgeZ;
+    this.settle(p, TMP[0] + TMP[3] * p.lat + p.dodgeX, TMP[1] - TMP[2] * p.lat + p.dodgeZ);
     const s = Math.sign(p.latT - p.lat) || 1;
     const hx = TMP[3] * s, hz = -TMP[2] * s;     // across the road
     const yaw = Math.atan2(hz, hx);
@@ -667,14 +671,16 @@ export class People {
       if (Math.abs(ex) > 4 || Math.abs(ez) > 4 || !v.T) continue;
       const hl = v.T.L / 2 + 0.25, hw = v.T.W / 2 + 0.25, lx = ex * v.hx + ez * v.hz, lz = -ex * v.hz + ez * v.hx;
       if (Math.abs(lx) >= hl || Math.abs(lz) >= hw) continue;
-      const pl = hl - Math.abs(lx), pw = hw - Math.abs(lz);
-      if (pl < pw) { const s = Math.sign(lx) || 1; p.x += v.hx * pl * s; p.z += v.hz * pl * s; }
+      // out of the box, but at a stumble, not a jump
+      const cap = Math.max(0.05, 5 * dt), pl = Math.min(cap, hl - Math.abs(lx)), pw = Math.min(cap, hw - Math.abs(lz));
+      if (hl - Math.abs(lx) < hw - Math.abs(lz)) { const s = Math.sign(lx) || 1; p.x += v.hx * pl * s; p.z += v.hz * pl * s; }
       else { const s = Math.sign(lz) || 1; p.x += -v.hz * pw * s; p.z += v.hx * pw * s; }
     }
     // somehow inside a building (spawned or shoved there): back out to the street at once
-    if (surf.inBuilding && surf.inBuilding(p.x, p.z)) {
+    // (walk out to the street: they can always step out of a wall, only never into one)
+    if (surf.inBuilding && surf.inBuilding(p.x, p.z) && !g.outside) {
       const near = this.g.nearest(p.x, p.z, 60);
-      if (near) { this.g.at(near.e, near.s, TMP); p.x = TMP[0]; p.z = TMP[1]; }
+      if (near) { this.g.at(near.e, near.s, TMP); g.x = TMP[0]; g.z = TMP[1]; g.path = null; g.outside = true; g.best = 1e9; }
     }
     // stuck against something (a wall between them and where they're going): don't keep running into
     // it; head for the street, or give up and carry on from here
