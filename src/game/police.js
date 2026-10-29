@@ -62,7 +62,7 @@ export class Police {
     this.history = [];             // last few challans for the menu
     this.record = {};              // offences on your record by kind
     this.licence = { until: 0 };   // suspended until this many game-hours
-    this.heat = 0; this.unseenT = 0; this.lastSeen = null; this.charges = new Set();
+    this.heat = 0; this.pts = 0; this.unseenT = 0; this.lastSeen = null; this.charges = new Set();
     this.stop = null;
     this.sms = [];                 // delayed messages {t, fn}
     this.marshals = [];
@@ -385,7 +385,7 @@ export class Police {
       const chance = theft ? 0.08 : (firstTime ? 0.45 : 0.15) * (0.5 + cop.mood) - (this.duesTotal > 0 ? 0.12 : 0) - (s.found ? 0.3 : 0);
       if (r < chance) {
         line = 'r_plead_ok'; res = theft ? 'Let off with a warning' : 'Let off with a warning'; sub = theft ? 'The vehicle stays with them. You walk.' : 'He waves you on. Don’t push your luck.'; kind = 'meter';
-        if (theft) { this.confiscate(); this.heat = 0; this.clearMarshals(); this.clearCharges(); }
+        if (theft) { this.confiscate(); this.heat = 0; this.pts = 0; this.clearMarshals(); this.clearCharges(); }
       } else {
         line = 'r_plead_no';
         if (theft) { this.arrest('Pleading didn’t work'); res = 'Taken to the chowki'; sub = `Bail ${fmtRupees(s.total)}.`; kind = 'bad'; }
@@ -410,7 +410,7 @@ export class Police {
         line = cop.bribes > 0 ? 'r_bribe_more' : 'r_bribe_ok';
         G.stats.money -= s.bribe; cop.bribes++;
         res = `${fmtRupees(s.bribe)} changes hands`; sub = cop.bribes > 1 ? 'He remembers you. The rate goes up every time.' : 'No receipt, obviously.'; kind = 'warn';
-        if (theft) { this.confiscate(); this.heat = 0; this.clearMarshals(); this.clearCharges(); sub = s.kind === 'theft' ? 'The vehicle stays with him. You walk away.' : 'The case never gets written. You walk away.'; }
+        if (theft) { this.confiscate(); this.heat = 0; this.pts = 0; this.clearMarshals(); this.clearCharges(); sub = s.kind === 'theft' ? 'The vehicle stays with him. You walk away.' : 'The case never gets written. You walk away.'; }
         // someone on the footpath had their phone out
         if (this.rng.next() < 0.12) this.later(25 + this.rng.next() * 40, () => {
           G.hud.sms('Pune Mirror', `Video of a ${s.kind === 'theft' ? 'beat marshal' : 'traffic constable'} taking cash at ${this.whereName(cop.x, cop.z)} goes viral. Constable suspended; the driver traced.`, fmtRupees(s.total + 1000), 'Challan + penalty added');
@@ -471,7 +471,11 @@ export class Police {
     if (G.free) return;
     const was = this.heat;
     if (charge) this.charges.add(charge);
-    this.heat = Math.min(5, this.heat + n);
+    // heat is points underneath (0–100), the level is what they add up to: a pickpocket gets you Noticed, a killing
+    // Pursuit, and only a run of it all a Manhunt; the closer to the top, the less each new thing adds
+    const add = n <= 1 ? 14 : n === 2 ? 30 : 50;
+    this.pts = Math.min(100, (this.pts || 0) + add * (1 - (this.pts || 0) / 130));
+    this.heat = levelOf(this.pts);
     this.unseenT = 0;
     this.lastSeen = { x: G.player.x, z: G.player.z };
     if (this.heat > was) { G.hud.toast(`${LEVELS[this.heat]}`, `${why} · ${FINES[this.topCharge()].name}, ${FINES[this.topCharge()].law}`, 'bad', 3.6); G.audio.siren(0.001, 0); }
@@ -507,13 +511,15 @@ export class Police {
     G.audio.siren(Math.max(pl, em), em > pl ? G.emPan || 0 : sirenPan);
     if (this.heat > 0) {
       if (seen) this.unseenT = 0; else this.unseenT += dt;
-      const need = 20 + this.heat * 10;
-      if (this.unseenT > need) {
-        this.heat--; this.unseenT = 0;
+      // out of sight the points drain (after a few seconds of them looking), quicker at the low levels
+      if (this.unseenT > 6) this.pts = Math.max(0, (this.pts || 0) - dt * (2.2 - this.heat * 0.3));
+      const was = this.heat; this.heat = levelOf(this.pts || 0);
+      if (this.heat < was) {
         if (this.heat === 0) { G.hud.toast('You lost them', 'The police have given up, for now', 'meter', 3); this.say('m_lost', null, true); this.clearCharges(); }
-        else G.hud.toast('Fewer police looking', '', 'info', 2);
+        else G.hud.toast(LEVELS[this.heat], 'Fewer of them looking', 'info', 2);
       }
-      G.hud.setHeat(this.heat, seen, this.heat ? 1 - this.unseenT / need : 0, LEVELS[this.heat]);
+      const lo = HEAT_AT[this.heat - 1] || 0, hi = HEAT_AT[this.heat] ?? 100;
+      G.hud.setHeat(this.heat, seen, ((this.pts || 0) - lo + 2) / (hi - lo + 2), LEVELS[this.heat], this.marshals.length + (this.naka ? 1 : 0));
     } else G.hud.setHeat(0);
   }
   // checkpoints (nakabandi): barricades across a junction on the road ahead of you, a jeep and constables with lathis;
@@ -574,7 +580,7 @@ export class Police {
     const G = this.g, P = G.player, W = this.W;
     const near = this.lastSeen || { x: P.x, z: P.z };
     for (let k = 0; k < 40; k++) {
-      const a = this.rng.next() * Math.PI * 2, r = 85 + this.rng.next() * 70;
+      const a = this.rng.next() * Math.PI * 2, r = (this.heat <= 1 ? 55 : 85) + this.rng.next() * (this.heat <= 1 ? 45 : 70);
       const x = near.x + Math.cos(a) * r, z = near.z + Math.sin(a) * r;
       const e = W.graph.nearest(x, z, 30, e => e.rank >= 2);
       if (!e) continue;
@@ -610,7 +616,7 @@ export class Police {
     G.date && G.date.event('arrest', fine);
     if (G.lights && G.rng.chance(0.5)) G.lights.lose('Kept at the chowki with your other things');
     this.clearCharges();
-    this.heat = 0; this.unseenT = 0; this.clearMarshals(); this.clearNaka();
+    this.heat = 0; this.pts = 0; this.unseenT = 0; this.clearMarshals(); this.clearNaka();
     const ch = this.nearestChowki(P.x, P.z);
     this.later(0.6, () => {
       G.hud.flash(`Taken to ${ch.name}`, `${FINES[kind].name} (${FINES[kind].law}). ${why}. Released on bail · ${fmtRupees(fine)}`);
@@ -709,6 +715,9 @@ export class Police {
 // ---------------------------------------------------------------- a beat marshal on a motorcycle
 const _g = new THREE.Vector3(), _pl = new THREE.Vector3();
 const LEVELS = ['', 'Noticed', 'Wanted', 'Pursuit', 'Nakabandi', 'Manhunt'];
+// the points each level starts at
+const HEAT_AT = [0, 8, 30, 55, 76, 92];
+const levelOf = (p) => HEAT_AT.filter((t, i) => i > 0 && p >= t).length;
 // a police unit: a beat marshal on a motorcycle, or a patrol jeep with two constables. They drive like trained
 // drivers (left of the lane, slowing for bends, stopping at red when they're not chasing anyone, braking for
 // people, never through traffic), chase with the siren when they've seen you, and get out and run after you
@@ -800,7 +809,7 @@ class Marshal {
     // you're on foot and they've seen you close: out of the saddle (or the jeep) and after you
     // (close, or as close as the road gets them: you're off it, or they've come to a stop)
     const offRoad = P.onFoot && !W.surf.isRoad(P.x, P.z);
-    if (police.heat > 0 && P.onFoot && this.sees && this.stunT <= 0 && (d < 30 || (d < 75 && (offRoad || Math.abs(v.v) < 1.5)))) { this.dismount(); return; }
+    if (police.heat > 0 && P.onFoot && this.stunT <= 0 && ((this.sees && (d < 45 || (d < 75 && (offRoad || Math.abs(v.v) < 1.5)))) || d < 18)) { this.dismount(); return; }
     let tx, tz, want, close = false;
     if (police.heat > 0) {
       const ls = this.sees ? { x: P.x, z: P.z } : police.lastSeen || { x: P.x, z: P.z };

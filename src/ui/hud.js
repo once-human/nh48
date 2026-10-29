@@ -75,7 +75,7 @@ export class HUD {
       <div class="lic" id="h-lic" hidden></div>
       <div class="hp" id="h-hp" hidden><i></i></div>
       <div class="vitals" id="h-vit" hidden></div>
-      <div class="heat" id="h-heat" hidden><b id="h-heat-l">Wanted</b><span class="pips"><i></i><i></i><i></i><i></i><i></i></span><span id="h-heat-t">Searching</span><em class="lose"><i></i></em></div>`);
+      <div class="heat" id="h-heat" hidden><span class="hb"><svg viewBox="0 0 36 36"><circle class="rb" cx="18" cy="18" r="16"/><circle class="rr" id="h-heat-r" cx="18" cy="18" r="16" stroke-dasharray="100.5" stroke-dashoffset="0"/></svg><svg class="sh" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z"/><path class="st" d="m12 7 1.4 2.9 3.1.4-2.3 2.2.6 3.1L12 14.1l-2.8 1.5.6-3.1-2.3-2.2 3.1-.4L12 7Z"/></svg></span><span class="ht"><b id="h-heat-l">Wanted</b><small id="h-heat-t">Searching</small></span><span class="lamps"><i></i><i></i><i></i><i></i><i></i></span></div>`);
     this.zoneEl = el('div', 'h zone', '<i></i><b id="h-zone-t"></b><span id="h-zone-s"></span>');
     this.zoneEl.hidden = true;
     this.smsWrap = el('div', 'h smsbox');
@@ -700,15 +700,17 @@ export class HUD {
   // wanted level 0–3; `seen` = a marshal has eyes on you; frac = how close they are to giving up
   // the police level (Noticed … Manhunt), five bars, whether they can see you, and (out of sight) how close they
   // are to giving up, as a draining line
-  setHeat(level, seen, frac, name) {
+  setHeat(level, seen, frac, name, units = 0) {
     const h = this.$('h-heat');
     this.Hd(h, !level);
     if (!level) return;
-    if (h._lv !== level) { h._lv = level; h.querySelectorAll('.pips i').forEach((p, i) => p.classList.toggle('on', i < level)); }
+    if (h._lv !== level) { h._lv = level; h.querySelectorAll('.lamps i').forEach((p, i) => p.classList.toggle('on', i < level)); h.dataset.lv = level; }
     this.C(h, 'seen', !!seen);
     this.T('h-heat-l', name || 'Wanted');
-    this.T('h-heat-t', seen ? 'They see you' : 'Searching');
-    const b = h.querySelector('.lose i'); this.Wd(b, seen ? '100%' : Math.round(Math.max(0, frac) * 100) + '%');
+    this.T('h-heat-t', `${units ? units + (units === 1 ? ' unit · ' : ' units · ') : ''}${seen ? 'they see you' : 'searching'}`);
+    // the ring round the badge: full while they see you, draining as they lose you
+    const off = (100.5 * (1 - (seen ? 1 : Math.max(0, Math.min(1, frac))))).toFixed(1), r = this.$('h-heat-r');
+    if (r && r._o !== off) { r._o = off; r.setAttribute('stroke-dashoffset', off); }
   }
   setLicence(suspended, hoursLeft, dues) {
     const d = this.$('h-dues'), l = this.$('h-lic');
