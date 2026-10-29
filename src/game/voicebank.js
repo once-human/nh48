@@ -15,6 +15,8 @@ export class VoiceBank {
   has(id) { const R = this.g.audio && this.g.audio.remote; return !!(R && R.idx && R.idx[id]); }
   // what's around: rain, a summer afternoon, late night, the festival weeks (Ganeshotsav, Diwali)
   ctx() {
+    return 'base';       // (the context versions just tacked a phrase on the end: off until the bank is redone)
+    // eslint-disable-next-line no-unreachable
     const G = this.g, h = G.hour ?? 12, m = new Date().getMonth();
     if (G.weather && G.weather.cur && G.weather.cur.rain > 0.25) return 'rain';
     if (h >= 22 || h < 5) return 'night';

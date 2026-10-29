@@ -32,6 +32,9 @@ import VLINES from './vendor_lines.json';
 import { Rep } from '../people/rep.js';
 import { Blood } from '../gfx/blood.js';
 import { Duty } from './duty.js';
+import { buildAmbulance, buildPoliceJeep } from '../vehicles/emodels.js';
+import { Vehicle, specOf, makeService } from '../vehicles/vehicle.js';
+import FAMOUS from '../world/famous.json';
 import { VoiceBank } from './voicebank.js';
 import { ikArm, bendBone } from '../people/humans.js';
 const _cufT = new THREE.Vector3(), _cufP = new THREE.Vector3();
@@ -57,7 +60,6 @@ import { loadSettings, applySettings } from './settings.js';
 import { refreshChips } from './keys.js';
 import { Trial } from './trial.js';
 import { Fauna } from '../people/animals.js';
-import { Vehicle } from '../vehicles/vehicle.js';
 
 export class Game {
   constructor(ctx) {
@@ -198,10 +200,12 @@ export class Game {
     player.servicesNear = () => {
       const L = [];
       for (const m of this.police ? this.police.marshals : []) if (!m.taken) L.push({ veh: m.veh, kind: 'pol', unit: m, label: m.jeep ? 'Take the police jeep' : 'Take the police bike' });
-      for (const R of this.emergency ? this.emergency.list : []) if (!R.taken) L.push({ veh: R.v, kind: R.type === 'ambulance' ? 'amb' : 'pol', R, label: R.type === 'ambulance' ? 'Take the ambulance' : 'Take the police jeep' });
+      for (const R of this.emergency ? this.emergency.list : []) if (!R.taken) L.push({ veh: R.v, kind: R.type === 'ambulance' ? 'amb' : 'pol', R, label: R.type === 'ambulance' ? 'Steal the ambulance' : 'Steal the police jeep' });
+      for (const d of this.depots.list || []) if (d.veh) L.push({ veh: d.veh, kind: d.kind, depot: d, label: d.kind === 'amb' ? 'Sign in for a 108 shift' : 'Sign in for a Home Guard patrol' });
       return L;
     };
     player.onService = (sv) => this.takeService(sv);
+    this.depots = { list: null, taken: new Set(), t: 0 };
     this.emergency = new Emergency(this);
     this.weather = new Weather(this.scene, this.audio);
     player.makePed = (look, x, z, per) => this.people.spawnAt(look, x, z, per);
@@ -425,7 +429,18 @@ export class Game {
   // taking a service vehicle: it stops being theirs (no more AI driving it); with its crew watching it's a theft of
   // government property, and they come after you; on duty, its calls come to you
   takeService(sv) {
-    const v = sv.veh, G = this, ex = this.traffic.extra || [];
+    const v = sv.veh, G = this, ex = this.traffic.extra || [], S = this.life.s.svc || (this.life.s.svc = {});
+    // a shift you sign up for: the 108 depot at a hospital, the Home Guard at a chowki (not if they know you)
+    if (sv.depot) {
+      const barred = sv.kind === 'amb' ? (S.bar108 || 0) > (this.clock || 0) : (S.barHG || 0) > (this.clock || 0) || (this.police && (this.police.heat > 0 || Object.keys(this.police.record || {}).some(k => ['theft', 'assault', 'murder', 'hitrun', 'fled', 'pickpocket'].includes(k))));
+      if (barred) { this.hud.toast(sv.kind === 'amb' ? '108 won’t take you' : 'Not with your record', sv.kind === 'amb' ? 'You stole one of their ambulances. Come back in a few days' : 'The Home Guard checks records. Yours has things on it', 'bad', 3.4); return false; }
+      v.serviceKind = sv.kind; v.service = true; v.legit = true; v.agent.isPlayer = true;
+      const k = ex.indexOf(v.agent); if (k >= 0) ex.splice(k, 1);
+      this.depots.taken.add(sv.depot.key); sv.depot.veh = null;
+      v.seatOverride = sv.kind === 'amb' ? [1.32, 1.18, 0.42] : [0.05, 0.82, 0.38];
+      this.hud.toast(sv.kind === 'amb' ? 'Signed in · 108 shift' : 'Signed in · Home Guard patrol', 'Calls will come to you. Siren comes on when you’re on one', 'meter', 3.4);
+      return true;
+    }
     v.serviceKind = sv.kind; v.service = true; v.stolen = true; v.agent.isPlayer = true;
     if (sv.unit) { const P = this.police, i = P.marshals.indexOf(sv.unit); sv.unit.taken = true; if (i >= 0) P.marshals.splice(i, 1);
       // the crew on foot stay as they are (furious); the rider on the bike gets off
@@ -433,9 +448,37 @@ export class Game {
     if (sv.R) { sv.R.taken = true; const L = this.emergency.list, i = L.indexOf(sv.R); if (i >= 0) L.splice(i, 1); for (const c of sv.R.crew) c.H.holder.visible = c.role !== 'driver'; }
     const k = ex.indexOf(v.agent); if (k >= 0) ex.splice(k, 1);
     v.seatOverride = v.spec.two ? null : sv.kind === 'amb' ? [1.32, 1.18, 0.42] : [0.05, 0.82, 0.38];
-    const crewNear = (this.police && this.police.marshals.some(m => m.foot.some(p => Math.hypot(p.x - v.x, p.z - v.z) < 25))) || (sv.unit && sv.unit.foot && sv.unit.foot.length);
-    if (!this.free && (crewNear || sv.kind === 'pol')) this.police.raiseHeat(2, sv.kind === 'amb' ? 'Stole an ambulance' : 'Stole a police vehicle', 'theft');
-    G.hud.toast(sv.kind === 'amb' ? '108 · on duty' : 'Police · on patrol', 'Calls will come to you. Siren comes on when you’re on one', 'meter', 3.4);
+    // a working vehicle, stolen: a serious crime, in front of its crew; no calls come to a stolen one, and the service
+    // remembers (108 won't take you for days). If there's a patient in the back, they're now yours to get to hospital
+    if (!this.free) { this.police.raiseHeat(2, sv.kind === 'amb' ? 'Stole an ambulance' : 'Stole a police vehicle', 'theft'); this.police.law && (this.police.law.setDesc(), this.police.law.radioDesc()); }
+    if (sv.kind === 'amb') S.bar108 = (this.clock || 0) + 72; else S.barHG = (this.clock || 0) + 168;
+    const patient = sv.R && (sv.R.ph === 'loaded' || sv.R.ph === 'carry' || sv.R.ph === 'lift') && sv.R.victim && !sv.R.victim.corpse;
+    if (patient && this.duty) this.duty.patientAboard();
+    G.hud.toast(sv.kind === 'amb' ? 'You stole an ambulance' : 'You stole a police vehicle', patient ? 'There’s a patient in the back. Get them to a hospital' : 'No calls will come to it. And they know who took it', 'bad', 3.8);
+  }
+  // a parked 108 ambulance at each hospital, a Home Guard jeep at the police chowkis: there when you're near
+  depotsTick(dt) {
+    const D = this.depots; if ((D.t -= dt) > 0) return; D.t = 1;
+    if (!D.list) {
+      const H = ['Sassoon Hospital', 'KEM Hospital', 'Ruby Hall Clinic', 'Jehangir Hospital', 'Deenanath Mangeshkar Hospital', 'Bharati Vidyapeeth'].map(n => FAMOUS.find(f => f.name === n)).filter(Boolean);
+      D.list = [...H.map(h => ({ key: h.name, kind: 'amb', x: h.x, z: h.z })), ...(this.police ? this.police.chowkis : []).slice(0, 40).map(c => ({ key: c.name, kind: 'pol', x: c.x, z: c.z }))];
+    }
+    const P = this.player;
+    for (const d of D.list) {
+      const near = Math.hypot(d.x - P.x, d.z - P.z);
+      if (d.veh && near > 300) { if (d.veh.root.parent) d.veh.root.parent.remove(d.veh.root); const ex = this.traffic.extra || [], k = ex.indexOf(d.veh.agent); if (k >= 0) ex.splice(k, 1); d.veh = null; }
+      if (!d.veh && near < 150 && !D.taken.has(d.key) && !(this.inView && this.inView(d.x, d.z) && near < 60)) {
+        if (!this.W.graph.nearest(d.x, d.z, 200)) continue;        // its street hasn't loaded yet
+        const sp = this.police.kerbSpot(d.x, d.z), amb = d.kind === 'amb';
+        const v = new Vehicle(this.W, this.scene, this.vmats, amb ? 'tempo' : 'suv', [0.95, 0.95, 0.93]);
+        v.reset(sp.x, sp.z, sp.th); v.y = this.W.surf.height(sp.x, sp.z);
+        for (const c of v.tilt.children) c.visible = false;
+        const md = amb ? buildAmbulance() : buildPoliceJeep(); v.tilt.add(md.group); for (const L2 of ['red', 'blue', 'red2']) if (md.lights[L2]) md.lights[L2].visible = false;
+        v.spec = { ...specOf(amb ? 'tempo' : 'suv'), L: md.dims.L, W: md.dims.W }; makeService(v);
+        this.traffic.extra = this.traffic.extra || []; this.traffic.extra.push(v.agent);
+        d.veh = v;
+      }
+    }
   }
   // the traffic's damage: smoke past half, black smoke and flames near the end, then it goes up like yours
   trafficDamage(dt) {
@@ -1165,7 +1208,7 @@ export class Game {
     this.stepRefuel(dt);
     if (this.brain && this.state !== 'title') this.brain.update(dt, this.player);
     if (this.emergency && this.state !== 'title') this.emergency.update(dt);
-    if (this.duty && this.state === 'play') this.duty.update(dt);
+    if (this.duty && this.state === 'play') { this.duty.update(dt); this.depotsTick(dt); }
     // in your story the weather follows Pune's year (free roam: whatever you picked)
     if (this.weather && !this.free) { const day = Math.floor((this.clock || 0) / 24), hb = Math.floor(this.hour || 0); if (day !== this._wDay || hb !== this._wHr) { this._wDay = day; this._wHr = hb; this.weather.auto(day, this.hour || 12); } }
     if (this.state !== 'title' && this.tut) this.tut.update(dt);

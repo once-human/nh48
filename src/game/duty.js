@@ -18,7 +18,8 @@ export class Duty {
   update(dt) {
     const G = this.g, P = G.player, k = this.kind;
     if (!k) { if (this.call) this.end(null); this.waitT = 6; return; }
-    if (!this.call) { if ((this.waitT -= dt) <= 0) this.newCall(k); return; }
+    // calls only come to a vehicle you signed in for; a stolen one gets nothing (unless there's a patient in the back)
+    if (!this.call) { if (P.cur.legit && (this.waitT -= dt) <= 0) this.newCall(k); return; }
     const C = this.call; C.t += dt;
     // the siren: on while you're on a call and moving; traffic ahead makes way
     const v = P.cur, on = C.stage !== 'done' && Math.abs(v.v) > 1;
@@ -40,6 +41,14 @@ export class Duty {
       const t = W.graph.at(n.e, n.s); return { x: t[0], z: t[1], e: n.e, s: n.s, th: Math.atan2(t[3], t[2]), name: n.e.name || 'a side road' };
     }
     return null;
+  }
+  // you've stolen an ambulance with someone already in the back: get them to a hospital
+  patientAboard() {
+    const G = this.g, v = G.player.cur || G.player;
+    const hs = HOSPITALS.map(n => FAMOUS.find(f => f.name === n)).filter(Boolean).sort((a, b) => Math.hypot(a.x - v.x, a.z - v.z) - Math.hypot(b.x - v.x, b.z - v.z));
+    const h = hs[0] || { x: v.x, z: v.z, name: 'Sassoon Hospital' };
+    this.call = { kind: 'amb', stage: 'hosp', t: 0, h, crit: true, dmg0: 0, limit: 60 + Math.hypot(h.x - v.x, h.z - v.z) / 8, stolen: true, lateMsg: 'You took too long. They didn’t make it' };
+    G.setWaypoint({ x: h.x, z: h.z, name: h.name, gig: true });
   }
   newCall(k) {
     const G = this.g, S = this.spot(k === 'amb' ? 250 : 180, k === 'amb' ? 750 : 450);
@@ -121,7 +130,7 @@ export class Duty {
   objective() {
     const C = this.call, k = this.kind; if (!k) return null;
     const P = this.g.player;
-    if (!C) return { main: k === 'amb' ? '108 · on duty' : 'Police · on patrol', sub: 'Waiting for a call…' };
+    if (!C) return P.cur && !P.cur.legit ? { main: k === 'amb' ? 'Stolen ambulance' : 'Stolen police vehicle', sub: 'No calls will come to it. Lose it, or lose them' } : { main: k === 'amb' ? '108 · on duty' : 'Home Guard · on patrol', sub: 'Waiting for a call…' };
     const left = C.limit ? Math.max(0, Math.ceil(C.limit - C.t)) : 0;
     if (C.kind === 'amb') return C.stage === 'pickup' ? { main: '108 · get to the patient', sub: `${Math.round(Math.hypot(C.x - P.x, C.z - P.z))} m · ${left} s${C.crit ? ' · bleeding' : ''}`, urgent: left < 30 } : { main: `108 · to ${C.h.name}`, sub: `${Math.round(Math.hypot(C.h.x - P.x, C.h.z - P.z))} m · ${left} s · drive smooth`, urgent: left < 30 };
     return { main: 'Police · catch the snatcher', sub: `${Math.round(Math.hypot(C.v.x - P.x, C.v.z - P.z))} m · stay alongside him · ${left} s`, urgent: left < 30 };

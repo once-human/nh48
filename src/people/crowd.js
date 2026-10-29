@@ -26,6 +26,7 @@ let UGEO = null;
 
 const RANGE = 48;            // metres from the camera
 const NAT = { walk: 1.25, jog: 3.0 };
+const LOCO = new Set(['walk', 'jog', 'sprint', 'walk_formal', 'carry', 'swim']);
 
 // how someone walks: the office crowd walks formal at rush hour, kakus and aunties often carry the shopping
 function walkFor(p, people) { void people; return 'walk'; }   // one walk for everyone (the formal-walk clip faces the wrong way)
@@ -185,7 +186,11 @@ export class Crowd {
     }
     // how fast they're really moving over the ground (the walk follows it, so feet never slide)
     if (!p.rideOf) { const m = s.lx === undefined ? 0 : Math.hypot(p.x - s.lx, p.z - s.lz); if (m < 3 && dt > 0) s.vel = (s.vel || 0) + (m / dt - (s.vel || 0)) * Math.min(1, dt * 8); s.lx = p.x; s.lz = p.z; }
-    const [name, speed, once] = this.animFor(p, s.vel);
+    let [name, speed, once] = this.animFor(p, s.vel);
+    // nobody slides: anyone actually covering ground walks or runs, whatever pose they were in (a head-shake, a
+    // wave, the phone, arms folded); only real actions (a punch, carrying, falling) and riders keep their clip
+    const mv = p.rideOf ? 0 : (s.vel || 0);
+    if (mv > 0.6 && !once && !LOCO.has(name)) { if (mv > 2.2) { name = 'jog'; speed = clamp(mv / NAT.jog, 0.6, 1.5); } else { name = 'walk'; speed = clamp(mv / NAT.walk, 0.55, 1.5); } }
     // a new punch or flinch restarts its clip even if the last one was the same
     const restart = p.actId !== s.actId; s.actId = p.actId;
     H.play(name, { speed, once, fade: p.act || p.mode === 'fight' ? 0.08 : 0.25, restart: restart && !!p.act });

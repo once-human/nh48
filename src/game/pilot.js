@@ -362,8 +362,8 @@ export class Pilot {
       veh.stolen = true; veh.plate = this.randomPlate();
       this.events.push({ type: 'stoleParked', veh, name: veh.spec.name.toLowerCase(), x: r.x, z: r.z });
     } else if (offer.kind === 'service') {
+      if (this.onService && this.onService(offer.sv) === false) return;     // (refused: they know you)
       veh = offer.sv.veh;
-      if (this.onService) this.onService(offer.sv);
     } else if (offer.kind === 'traffic') {
       const o = offer.o;
       veh = new Vehicle(this.W, this.scene, this.vmats, o.type, o.col);
