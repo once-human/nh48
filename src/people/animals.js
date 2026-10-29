@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
 import { RNG } from '../core/util.js';
+import { shareSkeleton } from './humans.js';
 
 const TARGET = { dog: 0.62, cat: 0.44, cow: 1.3, kite: 1.25 };   // standing height (kite: wingspan)
 const C = (h) => new THREE.Color(h).convertSRGBToLinear();
@@ -41,6 +42,7 @@ export class AnimalKit {
     const S = this.src[kind];
     if (!S) return null;
     const root = skeletonClone(S.g.scene);
+    shareSkeleton(root);
     const mats = new Map();
     root.traverse((o) => {
       if (!o.isMesh) return;

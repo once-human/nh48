@@ -178,6 +178,32 @@ export function ikArm(H, side, target, pole, w = 1) {
 // the top ring hugs the shirt and the tube eases out to its old flare by mid-thigh, and each side of the
 // tube leans toward its own leg while hanging between both (legs under it aren't drawn).
 const _v = new THREE.Vector3();
+// every skinned part on the same bones gets the first part's skeleton. The packed models keep each part's
+// dequantising scale in its bone inverses (the same extra transform X on every bone), so X moves into that
+// part's bind matrix: bone · inv · bind = bone · invShared · (X · bind), the same skinning to the last digit
+const _X = new THREE.Matrix4(), _Y = new THREE.Matrix4();
+export function shareSkeleton(root) {
+  const seen = [];
+  root.traverse((o) => {
+    if (!o.isSkinnedMesh || !o.skeleton) return;
+    const s = o.skeleton;
+    for (const q of seen) {
+      if (q === s) return;
+      if (q.bones.length !== s.bones.length || !q.bones.every((b, i) => b === s.bones[i])) continue;
+      _X.copy(q.boneInverses[0]).invert().multiply(s.boneInverses[0]);
+      const ok = q.boneInverses.every((m, i) => {
+        const a = _Y.multiplyMatrices(m, _X).elements, b = s.boneInverses[i].elements;
+        for (let k = 0; k < 16; k++) if (Math.abs(a[k] - b[k]) > 1e-4 * Math.max(1, Math.abs(b[k]))) return false;
+        return true;
+      });
+      if (!ok) continue;
+      o.bindMatrix.premultiply(_X);          // (bindMatrixInverse stays: it takes the result back to the mesh)
+      o.skeleton = q; s.dispose();
+      return;
+    }
+    seen.push(s);
+  });
+}
 function bindOf(o) {
   const sk = o.skeleton, M = new THREE.Matrix4().multiplyMatrices(sk.bones[0].matrixWorld, sk.boneInverses[0]);
   return new THREE.Matrix4().multiplyMatrices(o.bindMatrixInverse, M).multiply(o.bindMatrix);
@@ -456,6 +482,9 @@ export class HumanKit {
       else if (o.name.startsWith('cloth')) { o.material = o.name === 'cloth_pants' ? botMat : o.name === 'cloth_shoes' ? shoeMat : o.name === 'cloth_saree' ? skirtMat : o.name === 'cloth_kurta' ? kurtaMat : topMat; o.castShadow = o.name !== 'cloth_shoes'; parts.push(o); }
       else { o.material = acc; parts.push(o); }
     });
+    // one skeleton for the whole person: the clone gives every part (body, clothes, hair, eyes) its own copy of
+    // the same bones, and each copy works out every bone and sends it to the GPU, every frame. Shared, it's once
+    shareSkeleton(root);
     const holder = new THREE.Group();
     root.rotation.y = Math.PI / 2;            // the rig faces +Z; the game's heading is +X
     root.scale.setScalar(look.scale);
