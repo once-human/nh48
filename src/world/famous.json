@@ -610,5 +610,14 @@
 "z": 1039.7,
 "osm": "osm: PYC Gymkhana, Bhandarkar Path, Deccan Gymkhana, Pune, Pune City Subdistrict, Pun",
 "pinOff": null
+},
+{
+"name": "The Mills",
+"mr": "द मिल्स",
+"kind": "",
+"x": 630.0,
+"z": -595.0,
+"osm": "Raja Bahadur Mill compound, RBM Road (OSM: 624,-586)",
+"pinOff": null
 }
 ]
