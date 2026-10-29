@@ -247,7 +247,7 @@ export class Story {
     const m = this.mission(); if (!m) return;
     this.st.step = 0; this.st.base = this.g.stats.rides || 0; this.save(); this._entered = true;
     const n = this.list().filter(q => q.act === m.act), k = n.indexOf(m) + 1;
-    if (!m.steps.some(q => q.flash)) this.g.hud.flash(m.title, `${m.mr} · ${m.act ? `Act ${m.act}, ${k} of ${n.length}` : 'Prologue'}`);
+    if (!m.cine && !m.steps.some(q => q.flash)) this.g.hud.flash(m.title, `${m.mr} · ${m.act ? `Act ${m.act}, ${k} of ${n.length}` : 'Prologue'}`);
     const tx = []; for (const t of m.texts || []) { if (t.fn) tx.push(...t.fn()); else tx.push(t); }
     for (const [w, mr, en] of tx) this.g.later(1.5, () => this.text(w, mr, en));
     this.enterStep();

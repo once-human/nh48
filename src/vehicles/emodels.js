@@ -249,3 +249,5 @@ export function buildPoliceJeep() {
   const wl = wheels(g, [[1.35, hw - 0.18, true], [1.35, -hw + 0.18, true], [-1.32, hw - 0.18, false], [-1.32, -hw + 0.18, false]], 0.36, 0.24);
   return { group: g, wheels: wl, lights: bars, dims: { L: 4.2, W }, seats: [[0.05, 0.82, 0.38, 'driver'], [0.05, 0.82, -0.38, 'mate']] };
 }
+
+export { M, canvasMat, profileBody, boxG, sidePanel, slopePanel, add, wheels };

@@ -108,7 +108,7 @@ export class Pilot {
       if (this.riderShown) { this.placeRider(); if (this.human && !this.cockpitOn && !this.human.holder.visible) this.human.holder.visible = true; }
       else if (this.human) this.human.holder.visible = false;     // never left standing on the road
     }
-    if (this.onFoot && this.human && !this.human.holder.visible) this.human.holder.visible = true;
+    if (this.onFoot && this.human && this.human.holder.visible === !!this.hideBody) this.human.holder.visible = !this.hideBody;   // (a scene can keep you off-stage)
     // vehicles left behind settle and stay solid
     for (const d of this.dropped) if (d.veh !== this.cur && d.veh.sync) d.veh.sync(0);
     this.updateNpcs(dt);
@@ -124,9 +124,16 @@ export class Pilot {
   }
 
   updateFoot(dt, input, traffic, camYaw) {
-    const F = this.foot, k = (...c) => input.key(...c);
+    const F = this.foot, pup = this.puppet;
+    // in a scene: no control of your own; the scene walks you where it needs you (puppet), or you stand
+    const k = this.frozen ? (...c) => (pup && c[0] === 'AltLeft') : (...c) => input.key(...c);
     let fw = (k('KeyW', 'ArrowUp') ? 1 : 0) - (k('KeyS', 'ArrowDown') ? 1 : 0);
     let sd = (k('KeyD', 'ArrowRight') ? 1 : 0) - (k('KeyA', 'ArrowLeft') ? 1 : 0);
+    if (pup) {
+      const ex = pup.x - F.x, ez = pup.z - F.z, e = Math.hypot(ex, ez);
+      fw = e > 0.3 ? 1 : 0; sd = 0; camYaw = Math.atan2(ez, ex);
+      if (!fw) { pup.done = true; if (pup.face !== undefined) F.yaw = pup.face; }
+    }
     const len = Math.hypot(fw, sd) || 1;
     fw /= len; sd /= len;
     const run = k('ShiftLeft', 'ShiftRight');

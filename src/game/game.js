@@ -61,6 +61,7 @@ import { refreshChips } from './keys.js';
 import { Trial } from './trial.js';
 import { Fauna } from '../people/animals.js';
 import { Puddles } from './puddles.js';
+import { Cutscene } from './cutscene.js';
 
 export class Game {
   constructor(ctx) {
@@ -130,6 +131,7 @@ export class Game {
     this.fauna = new Fauna(this.people, W.animalKit, this.scene, W);
     this.smoke = new Smoke(this.scene);
     this.puddles = new Puddles(this);
+    this.cut = new Cutscene(this);
     player.animalsNear = () => this.people.animals;
     // on foot your head (and a little of your body) turns to where the camera looks, so looking back you look back;
     // the torch arm goes on top
@@ -303,7 +305,7 @@ export class Game {
       if (locked() && e.button === 0 && this.state === 'play') this.input.pressed.add('Mouse0');
       if (!locked() && (e.button === 0 || e.button === 2)) drag = { x: e.clientX, y: e.clientY };
     });
-    document.addEventListener('mousemove', (e) => { if (locked() && this.state === 'play') { const s = this.settings.sens; this.rig.drag(e.movementX * 0.8 * s, e.movementY * 0.8 * s * (this.settings.invertY ? -1 : 1)); } });
+    document.addEventListener('mousemove', (e) => { if (locked() && this.state === 'play') { const s = this.settings.sens; if (this.cut && this.cut.on) { this.cut.drag(e.movementX * 0.8 * s, e.movementY * 0.8 * s); return; } this.rig.drag(e.movementX * 0.8 * s, e.movementY * 0.8 * s * (this.settings.invertY ? -1 : 1)); } });
     document.addEventListener('pointerlockchange', () => {
       this.hud.setLockHint?.(this.state === 'play' && !locked());
       // Esc released the mouse during play: that's a pause, like any game. Esc that closed a shop
@@ -1361,6 +1363,7 @@ export class Game {
       this.approachSt.update(dt);
       this.updateNav(dt);
       this.rig.update(dt, P);
+      if (this.cut && this.cut.on) { this.cut.update(dt); this.cut.camera(this.camera, dt); }
       const S = P.spec;
       const kind = !S ? 'none' : P.inAuto ? 'auto' : S.two ? 'two' : S.L > 6 ? 'bus' : 'car';
       this.audio.updateEngine(P.rpm, P.throttle, kind !== 'none', kind);

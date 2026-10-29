@@ -1519,3 +1519,18 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .stop.compact .st-foot::after { content: ' · or just leave (they’ll remember)'; color: var(--paper-3); }
 .stop.compact .st-mood { width: 70px; }
 .booking .bk-photo { display: block; width: 130px; height: 162px; object-fit: cover; border-radius: 6px; filter: saturate(.75) contrast(1.05); }
+
+/* scenes: cinema bars, the title card, the skip hint; the playing HUD steps aside (subtitles stay) */
+.cine { position: fixed; inset: 0; pointer-events: none; z-index: 40; }
+.cine .cb { position: absolute; left: 0; right: 0; height: 0; background: #000; transition: height .6s cubic-bezier(.2,.7,.2,1); }
+.cine .cb.t { top: 0; } .cine .cb.b { bottom: 0; }
+.cine.in .cb { height: 10.5vh; } .cine.out .cb { height: 0; }
+.cine .ct { position: absolute; left: 6vw; bottom: 15vh; color: #f4f1ea; opacity: 0; text-shadow: 0 2px 18px rgba(0,0,0,.8); }
+.cine .ct b { display: block; font: 800 clamp(30px, 4.4vw, 64px)/1 var(--font-disp, Inter, sans-serif); letter-spacing: .02em; }
+.cine .ct small { display: block; margin-top: 8px; font: 600 14px var(--font-ui, Inter, sans-serif); letter-spacing: .3em; text-transform: uppercase; color: #ffb357; }
+.cine .ct.show { animation: ctin 6s ease forwards; }
+@keyframes ctin { 0% { opacity: 0; transform: translateY(10px); } 12% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
+.cine .cs { position: absolute; right: 3vw; bottom: 3.2vh; font: 600 12px var(--font-ui, Inter, sans-serif); color: rgba(244,241,234,.6); }
+#ui.in-cine .mm, #ui.in-cine .vit, #ui.in-cine .dash, #ui.in-cine .wallet, #ui.in-cine .corner, #ui.in-cine .nerd, #ui.in-cine .loc,
+#ui.in-cine .obj, #ui.in-cine .toasts, #ui.in-cine .prompt, #ui.in-cine .placecard, #ui.in-cine .smsbox, #ui.in-cine .zone { opacity: 0 !important; transition: opacity .4s; }
+#ui.in-cine .lower { bottom: 12.5vh !important; z-index: 41; }
