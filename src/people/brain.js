@@ -121,9 +121,9 @@ export class Brain {
         p.stare = -8;
         const S = G.life && G.life.s;
         if (S && S.respect > 25) { this.watch(p, P.x, P.z, 3, 'wave'); ppl.speakAs('respect', p, 1, 4) || ppl.speakAs('greet', p, 1, 4); }
-        else if (t.temper > 0.7) { this.watch(p, P.x, P.z, 3, 'no'); ppl.speakAs('mutter', p, 1, 4); }
+        else if (t.temper > 0.7) { this.watch(p, P.x, P.z, 3, 'arms_folded'); ppl.speakAs('mutter', p, 1, 4); }
         else if (t.brave < 0.35) { ppl.flee(p, P.x, P.z, 10); }
-        else { this.watch(p, P.x, P.z, 2.5, R() < 0.5 ? 'yes' : 'idle'); ppl.speakAs('greet', p, 0.8, 4); }
+        else { this.watch(p, P.x, P.z, 2.5, 'idle'); ppl.speakAs('greet', p, 0.8, 4); }
         return;
       }
     } else if (p.stare > 0) p.stare = 0;
@@ -132,8 +132,21 @@ export class Brain {
     const h = (G.hour ?? 12), r = R();
     // dawn: the morning walkers and joggers are out (ajobas, kakas, aunties, the fitness dadas)
     if (h > 5.3 && h < 8.3 && !p.jogger && r < 0.25 && /ajoba|kaka|aunty|kaku|dada/.test(p.persona || '')) { p.jogger = true; if (/dada|kaka/.test(p.persona) && R() < 0.5) p.speed *= 2.1; else p.speed *= 1.3; }
-    // rain: everyone walks faster, heads down
-    if (G.weather && G.weather.raining && !p.rainHurry) { p.rainHurry = true; p.speed *= 1.35; }
+    // the weather: in rain some hurry and some duck under an awning; in a storm everyone runs and most take shelter;
+    // when it stops they go back to their own pace
+    const wr = G.weather ? G.weather.cur.rain : 0;
+    if (p.speed0 === undefined) p.speed0 = p.speed;
+    if (wr > 0.15) {
+      const storm = wr > 0.75;
+      if (!p.wxDone) {
+        p.wxDone = true;
+        if (storm || R() < 0.35) p.speed = p.speed0 * (storm ? 2.1 : 1.8);
+        if (R() < (storm ? 0.6 : 0.2)) {
+          const d = ppl.doorNear && ppl.doorNear(p.x, p.z, 28, p);
+          if (d) { ppl.goTo(p, d.x + d.nx * 0.9, d.z + d.nz * 0.9, (q) => this.watch(q, q.x + d.nx * 5, q.z + d.nz * 5, 30 + R() * 40, R() < 0.5 ? 'arms_folded' : 'phone'), true); p.busy = 80; return; }
+        }
+      }
+    } else if (p.wxDone) { p.wxDone = false; p.speed = p.speed0; }
     // rush hour: some are late
     if ((h > 8.5 && h < 10) || (h > 17.5 && h < 19.5)) { if (!p.hurry && r < 0.08 && /college|dada|kp|tai/.test(p.persona || '')) { p.hurry = true; p.speed *= 1.9; } }
     // two people who know each other stop for a chat
@@ -147,7 +160,6 @@ export class Brain {
     }
     // a wave across the road, a dropped coin, a sit at the bus stop
     if (r < 0.02) { p.act = { clip: 'wave', t: 0, dur: 1.8 }; ppl.speakAs('greet', p, 0.25, 6); return; }
-    if (r < 0.03) { this.watch(p, p.x + Math.cos(p.yaw), p.z + Math.sin(p.yaw), 1.8, 'pickup'); return; }
     if (r < 0.045 && (h > 20 || h < 7 || /ajoba|aaji|kaka/.test(p.persona || ''))) this.sitAtStop(p);
   }
   watch(p, x, z, secs, anim) { p.mode = 'watch'; p.watch = { x, z }; p.wait = secs; p.anim = anim; p.v = 0; p.busy = Math.max(p.busy || 0, secs); }
@@ -172,7 +184,7 @@ export class Brain {
       c.beat -= dt;
       if (c.beat > 0) continue;
       c.beat = 2 + R() * 3; c.talker = !c.talker;
-      p.anim = c.talker ? (R() < 0.8 ? 'talk' : 'no') : (R() < 0.55 ? 'yes' : R() < 0.5 ? 'idle' : 'arms_folded');
+      p.anim = c.talker ? 'talk' : (R() < 0.5 ? 'idle' : 'arms_folded');
     }
   }
   endChat(p) { const q = p.chat && p.chat.with; p.chat = null; if (q && q.chat) q.chat = null; }
