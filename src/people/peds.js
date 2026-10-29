@@ -540,6 +540,28 @@ export class People {
         if (this.rng.next() < dt * 1.5) this.events.push({ type: 'bark', x: a.x, z: a.z });
       }
     }
+    // your vehicle: animals get out of the way if they can; a dog or cat that can't is hurt or killed; a cow
+    // doesn't move for anyone, and what you hit is a few hundred kilos of cow
+    if (a.dead) { a.v = 0; a.moving = false; return; }
+    if (player && !player.onFoot && !player.tipped) {
+      const pv = Math.abs(player.v), hx = Math.cos(player.th), hz = Math.sin(player.th), dx = a.x - px, dz = a.z - pz, d = Math.hypot(dx, dz);
+      const along = dx * hx + dz * hz, side = -dx * hz + dz * hx, r = a.cow ? 1.9 : 1.2;
+      if (!a.cow && pv > 2.5 && along > 0 && along < 2 + pv && Math.abs(side) < 1.5 && !(a.dodgeT > 0) && along / pv > (a.kind === 'cat' ? 0.25 : 0.4)) {
+        a.dodgeT = 1; a.lat += (Math.sign(a.lat) || 1) * 1.6; a.moving = true; sp = 6;                // a dart for the kerb
+      }
+      if (a.dodgeT > 0) a.dodgeT -= dt;
+      if (d < r && pv > 2) {
+        const kmh = pv * 3.6;
+        if (a.cow) { this.events.push({ type: 'cowHit', a, speed: pv, x: a.x, z: a.z }); a.rest = 20; a.moving = false; }
+        else if (!(a.hurtT > 0)) {
+          const dead = kmh > 35 || (kmh > 20 && this.rng.next() < 0.4);
+          if (dead) { a.dead = true; a.moving = false; a.v = 0; } else { a.hurtT = 8; a.chase = 0; a.dir = -a.dir; a.moving = true; a.rest = 8; }
+          this.events.push({ type: 'animalHit', a, dead, x: a.x, z: a.z });
+          return;
+        }
+      }
+    }
+    if (a.hurtT > 0) { a.hurtT -= dt; sp = Math.max(sp, 4.5); }                 // limping off, fast
     if (a.moving) {
       a.s += a.dir * sp * dt;
       if (a.s < 2 || a.s > a.e.len - 2) { a.dir = -a.dir; a.s = clamp(a.s, 2, a.e.len - 2); a.chase = 0; }
@@ -555,7 +577,7 @@ export class People {
       const d = Math.hypot(TMP[0] - px, TMP[1] - pz);
       const night = this.act && (this.act._h > 22 || this.act._h < 5.5);
       if (d < (night && a.kind === 'dog' ? 45 : 90) || d > 220) continue;
-      a.e = e; a.s = this.rng.range(5, e.len - 5);
+      a.e = e; a.s = this.rng.range(5, e.len - 5); a.dead = false; a.hurtT = 0;          // a different animal, out of sight
       a.lat = a.cow ? a.side * (e.w / 2 - 1.0) : a.kind === 'cat' ? a.side * (e.w / 2 + Math.max(0.5, e.sw - 0.35)) : a.side * (e.w / 2 + Math.max(0.6, e.sw * 0.5));
       this.placeAnimal(a);
       return true;

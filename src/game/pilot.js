@@ -293,6 +293,12 @@ export class Pilot {
       const dist = this.distToBox(F.x, F.z, v.x, v.z, Math.cos(v.th), Math.sin(v.th), S.L, S.W);
       if (dist < 1.6) consider(dist, { kind: 'dropped', d, label: d.towed ? `Pay ₹${d.towed.fee} and take your auto` : v === this.auto ? 'Get in your auto' : S.two ? `Get on the ${S.name.toLowerCase()}` : `Get in the ${S.name.toLowerCase()}`, key: 'F' });
     }
+    // a street dog, a cat, a cow
+    if (this.animalsNear) for (const a of this.animalsNear()) {
+      if (a.dead || a.free) continue;
+      const dist = Math.hypot(a.x - F.x, a.z - F.z);
+      if (dist < (a.cow ? 2.2 : 1.5)) consider(dist + 0.3, { kind: 'pet', a, label: a.cow ? 'Touch the cow for luck' : a.kind === 'cat' ? 'Pet the cat' : 'Pet the dog', key: 'F' });
+    }
     // parked vehicles
     if (!this.parkGrid) this.buildParkGrid();
     const i0 = Math.floor(F.x / 20), j0 = Math.floor(F.z / 20);
@@ -320,6 +326,7 @@ export class Pilot {
   }
 
   enter(offer, traffic) {
+    if (offer.kind === 'pet') { this.events.push({ type: 'pet', a: offer.a }); return; }
     let veh = null;
     if (offer.kind === 'dropped') {
       if (offer.d.towed && this.onRelease && !this.onRelease(offer.d)) return;

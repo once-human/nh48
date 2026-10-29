@@ -110,6 +110,7 @@ export class Game {
     this.crowd = new Crowd(this.people, W.kit, this.scene, W, this.quality);
     this.fauna = new Fauna(this.people, W.animalKit, this.scene, W);
     this.smoke = new Smoke(this.scene);
+    player.animalsNear = () => this.people.animals;
     this.wrecks = [];
     this.traffic.peds = this.people;
     this.city = new CityMap(W);
@@ -888,6 +889,26 @@ export class Game {
         if (ev.kind === 3) this.hud.toast('End of the shift area', 'Turn back, the map ends here', 'warn', 2);
       }
       if (ev.type === 'scrape') this.audio.thud(0.15);
+      if (ev.type === 'pet') {
+        const a = ev.a; a.moving = false; a.rest = 8; this.life.change('mood', 0.06);
+        const L = a.cow ? ['Touch the cow for luck', 'She doesn’t care. A kaku nearby approves.'] : a.kind === 'cat' ? ['The cat allows it', 'Three seconds, then a look that says enough.'] : ['Good dog', 'The tail goes like a fan. A friend for life, or till the next vada pav.'];
+        this.hud.toast(L[0], L[1], 'good', 2.6); if (!a.cow && a.kind !== 'cat') this.audio.bark && this.audio.bark(0.3);
+      }
+      if (ev.type === 'animalHit') {
+        this.audio.thud(0.5); this.audio.bark && this.audio.bark(0.9);
+        if (ev.dead) { this.hud.toast(ev.a.kind === 'cat' ? 'You killed a cat' : 'You killed a street dog', 'People saw. Nobody in Pune forgets that', 'bad', 4); this.life.change('karma', -8); }
+        else { this.hud.toast(ev.a.kind === 'cat' ? 'You hit a cat' : 'You hit a street dog', 'It limps off yelping. Slow down near the kerb', 'warn', 3); this.life.change('karma', -3); }
+        if ((this._gatherT || 0) < this.t) { this._gatherT = this.t + 8; this.people.gather(ev.x, ev.z, 4); }
+      }
+      if (ev.type === 'cowHit' && !P.onFoot) {
+        const v = P.cur, kmh = ev.speed * 3.6;
+        v.v = 0; v.vl = 0; this.rig.shake(Math.min(0.9, ev.speed * 0.08)); this.audio.crash(1);
+        v.dmg = Math.min(1, (v.dmg || 0) + Math.max(0, ev.speed - 2) * 0.03);
+        this.life.change('karma', -10);
+        this.hud.toast('You hit a cow', kmh > 25 ? 'She’s hurt, your vehicle’s wrecked, and a crowd is forming fast' : 'She barely moved. Your bumper did. Everyone is staring', 'bad', 4);
+        if ((this._gatherT || 0) < this.t) { this._gatherT = this.t + 8; this.people.gather(ev.x, ev.z, 8); }
+        if (kmh > 25 && this.police && this.police.raiseHeat) this.police.raiseHeat(1, 'Hit a cow', null);
+      }
       if (ev.type === 'bark' || ev.type === 'dogChase') { const d = Math.hypot(ev.x - P.x, ev.z - P.z); if (d < 60) this.audio.bark(Math.min(0.9, 12 / (d + 6))); }
       if (ev.type === 'dogChase' && (this._dogT || 0) < this.t) { this._dogT = this.t + 30; this.hud.toast('A street dog is chasing you', 'Classic. Keep going, it’ll give up.', 'info', 2.4); }
       if (ev.type === 'bump') { this.rig.shake(Math.min(0.25, ev.strength * 0.03)); this.audio.thud(Math.min(0.6, ev.strength * 0.12)); }
