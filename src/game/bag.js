@@ -12,7 +12,7 @@ import { refreshChips } from './keys.js';
 import { guideHTML } from './guide.js';
 import { BUSINESSES as BIZ } from './hustle.js';
 import { levelOf, ASKS } from './date.js';
-import { itemArt, garmentArt } from '../ui/itemArt.js';
+import { itemArt, garmentArt, photo } from '../ui/itemArt.js';
 import { CLOTHES, SHOES } from './shops.js';
 import { Studio } from './studio.js';
 
@@ -25,10 +25,10 @@ const dist = (d) => d < 1000 ? `${Math.round(d / 10) * 10} m` : `${(d / 1000).to
 // the order things sit in the bag: tools first (the torch), then food and drink, then the rest. The first five
 // are the hotbar (keys 1 to 5 while you play)
 const ART2 = {};
-function phoneArt() { if (ART2.p) return ART2.p; const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+function phoneArt() { const ph = photo('phone'); if (ph) return ph; if (ART2.p) return ART2.p; const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
   const g = x.createLinearGradient(40, 0, 88, 0); g.addColorStop(0, '#1b1d22'); g.addColorStop(0.5, '#3a3e46'); g.addColorStop(1, '#16181c'); x.fillStyle = g; x.beginPath(); x.roundRect(40, 14, 48, 100, 9); x.fill();
   const s = x.createLinearGradient(0, 20, 0, 108); s.addColorStop(0, '#2b5fd9'); s.addColorStop(1, '#8a3fd1'); x.fillStyle = s; x.beginPath(); x.roundRect(44, 20, 40, 88, 6); x.fill(); x.fillStyle = 'rgba(255,255,255,.25)'; x.fillRect(46, 22, 10, 84); return (ART2.p = c.toDataURL()); }
-function keyArt() { if (ART2.k) return ART2.k; const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+function keyArt() { const ph = photo('keys'); if (ph) return ph; if (ART2.k) return ART2.k; const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
   const g = x.createLinearGradient(0, 30, 0, 100); g.addColorStop(0, '#e8e2c8'); g.addColorStop(1, '#9a8f6a'); x.strokeStyle = g; x.lineWidth = 8; x.beginPath(); x.arc(46, 54, 18, 0, 6.283); x.stroke();
   x.fillStyle = g; x.fillRect(60, 50, 44, 8); x.fillRect(90, 58, 6, 12); x.fillRect(78, 58, 6, 9); x.fillStyle = '#c0281f'; x.beginPath(); x.roundRect(22, 74, 26, 34, 6); x.fill(); return (ART2.k = c.toDataURL()); }
 export function bagOrder(G) {

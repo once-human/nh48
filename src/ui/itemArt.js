@@ -1,3 +1,4 @@
+import { assetVersion, versioned } from '../core/assets.js';
 // Painted pictures of the things in your jhola: each one lit from the top left, shaded, with its highlight and a
 // soft shadow under it, the way a product shot looks (not a flat icon). Drawn once at the size asked, cached.
 const CACHE = new Map();
@@ -54,7 +55,10 @@ const ART = {
   beer: (x) => { shadow(x, 80, 148, 26, 7); x.fillStyle = lin(x, 60, 0, 100, 0, [[0, '#3a1e06'], [0.4, '#8a4a10'], [0.6, '#5e300a'], [1, '#2a1404']]); x.beginPath(); x.moveTo(72, 20); x.lineTo(88, 20); x.lineTo(88, 52); x.quadraticCurveTo(102, 62, 102, 82); x.lineTo(102, 142); x.lineTo(58, 142); x.lineTo(58, 82); x.quadraticCurveTo(58, 62, 72, 52); x.closePath(); x.fill();
     x.fillStyle = '#d6b043'; R(x, 70, 14, 20, 10, 3); x.fill(); x.fillStyle = lin(x, 0, 92, 0, 128, [[0, '#f3e6c4'], [1, '#d8c79c']]); x.fillRect(58, 92, 44, 36); text(x, 'KF', 80, 110, 16, '#c0281f'); gloss(x, 58, 20, 44, 122); },
 };
+// a real photograph of it when the game has one (assets/items/<id>.webp, from tools/item_photos.ipynb), the painting if not
+export function photo(id) { const u = 'assets/items/' + id + '.webp'; return assetVersion(u) ? versioned(u) : null; }
 export function itemArt(id, size = 160) {
+  const ph = photo(id); if (ph) return ph;
   const k = id + '@' + size; if (CACHE.has(k)) return CACHE.get(k);
   const c = document.createElement('canvas'); c.width = c.height = size; const x = c.getContext('2d');
   x.scale(size / 160, size / 160);
