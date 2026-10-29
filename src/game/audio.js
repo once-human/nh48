@@ -437,6 +437,38 @@ export class Audio {
     this.env(og, t, 0.005, clamp(strength * 0.3, 0.05, 0.6), 0.02, 0.2);
     o.start(t); o.stop(t + 0.3);
   }
+  // the vehicles around you, each heard where it is: the four nearest get an engine voice (a scooter's buzz, an
+  // auto's putter, a car's hum, a bus's diesel), pitched by its speed, moving with it, fading as it goes
+  engines(list, lx, lz) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if (!this.eng) {
+      this.eng = [];
+      for (let i = 0; i < 4; i++) {
+        const o = ctx.createOscillator(); o.type = 'sawtooth';
+        const o2 = ctx.createOscillator(); o2.type = 'square';
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600; lp.Q.value = 1.2;
+        const g = ctx.createGain(); g.gain.value = 0;
+        const m2 = ctx.createGain(); m2.gain.value = 0.3;
+        const pn = this.panner({ x: 0, y: 0.8, z: 0 }, 5);
+        o.connect(lp); o2.connect(m2).connect(lp); lp.connect(g); g.connect(pn).connect(this.bus('traffic'));
+        o.start(); o2.start();
+        this.eng.push({ o, o2, lp, g, pn, v: null });
+      }
+    }
+    const near = list.filter(v => Math.abs(v.x - lx) < 45 && Math.abs(v.z - lz) < 45).sort((a, b) => ((a.x - lx) ** 2 + (a.z - lz) ** 2) - ((b.x - lx) ** 2 + (b.z - lz) ** 2)).slice(0, 4);
+    this.eng.forEach((E, i) => {
+      const v = near[i];
+      if (!v) { E.g.gain.setTargetAtTime(0, t, 0.2); return; }
+      const ty = v.type || '', sp = Math.abs(v.v || 0);
+      const base = /^(scooter|bike)/.test(ty) ? 55 : /^auto/.test(ty) ? 30 : /bus|tempo/.test(ty) ? 24 : 34;
+      const f = base * (1 + sp / (/^(scooter|bike)/.test(ty) ? 9 : 14));
+      E.o.frequency.setTargetAtTime(f, t, 0.08); E.o2.frequency.setTargetAtTime(f * (/^auto/.test(ty) ? 0.5 : 1.01), t, 0.08);
+      E.lp.frequency.setTargetAtTime(/bus|tempo/.test(ty) ? 380 : /^(scooter|bike)/.test(ty) ? 1100 : 700, t, 0.2);
+      E.g.gain.setTargetAtTime((/bus|tempo/.test(ty) ? 0.16 : 0.1) * (0.4 + Math.min(1, sp / 10) * 0.6), t, 0.15);
+      if (E.pn.positionX) { E.pn.positionX.setTargetAtTime(v.x, t, 0.05); E.pn.positionY.setTargetAtTime(0.8, t, 0.05); E.pn.positionZ.setTargetAtTime(v.z, t, 0.05); } else E.pn.setPosition(v.x, 0.8, v.z);
+    });
+  }
   // a cat purring: a low rumble, pulsing
   purr() {
     if (!this.ctx) return;
