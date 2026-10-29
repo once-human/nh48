@@ -790,7 +790,7 @@ class Marshal {
     this.lightR.visible = Math.sin(t * 14) > 0; this.lightB.visible = !this.lightR.visible;
     if (this.H) {
       v.tilt.updateWorldMatrix(true, false);
-      const p = new THREE.Vector3(-0.12 + RIDER_HIPS, 0.95 - 0.62, 0).applyMatrix4(v.tilt.matrixWorld);
+      const p = new THREE.Vector3(0.0 + RIDER_HIPS, 0.95 - 0.62, 0).applyMatrix4(v.tilt.matrixWorld);
       this.H.holder.position.copy(p);
       this.H.holder.rotation.set(0, -v.th, 0);
       this.H.holder.rotateX(v.lean || 0);

@@ -604,7 +604,7 @@ function bendBone(bone, axisWorld, angle) {
   bone.updateMatrixWorld(true);
 }
 export const RIDER_HIPS = 0.31;            // the seated clips put the hips this far behind the body's origin
-export const RIDER_LEAN = { bike: 0.8, scooter: 0.66, auto: 0.42, pillion: 0.3 };
+export const RIDER_LEAN = { bike: 0.5, scooter: 0.36, auto: 0.24, pillion: 0.14 };
 export function leanRider(H, sideWorld, lean) {
   const b = H._rb || (H._rb = { s1: H.root.getObjectByName('spine_01'), s2: H.root.getObjectByName('spine_02'), nk: H.root.getObjectByName('neck_01') });
   bendBone(b.s1, sideWorld, -lean * 0.6); bendBone(b.s2, sideWorld, -lean * 0.4); bendBone(b.nk, sideWorld, lean * 0.75);

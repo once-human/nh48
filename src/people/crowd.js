@@ -14,7 +14,7 @@ const FULL = { lite: 25, low: 32, med: 40, high: 48 };
 // the seated clips put the hips this far behind the body's origin
 const HIPS = 0.31;
 // how far a rider leans into the bars (radians): a motorcycle, a scooter, an auto; a pillion a little
-const LEAN = { bike: 0.8, scooter: 0.66, auto: 0.42, pillion: 0.3 };
+const LEAN = { bike: 0.5, scooter: 0.36, auto: 0.24, pillion: 0.14 };
 const _ax = new THREE.Vector3(), _pq = new THREE.Quaternion(), _dq = new THREE.Quaternion();
 function bend(bone, axisWorld, angle) {
   if (!bone || !bone.parent) return;
@@ -70,8 +70,21 @@ export class Crowd {
     this.kit.applyLook(s.H, look);
   }
 
+  // spare bodies made in the browser's idle time, so turning round never waits on one being built mid-frame
+  warm() {
+    if (this._warm || !this.kit || !window.requestIdleCallback) return;
+    const want = Math.min(this.cap, Math.round(this.cap * 0.75)), free = this.pool.filter(q => !q.p);
+    if (this.pool.length >= want || free.length >= 6) return;
+    this._warm = requestIdleCallback((d) => {
+      this._warm = null;
+      if (d.timeRemaining() < 6) return;
+      const f = this.pool.filter(q => !q.p && q.female).length, m = this.pool.filter(q => !q.p && !q.female).length;
+      this.makeSkin(f < m * 0.7);
+    }, { timeout: 4000 });
+  }
   update(dt, cx, cz) {
     if (!this.kit) return;
+    this.warm();
     this.t -= dt;
     // a vehicle just came close enough for real riders: seat them now, not at the next quarter-second (the baked
     // figures stay until they're seated, so nobody blinks out); one that's gone back to baked figures lets go at once
@@ -92,8 +105,8 @@ export class Crowd {
         // the seats as the models have them (x along, height of the seat; the body sits 0.62 below the seat, like yours)
         const bike = /^bike/.test(o.type);
         // [hips x, z, side-saddle, seat height] in the vehicle's frame: the hips on the seat, not behind it
-        const seats = two ? [[bike ? -0.12 : -0.06, 0, false, bike ? 0.95 : 0.8]] : [[0.22, 0, false, 0.8]];
-        if (pil) seats.push([bike ? -0.5 : -0.56, 0, o.type === 'scooterP', bike ? 0.97 : 0.84]);
+        const seats = two ? [[bike ? 0.0 : 0.04, 0, false, bike ? 0.95 : 0.8]] : [[0.22, 0, false, 0.8]];
+        if (pil) seats.push([bike ? -0.38 : -0.44, 0, o.type === 'scooterP', bike ? 0.97 : 0.84]);
         o._riders = seats.map(([a, b, side, sy], i) => {
           const female = i === 1 ? (side ? Math.random() < 0.75 : Math.random() < 0.2) : Math.random() < 0.15;
           const look = this.kit.randomLook(rng, { female, helmet: two && i === 0 && o.type !== 'scooterP' });
@@ -129,7 +142,9 @@ export class Crowd {
       const fem = !!p.look.female;
       let s = this.pool.find(q => !q.p && q.female === fem);
       // a new body is a few ms: at most two per tick so a crowd arriving never stutters
-      if (!s && this.pool.length < this.cap + 8 && made < 2) { s = this.makeSkin(fem); made++; }
+      // (nearest first, the ones on screen before the ones behind you; someone right beside you can't wait)
+      const urgent = Math.abs(p.x - cx) + Math.abs(p.z - cz) < 12;
+      if (!s && this.pool.length < this.cap + 8 && (made < 2 || (urgent && made < 4))) { s = this.makeSkin(fem); made++; }
       if (!s) continue;
       this.dress(s, p.look);
       if (p.kid) s.H.root.scale.setScalar(p.look.scale * 0.7);

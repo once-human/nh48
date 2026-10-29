@@ -427,7 +427,7 @@ export class Pilot {
     v.tilt.updateWorldMatrix(true, false);
     // on a two-wheeler: the hips on the seat (the seated clip carries them behind the body's origin), leaning into the bars
     const two = v !== this.auto && v.spec && v.spec.two && v.type !== 'cycle';
-    const sx = two ? (/^bike/.test(v.type) ? -0.12 : -0.06) + RIDER_HIPS : seat[0] - 0.05;
+    const sx = two ? (/^bike/.test(v.type) ? 0.0 : 0.04) + RIDER_HIPS : seat[0] - 0.05;
     const p = new THREE.Vector3(sx, seat[1] - 0.62, seat[2] || 0).applyMatrix4(v.tilt.matrixWorld);
     H.holder.position.copy(p);
     H.holder.rotation.set(0, -v.th, 0);
