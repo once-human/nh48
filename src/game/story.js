@@ -13,6 +13,7 @@ import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import FAMOUS from '../world/famous.json';
 import { wrapAngle } from '../core/util.js';
 import { playerName } from '../people/characters.js';
+import { castLook, castPersona, castIdle } from '../people/castLooks.js';
 
 const WHO = {
   aai: ['Aai', '#f4a3c0'], bapu: ['Bapu Kaka', '#ffd166'], pappu: ['Pappu RTO', '#7bdff2'], joshi: ['Joshi Kaka', '#b8e0a8'],
@@ -351,7 +352,12 @@ export class Story {
       const spot = { x: w.x + i * 2.2, z: w.z + i * 1.4 };
       const near = G.W.graph.nearest(spot.x, spot.z, 160); if (!near) return;
       const p = G.people.make(near.e, near.s, near.side || 1, { mode: 'stand', female: FEMALE.has(who) });
-      p.x = spot.x + i * 1.6; p.z = spot.z + i * 0.9; p.fixed = true; p.anchor = { x: p.x, z: p.z }; p.wait = 1e9; p.idle = who === 'goons' ? 'arms_folded' : 'talk'; p.story = who; p.crew = true;
+      p.x = spot.x + i * 1.6; p.z = spot.z + i * 0.9; p.fixed = true; p.anchor = { x: p.x, z: p.z }; p.wait = 1e9; p.idle = castIdle(who); p.story = who; p.crew = true;
+      // their own face and clothes, the same every time you meet them
+      const L = castLook(G.people.kit, who, i);
+      if (L) { p.look = L; p.female = L.female; p.persona = castPersona(who) || p.persona; p.shirt = [L.top.r, L.top.g, L.top.b]; p.lower = [L.bottom.r, L.bottom.g, L.bottom.b]; p.skin = [L.skin.r, L.skin.g, L.skin.b]; p.scale = L.scale; }
+      // facing you
+      p.yaw = Math.atan2(G.player.z - p.z, G.player.x - p.x);
       G.people.list.push(p); this.npcs.push(p);
     }
   }
