@@ -261,6 +261,7 @@ export class Surfaces {
     this.cs = meta.chunk; this.ncx = meta.ncx; this.ncz = meta.ncz;
     this.road = new Map();    // chunk -> [{rings, bb}]
     this.water = new Map();
+    this.bridge = new Map();  // bridge decks and their footpaths: solid over the river
     this.bld = new Map();     // building footprints, filed in every chunk their box touches
     if (M.buildings) this.addTile(M, 0);
   }
@@ -275,6 +276,7 @@ export class Surfaces {
     };
     for (const [kind, polys] of D.ground) {
       if (kind === 'asphalt' || kind === 'concrete' || kind === 'bridge_road') for (const [ci, rings] of polys) add(this.road, ci, rings);
+      if (kind === 'bridge_road' || kind === 'bridge_sw') for (const [ci, rings] of polys) add(this.bridge, ci, rings);
     }
     for (const [ci, rings] of D.water) add(this.water, ci, rings);
     for (const B of D.buildings) {
@@ -292,7 +294,7 @@ export class Surfaces {
     }
   }
   removeTile(tag) {
-    for (const map of [this.road, this.water, this.bld]) for (const [ci, l] of map) {
+    for (const map of [this.road, this.water, this.bridge, this.bld]) for (const [ci, l] of map) {
       const k = l.filter(p => p.tag !== tag);
       if (!k.length) map.delete(ci); else if (k.length !== l.length) map.set(ci, k);
     }
@@ -314,7 +316,8 @@ export class Surfaces {
     return false;
   }
   isRoad(x, z) { return this.test(this.road, x, z); }
-  isWater(x, z) { return this.test(this.water, x, z); }
+  // water you'd fall into: not where a bridge (its deck or its footpath) or a road runs over it
+  isWater(x, z) { return this.test(this.water, x, z) && !this.test(this.bridge, x, z) && !this.test(this.road, x, z); }
   height(x, z) {
     let b = this.isRoad(x, z) ? 0 : 0.15;
     if (this.hills) b += this.hills.height(x, z);

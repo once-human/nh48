@@ -294,7 +294,7 @@ export class People {
     let hx = TMP[2] * p.dir, hz = TMP[3] * p.dir;
     if (p.mode === 'cross') { hx = TMP[3] * -Math.sign(p.lat - p.latT) * -1; hz = -TMP[2] * -Math.sign(p.lat - p.latT) * -1; }
     p.x = x + p.dodgeX; p.z = z + p.dodgeZ;
-    if (p.mode !== 'stand' || !p.faced) {
+    if ((p.mode !== 'stand' || !p.faced) && !(p.dodge > 0)) {          // while scrambling clear they face where they run
       const yaw = Math.atan2(hz, hx);
       p.yaw = p.yaw + wrapAngle(yaw - p.yaw) * 0.25;
       p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
@@ -417,7 +417,7 @@ export class People {
     // react to the player's auto
     const dx = p.x - player.x, dz = p.z - player.z;
     const d = Math.hypot(dx, dz);
-    if (d < 6 && !player.tipped) {
+    if (d < 6 && !player.tipped && !player.onFoot) {        // a vehicle coming at them (you on foot don't make people scramble)
       const along = dx * phx + dz * phz;                  // in front of the auto?
       const side = -dx * phz + dz * phx;
       if (along > -1.5 && along < 2 + pv * 0.9 && Math.abs(side) < 1.6 && pv > 2.2 && p.dodge <= 0 && !p.froze) {
