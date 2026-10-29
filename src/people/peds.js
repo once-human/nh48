@@ -153,11 +153,15 @@ export class People {
     // no line for this moment: stay quiet rather than say something that doesn't fit
     const arr = STREET[per][scenario] || (scenario.startsWith('carjack') ? STREET[per].carjack_two : null);
     if (!arr || !arr.length) return false;
+    // a crowd round a shove or a fight on foot doesn't talk about accidents, speeding or number plates
+    let ok = arr.map((_, k) => k);
+    if (scenario === 'crowd' && this.crowdCtx === 'foot') ok = ok.filter(k => !/accident|fast|number|driv|ॲक्सिडेंट|गाडी|स्पीड/i.test(arr[k][1] + ' ' + arr[k][2] + ' ' + arr[k][0]));
+    if (!ok.length) return false;
     // don't repeat the last line this persona said
-    let i = Math.floor(this.rng.next() * arr.length);
+    let i = ok[Math.floor(this.rng.next() * ok.length)];
     const key = per + scenario;
     this.lastLine = this.lastLine || {};
-    if (arr.length > 1 && this.lastLine[key] === i) i = (i + 1) % arr.length;
+    if (ok.length > 1 && this.lastLine[key] === i) i = ok[(ok.indexOf(i) + 1) % ok.length];
     // the audio decides: idle chatter waits until nobody else is talking (see audio.voice)
     if (!this.say(`s_${per}_${scenario}${i}`, p)) return false;
     this.lastLine[key] = i;
@@ -880,7 +884,8 @@ export class People {
     if (any) this.speakAs('honk', any, 0.4);
   }
   // something happened at (x, z): people nearby come and stand around, some filming it
-  gather(x, z, n = 5) {
+  gather(x, z, n = 5, ctx = 'vehicle') {
+    this.crowdCtx = ctx;
     const c = [];
     for (const p of this.list) {
       if (p.pax || p.cop || p.fallen > 0 || p.hidden || p.ctl || p.mode === 'free' || p.mode === 'watch' || p.mode === 'inside') continue;

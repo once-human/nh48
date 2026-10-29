@@ -937,7 +937,7 @@ export class Game {
       this.police.onEvent(ev);
       // accidents draw a crowd
       if (ev.type === 'pedHit' || ev.type === 'knock' || ev.type === 'gotHit' || ev.type === 'pedBumped' || (ev.type === 'crash' && ev.speed > 6 && ev.kind !== 3)) {
-        if ((this._gatherT || 0) < this.t) { this._gatherT = this.t + 8; this.people.gather(ev.x ?? P.x, ev.z ?? P.z, ev.type === 'crash' ? 3 : 5); }
+        if ((this._gatherT || 0) < this.t) { this._gatherT = this.t + 8; this.people.gather(ev.x ?? P.x, ev.z ?? P.z, ev.type === 'crash' ? 3 : 5, ev.type === 'pedBumped' || ev.type === 'gotHit' ? 'foot' : 'vehicle'); }
       }
     }
   }
