@@ -435,6 +435,13 @@ export class People {
     }
     if (p.fallen > 0) {
       p.fallen -= dt;
+      // the injured on the ground: the critical bleed out if nobody comes, the knocked out come round in the end
+      const J = p.inj;
+      if (J && !p.corpse) {
+        J.t += dt;
+        if (J.sev === 'critical' && J.t > 150) { p.corpse = true; p.fallen = 1e6; J.sev = 'dead'; this.events.push({ type: 'pedDied', p, x: p.x, z: p.z, bled: true }); }
+        else if (J.sev === 'ko' && J.t > 240) { p.fallen = 1.5; p.unconscious = false; p.ko = false; p.limp = 120; J.sev = 'knock'; }
+      }
       if (p.fallen <= 0) {
         p.wave = 0;
         if (p.ko) {
@@ -492,8 +499,12 @@ export class People {
         const dead = kmh > 70 ? R < 0.8 : kmh > 50 ? R < 0.4 : kmh > 35 ? R < 0.08 : false;
         const ko = dead || kmh > 25;
         p.dodge = 0.3; p.dodgeVX = phx * pv * 0.55; p.dodgeVZ = phz * pv * 0.55;       // thrown along your path
-        // knocked out by a vehicle: they don't get up on their own (the ambulance takes them); a knock, they do
+        // how bad it is: a knock (they get up, and limp), knocked out (down till the ambulance; out of it for minutes
+        // if nobody comes), critical (bleeding: without an ambulance within a few minutes they die), or killed
+        const crit = !dead && kmh > 45;
         p.fallen = dead || ko ? 1e6 : 3 + kmh * 0.12; p.ko = ko; p.corpse = dead; p.unconscious = ko && !dead; p.v = 0;
+        p.inj = { sev: dead ? 'dead' : crit ? 'critical' : ko ? 'ko' : 'knock', t: 0 };
+        if (!ko) p.limp = 40 + kmh * 2;
         this.remember(p, dead ? 'dead' : 'hit');
         this.events.push({ type: 'pedHit', p, speed: pv, x: p.x, z: p.z, sev: dead ? 'dead' : ko ? 'ko' : 'knock' });
         return;
@@ -561,9 +572,11 @@ export class People {
         return;
       }
     }
-    // walk along the footpath
-    p.s += p.dir * p.speed * dt;
-    p.v = p.speed;
+    // walk along the footpath (a limp after a knock: slower for a while)
+    if (p.limp > 0) p.limp -= dt;
+    const pace = p.limp > 0 ? p.speed * 0.5 : p.speed;
+    p.s += p.dir * pace * dt;
+    p.v = pace;
     p.phase += dt * p.speed * 4.2;
     if (p.s < 0 || p.s > p.e.len) {
       const nodeIdx = p.s < 0 ? p.e.a : p.e.b;

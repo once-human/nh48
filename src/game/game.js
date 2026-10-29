@@ -30,6 +30,7 @@ import { Wada } from './wada.js';
 import TRANSIT_DATA from './transit.json';
 import VLINES from './vendor_lines.json';
 import { Rep } from '../people/rep.js';
+import { Blood } from '../gfx/blood.js';
 import { justOpened, lineOpen, opensOn } from './metroOpen.js';
 import { Club } from './club.js';
 import { Lights } from './lights.js';
@@ -187,6 +188,7 @@ export class Game {
     this.brawl = new Brawl(this); this.people.brawl = this.brawl;
     this.brain = new Brain(this.people, this); this.people.brain = this.brain;
     this.rep = new Rep(this); this.people.rep = this.rep;
+    this.blood = new Blood(this.scene, W);
     this.emergency = new Emergency(this);
     this.weather = new Weather(this.scene, this.audio);
     player.makePed = (look, x, z, per) => this.people.spawnAt(look, x, z, per);
@@ -1012,7 +1014,9 @@ export class Game {
         if (ev.kind === 3) this.hud.toast('End of the shift area', 'Turn back, the map ends here', 'warn', 2);
       }
       if (ev.type === 'scrape') this.audio.thud(0.15);
-      if (ev.type === 'pedDied') {
+      if (ev.type === 'pedDied' && ev.bled) { this.hud.toast('They didn’t make it', 'Nobody got them to a hospital in time', 'bad', 4); }
+      else if (ev.type === 'pedDied' && this.blood) this.blood.spill(ev.x, ev.z, 0.9, 30);
+      if (ev.type === 'pedDied' && !ev.bled) {
         if (!this.free) { this.hud.toast('You killed someone', 'Murder is BNS s.103. There were witnesses', 'bad', 5); this.life.change('karma', -30); this.police && this.police.raiseHeat && this.police.raiseHeat(3, 'Killed someone in a fight', null); }
       }
       if (ev.type === 'pet') {
@@ -1045,6 +1049,9 @@ export class Game {
       if (ev.type === 'knock') { this.audio.crash(0.7); this.hud.toast('You knocked over a two-wheeler', 'They’re fine. Very, very angry, but fine.', 'warn', 2.6); }
       if (ev.type === 'pedHit') {
         this.brain && this.brain.incident(ev.sev === 'knock' ? 'crash' : 'down', ev.x, ev.z, { victim: ev.p, byYou: true });
+        // blood under the badly hurt: a little for knocked out, a spreading pool for the critical and the dead
+        const J = ev.p && ev.p.inj, sev = J ? J.sev : ev.sev;
+        if (this.blood && sev !== 'knock') this.blood.spill(ev.p.x, ev.p.z, sev === 'dead' ? 1.1 : sev === 'critical' ? 0.85 : 0.35, sev === 'ko' ? 15 : 40);
         this.audio.thud(ev.sev === 'knock' ? 0.4 : 0.8); this.rig.shake(ev.sev === 'knock' ? 0.15 : 0.35);
         if (ev.sev === 'dead') { this.hud.toast('You killed someone', 'Hit and run is BNS s.106: up to ten years. Every cop in Pune is looking for you', 'bad', 5); this.life.change('karma', -25); this.police && this.police.raiseHeat && this.police.raiseHeat(3, 'Killed a pedestrian', null); }
         else if (ev.sev === 'ko') { this.hud.toast('You knocked someone out', 'They’re not getting up. People are calling the police', 'bad', 3.6); this.life.change('karma', -6); this.police && this.police.raiseHeat && this.police.raiseHeat(1, 'Hit a pedestrian', null); }
@@ -1080,6 +1087,7 @@ export class Game {
     // a dark base under the whole city: any hairline crack between ground pieces shows asphalt, not the bright sky
     if (!this.under) { this.under = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshLambertMaterial({ color: 0x2b2b2d })); this.under.rotation.x = -Math.PI / 2; this.under.receiveShadow = false; this.scene.add(this.under); }
     this.under.position.set(Math.round(this.camera.position.x / 50) * 50, -0.03, Math.round(this.camera.position.z / 50) * 50);
+    if (this.blood) this.blood.update(dt);
     if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); if (this.traffic && this.state === 'play') this.trafficDamage(dt); }
     this.stepRefuel(dt);
     if (this.brain && this.state !== 'title') this.brain.update(dt, this.player);
