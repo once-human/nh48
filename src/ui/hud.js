@@ -850,7 +850,7 @@ export class HUD {
     const rot = -p.th - Math.PI / 2;
     const cy = r + 34 * k;             // player sits below centre: more road ahead
     x.save(); x.translate(r, cy);
-    city.drawTiles(x, p.x, p.z, sc, rot, S * 0.95);
+    city.drawTiles(x, p.x, p.z, sc, rot, S * 0.95, sc, false);
     // world-space overlays
     x.rotate(rot); x.scale(sc, sc); x.translate(-p.x, -p.z);
     const line = (pts, col, w) => {

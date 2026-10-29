@@ -252,7 +252,13 @@ export class CityMap {
   }
   drawRaster(ctx, cx, cz, r, devPpm) {
     const R = this.raster, want = devPpm <= 0.09 ? -1 : devPpm <= 0.18 ? 0 : devPpm <= 0.36 ? 1 : devPpm <= 0.72 ? 2 : 3;
-    if (R.ov.ok) ctx.drawImage(R.ov, this.x0, this.z0, R.ov.naturalWidth * 16, R.ov.naturalHeight * 16);   // 0.0625 px/m
+    // the whole-city overview only where the sharper pictures haven't arrived (it sat under them, drawn for nothing)
+    let covered = want >= 0;
+    if (covered) {
+      const m = R.levels[want][1], a0 = Math.floor((cx - r - this.x0) / m), a1 = Math.floor((cx + r - this.x0) / m), b0 = Math.floor((cz - r - this.z0) / m), b1 = Math.floor((cz + r - this.z0) / m);
+      for (let b = Math.max(0, b0); b <= b1 && covered; b++) for (let a = Math.max(0, a0); a <= a1 && covered; a++) { const o = this.rimg(want, a, b); if (!o.ok && !o.bad) covered = false; }
+    }
+    if (!covered && R.ov.ok) ctx.drawImage(R.ov, this.x0, this.z0, R.ov.naturalWidth * 16, R.ov.naturalHeight * 16);   // 0.0625 px/m
     if (want < 0) return;
     for (let L = Math.max(0, want - 1); L <= want; L++) {
       const m = R.levels[L][1];
@@ -328,14 +334,16 @@ export class CityMap {
   // draw the map into ctx: view centred at (cx,cz) in metres, ppm screen px per metre, rotation rot (rad),
   // ctx already translated to the view centre in screen px; radius = half-diagonal of the view in px
   // lvlPpm: device pixels per metre (picks the level so tile pixels match screen pixels)
-  drawTiles(ctx, cx, cz, ppm, rot, radius, lvlPpm = ppm) {
+  // hq: smooth resampling for the big map; the minimap is drawn near 1:1 thirty times a second, where 'high' only
+  // made the browser rebuild every picture's smaller copies each time (tens of ms on a laptop's graphics)
+  drawTiles(ctx, cx, cz, ppm, rot, radius, lvlPpm = ppm, hq = true) {
     const z = this.level(lvlPpm / this.res), S = this.tileSize(z), r = radius / ppm;
     const t0x = Math.floor((cx - r - this.x0) / S), t1x = Math.floor((cx + r - this.x0) / S);
     const t0y = Math.floor((cz - r - this.z0) / S), t1y = Math.floor((cz + r - this.z0) / S);
     const nx = Math.ceil((this.x1 - this.x0) / S), ny = Math.ceil((this.z1 - this.z0) / S);
     ctx.save();
     ctx.rotate(rot); ctx.scale(ppm, ppm); ctx.translate(-cx, -cz);
-    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = hq ? 'high' : 'low';
     if (this.raster) {
       this.drawRaster(ctx, cx, cz, r, lvlPpm / this.res);
       if (z < 2) { ctx.restore(); return; }
