@@ -496,6 +496,7 @@ export class Game {
     // drop focus from the menu button so Space (handbrake) can't press it again
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     this.state = 'play';
+    this.tut && this.later(1.2, () => this.tut.start());     // the first minutes, taught by doing (once, for everyone)
     if (this.wadaIntro) {
       this.wadaIntro = false;
       const L = this.W.landmarks && this.W.landmarks.find(l => l.id === 'shaniwar');
@@ -506,7 +507,6 @@ export class Game {
         const dd = this.player.dropped && this.player.dropped.find(q => q.veh === this.player.auto);
         if (dd) dd.safe = true;
         this.findAuto = true;
-        this.tut.start();                   // the first minutes, taught by doing (once)
       }
     }
     this.goFullscreen();

@@ -1399,3 +1399,21 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .sp-sec:first-child { padding-top: 6px; }
 .kp-sec { margin: 4px 0 1px; padding-top: 3px; border-top: 1px dashed currentColor; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; opacity: .7; }
 .kp-sec:first-child { border-top: 0; padding-top: 0; }
+
+/* the coach: teaches the game as you play (game/tutorial.js). Keycaps on the left, what to do on the right */
+.coach { left: 50%; bottom: calc(132px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; align-items: center; gap: 16px;
+  padding: 14px 20px 14px 14px; border-radius: 20px; background: rgba(24, 24, 28, .72); border: .5px solid rgba(255, 255, 255, .14);
+  -webkit-backdrop-filter: blur(30px) saturate(170%); backdrop-filter: blur(30px) saturate(170%); box-shadow: 0 20px 50px -14px rgba(0, 0, 0, .6); max-width: min(560px, calc(100vw - 40px)); }
+.coach.in { animation: coachIn .45s cubic-bezier(.2, .8, .2, 1); }
+@keyframes coachIn { from { opacity: 0; transform: translate(-50%, 12px) scale(.97); } to { opacity: 1; transform: translate(-50%, 0); } }
+.co-keys { display: flex; gap: 5px; flex: none; }
+.co-keys .kc { min-width: 38px; height: 38px; padding: 0 9px; display: grid; place-items: center; border-radius: 9px; font: 700 15px var(--font-ui);
+  color: #111; background: linear-gradient(180deg, #ffffff, #dedad2); box-shadow: 0 3px 0 #9f9a90, 0 6px 14px -4px rgba(0, 0, 0, .5); animation: kcPress 1.6s ease-in-out infinite; }
+.co-keys .kc.w { font-size: 13px; }
+.co-keys .kc:nth-child(2) { animation-delay: .15s; } .co-keys .kc:nth-child(3) { animation-delay: .3s; } .co-keys .kc:nth-child(4) { animation-delay: .45s; } .co-keys .kc:nth-child(5) { animation-delay: .6s; }
+@keyframes kcPress { 0%, 70%, 100% { transform: none; box-shadow: 0 3px 0 #9f9a90, 0 6px 14px -4px rgba(0, 0, 0, .5); } 80% { transform: translateY(2px); box-shadow: 0 1px 0 #9f9a90, 0 3px 8px -4px rgba(0, 0, 0, .5); } }
+.co-t { display: grid; gap: 2px; min-width: 0; }
+.co-t b { font: 650 16px var(--font-ui); letter-spacing: -0.01em; }
+.co-t span { font: 500 13px/1.4 var(--font-ui); color: rgba(245, 245, 247, .72); }
+.co-n { align-self: flex-start; font: 600 11px var(--font-ui); font-style: normal; color: var(--acc, #ffb224); white-space: nowrap; margin-left: 4px; }
+@media (max-width: 760px) { .coach { bottom: calc(110px + env(safe-area-inset-bottom, 0px)); } .co-keys .kc { min-width: 32px; height: 32px; } }
