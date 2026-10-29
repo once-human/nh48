@@ -238,6 +238,7 @@ export class Pilot {
     H.holder.rotation.set(0, -F.yaw, 0);
     H.mixer.update(dt);
     if (this.postPose) this.postPose(H, dt);
+    if (this.lookPose && !this.seated) this.lookPose(H, dt);
   }
 
   // over a compound wall: hands on top, swing up (0.9 s), over and drop down the other side

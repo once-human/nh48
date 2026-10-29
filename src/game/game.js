@@ -6,6 +6,7 @@ import { HUD } from '../ui/hud.js';
 import { CityMap } from '../ui/map.js';
 import { SW } from '../world/landmarks.js';
 
+const Y_UP = new THREE.Vector3(0, 1, 0);
 const LM_MR = { shaniwar: 'शनिवारवाडा', dagdusheth: 'श्रीमंत दगडूशेठ हलवाई गणपती', mandai: 'महात्मा फुले मंडई', station: 'पुणे रेल्वे स्टेशन',
   agakhan: 'आगाखान पॅलेस', lalmahal: 'लाल महाल', ohel: 'लाल देऊळ', tulshibaug: 'तुळशीबाग राम मंदिर', kasba: 'कसबा गणपती', sppu: 'सावित्रीबाई फुले पुणे विद्यापीठ',
   coep: 'सीओईपी', osho: 'ओशो आश्रम', parvati: 'पर्वती', shinde: 'शिंदे छत्री', omkareshwar: 'ओंकारेश्वर मंदिर', stmary: 'सेंट मेरी चर्च',
@@ -113,6 +114,26 @@ export class Game {
     this.fauna = new Fauna(this.people, W.animalKit, this.scene, W);
     this.smoke = new Smoke(this.scene);
     player.animalsNear = () => this.people.animals;
+    // on foot your head (and a little of your body) turns to where the camera looks, so looking back you look back;
+    // the torch arm goes on top
+    {
+      const rot = { yH: 0, yS: 0 }, dir = new THREE.Vector3();
+      player.lookPose = (H, dt) => {
+        const P = this.player, C = this.camera;
+        if (!P.onFoot || P.downT > 0 || this.state !== 'play') { rot.yH *= 0.8; rot.yS *= 0.8; }
+        else {
+          C.getWorldDirection(dir);
+          const want = Math.atan2(dir.z, dir.x), d = Math.atan2(Math.sin(want - P.foot.yaw), Math.cos(want - P.foot.yaw));
+          const k = 1 - Math.exp(-dt * 6);
+          rot.yH += (Math.max(-1.25, Math.min(1.25, d)) * 0.62 - rot.yH) * k;     // head takes most of it
+          rot.yS += (Math.max(-1.25, Math.min(1.25, d)) * 0.38 - rot.yS) * k;     // the chest the rest
+        }
+        const sp = H.root.getObjectByName('spine_03'), hd = H.root.getObjectByName('Head');
+        if (sp) sp.rotateOnWorldAxis(Y_UP, -rot.yS);
+        if (hd) hd.rotateOnWorldAxis(Y_UP, -rot.yH);
+        if (P.torchArm) P.torchArm(H);
+      };
+    }
     this.wrecks = [];
     this.traffic.peds = this.people;
     this.city = new CityMap(W);

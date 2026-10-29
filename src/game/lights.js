@@ -4,6 +4,7 @@
 // kirana or an electronics shop. Both lights live in the scene from the start (intensity 0 when off),
 // so switching never recompiles a shader.
 import * as THREE from 'three';
+import { ikArm } from '../people/humans.js';
 import { keyLabel } from './keys.js';
 
 export class Lights {
@@ -43,6 +44,38 @@ export class Lights {
     G.audio.blip?.();
     return this.torchOn ? 'Torch on' : 'Torch off';
   }
+  // a real torch in your right hand while it's on, the arm raised to point it where you look
+  torchMesh(on) {
+    const P = this.g.player, H = P.human;
+    if (!H) return;
+    if (!this.tm) {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.02, 0.2, 10), new THREE.MeshStandardMaterial({ color: 0x1c1c1e, roughness: 0.5, metalness: 0.4 }));
+      const head = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.022, 0.06, 12), new THREE.MeshStandardMaterial({ color: 0x2a2a2d, roughness: 0.4, metalness: 0.6 }));
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.028, 14), new THREE.MeshBasicMaterial({ color: 0xfff2d0 }));
+      body.rotation.x = Math.PI / 2; head.rotation.x = Math.PI / 2; head.position.z = 0.12; lens.position.z = 0.152;
+      g.add(body, head, lens); this.tm = g; this.tmLens = lens;
+    }
+    const hand = H.root.getObjectByName('hand_r');
+    if (hand && this.tm.parent !== hand) { hand.add(this.tm); this.tm.position.set(0, 0.06, 0.04); this.tm.scale.setScalar(1 / (H.root.scale.x || 1)); }
+    this.tm.visible = !!on && P.onFoot;
+    this.tmLens.material.color.setHex(on ? 0xfff2d0 : 0x333333);
+    if (!on || !P.onFoot) { P.torchArm = null; return; }
+    // raise the arm toward the look direction (after the walk cycle has posed the body)
+    const C = this.g.camera, dir = this._dir2 || (this._dir2 = new THREE.Vector3()), tgt = this._tg || (this._tg = new THREE.Vector3()), pole = this._po || (this._po = new THREE.Vector3());
+    P.torchArm = (H2) => {
+      C.getWorldDirection(dir);
+      const F = P.foot, sh = H2.root.getObjectByName('upperarm_r'); if (!sh) return;
+      sh.getWorldPosition(tgt);
+      const flat = Math.hypot(dir.x, dir.z) || 1, fx = Math.cos(F.yaw), fz = Math.sin(F.yaw);
+      // only in front of you: the arm can't point behind your back (your head and body turn for that)
+      if ((dir.x * fx + dir.z * fz) / flat < -0.1) { dir.set(fx, dir.y, fz); }
+      tgt.addScaledVector(dir, 0.55); tgt.y -= 0.12;
+      pole.set(-fz, -0.8, fx).normalize();
+      ikArm(H2, 'r', tgt, pole, 0.85);
+      this.tm.lookAt(tgt.x + dir.x * 5, tgt.y + dir.y * 5, tgt.z + dir.z * 5);
+    };
+  }
   // the torch is gone (beaten, robbed, taken at the chowki)
   lose(why) {
     const G = this.g;
@@ -59,10 +92,14 @@ export class Lights {
     const t = this.torch, on = this.torchOn && P.onFoot && this.hasTorch();
     if (this.torchOn && !this.hasTorch()) this.torchOn = false;
     t.intensity = on ? 9 + night * 9 : 0;
+    this.torchMesh(on);
     if (on) {
-      const F = P.foot, fx = Math.cos(F.yaw), fz = Math.sin(F.yaw), y = (F.y || 0) + 1.25;
-      t.position.set(F.x + fx * 0.3, y, F.z + fz * 0.3);
-      t.target.position.set(F.x + fx * 9, y - 1.6, F.z + fz * 9);
+      // the beam comes out of the torch in your hand and goes where you look (the camera), not just where you face
+      const C = G.camera, dir = this._dir || (this._dir = new THREE.Vector3()), hp = this._hp || (this._hp = new THREE.Vector3());
+      C.getWorldDirection(dir);
+      if (this.tm && this.tm.parent) this.tm.getWorldPosition(hp); else { const F = P.foot; hp.set(F.x, (F.y || 0) + 1.25, F.z); }
+      t.position.copy(hp);
+      t.target.position.set(hp.x + dir.x * 10, hp.y + dir.y * 10 - 0.8, hp.z + dir.z * 10);
       t.target.updateMatrixWorld();
     }
     // the HUD chip
