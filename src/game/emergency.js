@@ -53,7 +53,7 @@ export class Emergency {
     // its own model (a 108 van, a police jeep) in place of the stock body
     for (const c of v.tilt.children) c.visible = false;
     const md = amb ? buildAmbulance() : buildPoliceJeep();
-    v.tilt.add(md.group);
+    v.tilt.add(md.group); v.md = md;
     v.spec = { ...specOf(amb ? 'tempo' : 'suv'), acc: 3.2, vTop: 19, mass: amb ? 3200 : 2100, L: md.dims.L, W: md.dims.W };
     const n = Math.max(1, Math.round(md.dims.L / md.dims.W));
     v.circles = []; for (let k = 0; k < n; k++) v.circles.push([-md.dims.L / 2 + md.dims.W / 2 + (md.dims.L - md.dims.W) * k / (n - 1), md.dims.W / 2 + 0.04]);

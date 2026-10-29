@@ -410,6 +410,18 @@ export class Audio {
   playerHorn(on, kind = 'auto') {
     if (!this.ctx) return;
     const H = HORN[kind] || HORN.auto, b = this.buf[H.s];
+    // a tap is a proper short beep (at least a fifth of a second), a hold is one long horn
+    if (!on && this.hornNode && this.ctx.currentTime - this.hornNode.t0 < 0.2) return;
+    if (on && !this.hornNode && !b) {
+      // no recording for this one: its horn made from tones, held as long as you hold the key
+      const ctx = this.ctx, g = ctx.createGain(); g.gain.value = 0; g.connect(this.bus('traffic'));
+      const T = { auto: ['square', [415, 432], 0.16], scooter: ['square', [520, 540], 0.12], beep: ['square', [520], 0.12], bell: ['sine', [1800, 2400], 0.08], bus: ['sawtooth', [185, 233, 277], 0.13], truck: ['sawtooth', [185, 233, 277], 0.13], tempo: ['square', [560, 700], 0.12] }[kind] || ['sawtooth', [370, 466], 0.12];
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600; lp.connect(g);
+      const oscs = T[1].map(f => { const o = ctx.createOscillator(); o.type = T[0]; o.frequency.value = f; o.connect(lp); o.start(); return o; });
+      g.gain.setTargetAtTime(T[2], ctx.currentTime, 0.006);
+      this.hornNode = { src: { stop: (t) => oscs.forEach(o => o.stop(t)) }, g, t0: ctx.currentTime };
+      return;
+    }
     if (on && !this.hornNode && b) {
       const ctx = this.ctx;
       const src = ctx.createBufferSource(); src.buffer = b; src.playbackRate.value = H.r;
@@ -424,7 +436,7 @@ export class Audio {
       node.connect(g).connect(this.bus('traffic'));
       src.start();
       g.gain.setTargetAtTime(0.55 * H.v, ctx.currentTime, 0.008);
-      this.hornNode = { src, g };
+      this.hornNode = { src, g, t0: ctx.currentTime };
     } else if (!on && this.hornNode) {
       const h = this.hornNode; this.hornNode = null;
       h.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.015);

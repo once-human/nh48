@@ -896,7 +896,7 @@ class Marshal {
   initJeep(police) {
     const G = this.G, W = this.W, v = this.veh;
     for (const c of v.tilt.children) c.visible = false;
-    const md = this.md = buildPoliceJeep(); v.tilt.add(md.group);
+    const md = this.md = buildPoliceJeep(); v.tilt.add(md.group); v.md = md;
     v.spec.L = md.dims.L; v.spec.W = md.dims.W; v.agent.L = md.dims.L; v.agent.W = md.dims.W; makeService(v);
     this.cop = { name: 'Patrol', x: v.x, z: v.z, mood: police.rng.next() * 0.6, corrupt: police.rng.chance(0.3), bribes: 0, busyT: 0, post: { x: v.x, z: v.z } };
     this.stunT = 0; this.routeT = 0; this.route = null; this.stuckT = 0; this.revT = 0; this.sees = false; this.spotT = 0;

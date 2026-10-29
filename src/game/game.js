@@ -438,7 +438,7 @@ export class Game {
       const k = ex.indexOf(v.agent); if (k >= 0) ex.splice(k, 1);
       this.depots.taken.add(sv.depot.key); sv.depot.veh = null;
       v.seatOverride = sv.kind === 'amb' ? [1.32, 1.18, 0.42] : [0.05, 0.82, 0.38];
-      this.hud.toast(sv.kind === 'amb' ? 'Signed in · 108 shift' : 'Signed in · Home Guard patrol', 'Calls will come to you. Siren comes on when you’re on one', 'meter', 3.4);
+      this.hud.toast(sv.kind === 'amb' ? 'Signed in · 108 shift' : 'Signed in · Home Guard patrol', 'Calls will come to you. H for the siren and lights', 'meter', 3.4);
       return true;
     }
     v.serviceKind = sv.kind; v.service = true; v.stolen = true; v.agent.isPlayer = true;
@@ -473,7 +473,7 @@ export class Game {
         const v = new Vehicle(this.W, this.scene, this.vmats, amb ? 'tempo' : 'suv', [0.95, 0.95, 0.93]);
         v.reset(sp.x, sp.z, sp.th); v.y = this.W.surf.height(sp.x, sp.z);
         for (const c of v.tilt.children) c.visible = false;
-        const md = amb ? buildAmbulance() : buildPoliceJeep(); v.tilt.add(md.group); for (const L2 of ['red', 'blue', 'red2']) if (md.lights[L2]) md.lights[L2].visible = false;
+        const md = amb ? buildAmbulance() : buildPoliceJeep(); v.tilt.add(md.group); v.md = md; for (const L2 of ['red', 'blue', 'red2']) if (md.lights[L2]) md.lights[L2].visible = false;
         v.spec = { ...specOf(amb ? 'tempo' : 'suv'), L: md.dims.L, W: md.dims.W }; makeService(v);
         this.traffic.extra = this.traffic.extra || []; this.traffic.extra.push(v.agent);
         d.veh = v;
@@ -1278,7 +1278,12 @@ export class Game {
       const S = P.spec;
       const kind = !S ? 'none' : P.inAuto ? 'auto' : S.two ? 'two' : S.L > 6 ? 'bus' : 'car';
       this.audio.updateEngine(P.rpm, P.throttle, kind !== 'none', kind);
-      const horn = this.input.state.horn && !P.onFoot;
+      // H: the horn; in a police vehicle or an ambulance, the siren and lights on and off (and traffic makes way)
+      const svc = !P.onFoot && P.cur && P.cur.serviceKind, hk = this.input.state.horn && !P.onFoot;
+      if (svc && hk && !this._hornWas) { P.cur.sirenOn = !P.cur.sirenOn; this.hud.toast(P.cur.sirenOn ? 'Siren on' : 'Siren off', P.cur.sirenOn ? 'Traffic ahead will make way' : '', 'info', 1.4); }
+      this._hornWas = hk;
+      if (P.cur && P.cur.md && P.cur.md.lights) { const Lg = P.cur.md.lights, on = !!P.cur.sirenOn, f = on && Math.floor(this.t * 6) % 2 === 0; Lg.red.visible = f; Lg.redOff.visible = !f; Lg.blue.visible = on && !f; Lg.blueOff.visible = !(on && !f); }
+      const horn = hk && !svc;
       this.audio.playerHorn(horn, S ? S.honk : 'auto');
       if (horn) { this.hornScare(); this.police.honked(); if ((this._pedHornT = (this._pedHornT || 0) - dt) <= 0) { this._pedHornT = 0.5; this.people.onHorn(P); } }
       const sl = this.shops.near && this.shops.label();

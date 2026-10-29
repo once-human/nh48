@@ -17,18 +17,19 @@ export class Duty {
   get kind() { const v = this.g.player.cur; return this.g.player.onFoot || !v ? null : v.serviceKind || null; }
   update(dt) {
     const G = this.g, P = G.player, k = this.kind;
-    if (!k) { if (this.call) this.end(null); this.waitT = 6; return; }
+    if (!k) { if (this.call) this.end(null); this.waitT = 6; G.dutySiren = 0; return; }
+    // your siren (H): on or off, call or no call; traffic ahead pulls over while it's on
+    const v0 = P.cur, sOn = !!v0.sirenOn && Math.abs(v0.v) > 0.5;
+    if (k === 'amb') G.audio.ambSiren && G.audio.ambSiren(v0.sirenOn ? 1 : 0, { x: v0.x, z: v0.z });
+    else { G.dutySiren = v0.sirenOn ? 1 : 0; if (G.free) { G.audio.sirenAt = { x: v0.x, z: v0.z }; G.audio.siren(v0.sirenOn ? 1 : 0, 0); } }
+    if (sOn && (this.yT = (this.yT || 0) - dt) <= 0) {
+      this.yT = 0.5; const hx = Math.cos(v0.th), hz = Math.sin(v0.th);
+      G.traffic.near(v0.x + hx * 14, v0.z + hz * 14, 16, (o) => { if (!o.T || o.jc || o.isPlayer || o.service) return; const rx = o.x - v0.x, rz = o.z - v0.z, al = rx * hx + rz * hz; if (al < 0 || al > 30) return; const sd = -rx * hz + rz * hx; o.latT = o.lat + (sd > 0 ? 1 : -1) * 1.4; o.v = Math.min(o.v, 3); });
+    }
     // calls only come to a vehicle you signed in for; a stolen one gets nothing (unless there's a patient in the back)
     if (!this.call) { if (P.cur.legit && (this.waitT -= dt) <= 0) this.newCall(k); return; }
     const C = this.call; C.t += dt;
-    // the siren: on while you're on a call and moving; traffic ahead makes way
-    const v = P.cur, on = C.stage !== 'done' && Math.abs(v.v) > 1;
-    if (k === 'amb') G.audio.ambSiren && G.audio.ambSiren(on ? 1 : 0, { x: v.x, z: v.z });
-    else { G.dutySiren = on ? 1 : 0; if (G.free) { G.audio.sirenAt = { x: v.x, z: v.z }; G.audio.siren(on ? 1 : 0, 0); } }
-    if (on && (this.yT = (this.yT || 0) - dt) <= 0) {
-      this.yT = 0.5; const hx = Math.cos(v.th), hz = Math.sin(v.th);
-      G.traffic.near(v.x + hx * 14, v.z + hz * 14, 16, (o) => { if (!o.T || o.jc || o.isPlayer || o.service) return; const rx = o.x - v.x, rz = o.z - v.z, al = rx * hx + rz * hz; if (al < 0 || al > 30) return; const sd = -rx * hz + rz * hx; o.latT = o.lat + (sd > 0 ? 1 : -1) * 1.4; o.v = Math.min(o.v, 3); });
-    }
+    const v = P.cur;
     if (k === 'amb') this.ambTick(C, dt); else this.polTick(C, dt);
     if (C.limit && C.t > C.limit) { G.hud.toast('Too late', C.lateMsg || 'The call has gone to someone else', 'bad', 3.2); this.end(false); }
   }
@@ -65,7 +66,7 @@ export class Duty {
       if (crit && G.blood) G.blood.spill(x, z, 0.6, 40);
       this.call = { kind: 'amb', stage: 'pickup', t: 0, p, x, z, limit: crit ? 170 : 260, crit, lateMsg: crit ? 'They didn’t make it' : 'Another ambulance got there first' };
       G.setWaypoint({ x, z, name: '108: patient', gig: true });
-      G.hud.toast('108 call', `${crit ? 'Accident victim, bleeding' : 'Man collapsed'} on ${S.name}. Siren on, go`, 'bad', 4);
+      G.hud.toast('108 call', `${crit ? 'Accident victim, bleeding' : 'Man collapsed'} on ${S.name}. H for the siren, go`, 'bad', 4);
     } else {
       // the snatcher: off on a scooter, a lady shouting behind him
       const v = new Vehicle(G.W, G.scene, G.vmats, 'scooter', [0.05, 0.05, 0.06]);
