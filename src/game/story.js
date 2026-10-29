@@ -21,6 +21,8 @@ const WHO = {
   ira: ['Ira Kulkarni', '#c3a6ff'], bhau: ['Bhau Jagtap', '#ff6b6b'], kabir: ['Kabir', '#e0e0e0'], barista: ['Barista', '#b8e0a8'],
   warkari: ['Warkari', '#ffd166'], harish: ['Harish Malhotra', '#d0b080'], sunny: ['Sunny', '#b8e0a8'], mem: ['', '#e8d9b0'],
 };
+// a line's voice clip id: 'st_<who>_<FNV-1a of the text>' (tools/story_jobs.py makes the same ids)
+function voiceId(who, text) { let h = 0x811c9dc5; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return `st_${who}_${h.toString(16).padStart(8, '0')}`; }
 const FEMALE = new Set(['aai', 'meera', 'khushi', 'tara', 'shinde', 'ira']);
 const STORY_ON = true;
 // the step types beyond go-there-and-talk: see Story.update
@@ -378,6 +380,9 @@ export class Story {
       q('.sd-who').textContent = w === 'you' ? (this.fem ? 'Saee' : 'Sid') : this.name(w) || name; q('.sd-who').style.color = col;
       q('.sd-line').textContent = line; q('.sd-tr').textContent = tr || '';
       q('.sd-line').lang = /[ऀ-ॿ]/.test(line) ? 'mr' : 'en';
+      // spoken, when the voice pack has it (from where they stand; your own lines in your own voice)
+      const key = w === 'you' ? (this.fem ? 'youf' : 'youm') : w, id = voiceId(key, line), A = this.g.audio, p = this.npcs[0];
+      try { if (A && A.fetchVoice) { if (p && w !== 'you' && w !== 'mem') A.at(p.x, p.z, () => A.voice(id, 1, 0, false, 2), 1.6); else A.voice(id, 1, 0, false, 2); } } catch (e) { /* no clip: the subtitle carries it */ }
     }
     q('.sd-ask').innerHTML = ''; q('.sd-next').hidden = !!this.asking;
   }

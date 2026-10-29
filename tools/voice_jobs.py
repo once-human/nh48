@@ -67,7 +67,11 @@ for lid, voice, lang, text in jobs:
         for p in street:
             if lid.startswith(f's_{p}_') or lid.startswith(f'q_{p}_'): pid = p
         spk, pitch, pace, who = CAST[pid][0][L], *CAST[pid][1:]
-        emo = 'Conversation'
+        # the moment decides the feeling: shouted at a near-miss, scared running, warm saying hello
+        scn = re.sub(r'\d+$', '', lid.split('_', 2)[2]) if lid.count('_') >= 2 else ''
+        emo = {'dodge': 'Anger', 'honk': 'Anger', 'bump': 'Anger', 'shoved': 'Anger', 'fight': 'Anger', 'hit': 'Anger', 'fall': 'Anger',
+               'carjack_two': 'Anger', 'carjack_car': 'Anger', 'carjack_auto': 'Anger', 'flee': 'Fear', 'scared': 'Fear',
+               'greet': 'Happy', 'nice': 'Happy', 'respect': 'Happy', 'kind': 'Happy', 'odd': 'Surprise', 'stunt': 'Surprise'}.get(scn, 'Conversation')
     elif lid.startswith('p_'):
         f = lid.endswith('_f')
         spk, pitch, pace, who, emo = (['Sunita', 'Radha', 'Isha'][sum(map(ord, lid)) % 3] if f else ['Sanjay', 'Nikhil', 'Varun'][sum(map(ord, lid)) % 3]), 'moderate', 'moderate', 'a passenger hailing or riding an auto rickshaw', 'Conversation'
@@ -103,3 +107,5 @@ json.dump(out, open(dst, 'w'), ensure_ascii=False, indent=0)
 from collections import Counter
 print(len(out), 'lines →', dst)
 print(Counter(j['speaker'] for j in out).most_common())
+# the story's lines join the list (tools/story_jobs.py)
+exec(open(os.path.join(ROOT, 'tools/story_jobs.py')).read(), {'__file__': os.path.join(ROOT, 'tools/story_jobs.py')})
