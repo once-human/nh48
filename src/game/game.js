@@ -411,8 +411,8 @@ export class Game {
     this.paintDamage(v);
     this.smoke.explode(v.x, (v.y || 0) + 0.8, v.z);
     this.rig.shake(1.2); this.audio.at(v.x, v.z, () => { this.audio.crash && this.audio.crash(1); this.audio.boom && this.audio.boom(); });
-    if (!P.onFoot && P.cur === v) { P.exit(this.traffic, true); P.downT = 3.5; if (P.human) P.human.play('knockback', { once: true, fade: 0.06 }); P.hp = Math.max(5, (P.hp ?? 100) - 35); }
-    else if (P.onFoot && Math.hypot(P.x - v.x, P.z - v.z) < 7) { P.downT = 3; if (P.human) P.human.play('knockback', { once: true, fade: 0.06 }); }
+    if (!P.onFoot && P.cur === v) { P.exit(this.traffic, true); P.downT = 3.5; if (P.human) P.human.play('knockback', { once: true, fade: 0.06 }); this.burnHurt(68, 'Caught in the blast'); }
+    else if (P.onFoot) this.blastHurt(v.x, v.z);
     for (const p of this.people.list) { const dd = Math.hypot(p.x - v.x, p.z - v.z); if (dd < 9 && !p.fixed) { p.fallen = 4 + Math.random() * 3; } else if (dd < 40 && p.flee !== undefined) p.flee = 6; }
     this.police && this.police.offence && this.police.offence('explosion', v.x, v.z, {});
     this.wrecks.push({ v, t: 0 });
@@ -455,10 +455,29 @@ export class Game {
     this.smoke.explode(o.x, (o.y || 0) + 0.8, o.z);
     const d = Math.hypot(P.x - o.x, P.z - o.z);
     this.rig.shake(Math.max(0.2, 1.2 - d / 40)); this.audio.at(o.x, o.z, () => { this.audio.crash && this.audio.crash(1); this.audio.boom && this.audio.boom(); });
-    if (P.onFoot && d < 7) { P.downT = 3; if (P.human) P.human.play('knockback', { once: true, fade: 0.06 }); }
+    if (P.onFoot) this.blastHurt(o.x, o.z);
     for (const p of this.people.list) { const dd = Math.hypot(p.x - o.x, p.z - o.z); if (dd < 8 && !p.fixed && !(p.fallen > 0)) p.fallen = 4 + Math.random() * 3; }
     this.wrecks.push({ v: o, t: 0 });
     this.brain && this.brain.incident('blast', o.x, o.z, { byYou: true });
+  }
+  // fire and blasts hurt you: the blast by how close you were (right beside it, most of your health), the flames while
+  // you sit in a burning vehicle or stand in a burning wreck's fire
+  blastHurt(x, z) {
+    const P = this.player, d = Math.hypot(P.x - x, P.z - z);
+    if (d < 10) { P.downT = 3; if (P.human) P.human.play('knockback', { once: true, fade: 0.06 }); this.burnHurt(Math.round(80 * (1 - d / 10) + 15), 'Caught in the blast'); }
+    else if (d < 14) this.burnHurt(8, '');
+  }
+  burnHurt(n, why) {
+    const P = this.player;
+    P.hp = (P.hp ?? 100) - n; this.hud.hurt && this.hud.hurt();
+    if (P.hp <= 0) { P.hp = 0; this.blackout && this.blackout(why || 'Burns'); }
+  }
+  fireTick(dt) {
+    const P = this.player;
+    // in a vehicle that's on fire
+    if (!P.onFoot && P.cur && (P.cur.dmg || 0) >= 0.9 && !P.cur.dead) { this._fireT = (this._fireT || 0) + dt; if (this._fireT > 0.5) { this._fireT = 0; this.burnHurt(4, 'Burnt in a vehicle fire'); this.hud.toast('You’re burning', 'Get out (F)!', 'bad', 0.8); } }
+    // standing in a wreck's flames
+    if (P.onFoot) for (const w of this.wrecks) if (w.t < 25 && Math.hypot(w.v.x - P.x, w.v.z - P.z) < 3) { this._fireT2 = (this._fireT2 || 0) + dt; if (this._fireT2 > 0.5) { this._fireT2 = 0; this.burnHurt(5, 'Burnt'); } break; }
   }
   burnWrecks(dt) {
     for (const w of this.wrecks) {
@@ -1131,6 +1150,7 @@ export class Game {
       }
     }
     if (this.blood) this.blood.update(dt);
+    if (this.state === 'play') this.fireTick(dt);
     if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); if (this.traffic && this.state === 'play') this.trafficDamage(dt); }
     this.stepRefuel(dt);
     if (this.brain && this.state !== 'title') this.brain.update(dt, this.player);
