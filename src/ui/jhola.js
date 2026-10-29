@@ -21,17 +21,17 @@ const KG = { water: 1, tiffin: 0.8, vadapav: 0.25, biscuit: 0.1, banana: 0.6, ch
 const CAP = 12;
 const TABS = [['inv', 'Inventory'], ['map', 'Map'], ['missions', 'Missions'], ['stats', 'Stats'], ['settings', 'Settings']];
 // the kinds along the top of the grid, each with a little picture of one of them
-const CATS = [['all', 'All'], ['food', 'Food', 'vadapav'], ['drink', 'Drinks', 'water'], ['med', 'Medical', 'medkit'], ['tool', 'Tools', 'torch'], ['wear', 'Clothing'], ['keys', 'Keys', 'keys'], ['misc', 'Misc', 'book']];
+// (weapons: none yet, the shelf is ready; hacking gear will go under tools)
+const CATS = [['all', 'All'], ['food', 'Food & drink', 'vadapav'], ['med', 'Medical', 'medkit'], ['tool', 'Tools', 'torch'], ['weap', 'Weapons'], ['wear', 'Clothing'], ['misc', 'Misc', 'keys']];
 const catOf = (id) => {
   const it = ITEMS[id]; if (!it) return 'misc';
   if (it.tool) return 'tool';
   const u = it.use || {};
   if (u.hp && !u.hunger) return 'med';
-  if (u.thirst && !u.hunger) return 'drink';
-  if (u.hunger) return 'food';
+  if (u.hunger || u.thirst || u.energy || u.drunk) return 'food';
   return 'misc';
 };
-const KIND = { food: 'Food', drink: 'Drink', med: 'Medical', tool: 'Utility item', wear: 'Clothing', keys: 'Keys', misc: 'Misc' };
+const KIND = { food: 'Food & drink', med: 'Medical', tool: 'Tool', weap: 'Weapon', wear: 'Clothing', misc: 'Misc' };
 const EFFECT = { hunger: 'Food', thirst: 'Water', energy: 'Energy', mood: 'Mood', hp: 'Health', drunk: 'Drunk' };
 // a garment's kind from its shop entry: what part of you it covers, and how the studio frames it
 function pieceOf(p, shoe) {
@@ -50,9 +50,8 @@ export class Jhola {
     this.renders = new Map(); this.queue = [];
     const el = this.el = document.createElement('div'); el.className = 'iv'; el.hidden = true;
     el.innerHTML = `<div class="iv-dim"></div>
-      <div class="iv-top"><b class="iv-cash"></b><span class="iv-when"></span></div>
       <div class="iv-panel">
-        <nav class="iv-tabs"><kbd>Q</kbd>${TABS.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join('')}<kbd>E</kbd></nav>
+        <nav class="iv-tabs"><div class="iv-tabrow"><span class="kbd">Q</span>${TABS.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join('')}<span class="kbd">E</span></div><span class="iv-when"></span></nav>
         <div class="iv-equip"></div>
         <div class="iv-stage" title="Drag to turn"></div>
         <section class="iv-inv">
@@ -61,6 +60,7 @@ export class Jhola {
           <div class="iv-wt"><span></span><div class="bar"><i></i></div></div>
         </section>
         <aside class="iv-det"></aside>
+        <div class="iv-cond"></div>
         <section class="iv-stats" hidden>
           <div class="iv-vit"><figure class="jl-v hb"><canvas width="360" height="120"></canvas><figcaption>Heart · <span></span></figcaption></figure>
             <figure class="jl-v bo"><canvas width="90" height="180"></canvas><figcaption>Water · <span></span></figcaption></figure>
@@ -68,14 +68,14 @@ export class Jhola {
             <figure class="jl-v tf"><canvas width="120" height="150"></canvas><figcaption>Food · <span></span></figcaption></figure></div>
           <div class="iv-sbars"></div>
         </section>
-        <div class="iv-keys"><span><kbd>Drag</kbd>Quick slot</span><span><kbd>F</kbd>Use</span><span><kbd>R</kbd>Drop</span><span><kbd>Esc</kbd>Back</span></div>
+        <div class="iv-keys"><span><span class="kbd">Drag</span>Quick slot</span><span><span class="kbd">F</span>Use</span><span><span class="kbd">R</span>Drop</span><span><span class="kbd">Esc</span>Back</span></div>
       </div>
       <div class="iv-ctx" hidden></div>
       <div class="iv-insp" hidden></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     // the quick bar lives on the HUD (you use it while you play); the inventory shows it too, to drop things on
     const qb = this.qb = document.createElement('div'); qb.className = 'iv-qb';
-    qb.innerHTML = [1, 2, 3, 4, 5].map(k => `<div class="iv-q" data-q="${k - 1}"><kbd>${k}</kbd><img alt="" hidden><b></b></div>`).join('');
+    qb.innerHTML = [1, 2, 3, 4, 5].map(k => `<div class="iv-q" data-q="${k - 1}"><span class="kbd">${k}</span><img alt="" hidden><b></b></div>`).join('');
     (document.getElementById('hud') || document.body).appendChild(qb);
     this.paintQuick();
 
@@ -156,7 +156,7 @@ export class Jhola {
     out.push({ k: 'phone', cat: 'tool', name: smart ? 'Smartphone' : 'Nokia keypad phone', kind: 'Utility item', kg: smart ? 0.2 : 0.09, img: itemArt(smart ? 'phone' : 'keypad', 256),
       desc: smart ? 'Your phone. Calls, texts, maps, Zwiggy, the camera.' : 'The brick. Texts, calls, contacts and Snake. It has survived three falls off the auto.', use: 'Open', fixed: true });
     const nv = (s.vehicles || []).length;
-    out.push({ k: 'keys', cat: 'keys', name: 'Keys', kind: 'Keys', kg: 0.08 + nv * 0.04, img: itemArt('keys', 256), n: nv + 1,
+    out.push({ k: 'keys', cat: 'misc', name: 'Keys', kind: 'Keys', kg: 0.08 + nv * 0.04, img: itemArt('keys', 256), n: nv + 1,
       desc: `Your auto${nv ? ` and ${nv} more vehicle${nv > 1 ? 's' : ''}` : ''}, and the house key on the same ring.`, use: 'Show vehicles', fixed: true });
     for (const id of bagOrder(G)) {
       const it = ITEMS[id], u = it.use || {}, on = it.tool && G.lights && G.lights.torchOn;
@@ -278,12 +278,12 @@ export class Jhola {
   paint() {
     const G = this.g, s = G.life.s, el = this.el, P = G.player;
     const hh = Math.floor(G.hour || 0), mm = String(Math.floor(((G.hour || 0) % 1) * 60)).padStart(2, '0'), day = Math.floor((G.clock || 0) / 24);
-    el.querySelector('.iv-cash').textContent = fmt(G.stats.money);
-    el.querySelector('.iv-when').textContent = `${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][day % 7]}, Day ${day + 1}  ${String(hh).padStart(2, '0')}:${mm}`;
+    el.querySelector('.iv-when').innerHTML = `<span class="cap">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][day % 7]} · Day ${day + 1}</span><b class="num">${String(hh).padStart(2, '0')}:${mm}</b>`;
+    this.paintCond();
     for (const b of el.querySelectorAll('[data-tab]')) b.classList.toggle('on', b.dataset.tab === this.tab);
     const stats = this.tab === 'stats';
     el.querySelector('.iv-inv').hidden = stats; el.querySelector('.iv-det').hidden = stats; el.querySelector('.iv-stats').hidden = !stats;
-    el.querySelector('.iv-keys').hidden = stats;
+    el.querySelector('.iv-keys').hidden = stats; el.querySelector('.iv-cond').hidden = stats;
     // what you're wearing
     const L = P.look || {};
     const eq = [['head', 'Head', L.hat], ['face', 'Face', L.glasses || L.shades], ['torso', 'Torso', 1], ['legs', 'Legs', !(L.cut && L.cut.w === 2)], ['feet', 'Feet', 1], ['back', 'Back', 1]];
@@ -322,14 +322,14 @@ export class Jhola {
   }
   paintDet() {
     const D = this.el.querySelector('.iv-det'), e = this.entry(this.sel);
-    if (!e) { D.innerHTML = `<p class="iv-none">Nothing here.<br><small>A kirana sells water, Parle-G and bananas; any eatery will pack you a parcel.</small></p>`; return; }
+    if (!e) { D.innerHTML = this.cat === 'weap' ? `<p class="iv-none">No weapons.<br><small>Nothing to carry here yet.</small></p>` : `<p class="iv-none">Nothing here.<br><small>A kirana sells water, Parle-G and bananas; any eatery will pack you a parcel.</small></p>`; return; }
     const noUse = e.use === 'Wearing', noDrop = e.fixed || e.cat === 'wear';
     D.innerHTML = `<header><div><h3>${esc(e.name)}</h3><p>${esc(e.kind)}</p></div><small>${e.kg < 1 ? Math.round(e.kg * 1000) + ' g' : e.kg.toFixed(1) + ' kg'}</small></header>
       <div class="iv-big"><img alt="" data-r="${esc(e.k)}" ${e.img ? `src="${e.img}"` : 'hidden'}></div>
       ${e.n > 1 ? `<p class="iv-cnt">× ${e.n} in your jhola</p>` : ''}
       <p class="iv-desc">${esc(e.desc)}</p>
       ${e.effects && e.effects.length ? `<div class="iv-fx">${e.effects.map(f => `<span>${esc(f)}</span>`).join('')}</div>` : ''}
-      <div class="iv-acts"><button class="iv-btn use" data-do="use" ${noUse ? 'disabled' : ''}><kbd>F</kbd>${esc(e.use)}</button><button class="iv-btn" data-do="drop" ${noDrop ? 'disabled' : ''}><kbd>R</kbd>Drop</button></div>`;
+      <div class="iv-acts"><button class="st-opt iv-btn use" data-do="use" ${noUse ? 'disabled' : ''}><span class="kbd">F</span><span class="o-t">${esc(e.use)}</span></button><button class="st-opt iv-btn" data-do="drop" ${noDrop ? 'disabled' : ''}><span class="kbd">R</span><span class="o-t">Drop</span></button></div>`;
   }
   paintStats() {
     const G = this.g, s = G.life.s, P = G.player, L = G.life;
@@ -337,6 +337,18 @@ export class Jhola {
     const T = s.tally || {};
     this.el.querySelector('.iv-sbars').innerHTML = `${bar('Mood', s.mood)}${bar('Stamina', P.stam ?? 1)}${bar('Respect', s.respect || 0, 'People laugh at you', 'People know you', true)}${bar('Karma', s.karma || 0, 'People cross the road', 'Aajis bless you', true)}
       <dl>${[['Fitness', `+${Math.round(s.fitness || 0)} health`], ['Health', `${Math.round(P.hp ?? 100)} / ${L.hpMax}`], ['Rides', G.stats.rides || 0], ['Deliveries', T.deliveries || 0], ['Fights won', T.fightsWon || 0], ['Strays fed', T.fed || 0], ['Bank', fmt(s.bank || 0)]].map(([a, b]) => `<dt>${a}</dt><dd>${esc(b)}</dd>`).join('')}</dl>`;
+  }
+  // how you are, at a glance, under your feet: the body, then how Pune sees you
+  paintCond() {
+    const G = this.g, s = G.life.s, P = G.player, L = G.life, el = this.el.querySelector('.iv-cond'); if (!el) return;
+    const bar = (n, v, txt) => { const f = Math.max(0, Math.min(1, v)); return `<div class="ic-b${f < 0.2 ? ' low' : ''}"><small>${n}</small><i><b style="width:${Math.round(f * 100)}%"></b></i><span>${txt ?? Math.round(f * 100) + '%'}</span></div>`; };
+    const lean = (n, v, lo, hi) => `<div class="ic-l"><small>${n}</small><i><b style="left:${50 + Math.max(-50, Math.min(50, v / 2))}%"></b></i><span>${v > 25 ? hi : v < -15 ? lo : 'Nobody special'}</span></div>`;
+    let st = null; try { st = L.style && L.style(); } catch (e) { /* not here */ }
+    el.innerHTML = `<div class="ic-h"><span class="st-who">Condition</span></div>
+      ${bar('Health', (P.hp ?? 100) / L.hpMax, `${Math.round(P.hp ?? 100)}`)}${bar('Food', s.hunger)}${bar('Water', s.thirst)}${bar('Energy', s.energy)}${bar('Stamina', P.stam ?? 1)}${bar('Mood', s.mood)}
+      <div class="ic-h"><span class="st-who">Standing</span></div>
+      ${lean('Respect', s.respect || 0, 'Laughed at', 'Known')}${lean('Karma', s.karma || 0, 'Avoided', 'Blessed')}
+      <div class="ic-chips"><span><small>Style here</small>${st ? (st.odd ? 'Bold' : st.score > 0.85 ? 'Spot on' : st.score > 0.65 ? 'Fine' : 'Off') : '–'}</span><span><small>Fitness</small>+${Math.round(s.fitness || 0)}</span>${s.drunk > 0.15 ? `<span><small>Drink</small>${s.drunk > 0.6 ? 'Drunk' : 'Tipsy'}</span>` : ''}</div>`;
   }
   select(k) { this.sel = k; for (const b of this.el.querySelectorAll('.iv-slot[data-k]')) b.classList.toggle('sel', b.dataset.k === k); this.paintDet(); }
 
@@ -457,6 +469,7 @@ export class Jhola {
       if (Math.abs(c.fov - fov) > 0.1) { c.fov += (fov - c.fov) * k; c.updateProjectionMatrix(); }
       if (P.human) { P.human.holder.visible = true; P.human.mixer.update(dt); }
     }
+    if ((this._ct = (this._ct || 0) - dt) <= 0) { this._ct = 0.5; this.paintCond(); }
     if (this.tab === 'stats' && (this._vt = (this._vt || 0) - dt) <= 0) { this._vt = 1 / 30; this.vitals(); }
   }
   // a photo from assets/items, once it has loaded (null until then, and the painted one draws)
