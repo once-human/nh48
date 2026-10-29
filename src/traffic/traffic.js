@@ -162,7 +162,7 @@ export class Traffic {
       ignore: null, ignoreT: 0, fallen: 0, alive: true, redRunner: this.rng.chance(T.two ? 0.12 : 0.03), id: Math.floor(this.rng.next() * 1e9),
       col: null, colB: null, colC: null, angry: 0, prevV: 0,
     });
-    v.latT = v.lat;
+    v.latT = v.lat; v.dwell = 0; v.stopAt = null; v.lastStop = null;
     v.v = SPEED_BY_RANK[r.l.e.rank] * v.vMul * this.rng.range(0.3, 0.8);
     // colours
     const P = PAINTS;
@@ -382,6 +382,23 @@ export class Traffic {
     return best;
   }
 
+  busStop(v, vDes, dt) {
+    if (v.dwell > 0) { v.dwell -= dt; return 0; }
+    if ((v.bsT = (v.bsT || 0) - dt) <= 0) {
+      v.bsT = 0.5; v.stopAt = null;
+      const I = this.W.index, ci = I ? I.chunkOf(v.x, v.z) : -1, C = ci >= 0 ? I.chunks[ci] : null, L = C && C.buses;
+      if (L) for (const b of L) {
+        if (b === v.lastStop) continue;
+        const sx = b[0] / 100, sz = b[1] / 100, dx = sx - v.x, dz = sz - v.z, ah = dx * v.hx + dz * v.hz, sd = dx * v.hz - dz * v.hx;
+        if (ah > 1 && ah < 40 && sd > -1 && sd < 9) { v.stopAt = { b, sx, sz }; break; }
+      }
+    }
+    const S = v.stopAt; if (!S) return vDes;
+    v.latT = latBounds(v.l)[1];
+    const ah = (S.sx - v.x) * v.hx + (S.sz - v.z) * v.hz;
+    if (ah < 2) { v.dwell = 7 + this.rng.next() * 9; v.lastStop = S.b; v.stopAt = null; return 0; }
+    return Math.min(vDes, 1.2 + ah * 0.35);
+  }
   step(v, dt) {
     const T = v.T;
     if (v.wreck) { v.v = 0; v.rich = false; return; }                 // a burnt shell: just an obstacle now
@@ -401,6 +418,11 @@ export class Traffic {
         if (remain < 25) vDes = Math.min(vDes, lerp(turnV, vDes, clamp((remain - 6) / 19, 0, 1)));
       }
     } else if (Math.abs(v.jc.turn) > 0.5) vDes = Math.min(vDes, 3.5 + (1 - Math.min(1, Math.abs(v.jc.turn) / 1.6)) * 5);
+    // rubberneckers: everyone crawls past a crash, a fight, someone down in the road, to have a good look
+    const gk = this.gawk;
+    if (gk && gk.length) for (let i = 0; i < gk.length; i++) { const dx = gk[i].x - v.x, dz = gk[i].z - v.z, d2 = dx * dx + dz * dz; if (d2 < 900) vDes = Math.min(vDes, 2.4 + Math.sqrt(d2) * 0.12); }
+    // buses pull in to the kerb at their stops and sit there a while (and the traffic behind goes round)
+    if (v.type === 'bus' && !v.jc) vDes = this.busStop(v, vDes, dt);
     // --- obstacles
     const look = 7 + v.v * 2.4;
     const ob = this.scan(v, 0, look);

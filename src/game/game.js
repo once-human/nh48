@@ -1254,6 +1254,12 @@ export class Game {
     if (this.blood) this.blood.update(dt);
     if (this.state === 'play') this.fireTick(dt);
     if (this.puddles) this.puddles.update(dt);
+    // where the traffic slows to gawk: the last minute's crashes, fights and people down in the road
+    if ((this._gawkT = (this._gawkT || 0) - dt) <= 0 && this.brain && this.traffic) {
+      this._gawkT = 1; const L = [];
+      for (const I of this.brain.inc) if (I.t < 60 && (I.kind === 'down' || I.kind === 'crash' || I.kind === 'blast' || I.kind === 'fight')) L.push({ x: I.x, z: I.z });
+      this.traffic.gawk = L.slice(-6);
+    }
     if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); if (this.traffic && this.state === 'play') this.trafficDamage(dt); }
     this.stepRefuel(dt);
     if (this.brain && this.state !== 'title') this.brain.update(dt, this.player);
