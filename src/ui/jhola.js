@@ -382,6 +382,7 @@ export class Jhola {
     this.paintQuick(); if (this.on) this.paint();
   }
   paintQuick() {
+    if (!this.g.life || !this.g.player) return;     // (built before the save is loaded; drawn on the first frame)
     const q = this.g.life.s.quick || [], all = this._all || this.entries();
     let any = false;
     [...this.qb.children].forEach((d, i) => {
@@ -432,6 +433,7 @@ export class Jhola {
   // ------------------------------------------------------------------ every frame (from game.frame)
   update(dt) {
     const G = this.g;
+    if (!G.life || !G.player) return;
     { const pl = G.state === 'play' && !(G.cut && G.cut.on) && !(G.phone && G.phone.on); if (pl !== this._pl) { this._pl = pl; this.qb.classList.toggle('play', pl); } }
     if (!this.on) {
       // the quick bar keeps up with what you buy and eat
