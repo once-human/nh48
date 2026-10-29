@@ -1039,7 +1039,7 @@ export class Game {
     // audio parameters at a steady 30 / 20 a second (scheduling them every frame clogged the audio thread)
     this._aT = (this._aT || 0) + dt; this._eT = (this._eT || 0) + dt;
     if (this.audio && this.audio.listen && this._aT > 1 / 30) { this._aT = 0; this.audio.listen(this.camera); }
-    if (this.audio && this.audio.engines && this._eT > 0.05 && this.state === 'play' && this.traffic) { this._eT = 0; this.audio.engines(this.traffic.list, this.camera.position.x, this.camera.position.z); }
+    if (this.audio && this.audio.engines && this._eT > 0.12 && this.state === 'play' && this.traffic) { this._eT = 0; this.audio.engines(this.traffic.list, this.camera.position.x, this.camera.position.z); }
     // a dark base under the whole city: any hairline crack between ground pieces shows asphalt, not the bright sky
     if (!this.under) { this.under = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshLambertMaterial({ color: 0x2b2b2d })); this.under.rotation.x = -Math.PI / 2; this.under.receiveShadow = false; this.scene.add(this.under); }
     this.under.position.set(Math.round(this.camera.position.x / 50) * 50, -0.03, Math.round(this.camera.position.z / 50) * 50);

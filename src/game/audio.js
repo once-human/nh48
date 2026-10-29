@@ -86,7 +86,9 @@ export class Audio {
   at(x, z, fn, y = 1.2) { const was = this._at; this._at = { x, y, z }; try { return fn(); } finally { this._at = was; } }
   panner(pos, ref = 6) {
     const ctx = this.ctx, pn = ctx.createPanner();
-    pn.panningModel = 'equalpower'; pn.distanceModel = 'inverse';      // cheap on the audio thread (HRTF on every sound made it stutter) pn.refDistance = ref; pn.rolloffFactor = 1.15; pn.maxDistance = 400;
+    // equalpower is cheap on the audio thread (HRTF on every sound made it stutter); people's voices get HRTF, there's only ever one
+    pn.panningModel = this._hrtf ? 'HRTF' : 'equalpower'; pn.distanceModel = 'inverse';
+    pn.refDistance = ref; pn.rolloffFactor = 1.15; pn.maxDistance = 400;
     if (pn.positionX) { pn.positionX.value = pos.x; pn.positionY.value = pos.y; pn.positionZ.value = pos.z; } else pn.setPosition(pos.x, pos.y, pos.z);
     return pn;
   }
@@ -192,7 +194,8 @@ export class Audio {
     }
     this.keepVoice(name);
     if (this.curVoice) { try { this.curVoice.g.gain.setTargetAtTime(0, now, 0.04); this.curVoice.src.stop(now + 0.15); } catch (e) { /* already stopped */ } }
-    const v = this.play('v_' + id, { vol: 0.95 * vol, pan, filter: radio ? { type: 'bandpass', f: 1500, q: 0.9 } : undefined });
+    this._hrtf = true;
+    let v; try { v = this.play('v_' + id, { vol: 0.95 * vol, pan, filter: radio ? { type: 'bandpass', f: 1500, q: 0.9 } : undefined }); } finally { this._hrtf = false; }
     if (!v) return false;
     this.curVoice = v; this.voicePri = pri; this.voiceEnd = now + v.src.buffer.duration;
     this.duck(radio ? 0.75 : 0.55, Math.min(4, v.src.buffer.duration + 0.3));
@@ -448,29 +451,31 @@ export class Audio {
     const ctx = this.ctx, t = ctx.currentTime;
     if (!this.teng) {
       this.teng = [];
-      for (let i = 0; i < 6; i++) {
+      // three voices, one oscillator each: the ambient loop carries the rest of the traffic
+      for (let i = 0; i < 3; i++) {
         const o = ctx.createOscillator(); o.type = 'sawtooth';
-        const o2 = ctx.createOscillator(); o2.type = 'square';
-        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600; lp.Q.value = 1.2;
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600; lp.Q.value = 0.9;
         const g = ctx.createGain(); g.gain.value = 0;
-        const m2 = ctx.createGain(); m2.gain.value = 0.3;
         const pn = this.panner({ x: 0, y: 0.8, z: 0 }, 5);
-        o.connect(lp); o2.connect(m2).connect(lp); lp.connect(g); g.connect(pn).connect(this.bus('traffic'));
-        o.start(); o2.start();
-        this.teng.push({ o, o2, lp, g, pn, v: null });
+        o.connect(lp); lp.connect(g); g.connect(pn).connect(this.bus('traffic'));
+        o.start();
+        this.teng.push({ o, lp, g, pn, v: null, f: 0, on: true });
       }
     }
-    const near = list.filter(v => Math.abs(v.x - lx) < 70 && Math.abs(v.z - lz) < 70).sort((a, b) => ((a.x - lx) ** 2 + (a.z - lz) ** 2) - ((b.x - lx) ** 2 + (b.z - lz) ** 2)).slice(0, 6);
+    const near = [];
+    for (const v of list) { const q = (v.x - lx) ** 2 + (v.z - lz) ** 2; if (q > 2500) continue; near.push([q, v]); }
+    near.sort((a, b) => a[0] - b[0]);
     this.teng.forEach((E, i) => {
-      const v = near[i];
-      if (!v) { E.g.gain.setTargetAtTime(0, t, 0.2); return; }
+      const v = near[i] && near[i][1];
+      if (!v) { if (E.on) { E.on = false; E.g.gain.setTargetAtTime(0, t, 0.2); } return; }
+      E.on = true;
       const ty = v.type || '', sp = Math.abs(v.v || 0);
       const base = /^(scooter|bike)/.test(ty) ? 55 : /^auto/.test(ty) ? 30 : /bus|tempo/.test(ty) ? 24 : 34;
       const f = base * (1 + sp / (/^(scooter|bike)/.test(ty) ? 9 : 14));
-      E.o.frequency.setTargetAtTime(f, t, 0.08); E.o2.frequency.setTargetAtTime(f * (/^auto/.test(ty) ? 0.5 : 1.01), t, 0.08);
-      E.lp.frequency.setTargetAtTime(/bus|tempo/.test(ty) ? 380 : /^(scooter|bike)/.test(ty) ? 1100 : 700, t, 0.2);
+      if (Math.abs(f - E.f) > 1) { E.f = f; E.o.frequency.setTargetAtTime(f, t, 0.1); }
+      if (E.v !== v) { E.v = v; E.lp.frequency.setTargetAtTime(/bus|tempo/.test(ty) ? 380 : /^(scooter|bike)/.test(ty) ? 1000 : 650, t, 0.2); }
       E.g.gain.setTargetAtTime((/bus|tempo/.test(ty) ? 0.16 : 0.1) * (0.4 + Math.min(1, sp / 10) * 0.6), t, 0.15);
-      if (E.pn.positionX) { E.pn.positionX.setTargetAtTime(v.x, t, 0.05); E.pn.positionY.setTargetAtTime(0.8, t, 0.05); E.pn.positionZ.setTargetAtTime(v.z, t, 0.05); } else E.pn.setPosition(v.x, 0.8, v.z);
+      if (E.pn.positionX) { E.pn.positionX.setTargetAtTime(v.x, t, 0.08); E.pn.positionZ.setTargetAtTime(v.z, t, 0.08); } else E.pn.setPosition(v.x, 0.8, v.z);
     });
   }
   // a small bird in a tree near you: a few quick rising trills (bulbuls, sparrows, the koel in summer)

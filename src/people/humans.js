@@ -312,6 +312,8 @@ export class HumanKit {
       cl.tracks = cl.tracks.filter(t => !t.name.endsWith('.scale'));
       // root-motion clips: the game moves the body itself
       if (['climb', 'roll', 'hook', 'cross', 'punch', 'block'].includes(cl.name)) cl.tracks = cl.tracks.filter(t => t.name !== 'root.position');
+      // the wave clip stoops (hips back, head down): keep only the arms and head, the body stays upright on whatever's under it
+      if (cl.name === 'wave') cl.tracks = cl.tracks.filter(t => /clavicle|arm|hand|index|middle|pinky|ring|thumb|neck|head/i.test(t.name) && !/position/.test(t.name));
       this.clips[cl.name] = cl;
     }
     this.bindM = {}; this.maps = {}; this.hairMat = {}; this.eyeMat = {};

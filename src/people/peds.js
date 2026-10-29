@@ -761,7 +761,7 @@ export class People {
           p.persona = this.rng.pick(p.female ? ['kpgirl', 'kpgirl', 'collegegirl'] : ['kpguy', 'kpguy', 'collegeboy']);
           p.anchor = { x, z, fx: gx, fz: gz }; p.x = x; p.z = z; p.venue = d; p.clubber = true;
           p.wait = this.rng.range(60, 240);
-          p.idle = this.rng.pick(['talk', 'talk', 'talk', 'phone', 'drink', 'idle', 'arms_folded', 'dance']);
+          p.idle = this.rng.pick(['talk', 'talk', 'talk', 'phone', 'idle', 'arms_folded', 'dance']);
           d.clubCrowd = (d.clubCrowd || 0) + 1;
         }
         return;                       // one group per tick
@@ -1007,7 +1007,7 @@ export class People {
         const p = this.make(near.e, near.s, near.side || 1, { mode: 'stand' });
         p.anchor = { x: sx, z: sz, fx: x, fz: z }; p.x = sx; p.z = sz;
         p.wait = this.rng.range(50, 160);
-        p.idle = this.rng.pick(['drink', 'drink', 'talk', 'phone', 'idle']);
+        p.idle = this.rng.pick(['talk', 'talk', 'phone', 'idle', 'arms_folded']);
       }
     }
   }

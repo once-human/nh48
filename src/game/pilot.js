@@ -301,7 +301,9 @@ export class Pilot {
       if (dist < (a.cow ? 2.2 : 1.5)) consider(dist + 0.3, { kind: 'pet', a, label: a.cow ? 'Touch the cow for luck' : a.kind === 'cat' ? 'Pet the cat' : 'Pet the dog', key: 'F' });
     }
     // parked vehicles
-    if (!this.parkGrid) this.buildParkGrid();
+    // tiles stream in and out, so rebuild whenever the list has changed
+    const PL = this.W.parkedList || [];
+    if (!this.parkGrid || this.parkSrc !== PL || this.parkN !== PL.length) { this.buildParkGrid(); this.parkSrc = PL; this.parkN = PL.length; }
     const i0 = Math.floor(F.x / 20), j0 = Math.floor(F.z / 20);
     for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) {
       const l = this.parkGrid.get(i + ',' + j);

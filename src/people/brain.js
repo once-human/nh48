@@ -57,7 +57,7 @@ export class Brain {
         const p = ppl.spawnAt(look, x, z, male ? (shop ? (R() < 0.5 ? 'kaka' : 'bhaiya') : 'kaka') : 'kaku');
         if (!p) continue;
         p.mode = 'stand'; p.fixed = true; p.anchor = { x, z, fx: x + d.nx * 4, fz: z + d.nz * 4 }; p.wait = 1e9; p.anim = null;
-        p.idle = shop ? ['arms_folded', 'phone', 'idle', 'talk'][Math.floor(R() * 4)] : 'sit';
+        p.idle = shop ? ['arms_folded', 'phone', 'idle', 'talk'][Math.floor(R() * 4)] : 'arms_folded';
         d.keeper = p; this.keepers.push({ p, d, kind: shop ? 'shop' : 'watch' });
       }
     }
@@ -194,7 +194,7 @@ export class Brain {
     let best = null, bd = 25 * 25;
     for (const b of B) { const x = b[0] / 100, z = b[1] / 100, d = (x - p.x) ** 2 + (z - p.z) ** 2; if (d < bd) { bd = d; best = { x, z }; } }
     if (!best) return;
-    this.ppl.goTo(p, best.x + (R() - 0.5) * 1.2, best.z + (R() - 0.5) * 0.6, (q) => { this.watch(q, q.x + Math.cos(q.yaw), q.z + Math.sin(q.yaw), 20 + R() * 40, 'sit_talk'); });
+    this.ppl.goTo(p, best.x + (R() - 0.5) * 1.2, best.z + (R() - 0.5) * 0.6, (q) => { this.watch(q, q.x + Math.cos(q.yaw), q.z + Math.sin(q.yaw), 20 + R() * 40, R() < 0.5 ? 'phone' : 'idle'); });
     p.busy = 70;
   }
 }
