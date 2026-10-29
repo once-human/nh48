@@ -639,7 +639,14 @@ export class HUD {
     const mmStep = { lite: 1 / 20, low: 1 / 30, med: 1 / 30 }[g.qualityName] || 0;
     if ((this._mmAcc = (this._mmAcc || 0) + dt) >= mmStep) { this._mmAcc = 0; this.drawMinimap(dt); }
     if (!this.mapScreen.hidden) this.mapScreen.draw(dt);
-    else g.city.pump(0.7);
+    else this.schedPump(g.city);
+  }
+  // the map's tiles are drawn in the browser's spare time between frames (one at a time if there's none),
+  // never inside a frame: drawing one costs a few ms, every frame, while the map prefetches
+  schedPump(city) {
+    if (this._pumpQ || !city || !city.queue || !city.queue.length) return;
+    const run = (d) => { this._pumpQ = null; const left = d && d.timeRemaining ? d.timeRemaining() : 2; city.pump(Math.max(0.5, Math.min(8, left - 1))); };
+    this._pumpQ = window.requestIdleCallback ? requestIdleCallback(run, { timeout: 400 }) : setTimeout(run, 150);
   }
 
   // the first minute: a card over a blurred city, then out of your way
