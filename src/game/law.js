@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import FAMOUS from '../world/famous.json';
 import { fmtRupees } from '../core/util.js';
 import { playerName } from '../people/characters.js';
+import { Studio } from './studio.js';
 
 const hex = (c) => c ? '#' + c.getHexString() : '';
 const NAMES = { scooter: 'scooter', scooterP: 'scooter', bike: 'motorcycle', bikeP: 'motorcycle', auto: 'auto', hatch: 'hatchback', sedan: 'sedan', suv: 'SUV', taxi: 'taxi', tempo: 'tempo', bus: 'bus', cycle: 'cycle' };
@@ -212,44 +213,19 @@ export class Law {
   // a real mugshot: you, as you are right now, from the front, against the station's height chart
   mugshot() {
     // taken at the chowki, not in the street: you as you were brought in (your face, your hair, the clothes you were
-    // wearing, the helmet off), square to the camera against the station's plain wall, under flat light. A copy of
-    // you is posed in a little studio of its own and drawn once, off-screen
-    const G = this.g, P = G.player, R = G.renderer, kit = P.kit, look = P.look || (P.human && P.human.look);
-    if (!kit || !look) return null;
-    let H = null, rt = null;
-    const W = 240, Hh = 300;
+    // wearing, the helmet off), square to the camera against the station's plain wall, under flat light
+    const G = this.g, P = G.player, look = P.look || (P.human && P.human.look);
+    if (!look) return null;
+    let st = null;
     try {
-      H = kit.create({ ...look, acc: null, hat: false, helmet: false });
-      const sc = new THREE.Scene(); sc.background = new THREE.Color(0.6, 0.58, 0.54);
-      sc.add(new THREE.HemisphereLight(0xffffff, 0x7a746c, 1.5));
-      const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(0.5, 2.4, 3); sc.add(key);
-      const fill = new THREE.DirectionalLight(0xffffff, 0.45); fill.position.set(-2, 1.4, 2); sc.add(fill);
-      H.holder.rotation.y = -Math.PI / 2;                      // facing the camera (+z)
-      sc.add(H.holder);
-      H.play('idle', { fade: 0 }); H.mixer.update(0.05);
-      sc.updateMatrixWorld(true);
-      const hd = H.root.getObjectByName('Head'), hp = new THREE.Vector3(0, 1.55 * (look.scale || 1), 0); if (hd) hd.getWorldPosition(hp);
-      const cam = new THREE.PerspectiveCamera(26, W / Hh, 0.1, 20);
-      cam.position.set(hp.x, hp.y - 0.05, hp.z + 1.6); cam.lookAt(hp.x, hp.y - 0.17, hp.z); cam.updateMatrixWorld();
-      // tone-mapped and colour-encoded exactly as on the screen (an XR-flagged target), stored as plain bytes
-      rt = new THREE.WebGLRenderTarget(W, Hh, { samples: 4 });
-      rt.isXRRenderTarget = true; rt.texture.colorSpace = THREE.SRGBColorSpace; rt.texture.internalFormat = 'RGBA8';
-      const prev = R.getRenderTarget(), ex = R.toneMappingExposure;
-      R.toneMappingExposure = 1; R.setRenderTarget(rt); R.render(sc, cam); R.setRenderTarget(prev); R.toneMappingExposure = ex;
-      const buf = new Uint8Array(W * Hh * 4); R.readRenderTargetPixels(rt, 0, 0, W, Hh, buf);
-      const c = document.createElement('canvas'); c.width = W; c.height = Hh; const x = c.getContext('2d');
-      const img = x.createImageData(W, Hh), D = img.data;
-      for (let y = 0; y < Hh; y++) { D.set(buf.subarray((Hh - 1 - y) * W * 4, (Hh - y) * W * 4), y * W * 4); }     // (rows come bottom-up)
-      for (let i = 3; i < D.length; i += 4) D[i] = 255;
-      x.putImageData(img, 0, 0);
+      st = new Studio(G, 240, 300, { bg: 0xc9c4ba, floor: false, rim: 0.25, hemi: 1.4 });
+      st.dress(look);
+      const c = st.shoot('head'), x = c.getContext('2d');
       // the height chart on the wall behind
       x.strokeStyle = 'rgba(30, 30, 30, .5)'; x.fillStyle = 'rgba(30, 30, 30, .7)'; x.font = '9px monospace';
       for (let i = 0; i < 12; i++) { const y = 18 + i * 22; x.beginPath(); x.moveTo(0, y); x.lineTo(i % 2 ? 10 : 18, y); x.moveTo(240, y); x.lineTo(i % 2 ? 230 : 222, y); x.stroke(); if (!(i % 2)) x.fillText(String(190 - i * 5), 20, y + 3); }
       return c.toDataURL('image/jpeg', 0.88);
-    } catch (e) { return null; } finally {
-      if (H) { if (H.holder.parent) H.holder.parent.remove(H.holder); H.dispose(); }
-      if (rt) rt.dispose();
-    }
+    } catch (e) { return null; } finally { if (st) st.dispose(); }
   }
   booking(o) {
     const G = this.g, el = document.createElement('div'), shot = this.mugshot();

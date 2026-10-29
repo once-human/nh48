@@ -12,8 +12,10 @@ import { refreshChips } from './keys.js';
 import { guideHTML } from './guide.js';
 import { BUSINESSES as BIZ } from './hustle.js';
 import { levelOf, ASKS } from './date.js';
+import { itemArt } from '../ui/itemArt.js';
+import { Studio } from './studio.js';
 
-const TABS = [['bag', 'Bag', 'झोळी', 'jhola'], ['me', 'Me', 'मी', 'person'], ['wear', 'Wardrobe', 'कपडे', 'shirt'], ['own', 'Owned', 'माझं', 'key'], ['near', 'Nearby', 'जवळ', 'compass'], ['guide', 'Guide', 'माहिती', 'guide']];
+const TABS = [['bag', 'Inventory', 'झोळी', 'jhola'], ['me', 'Character', 'मी', 'person'], ['story', 'Missions', 'कथा', 'pin'], ['ppl', 'Phone', 'फोन', 'phone'], ['own', 'Owned', 'माझं', 'key'], ['near', 'Nearby', 'जवळ', 'compass'], ['guide', 'Guide', 'माहिती', 'guide']];
 const GROUPS = [['food', 'Food'], ['night', 'Night'], ['look', 'Look'], ['health', 'Health'], ['money', 'Money'], ['things', 'Shops'], ['vehicle', 'Vehicles'], ['place', 'Places'], ['homes', 'Homes for sale']];
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -30,15 +32,21 @@ export class Bag {
   constructor(G) {
     this.g = G; this.tab = 'bag'; this.group = 'food';
     const el = document.createElement('div');
-    el.className = 'jhola'; el.hidden = true;
+    el.className = 'jhola gm'; el.hidden = true;
     el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Backpack');
     el.innerHTML = `<div class="jh-top"><div class="jh-title"><i class="jh-badge">${icon('jhola')}</i><b>Jhola</b><span lang="mr">झोळी</span></div><div class="jh-money"></div></div>
       <div class="jh-tabs" role="tablist">${TABS.map(([k, l, m, ic]) => `<button role="tab" data-t="${k}">${icon(ic)}<b>${l}</b><span lang="mr">${m}</span></button>`).join('')}</div>
       <div class="jh-body"></div><div class="jh-msg" aria-live="polite"></div>
-      <div class="jh-foot"><span><span class="kbd">A</span><span class="kbd">D</span> tabs · <span class="kbd">↑↓</span> <span class="kbd">Enter</span> use</span><span><span class="kbd" data-k="E">E</span> close · <span class="kbd" data-k="Tab">Tab</span> me</span></div>`;
+      <div class="jh-foot"><span><span class="kbd">A</span><span class="kbd">D</span> switch · <span class="kbd">↑↓</span> <span class="kbd">Enter</span> use · drag your character to turn them</span><span><span class="kbd" data-k="E">E</span> close · <span class="kbd" data-k="Tab">Tab</span> character</span></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
     this.nav = new KbNav(el.querySelector('.jh-body'), '.jh-item, .jh-row[data-act], .jh-chips.sel button, .gd-sec > summary');
+    el.addEventListener('pointerover', (e) => { const it = e.target.closest('.jh-item[data-arg]'); if (it && this.tab === 'bag' && it.dataset.arg !== this.sel) { this.sel = it.dataset.arg; this.detail(); } });
+    // drag your character round on the character screen
+    let dg = null;
+    el.addEventListener('pointerdown', (e) => { if (e.target.closest('.gm-portrait')) { dg = e.clientX; e.preventDefault(); } });
+    addEventListener('pointermove', (e) => { if (dg === null || !this.studio) return; this.studio.yaw += (e.clientX - dg) * 0.012; dg = e.clientX; this.studio.shoot('full'); });
+    addEventListener('pointerup', () => { dg = null; });
     el.addEventListener('click', (e) => {
       const t = e.target.closest('[data-t]'); if (t) { this.tab = t.dataset.t; this.msg(''); this.render(); return; }
       const g = e.target.closest('[data-g]'); if (g) { this.group = g.dataset.g; this.render(); return; }
@@ -67,7 +75,7 @@ export class Bag {
     this.el.classList.remove('in'); void this.el.offsetWidth; this.el.classList.add('in');
     G.releaseMouse?.();          // the jhola and status are pointer menus
   }
-  close() { this.open = false; this.el.hidden = true; if (this.g.state === 'shop') this.g.state = 'play'; this.life.save(); this.g.lockMouse?.(); }
+  close() { if (this.studio) { this.studio.dispose(); this.studio = null; } this.open = false; this.el.hidden = true; if (this.g.state === 'shop') this.g.state = 'play'; this.life.save(); this.g.lockMouse?.(); }
   msg(t, good) { const m = this.el.querySelector('.jh-msg'); m.textContent = t || ''; m.classList.toggle('good', !!good); }
   row(ic, label, note, right, act, arg, cls = '') {
     const lead = act === 'contact' ? `<span class="av">${esc(String(label).charAt(0))}</span>` : icon(ic);
@@ -94,9 +102,9 @@ export class Bag {
         if (!id) { h += `<div class="jb-slot empty${k < 5 ? ' hot' : ''}">${k < 5 ? `<em>${k + 1}</em>` : ''}</div>`; continue; }
         const it = ITEMS[id], on = it.tool && torchOn, n = s.inv[id];
         const what = it.tool ? (on ? 'On · use to switch off' : 'Use to switch on') : it.feed ? (it.feed === 'dog' ? 'Eat, or feed a dog' : 'Eat, or feed a cow') : describe(it.use);
-        h += `<button class="jh-item jb-slot${k < 5 ? ' hot' : ''}${on ? ' on' : ''}" data-act="use" data-arg="${id}" title="${esc(it.name)} · ${esc(what)}">${k < 5 ? `<em>${k + 1}</em>` : ''}<span class="pk">${icon(ITEM_ICON[id] || 'parcel')}</span><b>${esc(it.name)}</b>${n > 1 ? `<i>${n}</i>` : ''}</button>`;
+        h += `<button class="jh-item jb-slot${k < 5 ? ' hot' : ''}${on ? ' on' : ''}${this.sel === id ? ' sel' : ''}" data-act="use" data-arg="${id}" title="${esc(it.name)} · ${esc(what)}">${k < 5 ? `<em>${k + 1}</em>` : ''}<img class="art" alt="" src="${itemArt(id, 128)}"><b>${esc(it.name)}</b>${n > 1 ? `<i>${n}</i>` : ''}</button>`;
       }
-      h += '</div></div>';
+      h += '</div><div class="gm-detail" id="gm-detail"></div></div>';
       if (!ids.length) h += `<p class="jh-empty">Nothing in here yet. A kirana sells water, Parle-G and bananas; any eatery will pack you a parcel.</p>`;
       if (s.vehicles.length) h += `<div class="jh-sub">Keys</div>` + s.vehicles.map(v => this.row('key', `${cap(v.type)}`, v.plate, '', null)).join('');
     } else if (this.tab === 'me') {
@@ -106,6 +114,10 @@ export class Bag {
         return `<div class="jh-ring${low ? ' low' : ''}"><svg class="rg" viewBox="0 0 52 52"><circle cx="26" cy="26" r="22" class="bg"/><circle cx="26" cy="26" r="22" class="fg" stroke-dasharray="${(c * Math.max(0, Math.min(1, v))).toFixed(1)} ${c.toFixed(1)}"/></svg>${icon(ic)}<b>${label}</b><small>${esc(note)}</small></div>`;
       };
       const scale = (label, v, lo, hi) => `<div class="jh-scale"><div class="lab"><b>${label}</b><span>${v > 25 ? hi[0] : v < -15 ? lo[0] : 'Nobody special'}</span></div><div class="bar"><i style="left:${50 + v / 2}%"></i></div><div class="ends"><span>${lo[1]}</span><span>${hi[1]}</span></div></div>`;
+      const own = s.wardrobe.filter(w => !w.startsWith('shoe_'));
+      h += `<div class="gm-char"><div class="gm-portrait" title="Drag to turn"><div class="gm-name">${esc((G.hud.charName && G.hud.charName()) || G.playerName || 'You')}<small>${esc({ respect: 'A respected local', scared: 'Trouble. Keep away', odd: 'The one in the unusual outfit', drunk: 'Had a few', nice: 'Well turned out' }[re] || 'Just another Punekar')}</small></div></div><div class="gm-side">
+        <div class="jh-sub">Outfit</div><div class="gm-wear">${this.row('shirt', 'What you started in', 'Your own clothes', 'Equip', 'wear', '__orig')}${own.map(id => this.row('shirt', cap(id.replace(/_/g, ' ')), 'Bought', 'Equip', 'wear', id)).join('')}${s.wardrobe.filter(w => w.startsWith('shoe_')).map(id => this.row('shirt', cap(id.slice(5).replace(/_/g, ' ')), 'Footwear', 'Equip', 'wear', id)).join('')}${own.length ? '' : '<p class="jh-empty">Any clothes shop sells shirts, kurtas and sarees. What you buy shows up here to put on.</p>'}</div>
+        <div class="jh-sub">Condition</div>`;
       h += `<div class="jh-rings">
         ${ring('health', 'Health', hp, `${Math.round(P.hp ?? 100)} / ${L.hpMax}`)}
         ${ring('food', 'Food', s.hunger, s.hunger < 0.2 ? 'Hungry' : s.hunger > 0.8 ? 'Full' : `${Math.round(s.hunger * 100)}%`)}
@@ -117,7 +129,7 @@ export class Bag {
         <div class="jh-scales">${scale('Respect', s.respect, ['People laugh at you', 'Nobody'], ['People know you', 'Respected'])}${scale('Karma', s.karma, ['People cross the road', 'Bad'], ['Aajis bless you', 'Good'])}</div>
         <div class="jh-chips"><span><small>Style here</small><b>${st.odd ? 'Bold' : st.score > 0.85 ? 'Spot on' : st.score > 0.65 ? 'Fine' : 'Off'}</b></span><span><small>Fitness</small><b>+${Math.round(s.fitness)} health</b></span><span><small>Drink</small><b>${s.drunk > 0.6 ? 'Drunk' : s.drunk > 0.2 ? 'Tipsy' : 'Sober'}</b></span><span><small>Wanted</small><b>${G.police.heat ? stars(G.police.heat, 3) : 'No'}</b></span></div>
         <div class="jh-sub">Record</div>
-        <div class="jh-stats">${[['Rides', `${G.stats.rides}${G.stats.rides ? ` · ${G.stats.rating.toFixed(1)} rated` : ''}`], ['Deliveries', s.tally.deliveries], ['Fights won', s.tally.fightsWon], ['Knocked out', s.tally.knockedOut], ['Strays fed', s.tally.fed], ['Meals', s.tally.meals], ['Rent earned', fmt(s.tally.rentEarned)], ['Challans due', fmt(G.police.duesTotal)]].map(([a, b]) => `<span><small>${a}</small><b>${b}</b></span>`).join('')}</div>`;
+        <div class="jh-stats">${[['Rides', `${G.stats.rides}${G.stats.rides ? ` · ${G.stats.rating.toFixed(1)} rated` : ''}`], ['Deliveries', s.tally.deliveries], ['Fights won', s.tally.fightsWon], ['Knocked out', s.tally.knockedOut], ['Strays fed', s.tally.fed], ['Meals', s.tally.meals], ['Rent earned', fmt(s.tally.rentEarned)], ['Challans due', fmt(G.police.duesTotal)]].map(([a, b]) => `<span><small>${a}</small><b>${b}</b></span>`).join('')}</div></div></div>`;
     } else if (this.tab === 'wear') {
       const own = s.wardrobe.filter(w => !w.startsWith('shoe_'));
       h += this.row('shirt', 'What you started in', 'Your own clothes', 'Wear', 'wear', '__orig');
@@ -167,6 +179,12 @@ export class Bag {
         }
       }
       h += `</div><div class="ph-keys" aria-hidden="true">${'123456789*0#'.split('').map(k => `<i>${k}</i>`).join('')}</div></div>`;
+    } else if (this.tab === 'story') {
+      const S = G.story, list = S && S.summary ? S.summary() : [], t = S && S.target ? S.target() : null;
+      const cur = list.find(q => q.cur);
+      h += `<div class="gm-story"><div class="gm-quest">${cur ? `<small>Current mission</small><b>${esc(cur.t.replace(/^\d+\. /, ''))}</b><p>${esc(cur.s)}</p>${t ? `<button class="btn primary" data-act="track">◆ Track · ${esc(t.name)}</button>` : ''}` : '<small>The story</small><b>Free roam</b><p>The story plays in Story mode.</p>'}</div><ol class="gm-chapters">`;
+      for (const q of list) h += `<li class="${q.cur ? 'cur' : q.s === 'Done' ? 'done' : 'locked'}"><b>${esc(q.t)}</b><small>${esc(q.s)}</small></li>`;
+      h += '</ol></div>';
     } else if (this.tab === 'guide') {
       h += `<div class="guide">${guideHTML()}</div>`;
     } else if (this.tab === 'near') {
@@ -181,7 +199,27 @@ export class Bag {
       list.forEach((x, i) => { h += this.row(x.ic, x.name, x.note, dist(x.d), 'goto', i); });
     }
     B.innerHTML = h;
+    B.dataset.tab = this.tab;
+    if (this.tab === 'bag') { if (!this.sel || !s.inv[this.sel]) this.sel = bagOrder(G)[0]; this.detail(); }
+    if (this.tab === 'me') this.portrait();
     this.nav.paint();
+  }
+  // the item you're pointing at, big, with what it does
+  detail() {
+    const D = this.el.querySelector('#gm-detail'); if (!D) return;
+    const id = this.sel, it = id && ITEMS[id], s = this.life.s;
+    if (!it) { D.innerHTML = '<p class="jh-empty">Point at something to look at it.</p>'; return; }
+    const on = it.tool && this.g.lights && this.g.lights.torchOn;
+    const what = it.tool ? (on ? 'On. Use to switch it off.' : 'Use to switch it on.') : it.feed ? (it.feed === 'dog' ? 'Eat it, or feed a street dog.' : 'Eat it, or feed a cow.') : describe(it.use);
+    D.innerHTML = `<img class="big" alt="" src="${itemArt(id, 320)}"><div class="dn">${esc(it.name)}</div><div class="dq">× ${s.inv[id] || 0} in your jhola</div><p class="dd">${esc(what)}</p><button class="btn primary" data-act="use" data-arg="${id}">${it.tool ? (on ? 'Switch off' : 'Switch on') : 'Use'}</button>`;
+  }
+  // you, in a studio light, as you're dressed now (drag to turn)
+  portrait() {
+    const box = this.el.querySelector('.gm-portrait'); if (!box) return;
+    const P = this.g.player;
+    if (!this.studio) { this.studio = new Studio(this.g, 380, 600, { bg: 0x101217, fov: 22 }); this.studio.dress(P.look); }
+    this.studio.shoot('full');
+    box.appendChild(this.studio.canvas);
   }
   whereVeh(v) {
     if (!v) return null;
@@ -198,8 +236,8 @@ export class Bag {
     }
     if (a === 'wear') {
       const P = G.player;
-      if (arg === '__orig') { L.s.look = null; const base = G.baseLook(); if (base) { Object.assign(P.look, base); G.W.kit.applyLook(P.human, P.look); } this.msg('Back in your own clothes', true); return; }
-      G.shops.wearById(arg); this.msg('Changed', true); return;
+      if (arg === '__orig') { L.s.look = null; const base = G.baseLook(); if (base) { Object.assign(P.look, base); G.W.kit.applyLook(P.human, P.look); } this.msg('Back in your own clothes', true); if (this.studio) { this.studio.dress(P.look); this.studio.shoot('full'); } return; }
+      G.shops.wearById(arg); this.msg('Changed', true); if (this.studio) { this.studio.dress(P.look); this.studio.shoot('full'); } return;
     }
     if (a === 'wp') {
       let t = null;
@@ -211,6 +249,7 @@ export class Bag {
     }
     if (a === 'meet') { const c = (L.s.contacts || []).find(q => q.name === arg); if (c && G.date.askToMeet(c)) this.close(); return; }
     if (a === 'reply') { const [n, i] = arg.split('|'); const c = (L.s.contacts || []).find(q => q.name === n); if (c) { G.date.reply(c, +i); this.render(); } return; }
+    if (a === 'track') { const t = G.story && G.story.trackNow && G.story.trackNow(); if (t) { G.hud.toast('Tracking', t.name, 'meter', 2); this.close(); } return; }
     if (a === 'contact') { this.contactSel = arg; this.render(); return; }
     if (a === 'contacts') { this.contactSel = null; this.render(); return; }
     if (a === 'call') { const c = (L.s.contacts || []).find(q => q.name === arg); if (c) { this.close(); G.date.call(c); } return; }

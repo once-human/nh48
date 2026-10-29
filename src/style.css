@@ -1534,3 +1534,57 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 #ui.in-cine .mm, #ui.in-cine .vit, #ui.in-cine .dash, #ui.in-cine .wallet, #ui.in-cine .corner, #ui.in-cine .nerd, #ui.in-cine .loc,
 #ui.in-cine .obj, #ui.in-cine .toasts, #ui.in-cine .prompt, #ui.in-cine .placecard, #ui.in-cine .smsbox, #ui.in-cine .zone { opacity: 0 !important; transition: opacity .4s; }
 #ui.in-cine .lower { bottom: 12.5vh !important; z-index: 41; }
+
+/* ---------------------------------------------------------------- the menu (E): full screen, a game's own menu */
+.jhola.gm { left: 0 !important; top: 0 !important; transform: none !important; width: 100vw !important; max-height: none !important; height: 100vh; border-radius: 0 !important;
+  border: 0 !important; display: grid; grid-template-rows: auto auto 1fr auto auto; padding: 0 !important; z-index: 30; color: #f2ede3;
+  background: radial-gradient(120% 90% at 30% 20%, rgba(38, 30, 22, .86), rgba(8, 8, 10, .96) 70%) !important; -webkit-backdrop-filter: blur(14px) !important; backdrop-filter: blur(14px) !important; }
+.jhola.gm::before { height: 0 !important; }
+.jhola.gm .jh-top { padding: 22px 4vw 6px; display: flex; justify-content: space-between; align-items: center; }
+.jhola.gm .jh-title b { font: 800 26px/1 var(--font-disp, Inter, sans-serif); letter-spacing: .08em; text-transform: uppercase; }
+.jhola.gm .jh-title span { color: #ffb357; margin-left: 10px; font-size: 18px; }
+.jhola.gm .jh-money { display: flex; gap: 22px; } .jhola.gm .jh-money small { display: block; font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: rgba(242,237,227,.5); } .jhola.gm .jh-money b { font: 700 20px var(--font-ui); }
+.jhola.gm .jh-tabs { justify-content: center; gap: 4px; padding: 0 4vw; border-bottom: 1px solid rgba(255,179,87,.18); }
+.jhola.gm .jh-tabs button { padding: 14px 20px 13px; text-align: center; border-bottom-width: 2px; }
+.jhola.gm .jh-tabs button svg { display: none; }
+.jhola.gm .jh-tabs button b { font: 700 13px var(--font-ui); letter-spacing: .22em; }
+.jhola.gm .jh-tabs button span { color: rgba(255,179,87,.55); font-size: 11px; }
+.jhola.gm .jh-tabs button[aria-selected=true] { color: #fff; border-bottom-color: #ffb357; background: linear-gradient(0deg, rgba(255,179,87,.12), transparent); }
+.jhola.gm .jh-body { overflow: auto; padding: 26px 4vw; max-height: none !important; }
+.jhola.gm .jh-foot { padding: 12px 4vw 18px; color: rgba(242,237,227,.45); border-top: 1px solid rgba(255,255,255,.06); }
+.jhola.gm .jh-sub { font: 700 11px var(--font-ui); letter-spacing: .26em; text-transform: uppercase; color: #ffb357; margin: 18px 0 8px; }
+.jhola.gm .jh-row { background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.06); border-radius: 10px; margin-bottom: 6px; }
+.jhola.gm .jh-row:hover, .jhola.gm .jh-row.kb { border-color: rgba(255,179,87,.55); background: rgba(255,179,87,.08); }
+/* inventory: your stats, the grid of things, the one you're looking at */
+.jhola.gm .jb { display: grid; grid-template-columns: 240px 1fr 320px; gap: 28px; align-items: start; }
+.jhola.gm .jb-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 12px; }
+.jhola.gm .jb-slot { position: relative; aspect-ratio: 1 / 1.12; border-radius: 12px; background: linear-gradient(160deg, rgba(255,255,255,.07), rgba(255,255,255,.015)); border: 1px solid rgba(255,255,255,.08);
+  display: grid; justify-items: center; align-content: center; gap: 4px; padding: 8px; transition: transform .12s, border-color .12s; }
+.jhola.gm .jb-slot.empty { background: rgba(255,255,255,.02); border-style: dashed; }
+.jhola.gm .jb-slot .art { width: 78%; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 6px 10px rgba(0,0,0,.5)); }
+.jhola.gm .jb-slot b { font: 600 12px var(--font-ui); text-align: center; color: #f2ede3; }
+.jhola.gm .jb-slot i { position: absolute; right: 8px; top: 6px; font: 700 12px var(--font-ui); color: #ffb357; font-style: normal; }
+.jhola.gm .jb-slot em { position: absolute; left: 8px; top: 6px; font: 700 11px var(--font-ui); color: rgba(242,237,227,.4); font-style: normal; }
+.jhola.gm .jb-slot:hover, .jhola.gm .jb-slot.sel, .jhola.gm .jb-slot.kb { transform: translateY(-2px); border-color: #ffb357; box-shadow: 0 0 0 1px rgba(255,179,87,.35), 0 10px 28px rgba(0,0,0,.45); }
+.jhola.gm .gm-detail { position: sticky; top: 0; display: grid; gap: 8px; justify-items: start; padding: 18px; border-radius: 14px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); }
+.jhola.gm .gm-detail .big { width: 100%; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 18px 24px rgba(0,0,0,.6)); }
+.jhola.gm .gm-detail .dn { font: 800 22px var(--font-disp, Inter, sans-serif); } .jhola.gm .gm-detail .dq { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: #ffb357; }
+.jhola.gm .gm-detail .dd { color: rgba(242,237,227,.75); line-height: 1.5; margin: 4px 0 8px; }
+/* character: you, big, in a studio light; outfit and condition beside you */
+.jhola.gm .gm-char { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 34px; align-items: start; }
+.jhola.gm .gm-portrait { position: relative; cursor: grab; border-radius: 16px; overflow: hidden; background: #101217; box-shadow: inset 0 0 0 1px rgba(255,179,87,.2), 0 24px 60px rgba(0,0,0,.5); }
+.jhola.gm .gm-portrait canvas { display: block; width: 100%; height: auto; }
+.jhola.gm .gm-portrait:active { cursor: grabbing; }
+.jhola.gm .gm-name { position: absolute; left: 18px; bottom: 16px; font: 800 26px var(--font-disp, Inter, sans-serif); text-shadow: 0 2px 12px rgba(0,0,0,.8); }
+.jhola.gm .gm-name small { display: block; font: 600 11px var(--font-ui); letter-spacing: .2em; text-transform: uppercase; color: #ffb357; margin-top: 4px; }
+.jhola.gm .gm-wear { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+/* missions: the current one, and every chapter */
+.jhola.gm .gm-story { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 34px; align-items: start; }
+.jhola.gm .gm-quest { padding: 22px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,153,51,.16), rgba(255,255,255,.03)); border: 1px solid rgba(255,153,51,.35); display: grid; gap: 8px; justify-items: start; }
+.jhola.gm .gm-quest small { font: 700 11px var(--font-ui); letter-spacing: .26em; text-transform: uppercase; color: #ffb357; }
+.jhola.gm .gm-quest b { font: 800 30px/1.1 var(--font-disp, Inter, sans-serif); } .jhola.gm .gm-quest p { color: rgba(242,237,227,.8); line-height: 1.5; }
+.jhola.gm .gm-chapters { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: none; }
+.jhola.gm .gm-chapters li { display: grid; gap: 2px; padding: 12px 16px; border-radius: 10px; background: rgba(255,255,255,.03); border-left: 3px solid rgba(255,255,255,.1); }
+.jhola.gm .gm-chapters li.done { border-left-color: #33d17a; opacity: .7; } .jhola.gm .gm-chapters li.cur { border-left-color: #ff9933; background: rgba(255,153,51,.08); }
+.jhola.gm .gm-chapters li.locked { opacity: .4; } .jhola.gm .gm-chapters li small { color: rgba(242,237,227,.6); }
+@media (max-width: 980px) { .jhola.gm .jb { grid-template-columns: 1fr; } .jhola.gm .gm-char, .jhola.gm .gm-story { grid-template-columns: 1fr; } }
