@@ -5,6 +5,7 @@
 // pin (added if the data has none, moved if it's on the wrong building). Places the data invents are dropped.
 // x, z: metres on the game map (the pins in data/pune/pins.json.gz)
 import { cmRing } from './geo.js';
+import LM from './landmarks.json';
 
 export const NIGHTLIFE = [
   // The Mills, Raja Bahadur Mill Road (Sangamwadi)
@@ -45,7 +46,21 @@ const NOT_REAL = new Set(['The Mills Sociable', 'Themillspune']);
 function centroid(ring) { let x = 0, z = 0; const n = ring.length / 2; for (let k = 0; k < ring.length; k += 2) { x += ring[k]; z += ring[k + 1]; } return [x / n, z / n]; }
 const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+// landmarks moved to their real site after the map was baked: the generic boxes standing there are flattened
+// to a speck (kept, so the tile's building numbering doesn't shift) so the real model stands alone
+const MOVED = ['station'].map(id => LM.find(l => l.id === id)).filter(Boolean);
+function clearSites(D) {
+  for (const L of MOVED) {
+    const c = Math.cos(L.rot), s = Math.sin(L.rot);
+    for (const B of D.buildings) {
+      const p = cmRing(B[1]); if (p.length < 6) continue;
+      const [x, z] = centroid(p), dx = x - L.x, dz = z - L.z, u = dx * c + dz * s, v = dx * s - dz * c;
+      if (Math.abs(u) < L.w / 2 + 4 && Math.abs(v) < L.d / 2 + 4) { const X = Math.round(x * 100), Z = Math.round(z * 100); B[1] = [X, Z, X + 5, Z, X, Z + 5]; }
+    }
+  }
+}
 export function fixVenues(D) {
+  if (D.buildings) clearSites(D);
   if (!D.shops || !D.shopNames || !D.buildings) return;
   // drop what isn't real
   D.shops = D.shops.filter(s => !NOT_REAL.has(D.shopNames[s[3]] && D.shopNames[s[3]][0]));
