@@ -216,7 +216,8 @@ export class Law {
       const cam = new THREE.PerspectiveCamera(28, 0.8, 0.1, 50);
       cam.position.set(F.x + fx * 1.25, hy + 0.02, F.z + fz * 1.25); cam.lookAt(F.x, hy - 0.06, F.z); cam.updateMatrixWorld();
       const was = P.human && P.human.holder.visible; if (P.human) P.human.holder.visible = true;
-      R.render(G.scene, cam);
+      // through the game's own final pass, so it uses the shaders already built (straight to the screen they'd compile)
+      if (G.post) { const pc = G.post.camera; G.post.camera = cam; G.post.render(); G.post.camera = pc; } else R.render(G.scene, cam);
       const src = R.domElement, w = src.width, h = src.height, cw = Math.round(h * 0.8);
       const c = document.createElement('canvas'); c.width = 240; c.height = 300; const x = c.getContext('2d');
       x.drawImage(src, (w - cw) / 2, 0, cw, h, 0, 0, 240, 300);

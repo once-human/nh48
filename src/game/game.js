@@ -349,7 +349,9 @@ export class Game {
       const pv = this.player.human && { vis: this.player.human.holder.visible, pos: this.player.human.holder.position.clone() };
       if (this.player.human) { this.player.human.holder.visible = true; at(this.player.human.holder); }
       await R.compileAsync(this.scene, cam);       // in parallel on the GPU driver where it can
-      R.render(this.scene, cam);
+      // (into the same picture the game draws into: with the after-frame smoothing that's the pass's, not the screen)
+      const tgt = this.post && this.post.fxaa ? this.post.target() : null;
+      R.setRenderTarget(tgt); R.render(this.scene, cam); R.setRenderTarget(null);
       if (pv) { this.player.human.holder.visible = pv.vis; this.player.human.holder.position.copy(pv.pos); }   // back as it was (at the wheel, or wherever)
     } catch (e) { console.warn('prewarm', e); }
     for (const s of shown) { s.H.holder.visible = false; if (kit) kit.applyLook(s.H, s.H.look); }
