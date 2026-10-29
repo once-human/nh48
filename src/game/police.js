@@ -576,18 +576,19 @@ export class Police {
     G.audio.sirenAt = em > pl ? G.emSirenAt : this.sirenAt;
     G.audio.siren(Math.max(pl, em), em > pl ? G.emPan || 0 : sirenPan);
     if (this.heat > 0) {
-      if (seen) this.unseenT = 0; else this.unseenT += dt;
-      // out of sight the points drain (after a few seconds of them looking), quicker at the low levels
-      // out of sight they slowly give up: about a crime's worth every 12 s (faster indoors, in a crowd, changed)
-      if (this.unseenT > 6) this.pts = Math.max(0, (this.pts || 0) - dt * 0.085 * this.law.coolMul());
-      const was = this.heat; this.heat = levelOf(this.pts || 0);
+      // out of sight they search (where you were last seen, then the roads round it, wider and wider); only when a
+      // level's whole search has turned up nothing do they ease off one level, and start searching again at that one
+      if (seen) this.unseenT = 0; else this.unseenT += dt * this.law.coolMul();
+      const was = this.heat, hold = SEARCH[was] || 40;
+      if (!seen && this.unseenT > hold) { this.pts = was > 1 ? HEAT_AT[was - 1] : 0; this.unseenT = 0; }
+      this.heat = levelOf(this.pts || 0);
       if (this.heat < was) {
         if (this.heat === 0) { G.hud.toast('You lost them', 'The police have given up, for now', 'meter', 3); this.say('m_lost', null, true); this.clearCharges(); }
         else G.hud.toast(LEVELS[this.heat], 'Fewer of them looking', 'info', 2);
       }
-      // the ring: how much is left before they drop to the level below
-      const lo = HEAT_AT[this.heat], hi = HEAT_AT[this.heat + 1] ?? 30;
-      G.hud.setHeat(this.heat, seen, ((this.pts || 0) - lo + 0.6) / (hi - lo + 0.6), LEVELS[this.heat], this.marshals.length + (this.naka ? 1 : 0));
+      // the ring: full while they see you, the search running down while they don't
+      if (this.heat > 0) G.hud.setHeat(this.heat, seen, seen ? 1 : 1 - this.unseenT / (SEARCH[this.heat] || 40), LEVELS[this.heat], this.marshals.length + (this.naka ? 1 : 0));
+      else G.hud.setHeat(0);
     } else G.hud.setHeat(0);
   }
   // checkpoints (nakabandi): barricades across a junction on the road ahead of you, a jeep and constables with lathis;
@@ -837,6 +838,9 @@ function dressRole(look, role) {
 }
 // the points each level starts at
 const HEAT_AT = [0, 1, 3, 7, 15, 25];
+// how long (s) they keep searching at each level once they've lost sight of you, before easing off a level (and
+// searching again at that one); hiding indoors, in a crowd, or not looking like the description runs it down faster
+const SEARCH = [0, 40, 60, 90, 120, 160];
 const levelOf = (p) => HEAT_AT.filter((t, i) => i > 0 && p >= t).length;
 // a police unit: a beat marshal on a motorcycle, or a patrol jeep with two constables. They drive like trained
 // drivers (left of the lane, slowing for bends, stopping at red when they're not chasing anyone, braking for
@@ -927,7 +931,7 @@ class Marshal {
     if (this.sees && !this.wasSeeing && this.spotT <= 0 && de < 60) { police.say(Math.random() < 0.75 ? 'spot_' + police.topCharge() : 'm_spot2', this); this.spotT = 12; }
     this.spotT -= dt;
     this.wasSeeing = this.sees;
-    const pursuing = this.pursuing = police.heat > 0 && (this.sees || police.unseenT < 8);
+    const pursuing = this.pursuing = police.heat > 0 && (this.sees || police.unseenT < 20);
     if (this.mode === 'foot') { this.footTick(dt); this.animate(dt, false); return; }
     // you're on foot and they've seen you close: out of the saddle (or the jeep) and after you
     // (close, or as close as the road gets them: you're off it, or they've come to a stop)
@@ -940,7 +944,18 @@ class Marshal {
     const trail = this.trail || (this.trail = []); trail.push({ x: P.x, z: P.z, t: police.g.t || 0 });
     while (trail.length > 2 && (police.g.t || 0) - trail[1].t > this.skill.lag) trail.shift();
     if (police.heat > 0) {
-      const ls = this.sees ? trail[0] : police.lastSeen || { x: P.x, z: P.z };
+      let ls = this.sees ? trail[0] : police.lastSeen || { x: P.x, z: P.z };
+      // got to where you were last seen and you're not there: each of them sweeps the streets round it, further out
+      // the longer it takes (a fresh sighting, from them, a witness or a camera, brings them straight back)
+      if (this.sees) this.srch = null;
+      else {
+        const c = police.lastSeen || ls, there = Math.hypot(v.x - c.x, v.z - c.z) < 20 || this.srch;
+        if (there && (!this.srch || this.srch.of !== c || Math.hypot(v.x - this.srch.x, v.z - this.srch.z) < 15 || (this.srch.t -= dt) < 0)) {
+          const r = 40 + Math.min(220, police.unseenT * 2.5), a = police.rng.next() * Math.PI * 2;
+          this.srch = { of: c, x: c.x + Math.cos(a) * r * (0.5 + police.rng.next() * 0.5), z: c.z + Math.sin(a) * r * (0.5 + police.rng.next() * 0.5), t: 18 };
+        }
+        if (this.srch) ls = this.srch;
+      }
       tx = ls.x; tz = ls.z;
       want = (pursuing ? (this.jeep ? 16 : 18) : 11) * this.skill.top;
       // close behind you and you've slowed down: up alongside, on your right, to wave you over
