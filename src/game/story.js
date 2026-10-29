@@ -12,6 +12,7 @@ import { PART1 } from './part1.js';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import FAMOUS from '../world/famous.json';
 import { wrapAngle } from '../core/util.js';
+import { playerName } from '../people/characters.js';
 
 const WHO = {
   aai: ['Aai', '#f4a3c0'], bapu: ['Bapu Kaka', '#ffd166'], pappu: ['Pappu RTO', '#7bdff2'], joshi: ['Joshi Kaka', '#b8e0a8'],
@@ -391,7 +392,7 @@ export class Story {
     const q = (c) => this.el.querySelector(c);
     if (it) {
       const [w, line, tr] = it, [name, col] = WHO[w] || [w, '#fff'];
-      q('.sd-who').textContent = w === 'you' ? (this.fem ? 'Saee' : 'Sid') : this.name(w) || name; q('.sd-who').style.color = col;
+      q('.sd-who').textContent = w === 'you' ? (this.g.playerName || playerName() || (this.fem ? 'Saee' : 'Sid')) : this.name(w) || name; q('.sd-who').style.color = col;
       q('.sd-line').textContent = line; q('.sd-tr').textContent = tr || '';
       q('.sd-line').lang = /[ऀ-ॿ]/.test(line) ? 'mr' : 'en';
       // spoken, when the voice pack has it (from where they stand; your own lines in your own voice)

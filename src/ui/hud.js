@@ -241,9 +241,9 @@ export class HUD {
     m.querySelectorAll('#pk-g button').forEach(b => b.onclick = () => {
       const f = b.dataset.g === 'f';
       if (f === P.sel.female) return;
-      const wasDefault = !P.sel.name || P.sel.name === (P.sel.female ? 'Ananya' : 'Aarav');
+      const wasDefault = !P.sel.name || ['Ananya', 'Aarav', 'Sid', 'Saee'].includes(P.sel.name);
       P.sel.female = f; P.sel.hair = '';
-      if (wasDefault) { P.sel.name = f ? 'Ananya' : 'Aarav'; nameIn.value = P.sel.name; }
+      if (wasDefault) { P.sel.name = f ? 'Saee' : 'Sid'; nameIn.value = P.sel.name; }
       P.sel = normalise(P.sel);
       this.renderPicker(); this.pickerVoice();
     });

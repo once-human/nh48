@@ -39,7 +39,7 @@ export function normalise(ch) {
   if (!HAIRS[g].some(h => h.id === ch.hair)) ch.hair = HAIRS[g][0].id;
   if (!OUTFITS[g].some(o => o.id === ch.outfit)) ch.outfit = OUTFITS[g][0].id;
   if (!HAIR_COLS.some(h => h.id === ch.hairCol)) ch.hairCol = 'black';
-  if (!ch.name) ch.name = ch.female ? 'Ananya' : 'Aarav';
+  if (!ch.name || ch.name === 'Ananya' || ch.name === 'Aarav') ch.name = ch.female ? 'Saee' : 'Sid';      // the story's Kales
   return ch;
 }
 export function lookOf(ch) {

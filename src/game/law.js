@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import FAMOUS from '../world/famous.json';
 import { fmtRupees } from '../core/util.js';
+import { playerName } from '../people/characters.js';
 
 const hex = (c) => c ? '#' + c.getHexString() : '';
 const NAMES = { scooter: 'scooter', scooterP: 'scooter', bike: 'motorcycle', bikeP: 'motorcycle', auto: 'auto', hatch: 'hatchback', sedan: 'sedan', suv: 'SUV', taxi: 'taxi', tempo: 'tempo', bus: 'bus', cycle: 'cycle' };
@@ -253,7 +254,7 @@ export class Law {
   booking(o) {
     const G = this.g, el = document.createElement('div'), shot = this.mugshot();
     el.className = 'booking';
-    const me = G.player.look && G.player.look.female ? 'Saee Kale' : 'Sid Kale';
+    const me = `${G.playerName || playerName() || (G.player.look && G.player.look.female ? 'Saee' : 'Sid')} Kale`;
     el.innerHTML = `<div class="bk-card"><div class="bk-top"><span class="bk-badge">पुणे पोलीस · PUNE POLICE</span><span class="bk-no">FIR ${Math.floor(1000 + Math.random() * 8999)}/${new Date().getFullYear()}</span></div>
       <div class="bk-body"><div class="bk-mug">${shot ? `<img class="bk-photo" src="${shot}" alt="">` : '<div class="bk-sil"></div>'}<div class="bk-board">${me.toUpperCase()}<br>${o.chowki.toUpperCase()}</div></div>
       <div class="bk-info"><b>${me}</b><span>${o.chowki}</span><ul>${o.charges.map(c => `<li><em>${c.law}</em>${c.name}</li>`).join('')}</ul>
