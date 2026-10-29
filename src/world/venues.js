@@ -6,6 +6,7 @@
 // x, z: metres on the game map (the pins in data/pune/pins.json.gz)
 import { cmRing } from './geo.js';
 import LM from './landmarks.json';
+import FAMOUS from './famous.json';
 
 export const NIGHTLIFE = [
   // The Mills, Raja Bahadur Mill Road (Sangamwadi)
@@ -67,7 +68,7 @@ export function fixVenues(D) {
   if (D.pins) D.pins = D.pins.filter(p => !NOT_REAL.has(p[0]));
   let cents = null;
   const used = new Set(D.shops.map(s => s[0] * 4096 + s[1] * 64 + s[2]));
-  for (const [name, mr, x, z] of NIGHTLIFE) {
+  for (const [name, mr, x, z, kind] of [...NIGHTLIFE, ...FAMOUS.filter(f => f.kind).map(f => [f.name, f.mr || f.name, f.x, f.z, f.kind])]) {
     cents = cents || D.buildings.map(B => { const p = cmRing(B[1]); return { c: centroid(p), p }; });
     // the building at the pin (its centre within 35 m), in this tile
     let bi = -1, bd = 35 * 35;
@@ -77,8 +78,8 @@ export function fixVenues(D) {
     const key = norm(name).slice(0, 8);
     let si = D.shops.findIndex(s => { const n = D.shopNames[s[3]]; return n && norm(n[0]).startsWith(key); });
     let ni;
-    if (si >= 0) { ni = D.shops[si][3]; Object.assign(D.shopNames[ni], { 0: name, 1: mr, 2: 'bar' }); }
-    else { ni = D.shopNames.length; D.shopNames.push([name, mr, 'bar', '']); }
+    if (si >= 0) { ni = D.shops[si][3]; Object.assign(D.shopNames[ni], { 0: name, 1: mr, 2: kind || 'bar' }); }
+    else { ni = D.shopNames.length; D.shopNames.push([name, mr, kind || 'bar', '']); }
     if (si >= 0 && D.shops[si][0] === bi) continue;                  // already on the right building
     // its board on the building's longest wall, in a free slot
     const ring = cents[bi].p;
@@ -91,4 +92,9 @@ export function fixVenues(D) {
   }
 }
 // the city-wide map pins: drop what isn't real
-export function fixPins(list) { return list.filter(p => !NOT_REAL.has(p[0])); }
+export function fixPins(list) {
+  const out = list.filter(p => !NOT_REAL.has(p[0]));
+  // Pune's famous places, checked against OpenStreetMap, as stars on the map
+  for (const f of FAMOUS) out.push([f.name, f.mr || '', 'landmark', Math.round(f.x * 100), Math.round(f.z * 100), 1]);
+  return out;
+}
