@@ -38,7 +38,7 @@ export class Rep {
   // you are all over Pune
   standing(x, z) {
     const v = this.at(x, z), L = this.g.life && this.g.life.s;
-    const local = Math.max(-1, Math.min(1, (v.good - v.bad) / 8)), glob = L ? Math.max(-1, Math.min(1, (L.karma || 0) / 60 + (L.respect || 0) / 160)) : 0;
+    const local = Math.max(-1, Math.min(1, (v.good - v.bad) / 16)), glob = L ? Math.max(-1, Math.min(1, (L.karma || 0) / 90 + (L.respect || 0) / 220)) : 0;
     return Math.max(-1, Math.min(1, local * 0.65 + glob * 0.45));
   }
   // word gets round: when a neighbourhood's opinion of you crosses a line, you hear about it

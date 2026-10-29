@@ -49,6 +49,8 @@ export class Life {
     }, this.load() || {});
     // older saves start with a torch too
     if (!this.s.torchGiven) { this.s.torchGiven = 1; if (!this.s.inv.torch) this.s.inv.torch = 1; }
+    // karma and respect used to swing hard: a save from then is brought to where the slower rules would have it
+    if (!this.s.repSlow) { this.s.repSlow = 1; this.s.karma = Math.round((this.s.karma || 0) * 0.35); this.s.respect = Math.round((this.s.respect || 0) * 0.35); }
     this.warned = {};
     this.saveT = 0;
   }
@@ -58,7 +60,14 @@ export class Life {
   get hpMax() { return 100 + Math.round(this.s.fitness); }
   change(k, d) {
     const s = this.s;
-    if (k === 'respect' || k === 'karma') s[k] = clamp(s[k] + d, -100, 100);
+    if (k === 'respect' || k === 'karma') {
+      // who you are changes slowly: any one thing moves it only a little, and only a few points a minute can move
+      // at all (a bad afternoon dents it; it takes a habit to really change it)
+      const now = this.g.t || 0, R = this._rb || (this._rb = {}), B = R[k] || (R[k] = { v: 4, t: now });
+      B.v = Math.min(4, B.v + Math.max(0, now - B.t) * (4 / 60)); B.t = now;
+      const dd = Math.sign(d) * Math.min(Math.abs(d) * 0.35, B.v); B.v -= Math.abs(dd);
+      s[k] = clamp(s[k] + dd, -100, 100);
+    }
     else if (k === 'fitness') s[k] = clamp(s[k] + d, 0, 40);
     else if (k === 'hp') { const P = this.g.player; P.hp = clamp((P.hp ?? 100) + d, 0, this.hpMax); }
     else if (k in s) s[k] = clamp(s[k] + d, 0, k === 'drunk' ? 1.2 : 1);
