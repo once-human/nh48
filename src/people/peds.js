@@ -184,8 +184,8 @@ export class People {
       else {
         // someone's had enough: the phone comes out
         p.act = { clip: 'phone', t: 0, dur: 4 };
-        const G = this.brain && this.brain.g;
-        if (G && !G.free && G.police) { G.hud.toast('Someone’s calling the police', 'People round here know what you did', 'bad', 3); G.later ? G.later(4, () => G.police.raiseHeat(1, 'Recognised in the neighbourhood', 'assault')) : G.police.raiseHeat(1, 'Recognised in the neighbourhood', 'assault'); }
+        // (a look and the phone out, filming you: nobody rings the police just because they recognise you)
+        this.watch(p, player.x, player.z, 4);
       }
     } else if (v.good > 2 && v.bad < 1 && R < Math.min(0.5, v.good * 0.06)) {
       p.act = { clip: 'wave', t: 0, dur: 1.6 }; p.yaw = Math.atan2(player.z - p.z, player.x - p.x);
@@ -960,6 +960,8 @@ export class People {
     else { p.stun = 0.34; p.act = { kind: 'hurt', clip: this.rng.chance(0.5) ? 'hit_head' : 'hit', speed: 1, t: 0, dur: 0.34 }; p.actId = (p.actId || 0) + 1; }
     if (!byPlayer) return;
     if (p.mode !== 'fight' && this.brawl && this.brawl.g.life) this.brawl.g.life.change('karma', -1);
+    // you threw the first punch at someone minding their own business: that's assault, and people may call it in
+    if (p.mode !== 'fight' && !p.startedIt && !p.youFirst) { p.youFirst = true; if (this.brain) this.brain.incident('fight', p.x, p.z, { byYou: true }); }
     if (p.mode !== 'fight' && !p.fleeing) {
       // first blow: fight back, or run and shout
       const resp = this.brawl && this.brawl.g.life ? this.brawl.g.life.s.respect : 0;
@@ -969,8 +971,10 @@ export class People {
       else { this.lineT = 0; this.speakAs(this.rng.chance(0.6) ? 'flee' : 'hit', p, 1, 3); this.flee(p, sx, sz, 28); }
     } else if (this.rng.next() < 0.18) this.speakAs('hit', p, 1, 3);
   }
+  // (a fight they start with you is theirs: people gather to watch, nobody rings the police about you)
   startFight(p, foe) {
-    if (this.brain && foe && foe.foot) this.brain.incident('fight', p.x, p.z, { byYou: true });
+    if (foe && foe.foot && p.mode !== 'fight' && !p.youFirst) p.startedIt = true;
+    if (this.brain && foe && foe.foot) this.brain.incident('fight', p.x, p.z, { byYou: false });
     if (p.hp0 === undefined) { p.hp0 = p.cop ? 130 : HP[p.persona] || 60; p.hp = p.hp0; }
     if (p.anchor) { p.anchor = null; if (p.venue) { (p.clubber ? p.venue.clubCrowd-- : p.venue.crowd--); p.venue = null; } }
     p.mode = 'fight'; p.foe = foe; p.fightT = 0; p.atkT = this.rng.range(0.5, 1.1); p.act = null; p.fixedWas = p.fixedWas ?? p.fixed; p.fixed = false;

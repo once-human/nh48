@@ -522,9 +522,10 @@ export class Police {
     if (ev.type === 'stoleParked' && this.rng.next() < 0.4) this.later(18 + this.rng.next() * 25, () => { ev.veh.reported = true; if (P.cur === ev.veh && !P.onFoot) { this.raiseHeat(1, 'The owner reported their ' + ev.name + ' stolen', 'theft'); this.law.setDesc(); this.law.radioDesc(); } });
     if (ev.type === 'pedHit' && !P.onFoot) {
       const cop = this.copSeeing(P.x, P.z, 50);
-      if (cop && !this.stop) this.beginStop(cop, 'rash', {});
-      // nobody in uniform saw it, but someone on the footpath took the number
-      else if (!cop && (ev.speed || 0) > 4) this.law.report(1, 'Hit and run', 'hitrun', ev.x, ev.z, { victim: ev.p });
+      // a light knock is a shouting match, not a case: only a real hit (a cop watching, or someone badly hurt) counts
+      const sev = ev.p && ev.p.inj ? ev.p.inj.sev : ev.sev;
+      if (cop && !this.stop && (ev.speed || 0) > 3 && sev !== 'knock') this.beginStop(cop, 'rash', {});
+      // (nobody in uniform saw it: someone on the footpath calls it in only if they're knocked out or worse, game.js)
     }
   }
   raiseHeat(n, why, charge = 'theft') {

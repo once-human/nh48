@@ -175,6 +175,9 @@ export class Brain {
   // someone saw it and calls 100 (once per incident, more likely the braver and more helpful they are)
   report(I, p, t) {
     if (!I.byYou || I.reported || !this.g.police || this.g.free) return;
+    // a crash with nobody hurt is a dent and an argument, not a police matter; and laying out the one who
+    // came at you is self-defence
+    if (I.kind === 'crash' || (I.victim && I.victim.startedIt)) return;
     const st = this.g.rep ? this.g.rep.standing(I.x, I.z) : 0;
     if (R() > (0.25 + t.helpful * 0.4 + t.brave * 0.2) * (1 - st * (I.kind === 'down' ? 0.25 : 0.55))) return;
     I.reported = true;
