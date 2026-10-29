@@ -741,21 +741,26 @@ export class HUD {
     setTimeout(() => c.remove(), 8000);
   }
   // police stop: the officer's line, the offence and your options (keys 1–4 or click)
+  // a police stop: the officer (badge, rank, how patient he is), the charge written up like a challan slip, what he
+  // says, and your choices; the outcome is stamped across the slip
   openStop(o) {
     const S = this.stopEl;
-    S.className = 'stop glass';
-    S.innerHTML = `<div class="st-head"><span class="st-who"></span><span class="st-off"></span>${o.amt ? '<span class="st-amt num"></span>' : ''}</div>
-      <div class="st-line"></div><div class="st-tr"></div><div class="st-opts"></div><div class="st-foot"></div>`;
-    S.querySelector('.st-who').textContent = o.who;
-    S.querySelector('.st-off').textContent = o.kind + (o.law ? ` · ${o.law}` : '');
+    S.className = 'stop glass' + (o.neg ? ' neg' : '');
+    S.innerHTML = `<div class="st-top"><span class="st-badge"><svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z"/><path class="st" d="m12 7 1.4 2.9 3.1.4-2.3 2.2.6 3.1L12 14.1l-2.8 1.5.6-3.1-2.3-2.2 3.1-.4L12 7Z"/></svg></span>
+      <span class="st-id"><b class="st-who"></b><small class="st-rank"></small></span><span class="st-mood"><small>Patience</small><i><b></b></i></span></div>
+      <div class="st-slip"><span class="sl-l"><small>${o.neg ? 'Negotiating' : 'Offence'}</small><b class="st-off"></b><em class="st-law"></em></span>${o.amt ? '<span class="st-amt num"></span>' : ''}<span class="st-stamp"></span></div>
+      <div class="st-say"><div class="st-line"></div><div class="st-tr"></div></div><div class="st-opts"></div><div class="st-foot"></div>`;
+    S.querySelector('.st-who').textContent = o.who; S.querySelector('.st-rank').textContent = o.rank || 'Pune Police';
+    S.querySelector('.st-mood b').style.width = Math.round(Math.max(0.08, Math.min(1, o.mood ?? 0.5)) * 100) + '%';
+    S.querySelector('.st-off').textContent = o.kind || ''; S.querySelector('.st-law').textContent = o.law || '';
     if (o.amt) S.querySelector('.st-amt').textContent = o.amt;
     S.querySelector('.st-line').textContent = `“${o.line}”`;
-    S.querySelector('.st-tr').textContent = o.tr;
-    S.querySelector('.st-foot').textContent = o.foot;
+    S.querySelector('.st-tr').textContent = o.tr || '';
+    S.querySelector('.st-foot').textContent = o.foot || '';
     const box = S.querySelector('.st-opts');
     o.opts.forEach((op, i) => {
       const b = el('button', 'st-opt', `<span class="kbd">${i + 1}</span><span class="o-t"></span><span class="o-s"></span>`);
-      b.querySelector('.o-t').textContent = op.t; b.querySelector('.o-s').textContent = op.s;
+      b.querySelector('.o-t').textContent = op.t; b.querySelector('.o-s').textContent = op.s || '';
       b.onclick = () => o.onPick(i);
       box.appendChild(b);
     });
@@ -766,10 +771,19 @@ export class HUD {
     const S = this.stopEl;
     S.classList.add('done', kind);
     if (line) { S.querySelector('.st-line').textContent = `“${line}”`; S.querySelector('.st-tr').textContent = tr; }
+    const st = S.querySelector('.st-stamp');
+    if (st) { st.textContent = kind === 'bad' ? (/book|chowki|arrest/i.test(res) ? 'BOOKED' : 'FINED') : kind === 'meter' ? 'LET OFF' : kind === 'warn' ? (/hands|took/i.test(res) ? 'SETTLED' : 'PAID') : /paid/i.test(res) ? 'PAID' : 'CLEARED'; st.classList.add('on'); }
     const box = S.querySelector('.st-opts');
     box.innerHTML = '<div class="st-res"><div class="r-t"></div><div class="r-s"></div></div><button class="btn small st-go">Continue <span class="kbd">↵</span></button>';
     box.querySelector('.r-t').textContent = res; box.querySelector('.r-s').textContent = sub;
     box.querySelector('.st-go').onclick = () => this.game.police && this.game.police.stop && this.game.police.finishTalk();
+  }
+  // being grabbed: mash F to break free, a bar for your effort and one for the time left
+  grab(on, effort = 0, left = 1) {
+    let g = this._grab;
+    if (!g) { g = this._grab = el('div', 'grab', '<b>Grabbed!</b><span>Mash <span class="kbd">F</span> to break free</span><i class="ge"><b></b></i><i class="gt"><b></b></i>'); this.root.appendChild(g); }
+    this.Hd(g, !on); if (!on) return;
+    g.querySelector('.ge b').style.width = Math.round(effort * 100) + '%'; g.querySelector('.gt b').style.width = Math.round(Math.max(0, left) * 100) + '%';
   }
   closeStop() { this.stopEl.hidden = true; this.lower.classList.remove('dim'); }
   // full-screen moment (arrest): fades in and out

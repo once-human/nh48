@@ -1457,3 +1457,51 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .jb-slot > i { top: 5px !important; bottom: auto !important; right: 5px !important; min-width: 18px !important; height: 18px !important; font-size: 10.5px !important; }
 .jb-slot em { top: 4px; left: 6px; font-size: 10.5px; line-height: 1; }
 .jb-me .kbd { min-width: 20px; height: 20px; font-size: 10.5px; padding: 0 5px; }
+
+/* the police stop: officer, the charge slip, what he says, your choices, a stamp for how it ended */
+.stop .st-top { display: flex; align-items: center; gap: 10px; }
+.stop .st-badge { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: rgba(42, 79, 174, .25); border: 1px solid rgba(143, 184, 255, .35); }
+.stop .st-badge svg { width: 20px; height: 20px; } .stop .st-badge path { fill: #2a4fae; stroke: #e9eefc; stroke-width: 1.2; } .stop .st-badge .st { fill: #ffd23a; stroke: none; }
+.stop .st-id { display: grid; flex: 1; min-width: 0; line-height: 1.15; }
+.stop .st-id .st-who { font-size: 14px; font-weight: 750; letter-spacing: .02em; color: var(--paper); text-transform: none; }
+.stop .st-id .st-rank { font-size: 11px; color: #8fb8ff; letter-spacing: .08em; text-transform: uppercase; }
+.stop .st-mood { display: grid; gap: 3px; width: 92px; } .stop .st-mood small { font-size: 10px; color: var(--paper-3); text-transform: uppercase; letter-spacing: .1em; }
+.stop .st-mood i { display: block; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.stop .st-mood i b { display: block; height: 100%; background: linear-gradient(90deg, #ff6b5e, #ffd166, #7bd88f); background-size: 92px 100%; }
+.stop .st-slip { position: relative; display: flex; align-items: center; gap: 12px; margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .035) 0 22px, rgba(255, 255, 255, .06) 22px 23px), rgba(244, 241, 234, .05); border: 1px dashed rgba(244, 241, 234, .22); overflow: hidden; }
+.stop .st-slip .sl-l { display: grid; flex: 1; min-width: 0; } .stop .st-slip small { font-size: 10px; color: var(--paper-3); letter-spacing: .12em; text-transform: uppercase; }
+.stop .st-slip .st-off { font-size: 14px; color: var(--paper); font-weight: 650; flex: none; } .stop .st-slip .st-law { font-size: 11.5px; color: var(--paper-2); font-style: normal; }
+.stop .st-slip .st-amt { font-size: 24px; }
+.stop .st-stamp { position: absolute; right: 18px; top: 50%; transform: translateY(-50%) rotate(-12deg) scale(2); opacity: 0; padding: 4px 12px; border: 3px solid currentColor; border-radius: 6px;
+  font-weight: 900; font-size: 20px; letter-spacing: .12em; color: #ff6b5e; pointer-events: none; mix-blend-mode: screen; }
+.stop .st-stamp.on { animation: stamp .35s cubic-bezier(.2, 1.6, .4, 1) forwards; }
+.stop.done.meter .st-stamp, .stop.done.info .st-stamp { color: #7bd88f; } .stop.done.warn .st-stamp { color: #ffd166; }
+@keyframes stamp { to { opacity: .9; transform: translateY(-50%) rotate(-12deg) scale(1); } }
+.stop .st-say { margin-top: 10px; }
+.stop.neg .st-opts { grid-template-columns: repeat(2, 1fr); }
+/* the radio feed, quiet, under the wanted badge */
+.radio-feed { position: fixed; right: 18px; top: 128px; max-width: 330px; padding: 7px 11px; border-radius: 10px; background: rgba(18, 20, 26, .62); backdrop-filter: blur(8px);
+  border-left: 3px solid #2f6bff; color: rgba(255, 255, 255, .82); font-size: 12px; line-height: 1.35; z-index: 6; display: grid; gap: 2px; }
+.radio-feed b { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #8fb8ff; }
+.radio-feed.in { animation: radioin .3s ease-out; } @keyframes radioin { from { opacity: 0; transform: translateX(14px); } }
+/* booked: the card */
+.booking { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, .55); z-index: 30; animation: bkin .4s ease-out; }
+.booking.out { opacity: 0; transition: opacity .5s; }
+.booking .bk-card { position: relative; width: min(560px, 92vw); padding: 18px; border-radius: 14px; background: #f1ece0; color: #1c1b18; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); font-family: Inter, sans-serif; }
+.booking .bk-top { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: .12em; font-weight: 700; color: #1d3f8f; border-bottom: 2px solid #1d3f8f; padding-bottom: 8px; }
+.booking .bk-body { display: flex; gap: 16px; margin-top: 14px; }
+.booking .bk-mug { width: 130px; flex: none; } .booking .bk-sil { height: 140px; border-radius: 6px; background: linear-gradient(#b9b4a8 0 100%); position: relative; overflow: hidden; }
+.booking .bk-sil::after { content: ''; position: absolute; left: 50%; bottom: -10px; width: 90px; height: 110px; transform: translateX(-50%); background: radial-gradient(circle at 50% 28%, #3a3833 0 26px, transparent 27px), radial-gradient(ellipse at 50% 100%, #3a3833 0 50px, transparent 51px); }
+.booking .bk-board { margin-top: 6px; padding: 5px; background: #1c1b18; color: #f1ece0; font: 700 10px/1.3 monospace; text-align: center; border-radius: 3px; }
+.booking .bk-info { display: grid; gap: 6px; align-content: start; flex: 1; } .booking .bk-info > b { font-size: 18px; } .booking .bk-info > span { font-size: 12px; color: #5a5650; }
+.booking ul { margin: 4px 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 12.5px; } .booking li em { font-style: normal; font-weight: 700; color: #a8161c; margin-right: 6px; }
+.booking .bk-row { display: flex; justify-content: space-between; font-size: 12.5px; border-top: 1px dashed #c9c2b2; padding-top: 5px; }
+.booking .bk-stamp { position: absolute; right: 26px; bottom: 26px; transform: rotate(-14deg); border: 4px solid #a8161c; color: #a8161c; font: 900 26px/1 Inter, sans-serif; letter-spacing: .15em; padding: 6px 14px; border-radius: 6px; opacity: .85; }
+@keyframes bkin { from { opacity: 0; } }
+.grab { position: fixed; left: 50%; top: 58%; transform: translateX(-50%); display: grid; gap: 6px; justify-items: center; padding: 12px 18px; border-radius: 14px;
+  background: rgba(30, 10, 10, .72); border: 1px solid rgba(255, 90, 79, .5); color: #fff; z-index: 12; min-width: 260px; animation: grabin .2s ease-out; }
+.grab > b { font-size: 20px; letter-spacing: .1em; text-transform: uppercase; color: #ff8a80; } .grab > span { font-size: 13px; color: rgba(255, 255, 255, .8); }
+.grab i { display: block; width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+.grab i b { display: block; height: 100%; } .grab .ge b { background: #7bd88f; } .grab .gt b { background: #ff6b5e; height: 3px; }
+@keyframes grabin { from { transform: translateX(-50%) scale(1.2); opacity: 0; } }

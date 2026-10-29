@@ -32,6 +32,8 @@ import VLINES from './vendor_lines.json';
 import { Rep } from '../people/rep.js';
 import { Blood } from '../gfx/blood.js';
 import { Duty } from './duty.js';
+import { ikArm } from '../people/humans.js';
+const _cufT = new THREE.Vector3(), _cufP = new THREE.Vector3();
 import { justOpened, lineOpen, opensOn } from './metroOpen.js';
 import { Club } from './club.js';
 import { Lights } from './lights.js';
@@ -46,7 +48,6 @@ import { bagOrder } from './bag.js';
 import { Brain } from '../people/brain.js';
 import { Emergency } from './emergency.js';
 import { Weather } from '../gfx/weather.js';
-import { ikArm } from '../people/humans.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { StreetApproach } from './approach.js';
@@ -242,7 +243,9 @@ export class Game {
     this.trial = new Trial(this);
     this.people.reaction = () => this.life.reaction();
     player.hpMax = () => this.life.hpMax;
-    player.sprintMul = () => this.life.sprintMul;
+    // sprinting tires you (about 15 s flat out, then you're down to a jog till you've got your breath back); shot or
+    // limping, you can't run at all
+    player.sprintMul = () => { const P = this.player; return this.life.sprintMul * (P.stam < 0.12 ? 0.58 : 1) * (P.limpT > 0 ? 0.5 : 1); };
     player.drunk = () => this.life.s.drunk;
     player.useHook = () => this.shops.tryUse();
     this.origLook = player.look ? { ...player.look, top: player.look.top.clone(), bottom: player.look.bottom.clone(), shoe: player.look.shoe.clone(), hair: player.look.hair.clone(), cut: player.look.cut.clone() } : null;
@@ -362,7 +365,7 @@ export class Game {
     if (was > 0 && v.fuel <= 0) this.hud.toast('Out of fuel', 'The engine coughs. You can crawl to a pump', 'bad', 4);
     const fuelMul = v.fuel > 0 ? 1 : 0.22;
     // a beaten engine: weaker and weaker, smoking, then burning, then gone
-    v.powerMul = v.dead || (this.refuel && this.refuel.v === v) ? 0 : (v.tune || 1) * fuelMul * (1 - Math.min(0.95, v.dmg) * 0.6);
+    v.powerMul = v.dead || (this.refuel && this.refuel.v === v) ? 0 : (v.tune || 1) * fuelMul * (1 - Math.min(0.95, v.dmg) * 0.6) * (v.flat > 0 ? 0.35 : 1);   // (shredded tyres: it limps)
     this.engineState(v, dt);
     if (v === P.auto) { this.life.s.autoFuel = Math.round(v.fuel * 1000) / 1000; this.life.s.autoDmg = Math.round(v.dmg * 1000) / 1000; }
   }
@@ -1047,7 +1050,7 @@ export class Game {
       if (ev.type === 'pedDied' && ev.bled) { this.hud.toast('They didn’t make it', 'Nobody got them to a hospital in time', 'bad', 4); }
       else if (ev.type === 'pedDied' && this.blood) this.blood.spill(ev.x, ev.z, 0.9, 30);
       if (ev.type === 'pedDied' && !ev.bled) {
-        if (!this.free) { this.hud.toast('You killed someone', 'Murder is BNS s.103. There were witnesses', 'bad', 5); this.life.change('karma', -30); this.police && this.police.raiseHeat && this.police.raiseHeat(3, 'Killed someone in a fight', null); }
+        if (!this.free) { this.hud.toast('You killed someone', 'Murder is BNS s.103. If anyone saw, they’ll call it in', 'bad', 5); this.life.change('karma', -30); this.police && this.police.law && this.police.law.report(3, 'Killed someone in a fight', 'murder', ev.x ?? P.x, ev.z ?? P.z, { victim: ev.p }); }
       }
       if (ev.type === 'pet') {
         const a = ev.a; a.moving = false; a.rest = 8; this.life.change('mood', 0.06);
@@ -1083,8 +1086,8 @@ export class Game {
         const J = ev.p && ev.p.inj, sev = J ? J.sev : ev.sev;
         if (this.blood && sev !== 'knock') this.blood.spill(ev.p.x, ev.p.z, sev === 'dead' ? 1.1 : sev === 'critical' ? 0.85 : 0.35, sev === 'ko' ? 15 : 40);
         this.audio.thud(ev.sev === 'knock' ? 0.4 : 0.8); this.rig.shake(ev.sev === 'knock' ? 0.15 : 0.35);
-        if (ev.sev === 'dead') { this.hud.toast('You killed someone', 'Hit and run is BNS s.106: up to ten years. Every cop in Pune is looking for you', 'bad', 5); this.life.change('karma', -25); this.police && this.police.raiseHeat && this.police.raiseHeat(3, 'Killed a pedestrian', null); }
-        else if (ev.sev === 'ko') { this.hud.toast('You knocked someone out', 'They’re not getting up. People are calling the police', 'bad', 3.6); this.life.change('karma', -6); this.police && this.police.raiseHeat && this.police.raiseHeat(1, 'Hit a pedestrian', null); }
+        if (ev.sev === 'dead') { this.hud.toast('You killed someone', 'Hit and run is BNS s.106: up to ten years. If anyone saw, they’ll call it in', 'bad', 5); this.life.change('karma', -25); this.police && this.police.law && this.police.law.report(3, 'Killed a pedestrian', 'hitrun', ev.x, ev.z, { victim: ev.p }); }
+        else if (ev.sev === 'ko') { this.hud.toast('You knocked someone out', 'They’re not getting up. Someone may call it in', 'bad', 3.6); this.life.change('karma', -6); this.police && this.police.law && this.police.law.report(1, 'Hit a pedestrian', 'hitrun', ev.x, ev.z, { victim: ev.p }); }
         else { this.hud.toast('Watch the pedestrians!', 'They’re hurt and furious', 'warn', 2.4); this.stats.money = Math.max(0, this.stats.money - 50); }
       }
       if (ev.type === 'dodge') { if (this.rng.chance(0.35) && (this._dodgeT || 0) < this.t) { this._dodgeT = this.t + 4; if (!(ev.p && this.people.speakAs('dodge', ev.p, 1, 4))) this.police.say(this.rng.pick(['d1', 'd2', 'd3', 'd4']), ev); } }
@@ -1118,6 +1121,15 @@ export class Game {
     if (!this.under) { this.under = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshLambertMaterial({ color: 0x2b2b2d })); this.under.rotation.x = -Math.PI / 2; this.under.receiveShadow = false; this.scene.add(this.under); }
     this.under.position.set(Math.round(this.camera.position.x / 50) * 50, -0.03, Math.round(this.camera.position.z / 50) * 50);
     this.W.playerVeh = this.player.onFoot ? null : this.player.cur;      // (only your driving wrecks the traffic)
+    // in cuffs: hands together behind your back
+    if (this.cuffT > 0) {
+      this.cuffT -= dt; const P = this.player, H = P.human;
+      if (H && P.onFoot) {
+        H.holder.updateMatrixWorld(true);
+        const F = P.foot, fx = Math.cos(F.yaw), fz = Math.sin(F.yaw), rx = -fz, rz = fx;
+        for (const sd of [1, -1]) { _cufT.set(F.x - fx * 0.2 + rx * 0.05 * sd, F.y + 0.92, F.z - fz * 0.2 + rz * 0.05 * sd); _cufP.set(rx * sd, -0.5, rz * sd).normalize(); ikArm(H, sd > 0 ? 'r' : 'l', _cufT, _cufP, 1); }
+      }
+    }
     if (this.blood) this.blood.update(dt);
     if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); if (this.traffic && this.state === 'play') this.trafficDamage(dt); }
     this.stepRefuel(dt);

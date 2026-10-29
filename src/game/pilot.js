@@ -130,6 +130,8 @@ export class Pilot {
     const len = Math.hypot(fw, sd) || 1;
     fw /= len; sd /= len;
     const run = k('ShiftLeft', 'ShiftRight');
+    this.stam = Math.max(0, Math.min(1, (this.stam ?? 1) + (run && (fw || sd) && F.v > 3.5 ? -dt / 15 : dt / 8)));
+    if (this.limpT > 0) this.limpT -= dt;
     const target = (fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0;
     const cy = camYaw ?? F.yaw;
     let dx = Math.cos(cy) * fw - Math.sin(cy) * sd, dz = Math.sin(cy) * fw + Math.cos(cy) * sd;

@@ -620,7 +620,7 @@ export class People {
   stepChase(p, dt) {
     const T = p.chase, dx = T.x - p.x, dz = T.z - p.z, d = Math.hypot(dx, dz);
     p.yaw = Math.atan2(dz, dx); p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
-    if (d < 1.1) { p.v = 0; return; }
+    if (d < 1.1) { p.v = 0; if (p.lathi && !p.act && (p.swingT = (p.swingT || 0) - dt) <= 0) { p.swingT = 1.1 + Math.random() * 0.8; p.act = { kind: 'atk', clip: Math.random() < 0.5 ? 'hook' : 'cross', speed: 1.1, t: 0, dur: 0.6 }; p.actId = (p.actId || 0) + 1; } return; }
     const sp = p.runSp || 4.6, st = Math.min(d - 1, sp * dt), surf = this.W.surf;
     let nx = p.x + dx / d * st, nz = p.z + dz / d * st;
     if (surf.inBuilding && surf.inBuilding(nx, nz) && !surf.inBuilding(p.x, p.z)) { nx = p.x - dz / d * st; nz = p.z + dx / d * st; }   // round the corner

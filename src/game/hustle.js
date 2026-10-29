@@ -110,7 +110,7 @@ export class Hustle {
       G.people.speakAs && G.people.speakAs('fight', p, 1, 0);
       if (this.rng.next() < 0.5) G.people.startFight(p, P); else G.people.flee(p, P.x, P.z, 18);
       const cop = G.police.copSeeing && G.police.copSeeing(P.x, P.z, 60);
-      if (cop || this.rng.next() < 0.3) G.police.raiseHeat(1, cop ? 'A cop saw you pickpocketing' : 'Someone called 112 about a pickpocket', 'pickpocket');
+      if (G.police.law) G.police.law.report(1, cop ? 'A cop saw you pickpocketing' : 'Pickpocketing', 'pickpocket', P.x, P.z, { direct: !!cop, victim: p });
     }
   }
 

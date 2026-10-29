@@ -175,8 +175,8 @@ export class Brain {
     if (!I.byYou || I.reported || !this.g.police || this.g.free) return;
     if (R() > 0.25 + t.helpful * 0.4 + t.brave * 0.2) return;
     I.reported = true;
-    this.g.later(4 + R() * 6, () => { if (!this.g.free) this.g.police.raiseHeat(1, I.kind === 'down' ? 'A witness called 100' : 'Someone called the police', null); });
-    p.act = { clip: 'phone', t: 0, dur: 4 };
+    // (the police's own witness system: they get the phone out and you have a little while)
+    if (this.g.police.law) this.g.police.law.report(1, I.kind === 'down' ? 'Someone got hurt' : 'Trouble on the street', I.kind === 'down' ? 'assault' : null, I.x, I.z, { victim: I.victim });
   }
   // a chat in the middle of the footpath: they face each other, one talks, the other nods or shakes their head
   startChat(a, b) {

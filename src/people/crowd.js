@@ -162,7 +162,7 @@ export class Crowd {
     if (p.react > 0 && p.reactAnim) return [p.reactAnim, 1, p.reactAnim === 'hit'];
     if (p.angry > 0) return ['no', 1];
     if (p.pax) return ['wave', 1];
-    if (p.cop) return [(performance.now() / 1000 + p.id % 17) % 14 < 4 ? 'wave' : 'arms_folded', 1];
+    if (p.cop && (vel ?? p.v) < 0.3 && p.mode !== 'chase') return [(performance.now() / 1000 + p.id % 17) % 14 < 4 ? 'wave' : 'arms_folded', 1];
     const v = vel ?? p.v;
     if (v < 0.25 && (p.mode === 'stand' || p.mode === 'watch' || p.v < 0.15 || v < 0.12)) return [idleFor(p), 1];
     if (v > 2.2) return ['jog', clamp(v / NAT.jog, 0.6, 1.5)];

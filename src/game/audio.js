@@ -268,6 +268,21 @@ export class Audio {
     if (S.p.positionX) { S.p.positionX.setTargetAtTime(sp.x, t, 0.05); S.p.positionY.setTargetAtTime(1.8, t, 0.05); S.p.positionZ.setTargetAtTime(sp.z, t, 0.05); } else S.p.setPosition(sp.x, 1.8, sp.z);
   }
 
+  // a burst of radio static (police chatter, quiet)
+  noiseBurst(dur, f, q, vol, at) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, n = Math.floor(ctx.sampleRate * dur), b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const s = ctx.createBufferSource(); s.buffer = b;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
+    const g = ctx.createGain(); g.gain.value = vol;
+    s.connect(bp).connect(g);
+    if (at) this.at(at.x, at.z, () => this.out3(g, 0, this.bus('fx'))); else g.connect(this.bus('fx'));
+    s.start();
+  }
+  squelch() { this.noiseBurst(0.18, 1900, 1.2, 0.05); setTimeout(() => this.noiseBurst(0.08, 2400, 2, 0.035), 320); }
+  cuffs() { this.noiseBurst(0.05, 4200, 6, 0.25); setTimeout(() => this.noiseBurst(0.05, 3800, 6, 0.22), 140); }
+  gunshot() { this.noiseBurst(0.35, 900, 0.4, 0.9, this._at); this.boom && setTimeout(() => this.noiseBurst(0.6, 300, 0.5, 0.25, this._at), 30); }
   // the 108's siren: a two-tone hi-lo (not the police wail), from the ambulance
   ambSiren(level, at) {
     if (!this.ctx) return;

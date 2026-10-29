@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { Vehicle, specOf, makeService } from '../vehicles/vehicle.js';
 import { ikArm, leanRider, RIDER_HIPS, RIDER_LEAN } from '../people/humans.js';
 import { buildPoliceJeep } from '../vehicles/emodels.js';
+import { Law } from './law.js';
 import { clamp, wrapAngle, RNG, safeStorage, fmtRupees } from '../core/util.js';
 import LINES from './lines.json';
 import { POLICE_MUL } from './settings.js';
@@ -42,17 +43,20 @@ export const FINES = {
   hurt:      { amt: 5000, name: 'Voluntarily causing hurt', law: 'BNS s.115' },
   hitrun:    { amt: 5000, name: 'Hit and run: not stopping after hitting someone', law: 'MV Act s.134/187' },
   fled:      { amt: 3000, name: 'Escaping from lawful custody', law: 'BNS s.262' },
+  murder:    { amt: 50000, name: 'Murder', law: 'BNS s.103' },
+  blast:     { amt: 25000, name: 'Mischief by fire or explosive', law: 'BNS s.326' },
+  court:     { amt: 2000, name: 'Fine imposed by the court', law: 'Judicial order' },
   pickpocket: { amt: 3000, name: 'Pickpocketing (theft)', law: 'BNS s.303' },
   stolengoods: { amt: 10000, name: 'Carrying stolen property', law: 'BNS s.317' },
   racing:    { amt: 5000, name: 'Racing on a public road', law: 'MV Act s.189' },
 };
 // what you're wanted for decides what the marshals shout and what you're booked under when caught
-const SERIOUS = new Set(['theft', 'assault', 'hurt', 'hitrun', 'fled', 'pickpocket']);
-const CHARGE_ORDER = ['assault', 'hitrun', 'theft', 'pickpocket', 'hurt', 'fled', 'disobey'];
+const SERIOUS = new Set(['theft', 'assault', 'hurt', 'hitrun', 'fled', 'pickpocket', 'murder', 'blast']);
+const CHARGE_ORDER = ['murder', 'blast', 'assault', 'hitrun', 'theft', 'pickpocket', 'hurt', 'fled', 'disobey'];
 const TOW = { two: 200, three: 200, four: 400, fine: 500 };   // towing charges + no-parking fine
 const SPEED_LIMIT = 50;                                         // km/h on city arterials
 const COP_NAMES = ['Havaldar Shinde', 'Havaldar Jadhav', 'PSI Kulkarni', 'Havaldar Pawar', 'Havaldar Gaikwad', 'ASI Deshmukh', 'Havaldar More', 'PSI Patil', 'Havaldar Sawant', 'Havaldar Kamble'];
-const STOP_LINE = { signal: 'stop_signal', helmet: 'stop_helmet', wrong: 'stop_wrong', speed: 'stop_speed', horn: 'stop_horn', check: 'stop_check', rash: 'stop_speed', suspended: 'stop_check', theft: 'caught_theft', assault: 'caught_assault', hurt: 'caught_hurt', hitrun: 'caught_hitrun', fled: 'caught_fled', disobey: 'caught_disobey', pickpocket: 'caught_pickpocket' };
+const STOP_LINE = { signal: 'stop_signal', helmet: 'stop_helmet', wrong: 'stop_wrong', speed: 'stop_speed', horn: 'stop_horn', check: 'stop_check', rash: 'stop_speed', suspended: 'stop_check', theft: 'caught_theft', assault: 'caught_assault', hurt: 'caught_hurt', hitrun: 'caught_hitrun', fled: 'caught_fled', disobey: 'caught_disobey', pickpocket: 'caught_pickpocket', murder: 'caught_assault', blast: 'caught_assault' };
 
 export class Police {
   constructor(game) {
@@ -74,6 +78,7 @@ export class Police {
     this.setupZones();
     this.chowkis = (this.W.M.pois || []).filter(p => p[4] === 'police').map(p => ({ name: p[0], x: p[2] / 100, z: p[3] / 100 }));
     this.zone = null;
+    this.law = new Law(this.g, this);
   }
 
   // ---------------------------------------------------------------- persistence
@@ -214,6 +219,8 @@ export class Police {
     this.checkCameras(dt);
     this.checkZones(dt);
     if (this.stop) this.updateStop(dt);
+    if (!G.free) this.law.update(dt);
+    if (this.grab) this.grabTick(dt);
     this.updateHeat(dt);
     this.updateTowing(dt);
     // licence chip
@@ -347,16 +354,16 @@ export class Police {
         { id: 'pay', t: serious ? 'Go quietly' : 'Pay the fine', s: serious ? `Bail ${fmtRupees(total)}${stolen ? ' · vehicle returned' : ''}` : `${fmtRupees(total)} by UPI on the e-challan machine` },
         { id: 'plead', t: 'Plead', s: serious ? (s.kind === 'theft' ? '“Saheb, galti jhali…”' : s.kind === 'hitrun' ? '“Saheb, ghabarlo hoto, thaambaycha hota…”' : '“Saheb, tyaane aadhi suru kela…”') : '“Saheb, pehli vel aahe, passenger la ushir hotoy…”' },
         { id: 'argue', t: s.kind === 'signal' ? '“It was still amber!”' : 'Argue', s: s.kind === 'signal' ? 'Only works if it really was' : '“Mi kahi kela nahi!”' },
-        { id: 'bribe', t: 'Offer chai-pani', s: `${fmtRupees(s.bribe)} in hand, quietly` },
+        { id: 'bribe', t: 'Offer chai-pani', s: (cop.corrupt ? this.rng.next() < 0.75 : this.rng.next() < 0.25) ? 'He keeps glancing at your wallet' : 'He looks like he goes by the book' },
       ];
       if (serious) s.opts[2] = { id: 'run', t: P.onFoot ? 'Run for it' : 'Floor it', s: 'They will chase you' };
     }
-    G.hud.openStop({
-      who: cop.name, kind: (s.kind === 'check' && s.found ? FINES[s.found].name : FINES[s.kind].name) + (s.kind !== 'disobey' && this.charges.has('disobey') && serious ? ' + ignoring a police signal' : ''), law: FINES[s.kind].law,
+    s.view = {
+      who: cop.name, rank: cop.marshal ? (cop.marshal.role === 'qrt' ? 'QRT, Pune Police' : cop.marshal.jeep ? 'Patrol, Pune Police' : 'Beat Marshal, Pune Police') : 'Traffic Police, Pune', mood: cop.mood, kind: (s.kind === 'check' && s.found ? FINES[s.found].name : FINES[s.kind].name) + (s.kind !== 'disobey' && this.charges.has('disobey') && serious ? ' + ignoring a police signal' : ''), law: FINES[s.kind].law,
       amt: s.kind === 'check' && !s.found ? '' : fmtRupees(total), line: LINES[line][4], tr: LINES[line][5], opts: s.opts,
       foot: `${dues ? `Pending challans ${fmtRupees(dues)}` : 'No pending challans'} · ${this.suspended ? 'Licence suspended' : 'Licence valid'} · ${fmtRupees(G.stats.money)} on you`,
-      onPick: (i) => this.choose(i),
-    });
+    };
+    G.hud.openStop({ ...s.view, onPick: (i) => this.choose(i) });
     s.phase = 'talk';
   }
   choose(i) {
@@ -404,6 +411,47 @@ export class Police {
         if (dues && G.stats.money >= dues) { G.stats.money -= dues; this.dues = []; this.save(); }
         res = 'That made it worse'; sub = `Full fine${dues ? ' and your pending challans' : ''}: ${fmtRupees(want)}${paid < s.total ? ' (part pending)' : ''}.`; kind = 'bad';
       }
+    } else if (o.id === 'bribe' && !s.neg) {
+      // how much? his price is hidden: what the charge is worth to him, his mood, how often you've done this
+      const base = Math.max(200, s.total || 500) * (theft ? 2.2 : 1);
+      s.neg = { R: cop.corrupt ? base * (0.35 + (1 - cop.mood) * 0.45) * (1 + cop.bribes * 0.4) : Infinity, tries: 0 };
+      const r50 = (x) => Math.max(100, Math.round(x / 50) * 50);
+      s.opts = [0.25, 0.5, 0.85, 1.3].map(k => ({ id: 'offer', amt: r50(base * k), t: fmtRupees(r50(base * k)), s: k < 0.3 ? '“Saheb, chai-pani…”' : k < 0.6 ? 'Folded, under the licence' : k < 1 ? '“Adjust kara na, saheb”' : 'More than the fine, to make it go away' }));
+      s.opts.push({ id: 'back', t: 'Never mind', s: 'Pay the fine properly instead' });
+      G.hud.openStop({ ...s.view, line: 'Bol. Kiti?', tr: 'Go on. How much?', opts: s.opts, onPick: (i) => this.choose(i), mood: cop.mood, neg: true });
+      return;
+    } else if (o.id === 'back') {
+      s.neg = null; const paid = this.charge(s.kind, s.total); res = `Paid ${fmtRupees(paid)}`; sub = 'Properly, with a receipt. He looks almost disappointed.'; line = 'r_pay'; G.audio.cash();
+    } else if (o.id === 'offer' || o.id === 'counter_yes') {
+      const amt = o.amt, N = s.neg;
+      if (G.stats.money < amt) { line = 'r_plead_no'; res = 'You don’t have it'; sub = `You fumble for ${fmtRupees(amt)} you don’t have. He writes the challan.`; this.charge(s.kind, s.total); kind = 'warn'; }
+      else if (!isFinite(N.R)) {
+        // an honest one
+        line = 'r_bribe_no'; res = 'Booked for offering a bribe'; sub = `Prevention of Corruption Act. ${fmtRupees(5000)} penalty, licence suspended.`; kind = 'bad';
+        this.charge('bribe', 5000, 'Attempt to bribe a public servant'); this.suspend(24, 'Bribery attempt');
+        if (theft) this.arrest('Tried to bribe the officer', true);
+      } else if (amt >= N.R || o.id === 'counter_yes') {
+        G.stats.money -= amt; cop.bribes++;
+        if (this.rng.next() < 0.1) { this.charge(s.kind, s.total); line = 'r_bribe_more'; res = 'He took it, and booked you anyway'; sub = `${fmtRupees(amt)} gone, and the full challan. Welcome to Pune.`; kind = 'bad'; }
+        else {
+          line = cop.bribes > 1 ? 'r_bribe_more' : 'r_bribe_ok'; res = `${fmtRupees(amt)} changes hands`; sub = cop.bribes > 1 ? 'He remembers you. The rate goes up every time.' : 'No receipt, obviously.'; kind = 'warn';
+          if (theft) { this.confiscate(); this.heat = 0; this.pts = 0; this.clearMarshals(); this.clearCharges(); sub = 'The case never gets written. You walk away.'; }
+          if (this.rng.next() < 0.12) this.later(25 + this.rng.next() * 40, () => { G.hud.sms('Pune Mirror', `Video of a policeman taking cash at ${this.whereName(cop.x, cop.z)} goes viral. Constable suspended; the driver traced.`, fmtRupees(s.total + 1000), 'Challan + penalty, pending'); this.addDue(s.kind, s.total + 1000, 'traced from a viral video'); });
+        }
+      } else if (amt >= N.R * 0.6 && !N.tries) {
+        // close: he names his number
+        N.tries = 1; const c = Math.max(amt + 100, Math.round(N.R / 50) * 50);
+        s.opts = [{ id: 'counter_yes', amt: c, t: `Pay ${fmtRupees(c)}`, s: 'His number, final' }, { id: 'back', t: 'Too much', s: 'Pay the fine instead' }];
+        G.hud.openStop({ ...s.view, line: `Itna nahi chalega. ${c}. Bas.`, tr: `That won’t do. ${c}. That’s it.`, opts: s.opts, onPick: (i) => this.choose(i), mood: cop.mood, neg: true });
+        return;
+      } else {
+        // insulting
+        cop.mood = Math.max(0, cop.mood - 0.3); line = 'r_bribe_no';
+        const book = this.rng.next() < 0.4;
+        this.charge(s.kind, s.total); if (book) this.charge('bribe', 2000, 'Attempt to bribe a public servant');
+        res = book ? 'Insulted, and booked for it' : 'He’s insulted'; sub = book ? 'Full fine plus a bribery penalty.' : `Full fine, ${fmtRupees(s.total)}, and a long look at your face.`; kind = 'bad';
+      }
+      s.neg = null;
     } else if (o.id === 'bribe') {
       if (G.stats.money < s.bribe) { line = 'r_plead_no'; res = 'You don’t have it'; sub = `You fumble for ${fmtRupees(s.bribe)} you don’t have. He writes the challan.`; this.charge(s.kind, s.total); kind = 'warn'; }
       else if (cop.corrupt && r < 0.9) {
@@ -457,13 +505,13 @@ export class Police {
   // ---------------------------------------------------------------- theft, heat, beat marshals
   onEvent(ev) {
     const G = this.g, P = G.player;
-    if (ev.type === 'carjack') this.raiseHeat(this.copSeeing(ev.x, ev.z, 70) ? 2 : 1, 'Vehicle theft, the owner is calling it in', 'theft');
-    if (ev.type === 'stoleParked' && this.rng.next() < 0.4) this.later(18 + this.rng.next() * 25, () => { if (P.cur === ev.veh && !P.onFoot) this.raiseHeat(1, 'The owner reported their ' + ev.name + ' stolen', 'theft'); });
+    if (ev.type === 'carjack') { const cop = this.copSeeing(ev.x, ev.z, 70); if (cop) { this.raiseHeat(2, 'Vehicle theft in front of a cop', 'theft'); this.law.setDesc(); } else this.later(1.5, () => this.law.report(1, 'Vehicle theft, the owner is calling it in', 'theft', ev.x, ev.z, { direct: true })); }
+    if (ev.type === 'stoleParked' && this.rng.next() < 0.4) this.later(18 + this.rng.next() * 25, () => { ev.veh.reported = true; if (P.cur === ev.veh && !P.onFoot) { this.raiseHeat(1, 'The owner reported their ' + ev.name + ' stolen', 'theft'); this.law.setDesc(); this.law.radioDesc(); } });
     if (ev.type === 'pedHit' && !P.onFoot) {
       const cop = this.copSeeing(P.x, P.z, 50);
       if (cop && !this.stop) this.beginStop(cop, 'rash', {});
       // nobody in uniform saw it, but someone on the footpath took the number
-      else if (!cop && (ev.speed || 0) > 4 && this.rng.next() < 0.35) this.later(6 + this.rng.next() * 10, () => this.raiseHeat(1, 'Hit and run: a witness took your number', 'hitrun'));
+      else if (!cop && (ev.speed || 0) > 4) this.law.report(1, 'Hit and run', 'hitrun', ev.x, ev.z, { victim: ev.p });
     }
   }
   raiseHeat(n, why, charge = 'theft') {
@@ -473,8 +521,10 @@ export class Police {
     if (charge) this.charges.add(charge);
     // heat is points underneath (0–100), the level is what they add up to: a pickpocket gets you Noticed, a killing
     // Pursuit, and only a run of it all a Manhunt; the closer to the top, the less each new thing adds
-    const add = n <= 1 ? 14 : n === 2 ? 30 : 50;
-    this.pts = Math.min(100, (this.pts || 0) + add * (1 - (this.pts || 0) / 130));
+    // heat counts crimes while they're on you (a killing weighs more): 1 gets you Noticed, 3 Wanted, 7 Pursuit,
+    // 15 Nakabandi, 25 Manhunt
+    const add = n <= 1 ? 1 : n === 2 ? 1.5 : 2.5;
+    this.pts = Math.min(30, (this.pts || 0) + add);
     this.heat = levelOf(this.pts);
     this.unseenT = 0;
     this.lastSeen = { x: G.player.x, z: G.player.z };
@@ -487,7 +537,9 @@ export class Police {
     const G = this.g, P = G.player;
     // who comes, by level: Noticed (a beat marshal), Wanted (two), Pursuit (two and a patrol jeep), Nakabandi
     // (checkpoints at the junctions ahead too), Manhunt (more of everyone)
-    const H = this.heat, wantBikes = [0, 1, 2, 2, 3, 4][H], wantJeeps = [0, 0, 0, 1, 1, 2][H];
+    // more crimes within a level bring more of them, not a higher level
+    const H = this.heat, extra = Math.min(2, Math.floor(((this.pts || 0) - HEAT_AT[H]) / 2));
+    const wantBikes = [0, 1, 2, 2, 3, 4][H] + (H ? extra : 0), wantJeeps = [0, 0, 0, 1, 1, 2][H] + (H >= 3 ? Math.min(1, extra) : 0);
     const bikes = this.marshals.filter(m => !m.jeep).length, jeeps = this.marshals.length - bikes;
     if ((this._spT = (this._spT || 0) - dt) <= 0 && (bikes < wantBikes || jeeps < wantJeeps)) { this._spT = 4; this.spawnMarshal(jeeps < wantJeeps && (bikes >= wantBikes || this.rng.chance(0.5)) ? 'jeep' : 'bike'); }
     this.nakabandi(dt);
@@ -500,7 +552,7 @@ export class Police {
       if (m.pursuing && m.mode === 'drive' && d < nearest) { nearest = d; this.sirenAt = { x: m.veh.x, z: m.veh.z }; const hx = Math.cos(P.th), hz = Math.sin(P.th); sirenPan = clamp((-(m.veh.x - P.x) * hz + (m.veh.z - P.z) * hx) / (d || 1), -1, 1); }
       if ((this.heat === 0 && d > 90) || d > 520) { m.dispose(); this.marshals.splice(i, 1); continue; }
       // caught?
-      if (this.heat > 0 && !this.stop && m.stunT <= 0) {
+      if (this.heat > 0 && !this.stop && !this.grab && m.stunT <= 0) {
         const slow = P.onFoot ? d < 2.6 : (d < 6 && Math.abs(P.v) < 2.2);
         m.catchT = slow ? (m.catchT || 0) + dt : 0;
         if (m.catchT > (P.onFoot ? 0.4 : 1.2)) this.caught(m);
@@ -513,14 +565,16 @@ export class Police {
     if (this.heat > 0) {
       if (seen) this.unseenT = 0; else this.unseenT += dt;
       // out of sight the points drain (after a few seconds of them looking), quicker at the low levels
-      if (this.unseenT > 6) this.pts = Math.max(0, (this.pts || 0) - dt * (2.2 - this.heat * 0.3));
+      // out of sight they slowly give up: about a crime's worth every 12 s (faster indoors, in a crowd, changed)
+      if (this.unseenT > 6) this.pts = Math.max(0, (this.pts || 0) - dt * 0.085 * this.law.coolMul());
       const was = this.heat; this.heat = levelOf(this.pts || 0);
       if (this.heat < was) {
         if (this.heat === 0) { G.hud.toast('You lost them', 'The police have given up, for now', 'meter', 3); this.say('m_lost', null, true); this.clearCharges(); }
         else G.hud.toast(LEVELS[this.heat], 'Fewer of them looking', 'info', 2);
       }
-      const lo = HEAT_AT[this.heat - 1] || 0, hi = HEAT_AT[this.heat] ?? 100;
-      G.hud.setHeat(this.heat, seen, ((this.pts || 0) - lo + 2) / (hi - lo + 2), LEVELS[this.heat], this.marshals.length + (this.naka ? 1 : 0));
+      // the ring: how much is left before they drop to the level below
+      const lo = HEAT_AT[this.heat], hi = HEAT_AT[this.heat + 1] ?? 30;
+      G.hud.setHeat(this.heat, seen, ((this.pts || 0) - lo + 0.6) / (hi - lo + 0.6), LEVELS[this.heat], this.marshals.length + (this.naka ? 1 : 0));
     } else G.hud.setHeat(0);
   }
   // checkpoints (nakabandi): barricades across a junction on the road ahead of you, a jeep and constables with lathis;
@@ -566,8 +620,9 @@ export class Police {
   nakaTick(dt) {
     const N = this.naka, G = this.g, P = G.player;
     N.t += dt; const f = Math.sin(N.t * 14) > 0; N.lights.red.visible = f; N.lights.redOff.visible = !f; N.lights.blue.visible = !f; N.lights.blueOff.visible = f;
-    // stopped at the barricade: that's you caught
+    // stopped at the barricade: that's you caught; through the gap at speed: the stinger
     const d = Math.hypot(N.x - P.x, N.z - P.z);
+    if (d < 4 && !P.onFoot && Math.abs(P.v) > 4 && P.cur) this.law.flatten(P.cur, 'The stinger at the nakabandi shredded your tyres');
     if (d < 7 && Math.abs(P.v || 0) < 1.5 && !this.stop && N.cops[0]) { const m = this.marshals[0]; if (m) this.caught(m); }
   }
   clearNaka() {
@@ -576,6 +631,12 @@ export class Police {
     G.scene.remove(N.group); this.W.collision.removeTag(N.tag, [N.x - 30, N.z - 30, N.x + 30, N.z + 30]);
     for (const p of N.cops) { const i = L.indexOf(p); if (i >= 0) { if (p.body) p.body.release(); L.splice(i, 1); } }
     this.naka = null;
+  }
+  roleFor(kind) {
+    const violent = ['assault', 'murder', 'hitrun', 'blast'].some(c => this.charges.has(c));
+    if (kind === 'jeep' && this.heat >= 5 && violent) return 'qrt';
+    if ([...this.charges].every(c => TRAFFIC_CH.has(c)) && this.charges.size) return 'traffic';
+    return 'beat';
   }
   spawnMarshal(kind = 'bike') {
     const G = this.g, P = G.player, W = this.W;
@@ -587,23 +648,45 @@ export class Police {
       if (!e) continue;
       const t = W.graph.at(e.e, e.s);
       if (G.inView && G.inView(t[0], t[1]) && k < 30) continue;
-      this.marshals.push(new Marshal(this, t[0], t[1], Math.atan2(P.z - t[1], P.x - t[0]), kind));
+      this.marshals.push(new Marshal(this, t[0], t[1], Math.atan2(P.z - t[1], P.x - t[0]), kind, this.roleFor(kind)));
       return;
     }
   }
   caught(m) {
     const G = this.g, P = G.player;
     const kind = this.topCharge();
-    // you fought them, or it's come to a manhunt: the lathis come out before the handcuffs
-    if ((this.charges.has('assault') || this.heat >= 5) && P.onFoot && !(P.downT > 0)) {
-      P.hp = Math.max(8, (P.hp ?? 100) - 22); P.downT = 2.2; if (P.human) P.human.play('knockback', { once: true, fade: 0.06 });
-      G.audio.punch?.(); G.rig && G.rig.shake(0.4); G.hud.toast('Lathi charge', 'They don’t ask twice when you’ve fought them', 'bad', 3);
+    // after a chase, or for anything serious: hands on you, no talking. You can try to wrench free (harder the more
+    // of them there are); otherwise it's the cuffs. Only a minor matter gets a conversation
+    if ((this.heat >= 2 || ['murder', 'assault', 'hitrun', 'blast'].some(c => this.charges.has(c))) && !this.grab) {
+      this.grab = { m, t: 0, need: 6 + this.marshals.reduce((n, u) => n + (u.catchDist() < 12 ? 3 : 0), 0), got: 0 };
+      P.busy = 999; G.hud.grab && G.hud.grab(true, 0); G.audio.thud && G.audio.thud(0.5);
+      this.law.radio('Hands on the suspect.');
+      return;
     }
+
     m.cop.name = 'Beat marshal';
     this.stop = { cop: m.cop, kind, fine: FINES[kind].amt + (this.charges.has('disobey') && kind !== 'disobey' ? FINES.disobey.amt : 0), phase: 'talk', t: 0, info: {} };
     m.cop.marshal = m;
     G.player.busy = 999;
     this.openTalk();
+  }
+  // the grab: mash F for three seconds to break free; fail and they cuff you
+  grabTick(dt) {
+    const G = this.g, P = G.player, R = this.grab; if (!R) return;
+    R.t += dt;
+    if (G.input.took('KeyF')) { R.got++; G.audio.thud && G.audio.thud(0.15); }
+    G.hud.grab && G.hud.grab(true, Math.min(1, R.got / R.need), 1 - R.t / 3);
+    if (R.got >= R.need) {
+      this.grab = null; P.busy = 0; G.hud.grab && G.hud.grab(false);
+      R.m.stunT = 3; for (const q of R.m.foot) { q.fallen = 1.8; } this.raiseHeat(1, 'Broke free from arrest', 'fled');
+      G.hud.toast('You wrench free', 'Shoved him off. Run!', 'meter', 2.2); return;
+    }
+    if (R.t > 3) {
+      this.grab = null; G.hud.grab && G.hud.grab(false);
+      // what happens now depends on what you did: a beating if you fought them, then the cuffs
+      if (this.charges.has('assault') || this.heat >= 4) { P.hp = Math.max(8, (P.hp ?? 100) - 18); G.audio.punch?.(); G.rig && G.rig.shake(0.4); G.hud.toast('Lathi charge', 'They don’t ask twice when you’ve fought them', 'bad', 2.6); }
+      this.arrest(this.heat >= 3 ? 'Caught after a chase' : 'Caught');
+    }
   }
   confiscate() {
     const P = this.g.player;
@@ -613,14 +696,23 @@ export class Police {
     const G = this.g, P = G.player;
     kind = kind || (this.stop && SERIOUS.has(this.stop.kind) ? this.stop.kind : this.topCharge());
     const fine = (this.stop && this.stop.kind === kind ? this.stop.total || FINES[kind].amt : FINES[kind].amt) + (extra ? 5000 : 0);
+    const list = [...new Set([kind, ...this.charges])].filter(c => FINES[c]).map(c => ({ name: FINES[c].name, law: FINES[c].law }));
+    const serious = SERIOUS.has(kind);
     this.charge(kind, fine, `Bail after arrest: ${FINES[kind].name}`);
     G.date && G.date.event('arrest', fine);
     if (G.lights && G.rng.chance(0.5)) G.lights.lose('Kept at the chowki with your other things');
     this.clearCharges();
     this.heat = 0; this.pts = 0; this.unseenT = 0; this.clearMarshals(); this.clearNaka();
     const ch = this.nearestChowki(P.x, P.z);
-    this.later(0.6, () => {
-      G.hud.flash(`Taken to ${ch.name}`, `${FINES[kind].name} (${FINES[kind].law}). ${why}. Released on bail · ${fmtRupees(fine)}`);
+    // the cuffs first: hands behind your back, the click, a hand on your shoulder
+    G.cuffT = 2.6; P.busy = 999; G.audio.cuffs ? G.audio.cuffs() : G.audio.thud && G.audio.thud(0.3);
+    this.law.radio(`Suspect in custody. Bringing them to ${ch.name}.`);
+    this.later(2.6, () => {
+      // booked: a card, a night in the lock-up for anything serious, a court date
+      const court = serious ? this.law.setCourt(list) : 'None, fine paid';
+      this.law.booking({ chowki: ch.name, charges: list, bail: fine, night: serious, court });
+      if (serious && G.setHour) { G.clock = (Math.floor((G.clock || 0) / 24) + 1) * 24 + 9; G.setHour(9); }
+      G.hud.flash(`Taken to ${ch.name}`, `${FINES[kind].name} (${FINES[kind].law}). ${why}. ${serious ? 'A night in the lock-up, then out' : 'Out'} on bail · ${fmtRupees(fine)}`);
       // you walk out of the chowki; your auto has been brought round
       if (P.cur && P.cur !== P.auto && !P.onFoot) P.abandon(G.traffic, true);
       const spot = this.kerbSpot(ch.x, ch.z);
@@ -716,17 +808,24 @@ export class Police {
 // ---------------------------------------------------------------- a beat marshal on a motorcycle
 const _g = new THREE.Vector3(), _pl = new THREE.Vector3();
 const LEVELS = ['', 'Noticed', 'Wanted', 'Pursuit', 'Nakabandi', 'Manhunt'];
+// who comes for what: traffic police (hi-vis vests) for the road, beat marshals for street crime, armed QRT in black
+// at a Manhunt for something violent
+const TRAFFIC_CH = new Set(['signal', 'speed', 'rash', 'helmet', 'horn', 'disobey', 'suspended', 'wrongway']);
+function dressRole(look, role) {
+  if (role === 'traffic') { look.top = new THREE.Color(0xd9f03a).convertSRGBToLinear(); look.pat = 1; look.patCol = new THREE.Color(0xc8ccd0).convertSRGBToLinear(); }
+  else if (role === 'qrt') { look.top = new THREE.Color(0x272b24).convertSRGBToLinear(); look.bottom = new THREE.Color(0x22261f).convertSRGBToLinear(); look.cut = new THREE.Vector4(0.92, 1, 0.6, 0); look.acc = 'helmet'; look.helmetCol = new THREE.Color(0x111111); look.helmetBand = false; }
+}
 // the points each level starts at
-const HEAT_AT = [0, 8, 30, 55, 76, 92];
+const HEAT_AT = [0, 1, 3, 7, 15, 25];
 const levelOf = (p) => HEAT_AT.filter((t, i) => i > 0 && p >= t).length;
 // a police unit: a beat marshal on a motorcycle, or a patrol jeep with two constables. They drive like trained
 // drivers (left of the lane, slowing for bends, stopping at red when they're not chasing anyone, braking for
 // people, never through traffic), chase with the siren when they've seen you, and get out and run after you
 // when you're on foot (a lathi in hand)
 class Marshal {
-  constructor(police, x, z, th, kind = 'bike') {
+  constructor(police, x, z, th, kind = 'bike', role = 'beat') {
     const G = police.g, W = police.W;
-    this.P = police; this.G = G; this.W = W; this.kind = kind; this.jeep = kind === 'jeep'; this.mode = 'drive'; this.foot = [];
+    this.P = police; this.G = G; this.W = W; this.kind = kind; this.role = role; this.jeep = kind === 'jeep'; this.mode = 'drive'; this.foot = [];
     this.veh = new Vehicle(W, G.scene, G.vmats, this.jeep ? 'suv' : 'bike', [0.92, 0.92, 0.9]);
     this.veh.reset(x, z, th);
     this.veh.y = W.surf.height(x, z);
@@ -741,6 +840,7 @@ class Marshal {
       look.top = new THREE.Color(0xc9ae76).convertSRGBToLinear(); look.bottom = new THREE.Color(0x6a5735).convertSRGBToLinear();
       look.cut = new THREE.Vector4(0.92, 1, 0.6, 0); look.shoe = new THREE.Color(0x111111);
       look.acc = 'helmet'; look.helmetCol = new THREE.Color(0xf2f2ee).convertSRGBToLinear(); look.helmetBand = true;
+      dressRole(look, role);
       this.H = W.kit.create(look);
       this.H.acc.color.set(0xf2f2f2);
       G.scene.add(this.H.holder);
@@ -782,7 +882,7 @@ class Marshal {
     this.stunT = 0; this.routeT = 0; this.route = null; this.stuckT = 0; this.revT = 0; this.sees = false; this.spotT = 0;
     this.crew = [];
     if (W.kit) for (const [sx, sy, sz] of md.seats) {
-      const look = W.kit.randomLook(police.rng, { role: 'police' }), H = W.kit.create(look);
+      const look = W.kit.randomLook(police.rng, { role: 'police' }); dressRole(look, this.role); const H = W.kit.create(look);
       H.holder.position.set(sx - 0.05, sy - 0.62, sz); v.tilt.add(H.holder); H.play('drive');
       this.crew.push({ H, look });
     }
@@ -801,7 +901,9 @@ class Marshal {
     const dx = P.x - v.x, dz = P.z - v.z, d = Math.hypot(dx, dz);
     const eye = this.mode === 'foot' && this.foot[0] ? this.foot[0] : v;
     const de = Math.hypot(P.x - eye.x, P.z - eye.z);
-    this.sees = police.heat > 0 && (de < 22 || (de < 75 && this.W.collision.ray(eye.x, eye.z, P.x, P.z) > 0.97));
+    // they're looking for a description: close up they know you, further off only if you still look like it
+    this.sees = police.heat > 0 && (de < 22 || (de < 75 && this.W.collision.ray(eye.x, eye.z, P.x, P.z) > 0.97)) && police.law.matches(de);
+    if (this.sees) police.law.setDesc();
     if (this.sees && !this.wasSeeing && this.spotT <= 0 && de < 60) { police.say(Math.random() < 0.75 ? 'spot_' + police.topCharge() : 'm_spot2', this); this.spotT = 12; }
     this.spotT -= dt;
     this.wasSeeing = this.sees;
@@ -812,12 +914,17 @@ class Marshal {
     const offRoad = P.onFoot && !W.surf.isRoad(P.x, P.z);
     if (police.heat > 0 && P.onFoot && this.stunT <= 0 && ((this.sees && (d < 45 || (d < 75 && (offRoad || Math.abs(v.v) < 1.5)))) || d < 18)) { this.dismount(); return; }
     let tx, tz, want, close = false;
+    // each of them has their own reactions and nerve: they go where they last saw you a moment ago (a sudden turn and
+    // they overshoot), and only as fast as they're willing to ride
+    if (!this.skill) this.skill = { lag: 0.7 + police.rng.next() * 1.1, top: 0.82 + police.rng.next() * 0.2 };
+    const trail = this.trail || (this.trail = []); trail.push({ x: P.x, z: P.z, t: police.g.t || 0 });
+    while (trail.length > 2 && (police.g.t || 0) - trail[1].t > this.skill.lag) trail.shift();
     if (police.heat > 0) {
-      const ls = this.sees ? { x: P.x, z: P.z } : police.lastSeen || { x: P.x, z: P.z };
+      const ls = this.sees ? trail[0] : police.lastSeen || { x: P.x, z: P.z };
       tx = ls.x; tz = ls.z;
-      want = pursuing ? (this.jeep ? 17 : 20) : 11;
-      // close behind you in a vehicle: up alongside, on your right, to wave you over
-      if (this.sees && !P.onFoot && d < 28) {
+      want = (pursuing ? (this.jeep ? 16 : 18) : 11) * this.skill.top;
+      // close behind you and you've slowed down: up alongside, on your right, to wave you over
+      if (this.sees && !P.onFoot && d < 18 && Math.abs(P.v) < 5) {
         const S = P.spec || { W: 0.6 }; close = true;
         tx = P.x + Math.cos(P.th) * 1.5 - Math.sin(P.th) * (S.W / 2 + 1.2); tz = P.z + Math.sin(P.th) * 1.5 + Math.cos(P.th) * (S.W / 2 + 1.2);
         want = Math.abs(P.v) + clamp((d - 2.5) * 0.9, 0, 5);
