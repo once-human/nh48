@@ -1505,3 +1505,13 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .grab i { display: block; width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .12); overflow: hidden; }
 .grab i b { display: block; height: 100%; } .grab .ge b { background: #7bd88f; } .grab .gt b { background: #ff6b5e; height: 3px; }
 @keyframes grabin { from { transform: translateX(-50%) scale(1.2); opacity: 0; } }
+
+/* the stop, out of your way: a compact card at the side; you can drive or walk off at any time */
+.stop.compact { left: auto; right: 18px; transform: none; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); width: min(380px, calc(100vw - 36px)); padding: 12px 14px; gap: 6px; }
+.stop.compact .st-line { font-size: 14.5px; } .stop.compact .st-tr { font-size: 12px; margin-top: 0; }
+.stop.compact .st-slip { margin-top: 6px; padding: 7px 10px; } .stop.compact .st-slip .st-amt { font-size: 18px; }
+.stop.compact .st-opts { grid-template-columns: 1fr; gap: 4px; }
+.stop.compact .st-opt { padding: 6px 8px; } .stop.compact .st-opt .o-s { font-size: 11px; }
+.stop.compact .st-foot::after { content: ' · or just leave (they’ll remember)'; color: var(--paper-3); }
+.stop.compact .st-mood { width: 70px; }
+.booking .bk-photo { display: block; width: 130px; height: 162px; object-fit: cover; border-radius: 6px; filter: saturate(.75) contrast(1.05); }

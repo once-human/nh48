@@ -216,6 +216,12 @@ export class Crowd {
         }
       }
     }
+    // hands on something (a stretcher's handles, a patient): the arms reach for it, on top of whatever clip is playing
+    if (p.hands && (seen || dd < 12)) {
+      H.holder.updateMatrixWorld(true);
+      const fx = Math.cos(p.yaw), fz = Math.sin(p.yaw);
+      p.hands.forEach((t, i) => { if (!t) return; const sd = i ? -1 : 1; _tg.set(t.x, t.y, t.z); _pl.set(-fz * sd * 0.6, -0.8, fx * sd * 0.6).normalize(); ikArm(H, sd > 0 ? 'r' : 'l', _tg, _pl, 1); });
+    }
     // a constable's lathi, in the right hand
     if (p.lathi) {
       if (!s.lathi) { const g = new THREE.CylinderGeometry(0.014, 0.016, 0.95, 6); g.translate(0, -0.3, 0); s.lathi = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.7 })); }

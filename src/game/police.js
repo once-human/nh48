@@ -292,7 +292,7 @@ export class Police {
       s.whistleT -= dt;
       if (s.whistleT <= 0 && d < 70) { s.whistleT = 2.6; G.audio.whistle(); }
       G.hud.prompt('!', d < 18 ? 'Stop here, the officer is walking over' : 'Traffic police waving you over, stop next to him', 0.3);
-      if (d < 18 && Math.abs(P.v) < 0.8) { s.phase = 'approach'; P.busy = 999; }
+      if (d < 18 && Math.abs(P.v) < 0.8) { s.phase = 'approach'; }
       else if (d > 65 || s.t > 16) {
         // drove off: the number is noted, the challan grows (and if it's stolen, word gets out)
         this.say('stop_ignored', cop);
@@ -315,6 +315,16 @@ export class Police {
       }
       s.phase = 'talk'; s.t = 0;
       this.openTalk();
+      return;
+    }
+    // you can always just leave: drive off or walk away mid-conversation. It's fleeing a police stop, and they react
+    if ((s.phase === 'approach' || s.phase === 'talk') && (Math.hypot(P.x - cop.x, P.z - cop.z) > 8 || Math.abs(P.v || 0) > 3 || (P.onFoot && (P.foot.v || 0) > 3))) {
+      G.hud.closeStop(); P.busy = 0;
+      this.say('m_spot2', cop);
+      const serious = SERIOUS.has(s.kind);
+      if (serious || cop.marshal) { this.raiseHeat(1, 'Fled from a police stop', 'disobey'); if (cop.marshal) cop.marshal.stunT = 1.5; this.law.setDesc(); this.law.radioDesc(); }
+      else { if (s.kind !== 'check') this.eChallan(s.kind, cop.x, cop.z, 'you drove off when stopped', FINES.disobey.amt); G.hud.toast('You left mid-stop', `He noted your number. Expect an extra ${fmtRupees(FINES.disobey.amt)} on the challan.`, 'bad', 3); }
+      if (ped) s.phase = 'leave'; else this.stop = null;
       return;
     }
     if (s.phase === 'talk' || s.phase === 'result') {
@@ -659,7 +669,7 @@ export class Police {
     // after a chase, or for anything serious: hands on you, no talking. You can try to wrench free (harder the more
     // of them there are); otherwise it's the cuffs. Only a minor matter gets a conversation
     if ((this.heat >= 2 || ['murder', 'assault', 'hitrun', 'blast'].some(c => this.charges.has(c))) && !this.grab) {
-      this.grab = { m, t: 0, need: 6 + this.marshals.reduce((n, u) => n + (u.catchDist() < 12 ? 3 : 0), 0), got: 0 };
+      this.grab = { m, t: 0, need: 4 + this.marshals.reduce((n, u) => n + (u.catchDist() < 10 ? 2 : 0), 0), got: 0 };
       P.busy = 999; G.hud.grab && G.hud.grab(true, 0); G.audio.thud && G.audio.thud(0.5);
       this.law.radio('Hands on the suspect.');
       return;
@@ -668,7 +678,7 @@ export class Police {
     m.cop.name = 'Beat marshal';
     this.stop = { cop: m.cop, kind, fine: FINES[kind].amt + (this.charges.has('disobey') && kind !== 'disobey' ? FINES.disobey.amt : 0), phase: 'talk', t: 0, info: {} };
     m.cop.marshal = m;
-    G.player.busy = 999;
+    G.player.busy = 0;
     this.openTalk();
   }
   // the grab: mash F for three seconds to break free; fail and they cuff you
@@ -1033,7 +1043,7 @@ class Marshal {
       if (!look) return;
       const sd = i ? -1 : 1, x = v.x - hz * sd * 1.3, z = v.z + hx * sd * 1.3;
       const p = G.people.spawnAt(look, x, z, 'kaka'); if (!p) return;
-      p.cop = true; p.crew = true; p.fixed = false; p.lathi = true; p.mode = 'chase'; p.chase = P; p.runSp = 4.5 + police.rng.next() * 0.7; p.unit = this; p.anim = null;
+      p.cop = true; p.crew = true; p.fixed = false; p.lathi = true; p.mode = 'chase'; p.chase = P; p.runSp = 4.2 + police.rng.next() * 0.6; p.chaseT = 0; p.unit = this; p.anim = null;
       this.foot.push(p);
     });
     if (this.H) this.H.holder.visible = false;

@@ -154,7 +154,7 @@ export class Law {
     if (!P.onFoot || pol.stop || P.downT > 0) return;
     for (const m of pol.marshals) for (const q of m.foot) {
       const d = Math.hypot(q.x - P.x, q.z - P.z);
-      if (d < 1.5 && (P.foot.v || 0) > 2.4) {
+      if (d < 1.15 && (P.foot.v || 0) > 2.4 && (q.tackleT = (q.tackleT || 0) - dt) <= 0 && ((q.tackleT = 2.5), Math.random() < 0.45)) {
         P.downT = 2.4; if (P.human) P.human.play('knockback', { once: true, fade: 0.05 }); G.rig && G.rig.shake(0.5); G.audio.thud && G.audio.thud(0.7);
         G.hud.toast('Tackled', 'Down on the road with a knee in your back', 'bad', 2.4);
         G.later(1.2, () => { if (!pol.stop && pol.heat > 0) pol.caught(m); });
@@ -206,12 +206,32 @@ export class Law {
   }
 
   // ---------------------------------------------------------------- arrest: cuffs, the booking, the lock-up, a court date
+  // a real mugshot: you, as you are right now, from the front, against the station's height chart
+  mugshot() {
+    const G = this.g, P = G.player, R = G.renderer;
+    try {
+      const F = P.foot, fx = Math.cos(F.yaw), fz = Math.sin(F.yaw), hy = (F.y || 0) + 1.52;
+      const cam = new THREE.PerspectiveCamera(28, 0.8, 0.1, 50);
+      cam.position.set(F.x + fx * 1.25, hy + 0.02, F.z + fz * 1.25); cam.lookAt(F.x, hy - 0.06, F.z); cam.updateMatrixWorld();
+      const was = P.human && P.human.holder.visible; if (P.human) P.human.holder.visible = true;
+      R.render(G.scene, cam);
+      const src = R.domElement, w = src.width, h = src.height, cw = Math.round(h * 0.8);
+      const c = document.createElement('canvas'); c.width = 240; c.height = 300; const x = c.getContext('2d');
+      x.drawImage(src, (w - cw) / 2, 0, cw, h, 0, 0, 240, 300);
+      if (P.human) P.human.holder.visible = was;
+      // the height chart over the background, and a grey wash so it reads as a station photo
+      x.fillStyle = 'rgba(190, 186, 176, .28)'; x.fillRect(0, 0, 240, 300);
+      x.strokeStyle = 'rgba(30, 30, 30, .5)'; x.fillStyle = 'rgba(30, 30, 30, .7)'; x.font = '9px monospace';
+      for (let i = 0; i < 12; i++) { const y = 18 + i * 22; x.beginPath(); x.moveTo(0, y); x.lineTo(i % 2 ? 10 : 18, y); x.moveTo(240, y); x.lineTo(i % 2 ? 230 : 222, y); x.stroke(); if (!(i % 2)) x.fillText(String(190 - i * 5), 20, y + 3); }
+      return c.toDataURL('image/jpeg', 0.85);
+    } catch (e) { return null; }
+  }
   booking(o) {
-    const G = this.g, el = document.createElement('div');
+    const G = this.g, el = document.createElement('div'), shot = this.mugshot();
     el.className = 'booking';
     const me = G.player.look && G.player.look.female ? 'Saee Kale' : 'Sid Kale';
     el.innerHTML = `<div class="bk-card"><div class="bk-top"><span class="bk-badge">पुणे पोलीस · PUNE POLICE</span><span class="bk-no">FIR ${Math.floor(1000 + Math.random() * 8999)}/${new Date().getFullYear()}</span></div>
-      <div class="bk-body"><div class="bk-mug"><div class="bk-sil"></div><div class="bk-board">${me.toUpperCase()}<br>${o.chowki.toUpperCase()}</div></div>
+      <div class="bk-body"><div class="bk-mug">${shot ? `<img class="bk-photo" src="${shot}" alt="">` : '<div class="bk-sil"></div>'}<div class="bk-board">${me.toUpperCase()}<br>${o.chowki.toUpperCase()}</div></div>
       <div class="bk-info"><b>${me}</b><span>${o.chowki}</span><ul>${o.charges.map(c => `<li><em>${c.law}</em>${c.name}</li>`).join('')}</ul>
       <div class="bk-row"><span>Bail</span><b>${fmtRupees(o.bail)}</b></div>${o.night ? '<div class="bk-row"><span>Custody</span><b>Overnight in the lock-up</b></div>' : ''}
       <div class="bk-row"><span>Court</span><b>${o.court}</b></div></div></div><div class="bk-stamp">BOOKED</div></div>`;

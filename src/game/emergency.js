@@ -162,38 +162,57 @@ export class Emergency {
       R.str = this.stretcher(); G.scene.add(R.str);
     }
     if (!R.medics || !R.medics.length) { if (R.ph !== 'wait') this.leave(R); return; }
-    const M = R.medics, mid = { x: (M[0].x + (M[1] || M[0]).x) / 2, z: (M[0].z + (M[1] || M[0]).z) / 2 };
-    // the two walk side by side, the stretcher between them; one at each end when carrying
-    const walk = (tx, tz, sp, pair) => {
-      let done = true;
-      M.forEach((p, i) => {
-        const dx = tx - mid.x, dz = tz - mid.z, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
-        const ox = pair ? ux * (i ? -1.05 : 1.05) : -uz * (i ? 0.5 : -0.5), oz = pair ? uz * (i ? -1.05 : 1.05) : ux * (i ? 0.5 : -0.5);
-        const gx = tx + ox, gz = tz + oz, ex = gx - p.x, ez = gz - p.z, e = Math.hypot(ex, ez);
-        if (e > 0.15) { const st = Math.min(e, sp * dt); p.x += ex / e * st; p.z += ez / e * st; p.v = sp; p.yaw = Math.atan2(uz, ux); p.anim = null; done = false; }
-        else { p.v = 0; }
-      });
-      return done;
+    const M = R.medics, A = M[0], B = M[1] || M[0];
+    // the stretcher between them by its handles, carried along the way they're walking (one at each end)
+    const carry = (cx, cz, yaw, y) => {
+      R.str.position.set(cx, y, cz); R.str.rotation.set(0, -yaw, 0);
+      const c = Math.cos(yaw), s2 = Math.sin(yaw), h = (lx, lz) => ({ x: cx + lx * c - lz * s2, y: y + 0.02, z: cz + lx * s2 + lz * c });
+      A.hands = [h(1.12, 0.3), h(1.12, -0.3)]; B.hands = [h(-1.12, -0.3), h(-1.12, 0.3)];
+      return [h(1.45, 0), h(-1.45, 0)];
     };
+    const step = (p, gx, gz, sp, face) => { const ex = gx - p.x, ez = gz - p.z, e = Math.hypot(ex, ez); if (e > 0.1) { const st = Math.min(e, sp * dt); p.x += ex / e * st; p.z += ez / e * st; p.v = sp; } else p.v = 0; p.yaw = face ?? Math.atan2(ez, ex); p.anim = null; return e < 0.15; };
     if (q) { q.fallen = Math.max(q.fallen, 999); }
-    if (R.ph === 'out') {
-      if (q && walk(q.x, q.z, 1.6, false)) { R.ph = 'treat'; R.pt = 0; for (const p of M) { p.anim = 'crouch'; p.yaw = Math.atan2(q.z - p.z, q.x - p.x); } }
-      R.str.position.set(mid.x, 0.35, mid.z);
-    } else if (R.ph === 'treat') {
-      R.pt += dt;
-      if (R.pt > 6) { R.ph = 'carry'; for (const p of M) p.anim = null; if (Math.hypot(P.x - v.x, P.z - v.z) < 50) G.hud.toast(q && q.corpse ? 'Taken away' : 'Taken to Sassoon', q && q.corpse ? 'They cover the body and lift it. Police will want to know who did it' : 'The paramedics lift them onto the stretcher', 'info', 3); }
-    } else if (R.ph === 'carry') {
-      const arrived = walk(rear.x, rear.z, 1.1, true);
-      const yaw = Math.atan2(rear.z - mid.z, rear.x - mid.x);
-      R.str.position.set(mid.x, 0.78, mid.z); R.str.rotation.set(0, -yaw, 0);
-      if (q) { q.x = mid.x; q.z = mid.z; q.liftY = 0.8; q.yaw = yaw; }
-      if (arrived || Math.hypot(mid.x - rear.x, mid.z - rear.z) < 0.6) {
-        R.ph = 'loaded';
-        if (q) { const i = G.people.list.indexOf(q); if (i >= 0) { if (q.body) q.body.release(); G.people.list.splice(i, 1); } }
-        R.str.parent && R.str.parent.remove(R.str); R.str = null;
-        this.crewIn(R); R.medics = null;
-        G.later(2, () => { if (R.state === 'scene') this.leave(R); });
+    if (R.ph === 'out' || R.ph === 'carry') {
+      // the pair walk to the goal (the patient, or back to the doors) with the stretcher at the waist
+      const goal = R.ph === 'out' ? { x: q ? q.x - Math.cos(R.ay || 0) * 1.6 : rear.x, z: q ? q.z - Math.sin(R.ay || 0) * 1.6 : rear.z } : rear;
+      R.mid = R.mid || { x: (A.x + B.x) / 2, z: (A.z + B.z) / 2 };
+      const ex = goal.x - R.mid.x, ez = goal.z - R.mid.z, e = Math.hypot(ex, ez), yaw = e > 0.3 ? Math.atan2(ez, ex) : (R.myaw ?? 0);
+      R.myaw = R.myaw === undefined ? yaw : R.myaw + Math.atan2(Math.sin(yaw - R.myaw), Math.cos(yaw - R.myaw)) * Math.min(1, dt * 3);
+      if (e > 0.25) { const st = Math.min(e, (R.ph === 'carry' ? 1.0 : 1.4) * dt); R.mid.x += ex / e * st; R.mid.z += ez / e * st; }
+      const [fa, fb] = carry(R.mid.x, R.mid.z, R.myaw, 0.78);
+      step(A, fa.x, fa.z, 2, R.myaw); step(B, fb.x, fb.z, 2, R.myaw);
+      if (R.ph === 'carry' && q) { q.x = R.mid.x; q.z = R.mid.z; q.liftY = 0.86; q.yaw = R.myaw; }
+      if (e < 0.3) {
+        if (R.ph === 'out') { R.ph = 'treat'; R.pt = 0; }
+        else {
+          R.ph = 'loaded';
+          if (q) { const i = G.people.list.indexOf(q); if (i >= 0) { if (q.body) q.body.release(); G.people.list.splice(i, 1); } }
+          R.str.parent && R.str.parent.remove(R.str); R.str = null; for (const p of M) p.hands = null;
+          this.crewIn(R); R.medics = null;
+          G.audio.thud && G.audio.thud(0.4);
+          G.later(2, () => { if (R.state === 'scene') this.leave(R); });
+        }
       }
+      if (R.ph === 'out' && !R.ay && q) R.ay = Math.atan2(q.z - rear.z, q.x - rear.x);
+    } else if (R.ph === 'treat') {
+      // the stretcher down beside them; both kneel at the patient, hands on them
+      R.pt += dt;
+      const yaw = R.ay || 0, c = Math.cos(yaw), s2 = Math.sin(yaw);
+      R.str.position.set(q.x - c * 1.2 - s2 * 0.0, 0.22, q.z - s2 * 1.2); R.str.rotation.set(0, -yaw + Math.PI / 2, 0);
+      [[A, 0.7], [B, -0.7]].forEach(([p, side]) => {
+        step(p, q.x - s2 * side, q.z + c * side, 1.2, Math.atan2(q.z - p.z, q.x - p.x));
+        p.anim = 'crouch'; p.hands = [{ x: q.x + (Math.random() - 0.5) * 0.02, y: (G.W.surf.height(q.x, q.z)) + 0.28, z: q.z }, { x: q.x + c * 0.25, y: G.W.surf.height(q.x, q.z) + 0.3, z: q.z + s2 * 0.25 }];
+      });
+      if (R.pt > 6) { R.ph = 'lift'; R.pt = 0; if (Math.hypot(P.x - v.x, P.z - v.z) < 50) G.hud.toast(q && q.corpse ? 'Taken away' : 'Taken to Sassoon', q && q.corpse ? 'They cover the body and lift it. Police will want to know who did it' : 'The paramedics lift them onto the stretcher', 'info', 3); }
+    } else if (R.ph === 'lift') {
+      // onto the stretcher, and up: from a crouch at the handles to standing with it at the waist
+      R.pt += dt; const k = Math.min(1, R.pt / 1.6), yaw = R.ay || 0;
+      R.mid = { x: q.x, z: q.z }; R.myaw = yaw;
+      const [fa, fb] = carry(q.x, q.z, yaw, 0.25 + 0.53 * k);
+      step(A, fa.x, fa.z, 1.5, yaw); step(B, fb.x, fb.z, 1.5, yaw);
+      A.anim = B.anim = k < 0.55 ? 'crouch' : null;
+      q.liftY = 0.3 + 0.56 * k; q.yaw = yaw;
+      if (k >= 1) { R.ph = 'carry'; }
     }
   }
   stretcher() {

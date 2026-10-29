@@ -746,7 +746,7 @@ export class HUD {
   // says, and your choices; the outcome is stamped across the slip
   openStop(o) {
     const S = this.stopEl;
-    S.className = 'stop glass' + (o.neg ? ' neg' : '');
+    S.className = 'stop glass compact' + (o.neg ? ' neg' : '');
     S.innerHTML = `<div class="st-top"><span class="st-badge"><svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z"/><path class="st" d="m12 7 1.4 2.9 3.1.4-2.3 2.2.6 3.1L12 14.1l-2.8 1.5.6-3.1-2.3-2.2 3.1-.4L12 7Z"/></svg></span>
       <span class="st-id"><b class="st-who"></b><small class="st-rank"></small></span><span class="st-mood"><small>Patience</small><i><b></b></i></span></div>
       <div class="st-slip"><span class="sl-l"><small>${o.neg ? 'Negotiating' : 'Offence'}</small><b class="st-off"></b><em class="st-law"></em></span>${o.amt ? '<span class="st-amt num"></span>' : ''}<span class="st-stamp"></span></div>
@@ -766,7 +766,6 @@ export class HUD {
       box.appendChild(b);
     });
     S.hidden = false;
-    this.lower.classList.add('dim');
   }
   stopResult(res, sub, kind, line, tr) {
     const S = this.stopEl;
