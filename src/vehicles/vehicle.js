@@ -259,7 +259,7 @@ export class Vehicle {
               o.v = Math.max(0, o.v - imp * (1 - share) * 0.8);
               o.angry = 6;
               // every vehicle can be wrecked, but only by you (the police nudging through traffic used to set half the city smoking)
-              if (imp > 2 && this.W.playerVeh === this) o.dmg = Math.min(1.2, (o.dmg || 0) + (imp - 2) * (T.two ? 0.05 : 0.035));
+              if (this.W.playerVeh === this) knock(o, imp, T.two ? 0.016 : 0.012);
               if (T.two && imp > 3.0 && !o.fallen) { o.fallen = 3.5; this.events.push({ type: 'knock', who: 'two', speed: imp, x: o.x, z: o.z }); }
               else if (imp > 1.5) this.events.push({ type: 'hit', who: o.type, speed: imp, x: o.x, z: o.z, o });
               if (!(o.honkT > 0)) { o.honkT = 2.5; traffic.honks.push({ x: o.x, z: o.z, kind: T.honk, n: 2 }); }   // once per bump, not every frame of contact
@@ -294,4 +294,13 @@ export class Vehicle {
     this.bodyMesh.dispose();                   // the model geometry is shared; only the instance goes
     if (this.cockpit) this.cockpit.group.traverse(o => { if (o.material && o.material.map && o.material.map.isCanvasTexture) o.material.map.dispose(); });
   }
+}
+
+// one knock to a vehicle: counted once per impact (not every frame the two are touching), nothing for a bump
+// under ~15 km/h, and never more than a fifth of it in one go: they're sturdy. k: how much a hit costs
+export function knock(v, imp, k) {
+  const now = performance.now() / 1000;
+  if (imp < 4 || (v._kT || 0) > now) return;
+  v._kT = now + 0.7;
+  v.dmg = Math.min(1, (v.dmg || 0) + Math.min(0.2, (imp - 4) * k));
 }

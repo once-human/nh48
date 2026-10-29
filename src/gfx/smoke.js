@@ -43,7 +43,8 @@ export class Smoke {
     p.size0 = fire ? 0.5 + R() * 0.4 : 0.5 + R() * 0.3; p.size1 = fire ? 0.2 : kind === 'black' ? 3.4 + R() * 1.5 : 2.2 + R();
     p.op = fire ? 0.95 : kind === 'black' ? 0.75 : 0.45;
     p.fire = fire;
-    p.m.color.setHex(fire ? (R() < 0.5 ? 0xffa53a : 0xff6a1a) : kind === 'black' ? 0x1b1b1b : 0x8a8a88);
+    if (kind === 'steam') { p.op = 0.35; p.size1 *= 0.8; }
+    p.m.color.setHex(fire ? (R() < 0.5 ? 0xffa53a : 0xff6a1a) : kind === 'black' ? 0x1b1b1b : kind === 'steam' ? 0xe6e6e2 : 0x8a8a88);
     p.m.blending = fire ? THREE.AdditiveBlending : THREE.NormalBlending;
     p.s.visible = true; if (!p.s.parent) this.scene.add(p.s);
   }

@@ -33,7 +33,7 @@ import { Rep } from '../people/rep.js';
 import { Blood } from '../gfx/blood.js';
 import { Duty } from './duty.js';
 import { buildAmbulance, buildPoliceJeep } from '../vehicles/emodels.js';
-import { Vehicle, specOf, makeService } from '../vehicles/vehicle.js';
+import { Vehicle, specOf, makeService, knock } from '../vehicles/vehicle.js';
 import FAMOUS from '../world/famous.json';
 import { VoiceBank } from './voicebank.js';
 import { ikArm, bendBone } from '../people/humans.js';
@@ -424,12 +424,14 @@ export class Game {
     const v = P.cur, S = P.spec || {};
     if (v.fuel === undefined) v.fuel = v === P.auto ? 1 : 0.35 + Math.random() * 0.6;
     if (v.dmg === undefined) v.dmg = 0;
-    const range = v === P.auto ? 25000 : S.two ? (S.name === 'Bicycle' ? 1e12 : 32000) : 45000;
+    // forgiving: a full tank of CNG in the auto lasts ~60 km, a two-wheeler ~70, a car ~100
+    const range = v === P.auto ? 60000 : S.two ? (S.name === 'Bicycle' ? 1e12 : 70000) : 100000;
     const was = v.fuel;
     v.fuel = Math.max(0, v.fuel - Math.abs(v.v) * dt / range * (0.6 + (v.throttle || 0) * 0.6));
-    if (was > 0.12 && v.fuel <= 0.12) this.hud.toast('Fuel low', `Under 12%. Nearest pump: ${this.nearestPump()}`, 'warn', 4);
-    if (was > 0 && v.fuel <= 0) this.hud.toast('Out of fuel', 'The engine coughs. You can crawl to a pump', 'bad', 4);
-    const fuelMul = v.fuel > 0 ? 1 : 0.22;
+    const kind = v === P.auto ? 'CNG' : 'Petrol';
+    if (was > 0.15 && v.fuel <= 0.15) this.hud.toast(`${kind} low`, `About 15% left. Nearest pump: ${this.nearestPump()}`, 'warn', 4);
+    if (was > 0 && v.fuel <= 0) this.hud.toast(`Out of ${kind}`, 'Running on fumes: slow, but enough to get you to a pump', 'bad', 4);
+    const fuelMul = v.fuel > 0 ? 1 : 0.38;
     // a beaten engine: weaker and weaker, smoking, then burning, then gone
     v.powerMul = v.dead || (this.refuel && this.refuel.v === v) ? 0 : (v.tune || 1) * fuelMul * (1 - Math.min(0.95, v.dmg) * 0.6) * (v.flat > 0 ? 0.35 : 1);   // (shredded tyres: it limps)
     this.engineState(v, dt);
@@ -440,10 +442,10 @@ export class Game {
   engineState(v, dt) {
     const P = this.player, d = v.dmg || 0, w = v._dw || 0;
     this.paintDamage(v);
-    if (d >= 0.8 && w < 0.8) this.hud.toast('Engine smoking', 'Under 20% left. Get it to a garage before it catches fire', 'warn', 4.5);
-    if (d >= 0.9 && w < 0.9) { this.hud.toast('It’s going to blow!', 'Flames under the engine. Get out and get clear (F)', 'bad', 5); this.audio.crash && this.audio.crash(0.3); }
+    if (d >= 0.75 && w < 0.75) this.hud.toast('Engine smoking', 'Black smoke now. Get it to a garage before it catches fire', 'warn', 4.5);
+    if (d >= 0.95 && w < 0.95) { this.hud.toast('It’s going to blow!', 'Flames under the engine. Get out and get clear (F)', 'bad', 5); this.audio.crash && this.audio.crash(0.3); }
     v._dw = d;
-    if (d >= 0.9 && !v.dead) v.dmg = Math.min(1, d + dt * 0.035);                // the fire spreads
+    if (d >= 0.95 && !v.dead) v.dmg = Math.min(1, d + dt * 0.006);               // the fire spreads (about 8 s to get clear)
     if (v.dmg >= 1 && !v.dead) { this.explode(v); return; }
     this.smokeFrom(v, dt);
   }
@@ -452,11 +454,12 @@ export class Game {
     if (d < 0.45) return;
     v._smT = (v._smT || 0) - dt;
     if (v._smT > 0) return;
-    v._smT = d > 0.9 ? 0.04 : d > 0.75 ? 0.08 : 0.18;
+    v._smT = d > 0.95 ? 0.04 : d > 0.75 ? 0.08 : 0.18;
     const hx = Math.cos(v.th || 0), hz = Math.sin(v.th || 0), back = v === this.player.auto ? -1.1 : 1.4;
     const x = v.x + hx * back, z = v.z + hz * back, y = (v.y || 0) + 1.0;
-    this.smoke.emit(x, y, z, d > 0.75 ? 'black' : 'smoke', 0.4);
-    if (d > 0.9) this.smoke.emit(x, y - 0.2, z, 'fire', 0.5);
+    // white steam first, then black smoke, then flames
+    this.smoke.emit(x, y, z, d > 0.75 ? 'black' : 'steam', 0.4);
+    if (d > 0.95) this.smoke.emit(x, y - 0.2, z, 'fire', 0.5);
   }
   paintDamage(v) {
     const d = v.dead ? 1 : v.dmg || 0;
@@ -548,11 +551,11 @@ export class Game {
     for (const o of this.traffic.list) {
       const d = o.dmg || 0;
       if (d < 0.5 || o.wreck) continue;
-      if (d >= 0.85) o.dmg = d + 0.1 * 0.03;                                            // once it's burning, it keeps burning
+      if (d >= 0.95) o.dmg = d + 0.1 * 0.007;                                           // once it's burning, it keeps burning (~7 s)
       if (o.dmg >= 1) { this.explodeAgent(o); continue; }
       const T = o.T || {}, back = (T.L || 3) * 0.35, hx = o.hx ?? Math.cos(o.yaw || 0), hz = o.hz ?? Math.sin(o.yaw || 0);
-      if (Math.random() < (d > 0.85 ? 1 : d > 0.7 ? 0.6 : 0.3)) this.smoke.emit(o.x + hx * back, (o.y || 0) + 0.9, o.z + hz * back, d > 0.7 ? 'black' : 'smoke', 0.35);
-      if (d > 0.85) this.smoke.emit(o.x + hx * back, (o.y || 0) + 0.6, o.z + hz * back, 'fire', 0.4);
+      if (Math.random() < (d > 0.95 ? 1 : d > 0.75 ? 0.6 : 0.3)) this.smoke.emit(o.x + hx * back, (o.y || 0) + 0.9, o.z + hz * back, d > 0.75 ? 'black' : 'steam', 0.35);
+      if (d > 0.95) this.smoke.emit(o.x + hx * back, (o.y || 0) + 0.6, o.z + hz * back, 'fire', 0.4);
     }
   }
   // someone nearby shouts what's happening (from the voice bank)
@@ -1189,7 +1192,7 @@ export class Game {
       if (ev.type === 'crash') {
         if (ev.speed > 8 && ev.kind !== 3) this.brain && this.brain.incident('crash', ev.x ?? P.x, ev.z ?? P.z, { byYou: true });
         this.rig.shake(Math.min(0.5, ev.speed * 0.06)); this.audio.crash(Math.min(1, ev.speed / 8));
-        if (!P.onFoot && ev.speed > 3) { const v = P.cur; v.dmg = Math.min(1, (v.dmg || 0) + (ev.speed - 3) * 0.022); if (v.dmg > 0.6 && !this._dmgWarn) { this._dmgWarn = true; this.date && this.date.event('crash'); this.hud.toast('Your vehicle is badly damaged', 'It’s slower now. Any garage can fix it', 'warn', 3.4); } if (v.dmg < 0.3) this._dmgWarn = false; }
+        if (!P.onFoot && ev.speed > 3) { const v = P.cur; knock(v, ev.speed, 0.007); if (v.dmg > 0.6 && !this._dmgWarn) { this._dmgWarn = true; this.date && this.date.event('crash'); this.hud.toast('Your vehicle is badly damaged', 'It’s slower now. Any garage can fix it', 'warn', 3.4); } if (v.dmg < 0.3) this._dmgWarn = false; }
         if (ev.kind === 3) this.hud.toast('End of the shift area', 'Turn back, the map ends here', 'warn', 2);
       }
       if (ev.type === 'hit' && ev.o && !P.onFoot && ev.speed > 2.5 && ev.speed < 12 && ev.o.T && !ev.o.T.two && !ev.o.service) this.fenderBender(ev.o);
@@ -1215,7 +1218,7 @@ export class Game {
       if (ev.type === 'cowHit' && !P.onFoot) {
         const v = P.cur, kmh = ev.speed * 3.6;
         v.v = 0; v.vl = 0; this.rig.shake(Math.min(0.9, ev.speed * 0.08)); this.audio.crash(1);
-        v.dmg = Math.min(1, (v.dmg || 0) + Math.max(0, ev.speed - 2) * 0.03);
+        knock(v, ev.speed + 2, 0.012);
         this.life.change('karma', -10);
         this.hud.toast('You hit a cow', kmh > 25 ? 'She’s hurt, your vehicle’s wrecked, and a crowd is forming fast' : 'She barely moved. Your bumper did. Everyone is staring', 'bad', 4);
         if ((this._gatherT || 0) < this.t) { this._gatherT = this.t + 8; this.people.gather(ev.x, ev.z, 8); }
