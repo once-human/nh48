@@ -411,6 +411,35 @@ export class Audio {
     this.env(og, t, 0.005, clamp(strength * 0.3, 0.05, 0.6), 0.02, 0.2);
     o.start(t); o.stop(t + 0.3);
   }
+  // rain on the roofs and the road: filtered noise, louder with the rain
+  rain(level) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    if (!this.rainN) {
+      if (level < 0.03) return;
+      const len = ctx.sampleRate * 2, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      const n = ctx.createBufferSource(); n.buffer = buf; n.loop = true;
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 900;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000;
+      const g = ctx.createGain(); g.gain.value = 0;
+      n.connect(hp); hp.connect(lp); lp.connect(g); g.connect(this.master || ctx.destination); n.start();
+      this.rainN = { n, g };
+    }
+    this.rainN.g.gain.setTargetAtTime(Math.min(0.35, level * 0.32), ctx.currentTime, 0.5);
+  }
+  // thunder: a crack close, a long low roll far off
+  thunder(near = 0.5) {
+    if (!this.ctx) return;
+    try {
+      const ctx = this.ctx, t = ctx.currentTime, len = ctx.sampleRate * 5, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+      let v = 0; for (let i = 0; i < len; i++) { v = v * 0.985 + (Math.random() * 2 - 1) * 0.15; const k = i / len; d[i] = v * (k < 0.02 ? k / 0.02 : Math.pow(1 - k, 1.6)) * (1 + 0.6 * Math.sin(k * 40)); }
+      const n = ctx.createBufferSource(); n.buffer = buf;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 300 + near * 900;
+      const g = ctx.createGain(); g.gain.value = 0.6 + near * 1.4;
+      n.connect(lp); lp.connect(g); g.connect(this.master || ctx.destination); n.start(t); n.stop(t + 5);
+    } catch (e) { /* silent */ }
+  }
   // a blast: a deep thump, a roar of filtered noise rolling off, debris rattling down
   boom() {
     if (!this.ctx) return;

@@ -323,6 +323,7 @@ async function main() {
     // indoors the light is the room's own, not the time of day outside (a club stays dark)
     sky.update(game.lightHour ? game.lightHour() : game.hour, focus, dt);
     renderer.toneMappingExposure *= EXPO;
+    if (game.weather && !(game.interiors && game.interiors.inside)) game.weather.apply(dt, sky, scene, renderer, camera);
     U.uShopsOpen.value = game.hour > 22.8 || game.hour < 8.5 ? 0.25 : 1;
     updateWorldMaterials(W);
     camera.updateMatrixWorld();

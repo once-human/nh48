@@ -95,6 +95,8 @@ export class Brain {
     // 3. their own day
     if (p.mode !== 'walk' || p.chat) return;
     const h = (G.hour ?? 12), r = R();
+    // rain: everyone walks faster, heads down
+    if (G.weather && G.weather.raining && !p.rainHurry) { p.rainHurry = true; p.speed *= 1.35; }
     // rush hour: some are late
     if ((h > 8.5 && h < 10) || (h > 17.5 && h < 19.5)) { if (!p.hurry && r < 0.08 && /college|dada|kp|tai/.test(p.persona || '')) { p.hurry = true; p.speed *= 1.9; } }
     // two people who know each other stop for a chat

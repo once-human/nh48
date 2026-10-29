@@ -419,7 +419,7 @@ export class HUD {
           <section class="pane" data-pane="guide"><h2>Guide</h2><div class="guide">${guideHTML()}</div></section>
           <section class="pane" data-pane="set"><h2>Settings</h2>
             <div class="gt">World</div>
-            <div class="group" id="p-time-g"><div class="row"><div class="rl">Time of day<small>Free roam only</small></div><div class="rc"><div class="seg" id="p-time"><button data-h="8.5">Morning</button><button data-h="13">Noon</button><button data-h="17.85">Sunset</button><button data-h="21.5">Night</button></div></div></div></div>
+            <div class="group" id="p-time-g"><div class="row"><div class="rl">Time of day<small>Free roam only</small></div><div class="rc"><div class="seg" id="p-time"><button data-h="8.5">Morning</button><button data-h="13">Noon</button><button data-h="17.85">Sunset</button><button data-h="21.5">Night</button></div></div></div><div class="row"><div class="rl">Weather<small>Free roam only</small></div><div class="rc"><div class="seg" id="p-wx"><button data-w="clear">Clear</button><button data-w="cloudy">Cloudy</button><button data-w="haze">Haze</button><button data-w="rain">Rain</button><button data-w="storm">Storm</button><button data-w="fog">Fog</button></div></div></div></div>
             <div class="gt">Picture</div>
             <div class="group"><div class="row"><div class="rl">Graphics<small id="p-qnote"></small></div><div class="rc"><div class="seg" id="p-q"><button data-q="lite">Lite</button><button data-q="low">Low</button><button data-q="med">Medium</button><button data-q="high">High</button></div></div></div></div>
             ${settingsHTML('av')}
@@ -467,6 +467,7 @@ export class HUD {
     p.querySelector('#p-reset-n').onclick = () => { p.querySelector('#p-reset-c').hidden = true; p.querySelector('#p-reset').hidden = false; };
     p.querySelector('#p-reset-y').onclick = () => this.game.resetAll();
     p.querySelectorAll('#p-time button').forEach(b => b.onclick = () => { this.game.setHour(parseFloat(b.dataset.h)); this.syncPause(); });
+    p.querySelectorAll('#p-wx button').forEach(b => b.onclick = () => { if (this.game.weather) this.game.weather.set(b.dataset.w); this.syncPause(); });
     p.querySelectorAll('#p-q button').forEach(b => b.onclick = () => { this.game.setQuality(b.dataset.q); this.syncPause(); });
     p.querySelector('#p-ch-pay').onclick = () => { if (this.game.police) this.game.police.payDues(); this.syncPause(); };
     bindSettings(p, this.game);
@@ -489,6 +490,7 @@ export class HUD {
     // the picker always shows something: the preset nearest the clock
     let nb = null, nd = 99; this.pause.querySelectorAll('#p-time button').forEach(b => { const d = Math.abs(parseFloat(b.dataset.h) - h); if (d < nd) { nd = d; nb = b; } });
     this.pause.querySelectorAll('#p-time button').forEach(b => b.classList.toggle('on', b === nb));
+    this.pause.querySelectorAll('#p-wx button').forEach(b => b.classList.toggle('on', !!this.game.weather && b.dataset.w === this.game.weather.kind));
     const pol = g.police;
     if (pol) {
       const tot = pol.duesTotal;

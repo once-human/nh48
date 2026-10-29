@@ -41,6 +41,7 @@ import { Photowalk } from './photowalk.js';
 import { bagOrder } from './bag.js';
 import { Brain } from '../people/brain.js';
 import { Emergency } from './emergency.js';
+import { Weather } from '../gfx/weather.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { StreetApproach } from './approach.js';
@@ -167,6 +168,7 @@ export class Game {
     this.brawl = new Brawl(this); this.people.brawl = this.brawl;
     this.brain = new Brain(this.people, this); this.people.brain = this.brain;
     this.emergency = new Emergency(this);
+    this.weather = new Weather(this.scene, this.audio);
     player.makePed = (look, x, z, per) => this.people.spawnAt(look, x, z, per);
     player.pickPersona = (f, x, z) => this.people.pickPersona(f, x, z);
     this.buildLightPools();
@@ -1000,6 +1002,8 @@ export class Game {
     this.stepRefuel(dt);
     if (this.brain && this.state !== 'title') this.brain.update(dt, this.player);
     if (this.emergency && this.state !== 'title') this.emergency.update(dt);
+    // in your story the weather follows Pune's year (free roam: whatever you picked)
+    if (this.weather && !this.free) { const day = Math.floor((this.clock || 0) / 24), hb = Math.floor(this.hour || 0); if (day !== this._wDay || hb !== this._wHr) { this._wDay = day; this._wHr = hb; this.weather.auto(day, this.hour || 12); } }
     if (this.state !== 'title' && this.tut) this.tut.update(dt);
     const P = this.player;
     if (this.state === 'photo') this.photo.update(dt);
