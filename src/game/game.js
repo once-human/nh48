@@ -29,6 +29,7 @@ import { PhotoMode } from './photo.js';
 import { Wada } from './wada.js';
 import TRANSIT_DATA from './transit.json';
 import VLINES from './vendor_lines.json';
+import { Rep } from '../people/rep.js';
 import { justOpened, lineOpen, opensOn } from './metroOpen.js';
 import { Club } from './club.js';
 import { Lights } from './lights.js';
@@ -185,6 +186,7 @@ export class Game {
     };
     this.brawl = new Brawl(this); this.people.brawl = this.brawl;
     this.brain = new Brain(this.people, this); this.people.brain = this.brain;
+    this.rep = new Rep(this); this.people.rep = this.rep;
     this.emergency = new Emergency(this);
     this.weather = new Weather(this.scene, this.audio);
     player.makePed = (look, x, z, per) => this.people.spawnAt(look, x, z, per);
@@ -435,6 +437,7 @@ export class Game {
   petAnimal(a) {
     const P = this.player, F = P.foot, H = P.human;
     if (!P.onFoot || !H) return;
+    if (this.rep) this.rep.good(a.x, a.z, 0.35);          // the lane notices who's kind to its dogs
     F.yaw = Math.atan2(a.z - F.z, a.x - F.x); F.vx = F.vz = 0;
     a.petT = 3.2; a.petPh = 0; a.petX = F.x; a.petZ = F.z;
     const cow = a.cow || a.kind === 'cow', dur = 3.0;

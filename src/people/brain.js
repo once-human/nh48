@@ -26,7 +26,14 @@ export class Brain {
   // something happened: kind 'down' (someone knocked out or killed), 'fight', 'blast', 'crash', 'theft'; byYou: the player did it
   incident(kind, x, z, o = {}) {
     if ((kind === 'down' || kind === 'blast') && this.g.emergency && !this.g.free) this.g.emergency.dispatch(kind, x, z, o.victim || null);
-    this.inc.push({ kind, x, z, t: 0, victim: o.victim || null, byYou: !!o.byYou, helpers: 0, reported: false }); if (this.inc.length > 12) this.inc.shift(); }
+    this.inc.push({ kind, x, z, t: 0, victim: o.victim || null, byYou: !!o.byYou, helpers: 0, reported: false }); if (this.inc.length > 12) this.inc.shift();
+    // you did it: the neighbourhood remembers, and whoever saw it remembers your face
+    if (o.byYou) {
+      const w = { down: o.victim && o.victim.corpse ? 6 : 2.5, blast: 4, theft: 2, fight: 1, crash: 0.4 }[kind] || 0.5;
+      if (this.g.rep) this.g.rep.bad(x, z, w);
+      if (w >= 1) for (const q of this.ppl.list) if (q !== o.victim && !q.hidden && !q.cop && Math.abs(q.x - x) < 25 && Math.abs(q.z - z) < 25) this.ppl.remember(q, 'saw');
+    }
+  }
   free(p) { return !(p.pax || p.cop || p.fixed || p.fallen > 0 || p.hidden || p.ctl || p.mode === 'fight' || p.mode === 'inside' || p.mode === 'free' || p.busy > 0 || p.tourist || p.venue); }
   // the people who are always there: shopkeepers in their doorways while the shop's open (in the peths they go in
   // for the 1 to 4 nap), a watchman on his chair at a gate at night

@@ -159,13 +159,40 @@ export class People {
   // people remember you (for as long as they're around): run into someone you hit or shoved and they react
   remember(p, what) { const m = this.mem || (this.mem = new Map()); const r = m.get(p.id) || {}; r[what] = (r[what] || 0) + 1; r.t = performance.now(); m.set(p.id, r); }
   recall(p, player) {
+    if (Math.abs(p.x - player.x) > 6 || Math.abs(p.z - player.z) > 6 || !player.onFoot || p.corpse || p.fallen > 0 || p.cop || p.pax || p.mode === 'fight') return;
     const r = this.mem && this.mem.get(p.id);
-    if (!r || p.corpse || p.fallen > 0 || r.met > performance.now() - 20000) return;
-    if (Math.hypot(p.x - player.x, p.z - player.z) > 3.5 || !player.onFoot) return;
+    if (!r) { this.knowYou(p, player); return; }
+    if (r.met > performance.now() - 20000) return;
+    if (Math.hypot(p.x - player.x, p.z - player.z) > 3.5) return;
     r.met = performance.now();
+    // saw what you did: keeps away, or (the tough ones) has a word with you
+    if (r.saw && !r.hit) { if ((TOUGH[p.persona] || 0.1) > 0.35 && this.rng.next() < 0.3) { p.angry = 4; p.grudge = 12; this.speakAs('odd', p, 1, 4); } else { this.speakAs('scared', p, 0.8, 4); this.flee(p, player.x, player.z, 14); } return; }
     if (r.hit) { if ((TOUGH[p.persona] || 0.1) > 0.3 && this.rng.next() < 0.6) { this.startFight(p, player); this.speakAs('fight', p, 1, 4); } else { this.speakAs('scared', p, 1, 4) || this.speakAs('flee', p, 1, 4); this.flee(p, player.x, player.z, 24); } }
     else if (r.shoved) { p.angry = 4; p.grudge = 15; this.speakAs('shoved', p, 1, 4); }
   }
+  // a stranger in a neighbourhood that knows what you did there (or what good you've done): once each, as you pass
+  knowYou(p, player) {
+    if (p.repSeen || !this.rep || p.fixed || p.mode === 'inside' || p.mode === 'free') return;
+    const d = Math.hypot(p.x - player.x, p.z - player.z);
+    if (d > 5) return;
+    p.repSeen = true;
+    const v = this.rep.at(p.x, p.z), R = this.rng.next();
+    if (v.bad > 1.5 && R < Math.min(0.65, v.bad * 0.09)) {
+      const k = this.rng.next();
+      if (k < 0.45) { this.watch(p, player.x, player.z, 2.5); p.anim = 'no'; this.speakAs(this.rng.chance(0.5) ? 'odd' : 'scared', p, 0.7, 4); }
+      else if (k < 0.85 || v.bad < 6) { this.speakAs('scared', p, 0.5, 4); this.flee(p, player.x, player.z, 12); }
+      else {
+        // someone's had enough: the phone comes out
+        p.act = { clip: 'phone', t: 0, dur: 4 };
+        const G = this.brain && this.brain.g;
+        if (G && !G.free && G.police) { G.hud.toast('Someone’s calling the police', 'People round here know what you did', 'bad', 3); G.later ? G.later(4, () => G.police.raiseHeat(1, 'Recognised in the neighbourhood', 'assault')) : G.police.raiseHeat(1, 'Recognised in the neighbourhood', 'assault'); }
+      }
+    } else if (v.good > 2 && v.bad < 1 && R < Math.min(0.5, v.good * 0.06)) {
+      p.act = { clip: 'wave', t: 0, dur: 1.6 }; p.yaw = Math.atan2(player.z - p.z, player.x - p.x);
+      this.speakAs(this.rng.chance(0.5) ? 'respect' : 'greet', p, 0.8, 4);
+    }
+  }
+  watch(p, x, z, secs) { p.mode = 'watch'; p.watch = { x, z }; p.wait = secs; p.v = 0; }
   speakAs(scenario, p, chance = 1, cool = 5) {
     if (!this.say || !p || this.lineT > 0 || this.rng.next() > chance) return false;
     let per = p.persona;
@@ -440,7 +467,7 @@ export class People {
     }
     if (p.angry > 0) p.angry -= dt;
     if (p.froze > 0) { p.froze -= dt; p.v = 0; }
-    if (this.mem && (p.id & 3) === ((this._mf = ((this._mf || 0) + 1) & 3))) this.recall(p, player);
+    if ((p.id & 3) === ((this._mf = ((this._mf || 0) + 1) & 3))) this.recall(p, player);
     // react to the player's auto
     const dx = p.x - player.x, dz = p.z - player.z;
     const d = Math.hypot(dx, dz);
