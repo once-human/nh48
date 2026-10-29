@@ -924,12 +924,25 @@ export class Game {
     this.W.streamer.setRadius(Q.streamRadius);
     this.traffic.max = Q.traffic; this.people.max = Math.min(Q.peds, this.people.cap - 120);
     if (this.crowd) this.crowd.setQuality(Q);
-    if (Q.shadows !== this.renderer.shadowMap.enabled) {
-      this.renderer.shadowMap.enabled = Q.shadows;
-      this.sky.setShadows(Q.shadows, Q.shadowSize || 1024);
-      this.scene.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => (m.needsUpdate = true)); });
-    }
+    if (Q.shadows !== this.shadowsOn()) this.swapShadows(Q.shadows, Q.shadowSize || 1024);
     this.qualityNote = Q.texMax !== this.quality.texMax || Q.msaa !== this.quality.msaa ? 'Some changes (textures, edge smoothing) apply after you reload the page.' : '';
+  }
+  shadowsOn() { return this.renderer.shadowMap.enabled && !this.shadowsOff; }
+  // shadows on or off changes every shader in the city, and compiling them all again froze the game for seconds
+  // on a laptop. So once the shadowed shaders exist they stay: "off" just stops drawing the shadow pass and
+  // fades the shadows to nothing (a setting, not a shader change), and "on" again brings them straight back
+  swapShadows(on, size) {
+    const R = this.renderer, sky = this.sky;
+    if (R.shadowMap.enabled) {
+      this.shadowsOff = !on;
+      sky.sun.shadow.intensity = on ? 1 : 0;
+      if (on) { if (size !== sky.sun.shadow.mapSize.x) sky.setShadows(true, size); R.shadowMap.needsUpdate = true; }
+      return;
+    }
+    // started without shadows: their shaders have to be built now (picked from the menu, so it's a pause there)
+    this.shadowsOff = false; sky.sun.shadow.intensity = 1;
+    R.shadowMap.enabled = true; sky.setShadows(true, size);
+    this.scene.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => (m.needsUpdate = true)); });
   }
   applyPixelRatio(pr) {
     this.renderer.setPixelRatio(pr);
