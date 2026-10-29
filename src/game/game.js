@@ -32,7 +32,7 @@ import VLINES from './vendor_lines.json';
 import { Rep } from '../people/rep.js';
 import { Blood } from '../gfx/blood.js';
 import { Duty } from './duty.js';
-import { ikArm } from '../people/humans.js';
+import { ikArm, bendBone } from '../people/humans.js';
 const _cufT = new THREE.Vector3(), _cufP = new THREE.Vector3();
 import { justOpened, lineOpen, opensOn } from './metroOpen.js';
 import { Club } from './club.js';
@@ -145,11 +145,8 @@ export class Game {
         // directly in a rotated rig tips the body forward or back instead of turning it)
         H.root.updateMatrixWorld(true);
         void sp;
-        for (const [b, a] of [[hd, -rot.yH - rot.yS * 0.5]]) {          // the head only: the body stays upright
-          if (!b || !b.parent || Math.abs(a) < 1e-4) continue;
-          b.parent.getWorldQuaternion(_pq); _ax.copy(Y_UP).applyQuaternion(_pq.invert());
-          _rq.setFromAxisAngle(_ax, a); b.quaternion.premultiply(_rq);
-        }
+        // (from the clip's pose each frame, never on top of the last turn: the head used to wander off and glitch)
+        if (hd) bendBone(hd, Y_UP, -rot.yH - rot.yS * 0.5);
         if (P.torchArm) P.torchArm(H);
       };
     }

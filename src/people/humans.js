@@ -5,6 +5,7 @@
 // so lips, eyelids and knuckles survive while the tone becomes any Indian complexion.
 import * as THREE from 'three';
 import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RNG } from '../core/util.js';
 
 // Indian complexions (sRGB): fair, wheatish, medium, brown, deep brown
@@ -336,6 +337,11 @@ export class HumanKit {
     }
     this.accMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55, metalness: 0 });
     for (const [k, g] of Object.entries(this.src)) fitTubes(g.scene, BODY[k]);
+    // the hair shells had hard, faceted shading: weld their vertices and smooth the normals (once, shared by everyone)
+    for (const g of Object.values(this.src)) g.scene.traverse((o) => {
+      if (!o.isSkinnedMesh || !o.name.startsWith('hair')) return;
+      try { const geo = o.geometry.clone(); geo.deleteAttribute('normal'); const m = mergeVertices(geo, 1e-4); m.computeVertexNormals(); o.geometry = m; } catch (e) { /* keep it */ }
+    });
   }
   // a random Pune look; opts: female, role ('police'), helmet, avoid (the player's look: never copy it)
   randomLook(rng, opts = {}) {
@@ -426,7 +432,8 @@ export class HumanKit {
       bindM: this.bindM[k] || new THREE.Matrix4(), body: new THREE.Vector4(B.hip, B.neck, B.armY, 0.085), arms: arm };
     if (mat.map) patchBody(mat);
     const acc = this.accMat.clone();
-    const hairMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.65, metalness: 0, map: this.hairMat[k] || null });
+    // hair with a soft sheen along the strands (it read as matte plastic)
+    const hairMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0, map: this.hairMat[k] || null, sheen: 1, sheenRoughness: 0.32, sheenColor: 0x6a5848 });
     // clothes are real shells over the body: top (short / long sleeves), trousers, kurta hem, saree
     const topMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
     const botMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
@@ -568,6 +575,7 @@ export class HumanKit {
       const u = H.mat.userData;
       u.top.copy(look.top); u.bottom.copy(look.bottom); u.skin.copy(look.skin); u.shoe.copy(look.shoe); u.cut.copy(look.cut);
       H.hairMat.color.copy(look.hair).multiplyScalar(1.8);
+      if (H.hairMat.sheenColor) H.hairMat.sheenColor.copy(look.hair).multiplyScalar(5).addScalar(0.06);
       // under a kurta or a saree the shirt shell sits behind the long one (it used to win and break through it in patches)
       const longCloth = look.cut.w > 0.5 && look.cut.w < 2.5;
       H.topMat.polygonOffsetFactor = longCloth ? 2 : -1; H.topMat.polygonOffsetUnits = longCloth ? 3 : -2;
@@ -620,7 +628,7 @@ export class HumanKit {
 const _rx = new THREE.Vector3(), _rq = new THREE.Quaternion(), _rd = new THREE.Quaternion();
 // (a bone the clip has no keys for keeps whatever was last set: so each bend starts from the pose before the last
 // bend, never on top of it, or riders slowly spin)
-function bendBone(bone, axisWorld, angle) {
+export function bendBone(bone, axisWorld, angle) {
   if (!bone || !bone.parent) return;
   const u = bone.userData;
   if (u.bentQ && bone.quaternion.equals(u.bentQ)) bone.quaternion.copy(u.baseQ);

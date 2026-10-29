@@ -341,7 +341,8 @@ async function main() {
     if (propT <= 0) { updateProps(W, camera.position.x, camera.position.z); W.fly?.update?.(camera.position.x, camera.position.z); propT = 0.2; }
     const t1 = performance.now();
     // the map covers the screen, and while paused the last frame just sits there (blurred by CSS): no rendering at all
-    if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = (frames & 1) === 0;
+    // shadows every other frame when you're still; every frame when you're moving (a stale shadow judders against you)
+    if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = (frames & 1) === 0 || Math.abs(player.onFoot ? (player.foot.v || 0) : (player.v || 0)) > 1.2;
     if (compiled && game.state !== 'map' && !(game.state === 'pause' && !game.livePause && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);
     const t2 = performance.now();
     perf.n++; perf.upd += t1 - t0; perf.rnd += t2 - t1; perf.worst = Math.max(perf.worst, t1 - t0);
