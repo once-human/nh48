@@ -24,7 +24,9 @@ export class Brain {
     return (p.tr = t);
   }
   // something happened: kind 'down' (someone knocked out or killed), 'fight', 'blast', 'crash', 'theft'; byYou: the player did it
-  incident(kind, x, z, o = {}) { this.inc.push({ kind, x, z, t: 0, victim: o.victim || null, byYou: !!o.byYou, helpers: 0, reported: false }); if (this.inc.length > 12) this.inc.shift(); }
+  incident(kind, x, z, o = {}) {
+    if ((kind === 'down' || kind === 'blast') && this.g.emergency && !this.g.free) this.g.emergency.dispatch(kind, x, z, o.victim || null);
+    this.inc.push({ kind, x, z, t: 0, victim: o.victim || null, byYou: !!o.byYou, helpers: 0, reported: false }); if (this.inc.length > 12) this.inc.shift(); }
   free(p) { return !(p.pax || p.cop || p.fixed || p.fallen > 0 || p.hidden || p.ctl || p.mode === 'fight' || p.mode === 'inside' || p.mode === 'free' || p.busy > 0 || p.tourist || p.venue); }
   update(dt, player) {
     const L = this.ppl.list, G = this.g;

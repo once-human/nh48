@@ -40,6 +40,7 @@ import { Smoke } from '../gfx/smoke.js';
 import { Photowalk } from './photowalk.js';
 import { bagOrder } from './bag.js';
 import { Brain } from '../people/brain.js';
+import { Emergency } from './emergency.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { StreetApproach } from './approach.js';
@@ -165,6 +166,7 @@ export class Game {
     this.people.say = (id, src) => this.police.say(id, src);
     this.brawl = new Brawl(this); this.people.brawl = this.brawl;
     this.brain = new Brain(this.people, this); this.people.brain = this.brain;
+    this.emergency = new Emergency(this);
     player.makePed = (look, x, z, per) => this.people.spawnAt(look, x, z, per);
     player.pickPersona = (f, x, z) => this.people.pickPersona(f, x, z);
     this.buildLightPools();
@@ -997,6 +999,7 @@ export class Game {
     if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); }
     this.stepRefuel(dt);
     if (this.brain && this.state !== 'title') this.brain.update(dt, this.player);
+    if (this.emergency && this.state !== 'title') this.emergency.update(dt);
     if (this.state !== 'title' && this.tut) this.tut.update(dt);
     const P = this.player;
     if (this.state === 'photo') this.photo.update(dt);

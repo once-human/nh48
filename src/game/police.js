@@ -497,7 +497,8 @@ export class Police {
         if (m.catchT > (P.onFoot ? 0.4 : 1.2)) this.caught(m);
       }
     }
-    G.audio.siren(this.heat > 0 && this.marshals.length ? clamp(1.4 - nearest / 160, 0, 1) : 0, sirenPan);
+    const pl = this.heat > 0 && this.marshals.length ? clamp(1.4 - nearest / 160, 0, 1) : 0, em = G.emSiren || 0;
+    G.audio.siren(Math.max(pl, em), em > pl ? G.emPan || 0 : sirenPan);
     if (this.heat > 0) {
       if (seen) this.unseenT = 0; else this.unseenT += dt;
       const need = 25 + this.heat * 12;
