@@ -1223,7 +1223,7 @@ export class Game {
         this.life.change('karma', -10);
         this.hud.toast('You hit a cow', kmh > 25 ? 'She’s hurt, your vehicle’s wrecked, and a crowd is forming fast' : 'She barely moved. Your bumper did. Everyone is staring', 'bad', 4);
         if ((this._gatherT || 0) < this.t) { this._gatherT = this.t + 8; this.people.gather(ev.x, ev.z, 8); }
-        if (kmh > 25 && this.police && this.police.raiseHeat) this.police.raiseHeat(1, 'Hit a cow', null);
+        if (kmh > 25 && this.police && this.police.raiseHeat) this.police.raiseHeat(1, 'Hit a cow', 'rash');
       }
       if (ev.type === 'bark' || ev.type === 'dogChase') { const d = Math.hypot(ev.x - P.x, ev.z - P.z); if (d < 60) this.audio.at(ev.x, ev.z, () => this.audio.bark(0.7, 0)); }
       if (ev.type === 'dogChase' && (this._dogT || 0) < this.t) { this._dogT = this.t + 30; this.hud.toast('A street dog is chasing you', 'Classic. Keep going, it’ll give up.', 'info', 2.4); }

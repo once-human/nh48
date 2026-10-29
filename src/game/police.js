@@ -318,7 +318,8 @@ export class Police {
       return;
     }
     // you can always just leave: drive off or walk away mid-conversation. It's fleeing a police stop, and they react
-    if ((s.phase === 'approach' || s.phase === 'talk') && (Math.hypot(P.x - cop.x, P.z - cop.z) > 8 || Math.abs(P.v || 0) > 3 || (P.onFoot && (P.foot.v || 0) > 3))) {
+    if ((s.phase === 'approach' || s.phase === 'talk') && !s.at) s.at = { x: P.x, z: P.z };
+    if ((s.phase === 'approach' || s.phase === 'talk') && s.at && (Math.hypot(P.x - s.at.x, P.z - s.at.z) > 9 || Math.abs(P.v || 0) > 3.5 || (P.onFoot && (P.foot.v || 0) > 3.5))) {
       G.hud.closeStop(); P.busy = 0;
       this.say('m_spot2', cop);
       const serious = SERIOUS.has(s.kind);
@@ -544,7 +545,8 @@ export class Police {
     this.lastSeen = { x: G.player.x, z: G.player.z };
     if (this.heat > was) { G.hud.toast(`${LEVELS[this.heat]}`, `${why} · ${FINES[this.topCharge()].name}, ${FINES[this.topCharge()].law}`, 'bad', 3.6); G.audio.siren(0.001, 0); }
   }
-  topCharge() { return CHARGE_ORDER.find(c => this.charges.has(c)) || 'theft'; }
+  // (nothing on the sheet but a reason they're after you: it's a traffic matter, never theft by default)
+  topCharge() { return CHARGE_ORDER.find(c => this.charges.has(c)) || [...this.charges][0] || 'rash'; }
   clearCharges() { this.charges.clear(); }
   clearMarshals() { for (const m of this.marshals) m.dispose(); this.marshals = []; }
   updateHeat(dt) {
@@ -673,7 +675,9 @@ export class Police {
     const kind = this.topCharge();
     // after a chase, or for anything serious: hands on you, no talking. You can try to wrench free (harder the more
     // of them there are); otherwise it's the cuffs. Only a minor matter gets a conversation
-    if ((this.heat >= 2 || ['murder', 'assault', 'hitrun', 'blast'].some(c => this.charges.has(c))) && !this.grab) {
+    // (a traffic matter, however long the chase, is a challan at the roadside: no cuffs, no booking)
+    const seriousNow = [...this.charges].some(c => SERIOUS.has(c));
+    if ((seriousNow || this.heat >= 3) && !this.grab) {
       // how hard it is to wrench free: easy at one or two stars, a real fight at three, very hard at four, and at
       // five they've got you for good. Every extra officer close by makes it harder still
       const lv = Math.max(1, this.heat), more = this.marshals.reduce((n, u) => n + (u !== m && u.catchDist() < 10 ? 2 : 0), 0);
