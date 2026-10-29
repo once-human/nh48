@@ -96,16 +96,16 @@ function offsetLine(p, d) {
 function kindLayer(kind, district) {
   switch (kind) {
     case 'asphalt': return [GL.asphalt, 0];
-    case 'concrete': return [district === 1 || district === 2 ? GL.concrete : GL.asphaltOld, 0];
-    case 'pavers': return [district === 0 || district === 2 ? GL.tiles : GL.pavers, KERB_H];
+    case 'concrete': return [district === 1 || district === 2 ? GL.concrete : GL.asphaltOld, 0.008];
+    case 'pavers': return [district === 0 || district === 2 ? GL.tiles : GL.pavers, KERB_H + 0.012];
     case 'compound': return [GL.compound, KERB_H];
-    case 'grass': return [GL.grass, KERB_H];
-    case 'soil': return [GL.dirt, KERB_H];
-    case 'scrub': return [GL.earth, KERB_H];
-    case 'plaza': return [GL.concrete, KERB_H];
-    case 'median': return [GL.median, KERB_H];
+    case 'grass': return [GL.grass, KERB_H + 0.004];
+    case 'soil': return [GL.dirt, KERB_H + 0.002];
+    case 'scrub': return [GL.earth, KERB_H + 0.003];
+    case 'plaza': return [GL.concrete, KERB_H + 0.008];
+    case 'median': return [GL.median, KERB_H + 0.01];
     case 'bridge_road': return [GL.asphalt, 0];
-    case 'bridge_sw': return [GL.tiles, KERB_H];
+    case 'bridge_sw': return [GL.tiles, KERB_H + 0.012];
     default: return null;
   }
 }
@@ -236,7 +236,7 @@ export function* buildGroundChunk(W, C, group) {
   yield;
   // lane paint
   const paintUV = cellUV(DECAL.paint), yellowUV = cellUV(DECAL.yellow), zebraUV = cellUV(DECAL.zebra);
-  const lineQuad = (x0, z0, x1, z1, w, uv, y = 0.014) => {
+  const lineQuad = (x0, z0, x1, z1, w, uv, y = 0.022) => {
     const dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz);
     if (L < 0.05) return;
     const ox = dz / L * w / 2, oz = -dx / L * w / 2;
@@ -250,7 +250,7 @@ export function* buildGroundChunk(W, C, group) {
     const n = Math.max(3, Math.floor((w - 0.6) / 0.95));
     for (let k = 0; k < n; k++) {
       const off = -w / 2 + 0.5 + (k + 0.5) * (w - 1.0) / n;
-      db.ground(x + nx * off, 0.016, zz + nz * off, ang, 1.5, 0.24, zebraUV);
+      db.ground(x + nx * off, 0.024, zz + nz * off, ang, 1.5, 0.24, zebraUV);
     }
   }
   for (const s of C.stop) {
@@ -258,7 +258,7 @@ export function* buildGroundChunk(W, C, group) {
     const nx = Math.sin(ang), nz = -Math.cos(ang);
     let cx = x, cz = z, half = w / 2 - 0.3;
     if (dir !== 0) { const side = dir > 0 ? 1 : -1; cx = x + nx * side * w / 4; cz = z + nz * side * w / 4; half = w / 4 - 0.2; }
-    lineQuad(cx - nx * half, cz - nz * half, cx + nx * half, cz + nz * half, 0.35, paintUV, 0.015);
+    lineQuad(cx - nx * half, cz - nz * half, cx + nx * half, cz + nz * half, 0.35, paintUV, 0.023);
   }
   // speed breakers: physical hump + paint
   for (const s of C.bump) {
