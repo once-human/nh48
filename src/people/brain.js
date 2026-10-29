@@ -28,8 +28,43 @@ export class Brain {
     if ((kind === 'down' || kind === 'blast') && this.g.emergency && !this.g.free) this.g.emergency.dispatch(kind, x, z, o.victim || null);
     this.inc.push({ kind, x, z, t: 0, victim: o.victim || null, byYou: !!o.byYou, helpers: 0, reported: false }); if (this.inc.length > 12) this.inc.shift(); }
   free(p) { return !(p.pax || p.cop || p.fixed || p.fallen > 0 || p.hidden || p.ctl || p.mode === 'fight' || p.mode === 'inside' || p.mode === 'free' || p.busy > 0 || p.tourist || p.venue); }
+  // the people who are always there: shopkeepers in their doorways while the shop's open (in the peths they go in
+  // for the 1 to 4 nap), a watchman on his chair at a gate at night
+  locals(dt, P) {
+    if ((this.locT = (this.locT || 0) - dt) > 0) return;
+    this.locT = 1.5;
+    const G = this.g, ppl = this.ppl, h = G.hour ?? 12, W = G.W;
+    const area = (G.hud && G.hud.$ && G.hud.$('h-area')?.textContent) || '';
+    const nap = h >= 13 && h < 16 && /Peth/.test(area), open = h >= 8.5 && h < 22.5 && !nap;
+    this.keepers = (this.keepers || []).filter(k => ppl.list.includes(k.p));
+    for (const k of [...this.keepers]) {
+      const far = Math.hypot(k.p.x - P.x, k.p.z - P.z) > 80;
+      if (far || (k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21)) { const i = ppl.list.indexOf(k.p); if (i >= 0) { if (k.p.body) k.p.body.release(); ppl.list.splice(i, 1); } if (k.d) k.d.keeper = null; this.keepers.splice(this.keepers.indexOf(k), 1); }
+    }
+    if (this.keepers.length >= 8 || !W.kit || !W.streamer) return;
+    const night = h >= 21 || h < 6.5;
+    for (const c of W.streamer.built) {
+      if (!c.doors || Math.abs(c.cx - P.x) > 70 || Math.abs(c.cz - P.z) > 70) continue;
+      for (const d of c.doors) {
+        if (d.keeper || this.keepers.length >= 8) continue;
+        const dd = Math.hypot(d.x - P.x, d.z - P.z);
+        if (dd > 60 || dd < 12 || (G.inView && G.inView(d.x, d.z) && dd < 35)) continue;
+        const shop = d.shop >= 0;
+        if (shop ? !open : !night) continue;
+        if (((d.x * 7 + d.z * 13) | 0) % (shop ? 3 : 7) !== 0) continue;        // not every shop, not every gate
+        const male = !shop || R() < 0.8, look = W.kit.randomLook({ next: R, chance: (q) => R() < q, range: (a, b) => a + R() * (b - a), pick: (a) => a[Math.floor(R() * a.length)], int: (a, b) => a + Math.floor(R() * (b - a + 1)), weighted: null }, { female: !male, dress: shop ? undefined : 'traditional' });
+        const x = d.x + d.nx * (shop ? 0.7 : 1.2), z = d.z + d.nz * (shop ? 0.7 : 1.2);
+        const p = ppl.spawnAt(look, x, z, male ? (shop ? (R() < 0.5 ? 'kaka' : 'bhaiya') : 'kaka') : 'kaku');
+        if (!p) continue;
+        p.mode = 'stand'; p.fixed = true; p.anchor = { x, z, fx: x + d.nx * 4, fz: z + d.nz * 4 }; p.wait = 1e9; p.anim = null;
+        p.idle = shop ? ['arms_folded', 'phone', 'idle', 'talk'][Math.floor(R() * 4)] : 'sit';
+        d.keeper = p; this.keepers.push({ p, d, kind: shop ? 'shop' : 'watch' });
+      }
+    }
+  }
   update(dt, player) {
     const L = this.ppl.list, G = this.g;
+    this.locals(dt, player);
     this.T += dt;
     for (const I of this.inc) I.t += dt;
     this.inc = this.inc.filter(I => I.t < (I.kind === 'down' ? 90 : 40));
@@ -95,6 +130,8 @@ export class Brain {
     // 3. their own day
     if (p.mode !== 'walk' || p.chat) return;
     const h = (G.hour ?? 12), r = R();
+    // dawn: the morning walkers and joggers are out (ajobas, kakas, aunties, the fitness dadas)
+    if (h > 5.3 && h < 8.3 && !p.jogger && r < 0.25 && /ajoba|kaka|aunty|kaku|dada/.test(p.persona || '')) { p.jogger = true; if (/dada|kaka/.test(p.persona) && R() < 0.5) p.speed *= 2.1; else p.speed *= 1.3; }
     // rain: everyone walks faster, heads down
     if (G.weather && G.weather.raining && !p.rainHurry) { p.rainHurry = true; p.speed *= 1.35; }
     // rush hour: some are late
