@@ -199,6 +199,8 @@ export class People {
     if (!per || !STREET[per]) per = p.persona = this.pickPersona(p.female, p.x, p.z);
     // the voice bank first (who they are, what's happening, the weather, the hour); the older lines if it has none
     // (the older lines first: they're the fun, properly Puneri ones; the bank only where there's no older line)
+    // bank 2 first (the street, redone), then the older lines, then bank 1
+    if (this.vb && !(scenario === 'crowd' && this.crowdCtx === 'foot') && this.vb.street2(p, scenario)) { this.lineT = cool; p.saidT = 0; return true; }
     const own = STREET[per] && STREET[per][scenario] && STREET[per][scenario].length;
     if (!own && this.vb && scenario !== 'stunt' && !(scenario === 'crowd' && this.crowdCtx === 'foot') && this.vb.street(p, scenario, { hard: this.rng.next() < 0.5 })) { this.lineT = cool; p.saidT = 0; return true; }
     // no line for this moment: stay quiet rather than say something that doesn't fit

@@ -10,8 +10,22 @@ export const MOMENT = { dodge: 'nearmiss', honk: 'honked', bump: 'bumped', shove
   respect: 'respect', nice: 'respect', scared: 'fearyou', odd: 'fearyou', flee: 'flee', fight: 'taunt', kind: 'hurt' };
 const pick = (n) => Math.floor(Math.random() * n);
 
+// bank 2 (the street, redone): its subtitles load in the background, a few hundred KB
+export const MOMENT2 = { dodge: 'nearmiss', honk: 'honked', bump: 'bumped', shoved: 'bumped', fight: 'taunt', greet: 'greet', chat: 'chat', mutter: 'mutter', respect: 'respect', nice: 'respect', scared: 'fearyou', odd: 'fearyou', crowd: 'crash' };
 export class VoiceBank {
-  constructor(G) { this.g = G; this.last = {}; }
+  constructor(G) { this.g = G; this.last = {}; fetch('assets/voice_bank2_lines.json').then(r => r.ok ? r.json() : null).then(t => { this.t2 = t; }).catch(() => {}); }
+  // bank 2: who they are, the moment; idle chatter becomes the weather or the hour's talk, or a Puneri patya, now and then
+  street2(p, scen) {
+    const T = this.t2 && this.t2[p.persona]; if (!T) return false;
+    let mom = MOMENT2[scen]; if (!mom) return false;
+    if (mom === 'chat') { const G = this.g, h = G.hour ?? 12, m = new Date().getMonth(), r = Math.random();
+      if (G.weather && G.weather.cur && G.weather.cur.rain > 0.25 && r < 0.6) mom = 'rain'; else if ((h >= 22 || h < 5) && r < 0.5) mom = 'night';
+      else if (m >= 2 && m <= 4 && h >= 12 && h < 17 && r < 0.5) mom = 'heat'; else if ((m === 7 || m === 8) && r < 0.4) mom = 'fest'; else if (r < 0.25) mom = 'patya'; }
+    const L = T[mom]; if (!L || !L.length) return false;
+    let i = pick(L.length); const key = 'v2' + p.persona + mom; if (this.last[key] === i) i = (i + 1) % L.length; this.last[key] = i;
+    const id = `vb2_${p.persona}_${mom}_${i}`;
+    return this.play(id, p, NAME[p.persona] || 'Passer-by', L[i][0], L[i][1], { pri: mom === 'nearmiss' || mom === 'bumped' || mom === 'taunt' ? 1 : 0 });
+  }
   has(id) { const R = this.g.audio && this.g.audio.remote; return !!(R && R.idx && R.idx[id]); }
   // what's around: rain, a summer afternoon, late night, the festival weeks (Ganeshotsav, Diwali)
   ctx() {
