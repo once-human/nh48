@@ -96,6 +96,13 @@ export function fixVenues(D, rect) {
 export function fixPins(list) {
   const out = list.filter(p => !NOT_REAL.has(p[0]));
   // Pune's famous places, checked against OpenStreetMap, as stars on the map
-  for (const f of FAMOUS) out.push([f.name, f.mr || '', 'landmark', Math.round(f.x * 100), Math.round(f.z * 100), 1]);
+  // (the city's own pin for the same place becomes the star, at OSM's spot; never two stars for one place)
+  const key = (n) => n.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 7);
+  for (const f of FAMOUS) {
+    const k = key(f.name), fx = Math.round(f.x * 100), fz = Math.round(f.z * 100);
+    const same = out.find(p => key(p[0]) === k && Math.hypot(p[3] - fx, p[4] - fz) < 30000);
+    if (same) { same[0] = f.name; if (f.mr) same[1] = f.mr; same[2] = 'landmark'; same[3] = fx; same[4] = fz; }
+    else out.push([f.name, f.mr || '', 'landmark', fx, fz, 1]);
+  }
   return out;
 }

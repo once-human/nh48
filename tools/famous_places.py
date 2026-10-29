@@ -89,6 +89,80 @@ PLACES = [
   ('PYC Hindu Gymkhana', 'PYC Hindu Gymkhana, Pune', '', 'पीवायसी हिंदू जिमखाना'),
   ('Sinhagad Fort', 'Sinhagad Fort', '', 'सिंहगड'),
   ('Khadakwasla Dam', 'Khadakwasla Dam', '', 'खडकवासला धरण'),
+  # ---- more, area by area (each kept only if OSM's match carries the name and lies inside the map)
+  # the old city (peths)
+  ('Kasba Ganpati', 'Kasba Ganpati, Kasba Peth, Pune', '', 'कसबा गणपती'),
+  ('Dagdusheth Halwai Ganpati', 'Dagdusheth Ganpati Temple', '', 'दगडूशेठ हलवाई गणपती'),
+  ('Mahatma Phule Mandai', 'Mahatma Phule Mandai, Shukrawar Peth, Pune', '', 'महात्मा फुले मंडई'),
+  ('Lal Mahal', 'Lal Mahal, Kasba Peth, Pune', '', 'लाल महाल'),
+  ('Bhide Wada', 'Bhide Wada', '', 'भिडे वाडा'),
+  ('Phule Wada', 'Phule Wada, Pune', '', 'फुले वाडा'),
+  ('Omkareshwar Temple', 'Omkareshwar Mandir, Pune', '', 'ओंकारेश्वर मंदिर'),
+  ('Belbaug Chowk', 'Belbaug Chowk, Pune', '', 'बेलबाग चौक'),
+  ('Kaka Halwai', 'Kaka Halwai, Pune', 'sweets', 'काका हलवाई'),
+  ('Alka Talkies', 'Alka Talkies, Pune', '', 'अलका टॉकीज'),
+  # Deccan, Shivajinagar, University Road
+  ('Fergusson College', 'Fergusson College, Pune', '', 'फर्ग्युसन कॉलेज'),
+  ('COEP', 'College of Engineering Pune', '', 'सीओईपी'),
+  ('Modern College', 'Modern College, Shivajinagar, Pune', '', 'मॉडर्न कॉलेज'),
+  ('Sambhaji Park', 'Sambhaji Udyan, Pune', '', 'संभाजी उद्यान'),
+  ('Z Bridge', 'Z Bridge, Pune', '', 'झेड ब्रिज'),
+  ('Shabree', 'Shabree, Pune', 'thali', 'शबरी'),
+  ('Shivajinagar Station', 'Shivajinagar railway station, Pune', '', 'शिवाजीनगर स्थानक'),
+  ('Savitribai Phule Pune University', 'Savitribai Phule Pune University', '', 'सावित्रीबाई फुले पुणे विद्यापीठ'),
+  ('E-Square', 'E Square, University Road, Pune', '', 'ई-स्क्वेअर'),
+  ('JW Marriott Pune', 'JW Marriott Pune', '', 'जेडब्ल्यू मॅरियट'),
+  ('Mangala Multiplex', 'Mangala, Shivajinagar, Pune', '', 'मंगला'),
+  # Camp, Pune Station, Koregaon Park, Kalyani Nagar
+  ('Aga Khan Palace', 'Aga Khan Palace, Pune', '', 'आगाखान पॅलेस'),
+  ('Lal Deval', 'Ohel David Synagogue, Pune', '', 'लाल देऊळ'),
+    ('Pune Race Course', 'Pune Race Course', '', 'पुणे रेस कोर्स'),
+  ('Council Hall', 'Council Hall, Pune', '', 'कौन्सिल हॉल'),
+  ('Victory Theatre', 'Victory Theatre, Pune', '', 'व्हिक्टरी थिएटर'),
+  ('Vohuman Cafe', 'Vohuman, Pune', 'cafe', 'वोहुमन कॅफे'),
+  ('George Restaurant', 'George Restaurant, Pune', 'food', 'जॉर्ज रेस्टॉरंट'),
+  ('Sassoon Hospital', 'Sassoon Hospital', '', 'ससून रुग्णालय'),
+  ('Ruby Hall Clinic', 'Ruby Hall Clinic, Pune', '', 'रुबी हॉल क्लिनिक'),
+  ('Jehangir Hospital', 'Jehangir Hospital, Pune', '', 'जहांगीर रुग्णालय'),
+  ('KEM Hospital', 'King Edward Memorial Hospital, Pune', '', 'केईएम रुग्णालय'),
+  ('Osho International Meditation Resort', 'Osho International Meditation Resort', '', 'ओशो आश्रम'),
+  ('The Westin Pune', 'The Westin Pune Koregaon Park', '', 'द वेस्टिन'),
+  ('Hyatt Pune', 'Hyatt Pune', '', 'हयात'),
+  ('Pune Central', 'Pune Central Mall, Bund Garden Road, Pune', '', 'पुणे सेंट्रल'),
+  ('Poona Club', 'Poona Club, Bund Garden Road, Pune', '', 'पूना क्लब'),
+  ('Poona Golf Club', 'Poona Golf Course', '', 'पूना गोल्फ क्लब'),
+  ('Yerwada Central Jail', 'Yerwada Central Jail, Pune', '', 'येरवडा कारागृह'),
+  # Kothrud, Karve Nagar, Erandwane, Sinhagad Road
+  ('MIT World Peace University', 'MIT World Peace University, Kothrud, Pune', '', 'एमआयटी विद्यापीठ'),
+  ('City Pride Kothrud', 'City Pride, Kothrud, Pune', '', 'सिटी प्राइड कोथरूड'),
+  ('Deenanath Mangeshkar Hospital', 'Deenanath Mangeshkar Hospital, Erandwane, Pune', '', 'दीनानाथ मंगेशकर रुग्णालय'),
+  ('ARAI', 'Automotive Research Association of India, Kothrud, Pune', '', 'एआरएआय'),
+  ('Abhiruchi Mall', 'Abhiruchi Mall, Sinhagad Road, Pune', '', 'अभिरुची मॉल'),
+  ('Taljai Hill', 'Taljai, Pune', '', 'तळजाई टेकडी'),
+  ('Padmavati Temple', 'Padmavati Temple, Sahakar Nagar, Pune', '', 'पद्मावती मंदिर'),
+  ('City Pride Satara Road', 'City Pride, Satara Road, Pune', '', 'सिटी प्राइड सातारा रोड'),
+  # Swargate, Market Yard, Katraj
+  ('Market Yard', 'Market Yard, Pune', '', 'मार्केट यार्ड'),
+  ('Katraj Dairy', 'Katraj Dairy, Pune', '', 'कात्रज डेअरी'),
+  ('Bharati Vidyapeeth', 'Bharati Vidyapeeth, Katraj, Pune', '', 'भारती विद्यापीठ'),
+  ('Shivsrushti', 'Shivsrushti', '', 'शिवसृष्टी'),
+  # Aundh, Baner, Pashan, Balewadi
+  ('Pashan Lake', 'Pashan Lake, Pune', '', 'पाषाण तलाव'),
+  ('National Chemical Laboratory', 'National Chemical Laboratory, Pashan, Pune', '', 'राष्ट्रीय रासायनिक प्रयोगशाळा'),
+  ('IISER Pune', 'Indian Institute of Science Education and Research, Pune', '', 'आयसर पुणे'),
+  ('Bremen Chowk', 'Bremen Chowk, Aundh, Pune', '', 'ब्रेमेन चौक'),
+  ('Baner Hill', 'Baner Hill, Pune', '', 'बाणेर टेकडी'),
+  # Viman Nagar, Kharadi, Hadapsar, Magarpatta
+  ('Magarpatta City', 'Magarpatta', '', 'मगरपट्टा सिटी'),
+  ('EON IT Park', 'EON IT Park, Kharadi, Pune', '', 'इऑन आयटी पार्क'),
+  ('World Trade Center Pune', 'World Trade Center, Kharadi, Pune', '', 'वर्ल्ड ट्रेड सेंटर'),
+  ('Symbiosis Viman Nagar', 'Symbiosis Viman Nagar', '', 'सिम्बायोसिस विमाननगर'),
+  # the west: Hinjewadi, Wakad, Pimpri-Chinchwad
+  ('Rajiv Gandhi Infotech Park', 'Rajiv Gandhi Infotech Park, Hinjawadi, Pune', '', 'हिंजवडी आयटी पार्क'),
+  ('Phoenix Mall of the Millennium', 'Phoenix Mall of the Millennium', '', 'फिनिक्स मॉल ऑफ द मिलेनियम'),
+  ('Bhakti Shakti', 'Bhakti Shakti, Nigdi, Pimpri-Chinchwad', '', 'भक्ती शक्ती'),
+  ('Appu Ghar', 'Appu Ghar, Nigdi, Pimpri-Chinchwad', '', 'अप्पूघर'),
+  ('Pimpri-Chinchwad Science Park', 'Pimpri Chinchwad Science Park, Chinchwad', '', 'सायन्स पार्क'),
 ]
 def q(query):
     url = 'https://nominatim.openstreetmap.org/search?' + urllib.parse.urlencode({'q': query, 'format': 'json', 'limit': 3, 'viewbox': '73.6,18.75,74.15,18.35', 'bounded': 1})
@@ -97,12 +171,34 @@ def q(query):
 pins = json.loads(gzip.open(os.path.join(ROOT, 'data/pune/pins.json.gz')).read())
 norm = lambda s: re.sub(r'[^a-z0-9]', '', s.lower())
 out, miss = [], []
+# already verified on an earlier run: kept as they are (no new request)
+prev = {}
+try: prev = {f['name']: f for f in json.load(open(os.path.join(ROOT, 'src/world/famous.json')))}
+except Exception: pass
+B = json.loads(gzip.open(os.path.join(ROOT, 'dist/assets/pune/base.json.gz')).read())
+OUT = B['meta']['outline']
+def inside(lon, lat):
+    c = False
+    for i in range(len(OUT)):
+        a, b = OUT[i], OUT[i - 1]
+        if (a[1] > lat) != (b[1] > lat) and lon < (b[0] - a[0]) * (lat - a[1]) / (b[1] - a[1]) + a[0]: c = not c
+    return c
+STOP = {'the', 'of', 'and', 'pune', 'hotel', 'cafe', 'temple', 'road', 'hospital', 'college', 'mall', 'park', 'station', 'city'}
+def named(name, r):
+    # OSM's match has to carry the name (a word of it that isn't generic), not just be somewhere in Pune
+    words = [w for w in re.findall(r'[a-z0-9]+', name.lower()) if w not in STOP and len(w) > 2]
+    hay = norm(r.get('display_name', '') + ' ' + r.get('name', ''))
+    return not words or any(w in hay for w in words)
 for name, query, kind, mr in PLACES:
+    if name in prev: out.append(prev[name]); continue
     time.sleep(1.1)
     try: res = q(query)
     except Exception as e: res = []
     if not res:
         miss.append(name); print('not found on OSM:', name); continue
+    res = [r for r in res if named(name, r) and inside(float(r['lon']), float(r['lat']))]
+    if not res:
+        miss.append(name); print('no named match inside the map:', name); continue
     r = res[0]; lat, lon = float(r['lat']), float(r['lon'])
     x, z = (lon - LON0) * MO, -(lat - LAT0) * ML
     # the game's own pin with that name, if close

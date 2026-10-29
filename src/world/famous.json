@@ -1,5 +1,23 @@
 [
 {
+"name": "Vaishali",
+"mr": "वैशाली",
+"kind": "southindian",
+"x": -2511.1,
+"z": 680.9,
+"osm": "osm: Vaishali, Wrangler Parajape Path, Deccan Gymkhana, Pune, Pune City Subdistrict, ",
+"pinOff": null
+},
+{
+"name": "Roopali",
+"mr": "रूपाली",
+"kind": "southindian",
+"x": -2489.2,
+"z": 847.4,
+"osm": "osm: Roopali, Gopal Krushna Gokhale Path, Deccan Gymkhana, Pune, Pune City Subdistric",
+"pinOff": null
+},
+{
 "name": "Cafe Goodluck",
 "mr": "कॅफे गुडलक",
 "kind": "cafe",
@@ -25,6 +43,15 @@
 "z": 1805.3,
 "osm": "Durvankur Dining Hall, Lokmanya Tilak Marg, Navi Peth, Pune, Pune City Subdistrict, Pune, ",
 "pinOff": 0
+},
+{
+"name": "Katakirr Misal",
+"mr": "काटाकिर्र",
+"kind": "misal",
+"x": -8535.8,
+"z": -3909.7,
+"osm": "game pin: Katakirrr",
+"pinOff": null
 },
 {
 "name": "Chitale Bandhu",
@@ -90,6 +117,15 @@
 "pinOff": 0
 },
 {
+"name": "SP’s Biryani House",
+"mr": "एसपीज बिर्याणी",
+"kind": "biryani",
+"x": -1552.4,
+"z": 2066.7,
+"osm": "osm: SP's Biryani, C. V. Joshi Marg, Sadashiv Peth, Pune, Pune City Subdistrict, Pune",
+"pinOff": null
+},
+{
 "name": "Joshi Wadewale",
 "mr": "जोशी वडेवाले",
 "kind": "fastfood",
@@ -126,6 +162,15 @@
 "pinOff": 0
 },
 {
+"name": "Saras Baug Ganpati",
+"mr": "सारसबाग गणपती",
+"kind": "",
+"x": -1272.3,
+"z": 2891.0,
+"osm": "game pin: Talyatla Ganpati",
+"pinOff": null
+},
+{
 "name": "Pataleshwar Caves",
 "mr": "पाताळेश्वर",
 "kind": "",
@@ -135,6 +180,24 @@
 "pinOff": 23
 },
 {
+"name": "ISKCON NVCC",
+"mr": "इस्कॉन",
+"kind": "",
+"x": 1667.0,
+"z": 8702.5,
+"osm": "osm: Iskcon lawn, Kondhwa Budruk, Pune City Subdistrict, Pune, Maharashtra, India",
+"pinOff": null
+},
+{
+"name": "Tambdi Jogeshwari",
+"mr": "तांबडी जोगेश्वरी",
+"kind": "",
+"x": -1080.7,
+"z": 1158.7,
+"osm": "osm: Tambdi Jogeshwari, 33 A, Nakalakar Bhonde Path, Narayan Peth, Pune, Pune City Su",
+"pinOff": null
+},
+{
 "name": "Guruji Talim Ganpati",
 "mr": "गुरुजी तालीम गणपती",
 "kind": "",
@@ -142,6 +205,24 @@
 "z": 1323.0,
 "osm": "Guruji Talim, Laxmi Path, Narayan Peth, Pune, Pune City Subdistrict, Pune, Maharashtra, 41",
 "pinOff": 0
+},
+{
+"name": "Kesariwada Ganpati",
+"mr": "केसरीवाडा",
+"kind": "",
+"x": -1680.3,
+"z": 1189.6,
+"osm": "osm: Kesariwada, Narsimha Chintaman Kelkar Marg, Narayan Peth, Pune, Pune City Subdis",
+"pinOff": null
+},
+{
+"name": "Saras Baug",
+"mr": "सारसबाग",
+"kind": "",
+"x": -1277.2,
+"z": 2933.7,
+"osm": "osm: Sarasbaug, swargate, Swargate, Pune, Pune City Subdistrict, Pune, Maharashtra, 4",
+"pinOff": null
 },
 {
 "name": "Empress Garden",
@@ -162,6 +243,15 @@
 "pinOff": 174
 },
 {
+"name": "Pu La Deshpande Garden",
+"mr": "पु. ल. देशपांडे उद्यान",
+"kind": "",
+"x": -2951.5,
+"z": 3555.8,
+"osm": "osm: Deshpande Udyan, Sinhagad Road, Prosperity Society, Dattawadi, Anandnagar, Pune ",
+"pinOff": null
+},
+{
 "name": "Kamala Nehru Park",
 "mr": "कमला नेहरू पार्क",
 "kind": "",
@@ -171,12 +261,39 @@
 "pinOff": 0
 },
 {
+"name": "Peshwe Park",
+"mr": "पेशवे पार्क",
+"kind": "",
+"x": -1477.2,
+"z": 2926.5,
+"osm": "game pin: Peshwe Park",
+"pinOff": null
+},
+{
 "name": "Vetal Tekdi",
 "mr": "वेताळ टेकडी",
 "kind": "",
 "x": -5281.9,
 "z": 431.1,
 "osm": "Automotive Research Association of India (ARAI), Survey No. 102, Vetal Hill, Off Paud Road",
+"pinOff": null
+},
+{
+"name": "Rajiv Gandhi Zoo",
+"mr": "कात्रज प्राणिसंग्रहालय",
+"kind": "",
+"x": -541.1,
+"z": 8050.7,
+"osm": "game pin: Rajiv Gandhi Zoological Park",
+"pinOff": null
+},
+{
+"name": "Osho Teerth Park",
+"mr": "ओशो तीर्थ पार्क",
+"kind": "",
+"x": 2721.5,
+"z": -1033.9,
+"osm": "osm: Osho Teerth Park, Ghorpuri, Pune, Pune City Subdistrict, Pune, Maharashtra, 4110",
 "pinOff": null
 },
 {
@@ -196,6 +313,15 @@
 "z": 373.1,
 "osm": "Mahatma Phule Vastu Sangrahalaya, Ghole Road, Shivajinagar, Pune, Pune City Subdistrict, P",
 "pinOff": 0
+},
+{
+"name": "Bal Gandharva Rang Mandir",
+"mr": "बालगंधर्व रंगमंदिर",
+"kind": "",
+"x": -1721.7,
+"z": 554.4,
+"osm": "osm: Balgandharva Rangmandir, Maharshi Vitthal Ramji Shinde Bridge, Shaniwar Peth, Pu",
+"pinOff": null
 },
 {
 "name": "Tilak Smarak Mandir",
@@ -234,6 +360,15 @@
 "pinOff": 0
 },
 {
+"name": "Joshi’s Museum of Miniature Railways",
+"mr": "जोशी रेल्वे संग्रहालय",
+"kind": "",
+"x": -4501.9,
+"z": 2832.3,
+"osm": "osm: Joshi's Museum of Miniature Railways, Balkrushna Shankar Joshi Path, Kothrud, Er",
+"pinOff": null
+},
+{
 "name": "Nana Wada",
 "mr": "नाना वाडा",
 "kind": "",
@@ -241,6 +376,15 @@
 "z": 952.3,
 "osm": "Nana Wada, Shivaji Road, Shaniwar Peth, Pune, Pune City Subdistrict, Pune, Maharashtra, 41",
 "pinOff": 29
+},
+{
+"name": "Vishrambaug Wada",
+"mr": "विश्रामबाग वाडा",
+"kind": "",
+"x": -1221.9,
+"z": 1455.7,
+"osm": "Vishrambaug Wada, R. B. Kumthekar Marg, Narayan Peth, Pune, Pune City Subdistrict, Pune, M",
+"pinOff": 28
 },
 {
 "name": "BMCC",
@@ -279,12 +423,30 @@
 "pinOff": 72
 },
 {
+"name": "SP College",
+"mr": "स. प. महाविद्यालय",
+"kind": "",
+"x": -1635.2,
+"z": 2117.4,
+"osm": "osm: S.P. College Library, Lokmanya Tilak Marg, Sadashiv Peth, Pune, Pune City Subdis",
+"pinOff": null
+},
+{
 "name": "Laxmi Road",
 "mr": "लक्ष्मी रस्ता",
 "kind": "",
 "x": 521.7,
 "z": 1254.1,
 "osm": "Laxmi Road, Ganesh Peth, Pune, Pune City Subdistrict, Pune, Maharashtra, 411001, India",
+"pinOff": null
+},
+{
+"name": "Fashion Street",
+"mr": "फॅशन स्ट्रीट",
+"kind": "",
+"x": 1514.2,
+"z": 1923.1,
+"osm": "osm: Fashion Street, Pune Cantonment, Pune, Pune City Subdistrict, Pune, Maharashtra,",
 "pinOff": null
 },
 {
@@ -315,6 +477,15 @@
 "pinOff": 0
 },
 {
+"name": "Pavillion Mall",
+"mr": "द पॅव्हिलियन",
+"kind": "",
+"x": -3735.3,
+"z": -744.1,
+"osm": "osm: The Pavillion, Senapati Bapat Marg, Model Colony, Pune, Pune City Subdistrict, P",
+"pinOff": null
+},
+{
 "name": "Westend Mall",
 "mr": "वेस्टएंड मॉल",
 "kind": "",
@@ -322,6 +493,15 @@
 "z": -3835.8,
 "osm": "Westend Mall, Mahadji Shinde Marg, Marutrao Gaikwad nagar, Aundh, Pune, Pune City Subdistr",
 "pinOff": 32
+},
+{
+"name": "Amanora Mall",
+"mr": "अमानोरा मॉल",
+"kind": "",
+"x": 7428.9,
+"z": 924.2,
+"osm": "osm: Amanora Mall, Amanora Town Centre, Pimpri-Chinchwad, Haveli Subdistrict, Pune, M",
+"pinOff": null
 },
 {
 "name": "Seasons Mall",
@@ -369,222 +549,6 @@
 "pinOff": 256
 },
 {
-"name": "Nehru Stadium",
-"mr": "नेहरू स्टेडियम",
-"kind": "",
-"x": -985.0,
-"z": 2737.8,
-"osm": "Jawaharlal Nehru Cricket Stadium, Balaji Vishwanath Path, Swargate, Pune, Pune City Subdis",
-"pinOff": 17
-},
-{
-"name": "Sinhagad Fort",
-"mr": "सिंहगड",
-"kind": "",
-"x": -11349.7,
-"z": 17962.1,
-"osm": "Sinhagad Fort, Sinhagad Trail, Atekar Vasti, Kalyan Gaon, Haveli Subdistrict, Pune, Mahara",
-"pinOff": null
-},
-{
-"name": "Khadakwasla Dam",
-"mr": "खडकवासला धरण",
-"kind": "",
-"x": -10237.1,
-"z": 9425.8,
-"osm": "Khadakwasla Dam, Khadakwasla, Haveli Subdistrict, Pune, Maharashtra, 411024, India",
-"pinOff": 19
-},
-{
-"name": "Vaishali",
-"mr": "वैशाली",
-"kind": "southindian",
-"x": -2511.1,
-"z": 680.9,
-"osm": "osm: Vaishali, Wrangler Parajape Path, Deccan Gymkhana, Pune, Pune City Subdistrict, ",
-"pinOff": null
-},
-{
-"name": "Roopali",
-"mr": "रूपाली",
-"kind": "southindian",
-"x": -2489.2,
-"z": 847.4,
-"osm": "osm: Roopali, Gopal Krushna Gokhale Path, Deccan Gymkhana, Pune, Pune City Subdistric",
-"pinOff": null
-},
-{
-"name": "Wadeshwar (Kothrud)",
-"mr": "वाडेश्वर",
-"kind": "southindian",
-"x": -4521.1,
-"z": 2836.5,
-"osm": "osm: Wadeshwar, Balkrushna Shankar Joshi Path, Kothrud, Erandwane, Pune, Pune City Su",
-"pinOff": null
-},
-{
-"name": "Katakirr Misal",
-"mr": "काटाकिर्र",
-"kind": "misal",
-"x": -8535.8,
-"z": -3909.7,
-"osm": "game pin: Katakirrr",
-"pinOff": null
-},
-{
-"name": "SP’s Biryani House",
-"mr": "एसपीज बिर्याणी",
-"kind": "biryani",
-"x": -1552.4,
-"z": 2066.7,
-"osm": "osm: SP's Biryani, C. V. Joshi Marg, Sadashiv Peth, Pune, Pune City Subdistrict, Pune",
-"pinOff": null
-},
-{
-"name": "JJ Garden Vada Pav",
-"mr": "गार्डन वडापाव",
-"kind": "fastfood",
-"x": 749.3,
-"z": 647.8,
-"osm": "game pin: JJ Garden Vada Pav",
-"pinOff": null
-},
-{
-"name": "Saras Baug Ganpati",
-"mr": "सारसबाग गणपती",
-"kind": "",
-"x": -1272.3,
-"z": 2891.0,
-"osm": "game pin: Talyatla Ganpati",
-"pinOff": null
-},
-{
-"name": "ISKCON NVCC",
-"mr": "इस्कॉन",
-"kind": "",
-"x": 1667.0,
-"z": 8702.5,
-"osm": "osm: Iskcon lawn, Kondhwa Budruk, Pune City Subdistrict, Pune, Maharashtra, India",
-"pinOff": null
-},
-{
-"name": "Tambdi Jogeshwari",
-"mr": "तांबडी जोगेश्वरी",
-"kind": "",
-"x": -1080.7,
-"z": 1158.7,
-"osm": "osm: Tambdi Jogeshwari, 33 A, Nakalakar Bhonde Path, Narayan Peth, Pune, Pune City Su",
-"pinOff": null
-},
-{
-"name": "Kesariwada Ganpati",
-"mr": "केसरीवाडा",
-"kind": "",
-"x": -1680.3,
-"z": 1189.6,
-"osm": "osm: Kesariwada, Narsimha Chintaman Kelkar Marg, Narayan Peth, Pune, Pune City Subdis",
-"pinOff": null
-},
-{
-"name": "Saras Baug",
-"mr": "सारसबाग",
-"kind": "",
-"x": -1277.2,
-"z": 2933.7,
-"osm": "osm: Sarasbaug, swargate, Swargate, Pune, Pune City Subdistrict, Pune, Maharashtra, 4",
-"pinOff": null
-},
-{
-"name": "Pu La Deshpande Garden",
-"mr": "पु. ल. देशपांडे उद्यान",
-"kind": "",
-"x": -2951.5,
-"z": 3555.8,
-"osm": "osm: Deshpande Udyan, Sinhagad Road, Prosperity Society, Dattawadi, Anandnagar, Pune ",
-"pinOff": null
-},
-{
-"name": "Peshwe Park",
-"mr": "पेशवे पार्क",
-"kind": "",
-"x": -1477.2,
-"z": 2926.5,
-"osm": "game pin: Peshwe Park",
-"pinOff": null
-},
-{
-"name": "Rajiv Gandhi Zoo",
-"mr": "कात्रज प्राणिसंग्रहालय",
-"kind": "",
-"x": -541.1,
-"z": 8050.7,
-"osm": "game pin: Rajiv Gandhi Zoological Park",
-"pinOff": null
-},
-{
-"name": "Osho Teerth Park",
-"mr": "ओशो तीर्थ पार्क",
-"kind": "",
-"x": 2721.5,
-"z": -1033.9,
-"osm": "osm: Osho Teerth Park, Ghorpuri, Pune, Pune City Subdistrict, Pune, Maharashtra, 4110",
-"pinOff": null
-},
-{
-"name": "Bal Gandharva Rang Mandir",
-"mr": "बालगंधर्व रंगमंदिर",
-"kind": "",
-"x": -1721.7,
-"z": 554.4,
-"osm": "osm: Balgandharva Rangmandir, Maharshi Vitthal Ramji Shinde Bridge, Shaniwar Peth, Pu",
-"pinOff": null
-},
-{
-"name": "Joshi’s Museum of Miniature Railways",
-"mr": "जोशी रेल्वे संग्रहालय",
-"kind": "",
-"x": -4501.9,
-"z": 2832.3,
-"osm": "osm: Joshi's Museum of Miniature Railways, Balkrushna Shankar Joshi Path, Kothrud, Er",
-"pinOff": null
-},
-{
-"name": "SP College",
-"mr": "स. प. महाविद्यालय",
-"kind": "",
-"x": -1635.2,
-"z": 2117.4,
-"osm": "osm: S.P. College Library, Lokmanya Tilak Marg, Sadashiv Peth, Pune, Pune City Subdis",
-"pinOff": null
-},
-{
-"name": "Fashion Street",
-"mr": "फॅशन स्ट्रीट",
-"kind": "",
-"x": 1514.2,
-"z": 1923.1,
-"osm": "osm: Fashion Street, Pune Cantonment, Pune, Pune City Subdistrict, Pune, Maharashtra,",
-"pinOff": null
-},
-{
-"name": "Pavillion Mall",
-"mr": "द पॅव्हिलियन",
-"kind": "",
-"x": -3735.3,
-"z": -744.1,
-"osm": "osm: The Pavillion, Senapati Bapat Marg, Model Colony, Pune, Pune City Subdistrict, P",
-"pinOff": null
-},
-{
-"name": "Amanora Mall",
-"mr": "अमानोरा मॉल",
-"kind": "",
-"x": 7428.9,
-"z": 924.2,
-"osm": "osm: Amanora Mall, Amanora Town Centre, Pimpri-Chinchwad, Haveli Subdistrict, Pune, M",
-"pinOff": null
-},
-{
 "name": "Balewadi Stadium",
 "mr": "बालेवाडी क्रीडा संकुल",
 "kind": "",
@@ -592,6 +556,15 @@
 "z": -5284.3,
 "osm": "osm: Balewadi Stadium, exit to baner, Wakad gaav, Mhalunge, Pune City Subdistrict, Pu",
 "pinOff": null
+},
+{
+"name": "Nehru Stadium",
+"mr": "नेहरू स्टेडियम",
+"kind": "",
+"x": -985.0,
+"z": 2737.8,
+"osm": "Jawaharlal Nehru Cricket Stadium, Balaji Vishwanath Path, Swargate, Pune, Pune City Subdis",
+"pinOff": 17
 },
 {
 "name": "Deccan Gymkhana",
@@ -612,12 +585,507 @@
 "pinOff": null
 },
 {
-"name": "The Mills",
-"mr": "द मिल्स",
+"name": "Sinhagad Fort",
+"mr": "सिंहगड",
 "kind": "",
-"x": 630.0,
-"z": -595.0,
-"osm": "Raja Bahadur Mill compound, RBM Road (OSM: 624,-586)",
+"x": -11349.7,
+"z": 17962.1,
+"osm": "Sinhagad Fort, Sinhagad Trail, Atekar Vasti, Kalyan Gaon, Haveli Subdistrict, Pune, Mahara",
 "pinOff": null
+},
+{
+"name": "Khadakwasla Dam",
+"mr": "खडकवासला धरण",
+"kind": "",
+"x": -10237.1,
+"z": 9425.8,
+"osm": "Khadakwasla Dam, Khadakwasla, Haveli Subdistrict, Pune, Maharashtra, 411024, India",
+"pinOff": 19
+},
+{
+"name": "Kasba Ganpati",
+"mr": "कसबा गणपती",
+"kind": "",
+"x": -819.3,
+"z": 882.1,
+"osm": "Kasba Ganpati, Ram Ganesh Gadkari Path, Kasba Peth, Pune, Pune City Subdistrict, Pune, Mah",
+"pinOff": 0
+},
+{
+"name": "Mahatma Phule Mandai",
+"mr": "महात्मा फुले मंडई",
+"kind": "",
+"x": -919.1,
+"z": 1558.7,
+"osm": "Mahatma Phule Mandai, Amrale Road, Guruwar Peth, Pune, Pune City Subdistrict, Pune, Mahara",
+"pinOff": 0
+},
+{
+"name": "Lal Mahal",
+"mr": "लाल महाल",
+"kind": "",
+"x": -880.6,
+"z": 912.3,
+"osm": "Lal Mahal, Ganesh Path, Kasba Peth, Pune, Pune City Subdistrict, Pune, Maharashtra, 411001",
+"pinOff": 0
+},
+{
+"name": "Omkareshwar Temple",
+"mr": "ओंकारेश्वर मंदिर",
+"kind": "",
+"x": -1677.8,
+"z": 779.9,
+"osm": "Omkareshwar Mandir, Chandrashekhar Agashe Road, Shaniwar Peth, Pune, Pune City Subdistrict",
+"pinOff": 0
+},
+{
+"name": "Kaka Halwai",
+"mr": "काका हलवाई",
+"kind": "sweets",
+"x": 69.6,
+"z": 833.3,
+"osm": "Kaka Halwai, Rasta peth, Sardar Moodliar Path, Somwar Peth, Pune, Pune City Subdistrict, P",
+"pinOff": 0
+},
+{
+"name": "Alka Talkies",
+"mr": "अलका टॉकीज",
+"kind": "",
+"x": -2288.4,
+"z": 1636.7,
+"osm": "Alka Talkies, Lalbahadur Shashtri Marg, Navi Peth, Pune, Pune City Subdistrict, Pune, Maha",
+"pinOff": 0
+},
+{
+"name": "Fergusson College",
+"mr": "फर्ग्युसन कॉलेज",
+"kind": "",
+"x": -2788.4,
+"z": 315.6,
+"osm": "Fergusson College, Gopal Krushna Gokhale Path, Shivajinagar, Pune, Pune City Subdistrict, ",
+"pinOff": 226
+},
+{
+"name": "COEP",
+"mr": "सीओईपी",
+"kind": "",
+"x": -862.4,
+"z": -400.8,
+"osm": "College of Engineering, Pune, COEP Road, Mangalwar Peth, Pune, Pune City Subdistrict, Pune",
+"pinOff": 75
+},
+{
+"name": "Modern College",
+"mr": "मॉडर्न कॉलेज",
+"kind": "",
+"x": -3933.6,
+"z": -1566.3,
+"osm": "Modern College, Ganeshkhind Road, Model Colony, Pune, Pune City Subdistrict, Pune, Maharas",
+"pinOff": 0
+},
+{
+"name": "Sambhaji Park",
+"mr": "संभाजी उद्यान",
+"kind": "",
+"x": -1895.0,
+"z": 715.6,
+"osm": "Sambhaji Udyan, Shaniwar Peth, Pune, Pune City Subdistrict, Pune, Maharashtra, 411001, Ind",
+"pinOff": 22
+},
+{
+"name": "Z Bridge",
+"mr": "झेड ब्रिज",
+"kind": "",
+"x": -2240.4,
+"z": 1243.8,
+"osm": "Kakasaheb Gadgil Bridge, Deccan Gymkhana, Pune, Pune City Subdistrict, Pune, Maharashtra, ",
+"pinOff": 16
+},
+{
+"name": "Shabree",
+"mr": "शबरी",
+"kind": "thali",
+"x": -2472.4,
+"z": 264.9,
+"osm": "Shabree Sharvaree, Ghole Road, Shivajinagar, Pune, Pune City Subdistrict, Pune, Maharashtr",
+"pinOff": 9
+},
+{
+"name": "Shivajinagar Station",
+"mr": "शिवाजीनगर स्थानक",
+"kind": "",
+"x": -1445.4,
+"z": -618.9,
+"osm": "Shivajinagar, Shivajinagar Railway Station Road, Shivajinagar, Pune, Pune City Subdistrict",
+"pinOff": 130
+},
+{
+"name": "Savitribai Phule Pune University",
+"mr": "सावित्रीबाई फुले पुणे विद्यापीठ",
+"kind": "",
+"x": -4050.0,
+"z": -2860.6,
+"osm": "Savitribai Phule Pune University, Ganeshkhind Road, Model Colony, Pune, Pune City Subdistr",
+"pinOff": 0
+},
+{
+"name": "E-Square",
+"mr": "ई-स्क्वेअर",
+"kind": "",
+"x": -3180.2,
+"z": -1175.1,
+"osm": "E-Square, Ganeshkhind Road, Model Colony, Pune, Pune City Subdistrict, Pune, Maharashtra, ",
+"pinOff": 78
+},
+{
+"name": "JW Marriott Pune",
+"mr": "जेडब्ल्यू मॅरियट",
+"kind": "",
+"x": -3742.4,
+"z": -592.0,
+"osm": "JW Marriott Pune, Bharatiya Vidyabhavan Marg, Model Colony, Pune, Pune City Subdistrict, P",
+"pinOff": 0
+},
+{
+"name": "Mangala Multiplex",
+"mr": "मंगला",
+"kind": "",
+"x": -1115.2,
+"z": 291.4,
+"osm": "Mangala Multiplex, Shivaji Road, Kasba Peth, Pune, Pune City Subdistrict, Pune, Maharashtr",
+"pinOff": 0
+},
+{
+"name": "Aga Khan Palace",
+"mr": "आगाखान पॅलेस",
+"kind": "",
+"x": 3851.7,
+"z": -2803.6,
+"osm": "Aga Khan Palace, Nagar Road, Kalyani Nagar, Pune City Subdistrict, Pune, Maharashtra, 4110",
+"pinOff": 18
+},
+{
+"name": "Pune Race Course",
+"mr": "पुणे रेस कोर्स",
+"kind": "",
+"x": 2960.7,
+"z": 1695.8,
+"osm": "Pune Race Course, Prince Of Wales Drive, Fatima Nagar, Pune, Pune City Subdistrict, Pune, ",
+"pinOff": 0
+},
+{
+"name": "Council Hall",
+"mr": "कौन्सिल हॉल",
+"kind": "",
+"x": 1366.9,
+"z": 246.1,
+"osm": "Council Hall, Maneckji Mehta Road, Somwar Peth, Pune, Pune City Subdistrict, Pune, Maharas",
+"pinOff": 104
+},
+{
+"name": "Vohuman Cafe",
+"mr": "वोहुमन कॅफे",
+"kind": "cafe",
+"x": 1251.2,
+"z": -601.9,
+"osm": "Vohuman Cafe, Rajarshi Shahu Maharaj Path, Bund Garden T.P.S, Somwar Peth, Pune, Pune City",
+"pinOff": 0
+},
+{
+"name": "George Restaurant",
+"mr": "जॉर्ज रेस्टॉरंट",
+"kind": "food",
+"x": 1521.8,
+"z": 1071.2,
+"osm": "George, East Street, Pune Cantonment, Pune, Pune City Subdistrict, Pune, Maharashtra, 4110",
+"pinOff": null
+},
+{
+"name": "Sassoon Hospital",
+"mr": "ससून रुग्णालय",
+"kind": "",
+"x": 482.2,
+"z": 205.5,
+"osm": "Sassoon Hospital, Babasaheb Ambedkar Marg, Somwar Peth, Pune, Pune City Subdistrict, Pune,",
+"pinOff": 0
+},
+{
+"name": "Ruby Hall Clinic",
+"mr": "रुबी हॉल क्लिनिक",
+"kind": "",
+"x": 1346.1,
+"z": -632.9,
+"osm": "Ruby Hall Clinic, Bund Garden Road, Bund Garden T.P.S, Somwar Peth, Pune, Pune City Subdis",
+"pinOff": 116
+},
+{
+"name": "Jehangir Hospital",
+"mr": "जहांगीर रुग्णालय",
+"kind": "",
+"x": 1230.2,
+"z": -370.1,
+"osm": "Jehangir Hospital, Bund Garden Road, Bund Garden T.P.S, Somwar Peth, Pune, Pune City Subdi",
+"pinOff": 4
+},
+{
+"name": "KEM Hospital",
+"mr": "केईएम रुग्णालय",
+"kind": "",
+"x": 213.8,
+"z": 758.3,
+"osm": "KEM Hospital, Jawaharlal Nehru Marg, Somwar Peth, Pune, Pune City Subdistrict, Pune, Mahar",
+"pinOff": 38
+},
+{
+"name": "The Westin Pune",
+"mr": "द वेस्टिन",
+"kind": "",
+"x": 4338.7,
+"z": -1335.3,
+"osm": "Westin, GDP Road, Ghorpuri, Pune, Pune City Subdistrict, Pune, Maharashtra, 411001, India",
+"pinOff": null
+},
+{
+"name": "Hyatt Pune",
+"mr": "हयात",
+"kind": "",
+"x": 4188.6,
+"z": -2974.0,
+"osm": "Hyatt Palace Pune, 88, Nagar Road, Ramwadi, Ward 12, Pune, Pune City Subdistrict, Pune, Ma",
+"pinOff": 30
+},
+{
+"name": "Poona Club",
+"mr": "पूना क्लब",
+"kind": "",
+"x": 1291.0,
+"z": -1263.4,
+"osm": "Goethe Institut Max Mueller Bhavan Pune, 14/3-B, Boat Club Road, Bund Garden T.P.S, Somwar",
+"pinOff": null
+},
+{
+"name": "Poona Golf Club",
+"mr": "पूना गोल्फ क्लब",
+"kind": "",
+"x": 2282.0,
+"z": -3185.4,
+"osm": "Poona Club Golf Course, National Games Marg, Ward 15, Pune, Pune City Subdistrict, Pune, M",
+"pinOff": null
+},
+{
+"name": "Yerwada Central Jail",
+"mr": "येरवडा कारागृह",
+"kind": "",
+"x": 2686.5,
+"z": -4116.6,
+"osm": "Yerwada Central Jail, National Games Marg, Ward 6, Pune, Pune City Subdistrict, Pune, Maha",
+"pinOff": 0
+},
+{
+"name": "MIT World Peace University",
+"mr": "एमआयटी विद्यापीठ",
+"kind": "",
+"x": -5220.9,
+"z": 950.9,
+"osm": "Maharashtra Institute of Technology World Peace University, Vishwashanti Marg, Kothrud, Er",
+"pinOff": null
+},
+{
+"name": "City Pride Kothrud",
+"mr": "सिटी प्राइड कोथरूड",
+"kind": "",
+"x": -4651.9,
+"z": 3016.9,
+"osm": "City Pride Kothrud, Uttamchand Mukunddas Gandhi Path, Kothrud, Karve Nagar, Pune, Pune Cit",
+"pinOff": 0
+},
+{
+"name": "Deenanath Mangeshkar Hospital",
+"mr": "दीनानाथ मंगेशकर रुग्णालय",
+"kind": "",
+"x": -3400.2,
+"z": 2783.4,
+"osm": "Deenanath Mangeshkar Hospital, Maai Mangeshkar Path, Erandwane, Pune, Pune City Subdistric",
+"pinOff": 55
+},
+{
+"name": "Abhiruchi Mall",
+"mr": "अभिरुची मॉल",
+"kind": "",
+"x": -5107.9,
+"z": 7086.3,
+"osm": "Abhiruchi Mall and Multiplex, 59/1C, Sinhagad Road, Vadgaon Budruk, Anandnagar, Pune City ",
+"pinOff": 11
+},
+{
+"name": "Taljai Hill",
+"mr": "तळजाई टेकडी",
+"kind": "",
+"x": -2386.6,
+"z": 5664.5,
+"osm": "Taljai forest, Anandnagar, Pune City Subdistrict, Pune, Maharashtra, 411051, India",
+"pinOff": null
+},
+{
+"name": "Padmavati Temple",
+"mr": "पद्मावती मंदिर",
+"kind": "",
+"x": -1080.8,
+"z": 5537.9,
+"osm": "Padmavati Temple Road, Panchavati, Sahakar Nagar, Pune, Pune City Subdistrict, Pune, Mahar",
+"pinOff": 39
+},
+{
+"name": "City Pride Satara Road",
+"mr": "सिटी प्राइड सातारा रोड",
+"kind": "",
+"x": -748.8,
+"z": 4239.7,
+"osm": "City Pride Multiplex, Satara Road, Swargate, Pune, Pune City Subdistrict, Pune, Maharashtr",
+"pinOff": 0
+},
+{
+"name": "Market Yard",
+"mr": "मार्केट यार्ड",
+"kind": "",
+"x": -790.0,
+"z": 4340.5,
+"osm": "Market Yard, Satara Road, Swargate, Pune, Pune City Subdistrict, Pune, Maharashtra, 411001",
+"pinOff": null
+},
+{
+"name": "Katraj Dairy",
+"mr": "कात्रज डेअरी",
+"kind": "",
+"x": -848.6,
+"z": 8099.5,
+"osm": "katraj dairy, Khashaba Jadhav Path | Lane Number 6, Katraj, Pune, Pune City Subdistrict, P",
+"pinOff": 0
+},
+{
+"name": "Bharati Vidyapeeth",
+"mr": "भारती विद्यापीठ",
+"kind": "",
+"x": -1378.1,
+"z": 7384.9,
+"osm": "Auditorium BVIEER, Bharati Vidyapeeth, Lane Number 3, Katraj, Pune, Pune City Subdistrict,",
+"pinOff": 54
+},
+{
+"name": "Shivsrushti",
+"mr": "शिवसृष्टी",
+"kind": "",
+"x": -2813.6,
+"z": 7948.6,
+"osm": "Shivsrushti Road, Dhayari, Haveli Subdistrict, Pune, Maharashtra, 411046, India",
+"pinOff": 291
+},
+{
+"name": "Pashan Lake",
+"mr": "पाषाण तलाव",
+"kind": "",
+"x": -8694.8,
+"z": -565.5,
+"osm": "Pashan Lake, Bavdhan, Pune, Pune City Subdistrict, Pune, Maharashtra, 411001, India",
+"pinOff": 255
+},
+{
+"name": "National Chemical Laboratory",
+"mr": "राष्ट्रीय रासायनिक प्रयोगशाळा",
+"kind": "",
+"x": -5727.6,
+"z": -1597.9,
+"osm": "National Chemical Laboratory, IISER Internal Road, Pashan, Pune, Pune City Subdistrict, Pu",
+"pinOff": 0
+},
+{
+"name": "IISER Pune",
+"mr": "आयसर पुणे",
+"kind": "",
+"x": -6102.5,
+"z": -2060.6,
+"osm": "Indian Institute of Science Education and Research, IISER Internal Road, Pashan, Pune, Pun",
+"pinOff": 220
+},
+{
+"name": "Bremen Chowk",
+"mr": "ब्रेमेन चौक",
+"kind": "",
+"x": -5286.8,
+"z": -3706.8,
+"osm": "Bremen Chowk, Dr. Jayakar Path, Sindh Colony, Aundh, Pune, Pune City Subdistrict, Pune, Ma",
+"pinOff": null
+},
+{
+"name": "Baner Hill",
+"mr": "बाणेर टेकडी",
+"kind": "",
+"x": -8295.3,
+"z": -2471.3,
+"osm": "Baner Hill, Pune, Pune City Subdistrict, Pune, Maharashtra, 411001, India",
+"pinOff": null
+},
+{
+"name": "Magarpatta City",
+"mr": "मगरपट्टा सिटी",
+"kind": "",
+"x": 6586.9,
+"z": 1753.9,
+"osm": "Magarpatta City School Ground, Pune, Pune City Subdistrict, Pune, Maharashtra, 411001, Ind",
+"pinOff": 0
+},
+{
+"name": "EON IT Park",
+"mr": "इऑन आयटी पार्क",
+"kind": "",
+"x": 9141.9,
+"z": -3002.7,
+"osm": "EON IT Park Road, Kharadi, Wagholi, Pune City Subdistrict, Pune, Maharashtra, 411023, Indi",
+"pinOff": null
+},
+{
+"name": "World Trade Center Pune",
+"mr": "वर्ल्ड ट्रेड सेंटर",
+"kind": "",
+"x": 8793.5,
+"z": -2897.8,
+"osm": "World Trade Center Tower 2, Connaught Place Road, Kharadi, Wagholi, Pune City Subdistrict,",
+"pinOff": 119
+},
+{
+"name": "Rajiv Gandhi Infotech Park",
+"mr": "हिंजवडी आयटी पार्क",
+"kind": "",
+"x": -13140.0,
+"z": -5985.2,
+"osm": "Rajiv Gandhi Infotech Park, Hinjawadi, Mhalunge, Mulshi Subdistrict, Pune, Maharashtra, In",
+"pinOff": null
+},
+{
+"name": "Bhakti Shakti",
+"mr": "भक्ती शक्ती",
+"kind": "",
+"x": -9547.9,
+"z": -15004.7,
+"osm": "Bhakti Shakti, Service Road, Nigdi, Pimpri-Chinchwad, Haveli Subdistrict, Pune, Maharashtr",
+"pinOff": null
+},
+{
+"name": "Appu Ghar",
+"mr": "अप्पूघर",
+"kind": "",
+"x": -11007.7,
+"z": -14631.7,
+"osm": "Appu Ghar-Shubham Park Road, Nigdi, Pimpri-Chinchwad, Haveli Subdistrict, Pune, Maharashtr",
+"pinOff": null
+},
+{
+"name": "Pimpri-Chinchwad Science Park",
+"mr": "सायन्स पार्क",
+"kind": "",
+"x": -6860.0,
+"z": -12531.5,
+"osm": "Pimpri Chinchwad Science Park, IBMR College Road, Ajmera, Pimpri-Chinchwad, Haveli Subdist",
+"pinOff": 30
 }
 ]
