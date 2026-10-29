@@ -19,7 +19,7 @@ export class CameraRig {
   shake(a) { this.shakeAmp = Math.min(0.6, this.shakeAmp + a); }
   drag(dx, dy) {
     if (this.footMode) { this.footYaw += dx * 0.006; this.footPitch = clamp(this.footPitch + dy * 0.004, -0.25, 0.9); this.orbitT = 1.2; return; }
-    this.orbit = clamp(this.orbit + dx * 0.006, -Math.PI, Math.PI); this.pitchOff = clamp(this.pitchOff + dy * 0.004, -0.3, 0.6); this.orbitT = 1.6;
+    this.orbit = clamp(this.orbit + dx * 0.006, -Math.PI, Math.PI); this.pitchOff = clamp(this.pitchOff + dy * 0.004, -0.3, 0.6); this.orbitT = this.mode === 2 ? 4 : 1.6;   // from the driver's seat the look holds longer
   }
   // on foot: a shoulder camera you turn with the mouse; it drifts back behind you as you walk
   updateFoot(dt, p) {

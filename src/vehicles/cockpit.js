@@ -107,6 +107,31 @@ export function buildCarCockpit(kind, mats) {
     tex.needsUpdate = true;
   };
   draw(0, 1, 0.1, 0);
+  // the cabin round you: carpet, door cards with armrests and handles, both front seats, the console and
+  // handbrake between them, the rear bench, so nothing of the paint shows on the inside
+  {
+    const c = new ColorBuilder(), CLOTH = [0.33, 0.31, 0.28, 0, MATTE], TRIM = [0.2, 0.19, 0.18, 0, MATTE], CARPET = [0.11, 0.105, 0.1, 0, MATTE], HANDLE = [0.5, 0.5, 0.52, 0, 0.4];
+    const bx = (x0, y0, z0, x1, y1, z1, col) => { const g = new THREE.BoxGeometry(Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0)); g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); c.addGeo(g, new THREE.Matrix4(), col.slice(0, 3), 0, col[4] ?? 0); };
+    const fl = S.sill + 0.06, xb = -hl + 0.55, xd = xf0 - 0.55;
+    bx(xb, fl - 0.04, -hw + 0.12, xd, fl, hw - 0.12, CARPET);
+    for (const sd of [-1, 1]) {
+      const zi = sd * (hw - 0.1);
+      bx(xb, fl, zi - sd * 0.05, xd, belt - 0.02, zi, TRIM);                                     // door card
+      bx(xf0 - 1.55, belt - 0.32, zi - sd * 0.13, xf0 - 0.85, belt - 0.26, zi - sd * 0.04, SOFT.concat([0, MATTE]));   // armrest
+      bx(xf0 - 0.95, belt - 0.12, zi - sd * 0.07, xf0 - 0.82, belt - 0.08, zi - sd * 0.05, HANDLE);  // handle
+      bx(xf0 - 0.4, belt - 0.05, zi - sd * 0.12, xf0 - 0.1, belt + 0.02, zi, TRIM);             // the corner by the mirror
+      // front seats: cushion, backrest leaning back, headrest
+      const zs = sd * 0.36, xs = xf0 - 1.35;
+      bx(xs - 0.28, fl + 0.22, zs - 0.24, xs + 0.24, fl + 0.36, zs + 0.24, CLOTH);
+      const back = new THREE.BoxGeometry(0.12, 0.62, 0.46); back.rotateZ(0.2); back.translate(xs - 0.36, fl + 0.68, zs);
+      c.addGeo(back, new THREE.Matrix4(), CLOTH.slice(0, 3), 0, MATTE);
+      bx(xs - 0.5, fl + 1.02, zs - 0.13, xs - 0.4, fl + 1.2, zs + 0.13, CLOTH);
+    }
+    bx(xf0 - 1.65, fl, -0.1, xf0 - 0.55, fl + 0.3, 0.1, TRIM);                                  // console
+    bx(xf0 - 1.3, fl + 0.3, -0.03, xf0 - 1.1, fl + 0.38, 0.03, DASH.concat([0, MATTE]));          // handbrake
+    if (S.L > 3.8) { bx(xb + 0.05, fl + 0.2, -hw + 0.15, xb + 0.55, fl + 0.36, hw - 0.15, CLOTH); bx(xb - 0.02, fl + 0.36, -hw + 0.15, xb + 0.1, fl + 0.95, hw - 0.15, CLOTH); }
+    group.add(new THREE.Mesh(c.build(), mats.solid));
+  }
   return {
     group, eye: [xf0 - 1.2, belt + 0.23, DRIVER_Z],
     update(steer, kmh, gear, rpm, night) {
