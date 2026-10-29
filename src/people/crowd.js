@@ -30,13 +30,13 @@ function idleFor(p) {
 export class Crowd {
   constructor(people, kit, scene, W, quality) {
     this.people = people; this.kit = kit; this.scene = scene; this.W = W;
-    this.cap = quality.name === 'lite' ? 8 : quality.name === 'low' ? 12 : quality.name === 'med' ? 22 : 34; this.range = quality.crowdRange || RANGE;
+    this.cap = quality.name === 'lite' ? 10 : quality.name === 'low' ? 15 : quality.name === 'med' ? 28 : 40; this.range = quality.crowdRange || RANGE;
     this.pool = [];
     this.t = 0;
     // build the pool up front: creating a skinned body mid-game is a visible hitch
     if (kit) { for (let i = 0; i < Math.ceil(this.cap * 0.65); i++) this.makeSkin(false); for (let i = 0; i < Math.ceil(this.cap * 0.45); i++) this.makeSkin(true); }
   }
-  setQuality(q) { this.cap = q.name === 'lite' ? 8 : q.name === 'low' ? 12 : q.name === 'med' ? 22 : 34; this.range = q.crowdRange || RANGE; }
+  setQuality(q) { this.cap = q.name === 'lite' ? 10 : q.name === 'low' ? 15 : q.name === 'med' ? 28 : 40; this.range = q.crowdRange || RANGE; }
   makeSkin(female) {
     const kit = this.kit;
     const look = kit.randomLook(new RNG(this.pool.length + 1), { female });
@@ -60,8 +60,30 @@ export class Crowd {
     if (this.t <= 0) { this.t = 0.25; this.assign(cx, cz); }
     for (const s of this.pool) if (s.p) this.drive(s, dt, cx, cz);
   }
+  // people riding the close, slow two-wheelers and autos (traffic.js marks them rich): one pseudo-person per seat
+  riders() {
+    const T = this.traffic, out = [];
+    if (!T || !this.kit) return out;
+    for (const o of T.list) {
+      if (!o.rich) { o._riders = null; continue; }
+      if (!o._riders) {
+        const two = !/^auto/.test(o.type), pil = /P$/.test(o.type), rng = { next: Math.random, chance: (q) => Math.random() < q, range: (a, b) => a + Math.random() * (b - a), pick: (a) => a[Math.floor(Math.random() * a.length)], int: (a, b) => a + Math.floor(Math.random() * (b - a + 1)), weighted: null };
+        const seats = two ? [[0, 0, false]] : [[0.32, 0, false]];
+        if (pil) seats.push([o.type === 'scooterP' ? -0.36 : -0.3, 0, o.type === 'scooterP']);
+        o._riders = seats.map(([a, b, side], i) => {
+          const female = i === 1 ? (side ? Math.random() < 0.75 : Math.random() < 0.2) : Math.random() < 0.15;
+          const look = this.kit.randomLook(rng, { female, helmet: two && i === 0 && o.type !== 'scooterP' });
+          if (!two) { look.top = look.top.setRGB(0.42, 0.36, 0.22); look.bottom = look.top.clone().multiplyScalar(0.9); }
+          return { id: (o.id || 0) * 4 + i + 1e7, look, female, rideOf: o, seat: [a, b], side, x: o.x, z: o.z, yaw: 0, v: 0, mode: 'ride', persona: female ? 'tai' : 'dada' };
+        });
+      }
+      for (const r of o._riders) { const hx = o.hx ?? Math.cos(o.yaw || 0), hz = o.hz ?? Math.sin(o.yaw || 0); r.x = o.x + hx * r.seat[0] - hz * r.seat[1]; r.z = o.z + hz * r.seat[0] + hx * r.seat[1]; r.yaw = Math.atan2(hz, hx); r.y = o.y || 0; out.push(r); }
+    }
+    return out;
+  }
   assign(cx, cz) {
     const cand = [];
+    for (const r of this.riders()) cand.push([-50, r]);          // the riders right next to you always get a body
     for (const p of this.people.list) {
       if (p.hidden || !p.look) continue;
       const d = Math.hypot(p.x - cx, p.z - cz);
@@ -87,6 +109,7 @@ export class Crowd {
     }
   }
   animFor(p) {
+    if (p.rideOf) return [p.side ? 'sit' : 'drive', 1];
     if (p.fallen > 0) return p.ko ? [p.fallen > 1.6 ? 'death' : 'getup', 1, true] : [p.fallen > 1.3 ? 'knockback' : 'getup', 1, true];
     if (p.act) return [p.act.clip, p.act.speed || 1, true];
     if (p.mode === 'fight') return p.v > 2.2 ? ['jog', clamp(p.v / NAT.jog, 0.7, 1.4)] : p.v > 0.2 ? ['walk', 1.3] : [p.fightT < 1.6 ? 'no' : 'idle', 1.3];
@@ -101,9 +124,9 @@ export class Crowd {
   }
   drive(s, dt, cx, cz) {
     const p = s.p, H = s.H;
-    const y = this.W.surf.height(p.x, p.z);
+    const y = p.rideOf ? (p.y || 0) + (p.side ? 0.38 : 0) : this.W.surf.height(p.x, p.z);
     H.holder.position.set(p.x, y, p.z);
-    H.holder.rotation.set(0, -p.yaw, 0);
+    H.holder.rotation.set(0, -p.yaw + (p.side ? Math.PI / 2 : 0), 0);
     const [name, speed, once] = this.animFor(p);
     // a new punch or flinch restarts its clip even if the last one was the same
     const restart = p.actId !== s.actId; s.actId = p.actId;

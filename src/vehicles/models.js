@@ -284,11 +284,11 @@ export function buildScooter(opts = {}) {
   box(b, -0.89, 0.38, -0.08, -0.86, 0.45, 0.08, [0.98, 0.98, 0.95]);     // plate
   // mudguard
   guard(b, 0.66, R + 0.03, 0, R + 0.05, 0.1, body, 1);
-  // rider + maybe pillion
-  if (!opts.parked) {
+  // rider + maybe pillion (noRider: real people ride it, see crowd.js)
+  if (!opts.parked && !opts.noRider) {
     addRider(b, -0.38, 0.8, 0, { lean: 0.05, inst: true, handX: 0.62, handY: 1.0, handW: 0.3, footX: 0.12, footY: 0.36, helmet: opts.helmet ? [0.2, 0.2, 0.2] : null });
     if (opts.pillion) addPillion(b, -0.72, 0.82, 0, opts.sideSaddle, true);
-  } else b.addGeo(G.cyl8, M(-0.2, 0.18, -0.12, 0.015, 0.36, 0.015, 0.35, 0, 0), CHROME);   // side stand
+  } else if (opts.parked) b.addGeo(G.cyl8, M(-0.2, 0.18, -0.12, 0.015, 0.36, 0.015, 0.35, 0, 0), CHROME);   // side stand
   wheel(b, 0.66, R, 0, R, 0.1); wheel(b, -0.62, R, 0, R, 0.1);
   return { body: b.build(), glass: gl.build(), dims: { L: 1.85, W: 0.72, H: 1.6, wb: 1.28 } };
 }
@@ -327,7 +327,7 @@ export function buildBike(opts = {}) {
   box(b, -0.7, 0.8, -0.07, -0.66, 0.86, 0.07, TAIL, 0, 0.9);
   guard(b, 0.78, R + 0.04, 0, R + 0.04, 0.09, BLACK);
   guard(b, -0.6, R + 0.04, 0, R + 0.05, 0.12, BLACK);
-  if (!opts.parked) {
+  if (!opts.parked && !opts.noRider) {
     addRider(b, -0.32, 0.95, 0, { lean: 0.32, inst: true, handX: 0.6, handY: 1.08, handW: 0.34, footX: 0.05, footY: 0.42, helmet: opts.helmet ? [0.6, 0.6, 0.6] : null });
     if (opts.pillion) addPillion(b, -0.62, 0.97, 0, opts.sideSaddle, true);
   }

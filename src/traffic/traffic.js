@@ -65,13 +65,15 @@ export class Traffic {
       auto: buildAuto({ driver: true, inst: true, withWheels: true }),
       hatch: buildCar('hatch'), sedan: buildCar('sedan'), suv: buildCar('suv'), taxi: buildCar('taxi'),
       tempo: buildTempo(), bus: buildBus(),
+      // the same, empty: close and slow, real people ride them (crowd.js)
+      scooterE: buildScooter({ helmet: true, noRider: true }), bikeE: buildBike({ helmet: true, noRider: true }), autoE: buildAuto({ inst: true, withWheels: true }),
     };
     this.models = models;
     this.inst = {};
     const cap = Math.max(8, Math.ceil(this.max * 0.6));
-    for (const k of TYPE_NAMES) {
+    for (const k of [...TYPE_NAMES, 'scooterE', 'bikeE', 'autoE']) {
       const m = models[k];
-      const c = k === 'bus' ? Math.max(4, Math.ceil(this.max * 0.08)) : cap;
+      const c = /E$/.test(k) ? 10 : k === 'bus' ? Math.max(4, Math.ceil(this.max * 0.08)) : cap;
       const body = new THREE.InstancedMesh(m.body.clone(), mats.body, c);
       body.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3);
       body.geometry.setAttribute('aColB', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));
@@ -518,8 +520,14 @@ export class Traffic {
     for (const k in this.inst) { this.inst[k].n = 0; this.inst[k].nl = 0; }
     const m = this.mtx, q = this.q, e = this.eul, p = this.v3, s = this.s3;
     const cx = this.cam.x, cz = this.cam.z, L2 = this.lodDist * this.lodDist;
+    // the riders you're right next to (close, slow): real people on an empty model instead of the baked figures
+    let nr = 0;
     for (const v of this.list) {
-      const I = this.inst[v.type];
+      const near = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) < 16 * 16 && Math.abs(v.v || 0) < 5.6 && /^(scooter|bike|auto)/.test(v.type) && !(v.fallen > 0);
+      v.rich = near && nr < 6 ? (nr++, true) : false;
+    }
+    for (const v of this.list) {
+      const I = this.inst[v.rich ? v.type.replace(/P$/, '') + 'E' : v.type] || this.inst[v.type];
       const far = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) > L2;
       const roll = v.fallen > 0 ? 1.3 : v.roll;
       e.set(roll, -v.yaw, v.pitch, 'YXZ');

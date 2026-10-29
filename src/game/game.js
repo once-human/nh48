@@ -114,6 +114,7 @@ export class Game {
     // which shop fronts are clubs (they get a crowd out front at night)
     this.people.isClub = (d) => { if (d.club === undefined) { const inf = d.shop >= 0 && this.shops && this.shops.infoOf(d); d.club = !!(inf && inf.kind === 'bar' && this.shops.isClub(inf)); } return d.club; };
     this.crowd = new Crowd(this.people, W.kit, this.scene, W, this.quality);
+    this.crowd.traffic = this.traffic;
     this.fauna = new Fauna(this.people, W.animalKit, this.scene, W);
     this.smoke = new Smoke(this.scene);
     player.animalsNear = () => this.people.animals;
