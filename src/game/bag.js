@@ -40,23 +40,25 @@ export class Bag {
   constructor(G) {
     this.g = G; this.tab = 'bag'; this.group = 'food';
     const el = document.createElement('div');
-    el.className = 'jhola gm'; el.hidden = true;
-    el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Backpack');
-    el.innerHTML = `<div class="jh-top"><div class="jh-title"><i class="jh-badge">${icon('jhola')}</i><b>Jhola</b><span lang="mr">झोळी</span></div><div class="jh-money"></div></div>
-      <div class="jh-tabs" role="tablist">${TABS.map(([k, l, m, ic]) => `<button role="tab" data-t="${k}">${icon(ic)}<b>${l}</b><span lang="mr">${m}</span></button>`).join('')}</div>
-      <div class="jh-body"></div><div class="jh-msg" aria-live="polite"></div>
-      <div class="jh-foot"><span><span class="kbd">A</span><span class="kbd">D</span> switch · <span class="kbd">↑↓</span> <span class="kbd">Enter</span> use · drag your character to turn them</span><span><span class="kbd" data-k="E">E</span> close · <span class="kbd" data-k="Tab">Tab</span> character</span></div>`;
+    el.className = 'jhola bagpz'; el.hidden = true;
+    el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Jhola');
+    // built like the pause screen: the title and the menu on the left, what you picked on the right
+    el.innerHTML = `<div class="pz"><div class="pz-l"><div class="pz-head"><span class="pz-k">Jhola · झोळी</span><b class="bz-title">Inventory</b><div class="pz-meta bz-meta"></div></div>
+      <nav class="pz-menu">${TABS.map(([k, l, m]) => `<button class="pz-i" data-t="${k}">${l}<small lang="mr">${m}</small></button>`).join('')}<button class="pz-i" data-close="1">Back to the game</button></nav></div>
+      <div class="pz-r"><div class="jh-body"></div><div class="jh-msg" aria-live="polite"></div></div>
+      <div class="pz-keys"><span><span class="kbd">A</span><span class="kbd">D</span> Switch</span><span><span class="kbd">↑</span><span class="kbd">↓</span> <span class="kbd">Enter</span> Use</span><span>Drag yourself to turn</span><span><span class="kbd" data-k="E">E</span> Close</span></div></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     this.el = el;
-    this.nav = new KbNav(el.querySelector('.jh-body'), '.jh-item, .jh-row[data-act], .jh-chips.sel button, .gd-sec > summary');
+    this.nav = new KbNav(el.querySelector('.jh-body'), '.row[data-act], .jh-row[data-act], .jh-chips.sel button, .gd-sec > summary');
     el.addEventListener('pointerover', (e) => { const it = e.target.closest('[data-tip]'); if (it && this.tab === 'bag' && it.dataset.tip !== this.sel) { this.sel = it.dataset.tip; this.detail(); } });
     // drag your character round on the character screen
     let dg = null;
-    el.addEventListener('pointerdown', (e) => { if (e.target.closest('.gm-portrait')) { dg = e.clientX; e.preventDefault(); } });
+    el.addEventListener('pointerdown', (e) => { if (e.target.closest('.bz-me')) { dg = e.clientX; e.preventDefault(); } });
     addEventListener('pointermove', (e) => { if (dg === null || !this.studio) return; this.studio.yaw += (e.clientX - dg) * 0.012; dg = e.clientX; this.studio.shoot('full'); });
     addEventListener('pointerup', () => { dg = null; });
     el.addEventListener('click', (e) => {
-      const t = e.target.closest('[data-t]'); if (t) { this.tab = t.dataset.t; this.msg(''); this.render(); return; }
+      if (e.target.closest('[data-close]')) { this.close(); return; }
+      const t = e.target.closest('[data-t]'); if (t) { if (t.dataset.t === 'bag' || t.dataset.t === 'story') { const k = t.dataset.t; this.close(); k === 'bag' ? G.jhola.open() : G.diary.open(); return; } this.tab = t.dataset.t; this.msg(''); this.render(); return; }
       const g = e.target.closest('[data-g]'); if (g) { this.group = g.dataset.g; this.render(); return; }
       const b = e.target.closest('[data-act]'); if (b && !b.disabled) this.act(b.dataset.act, b.dataset.arg);
     });
@@ -77,13 +79,14 @@ export class Bag {
     if (G.state !== 'play') return;
     if (tab) this.tab = tab;
     this.open = true; G.state = 'shop'; this.nav.i = -1;
-    G.audio.updateEngine?.(0, 0, false);
+    G.audio.updateEngine?.(0, 0, false); G.audio.playerHorn?.(false); G.audio.hush?.(true);
+    G.menuFreeze = true; G.pauseFrames = 0; G.renderer.domElement.classList.add('paused');
     this.el.hidden = false; this.msg(''); refreshChips(this.el);
     this.render();
     this.el.classList.remove('in'); void this.el.offsetWidth; this.el.classList.add('in');
     G.releaseMouse?.();          // the jhola and status are pointer menus
   }
-  close() { if (this.studio) { this.studio.dispose(); this.studio = null; } this.open = false; this.el.hidden = true; if (this.g.state === 'shop') this.g.state = 'play'; this.life.save(); this.g.lockMouse?.(); }
+  close() { if (this.studio) { this.studio.dispose(); this.studio = null; } this.open = false; this.el.hidden = true; const G0 = this.g; G0.menuFreeze = false; G0.audio.hush?.(false); G0.renderer.domElement.classList.remove('paused'); if (this.g.state === 'shop') this.g.state = 'play'; this.life.save(); this.g.lockMouse?.(); }
   msg(t, good) { const m = this.el.querySelector('.jh-msg'); m.textContent = t || ''; m.classList.toggle('good', !!good); }
   row(ic, label, note, right, act, arg, cls = '') {
     const lead = act === 'contact' ? `<span class="av">${esc(String(label).charAt(0))}</span>` : icon(ic);
@@ -91,51 +94,46 @@ export class Bag {
   }
   render() {
     const G = this.g, L = this.life, s = L.s;
-    this.el.querySelectorAll('.jh-tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.t === this.tab));
-    this.el.querySelector('.jh-money').innerHTML = `<span><small>Cash</small><b>${fmt(G.stats.money)}</b></span>${s.bank ? `<span><small>Bank</small><b>${fmt(s.bank)}</b></span>` : ''}${s.gold ? `<span><small>Gold</small><b>${s.gold} g</b></span>` : ''}`;
+    this.el.querySelectorAll('.pz-i[data-t]').forEach(b => b.classList.toggle('sel', b.dataset.t === this.tab));
+    this.el.querySelector('.bz-title').textContent = (TABS.find(t => t[0] === this.tab) || TABS[0])[1];
+    const hh = Math.floor(G.hour || 0), mm = String(Math.floor(((G.hour || 0) % 1) * 60)).padStart(2, '0');
+    this.el.querySelector('.bz-meta').innerHTML = `<span>${fmt(G.stats.money)} cash</span>${s.bank ? `<span>${fmt(s.bank)} in the bank</span>` : ''}<span>${((hh + 11) % 12) + 1}:${mm} ${hh < 12 ? 'am' : 'pm'}</span>${G.police.heat ? `<span class="bz-want">Wanted ${'★'.repeat(G.police.heat)}</span>` : ''}`;
     const B = this.el.querySelector('.jh-body');
     let h = '';
     if (this.tab === 'bag') {
-      // left: the categories and the grid; centre: you, with what you have on and in hand round you; right: how
-      // you are, and the tooltip for whatever you point at
-      const ids = bagOrder(G), torchOn = G.lights && G.lights.torchOn, P = G.player, cat = this.cat || 'all';
-      const CATS_ = [['all', 'All', 'jhola'], ['food', 'Food & drink', 'food'], ['health', 'Health', 'health'], ['things', 'Things', 'parcel'], ['clothes', 'Clothes', 'shirt']];
+      // you on the left (studio-lit, drag to turn); how you're doing, what's on you and what you carry beside you
+      const ids = bagOrder(G), torchOn = G.lights && G.lights.torchOn, P = G.player, look = P.look || {};
+      const ring = (lab, v, col, txt) => { const c = 2 * Math.PI * 30, f = Math.max(0, Math.min(1, v)); return `<div class="bz-ring${f < 0.2 ? ' low' : ''}" style="--c:${col}"><svg viewBox="0 0 72 72"><circle cx="36" cy="36" r="30" class="t"/><circle cx="36" cy="36" r="30" class="f" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}"/></svg><b>${txt ?? Math.round(f * 100)}</b><small>${lab}</small></div>`; };
+      const sw = (c) => `<i class="bz-sw" style="background:#${(c && c.getHex ? c.getHex() : 0x888888).toString(16).padStart(6, '0')}"></i>`;
+      const row = (left, right, act, arg, cls = '') => `<div class="row ${cls}" ${act ? `data-act="${act}"` : ''} ${arg !== undefined ? `data-arg="${esc(arg)}"` : ''}><div class="rl">${left}</div><div class="rc">${right}</div></div>`;
       const kindOf = (id) => { const it = ITEMS[id]; return it.tool || ['book', 'lottery', 'gajra'].includes(id) ? 'things' : it.use && (it.use.hp || it.use.health) && !it.use.hunger ? 'health' : 'food'; };
-      const tiles = [];
-      if (cat !== 'clothes') for (const id of ids) if (cat === 'all' || kindOf(id) === cat) tiles.push(`<button class="gi-tile${this.sel === id ? ' sel' : ''}${ITEMS[id].tool && torchOn ? ' on' : ''}" data-act="use" data-arg="${id}" data-tip="${id}"><img alt="" src="${itemArt(id, 128)}">${s.inv[id] > 1 ? `<i>${s.inv[id]}</i>` : ''}</button>`);
-      if (cat === 'clothes' || cat === 'all') {
-        for (const w of s.wardrobe) {
-          const c = CLOTHES.find(q => q[0] === w), sh = w.startsWith('shoe_') && SHOES.find(q => 'shoe_' + q[0] === w);
-          const P_ = c && c[4], kind = sh ? 'shoe' : P_ && P_.cut && P_.cut.w === 2 ? 'saree' : P_ && P_.cut && P_.cut.w === 1 ? 'kurta' : P_ && P_.bottom !== undefined && P_.top === undefined ? 'bottom' : 'top';
-          const hex = sh ? sh[4] : P_ ? (P_.top ?? P_.bottom ?? 0x888888) : 0x888888;
-          tiles.push(`<button class="gi-tile" data-act="wear" data-arg="${esc(w)}" data-tip="w:${esc(w)}"><img alt="" src="${garmentArt(kind, hex, 128)}"></button>`);
-        }
-      }
-      while (tiles.length < 30) tiles.push('<span class="gi-tile empty"></span>');
-      const slot = (key, label, img, act, arg, note) => `<button class="gi-slot" ${act ? `data-act="${act}"` : 'disabled'} ${arg !== undefined ? `data-arg="${esc(arg)}"` : ''} data-tip="s:${key}"><span class="dia">${img ? `<img alt="" src="${img}">` : '<em></em>'}</span><b>${label}</b>${note ? `<small>${esc(note)}</small>` : ''}</button>`;
-      const look = P.look || {}, hx = (c) => c && c.getHex ? c.getHex() : 0x888888;
       const saree = look.cut && look.cut.w === 2, kurta = look.cut && look.cut.w === 1;
-      const bar = (lab, v, col) => `<div class="gs-bar"><span>${lab}</span><i><b style="width:${Math.round(Math.max(0, Math.min(1, v)) * 100)}%;background:${col}"></b></i><em>${Math.round(Math.max(0, Math.min(1, v)) * 100)}</em></div>`;
-      const st = G.rep ? G.rep.standing(P.x, P.z) : 0;
-      h += `<div class="gi">
-        <div class="gi-left"><div class="gi-rail">${CATS_.map(([k, l, ic]) => `<button data-act="cat" data-arg="${k}" title="${l}" class="${cat === k ? 'on' : ''}">${icon(ic)}</button>`).join('')}</div>
-          <div class="gi-list"><div class="gi-h">${CATS_.find(c => c[0] === cat)[1]}</div><div class="gi-grid">${tiles.join('')}</div></div></div>
-        <div class="gi-mid">
-          <div class="gi-col l">${slot('top', saree ? 'Saree' : kurta ? 'Kurta' : 'Top', garmentArt(saree ? 'saree' : kurta ? 'kurta' : 'top', hx(look.top)), 'cat', 'clothes', 'Change')}
-            ${slot('bottom', 'Bottom', saree ? null : garmentArt('bottom', hx(look.bottom)), 'cat', 'clothes')}
-            ${slot('shoe', 'Footwear', garmentArt('shoe', hx(look.shoe)), 'cat', 'clothes')}</div>
-          <div class="gm-portrait gi-me" title="Drag to turn"><div class="gm-name">${esc((G.hud.charName && G.hud.charName()) || G.playerName || 'You')}<small>${st > 0.45 ? 'One of ours' : st > 0.15 ? 'Liked round here' : st < -0.45 ? 'Trouble' : st < -0.15 ? 'Watched round here' : 'Just another Punekar'}</small></div></div>
-          <div class="gi-col r">${slot('hand', 'Left hand', s.inv.torch ? itemArt('torch', 128) : null, s.inv.torch ? 'use' : null, 'torch', s.inv.torch ? (torchOn ? 'On' : 'Torch') : 'Empty')}
-            ${slot('pocket', 'Pocket', phoneArt(), 'phone', '', 'Open phone')}
-            ${slot('keys', 'Keys', keyArt(), 'tab', 'own', `${1 + s.vehicles.length} vehicle${s.vehicles.length ? 's' : ''}`)}</div>
-        </div>
-        <div class="gi-right"><div class="gi-h">Condition</div>
-          ${bar('Health', (P.hp ?? 100) / L.hpMax, '#ff375f')}${bar('Food', s.hunger, '#ffb224')}${bar('Water', s.thirst, '#40c8ff')}${bar('Energy', s.energy, '#a8e43a')}${bar('Stamina', P.stam ?? 1, '#30e0b0')}${bar('Mood', s.mood, '#c58cff')}
-          <div class="gi-h">Standing</div>
-          <div class="gs-kv"><span>Respect</span><b>${Math.round(s.respect)}</b></div><div class="gs-kv"><span>Karma</span><b>${Math.round(s.karma)}</b></div>
-          <div class="gs-kv"><span>Wanted</span><b>${G.police.heat ? '★'.repeat(G.police.heat) : 'No'}</b></div><div class="gs-kv"><span>Challans</span><b>${fmt(G.police.duesTotal)}</b></div>
-          <div class="gm-detail gi-tip" id="gm-detail"></div></div>
-      </div>`;
+      h += `<div class="bz-inv"><div class="bz-me" title="Drag to turn"></div><div class="bz-side">
+        <div class="gt">Condition</div><div class="bz-rings">${ring('Health', (P.hp ?? 100) / L.hpMax, '#ff375f', Math.round(P.hp ?? 100))}${ring('Food', s.hunger, '#ffb224')}${ring('Water', s.thirst, '#40c8ff')}${ring('Energy', s.energy, '#a8e43a')}${ring('Stamina', P.stam ?? 1, '#30e0b0')}${ring('Mood', s.mood, '#c58cff')}</div>
+        <div class="gt">On you</div><div class="group">
+          ${row(`<span class="bz-k">Wearing</span><span>${sw(look.top)}${saree ? 'Saree' : kurta ? 'Kurta' : 'Top'} ${saree ? '' : sw(look.bottom) + 'Bottom'} ${sw(look.shoe)}Shoes</span>`, `<button class="btn" data-act="jump" data-arg="bz-clothes">Change</button>`)}
+          ${s.inv.torch ? row(`<span class="bz-k">Left hand</span><span>Torch${torchOn ? ' · on' : ''}</span>`, `<button class="btn${torchOn ? ' primary' : ''}" data-act="use" data-arg="torch">${torchOn ? 'Switch off' : 'Switch on'}</button>`, 'use', 'torch') : ''}
+          ${row(`<span class="bz-k">Pocket</span><span>Phone</span>`, `<button class="btn" data-act="phone">Open</button>`, 'phone')}
+          ${row(`<span class="bz-k">Keys</span><span>Your auto${s.vehicles.length ? ` and ${s.vehicles.length} more` : ''}</span>`, `<button class="btn" data-act="tab" data-arg="own">See</button>`, 'tab', 'own')}
+        </div>`;
+      for (const [k, lab] of [['food', 'Food & drink'], ['health', 'Health'], ['things', 'Things']]) {
+        const list = ids.filter(id => kindOf(id) === k && !(k === 'things' && id === 'torch'));
+        if (!list.length) continue;
+        h += `<div class="gt">${lab}</div><div class="group">`;
+        for (const id of list) { const it = ITEMS[id], n = s.inv[id], what = it.feed ? (it.feed === 'dog' ? 'Eat it, or feed a street dog' : 'Eat it, or feed a cow') : describe(it.use);
+          h += row(`<img class="bz-im" alt="" src="${itemArt(id, 128)}"><span><b>${esc(it.name)}</b><small>${esc(what)}</small></span>`, `${n > 1 ? `<span class="bz-n">× ${n}</span>` : ''}<button class="btn" data-act="use" data-arg="${id}">Use</button>`, 'use', id); }
+        h += '</div>';
+      }
+      if (!ids.filter(id => id !== 'torch').length) h += `<div class="gt">In your jhola</div><p class="note">Nothing yet. A kirana sells water, Parle-G and bananas; any eatery will pack you a parcel.</p>`;
+      h += `<div class="gt" id="bz-clothes">Clothes</div><div class="group">`;
+      h += row(`<span><b>What you started in</b><small>Your own clothes</small></span>`, `<button class="btn" data-act="wear" data-arg="__orig">Wear</button>`, 'wear', '__orig');
+      for (const w of s.wardrobe) {
+        const c = CLOTHES.find(q => q[0] === w), sh = w.startsWith('shoe_') && SHOES.find(q => 'shoe_' + q[0] === w);
+        const P_ = c && c[4], kind = sh ? 'shoe' : P_ && P_.cut && P_.cut.w === 2 ? 'saree' : P_ && P_.cut && P_.cut.w === 1 ? 'kurta' : P_ && P_.bottom !== undefined && P_.top === undefined ? 'bottom' : 'top';
+        const hex = sh ? sh[4] : P_ ? (P_.top ?? P_.bottom ?? 0x888888) : 0x888888;
+        h += row(`<img class="bz-im" alt="" src="${garmentArt(kind, hex, 128)}"><span><b>${esc(c ? c[1] : sh ? sh[1] : w)}</b><small>${esc(c ? c[2] : sh ? sh[2] : '')}</small></span>`, `<button class="btn" data-act="wear" data-arg="${esc(w)}">Wear</button>`, 'wear', w);
+      }
+      h += '</div></div></div>';
     } else if (this.tab === 'me') {
       const P = G.player, st = L.style(), re = L.reaction(), hp = (P.hp ?? 100) / L.hpMax;
       const ring = (ic, label, v, note) => {
@@ -209,11 +207,18 @@ export class Bag {
       }
       h += `</div><div class="ph-keys" aria-hidden="true">${'123456789*0#'.split('').map(k => `<i>${k}</i>`).join('')}</div></div>`;
     } else if (this.tab === 'story') {
-      const S = G.story, list = S && S.summary ? S.summary() : [], t = S && S.target ? S.target() : null;
-      const cur = list.find(q => q.cur);
-      h += `<div class="gm-story"><div class="gm-quest">${cur ? `<small>Current mission</small><b>${esc(cur.t.replace(/^\d+\. /, ''))}</b><p>${esc(cur.s)}</p>${t ? `<button class="btn primary" data-act="track">◆ Track · ${esc(t.name)}</button>` : ''}` : '<small>The story</small><b>Free roam</b><p>The story plays in Story mode.</p>'}</div><ol class="gm-chapters">`;
-      for (const q of list) h += `<li class="${q.cur ? 'cur' : q.s === 'Done' ? 'done' : 'locked'}"><b>${esc(q.t)}</b><small>${esc(q.s)}</small></li>`;
-      h += '</ol></div>';
+      const S = G.story, ms = S && S.list ? S.list() : [], sm = S && S.summary ? S.summary() : [], t = S && S.target ? S.target() : null;
+      const ACTS = { 0: 'Prologue', 1: 'Act 1 · Homecoming', 2: 'Act 2 · Bappa', 3: 'Act 3 · Nine Nights', 4: 'Act 4 · Lights', 5: 'Act 5 · Winter' };
+      const ci = sm.findIndex(q => q.cur), cm = ms[ci];
+      if (cm) h += `<div class="pz-big bz-now"><small>Now · ${ACTS[cm.act] || ''}</small><b>${esc(cm.title)}</b><span class="bz-mr" lang="mr">${esc(cm.mr || '')}</span><p>${esc(sm[ci].s)}</p>${t ? `<button class="btn primary" data-act="track">Track · ${esc(t.name)}</button>` : ''}</div>`;
+      else h += `<div class="pz-big bz-now"><small>The story</small><b>${G.free ? 'Free roam' : 'All done'}</b><p>${G.free ? 'The story plays in Story mode.' : 'Pune remembers.'}</p></div>`;
+      let act = -1;
+      ms.forEach((m, i) => {
+        if (m.act !== act) { if (act !== -1) h += '</div>'; act = m.act; h += `<div class="gt">${ACTS[act] || 'Act ' + act}</div><div class="group">`; }
+        const q = sm[i] || { s: '' }, st = q.cur ? 'cur' : q.s === 'Done' ? 'done' : 'locked';
+        h += `<div class="row bz-ch ${st}"><div class="rl">${esc(m.title)}<small>${st === 'locked' ? 'Later' : esc(q.s)}</small></div><div class="rc"><span class="bz-tag">${st === 'done' ? 'Done' : st === 'cur' ? 'Now' : ''}</span></div></div>`;
+      });
+      if (act !== -1) h += '</div>';
     } else if (this.tab === 'guide') {
       h += `<div class="guide">${guideHTML()}</div>`;
     } else if (this.tab === 'near') {
@@ -229,7 +234,7 @@ export class Bag {
     }
     B.innerHTML = h;
     B.dataset.tab = this.tab;
-    if (this.tab === 'bag') { if (!this.sel || (!s.inv[this.sel] && !/^[ws]:/.test(this.sel))) this.sel = bagOrder(G)[0]; this.detail(); this.portrait(); }
+    if (this.tab === 'bag') this.portrait();
     this.nav.paint();
   }
   // the item you're pointing at, big, with what it does
@@ -247,9 +252,9 @@ export class Bag {
   }
   // you, in a studio light, as you're dressed now (drag to turn)
   portrait() {
-    const box = this.el.querySelector('.gi-me'); if (!box) return;
+    const box = this.el.querySelector('.bz-me'); if (!box) return;
     const P = this.g.player;
-    if (!this.studio) { this.studio = new Studio(this.g, 440, 760, { bg: 0x0e1014, fov: 22 }); this.studio.dress(P.look); }
+    if (!this.studio) { this.studio = new Studio(this.g, 440, 780, { bg: 0x0b0c0f, fov: 22, floor: false }); this.studio.dress(P.look); }
     this.studio.shoot('full');
     box.appendChild(this.studio.canvas);
   }
@@ -282,6 +287,7 @@ export class Bag {
     if (a === 'meet') { const c = (L.s.contacts || []).find(q => q.name === arg); if (c && G.date.askToMeet(c)) this.close(); return; }
     if (a === 'reply') { const [n, i] = arg.split('|'); const c = (L.s.contacts || []).find(q => q.name === n); if (c) { G.date.reply(c, +i); this.render(); } return; }
     if (a === 'cat') { this.cat = arg; this.render(); return; }
+    if (a === 'jump') { const t = this.el.querySelector('#' + arg); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
     if (a === 'tab') { this.tab = arg; this.render(); return; }
     if (a === 'phone') { this.close(); G.phone && G.phone.open && G.phone.open(); return; }
     if (a === 'track') { const t = G.story && G.story.trackNow && G.story.trackNow(); if (t) { G.hud.toast('Tracking', t.name, 'meter', 2); this.close(); } return; }

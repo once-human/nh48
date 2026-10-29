@@ -50,7 +50,9 @@ export class Audio {
     this.master = ctx.createGain(); this.master.gain.value = this.volume;
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -16; comp.ratio.value = 5;
-    this.master.connect(comp).connect(ctx.destination);
+    // a low-pass on everything, opened right up; the phone closes it down (the world goes muffled and far away)
+    this.muf = ctx.createBiquadFilter(); this.muf.type = 'lowpass'; this.muf.frequency.value = 20000;
+    this.master.connect(this.muf).connect(comp).connect(ctx.destination);
     // every bus straight into the master (the fx bus used to be wired into itself, so punches, clicks and UI sounds never came out)
     for (const k of BUSES) { const g = this.buses[k] = ctx.createGain(); g.gain.value = this.vols[k] ?? 1; g.connect(this.master); }
     // (no convolution reverb: too heavy for the audio thread on laptops, the sound broke up)
@@ -241,6 +243,12 @@ export class Audio {
   }
   voiceBusy() { return !!(this.ctx && this.curVoice && this.ctx.currentTime < this.voiceEnd - 0.15); }
   // street ambience dips while someone speaks
+  muffle(on) {
+    if (!this.ctx || !this.muf) return;
+    const t = this.ctx.currentTime;
+    this.muf.frequency.setTargetAtTime(on ? 650 : 20000, t, 0.25);
+    this.master.gain.setTargetAtTime(on ? this.volume * 0.35 : this.volume, t, 0.25);
+  }
   duck(level, sec) {
     if (!this.ctx) return;
     this.duckUntil = this.ctx.currentTime + sec;

@@ -95,6 +95,11 @@ export class PhotoMode {
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const x = cv.getContext('2d');
     x.drawImage(src, 0, 0);
+    // a small print of it for your diary, pinned to the chapter you're on
+    try {
+      const t = document.createElement('canvas'); t.width = 300; t.height = Math.round(300 * H / W); t.getContext('2d').drawImage(src, 0, 0, t.width, t.height);
+      const L = G.life && G.life.s; if (L) { const ph = L.photos || (L.photos = []); ph.push({ m: G.story && G.story.st ? G.story.st.m : -1, t: G.clock || 0, at: document.getElementById('h-area')?.textContent || 'Pune', url: t.toDataURL('image/jpeg', 0.72) }); while (ph.length > 36) ph.shift(); G.life.save(); }
+    } catch (e) { /* no print this time */ }
     const s = Math.max(1, H / 900), pad = 28 * s;
     const area = document.getElementById('h-area')?.textContent || 'Pune', street = document.getElementById('h-street')?.textContent || '';
     const where = street && street !== area ? `${street}, ${area}` : area;

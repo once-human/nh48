@@ -63,6 +63,8 @@ import { Fauna } from '../people/animals.js';
 import { Puddles } from './puddles.js';
 import { Cutscene } from './cutscene.js';
 import { Home } from './home.js';
+import { Jhola } from '../ui/jhola.js';
+import { Diary } from '../ui/diary.js';
 
 export class Game {
   constructor(ctx) {
@@ -134,6 +136,7 @@ export class Game {
     this.puddles = new Puddles(this);
     this.cut = new Cutscene(this);
     this.home = new Home(this);
+    this.jhola = new Jhola(this); this.diary = new Diary(this);
     player.animalsNear = () => this.people.animals;
     // on foot your head (and a little of your body) turns to where the camera looks, so looking back you look back;
     // the torch arm goes on top
@@ -284,12 +287,14 @@ export class Game {
     window.addEventListener('keydown', (e) => {
       const ae = document.activeElement;
       if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;     // typing in the map search
+      if (this.phone && this.phone.on && ['Escape', 'KeyE', 'KeyJ', 'Tab', 'KeyF', 'KeyM', 'KeyP', 'KeyK'].includes(e.code)) return;      // (the phone has them while it's out)
       // (Esc that just released the mouse already opened the pause menu: don't close it again)
       if (e.code === 'Escape' || e.code === 'KeyP') { if ((this.state === 'play' || this.state === 'pause') && performance.now() - (this._pausedAt || 0) > 300) this.togglePause(); }
       if (e.code === 'KeyM' && (this.state === 'play' || this.state === 'map')) this.toggleMap();
       if (this.free && this.state === 'play' && (e.code === 'BracketLeft' || e.code === 'BracketRight')) this.setHour((this.hour + (e.code === 'BracketRight' ? 1 : 23)) % 24);
-      if (e.code === 'KeyE' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.bag.show('bag'); }
-      if (e.code === 'Tab' && this.state === 'play') { e.preventDefault(); this.bag.show('bag'); }
+      if (e.code === 'KeyE' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.jhola.open(); }
+      if (e.code === 'Tab' && this.state === 'play') { e.preventDefault(); this.jhola.open(); }
+      if (e.code === 'KeyJ' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.diary.open(); }
       if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space') && !(this.hud.pickerOpen)) this.begin();
     });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'play') this.togglePause(true); });
@@ -1267,6 +1272,7 @@ export class Game {
   }
 
   frame(dt) {
+    if (this.jhola) this.jhola.update(dt);
     if (this.audio) this.audio.hour = this.hour;
     // audio parameters at a steady 30 / 20 a second (scheduling them every frame clogged the audio thread)
     this._aT = (this._aT || 0) + dt; this._eT = (this._eT || 0) + dt;
@@ -1413,7 +1419,7 @@ export class Game {
     // night lights
     const night = this.sky.state ? this.sky.state.night : 0;
     this.lights.update(dt, night);
-    if (this.state === 'play' || this.state === 'shop') this.phone.update(dt);
+    if (this.state === 'play' || this.state === 'shop') this.phone.update(this.realDt || dt);
     if (this.story.talking) this.story.cam(dt);
     if (this.lightPools) { this.lightPools.mesh.visible = night > 0.05; this.lightPools.mesh.material.opacity = night * 0.55; }
     this.people.render(P.x, P.z);

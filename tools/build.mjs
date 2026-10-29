@@ -60,6 +60,11 @@ const fontDefs = [
   ['Rozha One', '@fontsource/rozha-one/files/rozha-one-latin-400-normal.woff2', 400, 'normal', LAT],
   ['Teko', '@fontsource/teko/files/teko-latin-500-normal.woff2', 500, 'normal', LAT],
   ['Teko', '@fontsource/teko/files/teko-latin-600-normal.woff2', 600, 'normal', LAT],
+  // handwriting, Marathi and English (the diary, the paper tags in the jhola)
+  ['Kalam', '@fontsource/kalam/files/kalam-devanagari-400-normal.woff2', 400, 'normal', DEV],
+  ['Kalam', '@fontsource/kalam/files/kalam-latin-400-normal.woff2', 400, 'normal', LAT],
+  ['Kalam', '@fontsource/kalam/files/kalam-devanagari-700-normal.woff2', 700, 'normal', DEV],
+  ['Kalam', '@fontsource/kalam/files/kalam-latin-700-normal.woff2', 700, 'normal', LAT],
 ];
 // fonts as their own files (cached by the browser, and the page itself arrives ~1.2 MB lighter)
 let fontCss = '';

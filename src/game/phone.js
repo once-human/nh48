@@ -81,7 +81,8 @@ export class Phone {
   open() {
     const G = this.g;
     if (G.state !== 'play' || this.on) return;
-    this.on = true; G.state = 'shop';
+    // the world doesn't stop: it slows to a sixtieth, and goes quiet and muffled, while you're on your phone
+    this.on = true; G.timeWarp = 1 / 60; G.audio.muffle?.(true);
     this.stack = []; this.sel = 0; this.cur = this.smart ? 'home' : 'standby';
     G.audio.updateEngine?.(0, 0, false);
     this.el.hidden = false; this.el.className = 'hand ' + (this.smart ? 'smart' : 'kp');
@@ -95,7 +96,7 @@ export class Phone {
     if (!this.on) return;
     this.stopSnake();
     this.on = false; this.el.hidden = true;
-    if (G.state === 'shop') G.state = 'play';
+    G.timeWarp = 1; G.audio.muffle?.(false);
     G.lockMouse?.(); this.L.save(); this.syncBadge();
   }
   go(id, arg) { this.stack.push([this.cur, this.sel, this.arg]); this.cur = id; this.arg = arg; this.sel = 0; this.render(); this.g.audio.blip?.(); }

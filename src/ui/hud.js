@@ -127,7 +127,7 @@ export class HUD {
     this.vit = el('div', 'h vit', ['h:Health', 'f:Hunger', 'w:Thirst', 'e:Energy', 's:Stamina'].map(k => { const [c, n] = k.split(':');
       return `<span class="v-${c}" title="${n}"><svg viewBox="0 0 36 36"><circle class="tr" cx="18" cy="18" r="15"/><circle class="fg" cx="18" cy="18" r="15" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="0"/></svg><svg class="gl" viewBox="0 0 24 24">${VG[c]}</svg></span>`; }).join(''));
     this.vitC = C;
-    this.nerd = el('div', 'h nerd', 'E jhola · Tab status · F3 stats');
+    this.nerd = el('div', 'h nerd', 'E jhola · J diary · F3 stats');
     this.corner = el('div', 'h corner');
     const mkBtn = (icon, label, fn) => { const b = el('button', 'ibtn', `${ICON[icon]}<span class="sr">${label}</span>`); b.title = label; b.onclick = fn; return b; };
     this.corner.append(mkBtn('pause', 'Pause (Esc)', () => this.game.togglePause()));

@@ -335,6 +335,9 @@ async function main() {
     // a real hitch still counts in full so nothing drifts from the clock
     dtS = Math.abs(dt - dtS) < 0.012 ? dtS + (dt - dtS) * 0.2 : dt;
     dt = dtS;
+    // the world in slow motion (the phone out: 1/60th speed, everything still moving); UI keeps real time
+    game.realDt = dt;
+    if (game.timeWarp && game.timeWarp !== 1) dt *= game.timeWarp;
     if (TEST) dt = 1 / 30;
     renderer.info.reset();
     // tests can simulate several frames per rendered frame (?simx=4), software GL is slow
@@ -371,7 +374,7 @@ async function main() {
     // the map covers the screen, and while paused the last frame just sits there (blurred by CSS): no rendering at all
     // shadows every other frame when you're still; every frame when you're moving (a stale shadow judders against you)
     if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = !game.shadowsOff && ((frames & 1) === 0 || Math.abs(player.onFoot ? (player.foot.v || 0) : (player.v || 0)) > 1.2);
-    if (compiled && game.state !== 'map' && !(game.state === 'pause' && !game.livePause && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);
+    if (compiled && game.state !== 'map' && !(game.state === 'pause' && !game.livePause && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2) && !(game.menuFreeze && game.state === 'shop' && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);
     const t2 = performance.now();
     perf.n++; perf.upd += t1 - t0; perf.rnd += t2 - t1; perf.worst = Math.max(perf.worst, t1 - t0);
     if (!perfBox.hidden) {
