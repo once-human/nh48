@@ -912,7 +912,7 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .vit circle.tr { stroke: currentColor; opacity: .22; }
 .vit circle.fg { stroke: currentColor; stroke-linecap: round; transition: stroke-dashoffset .5s var(--ease); }
 .vit svg.gl { inset: 11px !important; width: 18px !important; height: 18px !important; fill: currentColor; filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 45%, transparent)); }
-.vit .v-h { color: #ff375f; } .vit .v-f { color: #ffb224; } .vit .v-w { color: #40c8ff; } .vit .v-e { color: #a8e43a; }
+.vit .v-h { color: #ff375f; } .vit .v-f { color: #ffb224; } .vit .v-w { color: #40c8ff; } .vit .v-e { color: #a8e43a; } .vit .v-s { color: #c79bff; }
 .vit > span.low svg.gl { animation: v2pulse 1s ease-in-out infinite; }
 @keyframes v2pulse { 50% { opacity: .35; } }
 

@@ -250,7 +250,9 @@ export class Game {
     player.hpMax = () => this.life.hpMax;
     // sprinting tires you (about 15 s flat out, then you're down to a jog till you've got your breath back); shot or
     // limping, you can't run at all
-    player.sprintMul = () => { const P = this.player; return this.life.sprintMul * (P.stam < 0.12 ? 0.58 : 1) * (P.limpT > 0 ? 0.5 : 1); };
+    // out of breath slows you gradually (from a third left down to a jog), not off a cliff
+    player.sprintMul = () => { const P = this.player, st = P.stam ?? 1; return this.life.sprintMul * (st < 0.33 ? 0.6 + 0.4 * st / 0.33 : 1) * (P.limpT > 0 ? 0.5 : 1); };
+    player.stamDrain = () => { const s = this.life.s; return (s.energy < 0.3 ? 1.5 : 1) * (s.hunger < 0.15 ? 1.25 : 1) * (s.drunk > 0.4 ? 1.3 : 1); };
     player.drunk = () => this.life.s.drunk;
     player.useHook = () => this.shops.tryUse();
     this.origLook = player.look ? { ...player.look, top: player.look.top.clone(), bottom: player.look.bottom.clone(), shoe: player.look.shoe.clone(), hair: player.look.hair.clone(), cut: player.look.cut.clone() } : null;

@@ -113,16 +113,17 @@ export class HUD {
       <div class="glass prompt" id="h-prompt"><span class="kbd" id="h-prompt-k">F</span><span id="h-prompt-t"></span></div>
       <div class="subt" id="h-sub"><div class="who" id="h-sub-who"></div><div class="line" id="h-sub-line"></div><div class="tr" id="h-sub-tr"></div></div>`);
     this.toastWrap = el('div', 'h toasts');
-    // health, food, water, energy: always on screen, just above the minimap
-    // the four vitals: rings like an activity watch, a bold glyph in each
+    // health, food, water, energy, stamina: always on screen, just above the minimap
+    // the five vitals: rings like an activity watch, a bold glyph in each
     const VG = {
       h: '<path d="M12 20.3 4.6 13.2A4.9 4.9 0 0 1 12 6.9a4.9 4.9 0 0 1 7.4 6.3Z"/>',
       f: '<path d="M7 3v7a2 2 0 0 0 1.5 1.9V21h2v-9.1A2 2 0 0 0 12 10V3h-1.4v6h-1V3H8.4v6h-1V3Zm8.6 0c-1.8 0-2.6 2.7-2.6 6 0 1.6.9 2.7 2 3V21h2V3Z"/>',
       w: '<path d="M12 2.8s-6.2 7-6.2 11.3a6.2 6.2 0 0 0 12.4 0C18.2 9.8 12 2.8 12 2.8Z"/>',
       e: '<path d="M13.6 2 5 13.4h6l-1.4 8.6 8.8-11.6h-6.1Z"/>',
+      s: '<path d="M14.5 3.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4ZM10 8.6l3.3-.6c.6-.1 1.1.1 1.5.6l1.6 2.3 2.6.9-.6 1.7-3.2-1.1-.9-1.2-1 3.7 2.4 2.3V22h-2v-4.6l-2.6-2.3-1.3 4.6-4.3-.9.4-1.9 2.6.6 2.2-8.1-1.6.3-1.3 2.5-1.8-.9 1.8-3.4Z"/>',
     };
     const C = 2 * Math.PI * 15;
-    this.vit = el('div', 'h vit', ['h:Health', 'f:Hunger', 'w:Thirst', 'e:Energy'].map(k => { const [c, n] = k.split(':');
+    this.vit = el('div', 'h vit', ['h:Health', 'f:Hunger', 'w:Thirst', 'e:Energy', 's:Stamina'].map(k => { const [c, n] = k.split(':');
       return `<span class="v-${c}" title="${n}"><svg viewBox="0 0 36 36"><circle class="tr" cx="18" cy="18" r="15"/><circle class="fg" cx="18" cy="18" r="15" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="0"/></svg><svg class="gl" viewBox="0 0 24 24">${VG[c]}</svg></span>`; }).join(''));
     this.vitC = C;
     this.nerd = el('div', 'h nerd', 'E jhola · Tab status · F3 stats');
@@ -583,8 +584,8 @@ export class HUD {
     // the vitals strip
     if (g.life && (this._vitT = (this._vitT || 0) - dt) <= 0) {
       this._vitT = 0.25;
-      const L = g.life.s, vals = [(p.hp ?? 100) / g.life.hpMax, L.hunger, L.thirst, L.energy];
-      (this._vitEls || (this._vitEls = [...this.vit.querySelectorAll(':scope > span')].map(sp => [sp, sp.querySelector('.fg')]))).forEach(([sp, fg], i) => { const v = Math.max(0, Math.min(1, vals[i])), o = (this.vitC * (1 - v)).toFixed(1); if (fg._o !== o) { fg._o = o; fg.setAttribute('stroke-dashoffset', o); } this.C(sp, 'low', v < 0.2); const tt = `${['Health', 'Hunger', 'Thirst', 'Energy'][i]} ${Math.round(v * 100)}%`; if (sp.title !== tt) sp.title = tt; });
+      const L = g.life.s, vals = [(p.hp ?? 100) / g.life.hpMax, L.hunger, L.thirst, L.energy, p.stam ?? 1];
+      (this._vitEls || (this._vitEls = [...this.vit.querySelectorAll(':scope > span')].map(sp => [sp, sp.querySelector('.fg')]))).forEach(([sp, fg], i) => { const v = Math.max(0, Math.min(1, vals[i])), o = (this.vitC * (1 - v)).toFixed(1); if (fg._o !== o) { fg._o = o; fg.setAttribute('stroke-dashoffset', o); } this.C(sp, 'low', v < 0.2); const tt = `${['Health', 'Hunger', 'Thirst', 'Energy', 'Stamina'][i]} ${Math.round(v * 100)}%`; if (sp.title !== tt) sp.title = tt; });
       }
     // health: on foot, while hurt or in a fight
     const hp = p.hp ?? 100, hpEl = this.$('h-hp');

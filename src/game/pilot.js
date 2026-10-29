@@ -130,7 +130,10 @@ export class Pilot {
     const len = Math.hypot(fw, sd) || 1;
     fw /= len; sd /= len;
     const run = k('ShiftLeft', 'ShiftRight');
-    this.stam = Math.max(0, Math.min(1, (this.stam ?? 1) + (run && (fw || sd) && F.v > 3.5 ? -dt / 15 : dt / 8)));
+    // stamina: about 25 s of flat-out running fresh (less when you're tired, hungry or drunk); it comes back while
+    // you jog, faster walking, fastest standing
+    const tire = this.stamDrain ? this.stamDrain() : 1, sprinting = run && (fw || sd) && F.v > 3.5;
+    this.stam = Math.max(0, Math.min(1, (this.stam ?? 1) + (sprinting ? -dt / 25 * tire : dt * (F.v < 0.3 ? 1 / 6 : F.v < 2.2 ? 1 / 8 : 1 / 12))));
     if (this.limpT > 0) this.limpT -= dt;
     const target = (fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0;
     const cy = camYaw ?? F.yaw;
