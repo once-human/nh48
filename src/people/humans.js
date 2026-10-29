@@ -434,6 +434,8 @@ export class HumanKit {
     const acc = this.accMat.clone();
     // hair with a soft sheen along the strands (it read as matte plastic)
     const hairMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0, map: this.hairMat[k] || null, sheen: 1, sheenRoughness: 0.32, sheenColor: 0x6a5848 });
+    // short hair sits right on the scalp: without this the two fought for the same pixels (head, hair, head, hair…)
+    hairMat.polygonOffset = true; hairMat.polygonOffsetFactor = -2; hairMat.polygonOffsetUnits = -6;
     // clothes are real shells over the body: top (short / long sleeves), trousers, kurta hem, saree
     const topMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
     const botMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });

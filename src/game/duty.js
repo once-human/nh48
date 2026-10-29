@@ -6,6 +6,7 @@
 // Traffic ahead pulls over while your siren is on.
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { wrapAngle, clamp } from '../core/util.js';
+import { Driver } from '../vehicles/driver.js';
 import FAMOUS from '../world/famous.json';
 
 const HOSPITALS = ['Sassoon Hospital', 'KEM Hospital', 'Ruby Hall Clinic', 'Jehangir Hospital', 'Deenanath Mangeshkar Hospital', 'Bharati Vidyapeeth'];
@@ -93,13 +94,9 @@ export class Duty {
   polTick(C, dt) {
     const G = this.g, W = G.W, P = G.player, me = P.cur, v = C.v;
     // the snatcher rides for the edge of the city, faster when you're on him
-    C.routeT -= dt;
-    if (C.routeT <= 0) { C.routeT = 1.5; C.route = null; const a = W.graph.nearest(v.x, v.z, 40), b = W.graph.nearest(C.dest.x, C.dest.z, 80); if (a && b) { const r = W.graph.route(a, b, true); if (r) C.route = W.graph.routePolyline(r, a, b); } }
-    let ax = C.dest.x, az = C.dest.z;
-    if (C.route && C.route.length >= 4) { let bi = 0, bd = 1e9; for (let i = 0; i < C.route.length; i += 2) { const q = (C.route[i] - v.x) ** 2 + (C.route[i + 1] - v.z) ** 2; if (q < bd) { bd = q; bi = i; } } const look = Math.min(C.route.length - 2, bi + 4); ax = C.route[look]; az = C.route[look + 1]; }
     const d = Math.hypot(me.x - v.x, me.z - v.z), want = d < 40 ? 15 : 10;
-    const diff = wrapAngle(Math.atan2(az - v.z, ax - v.x) - v.th), inp = { throttle: v.v < want ? (Math.abs(diff) < 0.5 ? 1 : 0.5) : 0, brake: v.v > want + 1.5 ? 1 : 0, steer: clamp(diff * 2.4, -1, 1), handbrake: false };
-    v.update(dt, inp, G.traffic);
+    if (!C.drv) C.drv = new Driver(v, G, { lane: 1.0, signals: false, emergency: true });
+    C.drv.goTo(C.dest.x, C.dest.z); C.drv.update(dt, want);
     if (!C.seen && d < 160) { C.seen = true; G.setWaypoint(null); }
     if (!C.seen) G.setWaypoint({ x: v.x, z: v.z, name: 'The snatcher', gig: true });
     G.story && G.story.showMarker ? G.story.showMarker(v.x, v.z) : null;

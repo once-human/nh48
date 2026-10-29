@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { Vehicle, specOf, makeService } from '../vehicles/vehicle.js';
 import { clamp, wrapAngle } from '../core/util.js';
 import { buildAmbulance, buildPoliceJeep } from '../vehicles/emodels.js';
+import { Driver } from '../vehicles/driver.js';
 
 const th0 = (st) => st.th;
 export class Emergency {
@@ -212,68 +213,12 @@ export class Emergency {
     R.out = [];
     for (const c of R.crew) c.H.holder.visible = true;
   }
-  // driving like a trained driver with a siren: on the route, keeping left in the lane, slowing for bends, weaving
-  // round what's stopped, braking for people, traffic ahead pulling over; never through anything (blocked: back up
-  // and turn, like a person would)
+  // the driving itself: see vehicles/driver.js (route, lanes, bends, obstacles, people, getting unstuck)
   drive(R, tx, tz, want, dt) {
-    const G = this.g, W = G.W, v = R.v;
-    R.routeT -= dt;
-    if (R.routeT <= 0) {
-      R.routeT = 1.5; R.route = null;
-      const a = W.graph.nearest(v.x, v.z, 40), b = W.graph.nearest(tx, tz, 60);
-      if (a && b) { const r = W.graph.route(a, b, true); if (r) R.route = W.graph.routePolyline(r, a, b); }
-    }
-    let ax = tx, az = tz, bendAhead = 0;
-    const hx = Math.cos(v.th), hz = Math.sin(v.th);
-    if (R.route && R.route.length >= 4 && Math.hypot(v.x - tx, v.z - tz) > 20) {
-      let bi = 0, bd = 1e9;
-      for (let i = 0; i < R.route.length; i += 2) { const q = (R.route[i] - v.x) ** 2 + (R.route[i + 1] - v.z) ** 2; if (q < bd) { bd = q; bi = i; } }
-      const look = Math.min(R.route.length - 2, bi + 2 * Math.max(1, Math.round((7 + Math.abs(v.v) * 0.7) / 8)));
-      ax = R.route[look]; az = R.route[look + 1];
-      // keep left of the road's middle (Indian roads), a car's width over
-      const sx = R.route[Math.min(R.route.length - 2, look + 2)] - ax, sz = R.route[Math.min(R.route.length - 1, look + 3)] - az, sl = Math.hypot(sx, sz) || 1;
-      ax += (sz / sl) * 1.6; az += (-sx / sl) * 1.6;
-      // how sharp the road turns ahead: slow down for it
-      const far = Math.min(R.route.length - 2, look + 6);
-      bendAhead = Math.abs(wrapAngle(Math.atan2(R.route[far + 1] - az, R.route[far] - ax) - v.th));
-    }
-    // what's in the way ahead: weave to a side gap, else wait behind it; people on the road: stop
-    let block = 99, off = 0;
-    const blocked = (lat) => {
-      let b = 99;
-      G.traffic.near(v.x + hx * 8, v.z + hz * 8, 11, (o) => {
-        if (o === v.agent || (!o.T && !o.parked)) return;
-        const rx = o.x - v.x, rz = o.z - v.z, al = rx * hx + rz * hz, ac = -rx * hz + rz * hx, w = (o.T ? o.T.W : o.W || 1.8) / 2 + (R.md.dims.W / 2) + 0.3;
-        if (al > 1 && al < 16 && Math.abs(ac - lat) < w) b = Math.min(b, al);
-      });
-      for (const p of G.people.list) { if (p.hidden || p.crew) continue; const rx = p.x - v.x, rz = p.z - v.z, al = rx * hx + rz * hz, ac = -rx * hz + rz * hx; if (al > 0.5 && al < 12 && Math.abs(ac - lat) < 1.8) b = Math.min(b, al); }
-      return b;
-    };
-    if ((R.scanT = (R.scanT || 0) - dt) <= 0) {
-      R.scanT = 0.2; block = blocked(0); R.block = block; R.off = 0;
-      if (block < 14) for (const c of [2.2, -2.2, 3.4, -3.4]) if (blocked(c) > 15) { R.off = c; break; }
-    }
-    block = R.block ?? 99; off = R.off || 0;
-    ax += -hz * off; az += hx * off;
-    if ((R.yieldT = (R.yieldT || 0) - dt) <= 0 && R.state === 'go') {
-      R.yieldT = 0.5;
-      G.traffic.near(v.x + hx * 16, v.z + hz * 16, 18, (o) => { if (!o.T || o.jc || o.isPlayer) return; const rx = o.x - v.x, rz = o.z - v.z, al = rx * hx + rz * hz; if (al < 0 || al > 34) return; const side = -rx * hz + rz * hx; o.latT = o.lat + (side > 0 ? 1 : -1) * 1.4; o.v = Math.min(o.v, 3); });
-    }
-    const diff = wrapAngle(Math.atan2(az - v.z, ax - v.x) - v.th);
-    let target = want * (bendAhead > 0.9 ? 0.45 : bendAhead > 0.45 ? 0.7 : 1);
-    if (!off && block < 14) target = Math.min(target, Math.max(0, (block - 4) * 0.8));
-    const inp = { throttle: 0, brake: 0, steer: clamp(diff * 2.0, -1, 1), handbrake: false };
-    if (R.revT > 0) {
-      R.revT -= dt; inp.brake = 1; inp.steer = -R.revSteer; v.reverse = true;
-      if (R.revT <= 0) v.reverse = false;
-    } else {
-      v.reverse = false;
-      if (want === 0) { inp.handbrake = true; inp.brake = 1; v.update(dt, inp, G.traffic); return; }      // parked at the scene
-      if (v.v < target) inp.throttle = Math.abs(diff) < 0.4 ? 0.85 : 0.5;
-      if (v.v > target + 1 || target === 0) { inp.brake = v.v > target + 4 ? 1 : 0.5; inp.throttle = 0; }
-      if (want > 0 && Math.abs(v.v) < 0.4 && (target < 0.5 || inp.throttle > 0.3)) R.stuckT += dt; else R.stuckT = Math.max(0, R.stuckT - dt);
-      if (R.stuckT > 3) { R.stuckT = 0; R.revT = 1.3; R.revSteer = inp.steer || 1; R.block = 99; }
-    }
-    v.update(dt, inp, G.traffic);
+    const G = this.g;
+    if (!R.drv) R.drv = new Driver(R.v, G, { lane: 1.6, emergency: true });
+    R.drv.o.emergency = R.state === 'go';
+    R.drv.goTo(tx, tz);
+    R.drv.update(dt, want);
   }
 }

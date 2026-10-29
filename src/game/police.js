@@ -13,6 +13,7 @@ import { Vehicle, specOf, makeService } from '../vehicles/vehicle.js';
 import { ikArm, leanRider, RIDER_HIPS, RIDER_LEAN } from '../people/humans.js';
 import { buildPoliceJeep } from '../vehicles/emodels.js';
 import { Law } from './law.js';
+import { Driver } from '../vehicles/driver.js';
 import { clamp, wrapAngle, RNG, safeStorage, fmtRupees } from '../core/util.js';
 import LINES from './lines.json';
 import { POLICE_MUL } from './settings.js';
@@ -796,7 +797,8 @@ export class Police {
   markers() {
     const out = [];
     if (this.stop && this.stop.phase === 'wave') out.push({ x: this.stop.cop.x, z: this.stop.cop.z, kind: 'cop' });
-    for (const m of this.marshals) out.push({ x: m.veh.x, z: m.veh.z, kind: 'marshal' });
+    for (const m of this.marshals) { if (m.mode !== 'foot') out.push({ x: m.veh.x, z: m.veh.z, kind: 'marshal' }); for (const q of m.foot) out.push({ x: q.x, z: q.z, kind: 'footcop' }); }
+    if (this.naka) out.push({ x: this.naka.x, z: this.naka.z, kind: 'naka', label: 'Nakabandi' });
     if (this.towedAt) out.push({ x: this.towedAt.x, z: this.towedAt.z, kind: 'tow' });
     // your own auto, wherever you left it
     const P = this.g.player;
@@ -960,6 +962,14 @@ class Marshal {
   }
   drive(tx, tz, want, dt, close, pursuing) {
     const G = this.G, W = this.W, v = this.veh;
+    // on the roads like anyone with sense (vehicles/driver.js); only pulling up alongside you is done by hand
+    if (!close) {
+      if (!this.drv) this.drv = new Driver(v, G, { lane: this.jeep ? 1.6 : 1.2 });
+      this.drv.o.emergency = !!pursuing; this.drv.o.signals = !pursuing; this.drv.o.offroadEnd = pursuing && G.player.onFoot;
+      this.drv.goTo(tx, tz); this.drv.update(dt, want);
+      v.y = v.y || W.surf.height(v.x, v.z);
+      return;
+    }
     this.routeT -= dt;
     if (this.routeT <= 0) { this.routeT = 1.3; this.route = null; const a = W.graph.nearest(v.x, v.z, 40), b = W.graph.nearest(tx, tz, 60); if (a && b) { const r = W.graph.route(a, b, true); if (r) this.route = W.graph.routePolyline(r, a, b); } }
     const hx = Math.cos(v.th), hz = Math.sin(v.th);

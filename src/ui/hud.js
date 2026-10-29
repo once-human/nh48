@@ -23,7 +23,8 @@ const AREA_NAMES = ['Deccan', 'Peth', 'Camp', 'Koregaon Park', 'Station', 'Pune'
 function markColor(m) {
   if (m.kind === 'pax') return '#33d17a';
   if (m.kind === 'cop') return '#5aa2ff';
-  if (m.kind === 'marshal') return (performance.now() / 250 | 0) % 2 ? '#ff4b3e' : '#4b7bff';
+  if (m.kind === 'marshal' || m.kind === 'footcop') return (performance.now() / 250 | 0) % 2 ? '#ff4b3e' : '#4b7bff';
+  if (m.kind === 'naka') return '#ff3b30';
   return '#f2b705';
 }
 function clock(h, h24) {
@@ -880,11 +881,12 @@ export class HUD {
       let [X, Y] = toS(m.x, m.z);
       const edge = !inView(X, Y);
       if (edge) {
-        if (m.kind === 'marshal' || m.kind === 'cop') continue;
+        if (m.kind === 'marshal' || m.kind === 'cop' || m.kind === 'footcop') continue;
         const f = lim / Math.max(Math.abs(X - r), Math.abs(Y - r)); X = r + (X - r) * f; Y = r + (Y - r) * f;
       }
       if (m.kind === 'wp') { if (edge) drawPin(x, X, Y, '#5fd0ff', null, 6 * k); else { x.save(); x.scale(k, k); drawFlag(x, X / k, Y / k); x.restore(); } continue; }
-      drawPin(x, X, Y, markColor(m), m.kind === 'tow' ? 'auto' : null, (m.kind === 'marshal' ? 6 : 7) * k);
+      drawPin(x, X, Y, markColor(m), m.kind === 'tow' ? 'auto' : null, (m.kind === 'marshal' ? 6 : m.kind === 'footcop' ? 4.5 : m.kind === 'naka' ? 9 : 7) * k);
+      if (m.kind === 'naka') { x.save(); x.strokeStyle = 'rgba(255, 59, 48, .8)'; x.lineWidth = 2 * k; const t = (performance.now() / 600) % 1; x.globalAlpha = 1 - t; x.beginPath(); x.arc(X, Y, (8 + t * 14) * k, 0, 6.283); x.stroke(); x.restore(); }
     }
     drawArrow(x, r, cy, 0, k);
     const n = this.mm.querySelector('.mm-n');

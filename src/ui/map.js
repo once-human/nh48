@@ -794,7 +794,7 @@ export class MapScreen {
     for (const m of [...(g.rides ? g.rides.markers() : []), ...(g.police ? g.police.markers() : []), ...(g.props ? g.props.markers() : [])]) {
       const [X, Y] = T(m.x, m.z);
       const prop = m.kind === 'prop', pc = prop ? (m.owned ? '#33d17a' : '#c58cff') : null;
-      drawPin(x, X, Y, prop ? pc : m.kind === 'pax' ? '#33d17a' : m.kind === 'cop' ? '#5aa2ff' : m.kind === 'marshal' ? '#ff4b3e' : '#f2b705', m.kind === 'tow' ? 'auto' : prop ? (m.owned ? 'home' : 'rupee') : null, m.kind === 'tow' || prop ? 8 : 6);
+      drawPin(x, X, Y, prop ? pc : m.kind === 'pax' ? '#33d17a' : m.kind === 'cop' ? '#5aa2ff' : m.kind === 'marshal' || m.kind === 'footcop' ? '#ff4b3e' : m.kind === 'naka' ? '#ff3b30' : '#f2b705', m.kind === 'tow' ? 'auto' : prop ? (m.owned ? 'home' : 'rupee') : null, m.kind === 'tow' || prop ? 8 : 6);
       if (m.label) { x.textAlign = 'left'; x.textBaseline = 'middle'; } if (m.label) text(m.label, X + 11, Y, '700 11px Inter, system-ui, sans-serif', pc || '#f2b705');
     }
     // waypoint + selection
