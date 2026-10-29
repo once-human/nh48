@@ -1364,14 +1364,16 @@ export class Game {
     if (p.acc >= 2) {
       const fps = p.n / p.acc;
       p.acc = 0; p.n = 0;
-      if (fps < 45) p.slow++; else p.slow = 0;
-      if (fps > 57) p.fast++; else p.fast = 0;
+      // steady: a resolution change reallocates every render target (a hitch, and the picture visibly softens or
+      // sharpens), so only on a clear, lasting trend
+      if (fps < 42) p.slow++; else p.slow = 0;
+      if (fps > 58) p.fast++; else p.fast = 0;
       const maxPr = Math.min(window.devicePixelRatio || 1, this.QUALITY[this.qualityName].pixelRatio);
       // never below the screen's own resolution (1.0): below that every sign, plate and shop board
       // smears. Slow machines lose shadows, grass and range instead (the preset step below).
       const floor = this.qualityName === 'lite' ? 0.6 : Math.min(1, window.devicePixelRatio || 1);
-      if (p.slow >= 1 && p.pr > floor) { p.pr = Math.max(floor, p.pr - (fps < 30 ? 0.15 : 0.08)); this.applyPixelRatio(p.pr); p.slow = 0; }
-      else if (p.fast >= 3 && p.pr < maxPr) { p.pr = Math.min(maxPr, p.pr + 0.08); this.applyPixelRatio(p.pr); p.fast = 0; }
+      if (p.slow >= 2 && p.pr > floor) { p.pr = Math.max(floor, p.pr - (fps < 30 ? 0.15 : 0.08)); this.applyPixelRatio(p.pr); p.slow = 0; }
+      else if (p.fast >= 6 && p.pr < maxPr) { p.pr = Math.min(maxPr, p.pr + 0.08); this.applyPixelRatio(p.pr); p.fast = 0; }
       // still struggling at the lowest resolution: step the graphics preset down once per level
       // (only when the player hasn't picked a preset themselves)
       p.floor = (p.pr <= floor + 0.01 && fps < 30) ? (p.floor || 0) + 1 : 0;

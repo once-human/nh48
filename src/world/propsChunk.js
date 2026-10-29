@@ -165,10 +165,14 @@ function stationLayout(W, st) {
   C.tag = t0;
   return out;
 }
-export function addStreetProps(W, D, tag, nmap) {
+export function addStreetProps(W, D, tag, nmap) { const it = addStreetPropsSteps(W, D, tag, nmap); while (!it.next().done) { /* all at once */ } }
+// a piece at a time (the instanced sets are tagged only while this runs, never across a pause)
+export function* addStreetPropsSteps(W, D, tag, nmap) {
   const { collision, index } = W;
   InstancedSet.tag = tag;
+  let n = 0;
   for (const l of D.lamps) {
+    if (++n % 300 === 0) { InstancedSet.tag = 0; yield; InstancedSet.tag = tag; }
     const x = l[0] / 100, z = l[1] / 100, a = l[2];
     const dx = Math.cos(a), dz = Math.sin(a);
     W.lampSet.add(x, z, compose(x, 0.15, z, yawX(dx, dz)));
@@ -182,7 +186,9 @@ export function addStreetProps(W, D, tag, nmap) {
     byRoad.get(p[2]).push({ x, z, d: p[3] });
     collision.addCircle(x, z, 0.14, 2);
   }
+  InstancedSet.tag = 0; yield; InstancedSet.tag = tag;
   for (const list of byRoad.values()) {
+    if (++n % 40 === 0) { InstancedSet.tag = 0; yield; InstancedSet.tag = tag; }
     list.sort((a, b) => a.d - b.d);
     for (let k = 0; k < list.length; k++) {
       const a = list[k], nb = list[k + 1];
@@ -211,6 +217,7 @@ export function addStreetProps(W, D, tag, nmap) {
       }
     }
   }
+  InstancedSet.tag = 0; yield; InstancedSet.tag = tag;
   for (const s of D.signals) {
     const x = s[0] / 100, z = s[1] / 100, a = s[2];
     const dx = Math.cos(a), dz = Math.sin(a);

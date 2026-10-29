@@ -60,7 +60,7 @@ function clearSites(D) {
     }
   }
 }
-export function fixVenues(D) {
+export function fixVenues(D, rect) {
   if (D.buildings) clearSites(D);
   if (!D.shops || !D.shopNames || !D.buildings) return;
   // drop what isn't real
@@ -69,6 +69,7 @@ export function fixVenues(D) {
   let cents = null;
   const used = new Set(D.shops.map(s => s[0] * 4096 + s[1] * 64 + s[2]));
   for (const [name, mr, x, z, kind] of [...NIGHTLIFE, ...FAMOUS.filter(f => f.kind).map(f => [f.name, f.mr || f.name, f.x, f.z, f.kind])]) {
+    if (rect && (x < rect[0] - 40 || x > rect[2] + 40 || z < rect[1] - 40 || z > rect[3] + 40)) continue;   // not in this tile
     cents = cents || D.buildings.map(B => { const p = cmRing(B[1]); return { c: centroid(p), p }; });
     // the building at the pin (its centre within 35 m), in this tile
     let bi = -1, bd = 35 * 35;

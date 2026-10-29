@@ -5,7 +5,7 @@
 import { versioned } from '../core/assets.js';
 import { cmRing } from './geo.js';
 import { fixVenues } from './venues.js';
-import { addStreetProps, removeStreetProps } from './propsChunk.js';
+import { addStreetPropsSteps, removeStreetProps } from './propsChunk.js';
 import { addGroundTile, removeGroundTile } from './groundChunk.js';
 
 // 1 km pieces: fetched when you're within 1.2 km of one, dropped past 1.9 km; joining one costs at most a few ms a frame
@@ -75,11 +75,11 @@ export class TileManager {
         else if (T.state === 'live' && d > DROP_R) { T.state = 'dropping'; this.dropping.push(T); }
       }
     }
-    if (!this.job && this.dropping.length) this.job = this.dropJob(this.dropping.shift());
-    if (!this.job && this.ready.length) this.job = this.integrate(this.ready.shift());
+    if (!this.job && this.dropping.length) { this.job = this.dropJob(this.dropping.shift()); this.jobKind = 'drop'; this.jobStep = 0; }
+    if (!this.job && this.ready.length) { this.job = this.integrate(this.ready.shift()); this.jobKind = 'add'; this.jobStep = 0; }
     if (this.job) {
       const t0 = performance.now();
-      while (performance.now() - t0 < BUDGET) { if (this.job.next().done) { this.job = null; break; } }
+      while (performance.now() - t0 < BUDGET) { const s0 = performance.now(), r = this.job.next(); if (window.__ts) window.__ts.push([this.jobKind + ':' + (r.value || 'end'), this.jobStep = (this.jobStep || 0) + 1, +(performance.now() - s0).toFixed(1)]); this._lastLbl = r.value; if (r.done) { this.job = null; this.jobStep = 0; break; } }
     }
   }
   // somewhere you're about to be (fast travel, a bus, the hospital): the pieces within r of (x, z) fetched and
@@ -108,43 +108,46 @@ export class TileManager {
     const g = W.graph.addTile(D.graph, tag);
     T.nodes = [...new Set(g.nodes)];
     if (this.game && this.game.traffic) this.game.traffic.signals.addNodes(T.nodes);
-    yield;
+    yield 'graph';
     // buildings and everything filed by chunk
     const bOff = M.buildings.length;
     for (const b of D.buildings) M.buildings.push(b);
     T.bOff = bOff; T.bN = D.buildings.length;
     for (const [bi, d] of D.hillB || []) if (M.buildings[bOff + bi]) M.buildings[bOff + bi].y = d / 10;   // up on a hillside
     D.buses = []; D.pois = []; D.places = [];
-    fixVenues(D);
-    W.index.addTile(D, bOff, rect, tag);
-    yield;
+    yield 'bpush';
+    fixVenues(D, rect);
+    yield 'venues';
+    yield* W.index.addTileSteps(D, bOff, rect, tag);
+    yield 'index';
     W.surf.addTile({ ground: D.ground, water: D.water, buildings: [] }, tag);
-    for (let k = 0; k < D.buildings.length; k += 1500) { yield; W.surf.addTile({ ground: [], water: [], buildings: D.buildings.slice(k, k + 1500) }, tag); }
-    yield;
-    for (let k = 0; k < D.buildings.length; k += 500) { tagged(() => { for (const B of D.buildings.slice(k, k + 500)) C.addRing(cmRing(B[1]), 0); }); yield; }
+    for (let k = 0; k < D.buildings.length; k += 600) { yield 'surfGround'; W.surf.addTile({ ground: [], water: [], buildings: D.buildings.slice(k, k + 600) }, tag); }
+    yield 'surfB';
+    for (let k = 0; k < D.buildings.length; k += 160) { tagged(() => { for (const B of D.buildings.slice(k, k + 160)) C.addRing(cmRing(B[1]), 0); }); yield 'pre-coll'; }
     tagged(() => {
       for (const [, line] of D.banks) C.addLine(cmRing(line), 4);
       for (const [, line] of D.rails) C.addLine(cmRing(line), 4);
     });
-    yield;
+    yield 'collB';
     tagged(() => {
-      for (const w of D.walls) { const p = cmRing(w); for (let k = 0; k + 3 < p.length; k += 2) C.addSeg(p[k], p[k + 1], p[k + 2], p[k + 3], 5); }
       for (const s of D.stalls) C.addCircle(s[0] / 100, s[1] / 100, 0.9, 2);
     });
-    yield;
+    for (let j = 0; j < D.walls.length; j += 60) { tagged(() => { for (const w of D.walls.slice(j, j + 60)) { const p = cmRing(w); for (let k = 0; k + 3 < p.length; k += 2) C.addSeg(p[k], p[k + 1], p[k + 2], p[k + 3], 5); } }); yield 'wallsC'; }
+    yield 'banks';
     if (W.hills) W.hills.addTile(D, rect, tag);
-    tagged(() => W.trees.addTile(D.trees, tag));
-    yield;
-    tagged(() => addStreetProps(W, D, tag, g.nodes));
-    yield;
+    yield 'hills';
+    for (let k = 0; k < D.trees.length; k += 500) { tagged(() => W.trees.addTile(D.trees.slice(k, k + 500), tag)); yield 'treesC'; }
+    yield 'walls';
+    { const it = addStreetPropsSteps(W, D, tag, g.nodes); for (;;) { C.tag = tag; let r; try { r = it.next(); } finally { C.tag = 0; } if (r.done) break; yield 'propsC'; } }
+    yield 'trees';
     if (W.parked) tagged(() => W.parked.addTile(D, tag)); else T.parkedLater = { parked: D.parked };
-    yield;
+    yield 'props';
     addGroundTile(W, D, g.edges, tag);
     W.activity.addCells(D.activity || [], tag);
     for (const s of D.stalls) { s.tag = tag; M.stalls.push(s); }
     for (const p of D.pins || []) { p.tag = tag; M.pins.push(p); }
     if (W.cityMap && W.cityMap.addPins) W.cityMap.addPins(D.pins || []);
-    yield;
+    yield 'parked';
     // chunks built before the data arrived get rebuilt, the map redraws here
     this.refresh(rect);
     T.data = null; T.state = 'live';
@@ -154,24 +157,26 @@ export class TileManager {
   *dropJob(T) {
     const W = this.W, M = W.M, tag = T.tag;
     this.refresh(T.rect, true);
-    yield;
+    yield 'd0';
     W.graph.removeTile(tag);
-    yield;
+    yield 'd1';
     if (this.game && this.game.traffic) this.game.traffic.signals.addNodes(T.nodes || []);
     W.index.removeTile(tag);
-    yield;
+    yield 'd2';
     for (let k = 0; k < T.bN; k++) M.buildings[T.bOff + k] = null;
     W.surf.removeTile(tag);
-    yield;
+    yield 'd3';
     W.collision.removeTag(tag, T.rect);
-    yield;
+    yield 'd4';
     W.trees.removeTile(tag);
     if (W.hills) W.hills.removeTile(tag);
-    yield;
+    yield 'd5';
     removeStreetProps(W, tag);
-    yield;
+    yield 'd6';
     W.parked?.removeTile(tag);
+    yield 'd7';
     removeGroundTile(W, tag);
+    yield 'd8';
     W.activity.removeTag(tag);
     M.stalls = M.stalls.filter(s => s.tag !== tag);
     M.pins = M.pins.filter(p => p.tag !== tag);

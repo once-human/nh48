@@ -146,7 +146,8 @@ export class Crowd {
     s.dtAcc += dt;
     const dd = Math.abs(p.x - cx) + Math.abs(p.z - cz), seen = !this.inView || dd < 8 || this.inView(p.x, p.z);
     s.k = ((s.k || 0) + 1) & 3;
-    if (seen ? (dd < 30 || (s.k & 1) === 0) : s.k === 0) { H.mixer.update(s.dtAcc); s.dtAcc = 0; }
+    // off-screen and not close: no animation at all (it catches up the moment they're in view)
+    if (seen ? (dd < 30 || (s.k & 1) === 0) : (dd < 12 && s.k === 0)) { H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; }
     const sh = dd < 22;
     if (s.sh !== sh) { s.sh = sh; H.root.traverse(o => { if (o.isMesh) o.castShadow = sh; }); }
     H.holder.visible = seen || dd < 12;

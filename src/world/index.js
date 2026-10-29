@@ -76,16 +76,20 @@ export class WorldIndex {
   }
   // one tile's worth of the city into its chunks. bOff: where its buildings start in M.buildings;
   // rect (metres) keeps everything inside the tile's own chunks. Returns the chunks it touched.
-  addTile(D, bOff, rect, tag = 0) {
+  addTile(D, bOff, rect, tag = 0) { const it = this.addTileSteps(D, bOff, rect, tag); while (!it.next().done) { /* all at once */ } }
+  // the same, a piece at a time (tiles join while you play)
+  *addTileSteps(D, bOff, rect, tag = 0) {
     const at = (x, z) => this.chunkOf(x, z), put = (a, ci, it) => this.put(a, ci, it);
     this._rng = rect ? (c) => c.cx >= rect[0] && c.cx < rect[2] && c.cz >= rect[1] && c.cz < rect[3] : null;
     const off = bOff || 0;
     for (const [kind, polys] of D.ground) for (const [ci, rings] of polys) put('ground', ci, { kind, rings: rings.map(cmRing) });
+    yield 'ix0';
     for (const [ci, rings] of D.water) put('water', ci, rings.map(cmRing));
     for (const [ci, line] of D.kerbs) put('kerbs', ci, cmRing(line));
     for (const [ci, line] of D.banks) put('banks', ci, cmRing(line));
     for (const [ci, line] of D.lakebanks || []) put('lakebanks', ci, cmRing(line));
     for (const [ci, line] of D.rails) put('rails', ci, cmRing(line));
+    yield 'ix1';
     D.buildings.forEach((b, bi) => put('bld', b[0], bi + off));
     for (const w of D.walls) put('walls', at(w[0] / 100, w[1] / 100), cmRing(w));
     for (const l of D.lamps) put('lamps', at(l[0] / 100, l[1] / 100), l);
@@ -93,6 +97,7 @@ export class WorldIndex {
     for (const s of D.signals) put('signals', at(s[0] / 100, s[1] / 100), s);
     for (const s of D.stalls) put('stalls', at(s[0] / 100, s[1] / 100), s);
     for (const h of D.hoardings) put('hoardings', at(h[2] / 100, h[3] / 100), h);
+    yield 'ix2';
     for (const q of D.marks.center) { const p = cmRing(q); put('center', at(p[p.length >> 2 << 1], p[(p.length >> 2 << 1) + 1]), p); }
     for (const q of D.marks.lane) { const p = cmRing(q); put('lane', at(p[p.length >> 2 << 1], p[(p.length >> 2 << 1) + 1]), p); }
     for (const z of D.marks.zebra) put('zebra', at(z[0] / 100, z[1] / 100), z);
@@ -100,6 +105,7 @@ export class WorldIndex {
     for (const z of D.marks.bump) put('bump', at(z[0] / 100, z[1] / 100), z);
     for (const r of D.railways || []) { const p = cmRing(r[1]); put('railways', at(p[0], p[1]), { yard: r[0], pts: p }); }
     for (const pf of D.platforms || []) { const p = cmRing(pf); put('platforms', at(p[0], p[1]), p); }
+    yield 'ix3';
     // shops grouped by building: bi -> Map(edge * 4096 + slot -> [bi, edge, slot, nameIndex, source]);
     // the tile's shop-board names join the global table
     const nOff = this.shopNames.length;

@@ -1063,6 +1063,8 @@ export class People {
       if (p.body || p.hidden) continue;    // drawn up close by crowd.js, or inside a shop
       if (nm >= this.cap - 1 || nf >= this.cap - 1) break;
       if (Math.abs(p.x - cx) > 130 || Math.abs(p.z - cz) > 130) continue;
+      // behind the camera and not right next to it: nothing to draw (their shadows fall well inside 25 m)
+      if (this.g_inView && Math.abs(p.x - cx) + Math.abs(p.z - cz) > 25 && !this.g_inView(p.x, p.z)) continue;
       if (p.gyX === undefined || Math.abs(p.x - p.gyX) + Math.abs(p.z - p.gyZ) > 1.5) { p.gyX = p.x; p.gyZ = p.z; p.gy = this.W.surf.height(p.x, p.z); }
       const y = p.gy;
       const s = p.scale;

@@ -129,7 +129,13 @@ export class HUD {
     const mkBtn = (icon, label, fn) => { const b = el('button', 'ibtn', `${ICON[icon]}<span class="sr">${label}</span>`); b.title = label; b.onclick = fn; return b; };
     this.corner.append(mkBtn('pause', 'Pause (Esc)', () => this.game.togglePause()));
     R.append(this.scrim, this.hurtEl, this.vit, this.nerd, this.loc, this.wallet, this.placeEl, this.obj, this.mm, this.zoneEl, this.dash, this.lower, this.toastWrap, this.smsWrap, this.stopEl, this.flashEl);
-    this.$ = (id) => document.getElementById(id);
+    const ids = new Map();
+    this.$ = (id) => { let e = ids.get(id); if (!e || !e.isConnected) { e = document.getElementById(id); if (e) ids.set(id, e); } return e; };
+    // writes only when the value changes: touching the DOM every frame (even with the same text) costs a style pass
+    this.T = (e, v) => { if (typeof e === 'string') e = this.$(e); if (e && e._t !== v) { e._t = v; e.textContent = v; } };
+    this.C = (e, c, on) => { if (typeof e === 'string') e = this.$(e); const k = '_c_' + c; if (e && e[k] !== on) { e[k] = on; e.classList.toggle(c, on); } };
+    this.Hd = (e, h) => { if (typeof e === 'string') e = this.$(e); if (e && e.hidden !== h) e.hidden = h; };
+    this.Wd = (e, w) => { if (e && e._w !== w) { e._w = w; e.style.width = w; } };
     this.$money = this.$('h-money'); this.$speed = this.$('h-speed'); this.$gear = this.$('h-gear'); this.$rpm = this.$('h-rpm');
     this.buildTitle();
     this.buildPause();
@@ -530,57 +536,55 @@ export class HUD {
     const pl = g.state === 'play'; if (pl !== this._pl) { this._pl = pl; this.root.classList.toggle('playing', pl); }
     // vehicle cluster only while driving
     const foot = !!p.onFoot;
-    this.dash.classList.toggle('foot', foot);
+    this.C(this.dash, 'foot', foot);
     const vl = p.vehicleLabel ? p.vehicleLabel() : 'Bajaj RE \u00b7 Auto rickshaw';
     if (vl !== this._vl) { this._vl = vl; this.$('h-veh').textContent = vl; }
     const kmh = Math.abs(p.v) * 3.6;
-    this.$speed.textContent = Math.round(kmh);
+    this.T(this.$speed, String(Math.round(kmh)));
     const gear = p.reverse ? 'R' : p.v < 0.2 && p.throttle < 0.1 ? 'N' : String(p.gear);
-    if (this.$gear.textContent !== gear) { this.$gear.textContent = gear; this.$gear.classList.toggle('r', gear === 'R'); }
-    this.$rpm.firstElementChild.style.width = Math.round(Math.min(1, p.rpm || 0) * 100) + '%';
-    this.$rpm.classList.toggle('hi', (p.rpm || 0) > 0.92);
+    this.T(this.$gear, gear); this.C(this.$gear, 'r', gear === 'R');
+    if (!foot) { this.Wd(this.$rpm.firstElementChild, Math.round(Math.min(1, p.rpm || 0) * 50) * 2 + '%'); this.C(this.$rpm, 'hi', (p.rpm || 0) > 0.92); }
     const money = fmtRupees(g.stats.money).replace('₹', '');
     if (this.$money.textContent !== money) {
       if (this.$money.textContent && this.$money.textContent !== '0') { this.$money.parentElement.classList.remove('flash'); void this.$money.offsetWidth; this.$money.parentElement.classList.add('flash'); }
       this.$money.textContent = money;
     }
-    this.$('h-rides').textContent = g.stats.rides ? `${g.stats.rides} ${g.stats.rides === 1 ? 'ride' : 'rides'} · ${g.stats.rating.toFixed(1)} rating` : '';
-    this.$('h-clock').textContent = clock(g.hour, g.settings && g.settings.clock24);
+    this.T('h-rides', g.stats.rides ? `${g.stats.rides} ${g.stats.rides === 1 ? 'ride' : 'rides'} · ${g.stats.rating.toFixed(1)} rating` : '');
+    this.T('h-clock', clock(g.hour, g.settings && g.settings.clock24));
     if (this.pcT > 0) { this.pcT -= dt; if (this.pcT <= 0) this.placeEl.classList.remove('show'); if (this.pcT < -0.5) this.placeEl.hidden = true; }
     // fare meter only on a shift
     const shift = g.rides && g.rides.enabled;
-    this.$('h-fare-box').hidden = !shift;
+    this.Hd('h-fare-box', !shift);
     if (shift) {
       const ride = g.rides.current, flag = this.$('h-flag');
       if (ride && ride.state === 'onboard') {
-        this.$('h-fare').textContent = '₹' + Math.round(ride.fare);
-        this.$('h-km').textContent = (ride.dist / 1000).toFixed(1) + ' km';
+        this.T('h-fare', '₹' + Math.round(ride.fare));
+        this.T('h-km', (ride.dist / 1000).toFixed(1) + ' km');
         const t = Math.max(0, Math.floor(ride.elapsed));
-        this.$('h-time').textContent = Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
-        flag.textContent = 'METER DOWN'; flag.classList.remove('idle');
+        this.T('h-time', Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'));
+        this.T(flag, 'METER DOWN'); this.C(flag, 'idle', false);
       } else {
-        this.$('h-fare').textContent = '₹–'; this.$('h-km').textContent = '0.0 km'; this.$('h-time').textContent = '0:00';
-        flag.textContent = 'FOR HIRE'; flag.classList.add('idle');
+        this.T('h-fare', '₹–'); this.T('h-km', '0.0 km'); this.T('h-time', '0:00');
+        this.T(flag, 'FOR HIRE'); this.C(flag, 'idle', true);
       }
     }
-    this.$('h-lift').classList.toggle('show', p.lift > 0.08 && !p.tipped);
+    this.C('h-lift', 'show', p.lift > 0.08 && !p.tipped);
     // fuel and damage of whatever you're driving
     if (!foot && p.cur) {
       const v = p.cur, f = v.fuel ?? 1, fe = this.$('h-fuel');
-      fe.querySelector('b').style.width = Math.round(f * 100) + '%';
-      fe.classList.toggle('low', f < 0.15);
+      this.Wd(fe.querySelector('b'), Math.round(f * 100) + '%');
+      this.C(fe, 'low', f < 0.15);
       const S = p.spec || {}, k = S.name === 'Bicycle' ? '' : (p.inAuto || v.type === 'taxi' || v.type === 'bus') ? 'CNG' : 'Petrol';
       if (this._fk !== k) { this._fk = k; this.$('h-fuel-k').textContent = k; fe.hidden = !k; }
       const dm = this.$('h-dmg'), dmg = v.dmg || 0;
-      dm.hidden = dmg < 0.08; if (dmg >= 0.08) dm.textContent = `Body ${Math.round((1 - dmg) * 100)}%`;
+      this.Hd(dm, dmg < 0.08); if (dmg >= 0.08) this.T(dm, `Body ${Math.round((1 - dmg) * 100)}%`);
     }
     // the vitals strip
     if (g.life && (this._vitT = (this._vitT || 0) - dt) <= 0) {
       this._vitT = 0.25;
       const L = g.life.s, vals = [(p.hp ?? 100) / g.life.hpMax, L.hunger, L.thirst, L.energy];
-      this.vit.querySelectorAll(':scope > span').forEach((sp, i) => { const v = Math.max(0, Math.min(1, vals[i])); sp.querySelector('.fg').setAttribute('stroke-dashoffset', (this.vitC * (1 - v)).toFixed(1)); sp.classList.toggle('low', v < 0.2); sp.title = `${['Health', 'Hunger', 'Thirst', 'Energy'][i]} ${Math.round(v * 100)}%`; });
-      this.vit.hidden = !!this.inPlace && false;
-    }
+      (this._vitEls || (this._vitEls = [...this.vit.querySelectorAll(':scope > span')].map(sp => [sp, sp.querySelector('.fg')]))).forEach(([sp, fg], i) => { const v = Math.max(0, Math.min(1, vals[i])), o = (this.vitC * (1 - v)).toFixed(1); if (fg._o !== o) { fg._o = o; fg.setAttribute('stroke-dashoffset', o); } this.C(sp, 'low', v < 0.2); const tt = `${['Health', 'Hunger', 'Thirst', 'Energy'][i]} ${Math.round(v * 100)}%`; if (sp.title !== tt) sp.title = tt; });
+      }
     // health: on foot, while hurt or in a fight
     const hp = p.hp ?? 100, hpEl = this.$('h-hp');
     const hpMax = g.life ? g.life.hpMax : 100;
@@ -593,20 +597,20 @@ export class HUD {
       this.areaT = 1;
       let best = null, bd = 900 * 900;
       for (const s of this.suburbs) { const d = (s.x - p.x) ** 2 + (s.z - p.z) ** 2; if (d < bd) { bd = d; best = s; } }
-      this.$('h-area').textContent = best ? best.n.replace(/ Peth$/, ' Peth') : AREA_NAMES[g.W.index.district(p.x, p.z)] || 'Pune';
+      this.T('h-area', best ? best.n.replace(/ Peth$/, ' Peth') : AREA_NAMES[g.W.index.district(p.x, p.z)] || 'Pune');
     }
     // objective
     const o = g.objective();
-    this.$('h-obj').textContent = o.main || '';
-    this.$('h-obj-sub').textContent = o.sub || '';
-    this.obj.classList.toggle('urgent', !!o.urgent);
+    this.T('h-obj', o.main || '');
+    this.T('h-obj-sub', o.sub || '');
+    this.C(this.obj, 'urgent', !!o.urgent);
     // gps chip
     const dest = g.rides && g.rides.current && g.rides.routeLeft;
     const wpLeft = !dest && g.waypoint && g.nav ? g.nav.left : 0;
-    this.gps.hidden = !dest && !wpLeft;
-    this.gps.classList.toggle('wp', !dest && !!wpLeft);
-    if (dest) { this.$('h-gps-t').textContent = 'Destination'; this.$('h-gps-d').textContent = fmtDist(dest); }
-    else if (wpLeft) { this.$('h-gps-t').textContent = g.waypoint.name || 'Waypoint'; this.$('h-gps-d').textContent = fmtDist(wpLeft); }
+    this.Hd(this.gps, !dest && !wpLeft);
+    this.C(this.gps, 'wp', !dest && !!wpLeft);
+    if (dest) { this.T('h-gps-t', 'Destination'); this.T('h-gps-d', fmtDist(dest)); }
+    else if (wpLeft) { this.T('h-gps-t', g.waypoint.name || 'Waypoint'); this.T('h-gps-d', fmtDist(wpLeft)); }
     // landmark arrival cards
     this.lmT = (this.lmT || 0) - dt;
     if (this.lmT <= 0 && g.state === 'play') {
@@ -635,7 +639,7 @@ export class HUD {
     const mmStep = { lite: 1 / 20, low: 1 / 30, med: 1 / 30 }[g.qualityName] || 0;
     if ((this._mmAcc = (this._mmAcc || 0) + dt) >= mmStep) { this._mmAcc = 0; this.drawMinimap(dt); }
     if (!this.mapScreen.hidden) this.mapScreen.draw(dt);
-    else g.city.pump(1.5);
+    else g.city.pump(0.7);
   }
 
   // the first minute: a card over a blurred city, then out of your way
@@ -766,7 +770,7 @@ export class HUD {
   enterPlace(ctx) {
     this.inPlace = true;
     this.$('h-street').textContent = ctx.name; this.$('h-street-mr').textContent = ctx.mr || '';
-    this.$('h-area').textContent = 'Inside'; this.mm.hidden = true;
+    this.T('h-area', 'Inside'); this.mm.hidden = true;
   }
   leavePlace() { this.inPlace = false; this.mm.hidden = false; this.areaT = 0; this.lastStreet = null; }
   setLockHint(on) {
