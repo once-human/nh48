@@ -36,6 +36,7 @@ import { Eggs } from './eggs.js';
 import { Story } from './story.js';
 import { Tutorial } from './tutorial.js';
 import { Smoke } from '../gfx/smoke.js';
+import { Photowalk } from './photowalk.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { StreetApproach } from './approach.js';
@@ -158,6 +159,7 @@ export class Game {
     this.club = new Club(this);
     this.bag = new Bag(this);
     this.tut = new Tutorial(this);
+    this.photowalk = new Photowalk(this);
     this.phone = new Phone(this);
     this.eggs = new Eggs(this);
     this.story = new Story(this);

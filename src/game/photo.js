@@ -116,6 +116,7 @@ export class PhotoMode {
     x.textAlign = 'right'; x.fillStyle = 'rgba(244,241,234,.8)'; x.font = `700 ${16 * s}px Inter, system-ui, sans-serif`;
     x.fillText('pune.onkar.buzz', W - pad, H - pad);
     G.story && G.story.onPhoto && G.story.onPhoto(this.c.x, this.c.z);
+    G.photowalk && G.photowalk.onPhoto(this.c.x, this.c.z);
     const fl = this.el.querySelector('.ph-flash'); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
     const name = 'Puneri ' + where.replace(/[^\w ,.-]+/g, '').slice(0, 40) + '.jpg';
     cv.toBlob((b) => {
