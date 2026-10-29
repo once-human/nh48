@@ -511,6 +511,7 @@ export class People {
       }
     }
     if (p.mode === 'free') return this.stepFree(p, dt);
+    if (p.mode === 'chase' && p.chase) return this.stepChase(p, dt);
     if (p.mode === 'watch') {
       p.wait -= dt; p.v = 0;
       if (p.watch.follow && !p.watch.follow.hidden) { p.watch.x = p.watch.follow.x; p.watch.z = p.watch.follow.z; }
@@ -607,6 +608,19 @@ export class People {
       p.latT = this.sidewalkLat(p.e, -p.side);
     }
     this.place(p);
+  }
+  // a constable running after someone (or back to the bike): straight at them, round what's in the way
+  stepChase(p, dt) {
+    const T = p.chase, dx = T.x - p.x, dz = T.z - p.z, d = Math.hypot(dx, dz);
+    p.yaw = Math.atan2(dz, dx); p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
+    if (d < 1.1) { p.v = 0; return; }
+    const sp = p.runSp || 4.6, st = Math.min(d - 1, sp * dt), surf = this.W.surf;
+    let nx = p.x + dx / d * st, nz = p.z + dz / d * st;
+    if (surf.inBuilding && surf.inBuilding(nx, nz) && !surf.inBuilding(p.x, p.z)) { nx = p.x - dz / d * st; nz = p.z + dx / d * st; }   // round the corner
+    p.x = nx; p.z = nz; p.v = sp;
+    const res = this.W.collision.resolve(p.x, p.z, 0.25);
+    if (res && res.kind !== 3) { p.x += res.nx * res.depth; p.z += res.nz * res.depth; }
+    p.onRoad = this.W.surf.isRoad(p.x, p.z);
   }
   placeCross(p) {
     this.g.at(p.e, p.s, TMP);

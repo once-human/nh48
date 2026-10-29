@@ -75,7 +75,7 @@ export class HUD {
       <div class="lic" id="h-lic" hidden></div>
       <div class="hp" id="h-hp" hidden><i></i></div>
       <div class="vitals" id="h-vit" hidden></div>
-      <div class="heat" id="h-heat" hidden><span class="pips"><i></i><i></i><i></i></span><span id="h-heat-t">Wanted</span></div>`);
+      <div class="heat" id="h-heat" hidden><b id="h-heat-l">Wanted</b><span class="pips"><i></i><i></i><i></i><i></i><i></i></span><span id="h-heat-t">Searching</span><em class="lose"><i></i></em></div>`);
     this.zoneEl = el('div', 'h zone', '<i></i><b id="h-zone-t"></b><span id="h-zone-s"></span>');
     this.zoneEl.hidden = true;
     this.smsWrap = el('div', 'h smsbox');
@@ -698,13 +698,17 @@ export class HUD {
     }, 220);
   }
   // wanted level 0–3; `seen` = a marshal has eyes on you; frac = how close they are to giving up
-  setHeat(level, seen, frac) {
+  // the police level (Noticed … Manhunt), five bars, whether they can see you, and (out of sight) how close they
+  // are to giving up, as a draining line
+  setHeat(level, seen, frac, name) {
     const h = this.$('h-heat');
-    h.hidden = !level;
+    this.Hd(h, !level);
     if (!level) return;
-    h.querySelectorAll('.pips i').forEach((p, i) => p.classList.toggle('on', i < level));
-    h.classList.toggle('seen', !!seen);
-    this.$('h-heat-t').textContent = seen ? 'Police on you' : 'Searching';
+    if (h._lv !== level) { h._lv = level; h.querySelectorAll('.pips i').forEach((p, i) => p.classList.toggle('on', i < level)); }
+    this.C(h, 'seen', !!seen);
+    this.T('h-heat-l', name || 'Wanted');
+    this.T('h-heat-t', seen ? 'They see you' : 'Searching');
+    const b = h.querySelector('.lose i'); this.Wd(b, seen ? '100%' : Math.round(Math.max(0, frac) * 100) + '%');
   }
   setLicence(suspended, hoursLeft, dues) {
     const d = this.$('h-dues'), l = this.$('h-lic');

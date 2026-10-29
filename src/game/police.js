@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { ikArm, leanRider, RIDER_HIPS, RIDER_LEAN } from '../people/humans.js';
+import { buildPoliceJeep } from '../vehicles/emodels.js';
 import { clamp, wrapAngle, RNG, safeStorage, fmtRupees } from '../core/util.js';
 import LINES from './lines.json';
 import { POLICE_MUL } from './settings.js';
@@ -470,24 +471,27 @@ export class Police {
     if (G.free) return;
     const was = this.heat;
     if (charge) this.charges.add(charge);
-    this.heat = Math.min(3, this.heat + n);
+    this.heat = Math.min(5, this.heat + n);
     this.unseenT = 0;
     this.lastSeen = { x: G.player.x, z: G.player.z };
-    if (this.heat > was) { G.hud.toast(this.heat === 1 ? 'Police alerted' : 'More police on the way', `${why} · ${FINES[this.topCharge()].name}, ${FINES[this.topCharge()].law}`, 'bad', 3.6); G.audio.siren(0.001, 0); }
+    if (this.heat > was) { G.hud.toast(`${LEVELS[this.heat]}`, `${why} · ${FINES[this.topCharge()].name}, ${FINES[this.topCharge()].law}`, 'bad', 3.6); G.audio.siren(0.001, 0); }
   }
   topCharge() { return CHARGE_ORDER.find(c => this.charges.has(c)) || 'theft'; }
   clearCharges() { this.charges.clear(); }
   clearMarshals() { for (const m of this.marshals) m.dispose(); this.marshals = []; }
   updateHeat(dt) {
     const G = this.g, P = G.player;
-    const want = this.heat === 0 ? 0 : this.heat === 1 ? 1 : this.heat === 2 ? 2 : 3;
-    // spawn/despawn
-    if (this.marshals.length < want && (this._spT = (this._spT || 0) - dt) <= 0) { this._spT = 4; this.spawnMarshal(); }
+    // who comes, by level: Noticed (a beat marshal), Wanted (two), Pursuit (two and a patrol jeep), Nakabandi
+    // (checkpoints at the junctions ahead too), Manhunt (more of everyone)
+    const H = this.heat, wantBikes = [0, 1, 2, 2, 3, 4][H], wantJeeps = [0, 0, 0, 1, 1, 2][H];
+    const bikes = this.marshals.filter(m => !m.jeep).length, jeeps = this.marshals.length - bikes;
+    if ((this._spT = (this._spT || 0) - dt) <= 0 && (bikes < wantBikes || jeeps < wantJeeps)) { this._spT = 4; this.spawnMarshal(jeeps < wantJeeps && (bikes >= wantBikes || this.rng.chance(0.5)) ? 'jeep' : 'bike'); }
+    this.nakabandi(dt);
     let seen = false, nearest = 1e9, sirenPan = 0;
     for (let i = this.marshals.length - 1; i >= 0; i--) {
       const m = this.marshals[i];
       m.update(dt);
-      const d = Math.hypot(m.veh.x - P.x, m.veh.z - P.z);
+      const d = m.catchDist();
       if (m.sees) { seen = true; this.lastSeen = { x: P.x, z: P.z }; }
       if (d < nearest) { nearest = d; this.sirenAt = { x: m.veh.x, z: m.veh.z }; const hx = Math.cos(P.th), hz = Math.sin(P.th); sirenPan = clamp((-(m.veh.x - P.x) * hz + (m.veh.z - P.z) * hx) / (d || 1), -1, 1); }
       if ((this.heat === 0 && d > 90) || d > 520) { m.dispose(); this.marshals.splice(i, 1); continue; }
@@ -503,16 +507,70 @@ export class Police {
     G.audio.siren(Math.max(pl, em), em > pl ? G.emPan || 0 : sirenPan);
     if (this.heat > 0) {
       if (seen) this.unseenT = 0; else this.unseenT += dt;
-      const need = 25 + this.heat * 12;
+      const need = 20 + this.heat * 10;
       if (this.unseenT > need) {
         this.heat--; this.unseenT = 0;
         if (this.heat === 0) { G.hud.toast('You lost them', 'The police have given up, for now', 'meter', 3); this.say('m_lost', null, true); this.clearCharges(); }
         else G.hud.toast('Fewer police looking', '', 'info', 2);
       }
-      G.hud.setHeat(this.heat, seen, this.heat ? 1 - this.unseenT / need : 0);
+      G.hud.setHeat(this.heat, seen, this.heat ? 1 - this.unseenT / need : 0, LEVELS[this.heat]);
     } else G.hud.setHeat(0);
   }
-  spawnMarshal() {
+  // checkpoints (nakabandi): barricades across a junction on the road ahead of you, a jeep and constables with lathis;
+  // squeeze through the gap at speed or get stopped
+  nakabandi(dt) {
+    const G = this.g, P = G.player, W = this.W;
+    if (this.heat < 4) { this.clearNaka(); return; }
+    if (this.naka && Math.hypot(this.naka.x - P.x, this.naka.z - P.z) > 450) this.clearNaka();
+    if (this.naka || (this._nkT = (this._nkT || 0) - dt) > 0) { if (this.naka) this.nakaTick(dt); return; }
+    this._nkT = 6;
+    const hx = Math.cos(P.th || 0), hz = Math.sin(P.th || 0);
+    const n = W.graph.nearest(P.x + hx * 160, P.z + hz * 160, 60, e => e.rank >= 3);
+    if (!n) return;
+    const t = W.graph.at(n.e, n.s), rx = -t[3], rz = t[2], hw = n.e.w / 2;
+    if (G.inView && G.inView(t[0], t[1]) && Math.hypot(t[0] - P.x, t[1] - P.z) < 120) return;
+    const tag = 7.7e6 + Math.floor(this.rng.next() * 1e5), group = new THREE.Group(), stripes = Marshal.stripes || (Marshal.stripes = (() => {
+      const c = document.createElement('canvas'); c.width = 128; c.height = 32; const x = c.getContext('2d');
+      for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? '#f2f2f2' : '#d42020'; x.beginPath(); x.moveTo(i * 16, 0); x.lineTo(i * 16 + 16, 0); x.lineTo(i * 16, 32); x.lineTo(i * 16 - 16, 32); x.fill(); }
+      const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; tx.wrapS = THREE.RepeatWrapping; return new THREE.MeshStandardMaterial({ map: tx, roughness: 0.6 });
+    })());
+    // two barricades from either kerb, a gap in the middle a vehicle can just get through
+    const C = W.collision; C.tag = tag;
+    for (const sd of [1, -1]) {
+      const a0 = sd * hw, a1 = sd * 1.4, ax = t[0] + rx * a0, az = t[1] + rz * a0, bx = t[0] + rx * a1, bz = t[1] + rz * a1;
+      const L = Math.hypot(bx - ax, bz - az), bar = new THREE.Mesh(new THREE.BoxGeometry(L, 0.32, 0.12), stripes);
+      bar.position.set((ax + bx) / 2, 0.85, (az + bz) / 2); bar.rotation.y = -Math.atan2(bz - az, bx - ax); group.add(bar);
+      for (const f of [0, 1]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.9, 0.5), new THREE.MeshStandardMaterial({ color: 0x2a2c30 })); leg.position.set(f ? bx : ax, 0.45, f ? bz : az); leg.rotation.y = bar.rotation.y; group.add(leg); }
+      C.addSeg(ax, az, bx, bz, 2);
+    }
+    C.tag = 0;
+    const jeep = buildPoliceJeep(); jeep.group.position.set(t[0] + rx * (hw + 2.4) + t[2] * 6, W.surf.height(t[0], t[1]), t[1] + rz * (hw + 2.4) + t[3] * 6); jeep.group.rotation.y = -Math.atan2(t[3], t[2]); group.add(jeep.group);
+    G.scene.add(group);
+    const cops = [];
+    for (const sd of [1, -1]) {
+      const look = W.kit ? W.kit.randomLook(this.rng, { role: 'police' }) : null; if (!look) continue;
+      const p = G.people.spawnAt(look, t[0] + rx * sd * (hw - 0.6) - t[2] * 1.5, t[1] + rz * sd * (hw - 0.6) - t[3] * 1.5, 'kaka'); if (!p) continue;
+      p.cop = true; p.crew = true; p.fixed = true; p.lathi = true; p.mode = 'stand'; p.wait = 1e9; p.anchor = { x: p.x, z: p.z, fx: t[0], fz: t[1] }; p.anim = null;
+      cops.push(p);
+    }
+    this.naka = { x: t[0], z: t[1], group, tag, cops, lights: jeep.lights, t: 0 };
+    G.hud.toast('Nakabandi ahead', 'Checkpoints going up on the roads around you', 'bad', 3.2);
+  }
+  nakaTick(dt) {
+    const N = this.naka, G = this.g, P = G.player;
+    N.t += dt; const f = Math.sin(N.t * 14) > 0; N.lights.red.visible = f; N.lights.redOff.visible = !f; N.lights.blue.visible = !f; N.lights.blueOff.visible = f;
+    // stopped at the barricade: that's you caught
+    const d = Math.hypot(N.x - P.x, N.z - P.z);
+    if (d < 7 && Math.abs(P.v || 0) < 1.5 && !this.stop && N.cops[0]) { const m = this.marshals[0]; if (m) this.caught(m); }
+  }
+  clearNaka() {
+    const N = this.naka; if (!N) return;
+    const G = this.g, L = G.people.list;
+    G.scene.remove(N.group); this.W.collision.removeTag(N.tag, [N.x - 30, N.z - 30, N.x + 30, N.z + 30]);
+    for (const p of N.cops) { const i = L.indexOf(p); if (i >= 0) { if (p.body) p.body.release(); L.splice(i, 1); } }
+    this.naka = null;
+  }
+  spawnMarshal(kind = 'bike') {
     const G = this.g, P = G.player, W = this.W;
     const near = this.lastSeen || { x: P.x, z: P.z };
     for (let k = 0; k < 40; k++) {
@@ -522,13 +580,18 @@ export class Police {
       if (!e) continue;
       const t = W.graph.at(e.e, e.s);
       if (G.inView && G.inView(t[0], t[1]) && k < 30) continue;
-      this.marshals.push(new Marshal(this, t[0], t[1], Math.atan2(P.z - t[1], P.x - t[0])));
+      this.marshals.push(new Marshal(this, t[0], t[1], Math.atan2(P.z - t[1], P.x - t[0]), kind));
       return;
     }
   }
   caught(m) {
-    const G = this.g;
+    const G = this.g, P = G.player;
     const kind = this.topCharge();
+    // you fought them, or it's come to a manhunt: the lathis come out before the handcuffs
+    if ((this.charges.has('assault') || this.heat >= 5) && P.onFoot && !(P.downT > 0)) {
+      P.hp = Math.max(8, (P.hp ?? 100) - 22); P.downT = 2.2; if (P.human) P.human.play('knockback', { once: true, fade: 0.06 });
+      G.audio.punch?.(); G.rig && G.rig.shake(0.4); G.hud.toast('Lathi charge', 'They don’t ask twice when you’ve fought them', 'bad', 3);
+    }
     m.cop.name = 'Beat marshal';
     this.stop = { cop: m.cop, kind, fine: FINES[kind].amt + (this.charges.has('disobey') && kind !== 'disobey' ? FINES.disobey.amt : 0), phase: 'talk', t: 0, info: {} };
     m.cop.marshal = m;
@@ -547,7 +610,7 @@ export class Police {
     G.date && G.date.event('arrest', fine);
     if (G.lights && G.rng.chance(0.5)) G.lights.lose('Kept at the chowki with your other things');
     this.clearCharges();
-    this.heat = 0; this.unseenT = 0; this.clearMarshals();
+    this.heat = 0; this.unseenT = 0; this.clearMarshals(); this.clearNaka();
     const ch = this.nearestChowki(P.x, P.z);
     this.later(0.6, () => {
       G.hud.flash(`Taken to ${ch.name}`, `${FINES[kind].name} (${FINES[kind].law}). ${why}. Released on bail · ${fmtRupees(fine)}`);
@@ -645,16 +708,20 @@ export class Police {
 
 // ---------------------------------------------------------------- a beat marshal on a motorcycle
 const _g = new THREE.Vector3(), _pl = new THREE.Vector3();
+const LEVELS = ['', 'Noticed', 'Wanted', 'Pursuit', 'Nakabandi', 'Manhunt'];
+// a police unit: a beat marshal on a motorcycle, or a patrol jeep with two constables. They drive like trained
+// drivers (left of the lane, slowing for bends, stopping at red when they're not chasing anyone, braking for
+// people, never through traffic), chase with the siren when they've seen you, and get out and run after you
+// when you're on foot (a lathi in hand)
 class Marshal {
-  constructor(police, x, z, th) {
+  constructor(police, x, z, th, kind = 'bike') {
     const G = police.g, W = police.W;
-    this.P = police; this.G = G; this.W = W;
-    this.veh = new Vehicle(W, G.scene, G.vmats, 'bike', [0.92, 0.92, 0.9]);
+    this.P = police; this.G = G; this.W = W; this.kind = kind; this.jeep = kind === 'jeep'; this.mode = 'drive'; this.foot = [];
+    this.veh = new Vehicle(W, G.scene, G.vmats, this.jeep ? 'suv' : 'bike', [0.92, 0.92, 0.9]);
     this.veh.reset(x, z, th);
     this.veh.y = W.surf.height(x, z);
-    // police bikes are ridden hard: quicker off the line, higher top speed
-    // and they shove through traffic rather than wait in it (mass), nudging vehicles aside
-    this.veh.spec = { ...specOf('bike'), acc: 4.8, vTop: 31, mu: 9, mass: 40000 };
+    this.veh.spec = this.jeep ? { ...specOf('suv'), acc: 3.0, vTop: 24 } : { ...specOf('bike'), acc: 4.2, vTop: 27, mu: 9 };
+    if (this.jeep) { this.initJeep(police); return; }
     this.cop = { name: 'Beat marshal', x, z, mood: police.rng.next() * 0.6, corrupt: police.rng.chance(0.35), bribes: 0, busyT: 0, post: { x, z } };
     this.stunT = 0; this.routeT = 0; this.route = null; this.stuckT = 0; this.revT = 0; this.sees = false; this.spotT = 0;
     // rider: khaki uniform, white helmet
@@ -695,118 +762,179 @@ class Marshal {
   }
   get x() { return this.veh.x; }
   get z() { return this.veh.z; }
+  initJeep(police) {
+    const G = this.G, W = this.W, v = this.veh;
+    for (const c of v.tilt.children) c.visible = false;
+    const md = this.md = buildPoliceJeep(); v.tilt.add(md.group);
+    v.spec.L = md.dims.L; v.spec.W = md.dims.W; v.agent.L = md.dims.L; v.agent.W = md.dims.W;
+    this.cop = { name: 'Patrol', x: v.x, z: v.z, mood: police.rng.next() * 0.6, corrupt: police.rng.chance(0.3), bribes: 0, busyT: 0, post: { x: v.x, z: v.z } };
+    this.stunT = 0; this.routeT = 0; this.route = null; this.stuckT = 0; this.revT = 0; this.sees = false; this.spotT = 0;
+    this.crew = [];
+    if (W.kit) for (const [sx, sy, sz] of md.seats) {
+      const look = W.kit.randomLook(police.rng, { role: 'police' }), H = W.kit.create(look);
+      H.holder.position.set(sx - 0.05, sy - 0.62, sz); v.tilt.add(H.holder); H.play('drive');
+      this.crew.push({ H, look });
+    }
+    this.agent = v.agent; G.traffic.extra = G.traffic.extra || []; G.traffic.extra.push(this.agent);
+  }
+  // how close any of us is to you (on the bike / in the jeep, or on foot)
+  catchDist() {
+    const P = this.G.player;
+    let d = this.mode === 'foot' ? 1e9 : Math.hypot(this.veh.x - P.x, this.veh.z - P.z);
+    for (const p of this.foot) d = Math.min(d, Math.hypot(p.x - P.x, p.z - P.z));
+    return d;
+  }
   update(dt) {
     const G = this.G, W = this.W, P = G.player, v = this.veh, police = this.P;
     this.stunT -= dt;
     const dx = P.x - v.x, dz = P.z - v.z, d = Math.hypot(dx, dz);
-    // can we see the player?
-    this.sees = police.heat > 0 && (d < 22 || (d < 75 && this.los(P.x, P.z)));
-    if (this.sees && !this.wasSeeing && this.spotT <= 0 && d < 60) { police.say(Math.random() < 0.75 ? 'spot_' + police.topCharge() : 'm_spot2', this); this.spotT = 12; }
+    const eye = this.mode === 'foot' && this.foot[0] ? this.foot[0] : v;
+    const de = Math.hypot(P.x - eye.x, P.z - eye.z);
+    this.sees = police.heat > 0 && (de < 22 || (de < 75 && this.W.collision.ray(eye.x, eye.z, P.x, P.z) > 0.97));
+    if (this.sees && !this.wasSeeing && this.spotT <= 0 && de < 60) { police.say(Math.random() < 0.75 ? 'spot_' + police.topCharge() : 'm_spot2', this); this.spotT = 12; }
     this.spotT -= dt;
     this.wasSeeing = this.sees;
-    const target = police.heat > 0 ? (this.sees ? { x: P.x, z: P.z } : police.lastSeen || { x: P.x, z: P.z }) : { x: v.x + Math.cos(v.th) * 50, z: v.z + Math.sin(v.th) * 50 };
-    // steer along a road route; straight at the player when close
-    this.routeT -= dt;
-    if (this.routeT <= 0) {
-      this.routeT = 1.3;
-      const G2 = W.graph;
-      const a = G2.nearest(v.x, v.z, 40), b = G2.nearest(target.x, target.z, 60);
-      this.route = null;
-      if (a && b) { const r = G2.route(a, b, true); if (r) this.route = G2.routePolyline(r, a, b); }
-    }
-    let ax = target.x, az = target.z;
-    const close = d < 28 && this.sees;
-    if (!close && this.route && this.route.length >= 4) {
-      // closest point on the route, then look ahead ~10 m
-      let bi = 0, bd = 1e9;
-      for (let i = 0; i < this.route.length; i += 2) { const q = (this.route[i] - v.x) ** 2 + (this.route[i + 1] - v.z) ** 2; if (q < bd) { bd = q; bi = i; } }
-      const look = Math.min(this.route.length - 2, bi + 2 * Math.max(1, Math.round((6 + Math.abs(v.v) * 0.6) / 8)));
-      ax = this.route[look]; az = this.route[look + 1];
-    } else if (close) {
-      // pull alongside, a little to the player's right
-      const S = P.spec || { W: 0.6 };
-      ax = P.x + Math.cos(P.th) * 1.5 - Math.sin(P.th) * (S.W / 2 + 1.1);
-      az = P.z + Math.sin(P.th) * 1.5 + Math.cos(P.th) * (S.W / 2 + 1.1);
-    }
-    // weave: if the way ahead is blocked, aim for a gap to one side; cars ahead pull over for the siren
-    const hx = Math.cos(v.th), hz = Math.sin(v.th);
-    if (!close) {
-      const blocked = (lat) => {
-        let b = false;
-        G.traffic.near(v.x + hx * 7, v.z + hz * 7, 9, (o) => {
-          if (b || o === v.agent || (!o.T && !o.parked)) return;
-          const rx = o.x - v.x, rz = o.z - v.z, al = rx * hx + rz * hz, ac = -rx * hz + rz * hx;
-          const w = (o.T ? o.T.W : o.W) / 2 + 0.55;
-          if (al > 0.4 && al < 12 && Math.abs(ac - lat) < w) b = true;
-        });
-        return b;
-      };
-      let off = 0;
-      if (blocked(0)) for (const c of [1.3, -1.3, 2.4, -2.4, 3.4, -3.4]) if (!blocked(c)) { off = c; break; }
-      this.off = (this.off || 0) + (off - (this.off || 0)) * Math.min(1, dt * 3);
-      ax += -hz * this.off * 1.6; az += hx * this.off * 1.6;
-      if (police.heat > 0 && (this.yieldT = (this.yieldT || 0) - dt) <= 0) {
-        this.yieldT = 0.5;
-        G.traffic.near(v.x + hx * 12, v.z + hz * 12, 14, (o) => {
-          if (!o.T || o.jc || o.isPlayer) return;
-          const rx = o.x - v.x, rz = o.z - v.z, al = rx * hx + rz * hz;
-          if (al < 0 || al > 26 || Math.random() > 0.7) return;
-          const side = -rx * hz + rz * hx;
-          o.latT = o.lat + (side > 0 ? 1 : -1) * 1.3;
-        });
+    const pursuing = police.heat > 0 && (this.sees || police.unseenT < 8);
+    if (this.mode === 'foot') { this.footTick(dt); this.animate(dt, false); return; }
+    // you're on foot and they've seen you close: out of the saddle (or the jeep) and after you
+    // (close, or as close as the road gets them: you're off it, or they've come to a stop)
+    const offRoad = P.onFoot && !W.surf.isRoad(P.x, P.z);
+    if (police.heat > 0 && P.onFoot && this.sees && this.stunT <= 0 && (d < 30 || (d < 75 && (offRoad || Math.abs(v.v) < 1.5)))) { this.dismount(); return; }
+    let tx, tz, want, close = false;
+    if (police.heat > 0) {
+      const ls = this.sees ? { x: P.x, z: P.z } : police.lastSeen || { x: P.x, z: P.z };
+      tx = ls.x; tz = ls.z;
+      want = pursuing ? (this.jeep ? 17 : 20) : 11;
+      // close behind you in a vehicle: up alongside, on your right, to wave you over
+      if (this.sees && !P.onFoot && d < 28) {
+        const S = P.spec || { W: 0.6 }; close = true;
+        tx = P.x + Math.cos(P.th) * 1.5 - Math.sin(P.th) * (S.W / 2 + 1.2); tz = P.z + Math.sin(P.th) * 1.5 + Math.cos(P.th) * (S.W / 2 + 1.2);
+        want = Math.abs(P.v) + clamp((d - 2.5) * 0.9, 0, 5);
       }
-    }
-    const want = Math.atan2(az - v.z, ax - v.x);
-    const diff = wrapAngle(want - v.th);
-    const inp = { throttle: 0, brake: 0, steer: clamp(diff * 2.4, -1, 1), handbrake: false };
-    const tgtSpeed = this.stunT > 0 ? 0 : close ? Math.abs(P.v) + clamp((d - 2.2) * 0.9, 0, 5) : police.heat > 0 ? 20 : 8;
-    // always a little throttle: a bike only turns while it's rolling
-    if (this.stunT <= 0 && v.v < tgtSpeed) inp.throttle = Math.abs(diff) < 0.4 ? 1 : Math.abs(diff) < 1.2 ? 0.7 : 0.45;
-    if (v.v > tgtSpeed + 1.5 || (Math.abs(diff) > 1.0 && v.v > 7)) { inp.brake = 1; inp.throttle = 0; }
-    // unstick: back up a little with the wheel the other way
-    if (inp.throttle > 0.3 && Math.abs(v.v) < 0.4) this.stuckT += dt; else this.stuckT = Math.max(0, this.stuckT - dt);
-    if (this.stuckT > 1.5) { this.revT = 1.0; this.stuckT = 0; this.stucks = (this.stucks || 0) + 1; }
-    // still wedged after a couple of tries: slip through the traffic for a moment
-    if (this.stucks >= 2) { this.ghostT = 1.6; this.stucks = 0; }
-    this.ghostT = (this.ghostT || 0) - dt;
-    if (this.revT > 0) {
-      this.revT -= dt; inp.throttle = 0; inp.brake = 1; inp.steer = -inp.steer; v.reverse = true;
-      if (this.revT <= 0) v.reverse = false;
-    } else if (v.reverse) v.reverse = false;
-    v.update(dt, inp, this.ghostT > 0 ? null : G.traffic);
-    for (const e of v.events) if (e.type === 'crash' || e.type === 'scrape' || e.type === 'hit') this.lastHit = e.type + ':' + (e.kind ?? e.who);
-    // squeeze past: anything we're overlapping edges sideways
-    G.traffic.near(v.x, v.z, 3.5, (o) => {
-      if (!o.T || o.isPlayer || o.jc) return;
-      const rx = o.x - v.x, rz = o.z - v.z;
-      if (rx * rx + rz * rz > 6.5) return;
-      const side = -rx * hz + rz * hx;
-      o.latT = o.lat + (side > 0 ? 1 : -1) * 1.4;
-    });
-    v.y = v.y || W.surf.height(v.x, v.z);
+    } else { tx = v.x + Math.cos(v.th) * 60; tz = v.z + Math.sin(v.th) * 60; want = 8; }
+    if (this.stunT > 0) want = 0;
+    this.drive(tx, tz, want, dt, close, pursuing);
     this.cop.x = v.x; this.cop.z = v.z;
-    // lights flash, rider sits
-    const t = performance.now() / 1000;
-    this.lightR.visible = Math.sin(t * 14) > 0; this.lightB.visible = !this.lightR.visible;
-    if (this.H) {
+    this.animate(dt, pursuing);
+  }
+  // the lights only with the siren (a patrol just drives); the rider / crew posed
+  animate(dt, on) {
+    const v = this.veh, t = performance.now() / 1000, flash = Math.sin(t * 14) > 0;
+    if (this.jeep) {
+      const Lg = this.md.lights; Lg.red.visible = on && flash; Lg.redOff.visible = !(on && flash); Lg.blue.visible = on && !flash; Lg.blueOff.visible = !(on && !flash);
+      for (const w of this.md.wheels) { w.spin.rotation.z -= (v.v || 0) * dt / w.r; if (w.front) w.steer.rotation.y = -(v.steer || 0); }
+      if (Math.hypot(v.x - this.G.player.x, v.z - this.G.player.z) < 70) for (const c of this.crew) if (c.H.holder.visible) c.H.mixer.update(dt);
+      return;
+    }
+    this.lightR.visible = on && flash; this.lightB.visible = on && !flash;
+    if (this.H && this.H.holder.visible) {
       v.tilt.updateWorldMatrix(true, false);
       const p = new THREE.Vector3(0.0 + RIDER_HIPS, 0.95 - 0.62, 0).applyMatrix4(v.tilt.matrixWorld);
       this.H.holder.position.copy(p);
       this.H.holder.rotation.set(0, -v.th, 0);
       this.H.holder.rotateX(v.lean || 0);
       this.H.mixer.update(dt);
-      // hands on the grips, elbows out, like you ride
       this.H.holder.updateMatrixWorld(true);
       const m = v.tilt.matrixWorld;
       leanRider(this.H, _pl.set(0, 0, 1).transformDirection(m), RIDER_LEAN.bike);
       for (const sd of [1, -1]) { _g.set(0.6, 1.08, 0.34 * sd).applyMatrix4(m); _pl.set(-0.2, -0.7, sd).transformDirection(m); ikArm(this.H, sd > 0 ? 'r' : 'l', _g, _pl, 1); }
     }
   }
+  drive(tx, tz, want, dt, close, pursuing) {
+    const G = this.G, W = this.W, v = this.veh;
+    this.routeT -= dt;
+    if (this.routeT <= 0) { this.routeT = 1.3; this.route = null; const a = W.graph.nearest(v.x, v.z, 40), b = W.graph.nearest(tx, tz, 60); if (a && b) { const r = W.graph.route(a, b, true); if (r) this.route = W.graph.routePolyline(r, a, b); } }
+    const hx = Math.cos(v.th), hz = Math.sin(v.th);
+    let ax = tx, az = tz, bend = 0;
+    if (!close && this.route && this.route.length >= 4) {
+      let bi = 0, bd = 1e9;
+      for (let i = 0; i < this.route.length; i += 2) { const q = (this.route[i] - v.x) ** 2 + (this.route[i + 1] - v.z) ** 2; if (q < bd) { bd = q; bi = i; } }
+      const look = Math.min(this.route.length - 2, bi + 2 * Math.max(1, Math.round((6 + Math.abs(v.v) * 0.6) / 8)));
+      ax = this.route[look]; az = this.route[look + 1];
+      const nx = this.route[Math.min(this.route.length - 2, look + 2)] - ax, nz = this.route[Math.min(this.route.length - 1, look + 3)] - az, nl = Math.hypot(nx, nz) || 1;
+      ax += (nz / nl) * (this.jeep ? 1.6 : 1.2); az += (-nx / nl) * (this.jeep ? 1.6 : 1.2);        // keep left
+      const far = Math.min(this.route.length - 2, look + 6); bend = Math.abs(wrapAngle(Math.atan2(this.route[far + 1] - az, this.route[far] - ax) - v.th));
+      // not chasing anyone: the signal is obeyed like anyone else
+      if (!pursuing && G.traffic.signals) {
+        const n = W.graph.nearest(v.x + hx * 14, v.z + hz * 14, 10);
+        const node = n && W.graph.nodes[n.s < n.e.len / 2 ? n.e.a : n.e.b];
+        if (node && node.signal && Math.hypot(node.x - v.x, node.z - v.z) < 22 && Math.hypot(node.x - v.x, node.z - v.z) > 6 && G.traffic.signals.stateForAngle(node.i, v.th) === 'r') want = 0;
+      }
+    }
+    // what's in front: a gap to one side, else wait behind; people in the road: stop
+    if ((this.scanT = (this.scanT || 0) - dt) <= 0) {
+      this.scanT = 0.2;
+      const blocked = (lat) => {
+        let b = 99;
+        G.traffic.near(v.x + hx * 7, v.z + hz * 7, 10, (o) => { if (o === v.agent || (!o.T && !o.parked) || o.isPlayer) return; const rx = o.x - v.x, rz = o.z - v.z, al = rx * hx + rz * hz, ac = -rx * hz + rz * hx, w = (o.T ? o.T.W : o.W || 1.8) / 2 + (this.jeep ? 1.2 : 0.6); if (al > 0.8 && al < 14 && Math.abs(ac - lat) < w) b = Math.min(b, al); });
+        for (const p of G.people.list) { if (!p.onRoad || p.cop) continue; const rx = p.x - v.x, rz = p.z - v.z, al = rx * hx + rz * hz, ac = -rx * hz + rz * hx; if (al > 0.8 && al < 10 && Math.abs(ac - lat) < 1.3) b = Math.min(b, al); }
+        return b;
+      };
+      this.block = close ? 99 : blocked(0); this.off = 0;
+      if (this.block < 12) for (const c of this.jeep ? [2.2, -2.2] : [1.3, -1.3, 2.4, -2.4]) if (blocked(c) > 13) { this.off = c; break; }
+    }
+    ax += -hz * (this.off || 0) * 1.4; az += hx * (this.off || 0) * 1.4;
+    if (pursuing && (this.yieldT = (this.yieldT || 0) - dt) <= 0) {
+      this.yieldT = 0.5;
+      G.traffic.near(v.x + hx * 12, v.z + hz * 12, 14, (o) => { if (!o.T || o.jc || o.isPlayer) return; const rx = o.x - v.x, rz = o.z - v.z, al = rx * hx + rz * hz; if (al < 0 || al > 26 || Math.random() > 0.7) return; const side = -rx * hz + rz * hx; o.latT = o.lat + (side > 0 ? 1 : -1) * 1.3; });
+    }
+    let target = want * (bend > 0.9 ? 0.45 : bend > 0.45 ? 0.7 : 1);
+    if (!this.off && (this.block ?? 99) < 12) target = Math.min(target, Math.max(0, (this.block - 3.5) * 0.9));
+    const diff = wrapAngle(Math.atan2(az - v.z, ax - v.x) - v.th);
+    const inp = { throttle: 0, brake: 0, steer: clamp(diff * (this.jeep ? 2.0 : 2.4), -1, 1), handbrake: false };
+    if (this.revT > 0) { this.revT -= dt; inp.brake = 1; inp.steer = -(this.revSteer || 1); v.reverse = true; if (this.revT <= 0) v.reverse = false; }
+    else {
+      v.reverse = false;
+      // a bike only turns while it's rolling: a little throttle always
+      if (v.v < target) inp.throttle = Math.abs(diff) < 0.4 ? 1 : Math.abs(diff) < 1.2 ? 0.7 : (this.jeep ? 0.5 : 0.45);
+      if (v.v > target + 1.2 || target === 0) { inp.brake = v.v > target + 4 ? 1 : 0.6; inp.throttle = 0; }
+      if (want > 0 && target > 0.5 && Math.abs(v.v) < 0.4) this.stuckT += dt; else this.stuckT = Math.max(0, this.stuckT - dt);
+      if (this.stuckT > 2.2) { this.stuckT = 0; this.revT = 1.1; this.revSteer = inp.steer || 1; this.block = 99; }
+    }
+    v.update(dt, inp, G.traffic);
+    for (const e of v.events) if (e.type === 'crash' || e.type === 'scrape' || e.type === 'hit') this.lastHit = e.type + ':' + (e.kind ?? e.who);
+    v.y = v.y || W.surf.height(v.x, v.z);
+  }
+  // out and after you: the marshal (helmet on, lathi out), or the jeep's two constables
+  dismount() {
+    const G = this.G, v = this.veh, P = G.player, police = this.P;
+    this.mode = 'foot'; v.v = 0;
+    const hx = Math.cos(v.th), hz = Math.sin(v.th);
+    const crew = this.jeep ? this.crew.map(c => c.look) : [this.H ? this.H.look : null];
+    crew.forEach((look, i) => {
+      if (!look) return;
+      const sd = i ? -1 : 1, x = v.x - hz * sd * 1.3, z = v.z + hx * sd * 1.3;
+      const p = G.people.spawnAt(look, x, z, 'kaka'); if (!p) return;
+      p.cop = true; p.crew = true; p.fixed = false; p.lathi = true; p.mode = 'chase'; p.chase = P; p.runSp = 4.5 + police.rng.next() * 0.7; p.unit = this; p.anim = null;
+      this.foot.push(p);
+    });
+    if (this.H) this.H.holder.visible = false;
+    for (const c of this.crew || []) c.H.holder.visible = false;
+    police.say('m_spot2', this);
+  }
+  // after you on foot; back to the vehicle once you've got away in one (or they've lost you)
+  footTick(dt) {
+    const G = this.G, P = G.player, v = this.veh, police = this.P;
+    let near = 1e9; for (const p of this.foot) near = Math.min(near, Math.hypot(p.x - P.x, p.z - P.z));
+    const lost = police.heat === 0 || (!P.onFoot && near > 22) || near > 90;
+    this.backT = lost ? (this.backT || 0) + dt : 0;
+    const L = G.people.list;
+    for (let i = this.foot.length - 1; i >= 0; i--) {
+      const p = this.foot[i];
+      if (!L.includes(p) || p.fallen > 0) { if (!L.includes(p)) this.foot.splice(i, 1); continue; }
+      if (this.backT > 3) { p.chase = { x: v.x, z: v.z }; p.runSp = 2.6; if (Math.hypot(p.x - v.x, p.z - v.z) < 1.8) { if (p.body) p.body.release(); L.splice(L.indexOf(p), 1); this.foot.splice(i, 1); } }
+      else p.chase = P;
+    }
+    if (!this.foot.length) { this.mode = 'drive'; this.backT = 0; if (this.H) this.H.holder.visible = true; for (const c of this.crew || []) c.H.holder.visible = true; }
+  }
   los(x, z) { return this.W.collision.ray(this.veh.x, this.veh.z, x, z) > 0.97; }
   dispose() {
-    const G = this.G;
+    const G = this.G, L = G.people.list;
+    for (const p of this.foot) { const i = L.indexOf(p); if (i >= 0) { if (p.body) p.body.release(); L.splice(i, 1); } }
+    this.foot = [];
     this.veh.dispose();
     if (this.H) { G.scene.remove(this.H.holder); this.H.dispose(); }
+    for (const c of this.crew || []) c.H.dispose && c.H.dispose();
     const ex = G.traffic.extra; if (ex) { const i = ex.indexOf(this.agent); if (i >= 0) ex.splice(i, 1); }
   }
 }

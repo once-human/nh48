@@ -98,9 +98,15 @@ body { margin: 0; font-family: var(--font-ui); font-size: 14px; -webkit-font-smo
 .hurtov { position: fixed; inset: 0; pointer-events: none; opacity: 0; box-shadow: inset 0 0 160px 40px rgba(200, 20, 10, .55); z-index: 3; }
 .hurtov.go { animation: hurt .5s ease-out; }
 @keyframes hurt { 0% { opacity: 1; } 100% { opacity: 0; } }
-.wallet .heat .pips { display: flex; gap: 4px; }
-.wallet .heat .pips i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 210, 205, .2); }
+.wallet .heat { position: relative; overflow: hidden; }
+.wallet .heat b { font-weight: 800; letter-spacing: .02em; color: #fff; }
+.wallet .heat .pips { display: flex; gap: 3px; align-items: flex-end; }
+.wallet .heat .pips i { width: 5px; border-radius: 2px; background: rgba(255, 210, 205, .22); }
+.wallet .heat .pips i:nth-child(1) { height: 6px; } .wallet .heat .pips i:nth-child(2) { height: 8px; } .wallet .heat .pips i:nth-child(3) { height: 10px; }
+.wallet .heat .pips i:nth-child(4) { height: 12px; } .wallet .heat .pips i:nth-child(5) { height: 14px; }
 .wallet .heat .pips i.on { background: var(--stop); box-shadow: 0 0 8px var(--stop); }
+.wallet .heat .lose { position: absolute; left: 10px; right: 10px; bottom: 2px; height: 2px; background: rgba(255, 210, 205, .15); border-radius: 2px; }
+.wallet .heat .lose i { display: block; height: 100%; width: 100%; background: rgba(255, 210, 205, .7); border-radius: 2px; transition: width .4s linear; }
 .wallet .heat.seen { animation: siren .5s steps(1) infinite; }
 @keyframes siren { 0% { border-color: rgba(255, 90, 79, .8); box-shadow: 0 0 18px rgba(255, 90, 79, .45); } 50% { border-color: rgba(75, 123, 255, .9); box-shadow: 0 0 18px rgba(75, 123, 255, .45); } }
 @keyframes blink { 50% { opacity: .25; } }

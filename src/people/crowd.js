@@ -216,6 +216,13 @@ export class Crowd {
         }
       }
     }
+    // a constable's lathi, in the right hand
+    if (p.lathi) {
+      if (!s.lathi) { const g = new THREE.CylinderGeometry(0.014, 0.016, 0.95, 6); g.translate(0, -0.3, 0); s.lathi = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.7 })); }
+      const hand = H.root.getObjectByName('hand_r');
+      if (hand && s.lathi.parent !== hand) { hand.add(s.lathi); s.lathi.position.set(0, 0.06, 0.02); s.lathi.rotation.set(Math.PI / 2, 0, 0); s.lathi.scale.setScalar(1 / (H.root.scale.x || 1)); }
+      s.lathi.visible = true;
+    } else if (s.lathi) s.lathi.visible = false;
     // in the rain: the umbrella up in the right hand, held at the chest, the canopy over the head
     const umb = this.rain > 0.2 && !p.rideOf && !(p.fallen > 0) && !p.act && p.mode !== 'fight' && dd < 60 && (seen || dd < 12) && hasUmbrella(p);
     if (umb) {
