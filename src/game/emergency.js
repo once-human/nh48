@@ -6,6 +6,28 @@ import * as THREE from 'three';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { clamp, wrapAngle } from '../core/util.js';
 
+// a band of colour with the words in Marathi and English, on both sides of the vehicle
+const LIV = {};
+function livery(v, amb) {
+  const key = amb ? 'amb' : 'pol';
+  if (!LIV[key]) {
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 160;
+    const x = c.getContext('2d');
+    x.fillStyle = amb ? '#c81e1e' : '#1d3f8f'; x.fillRect(0, 0, 1024, 160);
+    x.fillStyle = amb ? '#ffffff' : '#ffd23a'; x.fillRect(0, 0, 1024, 12); x.fillRect(0, 148, 1024, 12);
+    x.fillStyle = '#ffffff'; x.textBaseline = 'middle';
+    x.font = '800 74px Mukta, sans-serif'; x.fillText(amb ? 'रुग्णवाहिका' : 'पोलीस', 40, 84);
+    x.font = '800 70px Inter, Arial, sans-serif'; x.textAlign = 'right'; x.fillText(amb ? 'AMBULANCE 108' : 'POLICE  100', 990, 84);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    LIV[key] = new THREE.MeshStandardMaterial({ map: t, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -2 });
+  }
+  const S = v.spec, L = (S.L || 4) * 0.82, W = (S.W || 1.7) / 2 + 0.012, h = amb ? 1.05 : 0.86;
+  for (const sd of [1, -1]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(L, L * 160 / 1024), LIV[key]);
+    m.position.set(-0.1, h, sd * W); m.rotation.y = sd > 0 ? 0 : Math.PI;
+    v.tilt.add(m);
+  }
+}
 export class Emergency {
   constructor(G) { this.g = G; this.list = []; this.cool = 0; }
   // called by the brain when something happens
@@ -38,7 +60,12 @@ export class Emergency {
     const r = new THREE.Mesh(lg, new THREE.MeshBasicMaterial({ color: 0xff2020, toneMapped: false })), b = new THREE.Mesh(lg, new THREE.MeshBasicMaterial({ color: amb ? 0xff6060 : 0x2050ff, toneMapped: false }));
     r.position.set(0.2, y, 0.3); b.position.set(0.2, y, -0.3); v.tilt.add(r, b);
     if (amb) for (const sd of [1, -1]) { const s = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, 0.02), new THREE.MeshBasicMaterial({ color: 0xc81e1e })); s.position.set(-0.1, 1.05, sd * 0.79); v.tilt.add(s); }
-    const R = { type, v, r, b, x, z, victim, state: 'go', t: 0, routeT: 0, route: null, stuckT: 0 };
+    // livery: a bilingual band down each side, a dark base under the light bar, a real flashing light for the night
+    livery(v, amb);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 1.25), new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.6 }));
+    base.position.set(0.2, y - 0.08, 0); v.tilt.add(base); r.scale.z = b.scale.z = 1.15;
+    const light = new THREE.PointLight(0xff2020, 0, 22, 2); light.position.set(0.2, y + 0.3, 0); v.tilt.add(light);
+    const R = { type, v, r, b, light, x, z, victim, state: 'go', t: 0, routeT: 0, route: null, stuckT: 0 };
     G.traffic.extra = G.traffic.extra || []; G.traffic.extra.push(v.agent);
     this.list.push(R);
   }
@@ -49,6 +76,8 @@ export class Emergency {
       const v = R.v; R.t += dt;
       const flash = Math.floor(R.t * 6) % 2 === 0;
       R.r.visible = R.state !== 'gone' && flash; R.b.visible = R.state !== 'gone' && !flash;
+      const night = G.sky && G.sky.state ? G.sky.state.night : 0;
+      R.light.intensity = night > 0.2 ? 40 * night : 0; R.light.color.setHex(flash ? 0xff2020 : (R.type === 'police' ? 0x2050ff : 0xff6060));
       let tx = R.x, tz = R.z, want = 16;
       const d = Math.hypot(v.x - R.x, v.z - R.z);
       if (R.state === 'go' && d < 14) { R.state = 'scene'; R.t = 0; }

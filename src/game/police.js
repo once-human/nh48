@@ -673,6 +673,19 @@ class Marshal {
     this.lightR.position.set(-0.85, 1.12, 0.1); this.lightB.position.set(-0.85, 1.12, -0.1);
     this.lightR.scale.z = this.lightB.scale.z = 0.5;
     this.veh.tilt.add(this.lightR, this.lightB);
+    this.lightR.scale.z = this.lightB.scale.z = 0.8;
+    // a POLICE board on the carrier box behind the rider
+    if (!Marshal.board) {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 96; const x = c.getContext('2d');
+      x.fillStyle = '#1d3f8f'; x.fillRect(0, 0, 256, 96); x.fillStyle = '#ffd23a'; x.fillRect(0, 84, 256, 12);
+      x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = '800 30px Mukta, sans-serif'; x.fillText('पोलीस', 128, 30); x.font = '800 30px Inter, Arial, sans-serif'; x.fillText('POLICE', 128, 64);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+      Marshal.board = new THREE.MeshStandardMaterial({ map: t, roughness: 0.5 });
+    }
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.3, 0.42), new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.4 }));
+    box.position.set(-0.98, 0.95, 0); this.veh.tilt.add(box);
+    const bd = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.15), Marshal.board); bd.position.set(-1.155, 0.95, 0); bd.rotation.y = -Math.PI / 2; this.veh.tilt.add(bd);
+    for (const sd of [1, -1]) { const sb = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.12), Marshal.board); sb.position.set(-0.98, 0.95, sd * 0.212); sb.rotation.y = sd > 0 ? 0 : Math.PI; this.veh.tilt.add(sb); }
     this.agent = this.veh.agent;
     G.traffic.extra = G.traffic.extra || [];
     G.traffic.extra.push(this.agent);
