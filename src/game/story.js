@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { fmt } from './shops.js';
 import { PART1 } from './part1.js';
+import { PART2 } from './part2.js';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import FAMOUS from '../world/famous.json';
 import { wrapAngle } from '../core/util.js';
@@ -22,6 +23,7 @@ const WHO = {
   tj: ['TJ', '#7bdff2'], khushi: ['Khushi', '#ff9ec7'], kunal: ['Kunal', '#9ec7ff'], tara: ['Tara', '#ffb38a'], veer: ['Veer', '#ffb38a'],
   ira: ['Ira Kulkarni', '#c3a6ff'], bhau: ['Bhau Jagtap', '#ff6b6b'], kabir: ['Kabir', '#e0e0e0'], barista: ['Barista', '#b8e0a8'],
   warkari: ['Warkari', '#ffd166'], harish: ['Harish Malhotra', '#d0b080'], sunny: ['Sunny', '#b8e0a8'], mem: ['', '#e8d9b0'],
+  aryan: ['Aryan Malhotra', '#e0c080'], desai: ['Desai', '#c8c8c8'], goons: ['Aryan’s men', '#ff6b6b'],
 };
 // a line's voice clip id: 'st_<who>_<FNV-1a of the text>' (tools/story_jobs.py makes the same ids)
 function voiceId(who, text) { let h = 0x811c9dc5; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return `st_${who}_${h.toString(16).padStart(8, '0')}`; }
@@ -230,7 +232,7 @@ export class Story {
   }
   get on() { return !this.g.free && this.g.state !== 'title'; }
   // the old Act 1 is retired: Part One, Dark Store, is being written on this engine
-  list() { return this._ms || (this._ms = STORY_ON ? PART1(this) : MISSIONS(this).slice(0, 0)); }
+  list() { return this._ms || (this._ms = STORY_ON ? PART1(this).concat(PART2(this)) : MISSIONS(this).slice(0, 0)); }
   mission() { return this.list()[this.st.m] || null; }
   cur() { const m = this.mission(); return m && this.st.step >= 0 ? m.steps[this.st.step] : null; }
   swAt(u, v, name) { const W = this.g.W, L = W.landmarks && W.landmarks.find(l => l.id === 'shaniwar'); if (!L) return null; const c = Math.cos(L.rot), s = Math.sin(L.rot); return { x: L.x + u * c + v * s, z: L.z + u * s - v * c, name }; }
@@ -269,6 +271,8 @@ export class Story {
     if (s.escort) this.esc = { dmg: (G.player.cur && G.player.cur.dmg) || 0, over: 0 };
     if (s.sneak) this.makeGuards(s);
     if (s.rhythm) this.rhStart(s.rhythm);
+    // a scene: plays in the street (cutscene.js) and the step's done when it ends
+    if (s.scene) { this.sceneDone = false; G.later(0.3, () => { const sc = s.scene(this); if (!sc || !G.cut) { this.sceneDone = true; return; } const e0 = sc.end; sc.end = (cs) => { e0 && e0(cs); this.sceneDone = true; }; G.cut.play(sc); }); }
     if (s.flash) G.later(0.6, () => { document.body.classList.add('nh-mem'); this.el.classList.add('mem'); this.talk(s.flash.slice()); });
   }
   advance() {
@@ -315,6 +319,7 @@ export class Story {
     const tgt = this.npcs[0] || (w && Math.hypot(w.x - P.x, w.z - P.z) < 160 ? w : null);
     if (tgt && !this.talking) this.showMarker(tgt.x, tgt.z); else this.hideMarker();
     if (this.talking) return;
+    if (s.scene) { if (this.sceneDone) this.advance(); return; }
     if (s.course) { this.courseTick(dt); return; }
     if (s.drops) { if ((G.stats.drops || 0) - (st.base || 0) >= s.drops) this.advance(); return; }
     if (s.tail || s.chase) { this.targetTick(s, dt); return; }

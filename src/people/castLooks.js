@@ -26,6 +26,7 @@ const CAST = {
   sunny: { f: false, scale: 0.95, top: 0xf28a1d, bottom: 0x2b3240, cut: V(0.38, 1, 0.5, 0), style: 'hair_buzzed', hair: 0x141210, beard: true, persona: 'bhaiya', idle: 'idle' },
   barista: { f: false, scale: 0.96, top: 0x17171a, bottom: 0x5a4a3a, cut: V(0.38, 1, 0.5, 0), style: 'hair_simpleparted', hair: 0x1c1512, persona: 'collegeboy', idle: 'talk' },
   warkari: { f: false, scale: 0.92, top: 0xf4f2ea, bottom: 0xf0ede3, cut: V(0.9, 0.5, 0.55, 1), style: 'hair_buzzed', hair: 0xb9b5ae, beard: true, hat: true, hatCol: 0xfbfaf6, persona: 'ajoba', idle: 'talk' },
+  desai: { f: false, scale: 0.94, top: 0xdfe6ee, bottom: 0x2f3338, cut: V(0.95, 1, 0.5, 0), style: 'hair_buzzed', hair: 0x3a3632, glasses: true, persona: 'kaka', idle: 'phone' },
   goons: { f: false, scale: 1.03, top: 0x16161a, bottom: 0x2a2c30, cut: V(0.38, 1, 0.5, 0), style: 'hair_buzzed', hair: 0x0e0c0b, beard: true, persona: 'dada', idle: 'arms_folded' },
   raghu: { f: false, scale: 1.03, top: 0xf2f2ee, bottom: 0x2b2b2e, cut: V(0.95, 1, 0.5, 0), style: 'hair_simpleparted', hair: 0x0e0c0b, beard: true, shades: true, persona: 'dada', idle: 'arms_folded' },
 };

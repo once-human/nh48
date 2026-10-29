@@ -314,7 +314,7 @@ export function PART1(S) {
         G.later(10, () => S.text('aai', 'तुझ्या बॅगेत हे सिमकार्ड काय आहेत? लोकांच्या नावाचे? मला बोलू नकोस.', 'What are these SIM cards in your bag? In other people’s names? Don’t talk to me.'));
         G.later(18, () => S.text(R1(), fem() ? 'सरळ विचारतो. तू माझ्याशी खोटं बोलतेयस का?' : 'सरळ विचारते. तू माझ्याशी खोटं बोलतोयस का?', 'Straight question. Are you lying to me?'));
         G.later(26, () => S.text(R2(), 'मी आर्यन काय करतोय ते शोधते. काही दिवस फोन करू नको.', 'I’ll find out what Aryan’s doing. Don’t call me for a while.'));
-        G.later(32, () => G.hud.flash('Act 2 complete: Bappa', 'Part One ends here. Act 3, Nine Nights, is being written.'));
+        G.later(32, () => G.hud.flash('Act 2 complete: Bappa', 'Act 3, Nine Nights, begins with Navratri'));
       } },
   ];
 }

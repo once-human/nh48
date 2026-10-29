@@ -57,3 +57,42 @@ export function shivneri(S) {
     end: cleanup,
   };
 }
+
+// ---------------------------------------------------------------- building blocks for the story's scenes
+import { castLook, castPersona, castIdle } from '../people/castLooks.js';
+// someone from the story, standing at (x, z) facing (fx, fz); cleared with the step's other people
+export function actor(S, who, x, z, fx, fz) {
+  const G = S.g, near = G.W.graph.nearest(x, z, 200); if (!near) return null;
+  const p = G.people.make(near.e, near.s, near.side || 1, { mode: 'stand' });
+  p.x = x; p.z = z; p.fixed = true; p.ctl = true; p.anchor = { x, z }; p.wait = 1e9; p.story = who; p.crew = true; p.idle = castIdle(who);
+  const L = castLook(G.people.kit, who, (S.npcs || []).filter(q => q.story === who).length);
+  if (L) { p.look = L; p.female = L.female; p.persona = castPersona(who) || p.persona; p.shirt = [L.top.r, L.top.g, L.top.b]; p.lower = [L.bottom.r, L.bottom.g, L.bottom.b]; p.skin = [L.skin.r, L.skin.g, L.skin.b]; p.scale = L.scale; }
+  p.yaw = Math.atan2((fz ?? G.player.z) - z, (fx ?? G.player.x) - x);
+  G.people.list.push(p); (S.npcs || (S.npcs = [])).push(p);
+  return p;
+}
+const headOf = (G, o, h = 1.58) => ({ x: o.x, y: G.W.surf.height(o.x, o.z) + h, z: o.z });
+// a conversation, shot like a film: a wide on the two (or more) of you, then over the shoulder of whoever's
+// listening onto whoever's talking, a line at a time. place: where you stand; cast: [[who, side offset]]; lines:
+// [[who, mr, en]] (who 'you' is you). The people talk with their hands while they speak
+export function dialogueScene(S, place, cast, lines, o = {}) {
+  const G = S.g, P = G.player;
+  let people = [];
+  const sp = (who) => who === 'you' ? P.foot : people.find(q => q.story === who) || people[0];
+  const shots = [{ dur: 3.2, enter: () => {
+    P.teleportFoot(place.x, place.z, P.foot.yaw, G.traffic);
+    const a = o.facing ?? 0;
+    people = cast.map(([who, off], i) => { const ang = a + (off ?? (i - (cast.length - 1) / 2) * 0.7); return actor(S, who, place.x + Math.cos(ang) * 1.7, place.z + Math.sin(ang) * 1.7, place.x, place.z); }).filter(Boolean);
+    if (people[0]) P.foot.yaw = Math.atan2(people[0].z - P.foot.z, people[0].x - P.foot.x);
+  }, cam: () => { const a = (o.facing ?? 0) + Math.PI / 2, c = { x: place.x + Math.cos(a) * 5.2, z: place.z + Math.sin(a) * 5.2 }; return { ...c, y: G.W.surf.height(c.x, c.z) + 2.1, lx: place.x, ly: G.W.surf.height(place.x, place.z) + 1.3, lz: place.z, fov: 46, cut: true }; },
+    lines: o.title ? [] : [] }];
+  lines.forEach(([who, mr, en], i) => {
+    const dur = Math.min(7, 2.6 + (en || mr).length * 0.045);
+    shots.push({ dur, enter: (cs) => { const p = sp(who); if (p && p !== P.foot) { p.act = { clip: 'talk', t: 0, dur }; } cs.line(who, mr, en); },
+      cam: () => { const p = sp(who), l = who === 'you' ? (people[0] || P.foot) : P.foot, h = headOf(G, p), lh = headOf(G, l);
+        const dx = h.x - lh.x, dz = h.z - lh.z, d = Math.hypot(dx, dz) || 1, side = i % 2 ? 1 : -1;
+        const c = { x: lh.x - dx / d * 0.9 - dz / d * 0.55 * side, z: lh.z - dz / d * 0.9 + dx / d * 0.55 * side };
+        return { ...c, y: lh.y + 0.12, lx: h.x, ly: h.y - 0.05, lz: h.z, fov: 34, cut: true }; } });
+  });
+  return { title: o.title, sub: o.sub, shots, start: o.start, end: (cs) => { o.end && o.end(cs); } };
+}
