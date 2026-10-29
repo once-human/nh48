@@ -100,6 +100,7 @@ export class Hustle {
     const chance = 0.35 + (behind ? 0.25 : 0) + Math.min(0.2, crowd * 0.03) - (L.s.drunk > 0.5 ? 0.2 : 0);
     if (this.rng.next() < chance) {
       const rich = /^kp/.test(p.persona || ''), amt = Math.round(this.rng.range(rich ? 300 : 40, rich ? 1800 : 600) / 10) * 10;
+      G.brain && G.brain.incident('theft', G.player.x, G.player.z, { byYou: true });
       G.stats.money += amt; G.saveStats(); L.change('karma', -4); L.s.tally.pickpocketed = (L.s.tally.pickpocketed || 0) + 1;
       G.hud.toast(`+${fmt(amt)}`, behind ? 'Clean. They didn’t feel a thing' : 'They didn’t notice. This time', 'money', 2.4);
       if (this.rng.next() < 0.25) G.later(8 + this.rng.next() * 12, () => G.people.speakAs && G.people.speakAs('scared', p, 1, 0));

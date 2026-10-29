@@ -39,6 +39,7 @@ import { Tutorial } from './tutorial.js';
 import { Smoke } from '../gfx/smoke.js';
 import { Photowalk } from './photowalk.js';
 import { bagOrder } from './bag.js';
+import { Brain } from '../people/brain.js';
 import { Strays } from '../people/strays.js';
 import { Interiors } from '../world/interiors.js';
 import { StreetApproach } from './approach.js';
@@ -163,6 +164,7 @@ export class Game {
     player.speakAs = (sc, who) => { this.people.lineT = 0; return this.people.speakAs(sc, who, 1, 4); };
     this.people.say = (id, src) => this.police.say(id, src);
     this.brawl = new Brawl(this); this.people.brawl = this.brawl;
+    this.brain = new Brain(this.people, this); this.people.brain = this.brain;
     player.makePed = (look, x, z, per) => this.people.spawnAt(look, x, z, per);
     player.pickPersona = (f, x, z) => this.people.pickPersona(f, x, z);
     this.buildLightPools();
@@ -374,6 +376,7 @@ export class Game {
     for (const p of this.people.list) { const dd = Math.hypot(p.x - v.x, p.z - v.z); if (dd < 9 && !p.fixed) { p.fallen = 4 + Math.random() * 3; } else if (dd < 40 && p.flee !== undefined) p.flee = 6; }
     this.police && this.police.offence && this.police.offence('explosion', v.x, v.z, {});
     this.wrecks.push({ v, t: 0 });
+    this.brain && this.brain.incident('blast', v.x, v.z, { byYou: !this.player.onFoot || this.player.cur === v });
     this.hud.toast('It went up', v === P.auto ? 'Your auto is a burnt shell' : 'That vehicle is a burnt shell', 'bad', 4);
     if (v === P.auto) this.later(18, () => this.rebuildAuto());
   }
@@ -926,6 +929,7 @@ export class Game {
     this.people.events.length = 0;
     for (const ev of evs) {
       if (ev.type === 'crash') {
+        if (ev.speed > 8 && ev.kind !== 3) this.brain && this.brain.incident('crash', ev.x ?? P.x, ev.z ?? P.z, { byYou: true });
         this.rig.shake(Math.min(0.5, ev.speed * 0.06)); this.audio.crash(Math.min(1, ev.speed / 8));
         if (!P.onFoot && ev.speed > 3) { const v = P.cur; v.dmg = Math.min(1, (v.dmg || 0) + (ev.speed - 3) * 0.022); if (v.dmg > 0.6 && !this._dmgWarn) { this._dmgWarn = true; this.date && this.date.event('crash'); this.hud.toast('Your vehicle is badly damaged', 'It’s slower now. Any garage can fix it', 'warn', 3.4); } if (v.dmg < 0.3) this._dmgWarn = false; }
         if (ev.kind === 3) this.hud.toast('End of the shift area', 'Turn back, the map ends here', 'warn', 2);
@@ -937,6 +941,7 @@ export class Game {
         this.hud.toast(L[0], L[1], 'good', 2.6); if (!a.cow && a.kind !== 'cat') this.audio.bark && this.audio.bark(0.3);
       }
       if (ev.type === 'animalHit') {
+        this.brain && this.brain.incident('crash', ev.x, ev.z, { byYou: true });
         this.audio.thud(0.5); this.audio.bark && this.audio.bark(0.9);
         if (ev.dead) { this.hud.toast(ev.a.kind === 'cat' ? 'You killed a cat' : 'You killed a street dog', 'People saw. Nobody in Pune forgets that', 'bad', 4); this.life.change('karma', -8); }
         else { this.hud.toast(ev.a.kind === 'cat' ? 'You hit a cat' : 'You hit a street dog', 'It limps off yelping. Slow down near the kerb', 'warn', 3); this.life.change('karma', -3); }
@@ -958,6 +963,7 @@ export class Game {
       if (ev.type === 'hit') { this.audio.crash(Math.min(1, ev.speed / 6)); }
       if (ev.type === 'knock') { this.audio.crash(0.7); this.hud.toast('You knocked over a two-wheeler', 'They’re fine. Very, very angry, but fine.', 'warn', 2.6); }
       if (ev.type === 'pedHit') {
+        this.brain && this.brain.incident(ev.sev === 'knock' ? 'crash' : 'down', ev.x, ev.z, { victim: ev.p, byYou: true });
         this.audio.thud(ev.sev === 'knock' ? 0.4 : 0.8); this.rig.shake(ev.sev === 'knock' ? 0.15 : 0.35);
         if (ev.sev === 'dead') { this.hud.toast('You killed someone', 'Hit and run is BNS s.106: up to ten years. Every cop in Pune is looking for you', 'bad', 5); this.life.change('karma', -25); this.police && this.police.raiseHeat && this.police.raiseHeat(3, 'Killed a pedestrian', null); }
         else if (ev.sev === 'ko') { this.hud.toast('You knocked someone out', 'They’re not getting up. People are calling the police', 'bad', 3.6); this.life.change('karma', -6); this.police && this.police.raiseHeat && this.police.raiseHeat(1, 'Hit a pedestrian', null); }
@@ -987,6 +993,7 @@ export class Game {
   frame(dt) {
     if (this.smoke) { this.smoke.update(dt); this.burnWrecks(dt); }
     this.stepRefuel(dt);
+    if (this.brain && this.state !== 'title') this.brain.update(dt, this.player);
     if (this.state !== 'title' && this.tut) this.tut.update(dt);
     const P = this.player;
     if (this.state === 'photo') this.photo.update(dt);

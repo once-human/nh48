@@ -799,6 +799,7 @@ export class People {
     } else if (this.rng.next() < 0.18) this.speakAs('hit', p, 1, 3);
   }
   startFight(p, foe) {
+    if (this.brain && foe && foe.foot) this.brain.incident('fight', p.x, p.z, { byYou: true });
     if (p.hp0 === undefined) { p.hp0 = p.cop ? 130 : HP[p.persona] || 60; p.hp = p.hp0; }
     if (p.anchor) { p.anchor = null; if (p.venue) { (p.clubber ? p.venue.clubCrowd-- : p.venue.crowd--); p.venue = null; } }
     p.mode = 'fight'; p.foe = foe; p.fightT = 0; p.atkT = this.rng.range(0.5, 1.1); p.act = null; p.fixedWas = p.fixedWas ?? p.fixed; p.fixed = false;
