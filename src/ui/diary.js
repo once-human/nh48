@@ -3,7 +3,7 @@
 // left), the choices you made scribbled in the margin in a different pen; on the right, the photos you took
 // while it was going on, printed and taped in (K takes them), and a newspaper cutting when it made the papers.
 // Today's page has the objective in red at the top and a TRACK stamp. A / D (or the arrows) turn the pages.
-import { paper, teak, url } from './materials2d.js';
+import { paper, teak, url, real } from './materials2d.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const ACT = { 0: ['उपोद्घात', 'Prologue'], 1: ['भाग १', 'Act 1 · Homecoming'], 2: ['भाग २', 'Act 2 · Bappa'], 3: ['भाग ३', 'Act 3 · Nine Nights'], 4: ['भाग ४', 'Act 4 · Lights'], 5: ['भाग ५', 'Act 5 · Winter'] };
@@ -27,7 +27,7 @@ export class Diary {
     el.innerHTML = `<div class="dy-desk"></div><div class="dy-lamp"></div><div class="dy-book"><div class="dy-page l"></div><div class="dy-page r"></div><div class="dy-spine"></div><div class="dy-flip"><div class="f"></div><div class="b"></div></div></div>
       <div class="dy-keys"><span>A / D turn the page</span><span>J or Esc close</span></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
-    el.querySelector('.dy-desk').style.backgroundImage = `url(${url(teak())})`;
+    { const t = real('teak'); el.querySelector('.dy-desk').style.backgroundImage = t ? `radial-gradient(70% 80% at 50% 45%, rgba(60,26,8,.25), rgba(14,6,2,.82)), linear-gradient(rgba(70,30,10,.45), rgba(70,30,10,.45)), ${t}` : `url(${url(teak())})`; }
     el.addEventListener('click', (e) => {
       if (e.target.closest('[data-track]')) { const t = G.story && G.story.trackNow && G.story.trackNow(); if (t) { G.hud.toast('Tracking', t.name, 'meter', 2); this.close(); } return; }
       if (e.target.closest('.dy-page.r')) this.turn(1); else if (e.target.closest('.dy-page.l')) this.turn(-1);

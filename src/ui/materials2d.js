@@ -1,6 +1,7 @@
 // Surfaces for the jhola and the diary, painted once into canvases: hand block-printed cotton (indigo and madder
 // on unbleached cloth, the weave showing through), cream notebook paper (ruled, a red margin, the odd tea ring),
 // a teak desk with its grain, and kraft paper for tags. All slightly uneven, the way the real things are.
+import { assetVersion, versioned } from '../core/assets.js';
 const C = new Map();
 const rnd = (s) => { let x = s >>> 0; return () => ((x = (x * 1664525 + 1013904223) >>> 0) / 4294967296); };
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
@@ -82,3 +83,6 @@ export function kraft(w = 320, h = 200) {
   C.set(k, c); return c;
 }
 export const url = (c) => { if (!c._url) c._url = c.toDataURL('image/jpeg', 0.86); return c._url; };
+// the real thing, photographed (assets/ui/<name>.webp: the block-print, kraft, teak; see assets/items/CREDITS.txt),
+// or null and the painted canvas stands in
+export function real(name) { const u = 'assets/ui/' + name + '.webp'; return assetVersion(u) ? `url(${versioned(u)})` : null; }

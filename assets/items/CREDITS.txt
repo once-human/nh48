@@ -1,0 +1,23 @@
+Photos from Wikimedia Commons, used under their licences (CC0, public domain, CC BY, CC BY-SA), backgrounds removed:
+water: "Evian Label-Free Bottle.jpg" by James Tamim, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Evian_Label-Free_Bottle.jpg
+tiffin: "Dabba.jpg" by fr:Utilisateur:Nataraja - Utilisateur:Nataraja on French wikipedia, CC BY-SA 1.0, https://commons.wikimedia.org/wiki/File:Dabba.jpg
+vadapav: "Vada Paav.jpg" by Yakshitha, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Vada_Paav.jpg
+banana: "Bananas on black background 02.jpg" by Krzysztof Golik, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Bananas_on_black_background_02.jpg
+chikki: "Peanut Chikki.JPG" by Zeel Patel, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Peanut_Chikki.JPG
+medkit: "A first aid box.jpg" by Contributers2020, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:A_first_aid_box.jpg
+painkiller: "Paracetamol generico.jpg" by Mateus Hidalgo, CC BY-SA 2.5 br, https://commons.wikimedia.org/wiki/File:Paracetamol_generico.jpg
+ors: "Oral rehydration salts (ORS) - Packet.jpg" by Cjp24, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Oral_rehydration_salts_(ORS)_-_Packet.jpg
+coldcoffee: "Iced Coffee Cup at Cafe.jpg" by Tony Webster, CC BY 2.0, https://commons.wikimedia.org/wiki/File:Iced_Coffee_Cup_at_Cafe.jpg
+bakarwadi: "Msg1128409303-121485.jpg" by Abhi7704, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Msg1128409303-121485.jpg
+barfi: "Kaju katli dessert - side view.jpg" by Unknomics, CC BY-SA 3.0, https://commons.wikimedia.org/wiki/File:Kaju_katli_dessert_-_side_view.jpg
+shrewsbury: "Shrewsbury biscuits.jpg" by Alistair young, CC BY 2.0, https://commons.wikimedia.org/wiki/File:Shrewsbury_biscuits.jpg
+gajra: "Jasmine Garland.jpg" by Mohanapourani Hort, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Jasmine_Garland.jpg
+book: "Fred Verity catalogue hardcover front (1).jpg" by Fred Verity (died 1897), Public domain, https://commons.wikimedia.org/wiki/File:Fred_Verity_catalogue_hardcover_front_(1).jpg
+torch: "Flashlight.jpg" by KMJ at German Wikipedia, CC BY-SA 3.0, https://commons.wikimedia.org/wiki/File:Flashlight.jpg
+beer: "Target Brown Ale (33274874561).jpg" by Erik Cleves Kristensen, CC BY 2.0, https://commons.wikimedia.org/wiki/File:Target_Brown_Ale_(33274874561).jpg
+phone: "App Keyvisual cmyk.jpg" by Deutscher Volkshochschul-Verband, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:App_Keyvisual_cmyk.jpg
+keys: "Car Keys.jpg" by Mpelletier1, CC BY-SA 3.0, https://commons.wikimedia.org/wiki/File:Car_Keys.jpg
+keypad: "Nokia 1100 Series.jpg" by Mgpa, CC BY 3.0, https://commons.wikimedia.org/wiki/File:Nokia_1100_Series.jpg
+ui/cloth: "William Morris, designer, furnishing fabric, 1883, Merton Abbey Workshop ..jpg" by William Morris, Public domain, https://commons.wikimedia.org/wiki/File:William_Morris,_designer,_furnishing_fabric,_1883,_Merton_Abbey_Workshop_..jpg
+ui/kraft: "Kraft tileable 1024x1024.png" by Coyau, Public domain, https://commons.wikimedia.org/wiki/File:Kraft_tileable_1024x1024.png
+ui/teak: "Teak veneer diff 8k (JPG).jpg" by Rico Cilliers (Processing), Charlotte Baglioni (Scanning), Dimitrios Savva, Jenelle, CC0, https://commons.wikimedia.org/wiki/File:Teak_veneer_diff_8k_(JPG).jpg

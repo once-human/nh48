@@ -1756,3 +1756,14 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .dy-flip.back { display: block; left: 0; transform-origin: right center; animation: dybk .6s cubic-bezier(.4,.1,.3,1) forwards; }
 @keyframes dyfw { to { transform: rotateY(-180deg); } } @keyframes dybk { to { transform: rotateY(180deg); } }
 .dy-keys { position: absolute; bottom: 3vh; right: 4vw; display: flex; gap: 22px; font: 400 15px 'Kalam', cursive; color: rgba(244,234,210,.6); }
+
+/* the jhola's side pocket, the phone poking out of it */
+.jl-pocket { position: absolute; left: -9%; top: 36%; width: 23%; height: 30%; padding: 0; border: 0; background: none; cursor: pointer; transform: rotate(-7deg); z-index: 3; }
+.jl-pocket img { position: absolute; left: 14%; bottom: 34%; width: 72%; height: 110%; object-fit: contain; object-position: bottom; filter: drop-shadow(0 6px 6px rgba(0,0,0,.55)); transition: transform .25s cubic-bezier(.2,.9,.3,1.3); }
+.jl-pocket .flap { position: absolute; inset: 30% 0 0 0; background-image: var(--cot); background-size: 260px; background-position: 40px 80px; border-radius: 6px 6px 22% 22%; box-shadow: inset 0 14px 18px rgba(0,0,0,.45), inset 0 -10px 20px rgba(60,35,10,.35), 0 10px 16px rgba(0,0,0,.45); }
+.jl-pocket .flap::after { content: ''; position: absolute; inset: 7px; border-radius: inherit; border: 2px dashed rgba(240,225,195,.4); }
+.jl-pocket span { position: absolute; left: 0; right: 0; bottom: -26px; text-align: center; font: 400 15px 'Kalam', cursive; color: #f4ead2; text-shadow: 0 2px 6px rgba(0,0,0,.9); }
+.jl-pocket:hover img { transform: translateY(-22%) rotate(4deg); }
+.jl-cloth { background-size: 420px; }
+.jl-in { background-size: auto, 460px; }
+.dy-desk { background-size: cover, cover, 900px; }

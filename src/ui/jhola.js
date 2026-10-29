@@ -5,9 +5,9 @@
 // your breathing is in it when you're out of breath), a water bottle as full as you are, a cutting-chai glass for
 // your energy, a steel tiffin for your hunger. Labels sewn on the bag take you to your diary and the rest.
 import { ITEMS, describe } from '../game/life.js';
-import { itemArt } from './itemArt.js';
+import { itemArt, photo } from './itemArt.js';
 import { bagOrder } from '../game/bag.js';
-import { cotton, lining, kraft, url } from './materials2d.js';
+import { cotton, lining, kraft, url, real } from './materials2d.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const MR = { water: 'पाण्याची बाटली', tiffin: 'डबा', vadapav: 'वडापाव', biscuit: 'पार्ले-जी', banana: 'केळी', chikki: 'चिक्की', medkit: 'औषधाची पेटी', painkiller: 'गोळ्या', ors: 'ओआरएस',
@@ -21,6 +21,7 @@ export class Jhola {
     const el = this.el = document.createElement('div'); el.className = 'jl'; el.hidden = true;
     el.innerHTML = `<div class="jl-dim"></div>
       <div class="jl-bag"><div class="jl-cloth"></div><div class="jl-in"><div class="jl-items"></div></div><div class="jl-strap l"></div><div class="jl-strap r"></div>
+        <button class="jl-pocket" data-go="phone"><img alt=""><i class="flap"></i><span>फोन · T</span></button>
         <div class="jl-labels"><button data-go="diary"><b>दैनंदिनी</b>Diary · J</button><button data-go="own"><b>माझं</b>Owned</button><button data-go="near"><b>जवळ</b>Nearby</button><button data-go="guide"><b>माहिती</b>Guide</button></div>
         <div class="jl-tag" hidden><i class="jl-hole"></i><b></b><span class="mr"></span><span class="q"></span><p></p><em>click to use</em></div></div>
       <div class="jl-tray"><figure class="jl-v hb"><canvas width="360" height="120"></canvas><figcaption>हृदय · <span></span></figcaption></figure>
@@ -29,13 +30,15 @@ export class Jhola {
         <figure class="jl-v tf"><canvas width="120" height="150"></canvas><figcaption>डबा · <span></span></figcaption></figure></div>
       <div class="jl-keys">E close · J diary · click a thing to use it</div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
-    el.querySelector('.jl-cloth').style.backgroundImage = `url(${url(cotton())})`; el.style.setProperty('--cot', `url(${url(cotton())})`);
-    el.querySelector('.jl-in').style.backgroundImage = `url(${url(lining())})`;
-    el.querySelector('.jl-tag').style.backgroundImage = `url(${url(kraft())})`;
+    const cot = real('cloth') || `url(${url(cotton())})`, rc = real('cloth');
+    el.querySelector('.jl-cloth').style.backgroundImage = cot; el.style.setProperty('--cot', cot);
+    // inside: the same cloth, wrong side out, in the bag's own shadow
+    el.querySelector('.jl-in').style.backgroundImage = rc ? `linear-gradient(rgba(44,30,16,.8), rgba(22,14,6,.88)), ${rc}` : `url(${url(lining())})`;
+    el.querySelector('.jl-tag').style.backgroundImage = real('kraft') || `url(${url(kraft())})`;
     el.addEventListener('pointerover', (e) => { const b = e.target.closest('.jl-it'); if (b) this.tagFor(b); });
     el.addEventListener('pointerout', (e) => { const b = e.target.closest('.jl-it'); if (b && !b.contains(e.relatedTarget)) this.tagFor(null); });
     el.addEventListener('click', (e) => {
-      const go = e.target.closest('[data-go]'); if (go) { const k = go.dataset.go; this.close(); if (k === 'diary') G.diary && G.diary.open(); else G.bag && G.bag.show(k); return; }
+      const go = e.target.closest('[data-go]'); if (go) { const k = go.dataset.go; this.close(); if (k === 'diary') G.diary && G.diary.open(); else if (k === 'phone') G.phone && G.phone.open(); else G.bag && G.bag.show(k); return; }
       const b = e.target.closest('.jl-it'); if (b) this.use(b.dataset.id, b);
     });
     addEventListener('keydown', (e) => {
@@ -55,6 +58,8 @@ export class Jhola {
     this.foot = P.onFoot;
     if (P.onFoot && P.human) P.human.play('idle', { fade: 0.3 });
     this.fill();
+    // the phone in the side pocket: the brick, or the smartphone once you've got one
+    { const im = this.el.querySelector('.jl-pocket img'), u = photo(G.phone && G.phone.smart ? 'phone' : 'keypad'); im.hidden = !u; if (u) im.src = u; }
     this.el.hidden = false; this.el.classList.remove('out'); void this.el.offsetWidth; this.el.classList.add('in');
     G.hud && G.hud.root && G.hud.root.classList.add('in-jl');
   }
@@ -120,6 +125,12 @@ export class Jhola {
     }
     if ((this._vt = (this._vt || 0) - dt) <= 0) { this._vt = 1 / 30; this.vitals(); }
   }
+  // a photo from assets/items, once it has loaded (null until then, and the painted one draws)
+  pic(id) {
+    const c = this._pics || (this._pics = {});
+    if (!(id in c)) { const u = photo(id); c[id] = null; if (u) { const im = new Image(); im.src = u; c[id] = im; } }
+    const im = c[id]; return im && im.complete && im.naturalWidth ? im : null;
+  }
   vitals() {
     const G = this.g, P = G.player, s = G.life.s, el = this.el, t = this.t;
     const hp = Math.max(0, Math.min(1, (P.hp ?? 100) / G.life.hpMax)), st = P.stam ?? 1;
@@ -145,6 +156,19 @@ export class Jhola {
     // the water bottle: as full as you are, the water sloshing a little
     { const cv = el.querySelector('.bo canvas'), x = cv.getContext('2d'), W = cv.width, H = cv.height, f = Math.max(0, Math.min(1, s.thirst));
       x.clearRect(0, 0, W, H);
+      const ph = this.pic('water');
+      if (ph) {
+        // the real bottle; the water in it tinted down to your level, the rest clear plastic
+        x.drawImage(ph, (W - H) / 2, 0, H, H);
+        x.save(); x.globalCompositeOperation = 'source-atop';
+        const top = H * 0.97 - f * H * 0.8, wob = Math.sin(t * 2.4) * 2.5;
+        x.fillStyle = 'rgba(232,240,248,.5)'; x.fillRect(0, H * 0.1, W, Math.max(0, top - H * 0.1));
+        const g = x.createLinearGradient(0, top, 0, H); g.addColorStop(0, 'rgba(110,180,240,.5)'); g.addColorStop(1, 'rgba(30,100,190,.55)');
+        x.fillStyle = g; x.beginPath(); x.moveTo(0, top + wob); x.quadraticCurveTo(W / 2, top - wob, W, top + wob); x.lineTo(W, H); x.lineTo(0, H); x.closePath(); x.fill();
+        x.fillStyle = 'rgba(255,255,255,.5)'; x.fillRect(0, top + wob - 1, W, 2);
+        x.restore();
+        el.querySelector('.bo span').textContent = Math.round(f * 100) + '%';
+      } else {
       const body = () => { x.beginPath(); x.moveTo(34, 8); x.lineTo(56, 8); x.lineTo(56, 26); x.quadraticCurveTo(76, 34, 76, 56); x.lineTo(76, 166); x.quadraticCurveTo(76, 174, 68, 174); x.lineTo(22, 174); x.quadraticCurveTo(14, 174, 14, 166); x.lineTo(14, 56); x.quadraticCurveTo(14, 34, 34, 26); x.closePath(); };
       x.save(); body(); x.clip();
       x.fillStyle = 'rgba(200,225,240,.18)'; x.fillRect(0, 0, W, H);
@@ -156,7 +180,7 @@ export class Jhola {
       x.strokeStyle = 'rgba(230,245,255,.6)'; x.lineWidth = 1.5; body(); x.stroke();
       x.fillStyle = 'rgba(255,255,255,.35)'; x.fillRect(20, 50, 5, 110);
       x.fillStyle = '#1e5fa8'; x.fillRect(32, 0, 26, 12);
-      el.querySelector('.bo span').textContent = Math.round(f * 100) + '%'; }
+      el.querySelector('.bo span').textContent = Math.round(f * 100) + '%'; } }
     // the cutting chai: the glass as full as your energy, steam when it's hot
     { const cv = el.querySelector('.ch canvas'), x = cv.getContext('2d'), W = cv.width, H = cv.height, f = Math.max(0, Math.min(1, s.energy));
       x.clearRect(0, 0, W, H);
@@ -173,6 +197,16 @@ export class Jhola {
     // the tiffin: three steel tiers, the top one open, as full as you are fed
     { const cv = el.querySelector('.tf canvas'), x = cv.getContext('2d'), W = cv.width, H = cv.height, f = Math.max(0, Math.min(1, s.hunger));
       x.clearRect(0, 0, W, H);
+      const ph = this.pic('tiffin');
+      if (ph) {
+        // the real dabba; the tiers you've eaten through gone dull, from the top down
+        x.drawImage(ph, (W - H) / 2, 0, H, H);
+        x.save(); x.globalCompositeOperation = 'source-atop';
+        const e = (1 - f) * H * 0.9; x.fillStyle = 'rgba(14,10,6,.55)'; x.fillRect(0, 0, W, e);
+        const g = x.createLinearGradient(0, e, 0, H); g.addColorStop(0, 'rgba(255,190,90,.22)'); g.addColorStop(1, 'rgba(255,190,90,0)'); x.fillStyle = g; x.fillRect(0, e, W, H - e);
+        x.restore();
+        el.querySelector('.tf span').textContent = f < 0.2 ? 'hungry' : Math.round(f * 100) + '%';
+      } else {
       const steel = (y, h) => { const g = x.createLinearGradient(14, 0, 106, 0); g.addColorStop(0, '#7d848b'); g.addColorStop(0.35, '#eef1f3'); g.addColorStop(0.6, '#b5bcc2'); g.addColorStop(1, '#646b72'); x.fillStyle = g; x.beginPath(); x.roundRect(14, y, 92, h, 6); x.fill(); x.strokeStyle = 'rgba(0,0,0,.25)'; x.stroke(); };
       steel(104, 34); steel(70, 34); steel(40, 30);
       x.fillStyle = '#5a6168'; x.beginPath(); x.ellipse(60, 40, 46, 9, 0, 0, 6.283); x.fill();
@@ -180,6 +214,6 @@ export class Jhola {
       const g = x.createRadialGradient(56, 38, 2, 60, 40, 44); g.addColorStop(0, '#f4c35a'); g.addColorStop(1, '#c47a1e');
       x.globalAlpha = 0.25 + f * 0.75; x.fillStyle = g; x.fillRect(18, 32, 84 * Math.max(0.15, f), 16); x.restore(); x.globalAlpha = 1;
       x.strokeStyle = '#8d949b'; x.lineWidth = 4; x.beginPath(); x.moveTo(20, 60); x.quadraticCurveTo(60, 14 - 0, 100, 60); x.stroke();
-      el.querySelector('.tf span').textContent = f < 0.2 ? 'hungry' : Math.round(f * 100) + '%'; }
+      el.querySelector('.tf span').textContent = f < 0.2 ? 'hungry' : Math.round(f * 100) + '%'; } }
   }
 }
