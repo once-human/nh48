@@ -44,15 +44,7 @@ export class Audio {
     this.master.connect(comp).connect(ctx.destination);
     // every bus straight into the master (the fx bus used to be wired into itself, so punches, clicks and UI sounds never came out)
     for (const k of BUSES) { const g = this.buses[k] = ctx.createGain(); g.gain.value = this.vols[k] ?? 1; g.connect(this.master); }
-    // a street's reverb: the walls throw sound back (a short, dense tail, a little slap), sent from the city's buses
-    try {
-      const len = Math.floor(ctx.sampleRate * 1.6), ir = ctx.createBuffer(2, len, ctx.sampleRate);
-      for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) { const t = i / ctx.sampleRate; d[i] = (Math.random() * 2 - 1) * Math.exp(-t * 3.4) * (t < 0.012 ? 0 : 1) + (Math.abs(t - 0.09 - c * 0.013) < 0.002 ? 0.35 : 0); } }
-      const cv = ctx.createConvolver(); cv.buffer = ir;
-      const wet = ctx.createGain(); wet.gain.value = 0.22; cv.connect(wet).connect(this.master);
-      for (const k of ['world', 'traffic', 'voice', 'fx']) if (this.buses[k]) { const sgain = ctx.createGain(); sgain.gain.value = k === 'voice' ? 0.12 : 0.3; this.buses[k].connect(sgain).connect(cv); }
-      this.verb = wet;
-    } catch (e) { /* no reverb */ }
+    // (no convolution reverb: too heavy for the audio thread on laptops, the sound broke up)
     this.noise = this.makeNoise(2);
     this.buildEngine();
     this.buildAmbient();
@@ -94,7 +86,7 @@ export class Audio {
   at(x, z, fn, y = 1.2) { const was = this._at; this._at = { x, y, z }; try { return fn(); } finally { this._at = was; } }
   panner(pos, ref = 6) {
     const ctx = this.ctx, pn = ctx.createPanner();
-    pn.panningModel = 'HRTF'; pn.distanceModel = 'inverse'; pn.refDistance = ref; pn.rolloffFactor = 1.15; pn.maxDistance = 400;
+    pn.panningModel = 'equalpower'; pn.distanceModel = 'inverse';      // cheap on the audio thread (HRTF on every sound made it stutter) pn.refDistance = ref; pn.rolloffFactor = 1.15; pn.maxDistance = 400;
     if (pn.positionX) { pn.positionX.value = pos.x; pn.positionY.value = pos.y; pn.positionZ.value = pos.z; } else pn.setPosition(pos.x, pos.y, pos.z);
     return pn;
   }
@@ -456,7 +448,7 @@ export class Audio {
     const ctx = this.ctx, t = ctx.currentTime;
     if (!this.teng) {
       this.teng = [];
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 6; i++) {
         const o = ctx.createOscillator(); o.type = 'sawtooth';
         const o2 = ctx.createOscillator(); o2.type = 'square';
         const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600; lp.Q.value = 1.2;
@@ -468,7 +460,7 @@ export class Audio {
         this.teng.push({ o, o2, lp, g, pn, v: null });
       }
     }
-    const near = list.filter(v => Math.abs(v.x - lx) < 70 && Math.abs(v.z - lz) < 70).sort((a, b) => ((a.x - lx) ** 2 + (a.z - lz) ** 2) - ((b.x - lx) ** 2 + (b.z - lz) ** 2)).slice(0, 10);
+    const near = list.filter(v => Math.abs(v.x - lx) < 70 && Math.abs(v.z - lz) < 70).sort((a, b) => ((a.x - lx) ** 2 + (a.z - lz) ** 2) - ((b.x - lx) ** 2 + (b.z - lz) ** 2)).slice(0, 6);
     this.teng.forEach((E, i) => {
       const v = near[i];
       if (!v) { E.g.gain.setTargetAtTime(0, t, 0.2); return; }

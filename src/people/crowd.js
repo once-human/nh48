@@ -10,13 +10,13 @@ const NAT = { walk: 1.25, jog: 3.0 };
 // how someone walks: the office crowd walks formal at rush hour, kakus and aunties often carry the shopping
 function walkFor(p, people) { void people; return 'walk'; }   // one walk for everyone (the formal-walk clip faces the wrong way)
 // someone standing around doesn't hold one pose: the phone, a chat, a sip of chai, arms folded, a nod
-const IDLES = { young: ['phone', 'phone', 'talk', 'idle', 'arms_folded'], old: ['idle', 'arms_folded', 'talk', 'idle'], any: ['idle', 'talk', 'phone', 'arms_folded', 'drink'] };
+const IDLES = { young: ['phone', 'phone', 'talk', 'idle', 'arms_folded'], old: ['idle', 'arms_folded', 'talk', 'idle'], any: ['idle', 'talk', 'phone', 'arms_folded'] };
 function idleFor(p) {
   const now = performance.now() / 1000;
   if (!p.idleUntil || now > p.idleUntil) {
     const set = /aaji|ajoba/.test(p.persona || '') ? IDLES.old : /college|kp|dada|tai/.test(p.persona || '') ? IDLES.young : IDLES.any;
     p.idleNow = p.idle === 'phone' && Math.random() < 0.5 ? 'phone' : set[Math.floor(Math.random() * set.length)];
-    p.idleUntil = now + 6 + Math.random() * 10;
+    p.idleUntil = now + 25 + Math.random() * 40;                       // one pose for a good while, not a new one every few seconds
   }
   return p.idleNow;
 }
@@ -71,7 +71,7 @@ export class Crowd {
           const female = i === 1 ? (side ? Math.random() < 0.75 : Math.random() < 0.2) : Math.random() < 0.15;
           const look = this.kit.randomLook(rng, { female, helmet: two && i === 0 && o.type !== 'scooterP' });
           if (!two) { look.top = look.top.setRGB(0.42, 0.36, 0.22); look.bottom = look.top.clone().multiplyScalar(0.9); }
-          return { id: (o.id || 0) * 4 + i + 1e7, look, female, rideOf: o, seat: [a, b], seatY: sy - 0.62, side, x: o.x, z: o.z, yaw: 0, v: 0, mode: 'ride', persona: female ? 'tai' : 'dada' };
+          return { id: (o.id || 0) * 4 + i + 1e7, look, female, rideOf: o, seat: [a, b], seatY: sy - 0.62, sideSaddle: side, x: o.x, z: o.z, yaw: 0, v: 0, mode: 'ride', persona: female ? 'tai' : 'dada' };
         });
       }
       for (const r of o._riders) { const hx = o.hx ?? Math.cos(o.yaw || 0), hz = o.hz ?? Math.sin(o.yaw || 0); r.x = o.x + hx * r.seat[0] - hz * r.seat[1]; r.z = o.z + hz * r.seat[0] + hx * r.seat[1]; r.yaw = Math.atan2(hz, hx); r.y = o.y || 0; out.push(r); }
@@ -106,7 +106,7 @@ export class Crowd {
     }
   }
   animFor(p) {
-    if (p.rideOf) return [p.side ? 'sit' : 'drive', 1];
+    if (p.rideOf) return [p.sideSaddle ? 'sit' : 'drive', 1];
     if (p.fallen > 0) return p.ko ? [p.fallen > 1.6 ? 'death' : 'getup', 1, true] : [p.fallen > 1.3 ? 'knockback' : 'getup', 1, true];
     if (p.act) return [p.act.clip, p.act.speed || 1, true];
     if (p.mode === 'fight') return p.v > 2.2 ? ['jog', clamp(p.v / NAT.jog, 0.7, 1.4)] : p.v > 0.2 ? ['walk', 1.3] : [p.fightT < 1.6 ? 'no' : 'idle', 1.3];
@@ -124,9 +124,9 @@ export class Crowd {
     // riders follow their vehicle every frame (not only when bodies are handed out), so they ride smoothly with it
     if (p.rideOf) { const o = p.rideOf, hx = o.hx ?? Math.cos(o.yaw || 0), hz = o.hz ?? Math.sin(o.yaw || 0);
       p.x = o.x + hx * p.seat[0] - hz * p.seat[1]; p.z = o.z + hz * p.seat[0] + hx * p.seat[1]; p.yaw = Math.atan2(hz, hx); p.y = o.y || 0; }
-    const y = p.rideOf ? (p.y || 0) + (p.seatY ?? 0.2) + (p.side ? 0.04 : 0) : this.W.surf.height(p.x, p.z);
+    const y = p.rideOf ? (p.y || 0) + (p.seatY ?? 0.2) + (p.sideSaddle ? 0.04 : 0) : this.W.surf.height(p.x, p.z);
     H.holder.position.set(p.x, y, p.z);
-    H.holder.rotation.set(0, -p.yaw + (p.side ? Math.PI / 2 : 0), 0);
+    H.holder.rotation.set(0, -p.yaw + (p.rideOf && p.sideSaddle ? Math.PI / 2 : 0), 0);   // (p.side is a pedestrian's side of the road, not side-saddle)
     const [name, speed, once] = this.animFor(p);
     // a new punch or flinch restarts its clip even if the last one was the same
     const restart = p.actId !== s.actId; s.actId = p.actId;
