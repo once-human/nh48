@@ -146,6 +146,16 @@ export class People {
     this.say(ids[Math.floor(this.rng.next() * ids.length)], src);
   }
   // a line for this situation in this person's own voice (the speaker is always the one who talks)
+  // people remember you (for as long as they're around): run into someone you hit or shoved and they react
+  remember(p, what) { const m = this.mem || (this.mem = new Map()); const r = m.get(p.id) || {}; r[what] = (r[what] || 0) + 1; r.t = performance.now(); m.set(p.id, r); }
+  recall(p, player) {
+    const r = this.mem && this.mem.get(p.id);
+    if (!r || p.corpse || p.fallen > 0 || r.met > performance.now() - 20000) return;
+    if (Math.hypot(p.x - player.x, p.z - player.z) > 3.5 || !player.onFoot) return;
+    r.met = performance.now();
+    if (r.hit) { if ((TOUGH[p.persona] || 0.1) > 0.3 && this.rng.next() < 0.6) { this.startFight(p, player); this.speakAs('fight', p, 1, 4); } else { this.speakAs('scared', p, 1, 4) || this.speakAs('flee', p, 1, 4); this.flee(p, player.x, player.z, 24); } }
+    else if (r.shoved) { p.angry = 4; p.grudge = 15; this.speakAs('shoved', p, 1, 4); }
+  }
   speakAs(scenario, p, chance = 1, cool = 5) {
     if (!this.say || !p || this.lineT > 0 || this.rng.next() > chance) return false;
     let per = p.persona;
@@ -403,6 +413,7 @@ export class People {
     }
     if (p.angry > 0) p.angry -= dt;
     if (p.froze > 0) { p.froze -= dt; p.v = 0; }
+    if (this.mem && (p.id & 3) === ((this._mf = ((this._mf || 0) + 1) & 3))) this.recall(p, player);
     // react to the player's auto
     const dx = p.x - player.x, dz = p.z - player.z;
     const d = Math.hypot(dx, dz);
@@ -428,6 +439,7 @@ export class People {
         const ko = dead || kmh > 25;
         p.dodge = 0.3; p.dodgeVX = phx * pv * 0.55; p.dodgeVZ = phz * pv * 0.55;       // thrown along your path
         p.fallen = dead ? 1e6 : ko ? 8 + kmh * 0.25 + R * 6 : 3 + kmh * 0.12; p.ko = ko; p.corpse = dead; p.v = 0;
+        this.remember(p, dead ? 'dead' : 'hit');
         this.events.push({ type: 'pedHit', p, speed: pv, x: p.x, z: p.z, sev: dead ? 'dead' : ko ? 'ko' : 'knock' });
         return;
       }
@@ -917,7 +929,7 @@ export class People {
       if (p.cop && P.v > 1.2 && !(p.bumpT > 0) && p.mode !== 'fight') { this.copShoved(p, P); continue; }
       if (P.v > 2.4 && !(p.bumpT > 0)) {
         p.bumpT = 3; p.react = 1.4; p.reactAt = { x: P.x, z: P.z }; p.reactAnim = 'hit';
-        if (P.v > 5.2 && !p.cop) { p.fallen = 2.4; p.fallBy = 'foot'; this.events.push({ type: 'pedBumped', p, x: p.x, z: p.z }); }
+        if (P.v > 5.2 && !p.cop) { this.remember(p, 'shoved'); p.fallen = 2.4; p.fallBy = 'foot'; this.events.push({ type: 'pedBumped', p, x: p.x, z: p.z }); }
         else this.speakAs('bump', p, 0.6);
       }
     }

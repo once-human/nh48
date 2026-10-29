@@ -7,6 +7,26 @@ import { clamp, RNG } from '../core/util.js';
 const RANGE = 48;            // metres from the camera
 const NAT = { walk: 1.25, jog: 3.0 };
 
+// how someone walks: the office crowd walks formal at rush hour, kakus and aunties often carry the shopping
+function walkFor(p, people) {
+  if (p.walkClip === undefined) {
+    const h = people && people.act ? people.act._h || 12 : 12, rush = (h > 8 && h < 10.5) || (h > 17 && h < 20);
+    const R = (p.id % 100) / 100;
+    p.walkClip = /kaku|aunty|aaji|tai/.test(p.persona || '') && R < 0.35 ? 'carry' : /kpguy|kpgirl|dada|collegegirl/.test(p.persona || '') && rush && R < 0.5 ? 'walk_formal' : 'walk';
+  }
+  return p.walkClip;
+}
+// someone standing around doesn't hold one pose: the phone, a chat, a sip of chai, arms folded, a nod
+const IDLES = { young: ['phone', 'phone', 'talk', 'idle', 'yes', 'arms_folded'], old: ['idle', 'arms_folded', 'talk', 'no', 'idle'], any: ['idle', 'talk', 'phone', 'arms_folded', 'drink', 'yes'] };
+function idleFor(p) {
+  const now = performance.now() / 1000;
+  if (!p.idleUntil || now > p.idleUntil) {
+    const set = /aaji|ajoba/.test(p.persona || '') ? IDLES.old : /college|kp|dada|tai/.test(p.persona || '') ? IDLES.young : IDLES.any;
+    p.idleNow = p.idle === 'phone' && Math.random() < 0.5 ? 'phone' : set[Math.floor(Math.random() * set.length)];
+    p.idleUntil = now + 6 + Math.random() * 10;
+  }
+  return p.idleNow;
+}
 export class Crowd {
   constructor(people, kit, scene, W, quality) {
     this.people = people; this.kit = kit; this.scene = scene; this.W = W;
@@ -75,9 +95,9 @@ export class Crowd {
     if (p.angry > 0) return ['no', 1];
     if (p.pax) return ['wave', 1];
     if (p.cop) return [(performance.now() / 1000 + p.id % 17) % 14 < 4 ? 'wave' : 'arms_folded', 1];
-    if (p.mode === 'stand' || p.mode === 'watch' || p.v < 0.15) return [p.idle || 'idle', 1];
+    if (p.mode === 'stand' || p.mode === 'watch' || p.v < 0.15) return [idleFor(p), 1];
     if (p.v > 2.2) return ['jog', clamp(p.v / NAT.jog, 0.7, 1.4)];
-    return ['walk', clamp(p.v / NAT.walk, 0.7, 1.4)];
+    return [walkFor(p, this.people), clamp(p.v / NAT.walk, 0.7, 1.4)];
   }
   drive(s, dt, cx, cz) {
     const p = s.p, H = s.H;
