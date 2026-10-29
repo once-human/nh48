@@ -295,7 +295,7 @@ export class Police {
       if (d < 18 && Math.abs(P.v) < 0.8) { s.phase = 'approach'; }
       else if (d > 65 || s.t > 16) {
         // drove off: the number is noted, the challan grows (and if it's stolen, word gets out)
-        this.say('stop_ignored', cop);
+        this.say('stop_ignored', cop); this.g.rep && this.g.rep.deed('fled', P.x, P.z);
         if (s.kind !== 'check') this.eChallan(s.kind, cop.x, cop.z, 'you drove off when stopped', FINES.disobey.amt);
         if (P.cur && P.cur.stolen) { this.raiseHeat(1, 'Ran from the police in a stolen vehicle', 'theft'); this.charges.add('disobey'); }
         else G.hud.toast('Drove off from a police stop', `Number noted. Expect an extra ${fmtRupees(FINES.disobey.amt)} on the challan.`, 'bad', 3.2);
@@ -392,7 +392,7 @@ export class Police {
       line = theft ? 'm_caught' : 'r_pay';
       if (theft) { this.arrest('Went quietly'); res = 'Taken to the chowki'; sub = `${FINES[s.kind].name}. Bail ${fmtRupees(s.total)}.${s.kind === 'theft' ? ' The vehicle goes back to its owner.' : ''}`; kind = 'bad'; }
       else {
-        const paid = this.charge(s.kind, s.total);
+        const paid = this.charge(s.kind, s.total); G.rep && G.rep.deed('paid', P.x, P.z);
         res = paid >= s.total ? `Paid ${fmtRupees(s.total)}` : `Paid ${fmtRupees(paid)}, ${fmtRupees(s.total - paid)} pending`;
         sub = 'Receipt on SMS. Your record notes it.';
         if (s.found === 'suspended') sub = 'Driving while suspended. Your record looks worse.';
@@ -400,7 +400,7 @@ export class Police {
         G.audio.cash();
       }
     } else if (o.id === 'plead') {
-      const chance = theft ? 0.08 : (firstTime ? 0.45 : 0.15) * (0.5 + cop.mood) - (this.duesTotal > 0 ? 0.12 : 0) - (s.found ? 0.3 : 0);
+      const chance = theft ? 0.08 : (firstTime ? 0.45 : 0.15) * (0.5 + cop.mood) - (this.duesTotal > 0 ? 0.12 : 0) - (s.found ? 0.3 : 0) + (G.rep ? G.rep.standing(P.x, P.z) * 0.18 : 0);
       if (r < chance) {
         line = 'r_plead_ok'; res = theft ? 'Let off with a warning' : 'Let off with a warning'; sub = theft ? 'The vehicle stays with them. You walk.' : 'He waves you on. Don’t push your luck.'; kind = 'meter';
         if (theft) { this.confiscate(); this.heat = 0; this.pts = 0; this.clearMarshals(); this.clearCharges(); }
@@ -443,7 +443,7 @@ export class Police {
         this.charge('bribe', 5000, 'Attempt to bribe a public servant'); this.suspend(24, 'Bribery attempt');
         if (theft) this.arrest('Tried to bribe the officer', true);
       } else if (amt >= N.R || o.id === 'counter_yes') {
-        G.stats.money -= amt; cop.bribes++;
+        G.stats.money -= amt; cop.bribes++; G.rep && G.rep.deed('bribe', P.x, P.z);
         if (this.rng.next() < 0.1) { this.charge(s.kind, s.total); line = 'r_bribe_more'; res = 'He took it, and booked you anyway'; sub = `${fmtRupees(amt)} gone, and the full challan. Welcome to Pune.`; kind = 'bad'; }
         else {
           line = cop.bribes > 1 ? 'r_bribe_more' : 'r_bribe_ok'; res = `${fmtRupees(amt)} changes hands`; sub = cop.bribes > 1 ? 'He remembers you. The rate goes up every time.' : 'No receipt, obviously.'; kind = 'warn';
@@ -469,7 +469,7 @@ export class Police {
       if (G.stats.money < s.bribe) { line = 'r_plead_no'; res = 'You don’t have it'; sub = `You fumble for ${fmtRupees(s.bribe)} you don’t have. He writes the challan.`; this.charge(s.kind, s.total); kind = 'warn'; }
       else if (cop.corrupt && r < 0.9) {
         line = cop.bribes > 0 ? 'r_bribe_more' : 'r_bribe_ok';
-        G.stats.money -= s.bribe; cop.bribes++;
+        G.stats.money -= s.bribe; cop.bribes++; G.rep && G.rep.deed('bribe', P.x, P.z);
         res = `${fmtRupees(s.bribe)} changes hands`; sub = cop.bribes > 1 ? 'He remembers you. The rate goes up every time.' : 'No receipt, obviously.'; kind = 'warn';
         if (theft) { this.confiscate(); this.heat = 0; this.pts = 0; this.clearMarshals(); this.clearCharges(); sub = s.kind === 'theft' ? 'The vehicle stays with him. You walk away.' : 'The case never gets written. You walk away.'; }
         // someone on the footpath had their phone out

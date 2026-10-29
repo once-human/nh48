@@ -146,7 +146,12 @@ export class Rides {
       for (const o of this.offers) {
         const d = Math.hypot(o.p.x - P.x, o.p.z - P.z);
         if (!P.inAnyAuto) continue;                  // only an auto picks up passengers
-        if (d < 7.5 && Math.abs(P.v) < 1.6 && !P.tipped) { this.board(o); break; }
+        if (d < 7.5 && Math.abs(P.v) < 1.6 && !P.tipped) {
+          // a bad name round here: they take one look at who's driving and wait for the next auto
+          if (o.ok === undefined) { const st = g.rep ? g.rep.standing(o.p.x, o.p.z) : 0; o.ok = st > -0.3 || this.rng.next() > Math.min(0.85, -st * 1.1); }
+          if (!o.ok) { g.people.remove(o.p); this.offers.splice(this.offers.indexOf(o), 1); g.hud.toast('“Nako, dusri rickshaw.”', 'They know your face round here. They’ll wait for another auto', 'bad', 3); break; }
+          this.board(o); break;
+        }
         if (d < 25 && !o.greeted && Math.abs(P.v) < 7) {
           o.greeted = true;
           const hl = o.persona && PAX[o.persona] && PAX[o.persona].hail;
@@ -262,7 +267,7 @@ export class Rides {
     const bonus = this.shiftFares % 5 === 0 ? 500 : 0;
     if (bonus) g.later(3.6, () => g.hud.toast('Shift bonus ₹500', `${this.shiftFares} fares this shift. Keep going`, 'meter', 3.2));
     g.stats.money += fare + tip + bonus;
-    if (g.rep) g.rep.good(g.player.x, g.player.z, stars >= 4 ? 0.8 : 0.2);     // a good ride gets talked about
+    if (g.rep) g.rep.deed('ride', g.player.x, g.player.z, stars >= 4 ? 1.4 : 0.4);     // a good ride gets talked about
     g.stats.rides += 1;
     g.stats.starSum += stars;
     g.stats.rating = g.stats.starSum / g.stats.rides;

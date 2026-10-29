@@ -311,7 +311,8 @@ export class Shops {
   }
   priceMul(x, z, tier) {
     const a = this.g.people.areas.at(x, z);
-    const k = this.life.s.karma > 30 ? 0.95 : 1;
+    // a regular they like pays a bit less, someone with a bad name round here a bit (or a lot) more
+    const st = this.g.rep ? this.g.rep.standing(x, z) : 0, k = st >= 0 ? 1 - st * 0.1 : 1 - st * (st < -0.45 ? 0.6 : 0.2);
     // charm gets you a better price (a smile, a bit of chat), the brand on the board a worse one
     const c = 1 - Math.max(0, this.life.charm - 0.5) * 0.12;
     return (AREA_MUL[a ? a.kind : 'city'] || 1) * k * c * (tier ? TIER_MUL[tier] || 1 : 1);

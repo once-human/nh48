@@ -113,6 +113,7 @@ export class Bag {
         ${ring('energy', 'Energy', s.energy, s.energy < 0.2 ? 'Exhausted' : `${Math.round(s.energy * 100)}%`)}
         ${ring('mood', 'Mood', s.mood, s.mood > 0.75 ? 'Great' : s.mood < 0.3 ? 'Low' : 'Okay')}</div>
         <div class="jh-read"><span>How Pune sees you</span><b>${{ respect: 'A respected local', scared: 'Trouble. Keep away', odd: 'The one in the unusual outfit', drunk: 'Had a few', nice: 'Well turned out' }[re] || 'Just another Punekar'}</b></div>
+        <div class="jh-read"><span>Round here</span><b>${(() => { const G = this.g, P = G.player, st = G.rep ? G.rep.standing(P.x, P.z) : 0; return st > 0.45 ? 'One of ours' : st > 0.15 ? 'People are warming to you' : st < -0.45 ? 'Trouble. People keep away' : st < -0.15 ? 'They keep an eye on you' : 'Nobody knows you yet'; })()}</b></div>
         <div class="jh-scales">${scale('Respect', s.respect, ['People laugh at you', 'Nobody'], ['People know you', 'Respected'])}${scale('Karma', s.karma, ['People cross the road', 'Bad'], ['Aajis bless you', 'Good'])}</div>
         <div class="jh-chips"><span><small>Style here</small><b>${st.odd ? 'Bold' : st.score > 0.85 ? 'Spot on' : st.score > 0.65 ? 'Fine' : 'Off'}</b></span><span><small>Fitness</small><b>+${Math.round(s.fitness)} health</b></span><span><small>Drink</small><b>${s.drunk > 0.6 ? 'Drunk' : s.drunk > 0.2 ? 'Tipsy' : 'Sober'}</b></span><span><small>Wanted</small><b>${G.police.heat ? stars(G.police.heat, 3) : 'No'}</b></span></div>
         <div class="jh-sub">Record</div>

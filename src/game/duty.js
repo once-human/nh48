@@ -96,7 +96,7 @@ export class Duty {
         const rough = Math.max(0, (v.dmg || 0) - C.dmg0), quick = clamp(1 - C.t / C.limit, 0, 1);
         const pay = Math.round(PAY.amb * (0.6 + quick * 0.8) * (1 - Math.min(0.6, rough * 4)) + (C.crit ? 300 : 0));
         this.streak++; G.stats.money += pay; G.saveStats && G.saveStats(); G.audio.cash && G.audio.cash();
-        G.hud.toast(`Delivered · ₹${pay}`, rough > 0.05 ? 'They made it, bruised by the ride' : 'They made it. Good driving', 'good', 3.4);
+        G.rep && G.rep.deed('patient', G.player.x, G.player.z); G.hud.toast(`Delivered · ₹${pay}`, rough > 0.05 ? 'They made it, bruised by the ride' : 'They made it. Good driving', 'good', 3.4);
         this.end(true);
       }
     }
@@ -114,7 +114,7 @@ export class Duty {
     if (C.near > 1.8) {
       const pay = PAY.pol + Math.round(Math.max(0, C.limit - C.t) * 3);
       this.streak++; G.stats.money += pay; G.saveStats && G.saveStats(); G.audio.cash && G.audio.cash();
-      G.hud.toast(`Caught him · ₹${pay}`, 'He goes down off the scooter; the chain is back with the lady', 'good', 3.6);
+      G.rep && G.rep.deed('caught', G.player.x, G.player.z); G.hud.toast(`Caught him · ₹${pay}`, 'He goes down off the scooter; the chain is back with the lady', 'good', 3.6);
       this.end(true);
     }
     if (Math.hypot(v.x - C.dest.x, v.z - C.dest.z) < 30 || d > 400) { G.hud.toast('He got away', 'Lost him in the lanes', 'bad', 3); this.end(false); }

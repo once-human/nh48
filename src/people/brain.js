@@ -30,7 +30,7 @@ export class Brain {
     // you did it: the neighbourhood remembers, and whoever saw it remembers your face
     if (o.byYou) {
       const w = { down: o.victim && o.victim.corpse ? 6 : 2.5, blast: 4, theft: 2, fight: 1, crash: 0.4 }[kind] || 0.5;
-      if (this.g.rep) this.g.rep.bad(x, z, w);
+      if (this.g.rep) this.g.rep.deed(kind === 'down' ? (o.victim && o.victim.corpse ? 'kill' : 'hurt') : kind, x, z);
       if (w >= 1) for (const q of this.ppl.list) if (q !== o.victim && !q.hidden && !q.cop && Math.abs(q.x - x) < 25 && Math.abs(q.z - z) < 25) this.ppl.remember(q, 'saw');
     }
   }
@@ -127,7 +127,9 @@ export class Brain {
       if (p.stare > 2.5) {
         p.stare = -8;
         const S = G.life && G.life.s;
-        if (S && S.respect > 25) { this.watch(p, P.x, P.z, 3, 'wave'); ppl.speakAs('respect', p, 1, 4) || ppl.speakAs('greet', p, 1, 4); }
+        const st = this.g.rep ? this.g.rep.standing(P.x, P.z) : 0;
+        if (st < -0.3 && t.brave < 0.6) { ppl.speakAs('scared', p, 0.8, 4); ppl.flee(p, P.x, P.z, 10); }
+        else if ((S && S.respect > 25) || st > 0.3) { this.watch(p, P.x, P.z, 3, 'wave'); ppl.speakAs('respect', p, 1, 4) || ppl.speakAs('greet', p, 1, 4); }
         else if (t.temper > 0.7) { this.watch(p, P.x, P.z, 3, 'arms_folded'); ppl.speakAs('mutter', p, 1, 4); }
         else if (t.brave < 0.35) { ppl.flee(p, P.x, P.z, 10); }
         else { this.watch(p, P.x, P.z, 2.5, 'idle'); ppl.speakAs('greet', p, 0.8, 4); }
@@ -173,7 +175,8 @@ export class Brain {
   // someone saw it and calls 100 (once per incident, more likely the braver and more helpful they are)
   report(I, p, t) {
     if (!I.byYou || I.reported || !this.g.police || this.g.free) return;
-    if (R() > 0.25 + t.helpful * 0.4 + t.brave * 0.2) return;
+    const st = this.g.rep ? this.g.rep.standing(I.x, I.z) : 0;
+    if (R() > (0.25 + t.helpful * 0.4 + t.brave * 0.2) * (1 - st * (I.kind === 'down' ? 0.25 : 0.55))) return;
     I.reported = true;
     // (the police's own witness system: they get the phone out and you have a little while)
     if (this.g.police.law) this.g.police.law.report(1, I.kind === 'down' ? 'Someone got hurt' : 'Trouble on the street', I.kind === 'down' ? 'assault' : null, I.x, I.z, { victim: I.victim });

@@ -359,6 +359,36 @@ export class Game {
     for (const s of shown) { s.H.holder.visible = false; if (kit) kit.applyLook(s.H, s.H.look); }
     for (const v of tmp) v.dispose();
   }
+  // knocked down in the street: what happens next depends on who you are round here. Where they like you someone
+  // comes over, helps you up and gives you water; where you've a bad name they step round you, and someone may
+  // help themselves to your wallet
+  streetHelp() {
+    const P = this.player;
+    if (this.free || !this.rep || (this._helpT || 0) > this.t) return;
+    this._helpT = this.t + 25;
+    const st = this.rep.standing(P.x, P.z);
+    let best = null, bd = 22 * 22;
+    for (const q of this.people.list) {
+      if (q.hidden || q.cop || q.fixed || q.pax || q.fallen > 0 || q.rideOf || q.mode === 'fight' || q.mode === 'inside' || q.busy > 0) continue;
+      const d = (q.x - P.x) ** 2 + (q.z - P.z) ** 2; if (d < bd) { bd = d; best = q; }
+    }
+    if (!best) return;
+    if (st > -0.15 && this.rng.chance(0.4 + st * 0.5)) {
+      best.busy = 12;
+      this.people.goTo(best, P.x + 0.8, P.z + 0.4, (q) => {
+        this.people.watch(q, P.x, P.z, 4); q.act = { clip: 'talk', t: 0, dur: 3 };
+        this.people.speakAs('kind', q, 1, 3);
+        this.life.change('hp', 12);
+        this.hud.toast('Someone helps you up', st > 0.3 ? 'They know you round here. A hand up and a sip of water (+12 health)' : 'A hand up and a sip of water (+12 health)', 'good', 3);
+      }, true);
+    } else if (st < -0.3) {
+      this.people.speakAs('mutter', best, 1, 3);
+      if (this.rng.chance(Math.min(0.6, -st * 0.7)) && this.stats.money > 200) {
+        const amt = Math.min(1500, Math.round(this.stats.money * 0.05 / 10) * 10 + 100);
+        this.later(2.5, () => { this.stats.money -= amt; this.saveStats(); this.hud.toast(`₹${amt} gone`, 'Someone helped themselves while you were down. Nobody saw anything, of course', 'bad', 3.4); });
+      }
+    }
+  }
   // fuel burns as you drive (a full tank lasts ~25 km in an auto, more on a scooter), crashes dent
   // the engine (never an explosion: Indian vehicles are tougher than that), and both slow you down
   vehicleWear(dt) {
@@ -454,7 +484,7 @@ export class Game {
     v.seatOverride = v.spec.two ? null : sv.kind === 'amb' ? [1.32, 1.18, 0.42] : [0.05, 0.82, 0.38];
     // a working vehicle, stolen: a serious crime, in front of its crew; no calls come to a stolen one, and the service
     // remembers (108 won't take you for days). If there's a patient in the back, they're now yours to get to hospital
-    if (!this.free) { this.police.raiseHeat(2, sv.kind === 'amb' ? 'Stole an ambulance' : 'Stole a police vehicle', 'theft'); this.police.law && (this.police.law.setDesc(), this.police.law.radioDesc()); }
+    if (!this.free) { this.rep && this.rep.deed('theft', this.player.x, this.player.z); this.police.raiseHeat(2, sv.kind === 'amb' ? 'Stole an ambulance' : 'Stole a police vehicle', 'theft'); this.police.law && (this.police.law.setDesc(), this.police.law.radioDesc()); }
     if (sv.kind === 'amb') S.bar108 = (this.clock || 0) + 72; else S.barHG = (this.clock || 0) + 168;
     const patient = sv.R && (sv.R.ph === 'loaded' || sv.R.ph === 'carry' || sv.R.ph === 'lift') && sv.R.victim && !sv.R.victim.corpse;
     if (patient && this.duty) this.duty.patientAboard();
@@ -1142,7 +1172,7 @@ export class Game {
         if (!this.free) { this.hud.toast('You killed someone', 'Murder is BNS s.103. If anyone saw, they’ll call it in', 'bad', 5); this.life.change('karma', -30); this.police && this.police.law && this.police.law.report(3, 'Killed someone in a fight', 'murder', ev.x ?? P.x, ev.z ?? P.z, { victim: ev.p }); }
       }
       if (ev.type === 'pet') {
-        const a = ev.a; a.moving = false; a.rest = 8; this.life.change('mood', 0.06);
+        const a = ev.a; a.moving = false; a.rest = 8; this.life.change('mood', 0.06); this.rep && this.rep.deed('pet', a.x, a.z);
         this.petAnimal(a);
         const L = a.cow ? ['Touch the cow for luck', 'She doesn’t care. A kaku nearby approves.'] : a.kind === 'cat' ? ['The cat allows it', 'Three seconds, then a look that says enough.'] : ['Good dog', 'The tail goes like a fan. A friend for life, or till the next vada pav.'];
         this.hud.toast(L[0], L[1], 'good', 2.6); if (!a.cow && a.kind !== 'cat') this.audio.bark && this.audio.bark(0.3);
@@ -1182,7 +1212,7 @@ export class Game {
       if (ev.type === 'dodge') { if (this.rng.chance(0.35) && (this._dodgeT || 0) < this.t) { this._dodgeT = this.t + 4; if (!(ev.p && this.people.speakAs('dodge', ev.p, 1, 4))) this.police.say(this.rng.pick(['d1', 'd2', 'd3', 'd4']), ev); } }
       if (ev.type === 'recovered') this.hud.toast('Back on three wheels', '', 'info', 1.6);
       if ((ev.type === 'jump' && this.rng.chance(0.3)) || ev.type === 'climb') this.people.onStunt(P);
-      if (ev.type === 'gotHit') { P.hp = (P.hp ?? 100) - Math.min(60, 10 + (ev.speed || 4) * 4); if (P.hp <= 0) { this.blackout('hit'); continue; } this.audio.thud(0.6); this.rig.shake(0.4); this.hud.toast('Knocked down', 'Traffic doesn\u2019t stop for pedestrians here. Stay on the footpath.', 'bad', 3); }
+      if (ev.type === 'gotHit') { P.hp = (P.hp ?? 100) - Math.min(60, 10 + (ev.speed || 4) * 4); if (P.hp <= 0) { this.blackout('hit'); continue; } this.audio.thud(0.6); this.rig.shake(0.4); this.hud.toast('Knocked down', 'Traffic doesn\u2019t stop for pedestrians here. Stay on the footpath.', 'bad', 3); this.streetHelp(); }
       if (ev.type === 'carjack') { this.audio.crash(0.2); this.life.change('karma', -3); }
       if (ev.type === 'stoleParked') this.life.change('karma', -2);
       if (ev.type === 'pedHit') this.life.change('karma', -2);
