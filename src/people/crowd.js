@@ -10,7 +10,7 @@ const _e = new THREE.Euler(0, 0, 0, 'YXZ'), _q = new THREE.Quaternion(), _v = ne
 // where the hands go: the handlebar grips (vehicle frame, as you hold them), by model
 const GRIPS = { auto: [0.72, 1.07, 0.33], scooter: [0.62, 1.0, 0.3], bike: [0.6, 1.08, 0.34] };
 // everyone within this many metres is a fully dressed, animated person (by quality); riders within FULL * 0.7
-const FULL = { lite: 25, low: 32, med: 40, high: 48 };
+const FULL = { lite: 40, low: 55, med: 70, high: 90 };
 // the seated clips put the hips this far behind the body's origin
 const HIPS = 0.31;
 // how far a rider leans into the bars (radians): a motorcycle, a scooter, an auto; a pillion a little
@@ -54,7 +54,9 @@ export class Crowd {
     if (kit) { for (let i = 0; i < Math.ceil(pre * 0.6); i++) this.makeSkin(false); for (let i = 0; i < Math.ceil(pre * 0.45); i++) this.makeSkin(true); }
   }
   // a radius, not a count: everyone near you is a real person; the cap is only a safety net for a packed crowd
-  setQuality(q) { this.range = FULL[q.name] || 40; this.cap = q.name === 'lite' ? 40 : q.name === 'low' ? 60 : 110; if (this.traffic) this.traffic.richR = this.range * 0.7; }
+  setQuality(q) { this.range = FULL[q.name] || 60; this.cap = q.name === 'lite' ? 60 : q.name === 'low' ? 90 : 150; if (this.traffic) this.traffic.richR = Math.min(40, this.range * 0.5); }
+  // the whole pool built while the loading screen is up (building a body mid-game is a hitch)
+  prebuild() { const want = Math.round(this.cap * 0.85); while (this.pool.length < want) { const f = this.pool.filter(q => q.female).length; this.makeSkin(f < this.pool.length * 0.45); } }
   makeSkin(female) {
     const kit = this.kit;
     const look = kit.randomLook(new RNG(this.pool.length + 1), { female });
@@ -202,7 +204,7 @@ export class Crowd {
     s.k = ((s.k || 0) + 1) & 3;
     // off-screen and not close: no animation at all (it catches up the moment they're in view)
     let upd = false;
-    if (seen ? (dd < 30 || (s.k & 1) === 0) : (dd < 12 && s.k === 0)) { H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; }
+    if (seen ? (dd < 30 || (dd < 70 ? (s.k & 1) === 0 : s.k === 0)) : (dd < 12 && s.k === 0)) { H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; }
     // riders' hands: on the grips (the driver), round the rider's waist (a pillion astride)
     // (only on a frame the clip has just posed: the bend goes on top of the clip's pose, never on top of itself)
     if (p.rideOf && upd && (seen || dd < 12) && dd < 70) {

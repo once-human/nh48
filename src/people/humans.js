@@ -432,6 +432,7 @@ export class HumanKit {
       bindM: this.bindM[k] || new THREE.Matrix4(), body: new THREE.Vector4(B.hip, B.neck, B.armY, 0.085), arms: arm };
     if (mat.map) patchBody(mat);
     const acc = this.accMat.clone();
+    acc.polygonOffset = true; acc.polygonOffsetFactor = -3; acc.polygonOffsetUnits = -8;      // the police cap and the old helmet over the hair
     // hair with a soft sheen along the strands (it read as matte plastic)
     const hairMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0, map: this.hairMat[k] || null, sheen: 1, sheenRoughness: 0.32, sheenColor: 0x6a5848 });
     // short hair sits right on the scalp: without this the two fought for the same pixels (head, hair, head, hair…)
@@ -476,6 +477,8 @@ export class HumanKit {
           : n === 'visor' ? new THREE.MeshStandardMaterial({ color: 0x0e1216, roughness: 0.05, metalness: 0.5, transparent: true, opacity: 0.8, side: THREE.DoubleSide })
           : n === 'hband' ? new THREE.MeshStandardMaterial({ color: 0x1d3f8f, roughness: 0.4, side: THREE.DoubleSide }) : null;
         const m = new THREE.Mesh(geo, mat2 || (n === 'glasses' || n === 'lens' ? this.glassMat : n === 'bindi' ? this.bindiMat : n === 'cap' ? new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 }) : hairMat));
+        // whatever sits on the head or face wins the depth test over the hair and skin under it (no flicker)
+        if (n !== 'pony' && n !== 'braid' && m.material !== hairMat) { m.material.polygonOffset = true; m.material.polygonOffsetFactor = -3; m.material.polygonOffsetUnits = -8; }
         m.matrixAutoUpdate = false; m.matrix.copy(X.local); m.castShadow = false; m.visible = false;
         head.add(m); H.xtra[n] = m;
       }

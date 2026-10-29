@@ -214,15 +214,16 @@ async function main() {
     const idx = manifest.__voices || {}, bg = new Loader(() => {});
     const pack = (url, k) => bg.bytes(url).then((b) => { for (const [id, [off, len, pk]] of Object.entries(idx)) if ((pk || 0) === k) game.audio.raw['v_' + id] = b.buffer.slice(b.byteOffset + off, b.byteOffset + off + len); }).catch(() => { /* subtitles still show */ });
     // the main roads of all Pune for the map's street names (left out of the start)
-    if (W.tiles) setTimeout(() => bg.bytes('assets/pune/base_map.json.gz').then(async (b) => {
+    game.preloads = game.preloads || [];
+    if (W.tiles) game.preloads.push(bg.bytes('assets/pune/base_map.json.gz').then(async (b) => {
       const d = JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
       W.cityMap && W.cityMap.setCoarse(d.coarse, d.cwater);
-    }).catch(() => { /* names fill in as you go */ }), 6000);
+    }).catch(() => { /* names fill in as you go */ }));
     // every shop and place in Pune onto the map (names and spots only, about a megabyte)
-    if (W.tiles) setTimeout(() => bg.bytes('assets/pune/pins.json.gz').then(async (b) => {
+    if (W.tiles) game.preloads.push(bg.bytes('assets/pune/pins.json.gz').then(async (b) => {
       const list = JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
       W.cityMap && W.cityMap.addPins(fixPins(list));
-    }).catch(() => { /* the map fills in as you go */ }), 9000);
+    }).catch(() => { /* the map fills in as you go */ }));
     // the voice lines (about 40 MB in all) aren't downloaded up front any more: each clip is fetched the first
     // time someone says it (a ranged read from its pack), so the game stays light in memory
     game.voiceRemote = { idx, urls: [VOICE_BIN, 'assets/voices_k.mp3', 'assets/voices_d.mp3', 'assets/voices_pk.mp3', 'assets/voices_vb.mp3', 'assets/voices_vb2.mp3'] }; void pack;
@@ -238,8 +239,26 @@ async function main() {
   // shaders: compiled in the background while you're on the title screen; the city shows once they're in
   let compiled = TEST;
   const compileJob = Promise.all([game.warming, renderer.compileAsync(scene, camera)]).catch(() => {}).then(() => { compiled = true; document.getElementById('gl')?.classList.remove('warming'); });
+  // everything heavy happens behind the loading screen, so the game opens smooth: the shaders, the sounds, the
+  // sharp textures and leaves, the city map and its places, the police and ambulance models, the people's bodies
+  if (!TEST) {
+    await progress('Getting the city ready', 0.965);
+    await Promise.all(SOUNDS.map(async (n) => { try { const b = await new Loader(() => {}).bytes(sndUrl(n)); game.audio.addRaw(n, b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)); } catch (e) { /* plays without it */ } }));
+    for (const [k, url] of [['groundAlb', 'ground_alb'], ['groundNrm', 'ground_nrm'], ['groundArm', 'ground_arm'], ['wallAlb', 'wall_alb'], ['wallNrm', 'wall_nrm'], ['wallArm', 'wall_arm']]) {
+      try { const b = await new Loader(() => {}).bitmap(`assets/tex/${url}.webp`); upgradeArray(T[k], b, { maxSize: quality.texMax }); b.close?.(); } catch (e) { /* stays soft */ }
+    }
+    game.texUpgraded = true;
+    try { W.trees.sharpenLeaves(); } catch (e) { /* keep the soft ones */ }
+    await progress('Getting the people ready', 0.975);
+    if (game.crowd && game.crowd.prebuild) game.crowd.prebuild();
+    try { game.emergency && game.emergency.prewarm && game.emergency.prewarm(); } catch (e) { /* not critical */ }
+    await Promise.all(game.preloads || []);
+    await progress('Compiling the graphics', 0.985);
+    await compileJob;
+    // and once more for what was just built (the police, the ambulance, the people)
+    try { await renderer.compileAsync(scene, camera); } catch (e) { /* compiles on first use */ }
+  }
   if (TEST) await compileJob;
-  else document.getElementById('gl')?.classList.add('warming');
   const onResize = () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -251,11 +270,12 @@ async function main() {
   document.getElementById('loading').classList.add('done');
   // the map, sharp everywhere: the 2 km pictures of all of Pune, then the 1 km ones around you
   if (W.tiles && W.cityMap) setTimeout(() => { const P = game.player; W.cityMap.prefetch(1, P.x, P.z); W.cityMap.prefetch(2, P.x, P.z, 5000); }, 12000);
-  setTimeout(() => { try { W.trees.sharpenLeaves(); } catch (e) { /* keep the soft ones */ } }, 2500);
+  if (TEST) setTimeout(() => { try { W.trees.sharpenLeaves(); } catch (e) { /* keep the soft ones */ } }, 2500);
   // after the first frame: the sounds, then the sharp ground and wall textures (one at a time, so the first
   // seconds of play aren't fighting them for the network)
   (async () => {
     const bg = new Loader(() => {});
+    if (game.texUpgraded) return;               // (done during loading)
     await Promise.all(SOUNDS.map(async (n) => { try { const b = await bg.bytes(sndUrl(n)); game.audio.addRaw(n, b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)); } catch (e) { /* plays without it */ } }));
     for (const [k, url] of [['groundAlb', 'ground_alb'], ['groundNrm', 'ground_nrm'], ['groundArm', 'ground_arm'], ['wallAlb', 'wall_alb'], ['wallNrm', 'wall_nrm'], ['wallArm', 'wall_arm']]) {
       try { const b = await bg.bitmap(`assets/tex/${url}.webp`); upgradeArray(T[k], b, { maxSize: quality.texMax }); b.close?.(); } catch (e) { /* stays soft */ }
