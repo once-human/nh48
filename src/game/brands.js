@@ -24,7 +24,8 @@ export function tierOf(kind, name, flag) {
     if (has(n, /hospital|multispecial|nursing home|medical (centre|center)|institute/)) return 'hospital';
     return 'gp';
   }
-  if (kind === 'barber') return has(n, /habib|lakme|naturals|bblunt|enrich|toni|looks|jean-claude|studio|unisex|salon & spa|spa/) || flag === 'brand' ? 'premium' : 'local';
+  // three kinds of salon: the brands (polished, English), the unisex studios in between, the neighbourhood barber
+  if (kind === 'barber') return has(n, /habib|hab[ie]b|lakm|naturals|bblunt|b blunt|enrich|toni|looks salon|jean-claude|green trends|y ?salon|geetanjali|kaya/) || flag === 'brand' ? 'premium' : has(n, /unisex|studio|salon & spa|\bspa\b|beauty|makeover|hair ?(lounge|studio|zone)|parlou?r|family salon|men'?s salon/) ? 'mid' : 'local';
   if (kind === 'gym') return has(n, /gold|cult|anytime|talwalkar|snap|fitness first|crossfit/) || flag === 'brand' ? 'premium' : 'local';
   if (kind === 'clothes') {
     if (has(n, /handloom|saree|sari|silk|paithani|kurti|ladies|women|boutique|chhabra|kala ?niketan|mangaldeep/)) return 'women';
@@ -35,9 +36,9 @@ export function tierOf(kind, name, flag) {
   if (flag === 'brand') return 'chain';
   return 'local';
 }
-export const TIER_MUL = { premium: 1.9, chain: 1.25, brand: 1.35, local: 0.85, women: 1, men: 1, ethnic: 1.2, all: 1,
+export const TIER_MUL = { mid: 1.25, premium: 1.9, chain: 1.25, brand: 1.35, local: 0.85, women: 1, men: 1, ethnic: 1.2, all: 1,
   dental: 1, skin: 1, lab: 1, physio: 1, eyehosp: 1, hospital: 1.3, gp: 1 };
-export const TIER_LABEL = { premium: 'Premium', chain: 'Chain store', brand: 'Brand store', local: 'Local shop', women: 'Women’s wear', men: 'Men’s wear', ethnic: 'Ethnic wear', all: 'Clothing store',
+export const TIER_LABEL = { mid: 'Unisex salon', premium: 'Premium', chain: 'Chain store', brand: 'Brand store', local: 'Local shop', women: 'Women’s wear', men: 'Men’s wear', ethnic: 'Ethnic wear', all: 'Clothing store',
   dental: 'Dental clinic', skin: 'Skin & hair clinic', lab: 'Diagnostic lab', physio: 'Physiotherapy', eyehosp: 'Eye hospital', hospital: 'Hospital', gp: 'Doctor’s clinic' };
 
 // services: [label, note, base price, effect(G) -> message]

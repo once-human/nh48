@@ -24,7 +24,7 @@ import { F, MENUS, AREA_FOOD, STICKERS } from '../game/shops.js';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { applyMods, modsOf } from '../vehicles/mods.js';
 import { tierOf } from '../game/brands.js';
-import { ROOMS2 } from './rooms2.js';
+import { ROOMS2, roomPanel } from './rooms2.js';
 
 const SLOT0 = 40000;
 const FLOOR = 0.15;          // the game's off-road ground height, so people stand on the floor
@@ -59,6 +59,15 @@ const AES = {
   luxe: A(0x1c1c20, 0x2a2a30, 0xc9a227, 0xe8e4dc, false, 0x111114, 0x18181c, 'spot', { trim: true, legs: 0xc9a227, chair: 0x3a2f2a }),
   pastel: A(0xf4ece6, 0xf9d9e0, 0x7cc6b8, 0xffffff, false, 0xf6b8c8, 0xffffff, 'pendant', { dado: 0xbfe6dc, legs: 0xf2f2f2, chair: 0x7cc6b8, plants: true }),
   clinical: A(0xe8eeec, 0xf6faf8, 0x2e8b6e, 0xffffff, true, 0xffffff, 0xffffff, 'panel', { band: 0x2e8b6e }),
+  // salons: the neighbourhood barber, the unisex studio, and the brands (parodies, each in its own colours)
+  salonlocal: A(0xc9c3b5, 0x9fd8cf, 0xc0392b, 0xdfe3e0, true, 0x6b4a2e, 0xf2f2ea, 'tube', { band: 0x5fb3a6 }),
+  salonmid: A(0xd9d4cb, 0xf4f0e8, 0x2b2b2b, 0xffffff, false, 0x2b2b2b, 0xffffff, 'pendant', { plants: true, chair: 0x2b2b2b }),
+  salon_lakme: A(0x0f0f11, 0xf7f7f5, 0xe0218a, 0xffffff, false, 0x0f0f11, 0xffffff, 'spot', { trim: true, chair: 0x0f0f11 }),
+  salon_habib: A(0x161616, 0x232323, 0xff5a1f, 0xffffff, false, 0x0d0d0d, 0x1a1a1a, 'spot', { trim: true, chair: 0x0d0d0d }),
+  salon_enrich: A(0xece6f0, 0xf8f5fb, 0x7a2e8c, 0xffffff, false, 0x4a1d57, 0xffffff, 'pendant', { plants: true, chair: 0x4a1d57 }),
+  salon_naturals: A(0xe6e1d4, 0xf3f0e6, 0x2e8b57, 0xffffff, false, 0x2e5a3a, 0xffffff, 'pendant', { plants: true, chair: 0x2e5a3a }),
+  salon_bblunt: A(0x141414, 0xf0f0ee, 0xf2c230, 0xffffff, false, 0x141414, 0xffffff, 'spot', { chair: 0x141414 }),
+  salon_toni: A(0x3a3a3a, 0xcfcfcf, 0x111111, 0xffffff, false, 0x1a1a1a, 0x2a2a2a, 'edison', { brick: true, ducts: true, chair: 0x1a1a1a }),
   darkgym: A(0x2b2b2e, 0x3a3d42, 0xe0b23a, 0x2b2b2e, true, 0xe0b23a, 0x2a2a2e, 'tube'),
   // cuisines, for the local places
   udupi: A(0xf0f0ec, 0xdfeee3, 0x1f7a4a, 0xd8dde2, true, 0x2e7d4f, 0xf4f2ee, 'tube', { band: 0x2e9d5f }),
@@ -110,7 +119,10 @@ export function designOf(ctx) {
       else { aes = pick(['minimal', 'industrial', 'heritage', 'pastel', 'cafe']); layout = pick(['grid', 'lounge', 'communal']); }
       break;
     case 'club': aes = /brew|tap|craft|factory|warehouse|mill/.test(n) ? 'warehouse' : /lounge|sky|roof|terrace|social/.test(n) ? 'lounge' : pick(['warehouse', 'lounge', 'bollywood']); break;
-    case 'salon': aes = tier === 'premium' ? pick(['luxe', 'minimal']) : pick(['local', 'local', BOLD(h)]); scale = tier === 'premium' ? 1.15 : 0.9; break;
+    case 'salon': {
+      const br = /lakm/.test(n) ? 'lakme' : /hab[ie]b/.test(n) ? 'habib' : /enrich/.test(n) ? 'enrich' : /naturals|green trends/.test(n) ? 'naturals' : /b ?blunt/.test(n) ? 'bblunt' : /toni|looks|jean/.test(n) ? 'toni' : null;
+      aes = tier === 'premium' ? 'salon_' + (br || pick(['lakme', 'enrich', 'toni', 'naturals'])) : tier === 'mid' ? 'salonmid' : 'salonlocal';
+      scale = tier === 'premium' ? 1.2 : tier === 'mid' ? 1 : 0.72; layout = tier === 'premium' ? 'premium' : tier === 'mid' ? 'mid' : 'local'; break; }
     case 'boutique':
       if (k === 'optician') { aes = tier === 'premium' ? 'luxe' : tier === 'chain' ? pick(['minimal', 'bold2']) : 'local'; layout = 'gallery'; scale = tier === 'local' ? 0.75 : 0.9; }
       else if (k === 'shoes') { const chainN = chain || /bata|nike|adidas|puma|skechers|reebok|metro|mochi|woodland|red tape|crocs|asics/.test(n); aes = chainN ? pick(['industrial', 'bold0', 'minimal']) : 'local'; layout = 'gallery'; scale = 0.9; }
@@ -354,20 +366,51 @@ export class Interiors {
       spot(fx, fz, 4, 'dance', 'Dance');
       R.dancers = 18; R.ctxStyle = v;
     } else if (tpl === 'salon') {
-      const xs = []; for (let x = -W / 2 + 2; x < W / 2 - 3; x += 2.4) xs.push(x);
+      // three salons: the neighbourhood barber (old red chairs, a strip mirror, film-star posters, the paper on the
+      // bench), the unisex studio (bulb mirrors, a wash station, a reception), the brand (its colour everywhere, lit
+      // stations, a product wall, a wash lounge of recliners, its name on the wall)
+      const tierS = lay, A2 = S.accent, prem = tierS === 'premium', mid = tierS === 'mid';
+      const xs = []; for (let x = -W / 2 + (prem ? 2.2 : 1.6); x < W / 2 - (prem ? 3.4 : 2.2); x += prem ? 2.6 : mid ? 2.2 : 1.9) xs.push(x);
       for (const x of xs) {
-        box(B, x, 0.5, D - 0.9, 0.7, 0.12, 0.7, style === 'luxe' ? 0x111114 : 0x1b1c1f); box(B, x, 0.9, D - 0.6, 0.7, 0.8, 0.12, 0x1b1c1f); box(B, x, 0.25, D - 0.9, 0.2, 0.5, 0.2, 0x8e9093);
-        box(B, x, 1.7, D - 0.05, 1.1, 1.3, 0.04, 0xbcd0dc);   // mirror
-        if (style === 'luxe' || style === 'minimal') box(GL, x, 2.42, D - 0.06, 1.1, 0.04, 0.04, 0xfff1d6);   // a light bar over each mirror
+        if (!prem && !mid) {
+          // a barber's chair: red leatherette, chrome footrest, a headrest
+          box(B, x, 0.32, D - 0.9, 0.18, 0.64, 0.18, 0xb8bcc2); box(B, x, 0.66, D - 0.9, 0.62, 0.14, 0.62, 0xa3201c); box(B, x, 1.0, D - 0.6, 0.62, 0.62, 0.12, 0xa3201c); box(B, x, 1.42, D - 0.6, 0.3, 0.16, 0.1, 0xa3201c);
+          box(B, x - 0.36, 0.86, D - 0.9, 0.06, 0.06, 0.55, 0xd8dde2); box(B, x + 0.36, 0.86, D - 0.9, 0.06, 0.06, 0.55, 0xd8dde2); box(B, x, 0.2, D - 1.35, 0.5, 0.05, 0.2, 0xd8dde2);
+        } else {
+          box(B, x, 0.48, D - 0.9, 0.66, 0.14, 0.66, S.chair || 0x1b1c1f); box(B, x, 0.92, D - 0.62, 0.66, 0.78, 0.12, S.chair || 0x1b1c1f); box(B, x, 0.24, D - 0.9, 0.22, 0.48, 0.22, 0x8e9093);
+          box(B, x, 0.98, D - 0.1, prem ? 1.3 : 1.0, 0.04, 0.35, prem ? A2 : 0xf2f2f2);                                 // the station's counter
+          for (let k = 0; k < 4; k++) box(B, x - 0.4 + k * 0.27, 1.06, D - 0.12, 0.06, 0.14 + (k % 2) * 0.06, 0.06, [0xf2f2f2, A2, 0x1b1c1f, 0xd8c4a4][k]);
+        }
+        // the mirror: a strip on the local barber's wall, bulbs round it in the studio, a lit oval at the brand
+        if (prem) { box(B, x, 1.75, D - 0.05, 1.2, 1.5, 0.04, 0xcfe0ea); box(GL, x, 1.75, D - 0.07, 1.3, 0.04, 0.02, 0xfff1d6); box(GL, x, 2.52, D - 0.07, 1.3, 0.04, 0.02, 0xfff1d6); box(GL, x - 0.64, 1.75, D - 0.07, 0.03, 1.5, 0.02, 0xfff1d6); box(GL, x + 0.64, 1.75, D - 0.07, 0.03, 1.5, 0.02, 0xfff1d6); }
+        else if (mid) { box(B, x, 1.7, D - 0.05, 1.0, 1.25, 0.04, 0xbcd0dc); for (let k = 0; k < 6; k++) { box(GL, x - 0.56, 1.15 + k * 0.22, D - 0.08, 0.05, 0.05, 0.05, 0xfff1d6); box(GL, x + 0.56, 1.15 + k * 0.22, D - 0.08, 0.05, 0.05, 0.05, 0xfff1d6); } }
         R.seats.push({ x: O.x + x, z: O.z + D - 0.9, yaw: Math.PI / 2, salon: true, used: false });
         spot(x, D - 1.9, 1.0, 'chair', 'Sit in the chair');
       }
-      xs.forEach((x, i) => { if (i % 2 === 0) kp(x + 1.2, D - 1.7, Math.PI / 2, 'idle', i ? 'barber' : 'keeper'); });
-      // wash basins down the side, a reception, a waiting sofa
-      for (let z = 3; z < D - 3; z += 1.6) { box(B, W / 2 - 0.5, 0.45, z, 0.7, 0.9, 0.7, 0x1b1c1f); box(B, W / 2 - 0.5, 0.92, z, 0.5, 0.06, 0.45, 0xf2f2f2); solid(W / 2 - 0.5, z, 0.7, 0.7, 2); }
-      sofa(-W / 2 + 0.7, 3, 0, 3.2, S.chair || 0x6b4a2e);
-      counter(-W / 2 + 3.4, 1.8, 1.8, 0.6, S.counter);
-      R.customers = 3;
+      if (!prem && !mid) {
+        box(B, 0, 1.65, D - 0.05, W - 2, 1.0, 0.04, 0xbcd0dc);                                                              // one long mirror
+        box(B, 0, 1.05, D - 0.25, W - 2, 0.05, 0.4, 0xd9d2c4); for (let k = 0; k < 10; k++) box(B, -W / 2 + 1.5 + k * 0.5, 1.12, D - 0.22, 0.06, 0.12 + (k % 3) * 0.04, 0.06, [0x2e86ab, 0xf2f2f2, 0xd1495b, 0x1b1c1f][k % 4]);
+        for (let k = 0; k < 4; k++) roomPanel({ O, FLOOR, R }, -W / 2 + 1.6 + k * 1.3, 2.55, D - 0.06, 0.9, 0.55, Math.PI, (g, w, h) => { g.fillStyle = ['#f2e2b6', '#e8d7a8', '#f4e6c2', '#ead9ac'][k]; g.fillRect(0, 0, w, h); g.fillStyle = '#2a1a10'; g.beginPath(); g.ellipse(w / 2, h * 0.42, w * 0.18, h * 0.26, 0, 0, 6.29); g.fill(); g.fillStyle = '#c99a72'; g.beginPath(); g.ellipse(w / 2, h * 0.5, w * 0.14, h * 0.22, 0, 0, 6.29); g.fill(); g.fillStyle = '#7a1e1e'; g.font = `700 ${Math.round(h * 0.13)}px Archivo, sans-serif`; g.textAlign = 'center'; g.fillText(['HERO CUT', 'SPIKES', 'MUSHROOM', 'SIDE PART'][k], w / 2, h * 0.93); });
+        box(B, -W / 2 + 0.5, 0.42, 2.4, 0.5, 0.08, 2.4, 0x6b4a2e); for (const z of [1.4, 3.4]) box(B, -W / 2 + 0.5, 0.21, z, 0.4, 0.42, 0.06, 0x4a2e1e); solid(-W / 2 + 0.5, 2.4, 0.5, 2.4, 2);   // the bench
+        box(B, -W / 2 + 0.5, 0.5, 2.0, 0.4, 0.03, 0.3, 0xf2efe6);                                                          // the paper on it
+        roomPanel({ O, FLOOR, R }, W / 2 - 0.06, 2.1, 1.6, 0.5, 0.7, -Math.PI / 2, (g, w, h) => { g.fillStyle = '#fff6e0'; g.fillRect(0, 0, w, h); g.fillStyle = '#d8461f'; g.beginPath(); g.arc(w / 2, h * 0.38, w * 0.22, 0, 6.29); g.fill(); g.fillStyle = '#7a1e1e'; g.font = `700 ${Math.round(h * 0.1)}px Mukta, sans-serif`; g.textAlign = 'center'; g.fillText('२०२६', w / 2, h * 0.9); });    // a calendar
+        box(B, W / 2 - 0.4, 1.0, D - 2, 0.6, 2.0, 0.5, 0x8a97a3); solid(W / 2 - 0.4, D - 2, 0.6, 0.5);                    // the steel almirah
+        counter(-W / 2 + 2.2, 1.4, 1.2, 0.5, 0x6b4a2e);
+        R.lang = 'mr';
+      } else {
+        // wash basins (recliners at the brand), a reception, a waiting sofa
+        for (let z = 3; z < D - 3; z += prem ? 1.9 : 1.6) { box(B, W / 2 - 0.55, 0.45, z, 0.75, 0.9, 0.7, prem ? S.counter : 0x1b1c1f); box(B, W / 2 - 0.5, 0.92, z, 0.5, 0.06, 0.45, 0xf2f2f2); if (prem) box(B, W / 2 - 1.4, 0.5, z, 1.2, 0.18, 0.6, S.chair); solid(W / 2 - 0.5, z, 0.7, 0.7, 2); }
+        sofa(-W / 2 + 0.7, 3, 0, 3.2, S.chair || 0x6b4a2e);
+        counter(-W / 2 + 3.4, 1.8, 2.2, 0.6, S.counter);
+        if (prem) {
+          // the product wall, lit shelf by shelf, and the brand's colour across the back
+          box(B, -W / 2 + 0.2, 1.5, D / 2 + 1, 0.2, 2.6, 3.2, S.counter); for (let r = 0; r < 4; r++) { box(GL, -W / 2 + 0.32, 0.65 + r * 0.6, D / 2 + 1, 0.02, 0.02, 3.0, 0xfff1d6); for (let k = 0; k < 9; k++) box(B, -W / 2 + 0.38, 0.75 + r * 0.6, D / 2 - 0.3 + k * 0.33, 0.12, 0.18 + (k % 3) * 0.04, 0.1, [A2, 0xf2f2f2, 0x1b1c1f][k % 3]); }
+          box(B, 0, H - 0.6, D - 0.04, W - 1, 0.5, 0.03, A2); box(B, 0, 0.1, D - 0.04, W - 1, 0.2, 0.03, A2);
+        }
+        R.lang = prem ? 'en' : 'mix';
+      }
+      for (let k = 0; k < xs.length; k += prem ? 1 : 2) kp(xs[k] + 1.0, D - 1.7, Math.PI / 2, 'idle', k ? 'barber' : 'keeper');
+      R.customers = prem ? 4 : mid ? 3 : 2;
     } else if (tpl === 'boutique') {
       const racks = [];
       const LBL = dz.kind === 'optician' ? [['Frames', 'frames'], ['Sunglasses', 'shades'], ['Contact lenses', 'lens']] : dz.kind === 'shoes' ? [['Sneakers', 'sneak'], ['Formal shoes', 'formal'], ['Chappals and sandals', 'chappal']] : [['Shirts and tees', 'tops'], ['Trousers and jeans', 'bottoms'], ['Kurtas and sarees', 'ethnic']];
@@ -661,6 +704,13 @@ export class Interiors {
     G.audio.duck?.(0.2, 2);
     if (tpl === 'club') G.club.beat(true);
     G.shops.speak(ctx.kind, 'hello');
+    // the salon's own language: the neighbourhood barber Marathi (now and then a Hindi-speaking one), the studio
+    // anything, the brand English
+    if (R.lang) {
+      const r = Math.random(), L = R.lang === 'mr' ? (r < 0.88 ? 'mr' : 'hi') : R.lang === 'mix' ? (r < 0.4 ? 'mr' : r < 0.75 ? 'hi' : 'en') : 'en';
+      const T = { mr: ['या, बसा! काय करायचं? कटिंग की दाढी?', 'Come, sit. A cut or a shave?'], hi: ['Aaiye, baithiye. Kya karna hai, bhai?', 'Come in, sit. What’ll it be?'], en: ['Hi! Welcome in. Do you have an appointment?', 'Hi! Welcome in.'] }[L];
+      G.hud.toast(T[0], L === 'en' ? 'Coffee while you wait?' : T[1], 'info', 3);
+    }
     return true;
   }
   exit() {

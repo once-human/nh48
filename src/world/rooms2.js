@@ -385,3 +385,5 @@ export const ROOMS2 = {
     R.customers = 2;
   },
 };
+
+export { panel as roomPanel };
