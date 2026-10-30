@@ -44,6 +44,35 @@ const iconPath = (n) => ICON2D[n] || (ICON_PATHS[n] ? (ICON2D[n] = new Path2D(IC
 const FOOD = new Set(['food', 'cafe', 'bar', 'icecream', 'sweets', 'bakery']);
 const SHOPC = { bank: 'bank', atm: 'bank', police: 'police', clinic: 'hospital' };
 
+// a line for any place on the map: what kind of place it is, from its name and kind, and what it's good for in the game
+const BLURB = [
+  [/pharma|chemist|medical(?! college)/i, 'A chemist. Painkillers, ORS and a first-aid kit, when you’ve taken a knock.'],
+  [/hospital|nursing home/i, 'A hospital. If you’re knocked out nearby, this is where you wake up.'],
+  [/clinic|dental|dr\.?\s|diagnostic|path(o)?lab/i, 'A clinic. Small things patched up, no queue at the counter if you’re lucky.'],
+  [/petrol|fuel|pump|hp |bharat petroleum|indian oil|iocl|bpcl|hpcl/i, 'Petrol and diesel. Fill up before the needle hits red.'],
+  [/cng/i, 'CNG. Autos queue here; so will you.'],
+  [/metro/i, 'A Pune Metro station. Quick across the city, no traffic.'],
+  [/railway|station|junction/i, 'Trains in and out of Pune.'],
+  [/bus|pmpml|stand|depot/i, 'PMPML buses stop here.'],
+  [/mandir|temple|ganpati|ganesh|maruti|hanuman|devi|mata|vitthal|datta|shiv|ram mandir/i, 'A temple. Bells, flowers outside, and quiet inside.'],
+  [/masjid|mosque|dargah/i, 'A mosque.'], [/church|chapel/i, 'A church.'], [/gurudwara/i, 'A gurudwara.'],
+  [/misal/i, 'Misal pav, as spicy as you ask for.'], [/vada ?pav|wada ?pav/i, 'Vada pav, hot from the kadhai.'],
+  [/amrutt?ulya|chai|tea/i, 'Cutting chai. The cheapest pick-me-up in Pune.'], [/cafe|coffee/i, 'A café. Coffee and somewhere to sit.'],
+  [/bakery|bakers/i, 'A bakery. Shrewsbury biscuits and fresh pav.'], [/sweet|mithai|chitale/i, 'Sweets. Barfi and bakarwadi to take home or give away.'],
+  [/bar|pub|brew|wine/i, 'A bar. Don’t drive after.'], [/hotel|restaurant|dhaba|mess|biryani|kitchen|thali/i, 'Somewhere to eat. They’ll pack a parcel for later too.'],
+  [/atm/i, 'An ATM.'], [/bank/i, 'A bank. Put cash away where nobody can take it off you.'],
+  [/kirana|general stores|provision|mart|super ?market|d-?mart|grocer/i, 'Groceries. Water, Parle-G, bananas for the cows.'],
+  [/jewel|gold|sarafa/i, 'A jeweller. Gold by the gram, bought and sold at the day’s rate.'],
+  [/cloth|garment|fashion|saree|wear|tailor/i, 'Clothes. Anyone can wear anything; the street will have opinions.'],
+  [/mobile|electronics|phone/i, 'Phones and electronics.'], [/garage|auto works|motors|service centre|tyre|puncture/i, 'A garage. Dents out, engine sorted.'],
+  [/gym|fitness/i, 'A gym. Get fitter, hit harder.'], [/school|vidyalaya|shala/i, 'A school.'], [/college|university|institute|academy/i, 'A college. Students everywhere around exam time.'],
+  [/police|chowki/i, 'Police. Pay your e-challans here, or stay well away.'],
+  [/garden|udyan|park|baug/i, 'A garden. Benches, morning walkers, the odd couple.'], [/theatre|cinema|multiplex|pvr|inox|natya/i, 'A theatre.'],
+];
+const KIND_BLURB = { food: 'Somewhere to eat.', shop: 'A shop.', bank: 'A bank.', fuel: 'Petrol and diesel.', transit: 'Getting about the city starts here.', hospital: 'Medical help.', temple: 'A place of worship.',
+  park: 'A green space in the city.', college: 'A school or college.', cinema: 'A theatre.', police: 'Police.', service: 'An office or service.', landmark: 'One of Pune’s landmarks.' };
+export function blurbFor(p) { if (p.blurb) return p.blurb; const n = p.n || ''; for (const [re, t] of BLURB) if (re.test(n)) return t; return KIND_BLURB[p.c] || ''; }
+
 export class CityMap {
   constructor(W) {
     this.W = W;
@@ -399,7 +428,7 @@ export class MapScreen {
   constructor(game, root, city) {
     this.g = game; this.city = city;
     // the legend: nothing picked shows everything; pick some and only those show
-    this.pick = new Set();
+    this.legend = new Set();
     this.view = { x: 0, z: 0, ppm: 0.6 };
     this.target = null;            // smooth fly-to {x,z,ppm}
     this.sel = null;
@@ -439,7 +468,7 @@ export class MapScreen {
       const b = document.createElement('button');
       b.className = 'chip'; b.dataset.k = k; b.setAttribute('aria-pressed', 'false');
       b.innerHTML = `<i style="background:${col}"></i>${label}`;
-      b.onclick = () => { const on = !this.pick.has(k); on ? this.pick.add(k) : this.pick.delete(k); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); F.classList.toggle('some', this.pick.size > 0); };
+      b.onclick = () => { const on = !this.legend.has(k); on ? this.legend.add(k) : this.legend.delete(k); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); F.classList.toggle('some', this.legend.size > 0); };
       F.appendChild(b);
     }
     this.$('bm-close').onclick = () => this.g.toggleMap(false);
@@ -458,7 +487,7 @@ export class MapScreen {
     this.bindPointer();
     this.bindSearch();
   }
-  shows(k) { return !this.pick.size || this.pick.has(k); }
+  shows(k) { return !this.legend.size || this.legend.has(k); }
   get hidden() { return this.el.hidden; }
   open() {
     this.el.hidden = false;
@@ -556,10 +585,25 @@ export class MapScreen {
   }
   dropPin(sx, sy) {
     const [x, z] = this.toWorld(sx, sy);
-    const G = this.g.W.graph, near = G.nearest(x, z, 120);
-    let label = 'Dropped pin';
-    if (near) { const nm = G.names[near.e.name]; if (nm && nm[0]) label = nm[0]; }
-    this.select({ n: label, mr: '', c: 'pin', x, z });
+    const subs = (this.g.hud && this.g.hud.suburbs) || []; let a = null, bd = 2500 * 2500; for (const q of subs) { const d = (q.x - x) ** 2 + (q.z - z) ** 2; if (d < bd) { bd = d; a = q; } }
+    this.select({ n: 'Dropped pin', mr: '', c: 'pin', x, z, street: this.streetAt(x, z), area: a ? a.n : '' });
+  }
+  // the name of the road at (x, z): the streets built round you first, else the city's main roads
+  streetAt(x, z) {
+    const G = this.g.W.graph, near = G.nearest(x, z, 90);
+    if (near) { const nm = G.names[near.e.name]; if (nm && nm[0]) return nm[0]; }
+    const C = this.coarse, N = this.W.M.names || []; if (!C) return '';
+    let best = null, bd = 160;
+    for (const e of C.edges) {
+      const b = e.bb; if (x < b[0] - bd || x > b[2] + bd || z < b[1] - bd || z > b[3] + bd) continue;
+      const p = e.pts;
+      for (let k = 0; k + 3 < p.length; k += 2) {
+        const ax = p[k], az = p[k + 1], dx = p[k + 2] - ax, dz = p[k + 3] - az, L2 = dx * dx + dz * dz || 1e-9;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)), d = Math.hypot(x - ax - dx * t, z - az - dz * t);
+        if (d < bd && N[e.name] && N[e.name][0]) { bd = d; best = N[e.name][0]; }
+      }
+    }
+    return best || '';
   }
   select(p) { this.sel = p; this.renderCard(); }
   renderCard() {
@@ -567,13 +611,14 @@ export class MapScreen {
     card.hidden = !p;
     if (!p) { this.g.liveView && this.g.liveView.stop(); return; }
     const pl = this.g.player, d = Math.hypot(p.x - pl.x, p.z - pl.z);
-    const cat = p.c === 'pin' ? 'Pin' : p.c === 'street' ? 'Street' : p.c === 'area' ? 'Area' : (CATS[p.c] ? CATS[p.c][0].replace(/s$/, '').replace(/ & drink/, '') : p.c);
+    const cat = p.c === 'pin' ? (p.street || p.area || 'Pin') : p.c === 'street' ? 'Street' : p.c === 'area' ? 'Area' : (CATS[p.c] ? CATS[p.c][0].replace(/s$/, '').replace(/ & drink/, '') : p.c);
     const sub = p.sub && p.sub !== 'generic' ? ' · ' + p.sub.replace('icecream', 'ice cream') : '';
     this.$('bm-c-cat').textContent = `${cat}${sub} · ${fmtDist(d)} away`;
     this.$('bm-c-n').textContent = p.n;
     this.$('bm-c-mr').textContent = p.mr || '';
-    this.$('bm-c-b').textContent = p.blurb || '';
-    this.$('bm-c-b').hidden = !p.blurb;
+    const bl = p.c === 'pin' ? (p.street ? `On ${p.street}, ${p.area || 'Pune'}.` : `In ${p.area || 'Pune'}.`) : p.c === 'area' ? `A neighbourhood of Pune.` : blurbFor(p);
+    this.$('bm-c-b').textContent = bl;
+    this.$('bm-c-b').hidden = !bl;
     const ft = this.$('bm-c-ft'), cost = this.g.fastTravelCost(p.x, p.z), why = this.g.fastTravelBlock();
     ft.textContent = this.g.free ? 'Go there now' : `Take a rickshaw · ₹${cost}`;
     ft.disabled = !!why || this.g.stats.money < cost || d < 40;
@@ -639,7 +684,7 @@ export class MapScreen {
     };
     const choose = (p) => {
       if (!p) return;
-      if (CATS[p.c] && this.pick.size && !this.pick.has(p.c)) { this.pick.add(p.c); const b = this.$('bm-filters').querySelector(`[data-k="${p.c}"]`); if (b) b.classList.add('on'); }
+      if (CATS[p.c] && this.legend.size && !this.legend.has(p.c)) { this.legend.add(p.c); const b = this.$('bm-filters').querySelector(`[data-k="${p.c}"]`); if (b) b.classList.add('on'); }
       this.flyTo(p.x, p.z, Math.max(this.view.ppm, p.c === 'area' ? 0.9 : p.c === 'street' ? 1.6 : 2.4));
       this.select(p); res.hidden = true; q.blur();
     };
@@ -805,7 +850,7 @@ export class MapScreen {
     // 4. places by category, appearing as you zoom in
     const near = this.city.placesIn(xa, za, xb, zb);
     // (picked in the legend: they show from much further out)
-    const MINZ = this.pick.size ? { police: 0.2, fuel: 0.2, transit: 0.25, hospital: 0.25, temple: 0.3, park: 0.3, college: 0.3, cinema: 0.3, food: 0.45, shop: 0.5, bank: 0.45, service: 0.7 }
+    const MINZ = this.legend.size ? { police: 0.2, fuel: 0.2, transit: 0.25, hospital: 0.25, temple: 0.3, park: 0.3, college: 0.3, cinema: 0.3, food: 0.45, shop: 0.5, bank: 0.45, service: 0.7 }
       : { police: 0.5, fuel: 0.55, transit: 0.55, hospital: 0.7, temple: 0.8, park: 0.7, college: 0.7, cinema: 0.7, food: 0.85, shop: 1.0, bank: 0.95, service: 1.6 };
     const NAMEZ = { police: 1.5, fuel: 1.5, transit: 1.5, hospital: 2.4, temple: 2.6, park: 1.8, college: 1.8, cinema: 1.8, food: 2.2, shop: 2.8, bank: 2.8, service: 3.6 };
     for (const p of near) {

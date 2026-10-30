@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { cmRing } from '../world/geo.js';
 import { fetchJSONgz } from '../world/tiles.js';
 
-const W_ = 320, H_ = 180, R_ = 230, NEAR = 240;
+const W_ = 384, H_ = 216, R_ = 230, NEAR = 240;
 
 export class LiveView {
   constructor(G) { this.g = G; this.on = false; this.a = 0; this.t = 0; }
@@ -33,7 +33,8 @@ export class LiveView {
   show(p, canvas) {
     const G = this.g; if (!p || !canvas) { this.stop(); return; }
     this.init();
-    if (this.on && this.p && Math.abs(this.p.x - p.x) < 0.5 && Math.abs(this.p.z - p.z) < 0.5) { this.cv = canvas; this.cx = canvas.getContext('2d'); return; }     // (the card redrawn, same place)
+    if (this.on && this.p && Math.abs(this.p.x - p.x) < 0.5 && Math.abs(this.p.z - p.z) < 0.5) { if (canvas.width !== W_) { canvas.width = W_; canvas.height = H_; } this.cv = canvas; this.cx = canvas.getContext("2d"); this.img = this.cx.createImageData(W_, H_); return; }     // (the card redrawn, same place)
+    if (canvas.width !== W_ || canvas.height !== H_) { canvas.width = W_; canvas.height = H_; }     // (the picture fills its frame)
     this.p = p; this.cv = canvas; this.cx = canvas.getContext('2d'); this.img = this.cx.createImageData(W_, H_);
     this.on = true; this.live = false; this.a = Math.atan2(G.player.z - p.z, G.player.x - p.x) + 0.6; this.t = 0;
     this.real = Math.hypot(p.x - G.player.x, p.z - G.player.z) < NEAR && !(G.interiors && G.interiors.inside);
