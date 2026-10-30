@@ -448,6 +448,11 @@ export function carSpec(kind) {
   if (kind === 'hatch') spec = { L: 3.65, W: 1.6, H: 1.66, hood: 0.75, roofF: 0.95, roofR: -1.5, beltY: 0.95, sill: 0.25, R: 0.29, tail: 0.15, overhang: 0.6 };
   else if (kind === 'suv') spec = { L: 4.5, W: 1.8, H: 1.88, hood: 1.05, roofF: 0.85, roofR: -2.05, beltY: 1.12, sill: 0.38, R: 0.36, tail: 0.12, overhang: 0.75 };
   else spec = { L: 4.0, W: 1.7, H: 1.5, hood: 1.0, roofF: 0.6, roofR: -1.05, beltY: 0.88, sill: 0.24, R: 0.3, tail: 0.6, overhang: 0.72 };
+  // (low and wide; long and formal; tall and boxy)
+  if (kind === 'super') spec = { L: 4.52, W: 1.93, H: 1.15, hood: 1.2, roofF: 0.1, roofR: -0.55, beltY: 0.72, sill: 0.12, R: 0.33, tail: 0.95, overhang: 0.98 };
+  else if (kind === 'sports') spec = { L: 4.52, W: 1.85, H: 1.3, hood: 1.2, roofF: 0.45, roofR: -1.25, beltY: 0.8, sill: 0.16, R: 0.33, tail: 0.3, overhang: 0.85 };
+  else if (kind === 'lux') spec = { L: 4.92, W: 1.85, H: 1.47, hood: 1.3, roofF: 0.6, roofR: -1.25, beltY: 0.92, sill: 0.24, R: 0.33, tail: 0.78, overhang: 0.95 };
+  else if (kind === 'jeep') spec = { L: 3.98, W: 1.82, H: 1.92, hood: 1.0, roofF: 0.75, roofR: -1.75, beltY: 1.15, sill: 0.46, R: 0.39, tail: 0.05, overhang: 0.55 };
   if (kind === 'taxi') spec.yellowPlate = true;
   return spec;
 }
@@ -533,7 +538,7 @@ export const PAINTS = {
 // ---------------------------------------------------------------- far-LOD proxies (a few boxes each)
 export function buildLow(kind, parked = false) {
   const b = newB(true);
-  const two = ['scooter', 'scooterP', 'bike', 'bikeP', 'cycle'].includes(kind);
+  const two = ['scooter', 'scooterP', 'bike', 'bikeP', 'cycle', 'bullet'].includes(kind);
   if (two) {
     box(b, -0.8, 0.12, -0.05, 0.8, 0.6, 0.05, TYRE);
     box(b, -0.55, 0.45, -0.17, 0.55, 0.85, 0.17, [1, 1, 1], 1);
@@ -554,8 +559,8 @@ export function buildLow(kind, parked = false) {
     box(b, 0.7, 0.35, -0.77, 1.9, 1.9, 0.77, [1, 1, 1], 1);
     box(b, -1.9, 0.35, -0.77, 0.68, 1.05, 0.77, [0.9, 0.55, 0.1]);
   } else {
-    const L = kind === 'hatch' ? 3.65 : kind === 'suv' ? 4.5 : 4.0, Wd = kind === 'hatch' ? 1.6 : kind === 'suv' ? 1.8 : 1.7;
-    const H = kind === 'hatch' ? 1.66 : kind === 'suv' ? 1.88 : 1.5, belt = kind === 'suv' ? 1.12 : 0.92;
+    const cs = carSpec(['hatch', 'suv', 'super', 'sports', 'lux', 'jeep'].includes(kind) ? kind : 'sedan');
+    const L = cs.L, Wd = cs.W, H = cs.H, belt = cs.beltY;
     box(b, -L / 2, 0.22, -Wd / 2, L / 2, belt, Wd / 2, [1, 1, 1], 1);
     box(b, -L / 2 + 0.5, belt, -Wd / 2 + 0.08, L / 2 - 1.0, H, Wd / 2 - 0.08, [0.1, 0.12, 0.14]);
     box(b, -L / 2 + 0.6, H - 0.05, -Wd / 2 + 0.1, L / 2 - 1.1, H + 0.02, Wd / 2 - 0.1, [1, 1, 1], 1);

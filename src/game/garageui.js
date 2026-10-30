@@ -11,8 +11,8 @@ import { fmt, STICKERS } from './shops.js';
 import { modsOf, applyMods, statsOf, illegalOf, classOf, sameCol, COLOURS, NEON, HORNS, FINISH, RIMS, LIVERY, FLAPS, PATYA, EXHAUST, FANCY } from '../vehicles/mods.js';
 
 const r10 = (v) => Math.max(10, Math.round(v / 10) * 10);
-const F_OF = { auto: 1, cycle: 0.3, scooter: 0.8, scooterP: 0.8, bike: 0.9, bikeP: 0.9, hatch: 4, sedan: 4.5, taxi: 4, suv: 5, tempo: 2.2, bus: 8 };
-const VALUE = { cycle: 7500, scooter: 84000, bike: 96000, hatch: 690000, sedan: 880000, suv: 1590000, taxi: 700000, auto: 280000, tempo: 700000, bus: 4000000 };
+const F_OF = { auto: 1, cycle: 0.3, scooter: 0.8, scooterP: 0.8, bike: 0.9, bikeP: 0.9, bullet: 1.2, hatch: 4, sedan: 4.5, taxi: 4, suv: 5, jeep: 5, lux: 9, sports: 14, super: 20, tempo: 2.2, bus: 8 };
+const VALUE = { cycle: 7500, scooter: 84000, bike: 96000, bullet: 215000, hatch: 690000, sedan: 880000, suv: 1590000, jeep: 1650000, lux: 7900000, sports: 19500000, super: 39000000, taxi: 700000, auto: 280000, tempo: 700000, bus: 4000000 };
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const css = (p) => `rgb(${p.map(c => Math.round(Math.pow(Math.min(1, Math.max(0, c)), 1 / 2.2) * 255)).join(',')})`;
 // where each category points the camera: yaw round the vehicle (0 = its nose), height, distance

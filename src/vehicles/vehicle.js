@@ -23,6 +23,12 @@ export const SPECS = {
   suv: { name: 'SUV', model: 'Creta-style 1.5 diesel', vTop: 48, acc: 3.3, brake: 8.2, drag: 0.0012, wb: 2.6, steerMax: 0.55, mu: 8.4, gears: [6.5, 12, 18, 25, 32], mass: 1600, L: 4.5, W: 1.8, honk: 'car' },
   auto: { name: 'Auto rickshaw', model: 'Bajaj RE-style 4-stroke', vTop: 18.6, acc: 2.35, brake: 6.2, drag: 0.0025, wb: 2.0, steerMax: 0.62, mu: 6.8, gears: [4.8, 9.4, 13.8], mass: 520, L: 2.7, W: 1.4, honk: 'auto' },
   tempo: { name: 'Tempo', model: 'Ace-style mini truck', vTop: 21, acc: 1.7, brake: 6.0, drag: 0.0022, wb: 2.1, steerMax: 0.6, mu: 7.0, gears: [5, 9.5, 14.5], mass: 1400, L: 3.8, W: 1.55, honk: 'tempo' },
+  // the rare ones: Koregaon Park on a Saturday night, Baner's high street, a Bullet at every chai stop
+  lux: { name: 'Luxury sedan', model: 'E-Class-style 2.0 turbo petrol', vTop: 70, acc: 6.2, brake: 9.6, drag: 0.0004, wb: 2.94, steerMax: 0.55, mu: 9.6, gears: [8, 14, 20, 27, 34, 42, 52], mass: 1800, L: 4.92, W: 1.85, honk: 'car' },
+  jeep: { name: '4x4', model: 'Thar-style 2.2 diesel 4x4', vTop: 42, acc: 3.4, brake: 7.6, drag: 0.0014, wb: 2.45, steerMax: 0.6, mu: 7.9, gears: [6, 11, 17, 24, 32], mass: 1750, L: 3.98, W: 1.82, honk: 'car' },
+  sports: { name: 'Sports coupé', model: '911-style 3.0 flat-six', vTop: 82, acc: 8.8, brake: 10.8, drag: 0.00026, wb: 2.45, steerMax: 0.56, mu: 10.8, gears: [10, 17, 25, 33, 42, 52, 64], mass: 1500, L: 4.52, W: 1.85, honk: 'car' },
+  super: { name: 'Supercar', model: 'Huracán-style 5.2 V10', vTop: 90, acc: 10.5, brake: 11.5, drag: 0.0002, wb: 2.62, steerMax: 0.55, mu: 11.6, gears: [11, 19, 28, 38, 49, 62, 76], mass: 1420, L: 4.52, W: 1.93, honk: 'car' },
+  bullet: { name: 'Bullet', model: 'Classic 350-style thumper', vTop: 31, acc: 3.3, brake: 6.9, drag: 0.0026, wb: 1.39, steerMax: 0.62, mu: 8.3, gears: [6, 11, 17, 23], two: true, mass: 195, L: 2.15, W: 0.8, seat: [-0.25, 0.85], honk: 'scooter', helmet: true },
   bus: { name: 'PMPML bus', model: '12 m CNG city bus', vTop: 18.5, acc: 1.05, brake: 4.5, drag: 0.0028, wb: 5.4, steerMax: 0.58, mu: 6.0, gears: [4, 8, 12.5], mass: 11000, L: 11.4, W: 2.55, honk: 'bus' },
 };
 export function specOf(type) { const s = SPECS[type]; return s && s.alias ? SPECS[s.alias] : s; }
@@ -36,9 +42,9 @@ function modelFor(type) {
 function buildModel(type) {
   switch (type) {
     case 'scooter': case 'scooterP': return buildScooter({ parked: true });
-    case 'bike': case 'bikeP': return buildBike({ parked: true });
+    case 'bike': case 'bikeP': case 'bullet': return buildBike({ parked: true });
     case 'cycle': return buildCycle({ parked: true });
-    case 'hatch': case 'sedan': case 'suv': case 'taxi': return buildCar(type, { interior: true });
+    case 'hatch': case 'sedan': case 'suv': case 'taxi': case 'lux': case 'jeep': case 'sports': case 'super': return buildCar(type, { interior: true });
     case 'tempo': return buildTempo();
     case 'auto': return buildAuto({ withWheels: true });
     case 'bus': return buildBus();
@@ -51,6 +57,9 @@ export function defaultPaint(type, rng) {
   if (type === 'bus') return [1, 1, 1];
   if (type === 'auto') return [lin(0.12), lin(0.12), lin(0.12)];
   if (type === 'tempo') return pick(PAINTS.tempo);
+  if (type === 'super' || type === 'sports') return pick([[1, 0.55, 0], [0.75, 0.02, 0.02], [0.95, 0.75, 0.02], [0.02, 0.02, 0.025], [0.02, 0.35, 0.12], [0.9, 0.9, 0.9]]).map(lin);
+  if (type === 'lux') return pick([[0.02, 0.02, 0.025], [0.85, 0.85, 0.85], [0.3, 0.31, 0.33], [0.05, 0.08, 0.2]]).map(lin);
+  if (type === 'jeep') return pick([[0.55, 0.05, 0.03], [0.05, 0.05, 0.05], [0.85, 0.85, 0.83], [0.25, 0.3, 0.2]]).map(lin);
   if (specOf(type).two) return pick(PAINTS.two);
   return pick(PAINTS.car);
 }
@@ -92,7 +101,7 @@ export class Vehicle {
       this.tilt.add(g); this.glassMesh = g;          // (window film from the garage swaps its material)
     }
     // driver's-seat view: cars get a real interior (dashboard, turning wheel, live cluster)
-    if (['hatch', 'sedan', 'suv', 'taxi'].includes(type)) {
+    if (['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super'].includes(type)) {
       this.cockpit = buildCarCockpit(type, vmats);
       this.tilt.add(this.cockpit.group);
       this.cockpitEye = this.cockpit.eye;
@@ -188,9 +197,18 @@ export class Vehicle {
     const latDemand = sp * Math.abs(wT);
     let slide = 0;
     if (latDemand > mu && sp > 0.5) { const k = mu / latDemand; slide = 1 - k; wT *= lerp(1, k, 0.7); }
-    this.w += (wT - this.w) * Math.min(1, dt * (S.two ? 8 : 10));
+    // drifting: past ~25 km/h a flick of the handbrake (or, in the fast ones, a bootful of throttle in a corner)
+    // breaks the back loose; it keeps sliding, the turn carries on its own, opposite lock catches it, and it
+    // scrubs speed. The faster you go in, the bigger and longer the slide. Not on two wheels.
+    const kick = !S.two && sp > 7 && (inp.handbrake && Math.abs(inp.steer) > 0.2 || (thr > 0.85 && slide > 0.12 && S.acc * (this.accMul || 1) > 5.5));
+    const caught = Math.abs(this.vl) < 1.1 || sp < 5;
+    this.drift = clamp((this.drift || 0) + (kick ? dt * 3.5 : -dt * (caught ? 3 : 0.45)), 0, 1);
+    const D = this.drift;
+    if (D > 0) wT += Math.sign(this.w || inp.steer || 1) * D * Math.min(1.1, sp / 22) * 0.55 * (1 - Math.max(0, -Math.sign(this.w) * inp.steer) * 0.9);
+    this.w += (wT - this.w) * Math.min(1, dt * (S.two ? 8 : lerp(10, 2.6, D)));
     this.th = wrapAngle(this.th + this.w * dt);
-    this.vl += (slide * this.v * Math.sign(this.w) * 0.4 - this.vl) * Math.min(1, dt * 3);
+    this.vl += ((slide * 0.4 + D * 0.55) * this.v * Math.sign(this.w) - this.vl) * Math.min(1, dt * lerp(3, 0.9, D));
+    if (D > 0) { this.v -= Math.sign(this.v) * Math.abs(this.vl) * 0.32 * D * dt; if (Math.abs(this.vl) > 2) this.events.push({ type: 'drift', amount: Math.abs(this.vl), sp }); }
     this.latAcc = this.v * this.w;
     // ---- integrate
     const hx = Math.cos(this.th), hz = Math.sin(this.th);

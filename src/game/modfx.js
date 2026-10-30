@@ -59,11 +59,30 @@ export class ModFX {
     this.thrWas = thr; if (this.loudT > 0) this.loudT -= dt;
     // the law
     if ((this.chkT -= dt) <= 0) { this.chkT = 1; this.law(v, m, type); }
+    this.driftTick(dt);
     // the strip of keys for what this one has
-    const keys = [v.n2oMax ? `<span class="kbd">Shift</span><b>N₂O</b><i class="mfx-bar"><u style="width:${Math.round((m.n2o || 0) * 10)}%"></u></i>` : '', v.hydro ? '<span class="kbd">G</span><b>Hop</b>' : '', v.beacon ? `<span class="kbd">N</span><b${v.beaconOn ? ' class="on"' : ''}>${v.beacon === 'red' ? 'Laal batti' : 'Strobes'}</b>` : '', v.dj ? `<span class="kbd">U</span><b${this.djOn ? ' class="on"' : ''}>Music</b>` : ''].filter(Boolean);
+    const keys = [this.dr && this.dr.pts > 60 ? `<b class="on">DRIFT ${Math.round(this.dr.pts).toLocaleString('en-IN')}</b>` : '',v.n2oMax ? `<span class="kbd">Shift</span><b>N₂O</b><i class="mfx-bar"><u style="width:${Math.round((m.n2o || 0) * 10)}%"></u></i>` : '', v.hydro ? '<span class="kbd">G</span><b>Hop</b>' : '', v.beacon ? `<span class="kbd">N</span><b${v.beaconOn ? ' class="on"' : ''}>${v.beacon === 'red' ? 'Laal batti' : 'Strobes'}</b>` : '', v.dj ? `<span class="kbd">U</span><b${this.djOn ? ' class="on"' : ''}>Music</b>` : ''].filter(Boolean);
     const h = keys.map(k => `<span class="mfx-k">${k}</span>`).join('');
     if (h !== this._h) { this._h = h; this.el.innerHTML = h; }
     this.el.hidden = !keys.length;
+  }
+  // a drift: smoke off the back tyres, the squeal, and points for a long one (a combo that grows while it lasts)
+  onDrift(ev, v) {
+    const G = this.g; if (!v) return;
+    const c = Math.cos(v.th), s = Math.sin(v.th), L = (v.spec ? v.spec.L : 4) / 2 - 0.6, W = (v.spec ? v.spec.W : 1.7) / 2;
+    if (G.smoke && Math.random() < 0.55) for (const sd of [-1, 1]) G.smoke.emit(v.x - c * L - s * sd * W, (v.y || 0) + 0.25, v.z - s * L + c * sd * W, 'steam', 0.5);
+    if ((this._sqT = (this._sqT || 0) - 1 / 60) <= 0) { this._sqT = 0.09; G.audio.noiseBurst?.(0.12, 2400 + Math.random() * 600, 6, Math.min(0.22, ev.amount * 0.03)); }
+    this.dr = this.dr || { pts: 0, t: 0 };
+    this.dr.pts += ev.amount * ev.sp * 0.12; this.dr.t = 0.6;
+  }
+  driftTick(dt) {
+    const D = this.dr; if (!D || D.pts <= 0) return;
+    D.t -= dt;
+    if (D.t <= 0) {
+      const p = Math.round(D.pts);
+      if (p > 150) { this.g.hud.toast(p > 2500 ? 'Monster drift!' : p > 1000 ? 'Clean drift' : 'Drift', `${p.toLocaleString('en-IN')} points${p > 1000 ? '. Somebody filmed that' : ''}`, 'meter', 2.2); this.g.life && this.g.life.change('respect', Math.min(2, p / 2000)); }
+      D.pts = 0;
+    }
   }
   // flames out of the exhaust tip (world position from the vehicle's frame)
   fire(v, s) {

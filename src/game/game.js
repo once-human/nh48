@@ -251,6 +251,19 @@ export class Game {
     applySettings(this);
     this.trial = new Trial(this);
     this.garageUI = new GarageUI(this); this.modfx = new ModFX(this);
+    // the traffic is the neighbourhood's: Koregaon Park and Baner get the German sedans and the odd supercar,
+    // the peths scooters and cycles, Lohegaon and Wagholi autos, tempos and Thars
+    { const RICH = /koregaon park|boat club|bund garden|kalyani nagar|baner|balewadi|aundh|prabhat road|model colony|viman nagar|dhole patil|sopan baug|pashan|bavdhan|erandwane|salunke vihar|nibm|magarpatta city/i,
+        IT = /hinjawadi|hinjewadi|kharadi|magarpatta|wakad|eon|commerzone|panchshil|mundhwa|yerawada/i, PETH = /peth\b|kasba|mandai|tulshibaug/i,
+        STN = /pune station|sangamwadi|tadiwala|wakdewadi|agarkar nagar|swargate/i,
+        OUT = /lohegaon|lohgaon|wagholi|dhanori|charholi|moshi|dighi|kesnand|manjari|fursungi|uruli|undri|pisoli|yewalewadi|handewadi|narhe|ambegaon|kirkatwadi|khadakwasla|shivane|\bsus\b|mahalunge|marunji|\bmaan\b|punawale|ravet|talawade|chikhali|loni|kondhwa budruk|bhugaon|nanded/i;
+      const cache = new Map();
+      this.traffic.zoneAt = (x, z) => {
+        const k = Math.round(x / 300) * 100000 + Math.round(z / 300); if (cache.has(k)) return cache.get(k);
+        let best = null, bd = 1200 * 1200; for (const a of this.hud.suburbs || []) { const d = (a.x - x) ** 2 + (a.z - z) ** 2; if (d < bd) { bd = d; best = a.n; } }
+        const zn = !best ? null : RICH.test(best) ? 'rich' : IT.test(best) ? 'it' : PETH.test(best) ? 'peth' : STN.test(best) ? 'station' : OUT.test(best) ? 'outskirts' : null;
+        cache.set(k, zn); return zn;
+      }; }
     this.people.reaction = () => this.life.reaction();
     player.hpMax = () => this.life.hpMax;
     // sprinting tires you (about 15 s flat out, then you're down to a jog till you've got your breath back); shot or
@@ -1236,6 +1249,7 @@ export class Game {
       }
       if (ev.type === 'bark' || ev.type === 'dogChase') { const d = Math.hypot(ev.x - P.x, ev.z - P.z); if (d < 60) this.audio.at(ev.x, ev.z, () => this.audio.bark(0.7, 0)); }
       if (ev.type === 'dogChase' && (this._dogT || 0) < this.t) { this._dogT = this.t + 30; this.hud.toast('A street dog is chasing you', 'Classic. Keep going, it’ll give up.', 'info', 2.4); }
+      if (ev.type === 'drift') this.modfx && this.modfx.onDrift(ev, P.cur);
       if (ev.type === 'bump') {
         this.rig.shake(Math.min(0.25, ev.strength * 0.03)); this.audio.thud(Math.min(0.6, ev.strength * 0.12));
         const v = !P.onFoot && P.cur;          // slammed (the garage): a breaker or a pothole scrapes the floor

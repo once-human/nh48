@@ -315,6 +315,11 @@ export const DEALER = [
   ['hatch', 'Hatchback', 'Swift-style 1.2 petrol', 690000],
   ['sedan', 'Compact sedan', 'Dzire-style', 880000],
   ['suv', 'SUV', 'Creta-style 1.5 diesel', 1590000],
+  ['bullet', 'Bullet 350', 'Classic 350-style thumper; dhak-dhak', 215000],
+  ['jeep', '4x4', 'Thar-style 2.2 diesel, soft top', 1650000],
+  ['lux', 'Luxury sedan', 'E-Class-style 2.0 turbo, chauffeur seat in the back', 7900000],
+  ['sports', 'Sports coupé', '911-style 3.0 flat-six, 0-100 in 3.5 s', 19500000],
+  ['super', 'Supercar', 'Huracán-style 5.2 V10, 0-100 in 2.9 s, 325 km/h', 39000000],
 ];
 const PAINTS = [[0.78, 0.1, 0.1], [0.92, 0.92, 0.9], [0.1, 0.12, 0.16], [0.18, 0.32, 0.62], [0.55, 0.57, 0.6], [0.85, 0.55, 0.1]];
 
@@ -749,7 +754,7 @@ export class Shops {
       out.push({ label: name, note: `${note} · on-road price`, price, act: () => {
         if (!this.spend(price, true)) return false;
         this.spawnOwned(type, PAINTS[this.rng.int(0, PAINTS.length - 1)], ctx);
-        L.change('respect', type === 'suv' || type === 'sedan' ? 5 : 2);
+        L.change('respect', type === 'super' ? 25 : type === 'sports' ? 18 : type === 'lux' ? 12 : type === 'suv' || type === 'sedan' || type === 'jeep' ? 5 : 2);
         return `Your new ${name.toLowerCase()} is parked outside. Keys are in your bag`;
       } });
     }

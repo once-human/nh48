@@ -19,9 +19,22 @@ export const TYPES = {
   suv: { w: 4, L: 4.5, W: 1.8, vMul: [0.9, 1.15], A: 2.3, B: 5.5, T: 1.0, s0: 1.3, agile: 0.25, mass: 1700, honk: 'car' },
   taxi: { w: 2, L: 4.0, W: 1.7, vMul: [0.95, 1.15], A: 2.4, B: 5.5, T: 0.9, s0: 1.2, agile: 0.35, mass: 1100, honk: 'car' },
   tempo: { w: 4, L: 3.8, W: 1.55, vMul: [0.75, 0.95], A: 1.6, B: 4.5, T: 1.0, s0: 1.4, agile: 0.25, mass: 1400, honk: 'tempo' },
+  lux: { w: 0.7, L: 4.92, W: 1.85, vMul: [0.95, 1.2], A: 2.8, B: 6, T: 0.9, s0: 1.3, agile: 0.3, mass: 1800, honk: 'car' },
+  jeep: { w: 0.9, L: 3.98, W: 1.82, vMul: [0.95, 1.2], A: 2.4, B: 5.5, T: 0.9, s0: 1.3, agile: 0.3, mass: 1750, honk: 'car' },
+  sports: { w: 0.05, L: 4.52, W: 1.85, vMul: [1.0, 1.3], A: 3.4, B: 6.5, T: 0.8, s0: 1.3, agile: 0.35, mass: 1500, honk: 'car' },
+  super: { w: 0.025, L: 4.52, W: 1.93, vMul: [1.0, 1.35], A: 3.6, B: 7, T: 0.8, s0: 1.3, agile: 0.35, mass: 1420, honk: 'car' },
+  bullet: { w: 3, L: 2.15, W: 0.8, vMul: [0.95, 1.2], A: 2.6, B: 5.5, T: 0.55, s0: 0.65, agile: 0.85, mass: 195, two: true, honk: 'beep' },
   bus: { w: 3, L: 11.4, W: 2.55, vMul: [0.7, 0.85], A: 1.1, B: 3.5, T: 1.4, s0: 2.0, agile: 0.05, mass: 9000, honk: 'bus', mainOnly: true },
 };
 const TYPE_NAMES = Object.keys(TYPES);
+// the neighbourhood's own traffic (game.js tells the traffic which kind of place a spot is)
+const ZONE_MIX = {
+  rich: { lux: 5, suv: 1.8, sedan: 1.4, sports: 9, super: 9, jeep: 1.6, auto: 0.6, cycle: 0.4, tempo: 0.5, scooterP: 0.7 },          // KP, Boat Club Road, Baner, Kalyani Nagar...
+  it: { sedan: 1.5, suv: 1.6, lux: 2, hatch: 1.3, bike: 1.2, taxi: 2.5, sports: 2, super: 1.5, cycle: 0.4, tempo: 0.7 },             // Hinjawadi, Kharadi, Magarpatta: cabs and company cars
+  peth: { scooter: 1.4, scooterP: 1.6, auto: 1.3, cycle: 1.8, bullet: 1.4, hatch: 0.8, suv: 0.5, lux: 0.25, sports: 0.15, super: 0.1, jeep: 0.4 },
+  station: { auto: 2, taxi: 1.8, bus: 1.3, tempo: 1.2, lux: 0.4, sports: 0.1, super: 0.05 },
+  outskirts: { auto: 1.4, tempo: 1.8, bike: 1.4, bullet: 1.6, jeep: 2.2, cycle: 1.4, hatch: 0.8, sedan: 0.7, lux: 0.2, sports: 0.05, super: 0.03 },   // Lohegaon, Wagholi, Dhanori, the villages
+};
 
 const SPEED_BY_RANK = [4.5, 5, 7, 9.5, 11.5, 13.5, 14.5];
 const tmpA = [0, 0, 0, 0], tmpB = [0, 0, 0, 0];
@@ -64,6 +77,7 @@ export class Traffic {
       bike: buildBike({ helmet: true }), bikeP: buildBike({ helmet: true, pillion: true }), cycle: buildCycle(),
       auto: buildAuto({ driver: true, inst: true, withWheels: true }),
       hatch: buildCar('hatch'), sedan: buildCar('sedan'), suv: buildCar('suv'), taxi: buildCar('taxi'),
+      lux: buildCar('lux'), jeep: buildCar('jeep'), sports: buildCar('sports'), super: buildCar('super'), bullet: buildBike({ helmet: true }),
       tempo: buildTempo(), bus: buildBus(),
       // the same, empty: close and slow, real people ride them (crowd.js)
       scooterE: buildScooter({ helmet: true, noRider: true }), bikeE: buildBike({ helmet: true, noRider: true }), autoE: buildAuto({ inst: true, withWheels: true }),
@@ -108,7 +122,8 @@ export class Traffic {
   // ---------------------------------------------------------------- spawning
   pickType(link) {
     const main = link.e.rank >= 4;
-    const mix = this.mix();
+    const mix = { ...this.mix() }, p = link.e.pts, z = this.zoneAt && p ? this.zoneAt(p[0], p[1]) : null, Z = ZONE_MIX[z];
+    if (Z) for (const k in Z) mix[k] = (mix[k] ?? 1) * Z[k];
     let tot = 0;
     for (const k of TYPE_NAMES) { const t = TYPES[k]; if (t.mainOnly && !main) continue; tot += t.w * (mix[k] ?? 1); }
     let x = this.rng.next() * tot;
