@@ -80,7 +80,7 @@ export const KIND_INFO = {
   chowki: ['Police chowki', 'पोलीस चौकी', 'place'], lodge: ['Lodge', 'लॉज', 'place'], estate: ['Estate agent', 'इस्टेट', 'place'],
   cinema: ['Cinema', 'सिनेमा', 'fun'], gaming: ['Gaming & bowling', 'गेमिंग', 'fun'], laundry: ['Laundry & ironing', 'इस्त्री', 'look'], petshop: ['Pet shop', 'पेट शॉप', 'things'],
   library: ['Reading room', 'अभ्यासिका', 'place'], temple: ['Temple', 'मंदिर', 'place'], park: ['Garden', 'बाग', 'place'], zoo: ['Zoo', 'प्राणीसंग्रहालय', 'place'],
-  landmark: ['Landmark', 'वारसा', 'place'], shop: ['Shop', 'दुकान', 'things'], college: ['Campus', 'कॉलेज', 'place'],
+  landmark: ['Landmark', 'वारसा', 'place'], shop: ['Shop', 'दुकान', 'things'], college: ['Campus', 'कॉलेज', 'place'], station: ['Railway station', 'रेल्वे स्टेशन', 'place'],
 };
 // real entry fees where there is one (a garden's gate, a zoo, a palace); every other garden is free, as most public ones are
 const ENTRY = [[/okayama|p\.? ?l\.? deshpande|pu\.? ?la deshpande/i, 10], [/empress/i, 20], [/rajiv gandhi zoo|katraj.*zoo|zoological/i, 40], [/aga ?khan/i, 25]];
@@ -145,7 +145,7 @@ const HELLO = {
   mobile: [['Recharge ki navin phone?', 'A recharge or a new phone?']], electronics: [['EMI available aahe.', 'EMI is available.']],
   books: [['Navin aali aahet tikde.', 'New arrivals over there.']], florist: [['Gajra ghya, taaja aahe.', 'Take a gajra, it’s fresh.']],
   paan: [['Meetha ki saadha?', 'Sweet or plain?']], dealer: [['Test drive ghya, sir!', 'Take a test drive, sir!']],
-  garage: [['Kaay problem aahe gaadit?', 'What’s wrong with the vehicle?']], fuel: [['Kiti cha bharu?', 'How much shall I fill?']],
+  garage: [['Kaay problem aahe gaadit?', 'What’s wrong with the vehicle?']], station: [['Kuthe jaaycha?', 'Where to?']], fuel: [['Kiti cha bharu?', 'How much shall I fill?']],
   travel: [['Kuthe jaycha aahe?', 'Where do you want to go?']], chowki: [['Kaay takrar aahe?', 'What’s the complaint?']],
   lodge: [['Room pahije? ID dakhva.', 'Need a room? Show your ID.']], estate: [['Budget kaay aahe?', 'What’s your budget?']],
 };
@@ -336,6 +336,8 @@ export class Shops {
       const k = p[2] === 'fuel' ? 'fuel' : p[2] === 'police' ? 'chowki' : p[2] === 'hospital' ? 'clinic' : null;
       if (k) this.places.push({ x: p[3] / 100, z: p[4] / 100, kind: k, name: parodyFuel(p[0], k), mr: p[1] || '' });
     }
+    // Pune Junction: in under the porch, to the booking hall (the trains themselves are coming soon)
+    this.places.push({ x: 985.1, z: -202.6, kind: 'station', name: 'Pune Junction', mr: 'पुणे जंक्शन', pin: true });
     this.build();
     this.goldBase = 11800;            // ₹ per gram, 24 carat: a guess for late 2026, moves daily
   }
@@ -546,6 +548,7 @@ export class Shops {
         out.push({ label: 'Soda', note: 'Lemon soda, fizzy', price: r10(30 * mul), act: pay(r10(30 * mul), () => { L.apply({ thirst: 0.25 }); return 'Refreshing'; }) });
         break;
       case 'dealer': this.dealer(out, ctx); break;
+      case 'station': this.station(out, ctx); break;
       case 'garage': this.garage(out, ctx, mul); if (!ctx.gcat) this.g.hustle && this.g.hustle.garageItems(out, ctx); break;
       case 'fuel': this.fuel(out); break;
       case 'travel':
@@ -758,6 +761,17 @@ export class Shops {
         return `Your new ${name.toLowerCase()} is parked outside. Keys are in your bag`;
       } });
     }
+  }
+  // the booking window: every long-distance train is coming soon (an easter egg for now); a platform ticket, chai
+  station(out) {
+    const L = this.life, G = this.g;
+    out.push({ label: 'Long-distance trains', note: 'The railway isn’t in the game yet. The booking clerk takes your name anyway', price: 0, disabled: ' ' });
+    for (const [to, train, note] of [['Mumbai CSMT', 'Deccan Queen', 'The queen of the ghats, dining car and all'], ['Bengaluru', 'Udyan Express', 'Overnight, south'], ['Kolhapur', 'Mahalaxmi Express', 'For the Ambabai darshan'],
+      ['Jammu Tawi', 'Jhelum Express', 'Two nights to the far north'], ['Goa', 'via Miraj', 'The beach, eventually'], ['Nagpur', 'overnight', 'Oranges, heat']])
+      out.push({ label: `${to} · ${train}`, note, price: 0, disabled: 'Coming soon' });
+    out.push({ label: 'Platform ticket', note: 'On to the platforms, to see someone off', price: 10, act: () => { if (!this.spend(10)) return false; G.hud.toast('Platform ticket', 'Platform 1 is through the arch. No trains in yet: they’re coming soon', 'info', 3); return 'Valid two hours'; } });
+    out.push({ label: 'Railway chai', note: 'Sweet, in a paper cup', price: 10, act: () => { if (!this.spend(10)) return false; L.apply({ thirst: 0.15, energy: 0.05 }); return 'Garam chai'; } });
+    out.push({ label: 'Vada pav from the stall', note: 'The one every traveller eats', price: 20, act: () => { if (!this.spend(20)) return false; L.apply({ hunger: 0.3 }); return 'With the dry chutney'; } });
   }
   // the garage has its own screen (garageui.js): your vehicle in the bay, every mod, the build sheet
   garage() {}

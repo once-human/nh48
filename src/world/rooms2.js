@@ -91,6 +91,62 @@ function filmFrame(g, w, h) {
 
 // ---------------------------------------------------------------- the rooms
 export const ROOMS2 = {
+
+  // Pune Junction's booking hall: the windows down the left (reservation, unreserved, tatkal, enquiry), the
+  // departures board on the right (every train coming soon: the railway isn't in the game yet), benches, pillars,
+  // fans, a chai stall, and the arches through to the platforms with a coach waiting
+  station(K) {
+    const { B, GL, box, solid, spot, kp, W, D, H, R } = K, S2 = shapes(K);
+    floorPanel(K, 0, D / 2, W, D, PAINT.stone, [W / 4, D / 4]);
+    const wall = (g, w, h) => { g.fillStyle = '#eadfc4'; g.fillRect(0, 0, w, h); g.fillStyle = '#b8a37a'; g.fillRect(0, h * 0.84, w, h * 0.16); g.fillStyle = '#f6efdd';
+      for (let k = 0; k < 6; k++) { const x = (k + 0.5) * w / 6, aw = w / 6 * 0.32, top = h * 0.12; g.fillStyle = '#d9c9a4'; g.beginPath(); g.moveTo(x - aw, h * 0.55); g.lineTo(x - aw, top + aw); g.arc(x, top + aw, aw, Math.PI, 0); g.lineTo(x + aw, h * 0.55); g.closePath(); g.fill(); g.fillStyle = '#9fc3d8'; g.fillRect(x - aw * 0.75, top + aw * 0.5, aw * 1.5, h * 0.3); }
+      noise(g, w, h, 10, 5); };
+    for (const sd of [-1, 1]) panel(K, sd * (W / 2 - 0.05), H / 2, D / 2, D, H, -sd * Math.PI / 2, wall, { px: 1024 });
+    panel(K, 0, H / 2, 0.11, W, H, 0, wall, { px: 1024 });
+    box(B, 0, H - 0.01, D / 2, W, 0.02, D, 0xe8dcc0);
+    // the back wall: two arches through to platform 1, a blue coach standing at it
+    const arch = (g, w, h) => { const sky = g.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#e8d9b0'); sky.addColorStop(1, '#a89878'); g.fillStyle = sky; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#1f4f8f'; g.fillRect(0, h * 0.42, w, h * 0.42); g.fillStyle = '#e8dcc0'; g.fillRect(0, h * 0.5, w, h * 0.05); for (let x = 12; x < w - 30; x += 46) { g.fillStyle = '#0d1a2a'; g.fillRect(x, h * 0.58, 30, h * 0.12); g.fillStyle = '#9aa3ad'; g.fillRect(x, h * 0.58, 30, 3); }
+      g.fillStyle = '#5c5a55'; g.fillRect(0, h * 0.84, w, h * 0.16); g.fillStyle = '#e8c547'; g.fillRect(0, h * 0.84, w, 5); };
+    box(B, 0, H / 2, D - 0.15, W, H, 0.3, 0xeadfc4);
+    for (const sd of [-1, 1]) { panel(K, sd * W / 4, 3.2, D - 0.32, 7, 6.4, Math.PI, arch, { px: 512 }); box(B, sd * W / 4, 6.55, D - 0.36, 7.6, 0.3, 0.12, 0xd9c9a4); for (const e of [-1, 1]) box(B, sd * W / 4 + e * 3.65, 3.2, D - 0.36, 0.3, 6.4, 0.12, 0xd9c9a4);
+      panel(K, sd * W / 4, 7.6, D - 0.33, 4.4, 0.8, Math.PI, (g, w, h) => { g.fillStyle = '#f3c614'; g.fillRect(0, 0, w, h); g.fillStyle = '#111'; g.textAlign = 'center'; g.font = font(h * 0.42, 800, true); g.fillText(sd < 0 ? 'फलाट १  ·  PLATFORM 1  →' : '←  PLATFORMS 2 – 6  ·  पूल', w / 2, h * 0.65); }); }
+    panel(K, 0, H - 1.4, D - 0.33, 9, 1.4, Math.PI, (g, w, h) => { g.fillStyle = '#f3c614'; g.fillRect(0, 0, w, h); g.strokeStyle = '#111'; g.lineWidth = 8; g.strokeRect(6, 6, w - 12, h - 12); g.fillStyle = '#111'; g.textAlign = 'center'; g.font = font(h * 0.34, 800, true); g.fillText('पुणे जंक्शन', w / 2, h * 0.44); g.font = font(h * 0.26, 900); g.fillText('PUNE JN.', w / 2, h * 0.8); }, { px: 768 });
+    // the booking windows down the left wall: a counter, glass with a grille, a clerk behind each, the queue rails
+    const WIN = [['आरक्षण', 'RESERVATION'], ['आरक्षण', 'RESERVATION'], ['तत्काल', 'TATKAL'], ['चालू तिकीट', 'UNRESERVED'], ['चौकशी', 'ENQUIRY']];
+    WIN.forEach(([mr, en], i) => {
+      const z = 3.2 + i * 3.4, x = -W / 2 + 0.9;
+      box(B, x, 0.55, z, 0.8, 1.1, 2.6, 0x6b4a2e); box(B, x, 1.12, z, 0.9, 0.05, 2.7, 0x4a3220);
+      box(GL, x + 0.05, 1.75, z, 0.03, 1.1, 2.2, 0x9fc3d8); for (let k = 0; k < 9; k++) box(B, x + 0.08, 1.75, z - 1.0 + k * 0.25, 0.02, 1.1, 0.02, 0x3a3a3a);
+      box(B, x, 2.45, z, 0.9, 0.3, 2.7, 0x4a3220);
+      panel(K, x + 0.47, 2.85, z, 2.6, 0.6, Math.PI / 2, (g, w, h) => { g.fillStyle = '#1d3f7a'; g.fillRect(0, 0, w, h); g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = font(h * 0.34, 700, true); g.fillText(mr, w / 2, h * 0.42); g.font = font(h * 0.28, 800); g.fillText(en + '  ' + (i + 1), w / 2, h * 0.82); });
+      solid(x, z, 0.8, 2.6); kp(x - 0.25, z, 0, 'idle', 'keeper');
+      for (const dz of [-0.75, 0.75]) { box(B, x + 3.0, 0.9, z + dz, 4.0, 0.04, 0.04, 0xb8bcc2); for (let k = 0; k < 4; k++) S2.cyl(B, x + 1.3 + k * 1.15, 0.45, z + dz, 0.025, 0.9, 0xb8bcc2); solid(x + 3.0, z + dz, 4.0, 0.1, 2); }
+    });
+    spot(-W / 2 + 2.2, 3.2 + 2 * 3.4, 1.6, 'counter', 'Booking window');
+    // the departures board on the right wall, amber on black
+    panel(K, W / 2 - 0.16, 5.6, D * 0.42, 10, 3.6, -Math.PI / 2, (g, w, h) => {
+      g.fillStyle = '#0b0b0c'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffb000'; g.textAlign = 'left';
+      const rows = [['DEPARTURES', 'प्रस्थान', '', ''], ['Deccan Queen', 'Mumbai CSMT', '1', 'COMING SOON'], ['Udyan Express', 'KSR Bengaluru', '3', 'COMING SOON'], ['Mahalaxmi Express', 'Kolhapur', '2', 'COMING SOON'], ['Jhelum Express', 'Jammu Tawi', '4', 'COMING SOON'], ['Indrayani Express', 'Mumbai CSMT', '1', 'COMING SOON'], ['Sinhagad Express', 'Mumbai CSMT', '6', 'COMING SOON']];
+      rows.forEach((r, i) => { const y = h * (0.13 + i * 0.13); g.font = font(h * (i ? 0.075 : 0.085), i ? 700 : 900, !i); g.fillStyle = i ? '#ffb000' : '#ffd36a'; g.fillText(r[0] + (i ? '' : '   ' + r[1]), w * 0.03, y);
+        if (i) { g.fillText(r[1], w * 0.4, y); g.fillText(r[2], w * 0.68, y); g.fillStyle = Math.floor(i * 1.7) % 2 ? '#ff5a3d' : '#ffb000'; g.fillText(r[3], w * 0.76, y); } });
+      g.fillStyle = 'rgba(0,0,0,.35)'; for (let y = 0; y < h; y += 4) g.fillRect(0, y, w, 1);
+    }, { px: 1024 });
+    box(B, W / 2 - 0.08, 5.6, D * 0.42, 0.1, 3.8, 10.2, 0x1a1a1a);
+    // the station clock
+    S2.cyl(B, W / 2 - 0.15, 8.4, D * 0.42, 0.55, 0.08, 0xf4f1ea, 0, 0, Math.PI / 2); S2.ring(B, W / 2 - 0.2, 8.4, D * 0.42, 0.58, 0x1b1c1f, Math.PI / 2);
+    box(B, W / 2 - 0.22, 8.55, D * 0.42, 0.02, 0.35, 0.05, 0x1b1c1f); box(B, W / 2 - 0.22, 8.4, D * 0.42 + 0.12, 0.02, 0.04, 0.26, 0x1b1c1f);
+    // pillars, steel benches, ceiling fans
+    for (const x of [-W / 6, W / 6]) for (const z of [D * 0.3, D * 0.7]) { S2.cyl(B, x, H / 2, z, 0.45, H, 0xeadfc4); S2.cyl(B, x, 0.3, z, 0.6, 0.6, 0xb8a37a); solid(x, z, 1.0, 1.0); }
+    for (let r = 0; r < 3; r++) for (const sd of [-1, 1]) { const z = 5 + r * 4.4, x = sd * 3.2; box(B, x, 0.45, z, 4.2, 0.05, 0.5, 0x8a97a3); box(B, x, 0.75, z + 0.24, 4.2, 0.5, 0.04, 0x8a97a3); for (const e of [-1.9, 0, 1.9]) box(B, x + e, 0.22, z, 0.06, 0.45, 0.45, 0x5a646e); solid(x, z, 4.2, 0.6, 2);
+      for (let k = 0; k < 4; k++) R.seats.push({ x: K.O.x + x - 1.5 + k, z: K.O.z + z, yaw: -Math.PI / 2, used: false, wait: true }); }
+    for (const x of [-W / 4, 0, W / 4]) for (const z of [D * 0.3, D * 0.62]) { S2.cyl(B, x, H - 0.4, z, 0.02, 0.8, 0x3a3a3a); for (let k = 0; k < 3; k++) box(B, x + Math.cos(k * 2.09) * 0.5, H - 0.8, z + Math.sin(k * 2.09) * 0.5, 0.9, 0.02, 0.14, 0x6b5a46, 0, -k * 2.09); }
+    // the chai stall by the door
+    box(B, W / 2 - 2.2, 0.55, 2.4, 2.4, 1.1, 0.8, 0x8a5a2a); box(B, W / 2 - 2.2, 1.12, 2.4, 2.5, 0.04, 0.9, 0x6b4a2e); S2.cyl(B, W / 2 - 2.8, 1.3, 2.4, 0.16, 0.32, 0xb8bcc2); for (let k = 0; k < 6; k++) S2.cyl(B, W / 2 - 1.9 + k * 0.12, 1.19, 2.25, 0.03, 0.1, 0xf4f1ea);
+    panel(K, W / 2 - 2.2, 2.3, 2.0, 2.4, 0.8, 0, (g, w, h) => board(g, w, h, 'चहा · TEA & SNACKS', [['Chai', '₹10'], ['Vada pav', '₹20']], { bg: '#fffbe8', fg: '#7a1e1e', fg2: '#1b1c1f' }));
+    solid(W / 2 - 2.2, 2.4, 2.4, 0.8); kp(W / 2 - 2.2, 2.9, Math.PI / 2, 'idle', 'helper');
+    R.customers = 16;
+  },
   // a single-screen cinema: lobby to the hall's doors at z = 10, the hall beyond it
   cinema(K) {
     const { B, GL, box, solid, spot, kp, chair, counter, W, D, H, C, O, R } = K, S2 = shapes(K);

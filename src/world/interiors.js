@@ -34,14 +34,14 @@ const TEMPLATE = {
   bar: 'club', barber: 'salon', clothes: 'boutique', shoes: 'boutique', optician: 'boutique', bank: 'bank',
   home: 'home', pharmacy: 'shop', kirana: 'shop', mobile: 'shop', electronics: 'shop', books: 'shop', florist: 'shop', paan: 'shop', jeweller: 'shop',
   clinic: 'clinic', gym: 'gym', dealer: 'showroom', lodge: 'lodge', chowki: 'chowki', estate: 'office',
-  garage: 'garage', travel: 'office', cinema: 'cinema', temple: 'temple', gaming: 'arcade', laundry: 'laundry', library: 'library', petshop: 'shop', shop: 'shop',
+  garage: 'garage', travel: 'office', station: 'station', cinema: 'cinema', temple: 'temple', gaming: 'arcade', laundry: 'laundry', library: 'library', petshop: 'shop', shop: 'shop',
 };
 // How big each kind of room is (w across, d deep, h tall) before the brand scales it
 const ROOM = {
   eatery: [20, 15, 3.8], cafe: [18, 13, 3.7], club: [28, 22, 6], salon: [16, 11, 3.5], boutique: [22, 16, 4],
   bank: [20, 14, 4.2], shop: [16, 12, 3.6], clinic: [16, 12, 3.4], gym: [22, 15, 4.8], showroom: [26, 17, 6],
   lodge: [14, 11, 3.4], chowki: [13, 10, 3.4], office: [14, 10, 3.4], home: [14, 12, 3.3],
-  garage: [16, 14, 5], cinema: [20, 30, 8], temple: [14, 18, 6.5], arcade: [20, 20, 4.6], laundry: [9, 8, 3.4], library: [14, 14, 3.6],
+  garage: [16, 14, 5], station: [36, 22, 10], cinema: [20, 30, 8], temple: [14, 18, 6.5], arcade: [20, 20, 4.6], laundry: [9, 8, 3.4], library: [14, 14, 3.6],
 };
 // A place's look. The brand picks it: the chains and posh places get a designed interior (minimal,
 // bold, industrial, heritage, luxe, pastel), the local places a cuisine look or the plain Pune shop.
