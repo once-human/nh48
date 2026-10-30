@@ -44,7 +44,7 @@ export function missionsRoom(J) {
   };
   const row = (x) => `<button class="mr-it${x.id === J.msel ? ' sel' : ''}${x.locked ? ' locked' : ''}${x.done ? ' done' : ''}" data-msel="${x.id}">${thumb(x)}
     <span><b>${esc(x.locked ? 'Locked' : x.k === 'main' ? x.m.title : x.title)}</b><small>${x.k === 'main' ? esc(x.m.act ? `Act ${x.m.act} · ${ACTS[x.m.act][1]}` : 'Prologue') : esc(x.sub)}</small></span>
-    <em>${x.cur && dist != null ? km(dist) : x.done ? g('flag', 'dn') : x.locked ? g('shield', 'lk') : ''}</em></button>`;
+    <em>${x.cur && dist != null ? km(dist) : x.done ? g('flag', 'dn') : x.locked ? g('lock', 'lk') : ''}</em></button>`;
   const groups = [['main', 'Main story'], ['side', 'Side jobs'], ['act', 'Activities']].filter(([k]) => filt === 'all' || filt === k);
   const left = `<div class="rm-chips">${[['all', 'All'], ['main', 'Main story'], ['side', 'Side jobs'], ['act', 'Activities']].map(([k, n]) => `<button class="${filt === k ? 'on' : ''}" data-mf="${k}">${n}</button>`).join('')}</div>
     <div class="rm-scroll">${groups.map(([k, n]) => { const L = items.filter(x => x.k === k); return L.length ? `<div class="rm-h">${n}</div>${L.map(row).join('')}` : ''; }).join('')}</div>`;
@@ -141,7 +141,7 @@ export function statsRoom(J) {
     </div>
     <div class="rs-3">
       <div class="rf-card"><h4>Money</h4><div class="rs-grid">${tl('cash', 'Cash', rs(G.stats.money))}${tl('bank', 'Bank', rs(s.bank))}${tl('gold', 'Gold', (s.gold || 0) + ' g', '', '#ffc83d')}</div></div>
-      <div class="rf-card"><h4>Records</h4><div class="rs-grid four">${tl('auto', 'Rides completed', G.stats.rides || 0, G.stats.rides ? `<em>${g('star')}${(G.stats.rating || 0).toFixed(1)} avg</em>` : '')}${tl('bag', 'Deliveries', T.deliveries || 0)}${tl('fist', 'Fights won', T.fightsWon || 0)}${tl('paw', 'Strays fed', T.fed || 0)}</div></div>
+      <div class="rf-card"><h4>Records</h4><div class="rs-grid four">${tl('auto', 'Rides', G.stats.rides || 0, G.stats.rides ? `<em>${g('star')}${(G.stats.rating || 0).toFixed(1)} avg</em>` : '')}${tl('bag', 'Deliveries', T.deliveries || 0)}${tl('fist', 'Fights won', T.fightsWon || 0)}${tl('paw', 'Strays fed', T.fed || 0)}</div></div>
       <div class="rf-card"><div class="rf-h"><h4>Owned properties</h4><button class="rf-btn" data-goto="own">Manage <span class="kbd">P</span></button></div>
         ${homes.map(h => `<div class="rs-home"><div class="rs-hi">${homeImg(h)}</div><span><b>${esc(h.n)}</b><small>${g('pin', '', '#9aa0aa')}${esc(h.note || h.at)}</small></span>${h.cur ? '<em>Current</em>' : ''}</div>`).join('')}</div>
       <div class="rf-card"><div class="rf-h"><h4>Owned vehicles</h4><button class="rf-btn" data-goto="own">Manage <span class="kbd">V</span></button></div><div class="rs-veh">${veh.slice(0, 3).map(vCard).join('')}</div></div>

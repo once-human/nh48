@@ -45,6 +45,7 @@ const P = {
   wrench: 'M21 6.6a5.5 5.5 0 0 1-7.3 5.2l-7 6.9a2 2 0 0 1-2.8-2.8l6.9-7A5.5 5.5 0 0 1 17.4 1.6l-3.3 3.2.6 3 3 .6z',
   check: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 13.7-4.1-4.1 1.5-1.5 2.6 2.6 5.5-5.5 1.5 1.5z',
   pencil: 'M3 17.2V21h3.8L17.8 10 14 6.2zM20.7 7a1 1 0 0 0 0-1.4l-2.3-2.3a1 1 0 0 0-1.4 0l-1.8 1.8 3.8 3.8z',
+  lock: 'M7 10V7.5a5 5 0 0 1 10 0V10h1.5A1.5 1.5 0 0 1 20 11.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 20.5v-9A1.5 1.5 0 0 1 5.5 10zm2.5 0h5V7.5a2.5 2.5 0 0 0-5 0zM12 13.5a1.8 1.8 0 0 0-1 3.3V19h2v-2.2a1.8 1.8 0 0 0-1-3.3z',
   tree: 'M12 1.8 4.5 12.5h4L4 19h7v3.2h2V19h7l-4.5-6.5h4z',
   temple: 'M12 1.5 13 4h-2zM8.5 5h7l1.5 4h-10zM5 10h14v2H5zm1.5 3h11v7h-3.5v-4h-4v4H6.5zM3 21h18v1.5H3z',
   film: 'M3 4h18v16H3zm2 2v2h2V6zm12 0v2h2V6zM5 10v2h2v-2zm12 0v2h2v-2zM5 14v2h2v-2zm12 0v2h2v-2zM9 6v12h6V6z',
@@ -55,7 +56,7 @@ const P = {
 const C = { heart: '#ff4d5e', food: '#ff8a3d', drop: '#3ea8ff', bolt: '#ffd23f', run: '#f1ece2', smile: '#3ddc84', glass: '#e8b04a', rupee: '#6fdc8c', cash: '#6fdc8c', bank: '#6aa8ff', gold: '#ffc83d',
   auto: '#ffd23f', bag: '#ff9f43', fist: '#f3c9a0', paw: '#f1ece2', burst: '#ff6b5e', plate: '#f1ece2', star: '#ffd23f', receipt: '#f1ece2', card: '#3ddc84', shield: '#5aa2ff', home: '#f1ece2', pin: '#ff6b5e',
   user: '#f1ece2', rank: '#ffd23f', flag: '#ffd23f', road: '#f1ece2', phone: '#f1ece2', clock: '#f1ece2', pagdi: '#ffb224', lotus: '#5aa2ff', shirt: '#ff5a5f', dumbbell: '#3ddc84', cart: '#ff9f43',
-  pad: '#f1ece2', diamond: '#ffc83d', chat: '#3ddc84', car: '#a78bfa', cross: '#ff4d5e', fuel: '#a08cff', bus: '#33d17a', wrench: '#f1ece2', check: '#3ddc84', pencil: '#f1ece2', tree: '#5bbf6a',
+  pad: '#f1ece2', diamond: '#ffc83d', chat: '#3ddc84', car: '#a78bfa', cross: '#ff4d5e', fuel: '#a08cff', bus: '#33d17a', wrench: '#f1ece2', check: '#3ddc84', lock: '#8a8f98', pencil: '#f1ece2', tree: '#5bbf6a',
   temple: '#ff9f43', film: '#ff6ec7', college: '#c08cff', building: '#9aa0aa' };
-export const g = (name, cls = '', col) => P[name] ? `<svg class="gi ${cls}" viewBox="0 0 24 24" aria-hidden="true" style="color:${col || C[name] || 'currentColor'}"><path fill-rule="evenodd" d="${P[name]}"/></svg>` : '';
+export const g = (name, cls = '', col) => P[name] ? `<svg class="gy ${cls}" viewBox="0 0 24 24" aria-hidden="true" style="color:${col || C[name] || 'currentColor'}"><path fill-rule="evenodd" d="${P[name]}"/></svg>` : '';
 export const GLYPH = P;
