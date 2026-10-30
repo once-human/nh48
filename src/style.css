@@ -2390,3 +2390,6 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .iv.in .iv-panel > .iv-bin { animation: none !important; }
 .iv-head { position: relative; z-index: 6; }
 .iv-acts .st-opt { display: flex !important; align-items: center; justify-content: center; }
+/* the top bar's PUNERI: the title screen's wordmark, exactly */
+.mb-brand { gap: 12px; } .mb-brand svg { width: 20px; height: 26px; }
+.mb .mb-brand b { font-family: 'Archivo', var(--font-ui) !important; font-weight: 900 !important; font-stretch: 118% !important; font-size: 22px !important; letter-spacing: -0.02em !important; text-transform: uppercase; }
