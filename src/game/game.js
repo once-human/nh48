@@ -62,6 +62,7 @@ import { Puddles } from './puddles.js';
 import { Cutscene } from './cutscene.js';
 import { Home } from './home.js';
 import { setShutters } from '../world/buildingsChunk.js';
+import { applyMods } from '../vehicles/mods.js';
 import { Postcards } from './postcards.js';
 import { LiveView } from '../ui/liveview.js';
 import { MenuBar } from '../ui/menubar.js';
@@ -1065,6 +1066,7 @@ export class Game {
     const U = this.life.s.upg, A = this.player.auto;
     A.tune = 1 + (U.engine || 0) * 0.08;
     if (A.setSticker) A.setSticker(U.sticker || 0);
+    applyMods(this, A);              // the garage's mods (engine, turbo, neon, horn...) on your auto
   }
   baseLook() { return this.origLook; }
   // Start over: wipe all progress (with the warning shown in the pause menu) and reload fresh
@@ -1385,7 +1387,7 @@ export class Game {
       this._hornWas = hk;
       if (P.cur && P.cur.md && P.cur.md.lights) { const Lg = P.cur.md.lights, on = !!P.cur.sirenOn, f = on && Math.floor(this.t * 6) % 2 === 0; Lg.red.visible = f; Lg.redOff.visible = !f; Lg.blue.visible = on && !f; Lg.blueOff.visible = !(on && !f); }
       const horn = hk && !svc;
-      this.audio.playerHorn(horn, S ? S.honk : 'auto');
+      this.audio.playerHorn(horn, (P.cur && P.cur.hornKind) || (S ? S.honk : 'auto'));
       if (horn) { this.hornScare(); this.police.honked(); if ((this._pedHornT = (this._pedHornT || 0) - dt) <= 0) { this._pedHornT = 0.5; this.people.onHorn(P); } }
       const sl = this.shops.near && this.shops.label();
       if (P.offer && P.onFoot) this.hud.prompt(P.offer.key, P.offer.label, 0.3);

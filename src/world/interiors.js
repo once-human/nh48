@@ -20,8 +20,9 @@ import { ColorBuilder } from './geo.js';
 import { RNG } from '../core/util.js';
 import { castAs, pickCast } from '../people/cast.js';
 import { ikArm } from '../people/humans.js';
-import { F, MENUS, AREA_FOOD } from '../game/shops.js';
-import { Vehicle } from '../vehicles/vehicle.js';
+import { F, MENUS, AREA_FOOD, STICKERS } from '../game/shops.js';
+import { Vehicle, specOf } from '../vehicles/vehicle.js';
+import { applyMods, modsOf } from '../vehicles/mods.js';
 import { tierOf } from '../game/brands.js';
 import { ROOMS2 } from './rooms2.js';
 
@@ -545,7 +546,7 @@ export class Interiors {
       // a workshop: a car on the lift, tyres stacked, a pegboard of tools, a bike on its stand, oil on the floor
       for (const [x, z, r] of [[-2, 6, 1.6], [3, 4, 0.9], [-4, 9, 1.1]]) box(B, x, 0.003, z, r * 2, 0.004, r * 1.4, 0x2a2a2c);
       for (const sx of [-1, 1]) { box(B, -3 + sx * 1.6, 1.8, 6.5, 0.3, 3.6, 0.3, 0x3366cc); solid(-3 + sx * 1.6, 6.5, 0.3, 0.3); }
-      box(B, -3, 1.6, 6.5, 2.9, 0.12, 4.4, 0x2a2c30); box(B, -3, 2.3, 6.5, 1.8, 1.3, 3.8, 0x8a1e1e); box(B, -3, 2.9, 6.9, 1.6, 0.6, 2.0, 0x22303a);   // the car, up on the lift
+      box(B, -3, 1.6, 6.5, 2.9, 0.12, 4.4, 0x2a2c30);   // the lift: your car goes up on it (garageShow)
       for (let i = 0; i < 4; i++) for (let j = 0; j < 4 - (i & 1); j++) box(B, W / 2 - 1.2, 0.2 + j * 0.36, 2 + i * 0.9, 0.7, 0.32, 0.7, 0x161616);   // tyre stacks
       solid(W / 2 - 1.2, 3.3, 0.8, 3.6);
       box(B, -W / 2 + 0.06, 1.7, D / 2 + 1, 0.04, 1.6, 4.5, 0xc9a26b);                                 // pegboard
@@ -650,6 +651,7 @@ export class Interiors {
     this.paintBoard(R, ctx);
     this.populate(R, ctx);
     if (R.display) this.showVehicles(R);
+    if (tpl === 'garage') this.garageShow();
     P.teleportFoot(R.O.x, R.O.z + 1.3, Math.PI / 2, G.traffic);
     G.rig.footMode = false;              // the camera cuts inside (no 40 km swoop)
     G.rig.update(0.016, P); G.rig.footYaw = Math.PI / 2; G.rig.footPitch = 0.12;
@@ -672,6 +674,7 @@ export class Interiors {
     G.date && G.date.cur && G.date.close();
     C.R.group.visible = false;
     if (C.R.shown) { for (const v of C.R.shown) v.dispose(); C.R.shown = null; }
+    if (C.R.live) { C.R.live.dispose(); C.R.live = null; }
     if (C.R.tpl === 'club') G.club.beat(false);
     // back out of the door, facing the street
     const d = C.door, back = d.yaw + Math.PI;
@@ -789,6 +792,24 @@ export class Interiors {
       m.position.set(p.x, FLOOR + (/sit/.test(p.anim) ? 1.55 : 2.05), p.z); m.userData.p = p;
       G.scene.add(m); R.hearts.push(m);
     }
+  }
+  // the garage: your own vehicle in the bay, as it is right now. The one you parked outside (or your auto): a car up on
+  // the lift, an auto or a two-wheeler on the floor; your paint, the sticker on the back, the seat covers, the
+  // pressure horn, the tuned exhaust, and the dents if it's been knocked about. Rebuilt whenever you buy something here
+  garageShow() {
+    const G = this.g, C = this.cur; if (!C || C.R.tpl !== 'garage') return;
+    const R = C.R, P = G.player, ctx = C.ctx;
+    if (R.live) { R.live.dispose(); R.live = null; }
+    const d = (P.dropped || []).find(q => Math.hypot(q.veh.x - ctx.x, q.veh.z - ctx.z) < 16), here = d ? d.veh : P.auto;
+    if (!here) return;
+    const isAuto = here === P.auto, type = isAuto ? 'auto' : here.type, S = specOf(type), U = G.life.s.upg;
+    const v = new Vehicle(G.W, G.scene, G.vmats, type, here.paint);
+    const car = !S.two && type !== 'auto';
+    const [x, z, y] = car ? [-3, 6.5, 1.66] : [1.3, 5.2, 0];
+    v.reset(R.O.x + x, R.O.z + z, Math.PI / 2); v.y = FLOOR + y; v.sync && v.sync(0);
+    // the same dressing as on the road (mods.js), plus the sticker and the dents for a close look
+    applyMods(G, v, { mods: modsOf(G, here) || {}, sticker: isAuto ? (STICKERS[U.sticker || 0] || STICKERS[0]) : null, dmg: here.dmg || 0, auto: isAuto });
+    R.live = v;
   }
   showVehicles(R) {
     const G = this.g, types = ['scooter', 'bike', 'hatch', 'suv'];

@@ -257,7 +257,8 @@ export class Rides {
     // a speaker, leopard seat covers, a box of bakarwadi offered on the way: it all adds up
     const L = g.life, U = L ? L.s.upg : {};
     const washed = L && L.s.washed === Math.floor((g.clock || 0) / 24);
-    if (tip) tip = Math.round(tip * (1 + (U.speaker ? 0.15 : 0) + (U.seat ? 0.05 : 0) + (washed ? 0.08 : 0)) / 5) * 5;
+    const MA = (L && L.s.mods && L.s.mods.auto) || {}, night = g.hour >= 19 || g.hour < 6;
+    if (tip) tip = Math.round(tip * (1 + (U.speaker ? 0.15 : 0) + (U.seat || MA.seat ? 0.05 : 0) + (washed ? 0.08 : 0) + (MA.meter ? 0.04 : 0) + (MA.led && night ? 0.04 : 0) + (MA.ganpati ? 0.02 : 0)) / 5) * 5;
     if (L && mood > 0.5) {
       const gift = ['shrewsbury', 'barfi', 'bakarwadi', 'gajra'].find(id => L.has(id));
       if (gift) { L.take(gift); const extra = { shrewsbury: 45, barfi: 50, bakarwadi: 40, gajra: 20 }[gift]; tip += extra; g.hud.toast('You offered them something sweet', `+₹${extra} on the tip, and a smile`, 'good', 2.6); }

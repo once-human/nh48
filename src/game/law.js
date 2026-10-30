@@ -168,7 +168,7 @@ export class Law {
   }
   // the checkpoint's stinger, and tyres shot out: the vehicle limps
   flatten(v, why) {
-    if (!v || v.flat > 0) return;
+    if (!v || v.flat > 0 || v.noFlat) return;          // (bulletproof tyres from the garage)
     v.flat = 40; this.g.hud.toast('Tyres gone', why, 'bad', 3); this.g.audio.thud && this.g.audio.thud(0.6);
   }
   // a jeep alongside your rear quarter at speed: the box-in (it spins you)

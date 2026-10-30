@@ -17,6 +17,7 @@ import { KbNav } from '../ui/kbnav.js';
 import { clamp, RNG } from '../core/util.js';
 import { ITEMS, describe } from './life.js';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
+import { modsOf, applyMods, COLOURS, NEON, HORNS } from '../vehicles/mods.js';
 import { tierOf, TIER_MUL, TIER_LABEL, servicesFor } from './brands.js';
 import SHOPL from './shop_lines.json';
 import { venueKey, nightOf } from '../world/interiors.js';
@@ -305,7 +306,7 @@ export const SHOES = [
   ['formals', 'Formal shoes, black', 'Polished', 2199, 0x15120f],
   ['sports', 'Running shoes, grey', 'For the Vetal hill climb', 2499, 0x7d8085],
 ];
-const STICKERS = ['आई तुझा आशीर्वाद', 'बाबांची कृपा', 'हॉर्न ओके प्लीज', 'पुणे तिथे काय उणे', 'जय महाराष्ट्र', 'सद्गुरू कृपा', 'मी पुणेकर'];
+export const STICKERS = ['आई तुझा आशीर्वाद', 'बाबांची कृपा', 'हॉर्न ओके प्लीज', 'पुणे तिथे काय उणे', 'जय महाराष्ट्र', 'सद्गुरू कृपा', 'मी पुणेकर'];
 export const DEALER = [
   ['cycle', 'Bicycle (roadster)', 'Hero-style, a bell and a carrier', 7500],
   ['scooter', 'Scooter 110 cc', 'Activa-style; the family vehicle', 84000],
@@ -539,7 +540,7 @@ export class Shops {
         out.push({ label: 'Soda', note: 'Lemon soda, fizzy', price: r10(30 * mul), act: pay(r10(30 * mul), () => { L.apply({ thirst: 0.25 }); return 'Refreshing'; }) });
         break;
       case 'dealer': this.dealer(out, ctx); break;
-      case 'garage': this.garage(out, ctx, mul); this.g.hustle && this.g.hustle.garageItems(out, ctx); break;
+      case 'garage': this.garage(out, ctx, mul); if (!ctx.gcat) this.g.hustle && this.g.hustle.garageItems(out, ctx); break;
       case 'fuel': this.fuel(out); break;
       case 'travel':
         out.push({ label: 'Rent a scooter, 24 hours', note: 'Delivered right here, helmet included', price: r10(450 * mul), act: pay(r10(450 * mul), () => { this.spawnOwned('scooter', PAINTS[this.rng.int(0, 5)], ctx, true); return 'Your rental scooter is outside'; }) });
@@ -753,30 +754,36 @@ export class Shops {
       } });
     }
   }
+  // the garage, like a tuning shop: what's in the bay (repairs, a service, insurance), then a category at a time
+  // (respray, engine, turbo, brakes, tyres, suspension, armour, neon, lights, horn, interior, plates, stickers).
+  // What you fit goes on that vehicle (mods.js): it drives differently and you can see it, here and on the road
   garage(out, ctx, mul) {
-    const L = this.life, P = this.g.player, U = L.s.upg;
-    // repairs: whatever you came in on, or your auto parked outside (real workshop rates)
-    const here = !P.onFoot ? P.cur : (P.dropped.find(d => Math.hypot(d.veh.x - ctx.x, d.veh.z - ctx.z) < 16) || {}).veh;
-    if (here) {
-      const isAuto = here === P.auto, type = isAuto ? 'auto' : here.type;
-      const base = { auto: 6500, cycle: 600, scooter: 4200, bike: 5200, hatch: 38000, sedan: 46000, taxi: 42000, suv: 62000, tempo: 30000, bus: 90000 }[type] || 20000;
-      const dmg = here.dmg || 0, name = isAuto ? 'your auto' : 'the ' + here.spec.name.toLowerCase();
-      const cost = r10(Math.max(250, base * dmg) * Math.max(0.9, mul * 0.85));
-      out.push({ label: dmg > 0.02 ? `Repair ${name}` : `${name.charAt(0).toUpperCase() + name.slice(1)}: no damage`, note: dmg > 0.02 ? `Body and engine at ${Math.round((1 - dmg) * 100)}%. Dents, alignment, the works` : 'Runs like new', price: dmg > 0.02 ? cost : 0, disabled: dmg > 0.02 ? '' : ' ',
-        act: () => { if (!this.spend(cost)) return false; here.dmg = 0; return `Fixed. ${isAuto ? 'Your auto' : 'It'} runs like new`; } });
+    const G = this.g, L = this.life, P = G.player, U = L.s.upg;
+    const d = P.onFoot ? P.dropped.find(q => Math.hypot(q.veh.x - ctx.x, q.veh.z - ctx.z) < 16) : null;
+    const here = !P.onFoot ? P.cur : d ? d.veh : P.auto;
+    if (!here) { out.push({ label: 'Nothing in the bay', note: 'Park your vehicle outside and come in', price: 0, disabled: ' ' }); return; }
+    const isAuto = here === P.auto, type = isAuto ? 'auto' : here.type, mine = isAuto || (here.owned && !here.owned.rental);
+    const m = (mine && modsOf(G, here)) || {}, name = isAuto ? 'your auto' : (mine ? 'your ' : 'the ') + here.spec.name.toLowerCase();
+    const F = { auto: 1, cycle: 0.3, scooter: 0.8, bike: 0.9, hatch: 4, sedan: 4.5, taxi: 4, suv: 5, tempo: 2.2, bus: 8 }[type] || 3;
+    const $ = (b) => r10(b * F * Math.max(0.9, mul * 0.9));
+    const fit = (msg) => { applyMods(G, here); if (isAuto) G.applyUpgrades(); L.save(); return msg; };
+    const opt = (label, note, price, have, fn, off) => out.push({ label, note, price: have ? 0 : price, tag: have ? 'owned' : '', disabled: have ? 'Fitted' : off || '', act: () => { if (price && !this.spend(price)) return false; return fn(); } });
+    const cat = ctx.gcat;
+    if (!cat) {
+      const dmg = here.dmg || 0, base = { auto: 6500, cycle: 600, scooter: 4200, bike: 5200, hatch: 38000, sedan: 46000, taxi: 42000, suv: 62000, tempo: 30000, bus: 90000 }[type] || 20000;
+      out.push({ label: `In the bay: ${name}`, note: `Body ${Math.round((1 - dmg) * 100)}% · engine stage ${m.engine || 0}${m.turbo ? ' + turbo' : ''} · armour ${(m.armor || 0) * 20}%${m.ins ? ` · insured, ${m.ins} claims left` : ''}`, price: 0, disabled: ' ' });
+      const cost = m.ins ? 0 : r10(Math.max(250, base * dmg) * Math.max(0.9, mul * 0.85));
+      out.push({ label: dmg > 0.02 ? `Repair ${name}${m.ins ? ' (insured)' : ''}` : 'No damage', note: dmg > 0.02 ? 'Dents out, alignment, the works' : 'Runs like new', price: dmg > 0.02 ? cost : 0, disabled: dmg > 0.02 ? '' : ' ',
+        act: () => { if (cost && !this.spend(cost)) return false; if (m.ins) m.ins--; here.dmg = 0; return fit('Fixed. Like new'); } });
       const svc = r10(({ auto: 900, scooter: 750, bike: 850, cycle: 150 }[type] || 4500) * Math.max(0.9, mul * 0.85));
-      out.push({ label: 'General service', note: 'Oil, filters, brakes, chain. Small dents knocked out', price: svc, act: () => { if (!this.spend(svc)) return false; here.dmg = Math.max(0, (here.dmg || 0) - 0.15); return 'Serviced'; } });
-      if (!isAuto && here.bodyMesh && here.owned) {
-        const rp = r10((here.spec.two ? 3500 : 22000) * mul);
-        out.push({ label: 'Repaint', note: 'A new colour for your own vehicle', price: rp, act: () => { if (!this.spend(rp)) return false; const c = PAINTS[this.rng.int(0, PAINTS.length - 1)]; here.paint = c; here.bodyMesh.instanceColor.setXYZ(0, c[0], c[1], c[2]); here.bodyMesh.instanceColor.needsUpdate = true; const rec = L.s.vehicles.find(v => v.id === here.owned.id); if (rec) rec.col = c; return 'Fresh paint'; } });
-      }
-    }
-    const eng = U.engine || 0;
-    if (eng < 2) { const price = r10((eng ? 14000 : 6000) * mul); out.push({ label: `Engine tune, stage ${eng + 1}`, note: `Your auto: +${eng ? 16 : 8}% top speed`, price, act: () => { if (!this.spend(price)) return false; U.engine = eng + 1; this.g.applyUpgrades(); return 'Your auto pulls harder now'; } }); }
-    if (!U.horn) { const price = r10(1200 * mul); out.push({ label: 'Pressure horn', note: 'People jump out of the way from further', price, act: () => { if (!this.spend(price)) return false; U.horn = 1; return 'Loud. Very loud'; } }); }
-    if (!U.seat) { const price = r10(1800 * mul); out.push({ label: 'Leopard-print seat covers', note: 'Passengers tip 5% more (they say they don’t)', price, act: () => { if (!this.spend(price)) return false; U.seat = 1; return 'Classy'; } }); }
-    const sp = r10(300 * mul);
-    STICKERS.forEach((t, i) => { if ((U.sticker || 0) !== i) out.push({ label: `Rear sticker: ${t}`, note: 'Painted on the back of your auto', price: sp, act: () => { if (!this.spend(sp)) return false; U.sticker = i; this.g.applyUpgrades(); return 'New sticker'; } }); });
+      out.push({ label: 'General service', note: 'Oil, filters, brakes, chain. Small dents knocked out', price: svc, act: () => { if (!this.spend(svc)) return false; here.dmg = Math.max(0, (here.dmg || 0) - 0.15); return fit('Serviced'); } });
+      if (mine) {
+        const C = [['paint', 'Respray', 'Twelve colours, mirror finish'], ['engine', 'Engine', `Stage ${m.engine || 0} of 3: more top speed`], ['turbo', 'Turbo', m.turbo ? 'Fitted' : 'Pulls harder off the line'], ['brakes', 'Brakes', ['Stock', 'Street', 'Sport'][m.brakes || 0]],
+          ['tyres', 'Tyres', m.bulletproof ? 'Bulletproof' : m.tyres ? 'Grip' : 'Stock'], ['susp', 'Suspension', ['Stock', 'Lowered', 'Slammed'][m.lower || 0]], ['armor', 'Armour', `${(m.armor || 0) * 20}% less damage`],
+          ['neon', 'Neon underglow', m.neon ? 'On' : 'Light under the body, all night'], ['lights', 'Headlights', m.xenon ? 'Xenon' : 'Stock'], ['horn', 'Horn', (HORNS.find(h => h[1] === (m.horn || '')) || HORNS[0])[0]],
+          ['interior', 'Interior', 'Ganpati, nimbu-mirchi, dice, LED, seat covers' + (isAuto ? ', meter' : '')], ['plates', 'Number plates', m.vip ? m.vip : 'Stock'], ...(isAuto ? [['stickers', 'Rear sticker', STICKERS[U.sticker || 0]]] : []), ['ins', 'Insurance', m.ins ? `${m.ins} claims left` : 'Repairs on the house']];
+        for (const [k, l, n] of C) out.push({ label: l + ' ›', note: n, price: 0, tag: 'job', act: () => { ctx.gcat = k; return ''; } });
+      } else out.push({ label: 'Customise', note: 'Only for your own vehicles (and your auto)', price: 0, disabled: 'Not yours' });
     // a vehicle that isn't yours, right here: no questions asked
     const v = !P.onFoot && P.cur && P.cur.stolen ? P.cur : (P.dropped.find(d => d.veh.stolen && Math.hypot(d.veh.x - ctx.x, d.veh.z - ctx.z) < 14) || {}).veh;
     if (v) {
@@ -788,6 +795,38 @@ export class Shops {
         v.dispose(); this.g.stats.money += offer; this.g.audio.cash(); this.g.saveStats(); L.change('karma', -4);
         return `Sold for ${fmt(offer)}. It was never here`;
       } });
+    }
+      return;
+    }
+    out.push({ label: '‹ Back', note: 'All categories', price: 0, tag: 'job', act: () => { ctx.gcat = null; return ''; } });
+    const same = (a, b) => a && b && Math.abs(a[0] - b[0]) < 0.01 && Math.abs(a[1] - b[1]) < 0.01 && Math.abs(a[2] - b[2]) < 0.01;
+    switch (cat) {
+      case 'paint': for (const [n, c] of COLOURS) opt(n, 'Respray, two coats and a polish', $(2500), same(m.paint, c), () => { m.paint = c.slice(); if (!isAuto) { const rec = (L.s.vehicles || []).find(q => here.owned && q.id === here.owned.id); if (rec) rec.col = c.slice(); } return fit(`${n}. Fresh`); }); break;
+      case 'engine': [6000, 14000, 26000].forEach((b, i) => opt(`Stage ${i + 1} tune`, `+${(i + 1) * 8}% top speed${i ? `, needs stage ${i}` : ''}`, $(b), (m.engine || 0) > i, () => { m.engine = i + 1; return fit(`Stage ${i + 1}. Listen to that`); }, (m.engine || 0) < i ? `Stage ${i} first` : '')); break;
+      case 'turbo': opt('Turbo kit', 'Pulls 18% harder off the line', $(18000), !!m.turbo, () => { m.turbo = 1; return fit('Turbo on. Whoosh'); }, type === 'cycle' ? 'It’s a cycle' : ''); break;
+      case 'brakes': [['Street brakes', 4000], ['Sport brakes', 9000]].forEach(([n, b], i) => opt(n, `Stops ${(i + 1) * 15}% shorter`, $(b), (m.brakes || 0) > i, () => { m.brakes = i + 1; return fit('Stops on a coin'); })); break;
+      case 'tyres': opt('Grip tyres', 'Corners harder in the rain', $(5000), !!m.tyres, () => { m.tyres = 1; return fit('Sticky'); }); opt('Bulletproof tyres', 'Spike strips at a nakabandi don’t stop you', $(15000), !!m.bulletproof, () => { m.bulletproof = 1; return fit('Run-flat. Let them try'); }); break;
+      case 'susp': [['Stock height', 0, 0], ['Lowered', 1, 6000], ['Slammed', 2, 11000]].forEach(([n, lv, b]) => opt(n, lv ? `${lv * 3.5} cm lower, a little more grip. Mind the speed breakers` : 'Back to factory', lv ? $(b) : 0, (m.lower || 0) === lv, () => { m.lower = lv; return fit(n); })); break;
+      case 'armor': [8000, 16000, 28000].forEach((b, i) => opt(`Armour, level ${i + 1}`, `Takes ${(i + 1) * 20}% less damage from crashes`, $(b), (m.armor || 0) > i, () => { m.armor = i + 1; return fit('Plated'); }, (m.armor || 0) < i ? `Level ${i} first` : '')); break;
+      case 'neon': for (const [n, c] of NEON) opt(`${n} neon`, 'Glows on the road under you, best after dark', $(3500), m.neon === c, () => { m.neon = c; return fit(`${n} underglow`); }); if (m.neon) opt('Remove neon', '', 0, false, () => { m.neon = 0; return fit('Off'); }); break;
+      case 'lights': opt('Xenon headlights', 'Cold white, reaches further', $(2500), !!m.xenon, () => { m.xenon = 1; return fit('Bright'); }); if (m.xenon) opt('Stock headlights', 'Warm yellow', 0, false, () => { m.xenon = 0; return fit('Stock'); }); break;
+      case 'horn': [[0, 0], [1, 1200], [2, 2200], [3, 3500]].forEach(([i, b]) => { const [n, k] = HORNS[i]; opt(n, i ? 'Press H and the street hears it' : 'What it came with', i ? r10(b * Math.max(0.9, mul * 0.9)) : 0, (m.horn || '') === k, () => { m.horn = k; if (k === 'truck') U.horn = 1; return fit(n); }); }); break;
+      case 'interior':
+        opt('Ganpati on the dashboard', 'A small brass Bappa. +karma, passengers notice', 251, !!m.ganpati, () => { m.ganpati = 1; L.change('karma', 2); return fit('Ganpati Bappa Morya'); });
+        opt('Nimbu-mirchi', 'Lemon and seven chillies, to keep the evil eye off', 30, !!m.nimbu, () => { m.nimbu = 1; L.change('mood', 0.03); return fit('Nazar won’t touch it'); });
+        opt('Fuzzy dice', 'Hanging off the mirror', 199, !!m.dice, () => { m.dice = 1; return fit('Very 90s'); });
+        for (const [n, c] of [['Pink', 0xff2f9d], ['Blue', 0x2f7dff]]) opt(`${n} LED strip`, 'Inside the roof: night passengers tip a little more', $(1500), m.led === c, () => { m.led = c; return fit('Disco'); });
+        opt('Leopard seat covers', 'Passengers tip 5% more (they say they don’t)', $(1800), !!m.seat, () => { m.seat = 1; U.seat = 1; return fit('Classy'); });
+        if (isAuto) opt('Digital fare meter', 'Passengers trust it: tips 4% more', 4500, !!m.meter, () => { m.meter = 1; return fit('Beep. ₹30.00'); });
+        break;
+      case 'plates': {
+        const vip = () => `MH12 ${'ABCDEFGHJKLMNPRSTUVWXYZ'[Math.floor(Math.random() * 23)]}${'ABCDEFGHJKLMNPRSTUVWXYZ'[Math.floor(Math.random() * 23)]} 000${1 + Math.floor(Math.random() * 9)}`;
+        opt('VIP number', 'A 000-something number, gold plates. +respect wherever you park', 25000, !!m.vip, () => { m.vip = vip(); L.change('respect', 2); return fit(`${m.vip}. People look twice`); });
+        if (m.vip) opt('Back to the regular plates', '', 0, false, () => { m.vip = ''; return fit('Plain again'); });
+        break;
+      }
+      case 'stickers': { const sp = r10(300 * mul); STICKERS.forEach((t, i) => opt(t, 'Painted on the back of your auto', sp, (U.sticker || 0) === i, () => { U.sticker = i; return fit('New sticker'); })); break; }
+      case 'ins': opt('Insurance, three claims', 'The next three repairs here are free', $(5000), (m.ins || 0) > 0, () => { m.ins = 3; return fit('Insured. Drive like nobody’s watching'); }); break;
     }
   }
   fuel(out) {
@@ -855,6 +894,7 @@ export class Shops {
     const v = new Vehicle(G.W, G.scene, G.vmats, rec.type, rec.col);
     v.reset(spot.x, spot.z, spot.th || 0); v.y = G.W.surf.height(spot.x, spot.z);
     v.plate = rec.plate; v.helmet = true; v.fuel = rec.fuel ?? 1; v.owned = { id: rec.id };
+    applyMods(G, v);
     P.addDropped(v, G.traffic);
   }
   spawnOwned(type, paint, ctx, rental = false) {
@@ -942,6 +982,7 @@ export class Shops {
     this.creditCtx = null;
     if (r === false) return;
     if (it.price && this.ctx && LOCAL.has(this.ctx.kind)) this.visit(this.ctx);
+    const I = this.g.interiors; if (I && I.cur && I.cur.R.tpl === 'garage') I.garageShow();     // what you just paid for, on the vehicle in front of you
     if (this.ctx && it.price && ['menu', 'cafe', 'fast', 'neon'].includes(UI_OF[this.ctx.kind])) this.speak(this.ctx.kind, 'order');
     if (!this.open) return;
     if (r) this.msg(r, true);

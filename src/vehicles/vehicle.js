@@ -153,9 +153,9 @@ export class Vehicle {
     } else {
       const load = 1 + this.load * 0.1;
       const vTop = S.vTop * (this.powerMul ?? 1);
-      let eng = thr * S.acc * Math.min(1.1, this.powerMul ?? 1) / load * Math.max(0, 1 - Math.pow(Math.max(0, v) / vTop, 3));
+      let eng = thr * S.acc * (this.accMul || 1) * Math.min(1.1, this.powerMul ?? 1) / load * Math.max(0, 1 - Math.pow(Math.max(0, v) / vTop, 3));
       if (this.shiftT > 0) { this.shiftT -= dt; eng *= 0.3; }
-      a = eng - brk * S.brake * Math.sign(v || 1);
+      a = eng - brk * S.brake * (this.brakeMul || 1) * Math.sign(v || 1);
       if (v < 0) a += brk * S.brake * 2;
     }
     const foot = this.onFootpath ? (S.two ? 0.25 : 0.9) : 0;
@@ -181,7 +181,7 @@ export class Vehicle {
     this.steer += clamp(target - this.steer, -rate * dt, rate * dt);
     let wT = this.v * Math.tan(this.steer) / S.wb;
     if (inp.handbrake && sp > 4 && !S.two) wT *= 1.4;
-    const mu = inp.handbrake ? S.mu * 0.6 : S.mu;
+    const mu = (inp.handbrake ? S.mu * 0.6 : S.mu) * (this.gripMul || 1);
     const latDemand = sp * Math.abs(wT);
     let slide = 0;
     if (latDemand > mu && sp > 0.5) { const k = mu / latDemand; slide = 1 - k; wT *= lerp(1, k, 0.7); }
@@ -277,13 +277,15 @@ export class Vehicle {
     this.root.position.set(this.x, 0, this.z);
     this.root.rotation.set(0, -this.th, 0);
     const idle = this.v === 0 ? Math.sin(performance.now() / 1000 * (this.spec.two ? 70 : 40)) * 0.0015 : 0;
-    this.tilt.position.set(0, this.y + idle, 0);
+    this.tilt.position.set(0, this.y + idle - (this.lower || 0), 0);
     this.tilt.rotation.set(this.lean, 0, this.pitch, 'YXZ');
     if (this.inCockpit && this.cockpit) this.cockpit.update(this.steer, Math.abs(this.v) * 3.6, this.gear, this.rpm);
   }
   // borrow the one shared headlight (see Pilot.switchTo)
   takeHeadlight(light) {
     const S = this.spec;
+    if (light.userData.base == null) light.userData.base = light.color.getHex();
+    light.color.setHex(this.lightCol || light.userData.base);          // xenon from the garage
     light.position.set(S.L / 2 - 0.1, 0.8, 0);
     light.target.position.set(S.L / 2 + 12, 0, 0);
     this.tilt.add(light, light.target);
@@ -302,5 +304,5 @@ export function knock(v, imp, k) {
   const now = performance.now() / 1000;
   if (imp < 4 || (v._kT || 0) > now) return;
   v._kT = now + 0.7;
-  v.dmg = Math.min(1, (v.dmg || 0) + Math.min(0.2, (imp - 4) * k));
+  v.dmg = Math.min(1, (v.dmg || 0) + Math.min(0.2, (imp - 4) * k * (v.armorMul ?? 1)));
 }
