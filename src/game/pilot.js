@@ -2,6 +2,7 @@
 // parked scooter/bike/car, or pull a driver out of their vehicle (they won't be happy). The rest
 // of the game talks to this object as "the player", it forwards to whatever you're driving.
 import * as THREE from 'three';
+import { carSpec } from '../vehicles/models.js';
 import { Vehicle, specOf } from '../vehicles/vehicle.js';
 import { flyResolve } from '../world/flyover.js';
 import { clamp, damp, dampAngle, wrapAngle, RNG } from '../core/util.js';
@@ -22,8 +23,13 @@ function seatFor(veh, S, isAuto) {
   if (S.two) return [S.seat ? S.seat[0] : -0.3, S.seat ? S.seat[1] : 0.8, 0];
   if (isAuto) return SEATS.auto;
   if (veh.type === 'bus') return [S.L / 2 - 1.2, 1.25, 0.75];
-  return SEATS[veh.type] || null;
+  if (SEATS[veh.type] && veh.type !== 'sedan' && veh.type !== 'taxi') return SEATS[veh.type];
+  // a car's driving seat from its own body: hips ~1.25 m behind the foot of the windscreen, just above the sill,
+  // on the right (the sedan's used to be in the back seat)
+  const C = CAR_SEAT[veh.type] || (CAR_SEAT[veh.type] = (() => { try { const c = carSpec(veh.type); return [c.L / 2 - c.hood - 1.25, c.sill + 0.33, c.W * 0.22]; } catch (e) { return null; } })());
+  return C;
 }
+const CAR_SEAT = {};
 const SHOUTS = [
   ['Arre, gaadi kyon cheen rahe ho?!', 'Hey, why are you taking my vehicle?!'],
   ['Thamba! Maazi gaadi aahe ti!', 'Stop! That’s my vehicle!'],

@@ -403,7 +403,7 @@ function carBody(b, gl, spec) {
     }
     if (roof || seg === 'pillar') return [1, 1, 1, 1];
     const side = Math.abs(q.nz) > 0.55;
-    if (seg === 'wind') return side ? [1, 1, 1, 1] : [...GLASS, 0];
+    if (seg === 'wind') return side ? (q.y > H - 0.16 || q.y < beltY + 0.06 ? [1, 1, 1, 1] : [...GLASS, 0]) : [...GLASS, 0];     // (the side of the windscreen bay is the front quarter glass, framed: it used to be a slab of body colour that made the windows look broken)
     if (seg === 'rear') return side && sedan ? [1, 1, 1, 1] : [...GLASS, 0];
     // side windows with a thin body-colour frame along the top
     return q.y > H - 0.2 && !side ? [1, 1, 1, 1] : [...GLASS, 0];
