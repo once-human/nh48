@@ -418,6 +418,15 @@ export function drawPin(x, X, Y, col, glyph, size = 9, ring = '#0a0b0d') {
     x.save(); x.translate(X - 12 * k, Y - 12 * k); x.scale(k, k); x.fillStyle = '#0a0b0d'; x.fill(ip, 'evenodd'); x.restore();
   }
 }
+// a place on the map, drawn the way the legend shows it: the coloured icon itself (a dark edge so it reads on any ground)
+export function drawGlyph(x, X, Y, col, glyph, size = 20) {
+  const ip = glyph && iconPath(glyph); if (!ip) { drawPin(x, X, Y, col, null, size * 0.3); return; }
+  const k = size / 24;
+  x.save(); x.translate(X - 12 * k, Y - 12 * k); x.scale(k, k);
+  x.lineJoin = 'round'; x.lineWidth = 3.2 / k * 0.9; x.strokeStyle = 'rgba(8,9,11,.92)'; x.stroke(ip);
+  x.fillStyle = col; x.fill(ip, 'evenodd');
+  x.restore();
+}
 export function drawArrow(x, X, Y, ang, s = 1) {
   x.save(); x.translate(X, Y); x.rotate(ang); x.scale(s, s);
   x.fillStyle = '#f4f1ea'; x.strokeStyle = '#0a0b0d'; x.lineWidth = 2;
@@ -524,7 +533,20 @@ export class MapScreen {
   bindPointer() {
     const cv = this.cv, pts = new Map();
     let drag = null, moved = 0, pinch = null, lastT = 0;
+    // right button: a pin, dropped where you let go if you didn't move (kept apart from dragging and pinching,
+    // and from the browser's context menu, which fires on press on Linux and on release elsewhere)
+    const at = (e) => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    const pin = (x, y) => { const now = performance.now(); if (now - (this._pinT || 0) < 350) return; this._pinT = now; this.vel = { x: 0, z: 0 }; this.dropPin(x, y); };
+    cv.addEventListener('mousedown', (e) => { if (e.button === 2) { e.preventDefault(); this.rdown = at(e); } });
+    window.addEventListener('mouseup', (e) => {
+      if (e.button !== 2 || !this.rdown || this.el.hidden) return;
+      const [x, y] = at(e), d = Math.hypot(x - this.rdown[0], y - this.rdown[1]); this.rdown = null;
+      if (d < 14 && x >= 0 && y >= 0 && x <= cv.clientWidth && y <= cv.clientHeight) pin(x, y);
+    });
+    cv.addEventListener('contextmenu', (e) => { e.preventDefault(); if (!this.rdown) { const [x, y] = at(e); pin(x, y); } });     // (a trackpad's two-finger tap: no mousedown)
     cv.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button === 2) return;
+      if (e.pointerType === 'mouse') pts.clear();       // (a mouse is one pointer: never let a lost release look like a pinch)
       cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.offsetX, e.offsetY]);
       this.target = null; this.vel = { x: 0, z: 0 };
       if (pts.size === 1) { drag = { x: e.offsetX, y: e.offsetY }; moved = 0; lastT = performance.now(); }
@@ -550,14 +572,14 @@ export class MapScreen {
       pts.delete(e.pointerId); clearTimeout(this.lp);
       if (pts.size < 2) pinch = null;
       // a click (not a drag): left picks a place or the neighbourhood, right drops a pin exactly there
-      if (drag && moved < 10) { this.vel = { x: 0, z: 0 }; if (e.button === 2) this.dropPin(e.offsetX, e.offsetY); else this.pick(e.offsetX, e.offsetY); }
+      if (drag && moved < 10 && e.button !== 2) { this.vel = { x: 0, z: 0 }; this.pick(e.offsetX, e.offsetY); }
       if (performance.now() - lastT > 80) this.vel = { x: 0, z: 0 };
       drag = null;
     };
     cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
     cv.addEventListener('wheel', (e) => { e.preventDefault(); this.zoomAt(Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.0015)), e.offsetX, e.offsetY); }, { passive: false });
     cv.addEventListener('dblclick', (e) => this.zoomAt(2, e.offsetX, e.offsetY));
-    cv.addEventListener('contextmenu', (e) => e.preventDefault());     // (the pin goes down on release, in pointerup)
+
     window.addEventListener('keydown', (e) => {
       if (this.el.hidden) return;
       const typing = document.activeElement === this.$('bm-q');
@@ -812,11 +834,11 @@ export class MapScreen {
       for (const p of this.city.places) {
         if (p.c !== 'landmark' || !inV(p)) continue;
         if (z < 0.45 && !TOP.has(p.n)) continue;
-        const [X, Y] = T(p.x, p.z), s = z < 0.45 ? 7 : 9;
+        const [X, Y] = T(p.x, p.z), s = z < 0.45 ? 11 : 13;
         x.font = '700 12px Inter, system-ui, sans-serif';
         const tw = x.measureText(p.n).width;
         if (!free(X - s, Y - s, s * 2 + tw + 8, s * 2)) continue;
-        drawPin(x, X, Y, CATS.landmark[1], CATS.landmark[2], s);
+        drawGlyph(x, X, Y, CATS.landmark[1], CATS.landmark[2], s * 2);
         x.textAlign = 'left'; x.textBaseline = 'middle';
         text(p.n, X + s + 5, Y, '700 12px Inter, system-ui, sans-serif', '#f7e3a1');
         vis.push(p);
@@ -869,10 +891,10 @@ export class MapScreen {
       if (p.c === 'landmark' || !this.shows(p.c) || z < (MINZ[p.c] || 3)) continue;
       const [X, Y] = T(p.x, p.z);
       const small = p.c === 'food' || p.c === 'shop' || p.c === 'bank' || p.c === 'service';
-      const s = small ? (z >= 2 ? 7.5 : 6.5) : z >= 1.5 ? 8.5 : 7.5;
+      const s = small ? (z >= 2 ? 11 : 9.5) : z >= 1.5 ? 13 : 11.5;
       if (!free(X - s, Y - s, s * 2, s * 2)) continue;
       const [, col, gl] = CATS[p.c];
-      drawPin(x, X, Y, col, gl, s);
+      drawGlyph(x, X, Y, col, gl, s * 2);
       vis.push(p);
       if (z >= (NAMEZ[p.c] || 5)) {
         x.font = '600 11px Inter, system-ui, sans-serif'; x.textAlign = 'left'; x.textBaseline = 'middle';
