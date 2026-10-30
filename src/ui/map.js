@@ -284,7 +284,10 @@ export class CityMap {
     return o;
   }
   drawRaster(ctx, cx, cz, r, devPpm) {
-    const R = this.raster, want = devPpm <= 0.09 ? -1 : devPpm <= 0.18 ? 0 : devPpm <= 0.36 ? 1 : devPpm <= 0.72 ? 2 : 3;
+    // (zoomed out it draws the detailed level shrunk down, streets and buildings and all: the coarsest levels only
+    // have the main roads, which read as a broken map)
+    const R = this.raster, want = devPpm <= 0.36 ? 1 : devPpm <= 0.72 ? 2 : 3;
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     // the whole-city overview only where the sharper pictures haven't arrived (it sat under them, drawn for nothing)
     let covered = want >= 0;
     if (covered) {
