@@ -23,6 +23,7 @@ import { ikArm } from '../people/humans.js';
 import { F, MENUS, AREA_FOOD } from '../game/shops.js';
 import { Vehicle } from '../vehicles/vehicle.js';
 import { tierOf } from '../game/brands.js';
+import { ROOMS2 } from './rooms2.js';
 
 const SLOT0 = 40000;
 const FLOOR = 0.15;          // the game's off-road ground height, so people stand on the floor
@@ -39,7 +40,7 @@ const ROOM = {
   eatery: [20, 15, 3.8], cafe: [18, 13, 3.7], club: [28, 22, 6], salon: [16, 11, 3.5], boutique: [22, 16, 4],
   bank: [20, 14, 4.2], shop: [16, 12, 3.6], clinic: [16, 12, 3.4], gym: [22, 15, 4.8], showroom: [26, 17, 6],
   lodge: [14, 11, 3.4], chowki: [13, 10, 3.4], office: [14, 10, 3.4], home: [14, 12, 3.3],
-  garage: [16, 14, 5], cinema: [18, 22, 7], temple: [14, 16, 6], arcade: [22, 18, 4.5], laundry: [10, 9, 3.4], library: [16, 13, 3.6],
+  garage: [16, 14, 5], cinema: [20, 30, 8], temple: [14, 18, 6.5], arcade: [20, 20, 4.6], laundry: [9, 8, 3.4], library: [14, 14, 3.6],
 };
 // A place's look. The brand picks it: the chains and posh places get a designed interior (minimal,
 // bold, industrial, heritage, luxe, pastel), the local places a cuisine look or the plain Pune shop.
@@ -72,8 +73,8 @@ const AES = {
   lounge: A(0x1a1424, 0x2a1f3a, 0xc58cff, 0x3a2f4a, false, 0x2a1f3a, 0x0c0b10, 'neon'),
   bollywood: A(0x0e0e14, 0x14141e, 0xff2f7d, 0x222230, false, 0x1a1a24, 0x0c0b10, 'neon'),
   garage: A(0x4b4b4d, 0xb9b4a6, 0xffc000, 0x6a6a6e, true, 0x55565a, 0x8a8a8a, 'tube'),
-  cinema: A(0x3a1a22, 0x24121a, 0xd4a017, 0x2a1a1a, false, 0x8a1e2e, 0x120608, 'spot'),
-  temple: A(0xe9e3d6, 0xf3e8cf, 0xd4a017, 0xd8cfb8, false, 0x8a5a2a, 0xf6efe0, 'pendant', { brass: true }),
+  cinema: A(0x3a1a22, 0x24121a, 0xd4a017, 0x2a1a1a, false, 0x8a1e2e, 0x120608, 'none'),
+  temple: A(0xe9e3d6, 0xf3e8cf, 0xd4a017, 0xd8cfb8, false, 0x8a5a2a, 0xf6efe0, 'none'),
   arcade: A(0x15151d, 0x1a1a2c, 0x2fd3ff, 0x222230, false, 0x23233a, 0x0b0b12, 'neon'),
   laundry: A(0xd6dbe0, 0xeef2f5, 0x2e86ab, 0xdfe5ea, true, 0x9aa7b2, 0xffffff, 'tube'),
   library: A(0x8a6a4d, 0xe8dfc6, 0x2e5a3a, 0x7a5236, false, 0x6b4a2e, 0xf4efe2, 'tube'),
@@ -556,61 +557,9 @@ export class Interiors {
       spot(W / 2 - 2.2, D - 2.1, 1.4, 'counter', 'Talk to the mechanic');
       spot(-3, 3.6, 1.6, 'counter', 'Your ride: repairs and upgrades');
       R.customers = 1;
-    } else if (tpl === 'cinema') {
-      // the lobby: the ticket window, the snacks counter under lit menus, posters of what's on; the hall's doors at the back
-      counter(-W / 2 + 3, D * 0.42, 3.2, 0.8, S.counter, true); kp(-W / 2 + 3, D * 0.42 + 0.7, -Math.PI / 2, 'idle', 'keeper');
-      counter(W / 2 - 3, D * 0.42, 3.6, 0.8, 0x2a1a1a, true); kp(W / 2 - 3, D * 0.42 + 0.7, -Math.PI / 2, 'idle', 'helper');
-      for (let i = 0; i < 3; i++) box(GL, W / 2 - 4.2 + i * 1.2, 2.6, D * 0.42 + 1.1, 1.0, 0.6, 0.02, [0xffd166, 0xff6b6b, 0x4cc9f0][i]);
-      for (let i = 0; i < 5; i++) { const z = 2 + i * 2.2; for (const s of [-1, 1]) { box(B, s * (W / 2 - 0.05), 2.1, z, 0.04, 2.2, 1.4, 0x1a0a0e); box(GL, s * (W / 2 - 0.08), 2.1, z, 0.02, 2.0, 1.25, [0xff2f7d, 0x2f9dff, 0xffb02f, 0x7d2fff, 0x2fff9d][(i + (s > 0 ? 2 : 0)) % 5]); } }
-      box(B, 0, H / 2, D * 0.55, W, H, 0.3, S.wall); box(B, 0, 1.3, D * 0.55, 3.0, 2.6, 0.34, 0x5a1a22); box(GL, 0, 2.9, D * 0.55 - 0.2, 1.4, 0.3, 0.02, 0x2fff9d);   // the hall's doors, EXIT green over them
-      C.addSeg(O.x - W / 2, O.z + D * 0.55, O.x + W / 2, O.z + D * 0.55, 0);
-      // the hall itself, beyond: the screen glowing, rows of red seats rising
-      box(GL, 0, H * 0.55, D - 0.1, W * 0.8, H * 0.45, 0.02, 0xdfe8ff);
-      for (let r = 0; r < 6; r++) for (let x = -W / 2 + 1.5; x <= W / 2 - 1.5; x += 0.8) box(B, x, 0.45 + r * 0.25, D * 0.6 + 0.8 + r * 1.0, 0.6, 0.6, 0.6, 0x8a1e2e);
-      spot(-W / 2 + 3, D * 0.42 - 1, 1.5, 'counter', 'Tickets');
-      spot(W / 2 - 3, D * 0.42 - 1, 1.5, 'counter', 'Popcorn and cold drinks');
-      for (let x = -2; x <= 2; x += 1.2) chair(x, 3, Math.PI / 2, x, 6, { seat: { wait: true } });
-      R.customers = 5;
-    } else if (tpl === 'temple') {
-      // marble floor, pillars, the sanctum at the back up three steps: the deity lit by lamps, bells hanging at the door
-      for (const sx of [-1, 1]) for (let z = 2.5; z < D - 4; z += 3) { box(B, sx * (W / 2 - 2), H / 2, z, 0.6, H, 0.6, 0xe6dcc6); solid(sx * (W / 2 - 2), z, 0.6, 0.6); }
-      for (let i = 0; i < 3; i++) box(B, 0, 0.12 + i * 0.24, D - 3.6 + i * 0.5, 5 - i * 0.6, 0.24, 1.2, 0xd9cfb8);
-      box(B, 0, 2.3, D - 1.4, 4.2, 3.6, 2.6, 0xb5341f); box(B, 0, 4.4, D - 1.4, 3.2, 1.0, 2.0, 0xd4a017);   // the sanctum, its gold top
-      box(GL, 0, 1.9, D - 2.7, 1.0, 1.4, 0.05, 0xff8a1a);                                                    // the deity, in lamplight
-      for (let i = -3; i <= 3; i++) box(GL, i * 0.45, 0.85, D - 3.0, 0.08, 0.1, 0.08, 0xffb050);              // diyas
-      for (const sx of [-1.4, 1.4]) { box(B, sx, H - 0.6, D - 3.4, 0.03, 1.0, 0.03, 0x8a6a2a); box(B, sx, H - 1.2, D - 3.4, 0.35, 0.4, 0.35, 0xd4a017); }   // bells
-      solid(0, D - 2, 5, 3.2);
-      kp(1.6, D - 3.6, -Math.PI / 2, 'idle', 'keeper');
-      spot(0, D - 4.4, 1.6, 'counter', 'Darshan');
-      counter(-W / 2 + 2.2, 2.2, 2.0, 0.7, 0x8a5a2a); kp(-W / 2 + 2.2, 2.8, -Math.PI / 2, 'idle', 'helper');   // flowers and prasad at the entrance
-      spot(-W / 2 + 2.2, 1.4, 1.2, 'counter', 'Flowers and prasad');
-      R.customers = 6;
-    } else if (tpl === 'arcade') {
-      // bowling lanes down one side, rows of game cabinets glowing on the other
-      for (let i = 0; i < 3; i++) { const x = -W / 2 + 1.6 + i * 2.0; box(B, x, 0.05, D / 2 + 1, 1.4, 0.1, D - 5, 0xc8975a); box(B, x - 0.8, 0.12, D / 2 + 1, 0.2, 0.15, D - 5, 0x1b1c1f);
-        for (let p = 0; p < 6; p++) box(B, x - 0.3 + (p % 3) * 0.3, 0.25, D - 2.6 + Math.floor(p / 3) * 0.3, 0.1, 0.4, 0.1, 0xffffff); solid(x, D / 2 + 1, 1.6, D - 5, 2); }
-      for (let r = 0; r < 2; r++) for (let j = 0; j < 4; j++) { const x = 2 + j * 1.6, z = 4 + r * 4; box(B, x, 0.9, z, 1.0, 1.8, 0.8, 0x23233a); box(GL, x, 1.35, z - 0.41, 0.8, 0.6, 0.02, [0x2fd3ff, 0xff2f7d, 0xffd166, 0x7dff6b][(j + r) % 4]); solid(x, z, 1.0, 0.8, 2); browse(x, z - 1.0); }
-      counter(W / 2 - 2.5, D - 1.4, 3.0, 0.8, S.counter); kp(W / 2 - 2.5, D - 0.7, -Math.PI / 2, 'idle', 'keeper');
-      spot(W / 2 - 2.5, D - 2.3, 1.5, 'counter', 'Lanes and game cards');
-      R.customers = 6;
-    } else if (tpl === 'laundry') {
-      // washing machines along a wall, a steaming ironing table, clothes on hangers waiting to go home
-      for (let i = 0; i < 5; i++) { const x = -W / 2 + 1.2 + i * 1.1; box(B, x, 0.5, D - 0.6, 0.9, 1.0, 0.8, 0xf2f4f6); box(B, x, 0.55, D - 1.01, 0.5, 0.5, 0.02, 0x2a3b4c); }
-      solid(0, D - 0.6, W, 0.8);
-      box(B, W / 2 - 2, 0.85, 3.5, 2.2, 0.06, 0.8, 0xdfe5ea); box(B, W / 2 - 2.4, 0.95, 3.5, 0.35, 0.12, 0.2, 0x1b1c1f); solid(W / 2 - 2, 3.5, 2.2, 0.8, 2);
-      box(B, -W / 2 + 0.6, 1.9, D / 2 - 1, 0.04, 0.04, 4, 0xb8bcc2);
-      for (let i = 0; i < 9; i++) box(B, -W / 2 + 0.6, 1.35, D / 2 - 2.8 + i * 0.45, 0.08, 1.0, 0.4, [0xf4f2ee, 0x2e86ab, 0xd1495b, 0x1b1c1f, 0xe0b23a][i % 5]);
-      counter(0, 2.2, 3.0, 0.7, S.counter); kp(0, 2.8, -Math.PI / 2, 'idle', 'keeper');
-      spot(0, 1.4, 1.3, 'counter', 'At the counter');
-      R.customers = 1;
-    } else if (tpl === 'library') {
-      // the reading room: rows of desks with green lamps, books to the ceiling, the day's papers on a stand
-      for (const sx of [-1, 1]) for (let z = 1.5; z < D - 1; z += 2.2) { box(B, sx * (W / 2 - 0.3), 1.6, z + 1, 0.45, 3.2, 2.0, 0x6b4a2e); for (let r = 0; r < 6; r++) box(B, sx * (W / 2 - 0.55), 0.35 + r * 0.5, z + 1, 0.06, 0.3, 1.8, [0x2e5a3a, 0x8a1e1e, 0x2e4a7a, 0xc9a227][r % 4]); }
-      for (let r = 0; r < 3; r++) for (let x = -W / 4; x <= W / 4 + 0.01; x += W / 4) { const z = 4 + r * 2.6; tableTop(x, z, 2.2, 0.8); chair(x - 0.5, z + 0.75, -Math.PI / 2, x, z); chair(x + 0.5, z + 0.75, -Math.PI / 2, x, z); box(GL, x, 1.05, z - 0.15, 0.3, 0.1, 0.2, 0x7dffa0); }
-      box(B, -1.5, 0.7, 2, 1.2, 1.4, 0.3, 0x6b4a2e);
-      counter(2.5, 2, 2.4, 0.7, S.counter); kp(2.5, 2.6, -Math.PI / 2, 'idle', 'keeper');
-      spot(2.5, 1.2, 1.3, 'counter', 'Front desk');
-      R.customers = 5;
+    } else if (ROOMS2[tpl]) {
+      // the detailed rooms (rooms2.js): cinema, temple, games and bowling, reading room, laundry
+      ROOMS2[tpl]({ B, GL, box, solid, spot, kp, chair, counter, tableTop, browse, W, D, H, S, style, C, O, R, FLOOR });
     } else {
       // clinic / lodge / chowki / office
       counter(0, D - 1.6, Math.min(W * 0.45, 6), 0.8, tpl === 'chowki' ? 0x6b5a36 : tpl === 'lodge' ? 0x6b3a26 : S.counter);
