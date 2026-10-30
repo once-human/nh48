@@ -2,6 +2,7 @@
 // for search, and the full-screen map screen (drag, zoom, search, filters, waypoint + GPS).
 // The minimap draws through the same tile cache, so both always agree with the streets you drive.
 import { g as glyph, GLYPH } from './glyphs.js';
+import { pinKind } from '../game/shops.js';
 import { versioned } from '../core/assets.js';
 import { cmRing } from '../world/geo.js';
 import TRANSIT from '../game/transit.json';
@@ -21,6 +22,24 @@ export const CATS = {
   transit: ['Transit', '#33d17a', 'bus'], park: ['Parks', '#5bbf6a', 'tree'], temple: ['Temples', '#ff9f43', 'temple'], college: ['Colleges', '#c08cff', 'cap'],
   cinema: ['Theatres', '#ff6ec7', 'film'], service: ['Offices & services', '#9aa0aa', 'building'],
 };
+// every kind of place has its own filter, icon and colour (what the game makes of it: a bar, a garage, a gym...):
+// label, colour, glyph; each belongs to one of the groups above (how far out it shows)
+export const KINDS = {
+  landmark: ['Landmarks', '#f2b705', 'star'], temple: ['Temples', '#ff9f43', 'temple'], park: ['Gardens', '#5bbf6a', 'tree'], zoo: ['Zoo', '#8bd17a', 'paw'],
+  transit: ['Transit', '#33d17a', 'bus'], fuel: ['Petrol & CNG', '#a08cff', 'fuel'], police: ['Police', '#5aa2ff', 'shield'], chowki: ['Chowkis', '#5aa2ff', 'shield'],
+  hospital: ['Hospitals', '#ff4d5e', 'cross'], clinic: ['Clinics', '#ff6f7a', 'cross'], pharmacy: ['Medical stores', '#ff5a4f', 'pill'], gym: ['Gyms', '#3ddc84', 'dumbbell'],
+  food: ['Restaurants', '#ffb020', 'food'], thali: ['Thali', '#f5a623', 'plate'], misal: ['Misal & vada pav', '#ff7a2f', 'food'], biryani: ['Biryani', '#e0752d', 'food'],
+  southindian: ['South Indian', '#f5c542', 'plate'], chinese: ['Chinese', '#ff5e5e', 'food'], fastfood: ['Pizza & burgers', '#ffa33a', 'food'], tapri: ['Tapri & chai', '#e8b04a', 'glass'],
+  cafe: ['Cafés', '#c08b5c', 'glass'], bakery: ['Bakeries', '#e9b97a', 'food'], sweets: ['Sweets', '#ff9ecb', 'diamond'], juice: ['Juice & mastani', '#7bdc5a', 'drop'], icecream: ['Ice cream', '#ffb3d9', 'drop'],
+  bar: ['Bars, pubs & clubs', '#b58cff', 'cocktail'], cinema: ['Cinemas', '#ff6ec7', 'film'], gaming: ['Gaming & bowling', '#ff6b5e', 'burst'],
+  barber: ['Salons', '#ff7ab6', 'scissors'], clothes: ['Clothes', '#ff5a5f', 'shirt'], shoes: ['Footwear', '#ff8f6b', 'run'], optician: ['Opticians', '#6fb8ff', 'eye'], laundry: ['Laundry & ironing', '#6fb8ff', 'shirt'],
+  kirana: ['Kirana & grocery', '#7fd1ff', 'cart'], shop: ['Other shops', '#7fd1ff', 'bag'], mobile: ['Mobile shops', '#5ad1ff', 'phone'], electronics: ['Electronics', '#ffd23f', 'bolt'],
+  books: ['Books', '#c9a0ff', 'pad'], florist: ['Florists', '#ff7ab6', 'lotus'], paan: ['Paan', '#4fbf5a', 'leaf'], petshop: ['Pet shops', '#f1ece2', 'paw'], jeweller: ['Jewellers', '#ffc83d', 'gold'],
+  bank: ['Banks & ATMs', '#4dd0c8', 'bank'], dealer: ['Showrooms', '#a78bfa', 'car'], garage: ['Garages', '#c9ced6', 'wrench'], travel: ['Travels', '#33d17a', 'bus'],
+  lodge: ['Lodges & hotels', '#e0a26b', 'home'], estate: ['Estate agents', '#9aa0aa', 'key'], library: ['Reading rooms', '#c08cff', 'college'], college: ['Colleges & schools', '#c08cff', 'college'],
+  service: ['Offices & services', '#9aa0aa', 'building'],
+};
+const kindFor = (p) => { const k = p.c === 'transit' ? 'transit' : p.c === 'police' ? 'police' : pinKind(p); return KINDS[k] ? k : KINDS[p.c] ? p.c : 'service'; };
 // one filled icon set (24 x 24) for every pin on the map and minimap
 const ICON_PATHS = {
   star: 'M12 2.6l2.8 5.9 6.5.8-4.8 4.5 1.2 6.4L12 17.1l-5.7 3.1 1.2-6.4-4.8-4.5 6.5-.8z',
@@ -43,10 +62,10 @@ const ICON_PATHS = {
 const ICON2D = {};
 // the map's pins draw the same bold icons as the legend and the menus
 for (const [k, v] of Object.entries({ star: 'star', shield: 'shield', cross: 'cross', food: 'food', bag: 'cart', bank: 'bank', fuel: 'fuel', bus: 'bus', tree: 'tree', temple: 'temple', cap: 'college', film: 'film', building: 'building' })) if (GLYPH[v]) ICON_PATHS[k] = GLYPH[v];
-const iconPath = (n) => ICON2D[n] || (ICON_PATHS[n] ? (ICON2D[n] = new Path2D(ICON_PATHS[n])) : null);
+const iconPath = (n) => ICON2D[n] || (ICON_PATHS[n] || GLYPH[n] ? (ICON2D[n] = new Path2D(ICON_PATHS[n] || GLYPH[n])) : null);
 const GL = { landmark: 'star', police: 'shield', hospital: 'cross', food: 'food', shop: 'cart', bank: 'bank', fuel: 'fuel', transit: 'bus', park: 'tree', temple: 'temple', college: 'college', cinema: 'film', service: 'building' };
 const FOOD = new Set(['food', 'cafe', 'bar', 'icecream', 'sweets', 'bakery']);
-const SHOPC = { bank: 'bank', atm: 'bank', police: 'police', clinic: 'hospital' };
+const SHOPC = { bank: 'bank', atm: 'bank', police: 'police', clinic: 'hospital', pharmacy: 'hospital', garage: 'service' };
 
 // a line for any place on the map: what kind of place it is, from its name and kind, and what it's good for in the game
 const BLURB = [
@@ -99,7 +118,9 @@ export class CityMap {
     this.pgrid = new Map(); this.pcell = 120;
     for (const p of P) { const k = this.key(p.x, p.z); if (!this.pgrid.has(k)) this.pgrid.set(k, []); this.pgrid.get(k).push(p); }
     // areas (suburbs) and districts for labels at low zoom
-    this.areas = (M.areas || (M.pois || []).filter(p => p[4] === 'suburb').map(p => [p[0], p[1], p[2], p[3], 2]))
+    // (the 32 big ones first, then every locality OpenStreetMap knows: Lohegaon, Dhanori, Kharadi...)
+    const big = new Set((M.areas || []).map(a => a[0].toLowerCase()));
+    this.areas = [...(M.areas || []), ...(M.pois || []).filter(p => p[4] === 'suburb' && !big.has(p[0].toLowerCase())).map(p => [p[0], p[1], p[2], p[3], 2])]
       .map(a => ({ n: a[0], mr: a[1], x: a[2] / 100, z: a[3] / 100, tier: a[4] }))
       .sort((a, b) => a.tier - b.tier);
     // streets for search and labels: one entry per name, at its longest edge
@@ -140,6 +161,7 @@ export class CityMap {
       if (seen.has(id)) continue;
       seen.add(id);
       const p = { n: q[0], mr: q[1], c: CATS[c] ? c : FOOD.has(c) ? 'food' : (SHOPC[c] || 'shop'), sub: c, x: q[3] / 100, z: q[4] / 100 };
+      p.k = kindFor(p);
       this.places.push(p);
       const k = this.key(p.x, p.z); if (!this.pgrid.has(k)) this.pgrid.set(k, []); this.pgrid.get(k).push(p);
     }
@@ -482,13 +504,14 @@ export class MapScreen {
     this.$ = (id) => m.querySelector('#' + id);
     // filters
     const F = this.$('bm-filters');
-    for (const [k, [label, col]] of Object.entries(CATS)) {
+    for (const [k, [label, col, gl]] of Object.entries(KINDS)) {
       const b = document.createElement('button');
       b.className = 'chip'; b.dataset.k = k; b.setAttribute('aria-pressed', 'false');
-      b.innerHTML = `${glyph(GL[k] || 'pin', '', col)}<span>${label}</span>`;
+      b.innerHTML = `${glyph(gl || 'pin', '', col)}<span>${label}</span>`;
       b.onclick = () => { const on = !this.legend.has(k); on ? this.legend.add(k) : this.legend.delete(k); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); F.classList.toggle('some', this.legend.size > 0); };
       F.appendChild(b);
     }
+    F.addEventListener('wheel', (e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { F.scrollLeft += e.deltaY; e.preventDefault(); e.stopPropagation(); } }, { passive: false });   // (the mouse wheel scrolls the legend along)
     this.$('bm-close').onclick = () => this.g.toggleMap(false);
     this.$('bm-track').onclick = () => { const st = this.g.story, t = st && st.trackNow ? st.trackNow() : null; if (t) { this.view.x = t.x; this.view.z = t.z; this.g.hud.toast('Tracking', t.name, 'meter', 2); } else this.g.hud.toast('No mission right now', 'Your phone will ring when there is one', 'info', 2.4); };
     this.$('bm-in').onclick = () => this.zoomAt(1.6);
@@ -721,7 +744,7 @@ export class MapScreen {
     };
     const choose = (p) => {
       if (!p) return;
-      if (CATS[p.c] && this.legend.size && !this.legend.has(p.c)) { this.legend.add(p.c); const b = this.$('bm-filters').querySelector(`[data-k="${p.c}"]`); if (b) b.classList.add('on'); }
+      if (p.k && this.legend.size && !this.legend.has(p.k)) { this.legend.add(p.k); const b = this.$('bm-filters').querySelector(`[data-k="${p.k}"]`); if (b) b.classList.add('on'); }
       this.flyTo(p.x, p.z, Math.max(this.view.ppm, p.c === 'area' ? 0.9 : p.c === 'street' ? 1.6 : 2.4));
       this.select(p); res.hidden = true; q.blur();
     };
@@ -892,12 +915,12 @@ export class MapScreen {
       : { police: 0.25, fuel: 0.28, transit: 0.28, hospital: 0.35, temple: 0.4, park: 0.35, college: 0.35, cinema: 0.35, food: 0.42, shop: 0.5, bank: 0.48, service: 0.8 };
     const NAMEZ = { police: 0.75, fuel: 0.75, transit: 0.75, hospital: 1.2, temple: 1.3, park: 0.9, college: 0.9, cinema: 0.9, food: 1.1, shop: 1.4, bank: 1.4, service: 1.8 };
     for (const p of near) {
-      if (p.c === 'landmark' || !this.shows(p.c) || z < (MINZ[p.c] || 3)) continue;
+      if (p.c === 'landmark' || !this.shows(p.k || p.c) || z < (MINZ[p.c] || 3) * (this.legend.has(p.k) ? 0.6 : 1)) continue;
       const [X, Y] = T(p.x, p.z);
       const small = p.c === 'food' || p.c === 'shop' || p.c === 'bank' || p.c === 'service';
       const s = small ? (z >= 2 ? 11 : 9.5) : z >= 1.5 ? 13 : 11.5;
       if (!free(X - s, Y - s, s * 2, s * 2)) continue;
-      const [, col, gl] = CATS[p.c];
+      const [, col, gl] = KINDS[p.k] || CATS[p.c];
       drawGlyph(x, X, Y, col, gl, s * 2);
       vis.push(p);
       if (z >= (NAMEZ[p.c] || 5)) {

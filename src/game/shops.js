@@ -63,7 +63,7 @@ export function kindOf(name, cat) {
   if (/thali|bhojan|khanaval|khanawal|bhojanalay|thaali/.test(n)) return 'thali';
   const C = { salon: 'barber', clothes: 'clothes', shoes: 'shoes', cafe: 'cafe', bakery: 'bakery', sweets: 'sweets', icecream: 'icecream',
     pharmacy: 'pharmacy', clinic: 'clinic', grocery: 'kirana', mobile: 'mobile', electronics: 'electronics', jewellery: 'jeweller',
-    bank: 'bank', atm: 'bank', books: 'books', travel: 'travel', food: 'food', hotel: 'food', optician: 'optician' };
+    bank: 'bank', atm: 'bank', books: 'books', travel: 'travel', food: 'food', hotel: 'food', optician: 'optician', bar: 'bar', garage: 'garage' };
   return C[cat] || null;
 }
 
@@ -90,8 +90,9 @@ const PIN_CAT = { food: 'food', bank: 'bank', fuel: 'fuel', police: 'police', te
 export function pinKind(p) {
   const n = (p.n || '').toLowerCase();
   if (p.c === 'transit') return null;
+  if (p.sub === 'pharmacy') return 'pharmacy';
   if (p.c === 'hospital') return /pharma|chemist|medical stores?|drug/.test(n) ? 'pharmacy' : 'clinic';
-  const k = kindOf(p.n, PIN_CAT[p.c] || p.c);
+  const k = kindOf(p.n, p.sub && p.sub !== p.c ? p.sub : (PIN_CAT[p.c] || p.c));        // (the bake's trade first: OSM knows a pub is a pub)
   if (k) return k;
   if (p.c === 'shop') return 'shop';
   if (p.c === 'landmark') return 'landmark';

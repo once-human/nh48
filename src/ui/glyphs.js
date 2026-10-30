@@ -52,6 +52,12 @@ const P = {
   film: 'M3 4h18v16H3zm2 2v2h2V6zm12 0v2h2V6zM5 10v2h2v-2zm12 0v2h2v-2zM5 14v2h2v-2zm12 0v2h2v-2zM9 6v12h6V6z',
   college: 'M12 3 1 8.5 12 14l9-4.5V16h2V8.5zM5.5 12.6V17c0 1.7 2.9 3.5 6.5 3.5s6.5-1.8 6.5-3.5v-4.4L12 15.9z',
   building: 'M4 21V3h11v6h5v12zm3-15v2h2V6zm4 0v2h2V6zM7 10v2h2v-2zm4 0v2h2v-2zm6 2v2h1v-2zM7 14v2h2v-2zm4 0v2h2v-2zm6 2v2h1v-2zm-8 2v3h2v-3z',
+  scissors: 'M6.5 2a3.5 3.5 0 0 1 3.1 5.1L12 9.6l6.6-6.6H22L13.7 11.3 22 19.6h-3.4L12 13l-2.4 2.4a3.5 3.5 0 1 1-1.8-1.6L10.2 11.3 7.8 8.9A3.5 3.5 0 1 1 6.5 2zm0 2.2a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zm0 12.4a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6z',
+  eye: 'M12 4.5c5 0 8.8 3.4 10.5 7.5-1.7 4.1-5.5 7.5-10.5 7.5S3.2 16.1 1.5 12C3.2 7.9 7 4.5 12 4.5zm0 3a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm0 2.4a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2z',
+  pill: 'M8.2 3.8a5.6 5.6 0 0 1 7.9 0l4.1 4.1a5.6 5.6 0 0 1 0 7.9l-4.4 4.4a5.6 5.6 0 0 1-7.9 0l-4.1-4.1a5.6 5.6 0 0 1 0-7.9zm-2.8 5.6a3.2 3.2 0 0 0 0 4.5l4.2 4.2 4.5-4.5-4.2-4.2z',
+  cocktail: 'M3 3h18l-8 9.2V19h4v2.5H7V19h4v-6.8zm4.4 2.5 4.6 5.2 4.6-5.2z',
+  leaf: 'M20.5 3.2C11 3 4 7.5 4 15c0 1.6.4 3 1 4.2L3 21.3 4.4 22.7l2-2C7.6 21.5 9.2 22 11 22c6.6 0 10.3-6.3 9.5-18.8zM8 17.5c2.5-4 5.6-6.6 9.5-8.5-3 2.5-5.4 5.4-7.7 9.4z',
+  key: 'M8 6a6 6 0 0 1 5.8 7.5L22 21.7V23h-4v-2h-2v-2h-2.3l-1.5-1.5A6 6 0 1 1 8 6zm-1.5 3.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
   // the garage
   spray: 'M8 8h8v13a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1zM10 4.5h4V7h-4zM15.5 2h2v1.6h-2zM19 1.2h1.6v1.6H19zM19 4h1.6v1.6H19z',
   piston: 'M6 2.5h12V11H6zm2 2.2v1.6h8V4.7zm0 3.2v1.6h8V7.9zM10.6 11h2.8v4.4a3.2 3.2 0 1 1-2.8 0zM11 18.2a1 1 0 1 0 2 0 1 1 0 0 0-2 0z',
@@ -86,6 +92,6 @@ const C = { heart: '#ff4d5e', food: '#ff8a3d', drop: '#3ea8ff', bolt: '#ffd23f',
   temple: '#ff9f43', film: '#ff6ec7', college: '#c08cff', building: '#9aa0aa',
   spray: '#ff5fa2', piston: '#ff8a3d', turbo: '#5ad1ff', disc: '#ff5e5e', tyre: '#c9ced6', rim: '#e8ecf2', spring: '#ffd23f', bulb: '#b58cff', beam: '#fff1b8', horn: '#ffb224',
   seat: '#e0a26b', numplate: '#ffd23f', exhaust: '#b8bec8', window: '#6fb8ff', beacon: '#ff3b3b', speaker: '#a78bfa', nitro: '#3ea8ff', hydro: '#3ddc84', cam: '#f1ece2', brush: '#ff7a45',
-  chip: '#3ddc84', flame: '#ff6a2b', warn: '#ff4d5e', body: '#a78bfa' };
+  chip: '#3ddc84', flame: '#ff6a2b', warn: '#ff4d5e', body: '#a78bfa', scissors: '#ff7ab6', eye: '#6fb8ff', pill: '#ff5a4f', cocktail: '#b58cff', leaf: '#4fbf5a', key: '#e0a26b' };
 export const g = (name, cls = '', col) => P[name] ? `<svg class="gy ${cls}" viewBox="0 0 24 24" aria-hidden="true" style="color:${col || C[name] || 'currentColor'}"><path fill-rule="evenodd" d="${P[name]}"/></svg>` : '';
 export const GLYPH = P;

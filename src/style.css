@@ -2589,3 +2589,6 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .ld-tip { min-height: 46px; margin-top: 18px; opacity: 0; transform: translateY(6px); transition: opacity .5s, transform .5s; display: grid; gap: 3px; }
 .ld-tip.in { opacity: 1; transform: none; }
 .ld-tip b { font: 600 17px var(--font-dev); color: rgba(255, 255, 255, .9); } .ld-tip span { font-size: 12px; color: rgba(255, 255, 255, .55); }
+/* the map's legend: one chip per kind of place, scrolling along the top */
+#ui.mb-on .bm-filters { justify-content: flex-start !important; mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent); -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent); padding: 2px 24px !important; }
+#ui.mb-on .bm-filters .chip { white-space: nowrap; }
