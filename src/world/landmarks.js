@@ -638,6 +638,30 @@ const BUILD = {
     B.hitc(0, 0, 8.6);
   },
 
+  // a campus gate (tools/campuses.py: every university and college OSM has the outline of): two pillars, the arch with
+  // the name on both faces, a watchman's cabin, the boom barrier
+  gate(B) {
+    const L = B.L, nm = L.name, hd = 0.7;
+    for (const u of [-6.2, 6.2]) { B.cbox(u, 0, 0, 1.3, 5.6, 1.3, C.cream); B.cbox(u, 5.6, 0, 1.6, 0.3, 1.6, C.stone); B.hitc(u, 0, 0.8); }
+    B.cbox(0, 5.2, 0, 14, 1.3, 1.2, C.cream); B.cbox(0, 6.5, 0, 14.4, 0.18, 1.4, C.stone);
+    const draw = (x, w, h) => {
+      x.fillStyle = '#1d2f5a'; x.fillRect(0, 0, w, h); x.strokeStyle = '#d8b04a'; x.lineWidth = h * 0.05; x.strokeRect(h * 0.06, h * 0.06, w - h * 0.12, h - h * 0.12);
+      x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      const words = nm.split(' '); let lines = [nm];
+      x.font = `800 ${Math.round(h * 0.4)}px "Archivo", "Inter", sans-serif`;
+      if (x.measureText(nm).width > w * 0.9) { const mid = Math.ceil(words.length / 2); lines = [words.slice(0, mid).join(' '), words.slice(mid).join(' ')]; }
+      let fs = h * (lines.length > 1 ? 0.3 : 0.42); x.font = `800 ${Math.round(fs)}px "Archivo", "Inter", sans-serif`;
+      while (Math.max(...lines.map(l => x.measureText(l).width)) > w * 0.92 && fs > 8) { fs -= 2; x.font = `800 ${Math.round(fs)}px "Archivo", "Inter", sans-serif`; }
+      lines.forEach((l, i) => x.fillText(l, w / 2, h * (lines.length > 1 ? 0.33 + i * 0.36 : 0.52)));
+    };
+    B.board(0, 5.85, -hd - 0.02, 13.4, 1.15, draw, 'gate-' + L.id);
+    B.board(0, 5.85, hd + 0.02, 13.4, 1.15, draw, 'gate-' + L.id, Math.PI);
+    // the watchman's cabin and the barrier
+    B.cbox(8.4, 0, 1.2, 2.0, 2.6, 2.0, C.white); B.cbox(8.4, 2.6, 1.2, 2.3, 0.15, 2.3, C.slate); B.hitc(8.4, 1.2, 1.2);
+    B.cbox(5.2, 0, -0.6, 0.3, 1.1, 0.3, C.black);
+    for (let k = 0; k < 10; k++) B.cbox(4.6 - k * 1.0, 0.95, -0.6, 1.0, 0.1, 0.1, k % 2 ? C.white : C.red);
+  },
+
   // Pune Junction (1925): a long two-storey cream building with arched windows and a tiled roof, an arcaded
   // porch in the middle, the clock tower above it, and the yellow railway name board
   station(B) {
@@ -984,7 +1008,7 @@ export function addLandmarks(W) {
   const { index, collision } = W;
   W.landmarks = [];
   for (const L of LM) {
-    if (!BUILD[L.id]) continue;
+    if (!BUILD[L.id] && !(L.kind && BUILD[L.kind])) continue;
     const ci = index.chunkOf(L.x, L.z);
     if (ci < 0) continue;
     const c = index.chunks[ci];
@@ -994,7 +1018,7 @@ export function addLandmarks(W) {
     const col = [];
     const B = new LB(L, { fb: nullB(), gb: nullB(), cb: nullB(), group: { add() {} }, mm: new THREE.Matrix4() });
     B.col = col;
-    try { BUILD[L.id](B); } catch (e) { console.warn('landmark', L.id, e); }
+    try { (BUILD[L.id] || BUILD[L.kind])(B); } catch (e) { console.warn('landmark', L.id, e); }
     for (const h of col) { if (h[0] === 's') collision.addSeg(h[1], h[2], h[3], h[4], h[5] || 0); else collision.addCircle(h[1], h[2], h[3], 0); }
     if (B.decks) for (const d of B.decks) addDeck(W, L, d);
     if (L.id === 'shaniwar' && W.trees) W.trees.addTile(SW.trees.map(([u, v], i) => {
@@ -1041,7 +1065,8 @@ function nullB() { return { wall() {}, flat() {}, poly() {}, addGeo() {}, v() { 
 // build one landmark into a chunk's builders
 export function buildLandmark(W, id, b) {
   const L = LM.find(x => x.id === id);
-  if (!L || !BUILD[id]) return;
+  const fn = L && (BUILD[id] || (L.kind && BUILD[L.kind]));
+  if (!fn) return;
   const B = new LB(L, b); B.col = [];
-  BUILD[id](B);
+  fn(B);
 }
