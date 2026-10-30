@@ -2529,3 +2529,63 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .mfx-k b { font-weight: 700; } .mfx-k b.on { color: #ff6b6b; }
 .mfx-bar { width: 54px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
 .mfx-bar u { display: block; height: 100%; background: linear-gradient(90deg, #3ea8ff, #8fd3ff); }
+
+/* ---------------------------------------------------------------- round 10: the top bar's gradients, the studio light, the loading screen */
+@property --g1 { syntax: '<color>'; inherits: true; initial-value: #f2b705; }
+@property --g2 { syntax: '<color>'; inherits: true; initial-value: #ff6a3d; }
+@property --g3 { syntax: '<color>'; inherits: true; initial-value: #c2417a; }
+#ui { --g1: #f2b705; --g2: #ff6a3d; --g3: #c2417a; transition: --g1 .9s ease, --g2 .9s ease, --g3 .9s ease; }
+#ui[data-tab="inv"] { --g1: #ffb224; --g2: #ff6a3d; --g3: #d94f7a; }            /* jhola: saffron to rose */
+#ui[data-tab="map"] { --g1: #19c3b1; --g2: #2f80ff; --g3: #6a5cff; }            /* map: teal, blue */
+#ui[data-tab="missions"] { --g1: #ff7a45; --g2: #e2408f; --g3: #8b5cf6; }       /* missions: ember, magenta, violet */
+#ui[data-tab="stats"] { --g1: #3ddc84; --g2: #16b3a8; --g3: #3b82f6; }          /* stats: green to blue */
+#ui[data-tab="settings"] { --g1: #4285f4; --g2: #9b72cb; --g3: #d96570; }       /* settings: blue, violet, coral */
+.mb { overflow: hidden; background: #060608 !important; isolation: isolate; }
+.mb::before { content: ''; position: absolute; inset: -60% -10%; z-index: -1; pointer-events: none; opacity: .62;
+  background: radial-gradient(40% 120% at 15% 60%, var(--g1), transparent 70%), radial-gradient(38% 130% at 50% 40%, var(--g2), transparent 70%), radial-gradient(40% 120% at 85% 60%, var(--g3), transparent 70%);
+  filter: blur(28px) saturate(115%); animation: mbFlow 16s ease-in-out infinite alternate; }
+.mb::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; z-index: -1; background: linear-gradient(90deg, var(--g1), var(--g2), var(--g3), var(--g1)); background-size: 200% 100%; animation: mbLine 8s linear infinite; }
+.mb .mb-glow { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(6,6,8,.35), rgba(6,6,8,.62)); pointer-events: none; }
+@keyframes mbFlow { 0% { transform: translateX(-6%) scaleX(1.05); } 50% { transform: translateX(4%) scaleX(.95); } 100% { transform: translateX(-2%) scaleX(1.1) rotate(1deg); } }
+@keyframes mbLine { to { background-position: -200% 0; } }
+/* the tabs in the settings' own type: Archivo, wide, heavy, capitals */
+.mb .mb-tabs button { font-family: 'Archivo', var(--font-ui) !important; font-weight: 800 !important; font-stretch: 112% !important; font-size: 15px !important; letter-spacing: -0.01em !important; text-transform: uppercase; color: rgba(245, 245, 247, .5) !important; padding: 10px 20px !important; border: 0 !important; border-radius: 12px !important; transition: color .2s, background .3s; }
+.mb .mb-tabs button:hover { color: #fff !important; background: rgba(255, 255, 255, .06) !important; }
+.mb .mb-tabs button.on { color: #fff !important; background: rgba(255, 255, 255, .12) !important; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22), 0 6px 24px -8px var(--g2) !important; }
+/* place · day and time · money, exactly as the pause screen shows them */
+.mb .mb-r { display: flex !important; flex-wrap: nowrap; justify-self: end; align-items: center; gap: 6px 20px; font: 600 14px var(--font-ui) !important; color: var(--tx2, rgba(245,245,247,.72)); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mb .mb-r span { font: inherit !important; color: inherit; }
+.mb .mb-r .mb-where { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+#ui.mb-on #p-meta { display: none; }                           /* (the bar already says it) */
+/* a hint of the tab's gradient in what's below it */
+#ui.mb-on::before { content: ''; position: fixed; left: 0; right: 0; top: 60px; height: 140px; z-index: 1; pointer-events: none; background: radial-gradient(60% 100% at 50% 0%, color-mix(in srgb, var(--g2) 16%, transparent), transparent 70%); }
+#ui.mb-on .pz-i.sel::before { background: linear-gradient(90deg, var(--g1), var(--g3)); }
+#ui.mb-on .pane h2, #ui.mb-on .rm h3, #ui.mb-on .iv-head b { background-image: linear-gradient(90deg, #fff 55%, color-mix(in srgb, var(--g2) 60%, #fff)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+#ui.mb-on .gt::after, #ui.mb-on .rf-card::before { content: ''; display: block; height: 2px; width: 34px; margin-top: 8px; border-radius: 2px; background: linear-gradient(90deg, var(--g1), var(--g3)); }
+#ui.mb-on .rf-card { position: relative; } #ui.mb-on .rf-card::before { position: absolute; top: 0; left: 18px; margin: 0; width: 46px; }
+#ui.mb-on .seg button.on, #ui.mb-on .seg button[aria-pressed="true"] { box-shadow: 0 0 0 1px color-mix(in srgb, var(--g2) 45%, transparent), 0 6px 18px -8px var(--g2); }
+/* the jhola: the world itself goes dark around you now; this only shades the panels' side */
+.iv:not(.room) .iv-dim { background: linear-gradient(90deg, rgba(5, 5, 7, 0) 0%, rgba(5, 5, 7, 0) 30%, rgba(5, 5, 7, .5) 46%, rgba(5, 5, 7, .74) 100%), radial-gradient(120% 90% at 22% 50%, transparent 55%, rgba(0, 0, 0, .35)) !important; }
+/* loading: black, then light coming up in slow, shifting colour; Pune along the bottom */
+#loading { background: #000 !important; overflow: hidden; }
+.ld-aura { position: absolute; inset: -20%; filter: blur(90px) saturate(120%); opacity: 0; animation: ldUp 2.4s ease .5s forwards; }
+.ld-aura i { position: absolute; width: 46vmax; height: 46vmax; border-radius: 50%; mix-blend-mode: screen; opacity: .55; }
+.ld-aura i:nth-child(1) { background: #f2b705; left: 8%; top: 46%; animation: ldA 19s ease-in-out infinite alternate; }
+.ld-aura i:nth-child(2) { background: #ff5a1f; left: 38%; top: 58%; animation: ldB 23s ease-in-out infinite alternate; }
+.ld-aura i:nth-child(3) { background: #4285f4; left: 58%; top: 30%; animation: ldC 21s ease-in-out infinite alternate; opacity: .42; }
+.ld-aura i:nth-child(4) { background: #9b72cb; left: 20%; top: 8%; animation: ldB 27s ease-in-out infinite alternate-reverse; opacity: .38; }
+.ld-aura i:nth-child(5) { background: #d96570; left: 70%; top: 62%; animation: ldA 25s ease-in-out infinite alternate-reverse; opacity: .4; }
+@keyframes ldUp { to { opacity: .72; } }
+@keyframes ldA { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(18vmax, -10vmax) scale(1.2); } 100% { transform: translate(-8vmax, -22vmax) scale(.9); } }
+@keyframes ldB { 0% { transform: translate(0, 0) scale(1.1); } 50% { transform: translate(-20vmax, -8vmax) scale(.85); } 100% { transform: translate(10vmax, -18vmax) scale(1.15); } }
+@keyframes ldC { 0% { transform: translate(0, 0) scale(.9); } 50% { transform: translate(-14vmax, 16vmax) scale(1.2); } 100% { transform: translate(12vmax, 6vmax) scale(1); } }
+.ld-mr { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -54%); font: 700 min(38vw, 420px)/1 var(--font-dev); color: rgba(255, 255, 255, .035); letter-spacing: 0; pointer-events: none; opacity: 0; animation: ldUp 3s ease 1s forwards; white-space: nowrap; }
+.ld-sky { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 26vh; fill: rgba(0, 0, 0, .78); opacity: 0; animation: ldSky 2.6s ease 1.2s forwards; }
+@keyframes ldSky { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+#loading .ld { position: relative; z-index: 1; }
+#loading .ld-word { text-shadow: 0 0 40px rgba(255, 200, 120, .25); }
+#loading .ld-bar { height: 3px; background: rgba(255, 255, 255, .12); }
+#loading .ld-bar i { background: linear-gradient(90deg, #f2b705, #ff5a1f, #9b72cb, #4285f4); background-size: 300% 100%; animation: mbLine 4s linear infinite; box-shadow: 0 0 14px rgba(255, 160, 80, .6); }
+.ld-tip { min-height: 46px; margin-top: 18px; opacity: 0; transform: translateY(6px); transition: opacity .5s, transform .5s; display: grid; gap: 3px; }
+.ld-tip.in { opacity: 1; transform: none; }
+.ld-tip b { font: 600 17px var(--font-dev); color: rgba(255, 255, 255, .9); } .ld-tip span { font-size: 12px; color: rgba(255, 255, 255, .55); }

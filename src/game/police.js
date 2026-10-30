@@ -499,6 +499,9 @@ export class Police {
       if (s.cop.ped) s.phase = 'leave'; else this.stop = null;
       return;
     }
+    // a beat marshal who caught you for something minor: once it's settled (paid, let off, or booked), that's the end
+    // of it. The chase is over and they ride off (paying used to leave you wanted, so they caught you again, and again)
+    if (s.cop.marshal && !theft) { this.heat = 0; this.pts = 0; this.unseenT = 0; this.clearCharges(); G.hud.setHeat(0); }
     // fined for the garage's alterations: they come off, there and then
     if (s.kind === 'alter' && kind !== 'meter' && !/changes hands/.test(res)) { const gone = G.modfx && G.modfx.confiscate(); if (gone) sub += ` He has you take off the ${gone}.`; }
     if (line) line = this.say(line, cop) || line;

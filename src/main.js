@@ -136,6 +136,10 @@ async function main() {
   const sndUrl = (n) => `assets/snd/${n}.mp3`;
   loader.expect('assets/voices_pk.mp3', manifest['assets/voices_pk.mp3'] || 1e5);
   const VOICE_BIN = 'assets/voices.mp3';
+  { const tips = [['दुपारी १ ते ४ दुकान बंद राहील.', 'Shops shut 1 to 4. It is the law of Pune'], ['पुणे तिथे काय उणे', 'What can Pune possibly lack?'], ['येथे सल्ला मिळणार नाही.', 'No advice given here. Unless you ask. Then a lot'], ['मिसळ: तर्री मागू नये, मिळेल.', 'Misal: don’t ask for more tarri. It’s coming'], ['Loading the speed breakers', 'Every hundred metres, as in real life'], ['Warming up the vada pav', 'Garam, with the green chutney'], ['हॉर्न वाजवू नका', 'Don’t honk. Everyone honks']];
+    let k = Math.floor(Math.random() * tips.length); const tip = document.getElementById('ld-tip');
+    const show = () => { if (!tip) return; tip.classList.remove('in'); setTimeout(() => { const [mr, en] = tips[k++ % tips.length]; tip.innerHTML = `<b>${mr}</b><span>${en}</span>`; tip.classList.add('in'); }, 260); };
+    show(); const iv = setInterval(() => { if (document.getElementById('loading')?.classList.contains('done')) clearInterval(iv); else show(); }, 3600); }
   await progress('Downloading Pune', 0.01);
   const sounds = {};
   const sndJob = Promise.all([(async () => {
@@ -358,6 +362,10 @@ async function main() {
     sky.update(game.lightHour ? game.lightHour() : game.hour, focus, dt);
     renderer.toneMappingExposure *= EXPO;
     if (game.weather && !(game.interiors && game.interiors.inside)) game.weather.apply(dt, sky, scene, renderer, camera);
+    // the jhola's studio light: everything but you falls into the dark
+    { const st = game.jhola ? game.jhola.studio || 0 : 0;
+      if (st > 0.001) { sky.sun.intensity *= 1 - 0.88 * st; sky.hemi.intensity *= 1 - 0.82 * st; scene.environmentIntensity = 0.35 * (1 - 0.75 * st); game._studioWas = true; }
+      else if (game._studioWas) { scene.environmentIntensity = 0.35; game._studioWas = false; } }     // (sky.js's value)
     U.uShopsOpen.value = game.hour > 22.8 || game.hour < 8.5 ? 0.25 : 1;
     updateWorldMaterials(W);
     camera.updateMatrixWorld();

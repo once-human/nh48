@@ -11,7 +11,7 @@ export class MenuBar {
     const el = this.el = document.createElement('nav'); el.className = 'mb'; el.hidden = true;
     el.innerHTML = `<div class="mb-brand">${MARK}<b>PUNERI</b></div>
       <div class="mb-tabs"><span class="kbd">Q</span>${TABS.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join('')}<span class="kbd">E</span></div>
-      <div class="mb-r"><b class="num mb-cash"></b><span class="mb-when"></span></div>`;
+      <div class="mb-r pz-meta"><span class="mb-where"></span><span class="mb-when"></span><span class="mb-cash"></span></div><i class="mb-glow" aria-hidden="true"></i>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     el.addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) this.go(b.dataset.tab); });
     // Q / E on the map and in settings (the jhola handles its own)
@@ -54,15 +54,17 @@ export class MenuBar {
     const G = this.g, c = this.cur, on = !!c && G.state !== 'title';
     if (on !== !this.el.hidden) { this.el.hidden = !on; document.getElementById('ui')?.classList.toggle('mb-on', on); if (on) this._t = 0; }
     if (!on) return;
-    if (c !== this._c) { this._c = c; for (const b of this.el.querySelectorAll('[data-tab]')) b.classList.toggle('on', b.dataset.tab === c); }
+    if (c !== this._c) { this._c = c; for (const b of this.el.querySelectorAll('[data-tab]')) b.classList.toggle('on', b.dataset.tab === c); this.el.dataset.tab = c; document.getElementById('ui')?.setAttribute('data-tab', c); }
     if ((this._t = (this._t || 0) - dt) <= 0) { this._t = 0.5; this.sync(); }
   }
   sync() {
     const G = this.g, h = G.hour || 0, day = Math.floor((G.clock || 0) / 24);
     const hh = Math.floor(h), mm = String(Math.floor((h % 1) * 60)).padStart(2, '0');
     const t = G.settings && G.settings.clock24 ? `${String(hh).padStart(2, '0')}:${mm}` : `${((hh + 11) % 12) + 1}:${mm} ${hh < 12 ? 'am' : 'pm'}`;
+    const $ = (id) => document.getElementById(id), area = ($('h-area') && $('h-area').textContent) || 'Pune', street = ($('h-street') && $('h-street').textContent) || '';
+    this.el.querySelector('.mb-where').textContent = street || area;
     this.el.querySelector('.mb-cash').textContent = '₹' + Math.round(G.stats ? G.stats.money : 0).toLocaleString('en-IN');
-    this.el.querySelector('.mb-when').textContent = `${DAYS[day % 7]}, day ${day + 1} · ${t}`;
+    this.el.querySelector('.mb-when').textContent = `${DAYS[day % 7]} · day ${day + 1} · ${t}`;
     const c = this.cur; for (const b of this.el.querySelectorAll('[data-tab]')) b.classList.toggle('on', b.dataset.tab === c);
   }
 }

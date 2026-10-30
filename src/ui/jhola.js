@@ -58,7 +58,7 @@ export class Jhola {
     this.g = G; this.on = false; this.t = 0; this.tab = 'inv'; this.cat = 'all'; this.sel = null; this.orb = 0;
     this.renders = new Map(); this.queue = []; this.renderMissions = true;
     const el = this.el = document.createElement('div'); el.className = 'iv'; el.hidden = true;
-    el.innerHTML = `<div class="iv-dim"></div><canvas class="iv-light"></canvas>
+    el.innerHTML = `<div class="iv-dim"></div>
       <div class="iv-panel">
         <div class="iv-equip"></div>
         <div class="iv-stage" title="Drag to turn"></div>
@@ -325,7 +325,7 @@ export class Jhola {
     this.el.classList.remove('in'); this.el.classList.add('out'); setTimeout(() => { if (!this.on) this.el.hidden = true; }, 240);
     G.state = 'play'; G.timeWarp = 1; G.audio.slowmo?.(0); G.audio.hush?.(false);
     G.renderer && G.renderer.domElement.classList.remove('paused');
-    this.confirm(null); if (this.spot) this.spot.intensity = 0;
+    this.confirm(null);
     if (this.from && Math.abs(G.camera.fov - this.from.fov) > 0.01) { G.camera.fov = this.from.fov; G.camera.updateProjectionMatrix(); }
     if (G.rig) G.rig.inited = false;
     G.life.save(); if (!toMenu) G.lockMouse?.();
@@ -574,6 +574,7 @@ export class Jhola {
     if (!G.life || !G.player) return;
     if (!this.spot && G.scene) this.makeSpot();
     if (!this.on) {
+      if (this.spot && this.studio > 0.001) this.lightTick(G.player.foot, dt, false);
       // the quick bar keeps up with what you buy and eat
       if ((this._qt = (this._qt || 0) - dt) <= 0) { this._qt = 0.5; const sig = JSON.stringify([G.life.s.quick || [], G.life.s.inv]); if (sig !== this._qsig) { this._all = null; this.paintQuick(); } }
       if (this.queue.length && G.state === 'play') this.renderOne();
@@ -594,55 +595,79 @@ export class Jhola {
       c.lookAt(F.x + rx * off, y + 0.95, F.z + rz * off);
       if (Math.abs(c.fov - fov) > 0.1) { c.fov += (fov - c.fov) * k; c.updateProjectionMatrix(); }
       if (P.human) { P.human.holder.visible = true; if (G.state !== 'play') P.human.mixer.update(dt); }
-      // the spotlight: straight down on you from high up, a little in front
-      if (this.spot) {
-        const on = this.tab === 'inv', fx = Math.cos(F.yaw), fz = Math.sin(F.yaw);
-        this.spot.position.set(F.x + fx * 0.9, y + 6.5, F.z + fz * 0.9); this.spotT.position.set(F.x, y + 0.9, F.z); this.spotT.updateMatrixWorld();
-        this.spot.intensity += ((on ? 140 : 0) - this.spot.intensity) * (1 - Math.exp(-dt * 3));
-      }
+      // the studio light on you (the jhola's own tab)
+      if (this.spot) this.lightTick(F, dt, this.tab === 'inv');
     }
-    if (this.tab === 'inv') this.drawLight(dt); else if (this._lit) { this._lit = false; const cv = this.el.querySelector('.iv-light'); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); }
     if ((this._ct = (this._ct || 0) - rd) <= 0) { this._ct = 0.5; this.paintStrip(); }
     if (false && (this._vt = (this._vt || 0) - dt) <= 0) { this._vt = 1 / 30; this.vitals(); }
   }
-  // a real spotlight, in the scene from the start at zero (adding a light later recompiles every shader: a freeze)
+  // a studio key light, made at the start at zero (adding a light later recompiles every shader: a freeze): a real
+  // spotlight with a soft shadow straight down on you, a warm rim from behind, and the beam itself in the air (a cone
+  // that's brightest where you look through the most of it, fading to nothing at the floor) with dust turning in it.
+  // While it's on, the world around you is taken down (main.js, studioDim): you're the only thing lit
   makeSpot() {
     const G = this.g;
-    const L = this.spot = new THREE.SpotLight(0xffe7c4, 0, 16, 0.36, 0.55, 2);
-    const T = this.spotT = new THREE.Object3D(); L.target = T; L.castShadow = false;
-    G.scene.add(L); G.scene.add(T);
+    const L = this.spot = new THREE.SpotLight(0xfff0da, 0, 14, 0.3, 0.7, 1.4);
+    L.castShadow = true; L.shadow.mapSize.set(1024, 1024); L.shadow.bias = -0.0005; L.shadow.normalBias = 0.03; L.shadow.radius = 5;
+    L.shadow.camera.near = 0.3; L.shadow.camera.far = 0.05;           // (off: nothing in its frustum, so its shadow pass costs nothing)
+    const T = this.spotT = new THREE.Object3D(); L.target = T;
+    const R = this.rim = new THREE.SpotLight(0xffc98f, 0, 10, 0.55, 0.9, 1.6); const RT = this.rimT = new THREE.Object3D(); R.target = RT;
+    G.scene.add(L, T, R, RT);
+    // the beam
+    const cone = new THREE.ConeGeometry(1, 1, 64, 12, true); cone.translate(0, -0.5, 0);          // apex at the origin, opening down
+    this.beam = new THREE.Mesh(cone, new THREE.ShaderMaterial({
+      uniforms: { uCol: { value: new THREE.Color(0xffe8c8) }, uOp: { value: 0 }, uTime: { value: 0 } },
+      vertexShader: `varying float vH; varying vec3 vN; varying vec3 vV; varying vec3 vW;
+        void main() { vH = -position.y; vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = -mv.xyz; vN = normalize(normalMatrix * normal); vW = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `uniform vec3 uCol; uniform float uOp; uniform float uTime; varying float vH; varying vec3 vN; varying vec3 vV; varying vec3 vW;
+        float h3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+        float n3(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(mix(h3(i), h3(i + vec3(1,0,0)), f.x), mix(h3(i + vec3(0,1,0)), h3(i + vec3(1,1,0)), f.x), f.y), mix(mix(h3(i + vec3(0,0,1)), h3(i + vec3(1,0,1)), f.x), mix(h3(i + vec3(0,1,1)), h3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+        void main() {
+          float face = abs(dot(normalize(vN), normalize(vV)));
+          float thick = pow(face, 2.2);                                   // looking through the middle of the beam, not its skin
+          float fall = pow(1.0 - clamp(vH, 0.0, 1.0), 0.55) * smoothstep(0.0, 0.12, vH);   // bright near the lamp, gone at the lamp itself
+          float floorFade = smoothstep(1.0, 0.72, vH);                     // no hard ring where it meets the ground
+          float haze = 0.75 + 0.5 * n3(vW * 2.2 + vec3(0.0, -uTime * 0.12, uTime * 0.05));
+          gl_FragColor = vec4(uCol * thick * fall * floorFade * haze * uOp, 1.0);
+        }`,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false }));
+    this.beam.frustumCulled = false; this.beam.visible = false; this.beam.renderOrder = 5;
+    // dust motes, lit only inside the beam
+    const N = 220, pos = new Float32Array(N * 3), seed = new Float32Array(N * 4);
+    for (let i = 0; i < N; i++) { seed[i * 4] = Math.random(); seed[i * 4 + 1] = Math.random(); seed[i * 4 + 2] = Math.random() * 6.283; seed[i * 4 + 3] = 0.5 + Math.random(); }
+    const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); this._seed = seed;
+    this.dust = new THREE.Points(dg, new THREE.ShaderMaterial({
+      uniforms: { uOp: { value: 0 }, uPx: { value: G.renderer ? G.renderer.getPixelRatio() : 1 } },
+      vertexShader: `uniform float uPx; attribute float a; varying float vA; void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = uPx * 22.0 / -mv.z; vA = 1.0; gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `uniform float uOp; void main() { float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.0, d); gl_FragColor = vec4(vec3(1.0, 0.94, 0.84) * a * a * uOp, 1.0); }`,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
+    this.dust.frustumCulled = false; this.dust.visible = false;
+    G.scene.add(this.beam, this.dust);
+    this.studio = 0;
   }
-  // the light you can see: the cone through the dark, dust drifting in it, the pool at your feet
-  drawLight(dt) {
-    const G = this.g, P = G.player, cv = this.el.querySelector('.iv-light'), W = innerWidth >> 1, H = innerHeight >> 1;
-    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
-    const x = cv.getContext('2d'); this._lit = true;
-    x.clearRect(0, 0, W, H);
-    // where you are on screen: feet and head
-    const F = P.foot, v = this._v || (this._v = new THREE.Vector3());
-    v.set(F.x, (F.y || 0), F.z).project(G.camera); const fx = (v.x + 1) / 2 * W, fy = (1 - v.y) / 2 * H;
-    v.set(F.x, (F.y || 0) + 1.8, F.z).project(G.camera); const hy = (1 - v.y) / 2 * H;
-    this.el.style.setProperty('--sx', (fx / W * 100).toFixed(1) + '%'); this.el.style.setProperty('--sy', ((fy + hy) / 2 / H * 100).toFixed(1) + '%');
-    const t = (this.t || 0), fade = Math.min(1, t * 1.5), bw = (fy - hy) * 0.55, tw = bw * 0.18;
-    // the beam: narrow at the top, wide at your feet, brightest in the middle
-    x.save(); x.globalAlpha = 0.9 * fade; x.filter = 'blur(14px)';
-    const gr = x.createLinearGradient(0, 0, 0, fy); gr.addColorStop(0, 'rgba(255,236,205,.30)'); gr.addColorStop(0.6, 'rgba(255,230,195,.14)'); gr.addColorStop(1, 'rgba(255,225,185,.06)');
-    x.fillStyle = gr; x.beginPath(); x.moveTo(fx - tw, -20); x.lineTo(fx + tw, -20); x.lineTo(fx + bw, fy); x.lineTo(fx - bw, fy); x.closePath(); x.fill();
-    const core = x.createLinearGradient(fx - bw * 0.5, 0, fx + bw * 0.5, 0); core.addColorStop(0, 'rgba(255,240,215,0)'); core.addColorStop(0.5, 'rgba(255,240,215,.12)'); core.addColorStop(1, 'rgba(255,240,215,0)');
-    x.fillStyle = core; x.beginPath(); x.moveTo(fx - tw * 0.6, -20); x.lineTo(fx + tw * 0.6, -20); x.lineTo(fx + bw * 0.55, fy); x.lineTo(fx - bw * 0.55, fy); x.closePath(); x.fill();
-    // the pool of light on the ground
-    x.filter = 'blur(6px)';
-    const pool = x.createRadialGradient(fx, fy, 0, fx, fy, bw * 1.25); pool.addColorStop(0, 'rgba(255,232,196,.42)'); pool.addColorStop(0.55, 'rgba(255,225,185,.14)'); pool.addColorStop(1, 'rgba(255,225,185,0)');
-    x.fillStyle = pool; x.beginPath(); x.ellipse(fx, fy, bw * 1.25, bw * 0.3, 0, 0, Math.PI * 2); x.fill();
-    x.restore();
-    // dust in the beam, drifting and catching the light
-    const D = this._dust || (this._dust = Array.from({ length: 70 }, () => ({ u: Math.random() * 2 - 1, v: Math.random(), s: 0.4 + Math.random() * 1.3, p: Math.random() * 6.28, sp: 0.01 + Math.random() * 0.03 })));
-    for (const d of D) {
-      d.v += d.sp * dt * (0.4 + d.s * 0.3); d.u += Math.sin(t * 0.5 + d.p) * dt * 0.02; if (d.v > 1) { d.v = 0; d.u = Math.random() * 2 - 1; }
-      const yy = d.v * fy, half = tw + (bw - tw) * d.v, xx = fx + d.u * half * 0.9;
-      const a = (0.25 + 0.75 * Math.abs(Math.sin(t * 1.3 + d.p))) * (1 - Math.abs(d.u)) * 0.85 * fade;
-      x.fillStyle = `rgba(255,240,215,${a.toFixed(3)})`; x.beginPath(); x.arc(xx, yy, d.s, 0, 6.283); x.fill();
+  // the beam, the dust and the lights on you (every frame while the jhola's open, and fading out after)
+  lightTick(F, dt, on) {
+    const y = F.y || 0, fx = Math.cos(F.yaw), fz = Math.sin(F.yaw);
+    this.studio += ((on ? 1 : 0) - this.studio) * (1 - Math.exp(-dt * (on ? 2.2 : 4)));
+    const s = this.studio, L = this.spot, lx = F.x + fx * 0.7, ly = y + 6.2, lz = F.z + fz * 0.7;
+    L.position.set(lx, ly, lz); this.spotT.position.set(F.x, y + 0.2, F.z); this.spotT.updateMatrixWorld();
+    L.intensity = 190 * s; L.shadow.camera.far = s > 0.01 ? 12 : 0.05; L.shadow.camera.updateProjectionMatrix();
+    this.rim.position.set(F.x - fx * 2.4, y + 3.2, F.z - fz * 2.4); this.rimT.position.set(F.x, y + 1.3, F.z); this.rimT.updateMatrixWorld();
+    this.rim.intensity = 38 * s;
+    // the cone, from the lamp to the floor
+    const B = this.beam, gx = F.x, gz = F.z, dx = gx - lx, dy = y - ly, dz = gz - lz, len = Math.hypot(dx, dy, dz), r = len * Math.tan(L.angle) * 0.95;
+    B.visible = s > 0.01; B.position.set(lx, ly, lz); B.scale.set(r, len, r);
+    B.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), new THREE.Vector3(dx / len, dy / len, dz / len));
+    B.material.uniforms.uOp.value = 0.075 * s; B.material.uniforms.uTime.value = this.t || 0;
+    // dust: slow, turning, inside the cone
+    const D = this.dust, P = D.geometry.attributes.position, S = this._seed, t = this.t || 0;
+    D.visible = s > 0.01; D.material.uniforms.uOp.value = 0.55 * s;
+    for (let i = 0; i < P.count; i++) {
+      const h = (S[i * 4] + t * 0.012 * S[i * 4 + 3]) % 1, a = S[i * 4 + 2] + t * 0.05 * S[i * 4 + 3], rr = Math.sqrt(S[i * 4 + 1]) * r * h * 0.92;
+      P.setXYZ(i, lx + dx * h + Math.cos(a) * rr, ly + dy * h, lz + dz * h + Math.sin(a) * rr);
     }
+    P.needsUpdate = true;
   }
   // a photo from assets/items, once it has loaded (null until then, and the painted one draws)
   pic(id) {
