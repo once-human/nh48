@@ -19,7 +19,7 @@ const col = (h) => new THREE.Color(h).convertSRGBToLinear();
 const KG = { water: 1, tiffin: 0.8, vadapav: 0.25, biscuit: 0.1, banana: 0.6, chikki: 0.2, medkit: 0.9, painkiller: 0.02, ors: 0.03, energy: 0.3, coldcoffee: 0.4,
   bakarwadi: 0.3, barfi: 0.5, shrewsbury: 0.4, gajra: 0.05, book: 0.3, lottery: 0.01, torch: 0.25, beer: 0.6 };
 const CAP = 12;
-const TABS = [['inv', 'Inventory'], ['map', 'Map'], ['missions', 'Missions'], ['stats', 'Stats'], ['settings', 'Settings']];
+const SORTS = ['kind', 'name', 'count', 'weight'];
 // the kinds along the top of the grid, each with a little picture of one of them
 // (weapons: none yet, the shelf is ready; hacking gear will go under tools)
 const CATS = [['all', 'All'], ['food', 'Food & drink', 'vadapav'], ['med', 'Medical', 'medkit'], ['tool', 'Tools', 'torch'], ['weap', 'Weapons'], ['wear', 'Clothing'], ['misc', 'Misc', 'keys']];
@@ -49,18 +49,17 @@ export class Jhola {
     this.g = G; this.on = false; this.t = 0; this.tab = 'inv'; this.cat = 'all'; this.sel = null; this.orb = 0;
     this.renders = new Map(); this.queue = [];
     const el = this.el = document.createElement('div'); el.className = 'iv'; el.hidden = true;
-    el.innerHTML = `<div class="iv-dim"></div>
+    el.innerHTML = `<div class="iv-dim"></div><div class="iv-spot"></div>
       <div class="iv-panel">
-        <nav class="iv-tabs"><div class="iv-tabrow"><span class="kbd">Q</span>${TABS.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join('')}<span class="kbd">E</span></div><span class="iv-when"></span></nav>
         <div class="iv-equip"></div>
         <div class="iv-stage" title="Drag to turn"></div>
         <section class="iv-inv">
-          <div class="iv-cats">${CATS.map(([k, n, pic]) => `<button data-cat="${k}"><i class="ic" data-ic="${k}">${pic ? `<img alt="" src="${itemArt(pic, 96)}">` : ''}</i><span>${n}</span></button>`).join('')}</div>
+          <div class="iv-cats">${CATS.map(([k, n, pic]) => `<button data-cat="${k}"><i class="ic" data-ic="${k}">${pic ? `<img alt="" src="${itemArt(pic, 96)}">` : ''}</i><span>${n}</span></button>`).join('')}<button class="iv-sort" data-sort><small>Sort</small><b></b></button></div>
           <div class="iv-grid"></div>
           <div class="iv-wt"><span></span><div class="bar"><i></i></div></div>
         </section>
         <aside class="iv-det"></aside>
-        <div class="iv-cond"></div>
+        <div class="iv-qcard"><span class="st-who">Quick slots</span><div class="iv-qrow">${[1, 2, 3, 4, 5].map(k => `<div class="iv-q" data-q="${k - 1}"><span class="kbd">${k}</span><img alt="" hidden><b></b></div>`).join('')}</div></div>
         <section class="iv-stats" hidden>
           <div class="iv-vit"><figure class="jl-v hb"><canvas width="360" height="120"></canvas><figcaption>Heart · <span></span></figcaption></figure>
             <figure class="jl-v bo"><canvas width="90" height="180"></canvas><figcaption>Water · <span></span></figcaption></figure>
@@ -70,6 +69,7 @@ export class Jhola {
         </section>
         <div class="iv-keys"><span><span class="kbd">Drag</span>Quick slot</span><span><span class="kbd">F</span>Use</span><span><span class="kbd">R</span>Drop</span><span><span class="kbd">Esc</span>Back</span></div>
       </div>
+      <div class="iv-strip"></div>
       <div class="iv-ctx" hidden></div>
       <div class="iv-insp" hidden></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
@@ -80,7 +80,7 @@ export class Jhola {
     this.paintQuick();
 
     el.addEventListener('click', (e) => {
-      const tb = e.target.closest('[data-tab]'); if (tb) { this.goTab(tb.dataset.tab); return; }
+      if (e.target.closest('[data-sort]')) { this.sortBy = SORTS[(SORTS.indexOf(this.sortBy) + 1) % SORTS.length]; this.paint(); return; }
       const ct = e.target.closest('[data-cat]'); if (ct) { this.cat = ct.dataset.cat; this.paint(); return; }
       const eq = e.target.closest('[data-eq]'); if (eq) { this.cat = 'wear'; const k = eq.dataset.k; if (k) this.sel = k; this.paint(); return; }
       const cx = e.target.closest('[data-cx]'); if (cx) { this.ctxDo(cx.dataset.cx, cx.dataset.arg); return; }
@@ -103,24 +103,24 @@ export class Jhola {
       if (!d.on && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6) {
         d.on = true; const en = this.entry(d.k);
         const gh = this.ghost = document.createElement('img'); gh.className = 'iv-ghost'; gh.src = en ? en.img || '' : ''; document.body.appendChild(gh);
-        this.qb.classList.add('drop');
+        this.el.classList.add('drop');
       }
       if (d.on) {
         this.ghost.style.transform = `translate(${e.clientX - 40}px, ${e.clientY - 40}px)`;
         const q = document.elementFromPoint(e.clientX, e.clientY); const t = q && q.closest && q.closest('.iv-q');
-        for (const s of this.qb.children) s.classList.toggle('hot', s === t);
+        for (const s of this.el.querySelectorAll('.iv-q')) s.classList.toggle('hot', s === t);
       }
     });
     addEventListener('pointerup', (e) => {
       this.turn = null;
       const d = this.drag; this.drag = null; if (!d) return;
       if (!d.on) { this.select(d.k); return; }
-      this.ghost && this.ghost.remove(); this.ghost = null; this.qb.classList.remove('drop');
-      for (const s of this.qb.children) s.classList.remove('hot');
+      this.ghost && this.ghost.remove(); this.ghost = null; this.el.classList.remove('drop');
+      for (const s of this.el.querySelectorAll('.iv-q')) s.classList.remove('hot');
       const q = document.elementFromPoint(e.clientX, e.clientY); const t = q && q.closest && q.closest('.iv-q');
       if (t) this.assign(d.k, +t.dataset.q);
     });
-    this.qb.addEventListener('contextmenu', (e) => { const t = e.target.closest('.iv-q'); if (t && this.on) { e.preventDefault(); this.assign(null, +t.dataset.q); } });
+    this.el.addEventListener('contextmenu', (e) => { const t = e.target.closest('.iv-q'); if (t) { e.preventDefault(); e.stopPropagation(); this.assign(null, +t.dataset.q); } }, true);
 
     addEventListener('keydown', (e) => {
       const c = e.code;
@@ -137,15 +137,17 @@ export class Jhola {
       if (!this.el.querySelector('.iv-insp').hidden && (c === 'Escape' || c === 'Space' || c === 'Enter')) { stop(); this.inspect(null); return; }
       if (!this.el.querySelector('.iv-ctx').hidden && c === 'Escape') { stop(); this.ctx(null); return; }
       if (c === 'Escape' || c === 'Tab') { stop(); this.close(); return; }
-      if (c === 'KeyQ' || c === 'KeyE') { stop(); const i = TABS.findIndex(t => t[0] === this.tab); this.goTab(TABS[(i + (c === 'KeyE' ? 1 : TABS.length - 1)) % TABS.length][0]); return; }
+      if (c === 'KeyQ' || c === 'KeyE') { stop(); G.menubar && G.menubar.step(c === 'KeyE' ? 1 : -1); return; }
       if (c === 'KeyJ') { stop(); this.goTab('missions'); return; }
-      if (this.tab !== 'inv') return;
+      // the world is still running (slowly) behind the jhola: nothing else reaches it, so you don't walk off
+      if (this.tab !== 'inv') { if (!/^F\d+$/.test(c)) e.stopImmediatePropagation(); return; }
       if (c === 'KeyF' || c === 'Enter') { stop(); this.useSel(); return; }
       if (c === 'KeyR') { stop(); this.dropSel(); return; }
       if (c === 'KeyI' || c === 'Space') { stop(); if (this.sel) this.inspect(this.sel); return; }
       const m = /^Digit([1-5])$/.exec(c); if (m) { stop(); if (this.sel) this.assign(this.sel, +m[1] - 1); return; }
       const mv = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -6, ArrowDown: 6, KeyA: -1, KeyD: 1, KeyW: -6, KeyS: 6 }[c];
-      if (mv) { stop(); const L = this.list(), i = Math.max(0, L.findIndex(x => x.k === this.sel)), j = Math.max(0, Math.min(L.length - 1, i + mv)); if (L[j]) this.select(L[j].k); }
+      if (mv) { stop(); const L = this.list(), i = Math.max(0, L.findIndex(x => x.k === this.sel)), j = Math.max(0, Math.min(L.length - 1, i + mv)); if (L[j]) this.select(L[j].k); return; }
+      if (!/^F\d+$/.test(c)) e.stopImmediatePropagation();
     }, true);
   }
 
@@ -179,7 +181,15 @@ export class Jhola {
     }
     return out;
   }
-  list() { const all = this._all || (this._all = this.entries()); return this.cat === 'all' ? all : all.filter(e => e.cat === this.cat); }
+  list() {
+    const all = this._all || (this._all = this.entries()), L = this.cat === 'all' ? all.slice() : all.filter(e => e.cat === this.cat);
+    const ord = CATS.map(c => c[0]), by = this.sortBy || 'kind';
+    if (by === 'name') L.sort((a, b) => a.name.localeCompare(b.name));
+    else if (by === 'count') L.sort((a, b) => (b.n || 1) - (a.n || 1));
+    else if (by === 'weight') L.sort((a, b) => b.kg * (b.id ? b.n || 1 : 1) - a.kg * (a.id ? a.n || 1 : 1));
+    else L.sort((a, b) => ord.indexOf(a.cat) - ord.indexOf(b.cat));
+    return L;
+  }
   entry(k) { return (this._all || this.entries()).find(e => e.k === k) || null; }
   // the player's look with one garment on it (for its picture)
   lookWith(p, who) {
@@ -238,52 +248,56 @@ export class Jhola {
   }
 
   // ------------------------------------------------------------------ open / close
-  open() {
+  open(tab = 'inv') {
     const G = this.g, P = G.player;
-    if (this.on || G.state !== 'play') return;
-    this.on = true; G.state = 'shop'; this.t = 0; this.tab = 'inv'; this.orb = 0;
-    G.audio.updateEngine?.(0, 0, false); G.audio.playerHorn?.(false); G.audio.hush?.(true);
+    if (this.on || G.state !== 'play' || (G.phone && G.phone.on)) return;
+    this.on = true; this.t = 0; this.orb = 0; this.tab = null;
+    G.audio.playerHorn?.(false);
+    G.input && G.input.keys && G.input.keys.clear();
     G.releaseMouse?.();
     const c = G.camera;
     this.from = { x: c.position.x, y: c.position.y, z: c.position.z, fov: c.fov };
     this.foot = P.onFoot;
     if (P.onFoot && P.human) P.human.play('idle', { fade: 0.3 });
-    this._all = null; this.paint();
+    this._all = null; this.setTab(tab);
     this.el.hidden = false; this.el.classList.remove('out'); void this.el.offsetWidth; this.el.classList.add('in');
     this.qb.classList.add('open');
     G.hud && G.hud.root && G.hud.root.classList.add('in-jl');
   }
-  close() {
+  // the jhola's own tabs: in the inventory the world goes on at a sixtieth, slow and far away; missions
+  // and stats stop it (paused, silent), and it comes back slowed when you return
+  setTab(k) {
+    const G = this.g; if (k === this.tab) { this.paint(); return; }
+    this.tab = k;
+    if (k === 'inv') { G.state = 'play'; G.timeWarp = 1 / 60; G.audio.hush?.(false); G.audio.slowmo?.(2); }
+    else { G.state = 'shop'; G.timeWarp = 1; G.audio.hush?.(true); }
+    this.paint();
+  }
+  // toMenu: going straight on to the map or settings (keep the mouse, they pause the world themselves)
+  close(toMenu) {
     if (!this.on) return;
     const G = this.g;
-    this.on = false; this.ctx(null); this.inspect(null); G.hud && G.hud.root && G.hud.root.classList.remove('in-jl');
+    this.on = false; this.tab = null; this.ctx(null); this.inspect(null); G.hud && G.hud.root && G.hud.root.classList.remove('in-jl');
     this.qb.classList.remove('open');
     this.el.classList.remove('in'); this.el.classList.add('out'); setTimeout(() => { if (!this.on) this.el.hidden = true; }, 240);
-    if (G.state === 'shop') G.state = 'play';
-    G.audio.hush?.(false);
+    G.state = 'play'; G.timeWarp = 1; G.audio.slowmo?.(0); G.audio.hush?.(false);
     if (this.from && Math.abs(G.camera.fov - this.from.fov) > 0.01) { G.camera.fov = this.from.fov; G.camera.updateProjectionMatrix(); }
     if (G.rig) G.rig.inited = false;
-    G.life.save(); G.lockMouse?.();
+    G.life.save(); if (!toMenu) G.lockMouse?.();
     this.paintQuick();
   }
-  goTab(k) {
-    const G = this.g;
-    if (k === 'map') { this.close(); G.toggleMap && G.toggleMap(); return; }
-    if (k === 'missions') { this.close(); G.diary && G.diary.open(); return; }
-    if (k === 'settings') { this.close(); G.togglePause && G.togglePause(); return; }
-    this.tab = k; this.paint();
-  }
+  goTab(k) { const G = this.g; if (G.menubar) G.menubar.go(k); else if (['inv', 'stats', 'missions'].includes(k)) this.setTab(k); }
 
   // ------------------------------------------------------------------ drawing it
   paint() {
     const G = this.g, s = G.life.s, el = this.el, P = G.player;
     const hh = Math.floor(G.hour || 0), mm = String(Math.floor(((G.hour || 0) % 1) * 60)).padStart(2, '0'), day = Math.floor((G.clock || 0) / 24);
-    el.querySelector('.iv-when').innerHTML = `<span class="cap">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][day % 7]} · Day ${day + 1}</span><b class="num">${String(hh).padStart(2, '0')}:${mm}</b>`;
-    this.paintCond();
-    for (const b of el.querySelectorAll('[data-tab]')) b.classList.toggle('on', b.dataset.tab === this.tab);
+    void hh; void mm; void day;
+    this.paintStrip();
+    el.querySelector('.iv-sort b').textContent = { kind: 'Kind', name: 'Name', count: 'Count', weight: 'Weight' }[this.sortBy || 'kind'];
     const stats = this.tab === 'stats';
     el.querySelector('.iv-inv').hidden = stats; el.querySelector('.iv-det').hidden = stats; el.querySelector('.iv-stats').hidden = !stats;
-    el.querySelector('.iv-keys').hidden = stats; el.querySelector('.iv-cond').hidden = stats;
+    el.querySelector('.iv-keys').hidden = stats; el.querySelector('.iv-qcard').hidden = stats; el.classList.toggle('t-inv', this.tab === 'inv');
     // what you're wearing
     const L = P.look || {};
     const eq = [['head', 'Head', L.hat], ['face', 'Face', L.glasses || L.shades], ['torso', 'Torso', 1], ['legs', 'Legs', !(L.cut && L.cut.w === 2)], ['feet', 'Feet', 1], ['back', 'Back', 1]];
@@ -339,6 +353,12 @@ export class Jhola {
       <dl>${[['Fitness', `+${Math.round(s.fitness || 0)} health`], ['Health', `${Math.round(P.hp ?? 100)} / ${L.hpMax}`], ['Rides', G.stats.rides || 0], ['Deliveries', T.deliveries || 0], ['Fights won', T.fightsWon || 0], ['Strays fed', T.fed || 0], ['Bank', fmt(s.bank || 0)]].map(([a, b]) => `<dt>${a}</dt><dd>${esc(b)}</dd>`).join('')}</dl>`;
   }
   // how you are, at a glance, under your feet: the body, then how Pune sees you
+  // along the bottom of the screen: how your body is
+  paintStrip() {
+    const G = this.g, s = G.life.s, P = G.player, L = G.life, el = this.el.querySelector('.iv-strip'); if (!el) return;
+    const bars = [['Health', (P.hp ?? 100) / L.hpMax, '#ff375f', Math.round(P.hp ?? 100)], ['Food', s.hunger, '#ffb224'], ['Water', s.thirst, '#40c8ff'], ['Energy', s.energy, '#a8e43a'], ['Stamina', P.stam ?? 1, '#30e0b0'], ['Mood', s.mood, '#c58cff'], ['Drunk', s.drunk || 0, '#e8c27a']];
+    el.innerHTML = bars.map(([n, v, c, txt]) => { const f = Math.max(0, Math.min(1, v)); return `<div class="sb${f < 0.2 && n !== 'Drunk' ? ' low' : ''}" style="--c:${c}"><div><small>${n}</small><span>${txt ?? Math.round(f * 100)}</span></div><i><b style="width:${(f * 100).toFixed(1)}%"></b></i></div>`; }).join('');
+  }
   paintCond() {
     const G = this.g, s = G.life.s, P = G.player, L = G.life, el = this.el.querySelector('.iv-cond'); if (!el) return;
     const bar = (n, v, txt) => { const f = Math.max(0, Math.min(1, v)); return `<div class="ic-b${f < 0.2 ? ' low' : ''}"><small>${n}</small><i><b style="width:${Math.round(f * 100)}%"></b></i><span>${txt ?? Math.round(f * 100) + '%'}</span></div>`; };
@@ -397,7 +417,7 @@ export class Jhola {
     if (!this.g.life || !this.g.player) return;     // (built before the save is loaded; drawn on the first frame)
     const q = this.g.life.s.quick || [], all = this._all || this.entries();
     let any = false;
-    [...this.qb.children].forEach((d, i) => {
+    [...this.qb.children, ...this.el.querySelectorAll('.iv-qrow .iv-q')].forEach((d) => { const i = +d.dataset.q;
       const k = q[i], e = k && all.find(x => x.k === k), im = d.querySelector('img'), b = d.querySelector('b');
       d.classList.toggle('none', !!k && !e);
       if (k) { any = true; const src = e ? e.img : k.startsWith('w:') ? this.renders.get(k) : itemArt(k, 128); im.dataset.r = k; if (src) { im.src = src; im.hidden = false; } else im.hidden = true; }
@@ -453,23 +473,23 @@ export class Jhola {
       if (this.queue.length && G.state === 'play') this.renderOne();
       return;
     }
-    const P = G.player, c = G.camera;
-    this.t += dt;
+    const P = G.player, c = G.camera, rd = dt / (G.timeWarp || 1);     // (the world's slowed; the camera isn't)
+    this.t += rd; dt = rd;
     if (this.queue.length) this.renderOne();
     if (this.foot) {
       const F = P.foot, y = (F.y || 0);
-      // behind you and off to one side, low and far enough for head to toe; you stand in the left third
-      const th = F.yaw + Math.PI + 0.55 + this.orb, d = 3.3;
+      // in front of you, a little to one side, far enough for head to toe; you stand in the left third, lit from above
+      const th = F.yaw + 0.42 + this.orb, d = 3.3;
       const tx = F.x + Math.cos(th) * d, tz = F.z + Math.sin(th) * d, ty = y + 1.2;
       const k = 1 - Math.exp(-dt * 4.5), p = c.position;
       p.x += (tx - p.x) * k; p.y += (ty - p.y) * k; p.z += (tz - p.z) * k;
       const vx = F.x - p.x, vz = F.z - p.z, vl = Math.hypot(vx, vz) || 1, rx = -vz / vl, rz = vx / vl;
-      const fov = 40, off = 0.5 * Math.tan(fov * Math.PI / 360) * c.aspect * vl;
+      const fov = 40, off = 0.58 * Math.tan(fov * Math.PI / 360) * c.aspect * vl;
       c.lookAt(F.x + rx * off, y + 0.95, F.z + rz * off);
       if (Math.abs(c.fov - fov) > 0.1) { c.fov += (fov - c.fov) * k; c.updateProjectionMatrix(); }
-      if (P.human) { P.human.holder.visible = true; P.human.mixer.update(dt); }
+      if (P.human) { P.human.holder.visible = true; if (G.state !== 'play') P.human.mixer.update(dt); }
     }
-    if ((this._ct = (this._ct || 0) - dt) <= 0) { this._ct = 0.5; this.paintCond(); }
+    if ((this._ct = (this._ct || 0) - rd) <= 0) { this._ct = 0.5; this.paintStrip(); }
     if (this.tab === 'stats' && (this._vt = (this._vt || 0) - dt) <= 0) { this._vt = 1 / 30; this.vitals(); }
   }
   // a photo from assets/items, once it has loaded (null until then, and the painted one draws)

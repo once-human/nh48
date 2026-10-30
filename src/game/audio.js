@@ -32,6 +32,8 @@ const ENG = {
   car: { wave: 'sawtooth', idle: 30, max: 92, top: 20, lp: 420, pulse: 0.5, depth: 0.12, vol: 0.04 },
   diesel: { wave: 'square', idle: 21, max: 52, top: 13, lp: 300, pulse: 0.5, depth: 0.45, vol: 0.07 },
 };
+// slow motion levels (0 off, 1 phone, 2 jhola): how fast sounds play, the low-pass, how loud
+const SLOW_RATE = [1, 0.62, 0.5], SLOW_LP = [20000, 650, 380], SLOW_GAIN = [1, 0.35, 0.18];
 export class Audio {
   constructor(raw) {
     this.ctx = null; this.enabled = true; this.volume = 0.8;
@@ -69,7 +71,7 @@ export class Audio {
     }));
     this.startLoops();
   }
-  setVolume(v) { this.volume = v; if (this.master) this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05); }
+  setVolume(v) { this.volume = v; if (this.master) this.master.gain.setTargetAtTime(v * (SLOW_GAIN[this.slowLv || 0]), this.ctx.currentTime, 0.05); }
   setBusVolume(k, v) { this.vols[k] = v; const g = this.buses[k]; if (g) g.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05); }
   // the node a sound connects to: its category's bus (inside horn() etc. the category is set for the call)
   bus(k) { return this.buses[k || this._bus || 'fx'] || this.master; }
@@ -118,7 +120,8 @@ export class Audio {
     const b = this.buf[name];
     if (!this.ctx || !b) return null;
     const ctx = this.ctx, t = ctx.currentTime + delay;
-    const src = ctx.createBufferSource(); src.buffer = b; src.playbackRate.value = rate;
+    const bk = bus || this._bus || busOf(name);
+    const src = ctx.createBufferSource(); src.buffer = b; src.playbackRate.value = rate * (bk === 'fx' ? 1 : this.rateMul || 1);
     const g = ctx.createGain(); g.gain.value = vol;
     let node = src;
     if (filter) {
@@ -138,7 +141,7 @@ export class Audio {
     const src = this.ctx.createBufferSource(); src.buffer = b; src.loop = true;
     const g = this.ctx.createGain(); g.gain.value = vol;
     src.connect(g).connect(this.bus(busOf(name)));
-    src.start(0, Math.random() * b.duration);
+    src.start(0, Math.random() * b.duration); src.playbackRate.value = this.rateMul || 1;
     return { src, g };
   }
   // a sound that arrived after the start (they download once you're at the title): decode it now, and
@@ -243,11 +246,18 @@ export class Audio {
   }
   voiceBusy() { return !!(this.ctx && this.curVoice && this.ctx.currentTime < this.voiceEnd - 0.15); }
   // street ambience dips while someone speaks
-  muffle(on) {
+  muffle(on) { this.slowmo(on ? 1 : 0); }
+  // slow motion, heard: 1 the phone (the world at a thirtieth), 2 the jhola (a sixtieth, further away still).
+  // Everything plays slower and lower (horns, sirens, engines, the street, voices), under a closing low-pass
+  slowmo(lv) {
+    this.slowLv = lv; this.rateMul = SLOW_RATE[lv];
     if (!this.ctx || !this.muf) return;
-    const t = this.ctx.currentTime;
-    this.muf.frequency.setTargetAtTime(on ? 650 : 20000, t, 0.25);
-    this.master.gain.setTargetAtTime(on ? this.volume * 0.35 : this.volume, t, 0.25);
+    const t = this.ctx.currentTime, r = this.rateMul;
+    this.muf.frequency.setTargetAtTime(SLOW_LP[lv], t, 0.25);
+    this.master.gain.setTargetAtTime(this.volume * SLOW_GAIN[lv], t, 0.25);
+    for (const l of Object.values(this.loops)) if (l && l.src && l.src.playbackRate) l.src.playbackRate.setTargetAtTime(r, t, 0.3);
+    if (this.curVoice && this.curVoice.src) this.curVoice.src.playbackRate.setTargetAtTime(r, t, 0.2);
+    if (this.hornNode && this.hornNode.src && this.hornNode.src.playbackRate) this.hornNode.src.playbackRate.setTargetAtTime(r, t, 0.2);
   }
   duck(level, sec) {
     if (!this.ctx) return;
@@ -273,8 +283,8 @@ export class Audio {
       this.sir = { o, o2, g, p, ph: 0 };
     }
     const S = this.sir;
-    S.ph = (S.ph + 1 / 60) % 3.2;
-    const f = 620 + 760 * Math.sin(Math.PI * S.ph / 3.2);    // up and down over ~3 s
+    S.ph = (S.ph + (this.rateMul || 1) / 60) % 3.2;
+    const f = (620 + 760 * Math.sin(Math.PI * S.ph / 3.2)) * (this.rateMul || 1);    // up and down over ~3 s (lower in slow motion)
     S.o.frequency.setTargetAtTime(f, t, 0.03); S.o2.frequency.setTargetAtTime(f * 1.006, t, 0.03);
     S.g.gain.setTargetAtTime(level > 0 ? 0.32 : 0, t, 0.15);       // loudness comes from distance now
     // the siren is where the nearest siren-vehicle is (police.js / emergency.js set sirenAt)
@@ -378,7 +388,7 @@ export class Audio {
       const l = this.loops[name];
       if (!l) continue;
       l.g.gain.setTargetAtTime(on ? 0.22 + throttle * 0.18 : 0, t, 0.12);
-      l.src.playbackRate.setTargetAtTime(on ? (k === 'bus' ? 0.85 : 0.9) + rpm * (k === 'bus' ? 0.7 : 1.3) : 1, t, 0.08);
+      l.src.playbackRate.setTargetAtTime((on ? (k === 'bus' ? 0.85 : 0.9) + rpm * (k === 'bus' ? 0.7 : 1.3) : 1) * (this.rateMul || 1), t, 0.08);
     }
     if (!running && kind !== 'none') for (const k of ['street', 'traffic', 'ride']) this.setLoop(k, 0, 0.3);
   }
@@ -484,7 +494,7 @@ export class Audio {
     const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freqs[0] * 2.2; bp.Q.value = 0.7;
     bp.connect(g);
     for (const f of freqs) {
-      const o = ctx.createOscillator(); o.type = type; o.frequency.value = f;
+      const o = ctx.createOscillator(); o.type = type; o.frequency.value = f * (this.rateMul || 1);
       if (vib) { const l = ctx.createOscillator(); l.frequency.value = vib; const lg = ctx.createGain(); lg.gain.value = f * 0.015; l.connect(lg).connect(o.frequency); l.start(t); l.stop(t + dur + 0.1); }
       o.connect(bp); o.start(t); o.stop(t + dur + 0.05);
     }

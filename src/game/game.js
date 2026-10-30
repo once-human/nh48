@@ -63,6 +63,7 @@ import { Fauna } from '../people/animals.js';
 import { Puddles } from './puddles.js';
 import { Cutscene } from './cutscene.js';
 import { Home } from './home.js';
+import { MenuBar } from '../ui/menubar.js';
 import { Jhola } from '../ui/jhola.js';
 import { Diary } from '../ui/diary.js';
 
@@ -136,7 +137,7 @@ export class Game {
     this.puddles = new Puddles(this);
     this.cut = new Cutscene(this);
     this.home = new Home(this);
-    this.jhola = new Jhola(this); this.diary = new Diary(this);
+    this.jhola = new Jhola(this); this.diary = new Diary(this); this.menubar = new MenuBar(this);
     player.animalsNear = () => this.people.animals;
     // on foot your head (and a little of your body) turns to where the camera looks, so looking back you look back;
     // the torch arm goes on top
@@ -1273,6 +1274,7 @@ export class Game {
 
   frame(dt) {
     if (this.jhola) this.jhola.update(dt);
+    if (this.menubar) this.menubar.update(this.realDt || dt);
     if (this.audio) this.audio.hour = this.hour;
     // audio parameters at a steady 30 / 20 a second (scheduling them every frame clogged the audio thread)
     this._aT = (this._aT || 0) + dt; this._eT = (this._eT || 0) + dt;
@@ -1371,7 +1373,7 @@ export class Game {
       this.date.update(dt);
       this.approachSt.update(dt);
       this.updateNav(dt);
-      this.rig.update(dt, P);
+      if (!(this.jhola && this.jhola.on)) this.rig.update(dt, P);     // (the jhola holds the camera)
       if (this.cut && this.cut.on) { this.cut.update(dt); this.cut.camera(this.camera, dt); }
       const S = P.spec;
       const kind = !S ? 'none' : P.inAuto ? 'auto' : S.two ? 'two' : S.L > 6 ? 'bus' : 'car';
