@@ -37,9 +37,27 @@ export const KINDS = {
   books: ['Books', '#c9a0ff', 'pad'], florist: ['Florists', '#ff7ab6', 'lotus'], paan: ['Paan', '#4fbf5a', 'leaf'], petshop: ['Pet shops', '#f1ece2', 'paw'], jeweller: ['Jewellers', '#ffc83d', 'gold'],
   bank: ['Banks & ATMs', '#4dd0c8', 'bank'], dealer: ['Showrooms', '#a78bfa', 'car'], garage: ['Garages', '#c9ced6', 'wrench'], travel: ['Travels', '#33d17a', 'bus'],
   lodge: ['Lodges & hotels', '#e0a26b', 'home'], estate: ['Estate agents', '#9aa0aa', 'key'], library: ['Reading rooms', '#c08cff', 'college'], college: ['Colleges & schools', '#c08cff', 'college'],
-  service: ['Offices & services', '#9aa0aa', 'building'],
+  mall: ['Malls', '#ff9f43', 'bag'], classes: ['Classes & coaching', '#c08cff', 'pencil'], services: ['Services & repairs', '#9aa0aa', 'wrench'], office: ['Offices', '#8a929c', 'building'],
+  service: ['Other services', '#9aa0aa', 'building'],
 };
-const kindFor = (p) => { const k = p.c === 'transit' ? 'transit' : p.c === 'police' ? 'police' : pinKind(p); return KINDS[k] ? k : KINDS[p.c] ? p.c : 'service'; };
+// what each kind is filed under (how far out it shows, its colour family); the ones you can't walk into only show up close
+export const KIND_GROUP = { landmark: 'landmark', temple: 'temple', park: 'park', zoo: 'park', transit: 'transit', fuel: 'fuel', police: 'police', chowki: 'police',
+  hospital: 'hospital', clinic: 'hospital', pharmacy: 'hospital', gym: 'hospital', bank: 'bank', college: 'college', classes: 'college', library: 'college',
+  cinema: 'cinema', gaming: 'cinema', mall: 'cinema', office: 'service', services: 'service', estate: 'service', service: 'service' };
+for (const k in KINDS) if (!KIND_GROUP[k]) KIND_GROUP[k] = /food|thali|misal|biryani|southindian|chinese|fastfood|tapri|cafe|bakery|sweets|juice|bar/.test(k) ? 'food' : 'shop';
+// what a place is for, in the game
+const DOES = { food: 'Order a meal: hunger and mood back up.', thali: 'Unlimited thali: the best value hunger fix in town.', misal: 'Misal, vada pav, bhel: cheap, fast, Puneri.', biryani: 'Biryani to eat in or parcel.',
+  southindian: 'Dosa, idli, filter coffee.', chinese: 'Indo-Chinese: Manchurian, noodles, momos.', fastfood: 'Pizza and burgers, quick.', tapri: 'Cutting chai and a bun maska: a little energy.', cafe: 'Coffee, a seat, Wi-Fi: energy and mood.',
+  bakery: 'Khari, nankatai, cakes.', sweets: 'Sweets and farsan: gifts that please Aai.', juice: 'Juice, mastani, ice cream: cools you down.', bar: 'Drinks, music, dancing; cover charge at night, busiest Friday to Sunday.',
+  cinema: 'Watch a film.', gaming: 'Bowling, arcade games.', mall: 'A mall: shops, food court, a cinema.', barber: 'A haircut, a shave, a new look.', clothes: 'Try on and buy clothes.', shoes: 'Shoes and chappals.',
+  optician: 'Glasses and sunglasses.', laundry: 'Washing and ironing: clothes look sharper.', kirana: 'Groceries, water, snacks, the everyday things.', shop: 'Hardware and household things.',
+  mobile: 'Phones, SIMs, recharges, screen repairs.', electronics: 'Electronics and gadgets.', books: 'Books and stationery.', florist: 'Flowers, garlands for the temple.', paan: 'Paan and mouth fresheners.',
+  petshop: 'Food and toys for the street dogs you feed.', jeweller: 'Buy and sell gold.', bank: 'Deposit, withdraw, fixed deposits, loans; an ATM.', dealer: 'Buy a vehicle.', garage: 'Repairs, tuning, paint, mods: the garage screen.',
+  travel: 'Rent a vehicle, book a trip.', lodge: 'A room for the night.', estate: 'Buy or rent property.', library: 'A seat to study: smarter, calmer.', pharmacy: 'Painkillers, ORS, first aid: heal up.', clinic: 'See a doctor: heals you.',
+  hospital: 'Where you wake up if you’re knocked out nearby.', gym: 'Train: more health, stamina and punching power.', temple: 'Darshan: karma and a little peace.', chowki: 'Pay challans, report things, turn yourself in.',
+  police: 'Police.', fuel: 'Petrol, diesel, CNG.', college: 'A school or college campus.', classes: 'Classes and coaching (not one you can join yet).', office: 'An office (you can’t go in).', services: 'A service or repair shop (you can’t go in).',
+  service: 'An office or service (you can’t go in).', park: 'A green space: walk, sit, breathe.', zoo: 'Animals; entry fee.', landmark: 'One of Pune’s landmarks.', transit: 'Getting about the city starts here.' };
+const kindFor = (p) => { if (KINDS[p.sub] && p.sub !== 'shop' && p.sub !== 'food' && p.sub !== 'service') return p.sub; const k = p.c === 'transit' ? 'transit' : p.c === 'police' ? 'police' : pinKind(p); return KINDS[k] ? k : KINDS[p.c] ? p.c : 'service'; };
 // one filled icon set (24 x 24) for every pin on the map and minimap
 const ICON_PATHS = {
   star: 'M12 2.6l2.8 5.9 6.5.8-4.8 4.5 1.2 6.4L12 17.1l-5.7 3.1 1.2-6.4-4.8-4.5 6.5-.8z',
@@ -94,7 +112,7 @@ const BLURB = [
 ];
 const KIND_BLURB = { food: 'Somewhere to eat.', shop: 'A shop.', bank: 'A bank.', fuel: 'Petrol and diesel.', transit: 'Getting about the city starts here.', hospital: 'Medical help.', temple: 'A place of worship.',
   park: 'A green space in the city.', college: 'A school or college.', cinema: 'A theatre.', police: 'Police.', service: 'An office or service.', landmark: 'One of Pune’s landmarks.' };
-export function blurbFor(p) { if (p.blurb) return p.blurb; const n = p.n || ''; for (const [re, t] of BLURB) if (re.test(n)) return t; return KIND_BLURB[p.c] || ''; }
+export function blurbFor(p) { if (p.blurb) return p.blurb; if (p.k && DOES[p.k]) return DOES[p.k]; const n = p.n || ''; for (const [re, t] of BLURB) if (re.test(n)) return t; return KIND_BLURB[p.c] || ''; }
 
 export class CityMap {
   constructor(W) {
@@ -160,7 +178,7 @@ export class CityMap {
       const c = q[2], id = q[0] + '@' + q[3] + ',' + q[4];
       if (seen.has(id)) continue;
       seen.add(id);
-      const p = { n: q[0], mr: q[1], c: CATS[c] ? c : FOOD.has(c) ? 'food' : (SHOPC[c] || 'shop'), sub: c, x: q[3] / 100, z: q[4] / 100 };
+      const p = { n: q[0], mr: q[1], c: KIND_GROUP[c] || (CATS[c] ? c : FOOD.has(c) ? 'food' : (SHOPC[c] || 'shop')), sub: c, x: q[3] / 100, z: q[4] / 100 };
       p.k = kindFor(p);
       this.places.push(p);
       const k = this.key(p.x, p.z); if (!this.pgrid.has(k)) this.pgrid.set(k, []); this.pgrid.get(k).push(p);
@@ -667,8 +685,8 @@ export class MapScreen {
     card.hidden = !p;
     if (!p) { this.g.liveView && this.g.liveView.stop(); return; }
     const pl = this.g.player, d = Math.hypot(p.x - pl.x, p.z - pl.z);
-    const cat = p.c === 'pin' ? (p.street || p.area || 'Pin') : p.c === 'street' ? 'Street' : p.c === 'area' ? 'Area' : (CATS[p.c] ? CATS[p.c][0].replace(/s$/, '').replace(/ & drink/, '') : p.c);
-    const sub = p.sub && p.sub !== 'generic' ? ' · ' + p.sub.replace('icecream', 'ice cream') : '';
+    const cat = p.c === 'pin' ? (p.street || p.area || 'Pin') : p.c === 'street' ? 'Street' : p.c === 'area' ? 'Area' : KINDS[p.k] ? KINDS[p.k][0].replace(/s$/, '').replace(/ies$/, 'y') : (CATS[p.c] ? CATS[p.c][0].replace(/s$/, '').replace(/ & drink/, '') : p.c);
+    const sub = '';
     this.$('bm-c-cat').textContent = `${cat}${sub} · ${fmtDist(d)} away`;
     this.$('bm-c-n').textContent = p.n;
     this.$('bm-c-mr').textContent = p.mr || '';
@@ -915,7 +933,8 @@ export class MapScreen {
       : { police: 0.25, fuel: 0.28, transit: 0.28, hospital: 0.35, temple: 0.4, park: 0.35, college: 0.35, cinema: 0.35, food: 0.42, shop: 0.5, bank: 0.48, service: 0.8 };
     const NAMEZ = { police: 0.75, fuel: 0.75, transit: 0.75, hospital: 1.2, temple: 1.3, park: 0.9, college: 0.9, cinema: 0.9, food: 1.1, shop: 1.4, bank: 1.4, service: 1.8 };
     for (const p of near) {
-      if (p.c === 'landmark' || !this.shows(p.k || p.c) || z < (MINZ[p.c] || 3) * (this.legend.has(p.k) ? 0.6 : 1)) continue;
+      const far = p.k === 'office' || p.k === 'services' || p.k === 'service' || p.k === 'classes' || p.k === 'estate';
+      if (p.c === 'landmark' || !this.shows(p.k || p.c) || z < (far && !this.legend.has(p.k) ? 2.6 : (MINZ[p.c] || 3) * (this.legend.has(p.k) ? 0.6 : 1))) continue;
       const [X, Y] = T(p.x, p.z);
       const small = p.c === 'food' || p.c === 'shop' || p.c === 'bank' || p.c === 'service';
       const s = small ? (z >= 2 ? 11 : 9.5) : z >= 1.5 ? 13 : 11.5;

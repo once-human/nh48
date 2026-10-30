@@ -63,7 +63,7 @@ export function kindOf(name, cat) {
   if (/thali|bhojan|khanaval|khanawal|bhojanalay|thaali/.test(n)) return 'thali';
   const C = { salon: 'barber', clothes: 'clothes', shoes: 'shoes', cafe: 'cafe', bakery: 'bakery', sweets: 'sweets', icecream: 'icecream',
     pharmacy: 'pharmacy', clinic: 'clinic', grocery: 'kirana', mobile: 'mobile', electronics: 'electronics', jewellery: 'jeweller',
-    bank: 'bank', atm: 'bank', books: 'books', travel: 'travel', food: 'food', hotel: 'food', optician: 'optician', bar: 'bar', garage: 'garage' };
+    bank: 'bank', atm: 'bank', books: 'books', travel: 'travel', food: 'food', hotel: 'food', optician: 'optician', bar: 'bar', garage: 'garage', gym: 'gym' };
   return C[cat] || null;
 }
 
@@ -91,6 +91,8 @@ export function pinKind(p) {
   const n = (p.n || '').toLowerCase();
   if (p.c === 'transit') return null;
   if (p.sub === 'pharmacy') return 'pharmacy';
+  if (/^(office|services|service|classes|mall|college|estate)$/.test(p.sub || '')) return p.sub === 'estate' ? 'estate' : null;     // (offices, services, classes: you can't walk in)
+  if (p.sub && KIND_INFO[p.sub] && p.sub !== 'shop' && p.sub !== 'food') return p.sub;                                          // (the bake's kind, from the name)
   if (p.c === 'hospital') return /pharma|chemist|medical stores?|drug/.test(n) ? 'pharmacy' : 'clinic';
   const k = kindOf(p.n, p.sub && p.sub !== p.c ? p.sub : (PIN_CAT[p.c] || p.c));        // (the bake's trade first: OSM knows a pub is a pub)
   if (k) return k;

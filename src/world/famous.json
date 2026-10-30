@@ -1087,5 +1087,41 @@
 "z": -12531.5,
 "osm": "Pimpri Chinchwad Science Park, IBMR College Road, Ajmera, Pimpri-Chinchwad, Haveli Subdist",
 "pinOff": 30
+},
+{
+"name": "The Mills",
+"mr": "द मिल्स",
+"kind": null,
+"x": 626.1,
+"z": -616.5,
+"osm": "osm: Raja Bahadur International Limited (The Mills), Raja Bahadur Mill Marg",
+"pinOff": null
+},
+{
+"name": "The Mills Social",
+"mr": "द मिल्स सोशल",
+"kind": "bar",
+"x": 624.4,
+"z": -586.0,
+"osm": "osm: The Mills Social, amenity=bar",
+"pinOff": null
+},
+{
+"name": "Dimora Dance & Kitchen",
+"mr": "डिमोरा",
+"kind": "bar",
+"x": 584.6,
+"z": -616.7,
+"osm": "osm: Dimora Dance & Kitchen, amenity=nightclub",
+"pinOff": null
+},
+{
+"name": "Millers The Luxury Club",
+"mr": "मिलर्स",
+"kind": "bar",
+"x": 584.9,
+"z": -564.5,
+"osm": "osm: Millers The Luxury Club",
+"pinOff": null
 }
 ]

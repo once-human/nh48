@@ -86,6 +86,7 @@ const CAT_STYLE = {
   grocery: ['flex', '#e86a1a', '#ffffff', '#1e6b3a'], hardware: ['flex', '#2b7a8c', '#ffffff', '#f2c230'], salon: ['modern', '#f5d6df', '#3a1020', '#b3125a'],
   optician: ['modern', '#ffffff', '#0f4c8a', '#0f4c8a'], electronics: ['modern', '#141f33', '#ffffff', '#33a1fd'], travel: ['flex', '#0f4c8a', '#ffffff', '#f2c230'],
   police: ['bank', '#0b3d91', '#ffffff', '#e8b923'],
+  office: ['plate', '#e9ecef', '#22272e', '#8a929c'], classes: ['flex', '#fff6d8', '#1d3f7a', '#e23a3a'], gym: ['modern', '#0c0d0f', '#3ddc84', '#3ddc84'], garage: ['flex', '#1b1c1f', '#f2c230', '#f2c230'],
   icecream: ['modern', '#fff2f5', '#b3125a', '#f28fb0'], generic: ['flex', '#f7f1e1', '#0f4c8a', '#b3121b'],
 };
 const FLEX_BG = [['#b3121b', '#ffe7a1'], ['#f2c230', '#2a1a0c'], ['#0f4c8a', '#ffffff'], ['#1e6b3a', '#fff6d8'], ['#ffffff', '#b3121b'],
@@ -169,6 +170,10 @@ export function drawBoard(ctx, w, h, shop, rng) {
     ctx.shadowColor = 'transparent';
     fit(ctx, small, design === 'flex-trad' ? (s) => F.ui(700, s) : (s) => F.dev(700, s), w * 0.86, h * (design === 'flex-trad' ? 0.24 : 0.36));
     ctx.fillText(small, w / 2, h * 0.79);
+  } else if (design === 'plate') {
+    // an office: a plain brushed plate, small dark lettering, a thin rule (not a shopfront board)
+    ctx.fillStyle = cs[1]; ctx.fillRect(0, h * 0.18, w, h * 0.64); ctx.fillStyle = cs[3]; ctx.fillRect(h * 0.18, h * 0.3, h * 0.05, h * 0.4);
+    ctx.fillStyle = cs[2]; fit(ctx, en, (s) => F.ui(600, s), w - h * 0.6, h * 0.3); ctx.fillText(en, h * 0.36, h * 0.5);
   } else if (design === 'bank') {
     ctx.fillStyle = cs[1]; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = cs[3]; ctx.fillRect(0, h * 0.84, w, h * 0.16);
