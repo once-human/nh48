@@ -884,9 +884,10 @@ export class MapScreen {
     // 4. places by category, appearing as you zoom in
     const near = this.city.placesIn(xa, za, xb, zb);
     // (picked in the legend: they show from much further out)
-    const MINZ = this.legend.size ? { police: 0.2, fuel: 0.2, transit: 0.25, hospital: 0.25, temple: 0.3, park: 0.3, college: 0.3, cinema: 0.3, food: 0.45, shop: 0.5, bank: 0.45, service: 0.7 }
-      : { police: 0.5, fuel: 0.55, transit: 0.55, hospital: 0.7, temple: 0.8, park: 0.7, college: 0.7, cinema: 0.7, food: 0.85, shop: 1.0, bank: 0.95, service: 1.6 };
-    const NAMEZ = { police: 1.5, fuel: 1.5, transit: 1.5, hospital: 2.4, temple: 2.6, park: 1.8, college: 1.8, cinema: 1.8, food: 2.2, shop: 2.8, bank: 2.8, service: 3.6 };
+    // (shown from twice as far out as they used to be; picked in the legend, further still)
+    const MINZ = this.legend.size ? { police: 0.1, fuel: 0.1, transit: 0.12, hospital: 0.12, temple: 0.15, park: 0.15, college: 0.15, cinema: 0.15, food: 0.22, shop: 0.25, bank: 0.22, service: 0.35 }
+      : { police: 0.25, fuel: 0.28, transit: 0.28, hospital: 0.35, temple: 0.4, park: 0.35, college: 0.35, cinema: 0.35, food: 0.42, shop: 0.5, bank: 0.48, service: 0.8 };
+    const NAMEZ = { police: 0.75, fuel: 0.75, transit: 0.75, hospital: 1.2, temple: 1.3, park: 0.9, college: 0.9, cinema: 0.9, food: 1.1, shop: 1.4, bank: 1.4, service: 1.8 };
     for (const p of near) {
       if (p.c === 'landmark' || !this.shows(p.c) || z < (MINZ[p.c] || 3)) continue;
       const [X, Y] = T(p.x, p.z);
