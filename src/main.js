@@ -364,8 +364,10 @@ async function main() {
     pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     frustum.setFromProjectionMatrix(pv);
     camera.getWorldDirection(fwd);
-    W.tiles?.update(dt, focus.x, focus.z);
-    W.streamer.update(focus.x, focus.z, fwd);
+    const hold = game.peeking ? game.player.root.position : null;      // (the map looking somewhere else: you stay built)
+    W.tiles?.update(dt, focus.x, focus.z, hold);
+    W.streamer.base ??= W.streamer.budgetMs; W.streamer.budgetMs = hold ? Math.max(12, W.streamer.base) : W.streamer.base;      // (the menus are up: build faster)
+    W.streamer.update(focus.x, focus.z, fwd, hold);
     W.nearBoards.update(camera.position.x, camera.position.z, dt);
     W.trains?.update(dt, camera.position);
     propT -= dt;

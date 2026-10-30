@@ -425,9 +425,10 @@ export class MapScreen {
         <div class="bm-c-cat" id="bm-c-cat"></div><div class="bm-c-n" id="bm-c-n"></div><div class="bm-c-mr" lang="mr" id="bm-c-mr"></div>
         <div class="bm-c-b" id="bm-c-b"></div>
         <div class="bm-c-rep" id="bm-c-rep"></div>
+        <div class="bm-c-near" id="bm-c-near"></div>
         <div class="bm-c-act"><button class="btn primary small" id="bm-c-go">Set waypoint</button><button class="btn small" id="bm-c-ft">Take a rickshaw</button><button class="btn small" id="bm-c-x">Close</button></div>
       </div>
-      <div class="bm-foot"><span class="bm-scale" id="bm-scale"><i></i><b></b></span><span class="bm-hint"><span><span class="kbd">Right-click</span>Place waypoint</span><span><span class="kbd">Scroll</span>Zoom</span><span><span class="kbd">Drag</span>Pan</span><span><span class="kbd">Space</span>Recenter</span><span><span class="kbd">/</span>Search</span><span><span class="kbd" data-k="M">M</span>Close</span></span><span class="bm-credit">© OpenStreetMap contributors · Overture Maps · SRTM terrain</span></div>`;
+      <div class="bm-foot"><span class="bm-scale" id="bm-scale"><i></i><b></b></span><span class="bm-hint"><span><svg class="ms" viewBox="0 0 16 22" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="19" rx="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v7" stroke="currentColor" stroke-width="1.2"/><path d="M8 2.2v6.3H2.2V8a5.8 5.8 0 0 1 5.8-5.8z" fill="currentColor"/></svg>Select</span><span><svg class="ms" viewBox="0 0 16 22" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="19" rx="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v7" stroke="currentColor" stroke-width="1.2"/><path d="M8 2.2v6.3h5.8V8A5.8 5.8 0 0 0 8 2.2z" fill="currentColor"/></svg>Drop pin</span><span><svg class="ms" viewBox="0 0 16 22" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="19" rx="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v7" stroke="currentColor" stroke-width="1.2"/><rect x="6.6" y="4" width="2.8" height="5" rx="1.4" fill="currentColor"/></svg>Zoom</span><span><svg class="ms" viewBox="0 0 16 22" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="19" rx="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v7" stroke="currentColor" stroke-width="1.2"/><path d="M8 2.2v6.3H2.2V8a5.8 5.8 0 0 1 5.8-5.8z" fill="currentColor"/></svg><i class="ms-dr">⇔</i>Pan</span><span><span class="kbd">Space</span>Recenter</span><span><span class="kbd">/</span>Search</span></span><span class="bm-credit">© OpenStreetMap contributors · Overture Maps · SRTM terrain</span></div>`;
     root.appendChild(m);
     this.el = m;
     this.cv = m.querySelector('.bm-canvas');
@@ -548,7 +549,10 @@ export class MapScreen {
   pick(sx, sy) {
     const p = this.pickAt(sx, sy);
     if (p) { this.select(p); return; }
-    this.select(null);
+    // nothing there: the neighbourhood you clicked in (right-click drops an exact pin)
+    const [x, z] = this.toWorld(sx, sy), subs = (this.g.hud && this.g.hud.suburbs) || [];
+    let a = null, bd = 2500 * 2500; for (const q of subs) { const d = (q.x - x) ** 2 + (q.z - z) ** 2; if (d < bd) { bd = d; a = q; } }
+    this.select(a ? { n: a.n, mr: '', c: 'area', x, z } : null);
   }
   dropPin(sx, sy) {
     const [x, z] = this.toWorld(sx, sy);
@@ -576,6 +580,14 @@ export class MapScreen {
     ft.title = why || (this.g.stats.money < cost ? `You have ₹${this.g.stats.money}` : 'Skip the drive');
     // the place itself, live: the real street if it's near you, a model of it if not (liveview.js)
     { const el = this.$('bm-c-pic'); let cv = el.querySelector('canvas'); if (!cv) { el.innerHTML = '<canvas width="400" height="225"></canvas>'; cv = el.querySelector('canvas'); } this.g.liveView && this.g.liveView.show(p, cv); }
+    // what's round there: the neighbourhood, and what you'd find within a few minutes' walk
+    { const el = this.$('bm-c-near'), R = 500, list = (this.city.placesIn ? this.city.placesIn(p.x - R, p.z - R, p.x + R, p.z + R) : []).filter(q => Math.hypot(q.x - p.x, q.z - p.z) < R);
+      const n = {}; for (const q of list) n[q.c] = (n[q.c] || 0) + 1;
+      const subs = (this.g.hud && this.g.hud.suburbs) || []; let a = null, bd = 2500 * 2500; for (const q of subs) { const dd = (q.x - p.x) ** 2 + (q.z - p.z) ** 2; if (dd < bd) { bd = dd; a = q; } }
+      const pol = list.filter(q => q.c === 'police').length + (this.city.placesIn ? this.city.placesIn(p.x - 1500, p.z - 1500, p.x + 1500, p.z + 1500).filter(q => q.c === 'police').length : 0) * 0.3;
+      const rows = [['Area', a ? a.n : 'Pune'], ...[['food', 'Food & drink'], ['shop', 'Shops'], ['transit', 'Transit'], ['temple', 'Temples'], ['hospital', 'Health'], ['bank', 'Banks'], ['fuel', 'Fuel']].filter(([k]) => n[k]).map(([k, l]) => [l, n[k], CATS[k][1]]),
+        ['Police round here', pol >= 3 ? 'High' : pol >= 1 ? 'Medium' : 'Low']];
+      el.innerHTML = `<div class="bm-c-k">Within 500 m</div>` + rows.map(([l, v, c]) => `<div class="bm-c-r">${c ? `<i style="background:${c}"></i>` : '<i class="no"></i>'}<span>${l}</span><b>${v}</b></div>`).join(''); }
     // how people round there take you
     { const R = this.g.rep, el = this.$('bm-c-rep');
       if (R && !this.g.free) { const v = R.standing(p.x, p.z), w = v > 0.45 ? 'One of ours' : v > 0.15 ? 'Liked' : v < -0.45 ? 'Trouble' : v < -0.15 ? 'Wary' : 'Neutral';
@@ -792,7 +804,9 @@ export class MapScreen {
     }
     // 4. places by category, appearing as you zoom in
     const near = this.city.placesIn(xa, za, xb, zb);
-    const MINZ = { police: 1.0, fuel: 1.0, transit: 1.0, hospital: 1.4, temple: 1.6, park: 1.3, college: 1.3, cinema: 1.3, food: 1.4, shop: 1.8, bank: 1.6, service: 2.6 };
+    // (picked in the legend: they show from much further out)
+    const MINZ = this.pick.size ? { police: 0.2, fuel: 0.2, transit: 0.25, hospital: 0.25, temple: 0.3, park: 0.3, college: 0.3, cinema: 0.3, food: 0.45, shop: 0.5, bank: 0.45, service: 0.7 }
+      : { police: 0.5, fuel: 0.55, transit: 0.55, hospital: 0.7, temple: 0.8, park: 0.7, college: 0.7, cinema: 0.7, food: 0.85, shop: 1.0, bank: 0.95, service: 1.6 };
     const NAMEZ = { police: 1.5, fuel: 1.5, transit: 1.5, hospital: 2.4, temple: 2.6, park: 1.8, college: 1.8, cinema: 1.8, food: 2.2, shop: 2.8, bank: 2.8, service: 3.6 };
     for (const p of near) {
       if (p.c === 'landmark' || !this.shows(p.c) || z < (MINZ[p.c] || 3)) continue;

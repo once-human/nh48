@@ -760,8 +760,11 @@ export class Game {
     return { x: t[0] + t[3] * lat, z: t[1] - t[2] * lat, th: Math.atan2(t[3], t[2]) };
   }
   // where the world streams around: you, or the shop door while you're inside it
+  // while a menu shows somewhere far off live (the map's place card, a mission), the city streams in there
+  get peeking() { return !!(this.peek && (this.state === 'map' || this.state === 'shop' || this.state === 'pause')); }
   focus() {
     if (this.state === 'title') return this.camera.position;
+    if (this.peeking) { this._peekV = this._peekV || new THREE.Vector3(); return this._peekV.set(this.peek.x, 0, this.peek.z); }
     const I = this.interiors && this.interiors.cur;
     if (I) { this._door = this._door || new THREE.Vector3(); return this._door.set(I.door.x, 0, I.door.z); }
     return this.player.root.position;

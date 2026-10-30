@@ -2067,3 +2067,13 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .bm-c-pic.none { display: grid; place-content: center; text-align: center; gap: 2px; background: linear-gradient(135deg, #1b1c20, #0e0f12); }
 .bm-c-pic.none span { font-size: 13px; font-weight: 650; color: var(--paper-2); } .bm-c-pic.none small { font-size: 11.5px; color: var(--paper-3); }
 .bm-c-pic canvas { width: 100%; height: 100%; display: block; }
+/* the map: no box round the search, the legend's own look wins, details in the card, mouse keys */
+#ui .bigmap .bm-top { background: none !important; border: 0 !important; box-shadow: none !important; padding: 0; }
+#ui.mb-on .bm-filters button.chip { background: rgba(11, 12, 15, .86) !important; border: 1px solid rgba(255, 255, 255, .07) !important; box-shadow: none !important; }
+#ui.mb-on .bm-filters button.chip.on { background: var(--paper) !important; color: var(--ink-0); border-color: var(--paper) !important; }
+.bm-c-near { display: grid; gap: 5px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.bm-c-k { font-size: 11px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; color: var(--paper-3); margin-bottom: 2px; }
+.bm-c-r { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 10px; font-size: 13px; color: var(--paper-2); }
+.bm-c-r i { width: 8px; height: 8px; border-radius: 50%; } .bm-c-r i.no { background: rgba(255,255,255,.25); } .bm-c-r b { font-weight: 650; color: var(--paper); text-align: right; }
+.bm-hint .ms { width: 13px; height: 18px; color: var(--paper); flex: none; } .bm-hint .ms-dr { font-style: normal; font-size: 12px; color: var(--paper-3); margin: 0 -2px 0 -4px; }
+#ui.mb-on .bm-card { max-height: calc(100% - 140px); overflow-y: auto; scrollbar-width: thin; }

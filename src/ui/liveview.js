@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { cmRing } from '../world/geo.js';
 import { fetchJSONgz } from '../world/tiles.js';
 
-const W_ = 400, H_ = 225, R_ = 230, NEAR = 240;
+const W_ = 320, H_ = 180, R_ = 230, NEAR = 240;
 
 export class LiveView {
   constructor(G) { this.g = G; this.on = false; this.a = 0; this.t = 0; }
@@ -35,11 +35,15 @@ export class LiveView {
     this.init();
     if (this.on && this.p === p) { this.cv = canvas; this.cx = canvas.getContext('2d'); return; }     // (the card redrawn, same place)
     this.p = p; this.cv = canvas; this.cx = canvas.getContext('2d'); this.img = this.cx.createImageData(W_, H_);
-    this.on = true; this.a = Math.atan2(G.player.z - p.z, G.player.x - p.x) + 0.6; this.t = 0;
+    this.on = true; this.live = false; this.a = Math.atan2(G.player.z - p.z, G.player.x - p.x) + 0.6; this.t = 0;
     this.real = Math.hypot(p.x - G.player.x, p.z - G.player.z) < NEAR && !(G.interiors && G.interiors.inside);
+    // far off: the city streams in there behind the menu (game.peek); the model stands in until it's built
+    G.peek = this.real ? null : { x: p.x, z: p.z };
     if (!this.real) this.build(p);
   }
-  stop() { this.on = false; this.p = null; this.cv = null; }
+  stop() { this.on = false; this.p = null; this.cv = null; this.g.peek = null; }
+  // is the real street built at p yet
+  ready(p) { const I = this.g.W.index; try { const ci = I.chunkOf(p.x, p.z); const c = ci >= 0 ? I.chunks[ci] : null; return !!(c && c.built && !this.g.W.streamer.pendingAdd.some(q => q.c === c)); } catch (e) { return false; } }
   // the model: the map's picture underfoot, the buildings raised
   async build(p) {
     const G = this.g, key = Math.round(p.x) + ',' + Math.round(p.z); this.key = key;
@@ -103,6 +107,7 @@ export class LiveView {
     if (!this.real && this.groundT > 0) { this.groundT -= dt; if ((this.gAcc = (this.gAcc || 0) + dt) > 0.4) { this.gAcc = 0; this.paintGround(this.p); } }     // the map pictures arriving
     if ((this.t -= dt) > 0) return; this.t = 1 / 24;
     const G = this.g, R = G.renderer, C = this.cam, p = this.p;
+    if (!this.real && G.peek && this.ready(p)) { this.real = true; this.live = true; }
     if (this.real) {
       const gy = G.W.surf ? (G.W.surf.height(p.x, p.z) || 0) : 0, d = 95;
       C.position.set(p.x + Math.cos(this.a) * d, gy + 55, p.z + Math.sin(this.a) * d); C.lookAt(p.x, gy + 4, p.z);
@@ -112,6 +117,7 @@ export class LiveView {
     C.updateMatrixWorld(); C.updateProjectionMatrix();
     const prev = R.getRenderTarget(), ex = R.toneMappingExposure;
     if (!this.real) R.toneMappingExposure = 1;
+    if (this.live && R.shadowMap.enabled && ((this.n = (this.n || 0) + 1) % 12 === 1)) R.shadowMap.needsUpdate = true;     // (the shadows over there, not round you)
     R.setRenderTarget(this.rt); R.render(this.real ? G.scene : this.sc, C); R.setRenderTarget(prev); R.toneMappingExposure = ex;
     R.readRenderTargetPixels(this.rt, 0, 0, W_, H_, this.buf);
     const D = this.img.data, W4 = W_ * 4;

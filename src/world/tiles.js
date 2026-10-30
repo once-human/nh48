@@ -66,11 +66,11 @@ export class TileManager {
     this.game = game;
     for (const T of this.list) if (T.state === 'live' && T.parkedLater) { this.W.collision.tag = T.tag; this.W.parked?.addTile(T.parkedLater, T.tag); this.W.collision.tag = 0; T.parkedLater = null; }
   }
-  update(dt, x, z) {
+  update(dt, x, z, hold) {
     if ((this.t -= dt) <= 0) {
       this.t = 0.5;
       for (const T of this.list) {
-        const d = this.dist(T, x, z);
+        const d = hold ? Math.min(this.dist(T, x, z), this.dist(T, hold.x, hold.z)) : this.dist(T, x, z);
         if (T.state === 'none' && d < LOAD_R && !(T.retry > performance.now())) this.fetch(T);
         else if (T.state === 'live' && d > DROP_R) { T.state = 'dropping'; this.dropping.push(T); }
       }

@@ -261,12 +261,14 @@ export class Streamer {
     this.missing = n;
     return best;
   }
-  update(x, z, viewDir) {
+  // hold: a second place to keep built (you, while the menus look somewhere else: the map's live view)
+  update(x, z, viewDir, hold) {
     const I = this.W.index, half = I.size * 0.71;
     const t0 = performance.now();
+    const far = (c) => Math.hypot(c.cx - x, c.cz - z) - half > this.keep && (!hold || Math.hypot(c.cx - hold.x, c.cz - hold.z) - half > this.keep);
     // drop far chunks (and a half-built one we've driven away from)
-    for (const c of this.built) if (Math.hypot(c.cx - x, c.cz - z) - half > this.keep) this.disposeChunk(c);
-    if (this.job && Math.hypot(this.job.c.cx - x, this.job.c.cz - z) - half > this.keep) this.cancelJob();
+    for (const c of this.built) if (far(c)) this.disposeChunk(c);
+    if (this.job && far(this.job.c)) this.cancelJob();
     // one finished mesh joins the scene per frame
     if (this.pendingAdd.length) {
       const p = this.pendingAdd[0];
