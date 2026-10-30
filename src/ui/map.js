@@ -466,7 +466,7 @@ export class MapScreen {
     else { this.view.x = p.x; this.view.z = p.z; }
     this.target = null; this.vel = { x: 0, z: 0 };
   }
-  close() { this.el.hidden = true; this.$('bm-q').blur(); this.$('bm-res').hidden = true; }
+  close() { this.g.liveView && this.g.liveView.stop(); this.el.hidden = true; this.$('bm-q').blur(); this.$('bm-res').hidden = true; }
   centerOnMe() { const p = this.g.player; this.flyTo(p.x, p.z, Math.max(this.view.ppm, 1.2)); }
   flyTo(x, z, ppm) { this.target = { x, z, ppm: ppm || this.view.ppm }; this.vel = { x: 0, z: 0 }; }
   clampView() {
@@ -561,7 +561,7 @@ export class MapScreen {
   renderCard() {
     const card = this.$('bm-card'), p = this.sel;
     card.hidden = !p;
-    if (!p) return;
+    if (!p) { this.g.liveView && this.g.liveView.stop(); return; }
     const pl = this.g.player, d = Math.hypot(p.x - pl.x, p.z - pl.z);
     const cat = p.c === 'pin' ? 'Pin' : p.c === 'street' ? 'Street' : p.c === 'area' ? 'Area' : (CATS[p.c] ? CATS[p.c][0].replace(/s$/, '').replace(/ & drink/, '') : p.c);
     const sub = p.sub && p.sub !== 'generic' ? ' · ' + p.sub.replace('icecream', 'ice cream') : '';
@@ -574,9 +574,8 @@ export class MapScreen {
     ft.textContent = this.g.free ? 'Go there now' : `Take a rickshaw · ₹${cost}`;
     ft.disabled = !!why || this.g.stats.money < cost || d < 40;
     ft.title = why || (this.g.stats.money < cost ? `You have ₹${this.g.stats.money}` : 'Skip the drive');
-    // its picture: taken by the game when you're there (postcards.js)
-    { const el = this.$('bm-c-pic'), pc = this.g.postcards, u = pc ? pc.forPlace(p) : null;
-      el.innerHTML = u ? `<img alt="" src="${u}">` : `<span>No picture yet</span><small>Go there by day and it’s photographed</small>`; el.classList.toggle('none', !u); }
+    // the place itself, live: the real street if it's near you, a model of it if not (liveview.js)
+    { const el = this.$('bm-c-pic'); let cv = el.querySelector('canvas'); if (!cv) { el.innerHTML = '<canvas width="400" height="225"></canvas>'; cv = el.querySelector('canvas'); } this.g.liveView && this.g.liveView.show(p, cv); }
     // how people round there take you
     { const R = this.g.rep, el = this.$('bm-c-rep');
       if (R && !this.g.free) { const v = R.standing(p.x, p.z), w = v > 0.45 ? 'One of ours' : v > 0.15 ? 'Liked' : v < -0.45 ? 'Trouble' : v < -0.15 ? 'Wary' : 'Neutral';

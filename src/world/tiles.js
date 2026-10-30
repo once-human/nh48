@@ -11,7 +11,7 @@ import { addGroundTile, removeGroundTile } from './groundChunk.js';
 // 1 km pieces: fetched when you're within 1.2 km of one, dropped past 1.9 km; joining one costs at most a few ms a frame
 const LOAD_R = 1200, DROP_R = 1900, BUDGET = 3;
 
-async function fetchJSONgz(url) {
+export async function fetchJSONgz(url) {
   const r = await fetch(versioned(url));
   if (!r.ok) throw new Error(url + ' ' + r.status);
   const s = r.body.pipeThrough(new DecompressionStream('gzip'));
