@@ -398,7 +398,8 @@ const norm = (s) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').re
 export class MapScreen {
   constructor(game, root, city) {
     this.g = game; this.city = city;
-    this.filters = new Set(['landmark', 'police', 'hospital', 'transit', 'fuel', 'food', 'shop', 'bank', 'park', 'temple', 'college', 'cinema', 'service']);
+    // the legend: nothing picked shows everything; pick some and only those show
+    this.pick = new Set();
     this.view = { x: 0, z: 0, ppm: 0.6 };
     this.target = null;            // smooth fly-to {x,z,ppm}
     this.sel = null;
@@ -434,9 +435,9 @@ export class MapScreen {
     const F = this.$('bm-filters');
     for (const [k, [label, col]] of Object.entries(CATS)) {
       const b = document.createElement('button');
-      b.className = 'chip on'; b.dataset.k = k; b.setAttribute('aria-pressed', 'true');
+      b.className = 'chip'; b.dataset.k = k; b.setAttribute('aria-pressed', 'false');
       b.innerHTML = `<i style="background:${col}"></i>${label}`;
-      b.onclick = () => { const on = !this.filters.has(k); on ? this.filters.add(k) : this.filters.delete(k); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); };
+      b.onclick = () => { const on = !this.pick.has(k); on ? this.pick.add(k) : this.pick.delete(k); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); F.classList.toggle('some', this.pick.size > 0); };
       F.appendChild(b);
     }
     this.$('bm-close').onclick = () => this.g.toggleMap(false);
@@ -455,6 +456,7 @@ export class MapScreen {
     this.bindPointer();
     this.bindSearch();
   }
+  shows(k) { return !this.pick.size || this.pick.has(k); }
   get hidden() { return this.el.hidden; }
   open() {
     this.el.hidden = false;
@@ -622,7 +624,7 @@ export class MapScreen {
     };
     const choose = (p) => {
       if (!p) return;
-      if (CATS[p.c]) this.filters.add(p.c);
+      if (CATS[p.c] && this.pick.size && !this.pick.has(p.c)) { this.pick.add(p.c); const b = this.$('bm-filters').querySelector(`[data-k="${p.c}"]`); if (b) b.classList.add('on'); }
       this.flyTo(p.x, p.z, Math.max(this.view.ppm, p.c === 'area' ? 0.9 : p.c === 'street' ? 1.6 : 2.4));
       this.select(p); res.hidden = true; q.blur();
     };
@@ -734,7 +736,7 @@ export class MapScreen {
     const z = v.ppm;
     const TOP = new Set(['Shaniwar Wada', 'Dagdusheth Halwai Ganpati', 'Pune Junction', 'Fergusson College', 'Osho Teerth Park', 'Mahatma Phule Mandai', 'Sassoon Hospital', 'Bund Garden', 'College of Engineering Pune']);
     // 1. landmarks: a handful when the whole city is in view, all of them from district zoom in
-    if (this.filters.has('landmark')) {
+    if (this.shows('landmark')) {
       for (const p of this.city.places) {
         if (p.c !== 'landmark' || !inV(p)) continue;
         if (z < 0.45 && !TOP.has(p.n)) continue;
@@ -790,7 +792,7 @@ export class MapScreen {
     const MINZ = { police: 1.0, fuel: 1.0, transit: 1.0, hospital: 1.4, temple: 1.6, park: 1.3, college: 1.3, cinema: 1.3, food: 1.4, shop: 1.8, bank: 1.6, service: 2.6 };
     const NAMEZ = { police: 1.5, fuel: 1.5, transit: 1.5, hospital: 2.4, temple: 2.6, park: 1.8, college: 1.8, cinema: 1.8, food: 2.2, shop: 2.8, bank: 2.8, service: 3.6 };
     for (const p of near) {
-      if (p.c === 'landmark' || !this.filters.has(p.c) || z < (MINZ[p.c] || 3)) continue;
+      if (p.c === 'landmark' || !this.shows(p.c) || z < (MINZ[p.c] || 3)) continue;
       const [X, Y] = T(p.x, p.z);
       const small = p.c === 'food' || p.c === 'shop' || p.c === 'bank' || p.c === 'service';
       const s = small ? (z >= 4 ? 6 : 4.5) : z >= 3 ? 7 : 5.5;
