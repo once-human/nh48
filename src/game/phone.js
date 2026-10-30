@@ -217,7 +217,7 @@ export class Phone {
     } else if (cur === 'garage') {
       title = 'Garage';
       items.push({ t: 'Your auto', s: G.police.towedAt ? `Towed to ${G.police.towedAt.name}` : 'Find it', act: () => { const a = G.police.towedAt || { x: G.player.auto.x, z: G.player.auto.z }; G.setWaypoint({ x: a.x, z: a.z, name: 'Your auto' }); this.close(); return false; } });
-      for (const v of s.vehicles) { const w = G.bag.whereVeh(v); items.push({ t: `${v.type} · ${v.plate}`, s: w ? 'Parked. Find it' : 'In storage at your home', act: w ? () => { G.setWaypoint({ x: w.x, z: w.z, name: 'Your ' + v.type }); this.close(); return false; } : null }); }
+      for (const v of s.vehicles) { const w = G.jhola.whereVeh(v); items.push({ t: `${v.type} · ${v.plate}`, s: w ? 'Parked. Find it' : 'In storage at your home', act: w ? () => { G.setWaypoint({ x: w.x, z: w.z, name: 'Your ' + v.type }); this.close(); return false; } : null }); }
     } else if (cur === 'shift') {
       title = 'Rides';
       const R = G.rides;

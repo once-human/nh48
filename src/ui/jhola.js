@@ -8,13 +8,19 @@
 import * as THREE from 'three';
 import { ITEMS, describe } from '../game/life.js';
 import { itemArt, photo } from './itemArt.js';
-import { bagOrder } from '../game/bag.js';
 import { CLOTHES, SHOES, applyWear, fmt } from '../game/shops.js';
 import { Studio } from '../game/studio.js';
 import { Vehicle, defaultPaint, specOf } from '../vehicles/vehicle.js';
 import { real } from './materials2d.js';
 import { missionsRoom, statsRoom } from './rooms.js';
+import { g } from './glyphs.js';
 
+// what you carry, in order: the torch first, then food and water, then everything else
+function bagOrder(G) {
+  const inv = G.life.s.inv, ids = Object.keys(inv).filter(k => inv[k] > 0 && ITEMS[k]);
+  const order = (id) => ITEMS[id].tool ? 0 : ITEMS[id].use && (ITEMS[id].use.hunger || ITEMS[id].use.thirst) ? 1 : 2;
+  return ids.sort((a, b) => order(a) - order(b) || a.localeCompare(b));
+}
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const col = (h) => new THREE.Color(h).convertSRGBToLinear();
 // what a thing weighs (kg), and what a jhola holds before it cuts into your shoulder
@@ -22,6 +28,7 @@ const KG = { water: 1, tiffin: 0.8, vadapav: 0.25, biscuit: 0.1, banana: 0.6, ch
   bakarwadi: 0.3, barfi: 0.5, shrewsbury: 0.4, gajra: 0.05, book: 0.3, lottery: 0.01, torch: 0.25, beer: 0.6 };
 const CAP = 12;
 const SORTS = ['kind', 'name', 'count', 'weight'];
+const SORT_N = { kind: 'Kind', name: 'Name', count: 'How many', weight: 'Weight' };
 // the kinds along the top of the grid, each with a little picture of one of them
 // (weapons: none yet, the shelf is ready; hacking gear will go under tools)
 const CATS = [['all', 'All'], ['food', 'Food & drink', 'vadapav'], ['med', 'Medical', 'medkit'], ['tool', 'Tools', 'torch'], ['weap', 'Weapons'], ['wear', 'Clothing'], ['misc', 'Misc', 'keys']];
@@ -51,17 +58,19 @@ export class Jhola {
     this.g = G; this.on = false; this.t = 0; this.tab = 'inv'; this.cat = 'all'; this.sel = null; this.orb = 0;
     this.renders = new Map(); this.queue = []; this.renderMissions = true;
     const el = this.el = document.createElement('div'); el.className = 'iv'; el.hidden = true;
-    el.innerHTML = `<div class="iv-dim"></div><div class="iv-spot"></div>
+    el.innerHTML = `<div class="iv-dim"></div><canvas class="iv-light"></canvas>
       <div class="iv-panel">
         <div class="iv-equip"></div>
         <div class="iv-stage" title="Drag to turn"></div>
         <section class="iv-inv">
-          <div class="iv-cats">${CATS.map(([k, n, pic]) => `<button data-cat="${k}"><i class="ic" data-ic="${k}">${pic ? `<img alt="" src="${itemArt(pic, 96)}">` : ''}</i><span>${n}</span></button>`).join('')}<button class="iv-sort" data-sort><small>Sort</small><b></b></button></div>
+          <header class="iv-head"><div class="iv-ttl"><b>Jhola</b><span class="iv-count"></span></div><div class="iv-wt"><span></span><div class="bar"><i></i></div></div>
+            <div class="iv-sortw"><button class="iv-sort" data-sortopen>Sort by <b></b>${g('rank', 'cv', '#cfc9bd')}</button><div class="iv-sortm" hidden>${SORTS.map(k => `<button data-sort="${k}">${SORT_N[k]}</button>`).join('')}</div></div></header>
+          <div class="iv-cats">${CATS.map(([k, n, pic]) => `<button data-cat="${k}"><i class="ic" data-ic="${k}">${pic ? `<img alt="" src="${itemArt(pic, 96)}">` : ''}</i><span>${n}</span></button>`).join('')}</div>
           <div class="iv-grid"></div>
-          <div class="iv-wt"><span></span><div class="bar"><i></i></div></div>
+          <div class="iv-qcard"><div class="iv-qh"><b>Quick slots</b><small>drag a thing here · 1 to 5 to use it</small></div><div class="iv-qrow">${[1, 2, 3, 4, 5].map(k => `<div class="iv-q" data-q="${k - 1}"><span class="kn">${k}</span><img alt="" hidden><b></b><em>Empty</em></div>`).join('')}</div></div>
         </section>
         <aside class="iv-det"></aside>
-        <div class="iv-qcard"><span class="st-who">Quick slots</span><div class="iv-qrow">${[1, 2, 3, 4, 5].map(k => `<div class="iv-q" data-q="${k - 1}"><span class="kbd">${k}</span><img alt="" hidden><b></b></div>`).join('')}</div></div>
+        <div class="iv-bin">${g('trash', '', '#ff6b5e')}<b>Drop here to trash it</b><small>You’ll be asked first</small></div>
         <section class="iv-stats" hidden>
           <div class="iv-vit"><figure class="jl-v hb"><canvas width="360" height="120"></canvas><figcaption>Heart · <span></span></figcaption></figure>
             <figure class="jl-v bo"><canvas width="90" height="180"></canvas><figcaption>Water · <span></span></figcaption></figure>
@@ -70,16 +79,16 @@ export class Jhola {
           <div class="iv-sbars"></div>
         </section>
         <div class="iv-room" hidden></div>
-        <div class="iv-keys"><span><span class="kbd">Drag</span>Quick slot</span><span><span class="kbd">F</span>Use</span><span><span class="kbd">R</span>Drop</span><span><span class="kbd">Esc</span>Back</span></div>
+        <div class="iv-keys"><span><span class="kbd">Drag</span>Quick slot or trash</span><span><span class="kbd">F</span>Use</span><span><span class="kbd">R</span>Trash</span><span><span class="kbd">Esc</span>Back</span></div>
       </div>
       <div class="iv-strip"></div>
       <div class="iv-ctx" hidden></div>
+      <div class="iv-confirm" hidden></div>
       <div class="iv-insp" hidden></div>`;
     (document.getElementById('hud') || document.body).appendChild(el);
-    // the quick bar lives on the HUD (you use it while you play); the inventory shows it too, to drop things on
-    const qb = this.qb = document.createElement('div'); qb.className = 'iv-qb';
-    qb.innerHTML = [1, 2, 3, 4, 5].map(k => `<div class="iv-q" data-q="${k - 1}"><span class="kbd">${k}</span><img alt="" hidden><b></b></div>`).join('');
-    (document.getElementById('hud') || document.body).appendChild(qb);
+    if (G.scene) this.makeSpot();     // (before the shaders are first compiled, so lighting it later costs nothing)
+    // (the quick slots live in the jhola; the HUD gets its own version later)
+    this.qb = document.createElement('div');
     this.paintQuick();
 
     el.addEventListener('click', (e) => {
@@ -88,11 +97,17 @@ export class Jhola {
       if (e.target.closest('[data-mtrack]')) { this.track(); return; }
       const gt = e.target.closest('[data-goto]'); if (gt) { this.goto(gt.dataset.goto); return; }
       if (e.target.closest('[data-rename]')) { this.close(); G.hud.showPicker && G.hud.showPicker(); return; }
-      if (e.target.closest('[data-sort]')) { this.sortBy = SORTS[(SORTS.indexOf(this.sortBy) + 1) % SORTS.length]; this.paint(); return; }
+      if (e.target.closest('[data-sortopen]')) { const m = this.el.querySelector('.iv-sortm'); m.hidden = !m.hidden; return; }
+      const so = e.target.closest('[data-sort]'); if (so) { this.sortBy = so.dataset.sort; this.el.querySelector('.iv-sortm').hidden = true; this.paint(); return; }
+      if (!e.target.closest('.iv-sortw')) { const m = this.el.querySelector('.iv-sortm'); if (m) m.hidden = true; }
+      const cf = e.target.closest('[data-cf]'); if (cf) { this.confirmDo(cf.dataset.cf); return; }
+      const dr = e.target.closest('[data-drawer]'); if (dr) { this.drawer = dr.dataset.drawer || null; this.paint(); return; }
+      const wp = e.target.closest('[data-wp]'); if (wp) { this.waypoint(wp.dataset.wp); return; }
+      if (e.target.closest('[data-pay]')) { G.police && G.police.payDues && G.police.payDues(); this.paint(); return; }
       const ct = e.target.closest('[data-cat]'); if (ct) { this.cat = ct.dataset.cat; this.paint(); return; }
       const eq = e.target.closest('[data-eq]'); if (eq) { this.cat = 'wear'; const k = eq.dataset.k; if (k) this.sel = k; this.paint(); return; }
       const cx = e.target.closest('[data-cx]'); if (cx) { this.ctxDo(cx.dataset.cx, cx.dataset.arg); return; }
-      const bt = e.target.closest('[data-do]'); if (bt) { if (bt.dataset.do === 'use') this.useSel(); else if (bt.dataset.do === 'drop') this.dropSel(); return; }
+      const bt = e.target.closest('[data-do]'); if (bt) { if (bt.dataset.do === 'use') this.useSel(); else if (bt.dataset.do === 'drop') this.askTrash(this.sel); return; }
       if (!e.target.closest('.iv-ctx')) this.ctx(null);
       if (e.target.closest('.iv-insp')) { this.inspect(null); return; }
     });
@@ -111,22 +126,25 @@ export class Jhola {
       if (!d.on && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6) {
         d.on = true; const en = this.entry(d.k);
         const gh = this.ghost = document.createElement('img'); gh.className = 'iv-ghost'; gh.src = en ? en.img || '' : ''; document.body.appendChild(gh);
-        this.el.classList.add('drop');
+        this.el.classList.add('drop', 'dragging'); this.el.classList.toggle('nobin', !this.canTrash(en));
       }
       if (d.on) {
         this.ghost.style.transform = `translate(${e.clientX - 40}px, ${e.clientY - 40}px)`;
         const q = document.elementFromPoint(e.clientX, e.clientY); const t = q && q.closest && q.closest('.iv-q');
         for (const s of this.el.querySelectorAll('.iv-q')) s.classList.toggle('hot', s === t);
+        const bin = q && q.closest && q.closest('.iv-bin'); this.el.querySelector('.iv-bin').classList.toggle('hot', !!bin);
       }
     });
     addEventListener('pointerup', (e) => {
       this.turn = null;
       const d = this.drag; this.drag = null; if (!d) return;
       if (!d.on) { this.select(d.k); return; }
-      this.ghost && this.ghost.remove(); this.ghost = null; this.el.classList.remove('drop');
+      this.ghost && this.ghost.remove(); this.ghost = null;
       for (const s of this.el.querySelectorAll('.iv-q')) s.classList.remove('hot');
-      const q = document.elementFromPoint(e.clientX, e.clientY); const t = q && q.closest && q.closest('.iv-q');
+      const q = document.elementFromPoint(e.clientX, e.clientY); const t = q && q.closest && q.closest('.iv-q'), bin = q && q.closest && q.closest('.iv-bin');
+      this.el.querySelector('.iv-bin').classList.remove('hot'); this.el.classList.remove('drop', 'dragging', 'nobin');
       if (t) this.assign(d.k, +t.dataset.q);
+      else if (bin) this.askTrash(d.k);
     });
     this.el.addEventListener('contextmenu', (e) => { const t = e.target.closest('.iv-q'); if (t) { e.preventDefault(); e.stopPropagation(); this.assign(null, +t.dataset.q); } }, true);
 
@@ -142,17 +160,19 @@ export class Jhola {
         return;
       }
       const stop = () => { e.preventDefault(); e.stopImmediatePropagation(); };
+      if (!this.el.querySelector('.iv-confirm').hidden) { stop(); if (c === 'Enter' || c === 'KeyY') this.confirmDo('yes'); else if (c === 'KeyA') this.confirmDo('all'); else if (c === 'Escape' || c === 'KeyN') this.confirmDo('no'); return; }
+      if (this.drawer && c === 'Escape') { stop(); this.drawer = null; this.paint(); return; }
       if (!this.el.querySelector('.iv-insp').hidden && (c === 'Escape' || c === 'Space' || c === 'Enter')) { stop(); this.inspect(null); return; }
       if (!this.el.querySelector('.iv-ctx').hidden && c === 'Escape') { stop(); this.ctx(null); return; }
       if (c === 'Escape' || c === 'Tab') { stop(); this.close(); return; }
       if (c === 'KeyQ' || c === 'KeyE') { stop(); G.menubar && G.menubar.step(c === 'KeyE' ? 1 : -1); return; }
       if (c === 'KeyJ') { stop(); this.goTab('missions'); return; }
       if (c === 'KeyM' && this.tab === 'missions') { stop(); this.track(); return; }
-      if (this.tab === 'stats' && (c === 'KeyH' || c === 'KeyP' || c === 'KeyV')) { stop(); this.goto(c === 'KeyH' ? 'challans' : 'own'); return; }
-      // the world is still running (slowly) behind the jhola: nothing else reaches it, so you don't walk off
+      if (this.tab === 'stats' && (c === 'KeyH' || c === 'KeyP' || c === 'KeyV')) { stop(); this.drawer = c === 'KeyH' ? 'challans' : 'own'; this.paint(); return; }
+      // nothing else reaches the game behind the jhola
       if (this.tab !== 'inv') { if (!/^F\d+$/.test(c)) e.stopImmediatePropagation(); return; }
       if (c === 'KeyF' || c === 'Enter') { stop(); this.useSel(); return; }
-      if (c === 'KeyR') { stop(); this.dropSel(); return; }
+      if (c === 'KeyR') { stop(); this.askTrash(this.sel); return; }
       if (c === 'KeyI' || c === 'Space') { stop(); if (this.sel) this.inspect(this.sel); return; }
       const m = /^Digit([1-5])$/.exec(c); if (m) { stop(); if (this.sel) this.assign(this.sel, +m[1] - 1); return; }
       const mv = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -6, ArrowDown: 6, KeyA: -1, KeyD: 1, KeyW: -6, KeyS: 6 }[c];
@@ -273,7 +293,7 @@ export class Jhola {
   }
 
   // ------------------------------------------------------------------ open / close
-  open(tab = 'inv') {
+  open(tab = 'inv', cat) {
     const G = this.g, P = G.player;
     if (this.on || G.state !== 'play' || (G.phone && G.phone.on)) return;
     this.on = true; this.t = 0; this.orb = 0; this.tab = null;
@@ -284,18 +304,15 @@ export class Jhola {
     this.from = { x: c.position.x, y: c.position.y, z: c.position.z, fov: c.fov };
     this.foot = P.onFoot;
     if (P.onFoot && P.human) P.human.play('idle', { fade: 0.3 });
-    this._all = null; this.setTab(tab);
+    this._all = null; if (cat) this.cat = cat; this.drawer = null; this.setTab(tab);
     this.el.hidden = false; this.el.classList.remove('out'); void this.el.offsetWidth; this.el.classList.add('in');
-    this.qb.classList.add('open');
     G.hud && G.hud.root && G.hud.root.classList.add('in-jl');
   }
-  // the jhola's own tabs: in the inventory the world goes on at a sixtieth, slow and far away; missions
-  // and stats stop it (paused, silent), and it comes back slowed when you return
+  // the jhola's tabs all pause the game (quiet); in the inventory you stand there under a spotlight
   setTab(k) {
     const G = this.g; if (k === this.tab) { this.paint(); return; }
-    this.tab = k;
-    if (k === 'inv') { G.state = 'play'; G.timeWarp = 1 / 60; G.audio.hush?.(false); G.audio.slowmo?.(2); }
-    else { G.state = 'shop'; G.timeWarp = 1; G.audio.hush?.(true); }
+    this.tab = k; this.drawer = null;
+    G.state = 'shop'; G.timeWarp = 1; G.audio.hush?.(true); G.audio.updateEngine?.(0, 0, false);
     // the rooms sit over the city blurred and dimmed, the way the pause menu does it
     G.renderer && G.renderer.domElement.classList.toggle('paused', k !== 'inv');
     this.paint();
@@ -305,10 +322,10 @@ export class Jhola {
     if (!this.on) return;
     const G = this.g;
     this.on = false; this.tab = null; this._rt = null; this.ctx(null); this.inspect(null); G.hud && G.hud.root && G.hud.root.classList.remove('in-jl');
-    this.qb.classList.remove('open');
     this.el.classList.remove('in'); this.el.classList.add('out'); setTimeout(() => { if (!this.on) this.el.hidden = true; }, 240);
     G.state = 'play'; G.timeWarp = 1; G.audio.slowmo?.(0); G.audio.hush?.(false);
     G.renderer && G.renderer.domElement.classList.remove('paused');
+    this.confirm(null); if (this.spot) this.spot.intensity = 0;
     if (this.from && Math.abs(G.camera.fov - this.from.fov) > 0.01) { G.camera.fov = this.from.fov; G.camera.updateProjectionMatrix(); }
     if (G.rig) G.rig.inited = false;
     G.life.save(); if (!toMenu) G.lockMouse?.();
@@ -322,7 +339,8 @@ export class Jhola {
     const hh = Math.floor(G.hour || 0), mm = String(Math.floor(((G.hour || 0) % 1) * 60)).padStart(2, '0'), day = Math.floor((G.clock || 0) / 24);
     void hh; void mm; void day;
     this.paintStrip();
-    el.querySelector('.iv-sort b').textContent = { kind: 'Kind', name: 'Name', count: 'Count', weight: 'Weight' }[this.sortBy || 'kind'];
+    el.querySelector('.iv-sort b').textContent = SORT_N[this.sortBy || 'kind'];
+    for (const b of el.querySelectorAll('[data-sort]')) b.classList.toggle('on', b.dataset.sort === (this.sortBy || 'kind'));
     const stats = this.tab === 'stats' || this.tab === 'missions';
     el.querySelector('.iv-stats').hidden = true;
     el.classList.toggle('room', stats);
@@ -331,8 +349,8 @@ export class Jhola {
     const ent = this._rt !== this.tab; this._rt = this.tab; clearTimeout(this._et);
     room.classList.toggle('enter', ent); if (ent) this._et = setTimeout(() => room.classList.remove('enter'), 600);
     if (stats) { const sc = room.querySelector('.rm-l .rm-scroll'), top = sc ? sc.scrollTop : 0; room.innerHTML = this.tab === 'stats' ? statsRoom(this) : missionsRoom(this); const sc2 = room.querySelector('.rm-l .rm-scroll'); if (sc2) sc2.scrollTop = top;
-      const lc = this.tab === 'missions' && this.mloc && room.querySelector('.rm-pic.live canvas'); if (lc && G.liveView) G.liveView.show(this.mloc, lc); }
-    el.querySelector('.iv-keys').hidden = stats; el.querySelector('.iv-qcard').hidden = stats; el.classList.toggle('t-inv', this.tab === 'inv');
+      const lc = this.tab === 'missions' && this.mloc && room.querySelector('.rm-pic.live canvas'); if (lc && G.liveView) G.liveView.show(this.mloc, lc, this.mid ? 'm:' + this.mid : null); }
+    el.querySelector('.iv-keys').hidden = stats; el.classList.toggle('t-inv', this.tab === 'inv');
     // what you're wearing
     const L = P.look || {};
     const eq = [['head', 'Head', L.hat], ['face', 'Face', L.glasses || L.shades], ['torso', 'Torso', 1], ['legs', 'Legs', !(L.cut && L.cut.w === 2)], ['feet', 'Feet', 1], ['back', 'Back', 1]];
@@ -365,6 +383,7 @@ export class Jhola {
     // the weight on your shoulder
     const kg = all.reduce((a, e) => a + (e.cat === 'wear' && e.worn ? 0 : e.kg * (e.id ? e.n || 1 : 1)), 0);
     el.querySelector('.iv-wt span').textContent = `${kg.toFixed(1)} / ${CAP} kg`;
+    el.querySelector('.iv-count').textContent = `${all.filter(e => e.id).reduce((a, e) => a + (e.n || 1), 0)} things`;
     el.querySelector('.iv-wt i').style.width = Math.min(100, kg / CAP * 100) + '%';
     el.querySelector('.iv-wt').classList.toggle('over', kg > CAP);
     this.paintDet();
@@ -378,7 +397,7 @@ export class Jhola {
       ${e.n > 1 ? `<p class="iv-cnt">× ${e.n} in your jhola</p>` : ''}
       <p class="iv-desc">${esc(e.desc)}</p>
       ${e.effects && e.effects.length ? `<div class="iv-fx">${e.effects.map(f => `<span>${esc(f)}</span>`).join('')}</div>` : ''}
-      <div class="iv-acts"><button class="st-opt iv-btn use" data-do="use" ${noUse ? 'disabled' : ''}><span class="kbd">F</span><span class="o-t">${esc(e.use)}</span></button><button class="st-opt iv-btn" data-do="drop" ${noDrop ? 'disabled' : ''}><span class="kbd">R</span><span class="o-t">Drop</span></button></div>`;
+      <div class="iv-acts"><button class="st-opt iv-btn use" data-do="use" ${noUse ? 'disabled' : ''}><span class="kbd">F</span><span class="o-t">${esc(e.use)}</span></button><button class="st-opt iv-btn trash" data-do="drop" ${noDrop ? 'disabled' : ''}><span class="kbd">R</span><span class="o-t">Trash</span></button></div>`;
   }
   paintStats() {
     const G = this.g, s = G.life.s, P = G.player, L = G.life;
@@ -391,8 +410,8 @@ export class Jhola {
   // along the bottom of the screen: how your body is
   paintStrip() {
     const G = this.g, s = G.life.s, P = G.player, L = G.life, el = this.el.querySelector('.iv-strip'); if (!el) return;
-    const bars = [['Health', (P.hp ?? 100) / L.hpMax, '#ff375f', Math.round(P.hp ?? 100)], ['Food', s.hunger, '#ffb224'], ['Water', s.thirst, '#40c8ff'], ['Energy', s.energy, '#a8e43a'], ['Stamina', P.stam ?? 1, '#30e0b0'], ['Mood', s.mood, '#c58cff'], ['Drunk', s.drunk || 0, '#e8c27a']];
-    el.innerHTML = bars.map(([n, v, c, txt]) => { const f = Math.max(0, Math.min(1, v)); return `<div class="sb${f < 0.2 && n !== 'Drunk' ? ' low' : ''}" style="--c:${c}"><div><small>${n}</small><span>${txt ?? Math.round(f * 100)}</span></div><i><b style="width:${(f * 100).toFixed(1)}%"></b></i></div>`; }).join('');
+    const bars = [['heart', 'Health', (P.hp ?? 100) / L.hpMax, '#ff4d5e', Math.round(P.hp ?? 100)], ['food', 'Food', s.hunger, '#ff8a3d'], ['drop', 'Water', s.thirst, '#3ea8ff'], ['bolt', 'Energy', s.energy, '#ffd23f'], ['run', 'Stamina', P.stam ?? 1, '#f1ece2'], ['smile', 'Mood', s.mood, '#3ddc84'], ['glass', 'Drunk', s.drunk || 0, '#e8b04a']];
+    el.innerHTML = bars.map(([ic, n, v, c, txt]) => { const f = Math.max(0, Math.min(1, v)); return `<div class="sb${f < 0.2 && n !== 'Drunk' ? ' low' : ''}" style="--c:${c}">${g(ic)}<div><small>${n}</small><span>${txt ?? Math.round(f * 100)}</span></div><i><b style="width:${(f * 100).toFixed(1)}%"></b></i></div>`; }).join('');
   }
   paintCond() {
     const G = this.g, s = G.life.s, P = G.player, L = G.life, el = this.el.querySelector('.iv-cond'); if (!el) return;
@@ -424,8 +443,21 @@ export class Jhola {
   // the stats' buttons: your challans (settings), your homes and vehicles (the old jhola's Owned list)
   goto(k) {
     const G = this.g;
-    if (k === 'challans') { G.menubar && G.menubar.go('settings'); const b = G.hud.pause && G.hud.pause.querySelector('.pz-i[data-pane="ch"]'); if (b) b.click(); return; }
-    if (k === 'own') { this.close(); G.bag && G.bag.show('own'); }
+    this.drawer = k; if (this.tab !== 'stats') this.goTab('stats'); this.paint();
+  }
+  // set a waypoint from the stats' drawers: an owned home, the auto, a parked vehicle
+  waypoint(arg) {
+    const G = this.g, P = G.player; let t = null;
+    if (arg === 'auto') t = (G.police && G.police.towedAt) || (P.auto ? { x: P.auto.x, z: P.auto.z, name: 'Your auto' } : null);
+    else if (arg.startsWith('p:')) { const p = G.props.list.find(q => q.id === arg.slice(2)); if (p) t = { x: p.x, z: p.z, name: p.name }; }
+    else if (arg.startsWith('v:')) { const v = this.whereVeh((G.life.s.vehicles || []).find(q => q.id === arg.slice(2))); if (v) t = { x: v.x, z: v.z, name: 'Your ' + (v.spec && v.spec.name ? v.spec.name.toLowerCase() : 'vehicle') }; }
+    if (t) { G.setWaypoint({ x: t.x, z: t.z, name: t.name || 'Waypoint' }); G.hud.toast('Waypoint set', t.name || '', 'meter', 2); }
+  }
+  // one of your vehicles, if it's out somewhere (parked, or the one you're on)
+  whereVeh(v) {
+    if (!v) return null;
+    const P = this.g.player, d = (P.dropped || []).find(q => q.veh.owned && q.veh.owned.id === v.id);
+    return d ? d.veh : P.cur && P.cur.owned && P.cur.owned.id === v.id ? P.cur : null;
   }
   // the chapter you're on, onto the map
   track() { const G = this.g, t = G.story && G.story.trackNow && G.story.trackNow(); if (t) { G.hud.toast('Tracking', t.name, 'meter', 2); G.menubar && G.menubar.go('map'); } }
@@ -435,7 +467,7 @@ export class Jhola {
   act(k, quiet) {
     const G = this.g, e = this.entry(k); if (!e) return;
     if (k === 'phone') { if (this.on) this.close(); G.phone && G.phone.open(); return; }
-    if (k === 'keys') { if (this.on) this.close(); G.bag && G.bag.show('own'); return; }
+    if (k === 'keys') { this.drawer = 'own'; if (this.on) this.goTab('stats'); return; }
     if (e.w) {
       const P = G.player;
       if (e.w === '__orig') { G.life.s.look = null; const base = G.baseLook(); if (base) { Object.assign(P.look, base); G.W.kit.applyLook(P.human, P.look); } }
@@ -453,11 +485,26 @@ export class Jhola {
     this.paintQuick();
   }
   useSel() { const e = this.entry(this.sel); if (e && e.use !== 'Wearing') this.act(this.sel); }
-  dropSel() {
-    const G = this.g, e = this.entry(this.sel); if (!e || e.fixed || e.cat === 'wear' || !e.id) return;
-    const s = G.life.s; if (!(s.inv[e.id] > 0)) return;
-    s.inv[e.id]--; if (!s.inv[e.id]) delete s.inv[e.id];
-    G.life.save(); G.hud.toast('Dropped', e.name, 'info', 1.4);
+  canTrash(e) { return !!(e && e.id && !e.fixed && e.cat !== 'wear'); }
+  // trash: asked first, in red
+  askTrash(k) {
+    const e = this.entry(k); if (!e) return;
+    if (!this.canTrash(e)) { this.g.hud.toast('Can’t trash that', e.cat === 'wear' ? 'Clothes stay in your wardrobe' : 'You’ll need it', 'warn', 1.6); return; }
+    this.confirm(e);
+  }
+  confirm(e) {
+    const C = this.el.querySelector('.iv-confirm'); this.cfK = e ? e.k : null;
+    if (!e) { C.hidden = true; return; }
+    C.innerHTML = `<div class="cf-box"><div class="cf-ic">${g('trash', '', '#ff6b5e')}</div><img alt="" src="${e.img || ''}"><h3>Trash ${esc(e.name)}?</h3><p>${e.n > 1 ? `You have ${e.n}. ` : ''}It’s gone for good.</p>
+      <div class="cf-acts"><button class="cf-yes" data-cf="yes">Trash ${e.n > 1 ? 'one' : 'it'} <span class="kbd">Y</span></button>${e.n > 1 ? `<button class="cf-all" data-cf="all">Trash all ${e.n} <span class="kbd">A</span></button>` : ''}<button class="cf-no" data-cf="no">Keep it <span class="kbd">N</span></button></div></div>`;
+    C.hidden = false;
+  }
+  confirmDo(a) {
+    const G = this.g, k = this.cfK; this.confirm(null);
+    if (a === 'no' || !k) return;
+    const e = this.entry(k), s = G.life.s; if (!e || !(s.inv[e.id] > 0)) return;
+    if (a === 'all') delete s.inv[e.id]; else { s.inv[e.id]--; if (!s.inv[e.id]) delete s.inv[e.id]; }
+    G.life.save(); G.hud.toast('Trashed', e.name, 'info', 1.4);
     this._all = null; this.paint(); this.paintQuick();
   }
   quickUse(k) {
@@ -476,14 +523,14 @@ export class Jhola {
     if (!this.g.life || !this.g.player) return;     // (built before the save is loaded; drawn on the first frame)
     const q = this.g.life.s.quick || [], all = this._all || this.entries();
     let any = false;
-    [...this.qb.children, ...this.el.querySelectorAll('.iv-qrow .iv-q')].forEach((d) => { const i = +d.dataset.q;
+    [...this.el.querySelectorAll('.iv-qrow .iv-q')].forEach((d) => { const i = +d.dataset.q;
       const k = q[i], e = k && all.find(x => x.k === k), im = d.querySelector('img'), b = d.querySelector('b');
-      d.classList.toggle('none', !!k && !e);
+      d.classList.toggle('none', !!k && !e); d.classList.toggle('full', !!k);
       if (k) { any = true; const src = e ? e.img : k.startsWith('w:') ? this.renders.get(k) : itemArt(k, 128); im.dataset.r = k; if (src) { im.src = src; im.hidden = false; } else im.hidden = true; }
       else { im.hidden = true; im.removeAttribute('src'); }
       b.textContent = e && e.n > 1 ? e.n : '';
     });
-    this.qb.classList.toggle('some', any);
+    void any;
     this._qsig = JSON.stringify([q, this.g.life.s.inv]);
   }
 
@@ -496,7 +543,7 @@ export class Jhola {
     C.innerHTML = `<div class="iv-cx-h"><img alt="" src="${e.img || ''}"><b>${esc(e.name)}</b></div>
       <button data-cx="use" ${e.use === 'Wearing' ? 'disabled' : ''} class="first">${esc(e.use)}</button>
       <div class="iv-cx-q"><span>Assign to quick slot</span><div>${[1, 2, 3, 4, 5].map(n => `<button data-cx="q" data-arg="${n - 1}">${n}</button>`).join('')}</div></div>
-      <button data-cx="drop" ${noDrop ? 'disabled' : ''}>Drop</button><button data-cx="inspect">Inspect</button><button data-cx="cancel">Cancel</button>`;
+      <button data-cx="drop" ${noDrop ? 'disabled' : ''}>Trash</button><button data-cx="inspect">Inspect</button><button data-cx="cancel">Cancel</button>`;
     C.hidden = false;
     const r = C.getBoundingClientRect();
     C.style.left = Math.min(innerWidth - r.width - 10, x) + 'px'; C.style.top = Math.min(innerHeight - r.height - 10, y) + 'px';
@@ -506,7 +553,7 @@ export class Jhola {
     const k = this.ctxK; this.ctx(null);
     if (a === 'use') { this.sel = k; this.useSel(); }
     else if (a === 'q') this.assign(k, +arg);
-    else if (a === 'drop') { this.sel = k; this.dropSel(); }
+    else if (a === 'drop') this.askTrash(k);
     else if (a === 'inspect') this.inspect(k);
   }
   inspect(k) {
@@ -525,9 +572,7 @@ export class Jhola {
   update(dt) {
     const G = this.g;
     if (!G.life || !G.player) return;
-    { const pl = G.state === 'play' && !(G.cut && G.cut.on) && !(G.phone && G.phone.on); if (pl !== this._pl) { this._pl = pl; this.qb.classList.toggle('play', pl); }
-      // subtitles and prompts sit above the quick bar while it's up
-      const up = pl && !this.on && this.qb.classList.contains('some'); if (up !== this._qup) { this._qup = up; G.hud && G.hud.root && G.hud.root.classList.toggle('qb-on', up); } }
+    if (!this.spot && G.scene) this.makeSpot();
     if (!this.on) {
       // the quick bar keeps up with what you buy and eat
       if ((this._qt = (this._qt || 0) - dt) <= 0) { this._qt = 0.5; const sig = JSON.stringify([G.life.s.quick || [], G.life.s.inv]); if (sig !== this._qsig) { this._all = null; this.paintQuick(); } }
@@ -549,9 +594,55 @@ export class Jhola {
       c.lookAt(F.x + rx * off, y + 0.95, F.z + rz * off);
       if (Math.abs(c.fov - fov) > 0.1) { c.fov += (fov - c.fov) * k; c.updateProjectionMatrix(); }
       if (P.human) { P.human.holder.visible = true; if (G.state !== 'play') P.human.mixer.update(dt); }
+      // the spotlight: straight down on you from high up, a little in front
+      if (this.spot) {
+        const on = this.tab === 'inv', fx = Math.cos(F.yaw), fz = Math.sin(F.yaw);
+        this.spot.position.set(F.x + fx * 0.9, y + 6.5, F.z + fz * 0.9); this.spotT.position.set(F.x, y + 0.9, F.z); this.spotT.updateMatrixWorld();
+        this.spot.intensity += ((on ? 140 : 0) - this.spot.intensity) * (1 - Math.exp(-dt * 3));
+      }
     }
+    if (this.tab === 'inv') this.drawLight(dt); else if (this._lit) { this._lit = false; const cv = this.el.querySelector('.iv-light'); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); }
     if ((this._ct = (this._ct || 0) - rd) <= 0) { this._ct = 0.5; this.paintStrip(); }
     if (false && (this._vt = (this._vt || 0) - dt) <= 0) { this._vt = 1 / 30; this.vitals(); }
+  }
+  // a real spotlight, in the scene from the start at zero (adding a light later recompiles every shader: a freeze)
+  makeSpot() {
+    const G = this.g;
+    const L = this.spot = new THREE.SpotLight(0xffe7c4, 0, 16, 0.36, 0.55, 2);
+    const T = this.spotT = new THREE.Object3D(); L.target = T; L.castShadow = false;
+    G.scene.add(L); G.scene.add(T);
+  }
+  // the light you can see: the cone through the dark, dust drifting in it, the pool at your feet
+  drawLight(dt) {
+    const G = this.g, P = G.player, cv = this.el.querySelector('.iv-light'), W = innerWidth >> 1, H = innerHeight >> 1;
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    const x = cv.getContext('2d'); this._lit = true;
+    x.clearRect(0, 0, W, H);
+    // where you are on screen: feet and head
+    const F = P.foot, v = this._v || (this._v = new THREE.Vector3());
+    v.set(F.x, (F.y || 0), F.z).project(G.camera); const fx = (v.x + 1) / 2 * W, fy = (1 - v.y) / 2 * H;
+    v.set(F.x, (F.y || 0) + 1.8, F.z).project(G.camera); const hy = (1 - v.y) / 2 * H;
+    this.el.style.setProperty('--sx', (fx / W * 100).toFixed(1) + '%'); this.el.style.setProperty('--sy', ((fy + hy) / 2 / H * 100).toFixed(1) + '%');
+    const t = (this.t || 0), fade = Math.min(1, t * 1.5), bw = (fy - hy) * 0.55, tw = bw * 0.18;
+    // the beam: narrow at the top, wide at your feet, brightest in the middle
+    x.save(); x.globalAlpha = 0.9 * fade; x.filter = 'blur(14px)';
+    const gr = x.createLinearGradient(0, 0, 0, fy); gr.addColorStop(0, 'rgba(255,236,205,.30)'); gr.addColorStop(0.6, 'rgba(255,230,195,.14)'); gr.addColorStop(1, 'rgba(255,225,185,.06)');
+    x.fillStyle = gr; x.beginPath(); x.moveTo(fx - tw, -20); x.lineTo(fx + tw, -20); x.lineTo(fx + bw, fy); x.lineTo(fx - bw, fy); x.closePath(); x.fill();
+    const core = x.createLinearGradient(fx - bw * 0.5, 0, fx + bw * 0.5, 0); core.addColorStop(0, 'rgba(255,240,215,0)'); core.addColorStop(0.5, 'rgba(255,240,215,.12)'); core.addColorStop(1, 'rgba(255,240,215,0)');
+    x.fillStyle = core; x.beginPath(); x.moveTo(fx - tw * 0.6, -20); x.lineTo(fx + tw * 0.6, -20); x.lineTo(fx + bw * 0.55, fy); x.lineTo(fx - bw * 0.55, fy); x.closePath(); x.fill();
+    // the pool of light on the ground
+    x.filter = 'blur(6px)';
+    const pool = x.createRadialGradient(fx, fy, 0, fx, fy, bw * 1.25); pool.addColorStop(0, 'rgba(255,232,196,.42)'); pool.addColorStop(0.55, 'rgba(255,225,185,.14)'); pool.addColorStop(1, 'rgba(255,225,185,0)');
+    x.fillStyle = pool; x.beginPath(); x.ellipse(fx, fy, bw * 1.25, bw * 0.3, 0, 0, Math.PI * 2); x.fill();
+    x.restore();
+    // dust in the beam, drifting and catching the light
+    const D = this._dust || (this._dust = Array.from({ length: 70 }, () => ({ u: Math.random() * 2 - 1, v: Math.random(), s: 0.4 + Math.random() * 1.3, p: Math.random() * 6.28, sp: 0.01 + Math.random() * 0.03 })));
+    for (const d of D) {
+      d.v += d.sp * dt * (0.4 + d.s * 0.3); d.u += Math.sin(t * 0.5 + d.p) * dt * 0.02; if (d.v > 1) { d.v = 0; d.u = Math.random() * 2 - 1; }
+      const yy = d.v * fy, half = tw + (bw - tw) * d.v, xx = fx + d.u * half * 0.9;
+      const a = (0.25 + 0.75 * Math.abs(Math.sin(t * 1.3 + d.p))) * (1 - Math.abs(d.u)) * 0.85 * fade;
+      x.fillStyle = `rgba(255,240,215,${a.toFixed(3)})`; x.beginPath(); x.arc(xx, yy, d.s, 0, 6.283); x.fill();
+    }
   }
   // a photo from assets/items, once it has loaded (null until then, and the painted one draws)
   pic(id) {

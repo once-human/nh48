@@ -30,13 +30,14 @@ export class LiveView {
     this.bmesh = null;
   }
   // start showing p (anything with x, z) in this canvas
-  show(p, canvas) {
+  show(p, canvas, saveKey) {
     const G = this.g; if (!p || !canvas) { this.stop(); return; }
     this.init();
+    this.saveKey = saveKey || null;
     if (this.on && this.p && Math.abs(this.p.x - p.x) < 0.5 && Math.abs(this.p.z - p.z) < 0.5) { if (canvas.width !== W_) { canvas.width = W_; canvas.height = H_; } this.cv = canvas; this.cx = canvas.getContext("2d"); this.img = this.cx.createImageData(W_, H_); return; }     // (the card redrawn, same place)
     if (canvas.width !== W_ || canvas.height !== H_) { canvas.width = W_; canvas.height = H_; }     // (the picture fills its frame)
     this.p = p; this.cv = canvas; this.cx = canvas.getContext('2d'); this.img = this.cx.createImageData(W_, H_);
-    this.on = true; this.live = false; this.a = Math.atan2(G.player.z - p.z, G.player.x - p.x) + 0.6; this.t = 0;
+    this.on = true; this.live = false; this.nR = 0; this.nM = 0; this.saved = 0; this.a = Math.atan2(G.player.z - p.z, G.player.x - p.x) + 0.6; this.t = 0;
     this.real = Math.hypot(p.x - G.player.x, p.z - G.player.z) < NEAR && !(G.interiors && G.interiors.inside);
     // far off: the city streams in there behind the menu (game.peek); the model stands in until it's built
     G.peek = this.real ? null : { x: p.x, z: p.z };
@@ -125,5 +126,15 @@ export class LiveView {
     for (let y = 0; y < H_; y++) D.set(this.buf.subarray((H_ - 1 - y) * W4, (H_ - y) * W4), y * W4);
     for (let i = 3; i < D.length; i += 4) D[i] = 255;
     this.cx.putImageData(this.img, 0, 0);
+    // a still of it, kept (the mission list's thumbnail): the real street once it's settled, the model if that's all there is
+    if (this.saveKey && G.postcards) {
+      if (this.real) this.nR++; else this.nM++;
+      const want = this.real && this.nR === 18 && this.saved < 2 ? 2 : !this.real && this.nM === 30 && !this.saved && !G.postcards.get(this.saveKey) ? 1 : 0;
+      if (want) {
+        this.saved = want; const url = this.cv.toDataURL('image/jpeg', 0.78); G.postcards.put(this.saveKey, url);
+        const id = this.saveKey.replace(/^m:/, '');
+        for (const el of document.querySelectorAll(`[data-mthumb="${CSS.escape(id)}"]`)) { el.style.backgroundImage = `url(${url})`; el.classList.remove('txt'); el.textContent = ''; }
+      }
+    }
   }
 }

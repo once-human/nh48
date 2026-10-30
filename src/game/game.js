@@ -41,14 +41,12 @@ const _cufT = new THREE.Vector3(), _cufP = new THREE.Vector3();
 import { justOpened, lineOpen, opensOn } from './metroOpen.js';
 import { Club } from './club.js';
 import { Lights } from './lights.js';
-import { Bag } from './bag.js';
 import { Phone } from './phone.js';
 import { Eggs } from './eggs.js';
 import { Story } from './story.js';
 import { Tutorial } from './tutorial.js';
 import { Smoke } from '../gfx/smoke.js';
 import { Photowalk } from './photowalk.js';
-import { bagOrder } from './bag.js';
 import { Brain } from '../people/brain.js';
 import { Emergency } from './emergency.js';
 import { Weather } from '../gfx/weather.js';
@@ -236,18 +234,8 @@ export class Game {
     this.photo = new PhotoMode(this);
     this.wada = new Wada(this);
     this.club = new Club(this);
-    this.bag = new Bag(this);
     this.tut = new Tutorial(this);
     this.photowalk = new Photowalk(this);
-    // the hotbar: 1 to 5 use the jhola's top row while you play
-    window.addEventListener('keydown', (e) => {
-      const m = /^Digit([1-5])$/.exec(e.code);
-      if (!m || this.state !== 'play' || e.repeat || (this.police && this.police.stop) || (this.story && this.story.talking)) return;
-      const id = bagOrder(this)[+m[1] - 1];
-      if (!id) return;
-      const r = this.life.use(id);
-      if (r) this.hud.toast(r, '', 'good', 1.8);
-    });
     this.phone = new Phone(this);
     this.eggs = new Eggs(this);
     this.story = new Story(this);
@@ -857,7 +845,6 @@ export class Game {
     if (this.date && this.date.cur) this.date.close();
     if (this.trial && this.trial.open) this.trial.close();
     if (this.shops && this.shops.open) this.shops.close();
-    if (this.bag && this.bag.open) this.bag.close();
     if (this.club && this.club.on) this.club.leave();
     if (this.transit && this.transit.open) this.transit.close();
     if (this.state === 'shop') this.state = 'play';

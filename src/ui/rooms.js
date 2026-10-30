@@ -4,6 +4,7 @@
 import { savedCharacter } from '../people/characters.js';
 import { assetVersion, versioned } from '../core/assets.js';
 import { g } from './glyphs.js';
+import { BUSINESSES as BIZ } from '../game/hustle.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const rs = (n) => '₹' + Math.round(n || 0).toLocaleString('en-IN');
@@ -29,7 +30,7 @@ const SIDE = [
 ];
 
 export function missionsRoom(J) {
-  PC = J.g.postcards || null; J.mloc = null;
+  PC = J.g.postcards || null; J.mloc = null; J.mid = null;
   const G = J.g, S = G.story, st = S ? S.st : { m: 0, step: -1 }, ms = S && S.list ? S.list() : [];
   const filt = J.mfilt || 'all';
   const items = [];
@@ -40,7 +41,7 @@ export function missionsRoom(J) {
   const thumb = (x) => {
     if (x.k !== 'main') return `<i class="mr-th txt">${esc(x.title.charAt(0))}</i>`;
     const u = pic(x.m.id), ph = !u && (G.life.s.photos || []).filter(p => p.m === x.i).slice(-1)[0];
-    return u || ph ? `<i class="mr-th" style="background-image:url(${u || ph.url})"></i>` : `<i class="mr-th txt" lang="mr">${esc((x.m.mr || x.m.title).slice(0, 2))}</i>`;
+    return u || ph ? `<i class="mr-th" data-mthumb="${esc(x.m.id)}" style="background-image:url(${u || ph.url})"></i>` : `<i class="mr-th txt" data-mthumb="${esc(x.m.id)}" lang="mr">${esc((x.m.mr || x.m.title).slice(0, 2))}</i>`;
   };
   const row = (x) => `<button class="mr-it${x.id === J.msel ? ' sel' : ''}${x.locked ? ' locked' : ''}${x.done ? ' done' : ''}" data-msel="${x.id}">${thumb(x)}
     <span><b>${esc(x.locked ? 'Locked' : x.k === 'main' ? x.m.title : x.title)}</b><small>${x.k === 'main' ? esc(x.m.act ? `Act ${x.m.act} · ${ACTS[x.m.act][1]}` : 'Prologue') : esc(x.sub)}</small></span>
@@ -58,7 +59,7 @@ export function missionsRoom(J) {
     // where it happens, shown live (the map's live view): the current step's place, else the first place it names
     let loc = x.cur && t ? t : null;
     if (!loc) for (const sp of m.steps || []) { const w = sp.where; if (!w) continue; try { const r = typeof w === 'function' ? w() : w; if (r && isFinite(r.x)) { loc = r; break; } } catch (e) { /* */ } }
-    J.mloc = loc;
+    J.mloc = loc; J.mid = m.id;
     const who = tx[0] ? S.name(tx[0][0]) : (m.steps[0] && m.steps[0].who && typeof m.steps[0].who === 'string' ? S.name(m.steps[0].who) : '—');
     const inAct = ms.filter(q => q.act === m.act), doneInAct = inAct.filter(q => ms.indexOf(q) < st.m).length;
     const xpGain = 250 + steps.length * 25;
@@ -136,14 +137,36 @@ export function statsRoom(J) {
       <h4>Reputation</h4><p class="rs-sub">How people see you across Pune.</p>
       <div class="rs-reps">${seen.length ? seen.map(repRow).join('') : '<p class="rm-p">Nobody has made up their mind about you yet.</p>'}</div>
       <h4>Law &amp; legal record</h4>
-      <div class="rs-law"><span>Wanted level</span><div class="rs-stars">${[1, 2, 3, 4, 5].map(k => `<i class="${k <= heat ? 'on' : ''}">${g('star', '', k <= heat ? '#ffd23f' : 'rgba(255,255,255,.18)')}</i>`).join('')}</div><b>${heat} / 5</b><button class="rf-btn" data-goto="challans">View history <span class="kbd">H</span></button></div>
+      <div class="rs-law"><span>Wanted level</span><div class="rs-stars">${[1, 2, 3, 4, 5].map(k => `<i class="${k <= heat ? 'on' : ''}">${g('star', '', k <= heat ? '#ffd23f' : 'rgba(255,255,255,.18)')}</i>`).join('')}</div><b>${heat} / 5</b><button class="rf-btn" data-drawer="challans">View history <span class="kbd">H</span></button></div>
       <div class="rs-grid">${tl('receipt', 'Total challans', (pol.history || []).length)}${tl('card', 'Driving licence', pol.suspended ? 'Suspended' : `${g('check')} Valid`, '', pol.suspended ? '#ff5a5f' : '#3ddc84')}${tl('shield', 'Unpaid fines', rs(dues), '', dues ? '#ff8b7d' : '')}</div>
     </div>
     <div class="rs-3">
       <div class="rf-card"><h4>Money</h4><div class="rs-grid">${tl('cash', 'Cash', rs(G.stats.money))}${tl('bank', 'Bank', rs(s.bank))}${tl('gold', 'Gold', (s.gold || 0) + ' g', '', '#ffc83d')}</div></div>
       <div class="rf-card"><h4>Records</h4><div class="rs-grid four">${tl('auto', 'Rides', G.stats.rides || 0, G.stats.rides ? `<em>${g('star')}${(G.stats.rating || 0).toFixed(1)} avg</em>` : '')}${tl('bag', 'Deliveries', T.deliveries || 0)}${tl('fist', 'Fights won', T.fightsWon || 0)}${tl('paw', 'Strays fed', T.fed || 0)}</div></div>
-      <div class="rf-card"><div class="rf-h"><h4>Owned properties</h4><button class="rf-btn" data-goto="own">Manage <span class="kbd">P</span></button></div>
+      <div class="rf-card"><div class="rf-h"><h4>Owned properties</h4><button class="rf-btn" data-drawer="own">Manage <span class="kbd">P</span></button></div>
         ${homes.map(h => `<div class="rs-home"><div class="rs-hi">${homeImg(h)}</div><span><b>${esc(h.n)}</b><small>${g('pin', '', '#9aa0aa')}${esc(h.note || h.at)}</small></span>${h.cur ? '<em>Current</em>' : ''}</div>`).join('')}</div>
-      <div class="rf-card"><div class="rf-h"><h4>Owned vehicles</h4><button class="rf-btn" data-goto="own">Manage <span class="kbd">V</span></button></div><div class="rs-veh">${veh.slice(0, 3).map(vCard).join('')}</div></div>
-    </div></section>`;
+      <div class="rf-card"><div class="rf-h"><h4>Owned vehicles</h4><button class="rf-btn" data-drawer="own">Manage <span class="kbd">V</span></button></div><div class="rs-veh">${veh.slice(0, 3).map(vCard).join('')}</div></div>
+    </div>${J.drawer ? drawerHTML(J) : ''}</section>`;
+}
+// a drawer over the stats: your e-challans, or what you own (with the way to each)
+function drawerHTML(J) {
+  const G = J.g, s = G.life.s, P = G.player, pol = G.police || {};
+  let body = '', title = '';
+  if (J.drawer === 'challans') {
+    title = 'E-challans';
+    const H = (pol.history || []).slice().reverse(), due = pol.duesTotal || 0;
+    body = `<div class="dw-top"><div><small>Unpaid</small><b style="color:${due ? '#ff8b7d' : '#3ddc84'}">${rs(due)}</b></div>${due ? '<button class="rm-btn dw-pay" data-pay>Pay all</button>' : ''}</div>
+      ${H.length ? H.map(d => `<div class="dw-row">${g('receipt')}<span><b>${esc(d.what)}</b><small>${esc(d.where || '')}</small></span><em class="${d.paid ? 'g' : 'r'}">${rs(d.amt)} · ${d.paid ? 'Paid' : 'Unpaid'}</em></div>`).join('') : '<p class="rm-p">Clean record. No e-challans.</p>'}
+      ${pol.suspended ? '<p class="rm-p" style="color:#ff8b7d">Your licence is suspended.</p>' : ''}`;
+  } else {
+    title = 'What you own';
+    const homes = G.props && G.props.list ? G.props.list.filter(p => G.props.owned(p)) : [];
+    const biz = (s.biz || []).map(id => BIZ.find(b => b.id === id)).filter(Boolean);
+    const A = P.auto;
+    body = `<h4>Homes</h4>${homes.length ? homes.map(p => `<div class="dw-row">${g('home')}<span><b>${esc(p.name)}</b><small>${G.props.rentedOut && G.props.rentedOut(p) ? `Rented out · ${rs(p.rent)} a day` : 'You live here: sleep, change, keep your vehicles'}</small></span><button class="rf-btn" data-wp="p:${esc(p.id)}">Show</button></div>`).join('') : '<p class="rm-p">None yet. Six are for sale: they’re the house pins on the map.</p>'}
+      <h4>Businesses</h4>${biz.length ? biz.map(b => `<div class="dw-row">${g('cash')}<span><b>${esc(b.name)}</b><small>About ${rs(b.day)} a day, into your bank</small></span></div>`).join('') : '<p class="rm-p">None yet. Estate agents sell tapris, stalls, a cloud kitchen, a PG.</p>'}
+      <h4>Vehicles</h4><div class="dw-row">${g('auto')}<span><b>The stand’s auto</b><small>${pol.towedAt ? `Towed to ${esc(pol.towedAt.name)}` : A ? `Fuel ${Math.round((A.fuel ?? 1) * 100)}% · body ${Math.round((1 - (A.dmg || 0)) * 100)}%` : ''}</small></span><button class="rf-btn" data-wp="auto">Find</button></div>
+      ${(s.vehicles || []).map(v => { const w = J.whereVeh(v); return `<div class="dw-row">${g('car')}<span><b>${esc(VNAME[v.type] || v.type)}</b><small>${esc(v.plate || '')} · ${w ? 'Parked somewhere' : 'In storage at your home'}</small></span>${w ? `<button class="rf-btn" data-wp="v:${esc(v.id)}">Find</button>` : ''}</div>`; }).join('')}`;
+  }
+  return `<div class="dw"><div class="dw-in"><div class="rf-h"><h4>${title}</h4><button class="dw-x" data-drawer="" aria-label="Close">×</button></div>${body}</div></div>`;
 }

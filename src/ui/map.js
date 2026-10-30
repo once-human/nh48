@@ -1,7 +1,7 @@
 // City map: tiles drawn on demand from the same map data the world is built from, a places index
 // for search, and the full-screen map screen (drag, zoom, search, filters, waypoint + GPS).
 // The minimap draws through the same tile cache, so both always agree with the streets you drive.
-import { g as glyph } from './glyphs.js';
+import { g as glyph, GLYPH } from './glyphs.js';
 import { versioned } from '../core/assets.js';
 import { cmRing } from '../world/geo.js';
 import TRANSIT from '../game/transit.json';
@@ -41,6 +41,8 @@ const ICON_PATHS = {
   rupee: 'M6 3h12v2.2h-4.1c.6.6 1 1.3 1.2 2H18v2.2h-2.9a5.2 5.2 0 0 1-4.6 4.4L16.3 21h-3l-5.6-7.6v-1.8h2.2a3 3 0 0 0 2.8-2.2H6V7.2h6.6A3 3 0 0 0 9.9 5.2H6z',
 };
 const ICON2D = {};
+// the map's pins draw the same bold icons as the legend and the menus
+for (const [k, v] of Object.entries({ star: 'star', shield: 'shield', cross: 'cross', food: 'food', bag: 'cart', bank: 'bank', fuel: 'fuel', bus: 'bus', tree: 'tree', temple: 'temple', cap: 'college', film: 'film', building: 'building' })) if (GLYPH[v]) ICON_PATHS[k] = GLYPH[v];
 const iconPath = (n) => ICON2D[n] || (ICON_PATHS[n] ? (ICON2D[n] = new Path2D(ICON_PATHS[n])) : null);
 const GL = { landmark: 'star', police: 'shield', hospital: 'cross', food: 'food', shop: 'cart', bank: 'bank', fuel: 'fuel', transit: 'bus', park: 'tree', temple: 'temple', college: 'college', cinema: 'film', service: 'building' };
 const FOOD = new Set(['food', 'cafe', 'bar', 'icecream', 'sweets', 'bakery']);
@@ -547,14 +549,15 @@ export class MapScreen {
       if (!pts.has(e.pointerId)) return;
       pts.delete(e.pointerId); clearTimeout(this.lp);
       if (pts.size < 2) pinch = null;
-      if (drag && moved < 6 && e.button !== 2) { this.vel = { x: 0, z: 0 }; this.pick(e.offsetX, e.offsetY); }
+      // a click (not a drag): left picks a place or the neighbourhood, right drops a pin exactly there
+      if (drag && moved < 10) { this.vel = { x: 0, z: 0 }; if (e.button === 2) this.dropPin(e.offsetX, e.offsetY); else this.pick(e.offsetX, e.offsetY); }
       if (performance.now() - lastT > 80) this.vel = { x: 0, z: 0 };
       drag = null;
     };
     cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
     cv.addEventListener('wheel', (e) => { e.preventDefault(); this.zoomAt(Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.0015)), e.offsetX, e.offsetY); }, { passive: false });
     cv.addEventListener('dblclick', (e) => this.zoomAt(2, e.offsetX, e.offsetY));
-    cv.addEventListener('contextmenu', (e) => { e.preventDefault(); this.dropPin(e.offsetX, e.offsetY); });
+    cv.addEventListener('contextmenu', (e) => e.preventDefault());     // (the pin goes down on release, in pointerup)
     window.addEventListener('keydown', (e) => {
       if (this.el.hidden) return;
       const typing = document.activeElement === this.$('bm-q');
@@ -570,7 +573,7 @@ export class MapScreen {
       else if (e.code === 'Escape') { if (this.sel) this.select(null); else { e.stopImmediatePropagation(); this.g.toggleMap(false); } }   // Esc: clear the pick, then close
     });
   }
-  pickAt(sx, sy, r = 14) {
+  pickAt(sx, sy, r = 22) {
     const [wx, wz] = this.toWorld(sx, sy);
     let best = null, bd = r;
     for (const p of this.visiblePlaces || []) {
@@ -631,14 +634,15 @@ export class MapScreen {
     // the place itself, live: the real street if it's near you, a model of it if not (liveview.js)
     { const el = this.$('bm-c-pic'); let cv = el.querySelector('canvas'); if (!cv) { el.innerHTML = '<canvas width="400" height="225"></canvas>'; cv = el.querySelector('canvas'); } this.g.liveView && this.g.liveView.show(p, cv); }
     // what's round there: the neighbourhood, and what you'd find within a few minutes' walk
-    { const el = this.$('bm-c-near'), R = 500, list = (this.city.placesIn ? this.city.placesIn(p.x - R, p.z - R, p.x + R, p.z + R) : []).filter(q => Math.hypot(q.x - p.x, q.z - p.z) < R);
+    const nearEl = this.$('bm-c-near'); nearEl.innerHTML = ''; clearTimeout(this._nt);
+    this._nt = setTimeout(() => { if (this.sel !== p) return; const el = nearEl, R = 500, list = (this.city.placesIn ? this.city.placesIn(p.x - R, p.z - R, p.x + R, p.z + R) : []).filter(q => Math.hypot(q.x - p.x, q.z - p.z) < R);
       const n = {}; for (const q of list) n[q.c] = (n[q.c] || 0) + 1;
       const subs = (this.g.hud && this.g.hud.suburbs) || []; let a = null, bd = 2500 * 2500; for (const q of subs) { const dd = (q.x - p.x) ** 2 + (q.z - p.z) ** 2; if (dd < bd) { bd = dd; a = q; } }
       const pol = list.filter(q => q.c === 'police').length + (this.city.placesIn ? this.city.placesIn(p.x - 1500, p.z - 1500, p.x + 1500, p.z + 1500).filter(q => q.c === 'police').length : 0) * 0.3;
       const rows = [['Area', a ? a.n : 'Pune'], ...[['food', 'Food & drink'], ['shop', 'Shops'], ['transit', 'Transit'], ['temple', 'Temples'], ['hospital', 'Health'], ['bank', 'Banks'], ['fuel', 'Fuel']].filter(([k]) => n[k]).map(([k, l]) => [l, n[k], CATS[k][1]]),
         ['Police round here', pol >= 3 ? 'High' : pol >= 1 ? 'Medium' : 'Low']];
       const IC = { 'Food & drink': 'food', Shops: 'cart', Transit: 'bus', Temples: 'temple', Health: 'cross', Banks: 'bank', Fuel: 'fuel', Area: 'pin', 'Police round here': 'shield' };
-      el.innerHTML = rows.map(([l, v, c]) => `<div class="bm-c-r">${glyph(IC[l] || 'pin', '', c || undefined)}<span>${l}</span><b>${v}</b></div>`).join(''); }
+      el.innerHTML = rows.map(([l, v, c]) => `<div class="bm-c-r">${glyph(IC[l] || 'pin', '', c || undefined)}<span>${l}</span><b>${v}</b></div>`).join(''); }, 0);
     // how people round there take you
     { const R = this.g.rep, el = this.$('bm-c-rep');
       if (R && !this.g.free) { const v = R.standing(p.x, p.z), w = v > 0.45 ? 'One of ours' : v > 0.15 ? 'Liked' : v < -0.45 ? 'Trouble' : v < -0.15 ? 'Wary' : 'Neutral';
@@ -865,10 +869,10 @@ export class MapScreen {
       if (p.c === 'landmark' || !this.shows(p.c) || z < (MINZ[p.c] || 3)) continue;
       const [X, Y] = T(p.x, p.z);
       const small = p.c === 'food' || p.c === 'shop' || p.c === 'bank' || p.c === 'service';
-      const s = small ? (z >= 4 ? 6 : 4.5) : z >= 3 ? 7 : 5.5;
+      const s = small ? (z >= 2 ? 7.5 : 6.5) : z >= 1.5 ? 8.5 : 7.5;
       if (!free(X - s, Y - s, s * 2, s * 2)) continue;
       const [, col, gl] = CATS[p.c];
-      drawPin(x, X, Y, col, s >= 7 ? gl : null, s);
+      drawPin(x, X, Y, col, gl, s);
       vis.push(p);
       if (z >= (NAMEZ[p.c] || 5)) {
         x.font = '600 11px Inter, system-ui, sans-serif'; x.textAlign = 'left'; x.textBaseline = 'middle';

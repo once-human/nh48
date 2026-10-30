@@ -797,7 +797,7 @@ export class Interiors {
       case 'undance': this.dance(false); return;
       case 'workout': G.shops.show({ ...ctx, kind: 'gym', inside: true }); return;
       case 'sleep': if (G.sleep) G.sleep(); return;
-      case 'wardrobe': G.bag && (G.bag.cat = 'clothes', G.bag.show('bag')); return;
+      case 'wardrobe': G.jhola && G.jhola.open('inv', 'wear'); return;
       case 'aai': this.aaiTalk(); return;
       case 'eat': { const L = G.life; L.change('hunger', 0.6); L.change('thirst', 0.3); L.change('mood', 0.15); G.hud.toast('Varan-bhaat, bhaji, poli', 'Aai’s food. Nothing in Pune comes close', 'good', 3); if (C.R.aai) C.R.aai.act = { clip: 'talk', t: 0, dur: 2 }; return; }
       case 'vehicle': G.shops.show({ ...ctx, kind: 'dealer', inside: true }); return;

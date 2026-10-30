@@ -12,7 +12,7 @@ const STEPS = [
   { keys: ['W', 'S', 'A', 'D', 'Space'], main: 'Drive', sub: 'W go · S brake and reverse · A D steer · Space handbrake', done: (G, s) => s.driven > 60 },
   { keys: ['M'], main: 'Open the map', sub: 'Find places, set a waypoint, see where your auto is', done: (G) => G.state === 'map' },
   { keys: ['T'], main: 'Your phone', sub: 'Texts, contacts, and everything you’ll need', done: (G) => G.phone && G.phone.on },
-  { keys: ['E'], main: 'Your jhola', sub: 'Food, water and whatever you buy', done: (G) => (G.bag && G.bag.open) || (G.jhola && G.jhola.open) },
+  { keys: ['E'], main: 'Your jhola', sub: 'Food, water and whatever you buy', done: (G) => !!(G.jhola && G.jhola.on) },
 ];
 // first-time hints: when it applies, and what to say
 const HINTS = [
