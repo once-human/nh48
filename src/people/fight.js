@@ -121,12 +121,13 @@ export class Brawl {
   }
   attack() {
     const P = this.P;
+    if (this.g.arms && this.g.arms.use()) return;            // spray, fire (arms.js)
     const S = this.g.strays, F0 = P.foot;
     if (S && !this.pickTarget()) { const a = S.near(F0.x + Math.cos(F0.yaw) * 0.9, F0.z + Math.sin(F0.yaw) * 0.9, 1.5); if (a && a.kind === 'cow') { S.namaskar(a); return; } }
     if (this.comboT <= 0) this.combo = 0;
     const name = COMBO[this.combo % COMBO.length];
     this.combo = (this.combo + 1) % COMBO.length; this.comboT = 0.9;
-    const M = MOVES[name];
+    const M = this.g.arms ? this.g.arms.meleeOf(MOVES[name]) : MOVES[name];        // (a lathi, a bat, a knife in your hand)
     P.act = { kind: 'atk', name, t: 0, dur: M.dur, hit: M.hit, M, target: this.pickTarget(), done: false };
     P.human.play(M.clip, { once: true, fade: 0.06, speed: M.speed, restart: true });
     this.g.audio.whoosh?.(0.5);
@@ -160,6 +161,7 @@ export class Brawl {
     const crit = q.foe !== this.P && !q.angryAtYou;   // a sucker punch on someone not expecting it
     const dmg = M.dmg * (crit ? 1.35 : 1) * this.rng.range(0.85, 1.15) * (this.g.life ? this.g.life.punchMul : 1);
     this.people.hurt(q, dmg, F.x, F.z, M, true);
+    if (M.cut && this.g.police) this.g.police.raiseHeat(2, 'Knifed someone', 'hurt');
     this.g.audio.punch?.(M.dmg / 20);
     this.g.rig?.shake?.(0.08 + M.dmg / 200);
     this.started(q);

@@ -50,15 +50,16 @@ export const FINES = {
   pickpocket: { amt: 3000, name: 'Pickpocketing (theft)', law: 'BNS s.303' },
   stolengoods: { amt: 10000, name: 'Carrying stolen property', law: 'BNS s.317' },
   racing:    { amt: 5000, name: 'Racing on a public road', law: 'MV Act s.189' },
+  arms:      { amt: 25000, name: 'Carrying an illegal firearm', law: 'Arms Act 1959, s.25' },
   alter:     { amt: 5000, name: 'Illegal alteration to a vehicle', law: 'MV Act s.52, s.182A(4)' },     // per alteration (the garage's mods, modfx.js)
 };
 // what you're wanted for decides what the marshals shout and what you're booked under when caught
-const SERIOUS = new Set(['theft', 'assault', 'hurt', 'hitrun', 'fled', 'pickpocket', 'murder', 'blast']);
+const SERIOUS = new Set(['theft', 'assault', 'hurt', 'hitrun', 'fled', 'pickpocket', 'murder', 'blast', 'arms']);
 const CHARGE_ORDER = ['murder', 'blast', 'assault', 'hitrun', 'theft', 'pickpocket', 'hurt', 'fled', 'disobey'];
 const TOW = { two: 200, three: 200, four: 400, fine: 500 };   // towing charges + no-parking fine
 const SPEED_LIMIT = 50;                                         // km/h on city arterials
 const COP_NAMES = ['Havaldar Shinde', 'Havaldar Jadhav', 'PSI Kulkarni', 'Havaldar Pawar', 'Havaldar Gaikwad', 'ASI Deshmukh', 'Havaldar More', 'PSI Patil', 'Havaldar Sawant', 'Havaldar Kamble'];
-const STOP_LINE = { alter: 'stop_check', signal: 'stop_signal', helmet: 'stop_helmet', wrong: 'stop_wrong', speed: 'stop_speed', horn: 'stop_horn', check: 'stop_check', rash: 'stop_speed', suspended: 'stop_check', theft: 'caught_theft', assault: 'caught_assault', hurt: 'caught_hurt', hitrun: 'caught_hitrun', fled: 'caught_fled', disobey: 'caught_disobey', pickpocket: 'caught_pickpocket', murder: 'caught_assault', blast: 'caught_assault' };
+const STOP_LINE = { arms: 'caught_assault', alter: 'stop_check', signal: 'stop_signal', helmet: 'stop_helmet', wrong: 'stop_wrong', speed: 'stop_speed', horn: 'stop_horn', check: 'stop_check', rash: 'stop_speed', suspended: 'stop_check', theft: 'caught_theft', assault: 'caught_assault', hurt: 'caught_hurt', hitrun: 'caught_hitrun', fled: 'caught_fled', disobey: 'caught_disobey', pickpocket: 'caught_pickpocket', murder: 'caught_assault', blast: 'caught_assault' };
 
 export class Police {
   constructor(game) {
@@ -354,6 +355,8 @@ export class Police {
     const stolen = P.cur && P.cur.stolen;
     // what the officer finds once he looks at you
     if (stolen && s.kind !== 'theft') { s.kind = 'theft'; s.fine = FINES.theft.amt; }
+    // a frisk: a katta on you is the end of the conversation (and it's taken)
+    else if ((G.life.s.inv.katta || 0) > 0 && this.rng.next() < (s.kind === 'check' ? 0.7 : 0.4)) { s.kind = 'arms'; s.fine = FINES.arms.amt; G.life.s.inv.katta = 0; G.life.s.inv.ammo = 0; G.life.s.ammo = 0; if (G.arms) G.arms.equip(null); }
     else if (this.suspended && s.kind !== 'theft') { s.found = 'suspended'; if (s.kind === 'check') { s.kind = 'suspended'; s.fine = 0; } }
     const line = this.say(STOP_LINE[s.kind] || 'stop_check', cop) || 'stop_check';
     const dues = this.duesTotal;

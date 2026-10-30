@@ -39,6 +39,13 @@ export const ITEMS = {
   roses: { name: 'A dozen roses', note: 'Give them on a date', gift: 0, use: { mood: 0.02 } },
   dogfood: { name: 'Dog food pouch', note: 'Feed a street dog (F near one): it follows you all evening', feed: 'dog' },
   beer: { name: 'Beer (pint)', use: { drunk: 0.3, thirst: 0.1, mood: 0.05 } },
+  // what you can hold and fight with (arms.js): put them on a quick slot, hold Z for the wheel
+  lathi: { name: 'Bamboo lathi', note: 'Long reach, hits hard. Hold Z to pick it', weap: true },
+  bat: { name: 'Cricket bat', note: 'Kashmir willow. Hold Z to pick it', weap: true },
+  knife: { name: 'Kitchen knife', note: 'Drawing it in public is a crime', weap: true },
+  spray: { name: 'Pepper spray', note: 'Legal. Click to spray: three metres, five seconds', weap: true },
+  katta: { name: 'Katta (country pistol)', note: 'Illegal (Arms Act). Click to fire where you look', weap: true },
+  ammo: { name: 'Rounds', note: 'For the katta', weap: true },
 };
 
 export class Life {

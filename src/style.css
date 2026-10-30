@@ -2621,3 +2621,15 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .gx2-form.ok { color: #7ff0ae; } .gx2-form.meh { color: #ffd27a; } .gx2-form.bad { color: #ff9aa4; }
 .gx2-hint { margin-top: 8px; font-size: 11.5px; color: rgba(245,245,247,.5); }
 .gx2-hint .kbd { background: var(--cream, #f1e6cf) !important; color: var(--cream-ink, #17130c) !important; border-radius: 6px !important; padding: 1px 6px; }
+/* the weapon wheel (arms.js): hold Z */
+.wheel { position: fixed; left: 50%; top: 50%; width: 360px; height: 360px; transform: translate(-50%, -50%); z-index: 46; pointer-events: none; }
+.wheel.in { animation: whIn .22s var(--ease, ease) both; } @keyframes whIn { from { opacity: 0; transform: translate(-50%, -50%) scale(.85); } }
+.wheel svg { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 20px 40px rgba(0,0,0,.5)); }
+.wh-s { fill: rgba(16,16,19,.78); stroke: rgba(255,255,255,.1); stroke-width: 1.5; transition: fill .15s; }
+.wh-s.on { fill: rgba(241,230,207,.92); }
+.wh-i { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 3px; color: #f5f5f7; text-align: center; width: 92px; }
+.wh-i .gy { width: 30px; height: 30px; } .wh-i small { font: 700 11px var(--font-ui); } .wh-i em { font: 600 10px var(--font-ui); font-style: normal; color: #ffd27a; }
+.wh-c { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 110px; text-align: center; display: grid; gap: 2px; }
+.wh-c b { font: 800 13px 'Archivo', var(--font-ui); color: #fff; } .wh-c span { font-size: 10px; color: rgba(245,245,247,.55); }
+.xhair { position: fixed; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; z-index: 30; pointer-events: none; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(255,255,255,.85), 0 0 0 1px rgba(0,0,0,.5); }
+.xhair::after { content: ''; position: absolute; left: 7px; top: 7px; width: 4px; height: 4px; border-radius: 50%; background: #ff4d5e; }

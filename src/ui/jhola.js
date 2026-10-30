@@ -5,6 +5,7 @@
 // own garment shot on a mannequin in the studio), with a weight bar under it. On the right the one you picked:
 // a big picture, what it is, what it does, Use and Drop. Right-click for more (assign to a quick slot, inspect);
 // drag a thing onto the quick bar at the bottom and 1 to 5 use it while you play.
+import { HOLDABLE } from '../game/arms.js';
 import * as THREE from 'three';
 import { ITEMS, describe } from '../game/life.js';
 import { itemArt, photo } from './itemArt.js';
@@ -34,6 +35,7 @@ const SORT_N = { kind: 'Kind', name: 'Name', count: 'How many', weight: 'Weight'
 const CATS = [['all', 'All'], ['food', 'Food & drink', 'vadapav'], ['med', 'Medical', 'medkit'], ['tool', 'Tools', 'torch'], ['weap', 'Weapons'], ['wear', 'Clothing'], ['misc', 'Misc', 'keys']];
 const catOf = (id) => {
   const it = ITEMS[id]; if (!it) return 'misc';
+  if (it.weap) return 'weap';
   if (it.tool) return 'tool';
   const u = it.use || {};
   if (u.hp && !u.hunger) return 'med';
@@ -513,6 +515,8 @@ export class Jhola {
     this.act(k, true);
   }
   assign(k, i) {
+    // quick slots are for what you hold (weapons, the torch, keys), not snacks
+    if (k && !HOLDABLE.has(k)) { this.g.hud.toast('Quick slots are for things you hold', 'Weapons, the torch, keys. Eat from the jhola', 'info', 2.4); return; }
     const s = this.g.life.s, q = s.quick = (s.quick || [null, null, null, null, null]).slice(0, 5);
     while (q.length < 5) q.push(null);
     if (k) { const j = q.indexOf(k); if (j >= 0) q[j] = null; }

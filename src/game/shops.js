@@ -505,6 +505,7 @@ export class Shops {
         break;
       }
       case 'pharmacy':
+        out.push({ label: 'Pepper spray', note: 'Legal, 55 ml. Five seconds of tears at three metres', price: r10(399 * mul), act: pay(r10(399 * mul), () => { L.add('spray'); return 'In your jhola. Put it on a quick slot'; }) });
         for (const [id, base] of [['medkit', 220], ['painkiller', 40], ['ors', 25], ['water', 20]]) { const price = r10(base * mul); out.push({ label: ITEMS[id].name, note: ITEMS[id].note || describe(ITEMS[id].use), price, act: pay(price, () => { L.add(id); return `${ITEMS[id].name}, in your bag`; }) }); }
         break;
       case 'gym': {
@@ -523,7 +524,7 @@ export class Shops {
       case 'bank': this.bank(out); break;
       case 'jeweller': this.jeweller(out); break;
       case 'kirana':
-        for (const [id, base] of [['water', 20], ['biscuit', 10], ['banana', 60], ['chikki', 40], ['energy', 110], ['lottery', 50], ['torch', 250]]) { const price = r10(base * (mul > 1 ? 1.1 : 1)); out.push({ label: ITEMS[id].name, note: ITEMS[id].note || describe(ITEMS[id].use), price, act: pay(price, () => { L.add(id); return `${ITEMS[id].name}, in your bag`; }) }); }
+        for (const [id, base] of [['water', 20], ['biscuit', 10], ['banana', 60], ['chikki', 40], ['energy', 110], ['lottery', 50], ['torch', 250], ['knife', 150]]) { const price = r10(base * (mul > 1 ? 1.1 : 1)); out.push({ label: ITEMS[id].name, note: ITEMS[id].note || describe(ITEMS[id].use), price, act: pay(price, () => { L.add(id); return `${ITEMS[id].name}, in your bag`; }) }); }
         break;
       case 'mobile':
         if (!L.s.phone) out.push({ label: 'Smartphone', note: 'Upgrade from the brick: chats, UPI, Zwiggy, homes, garage, maps. No going back', price: r10(11999 * mul / 1.2), act: pay(r10(11999 * mul / 1.2), () => { L.s.phone = true; L.s.zwiggy = true; G.hud.flash('New smartphone', 'The old brick goes in a drawer. T opens your apps: chats, UPI, Zwiggy, homes, garage'); return 'Unboxed. T to open it'; }) });
@@ -566,6 +567,12 @@ export class Shops {
         break;
       case 'chowki': this.chowki(out); break;
       case 'cinema': case 'gaming': case 'laundry': case 'petshop': case 'library': case 'temple': case 'park': case 'zoo': case 'landmark': case 'shop': case 'college':
+        // a hardware or sports shop has things you can hold (arms.js)
+        if (k === 'shop') {
+          const sports = /sport|cricket|fitness|games/i.test(ctx.name || '');
+          if (sports) out.push({ label: 'Cricket bat, Kashmir willow', note: 'For gully cricket. Or not', price: r10(1400 * mul), act: pay(r10(1400 * mul), () => { L.add('bat'); return 'Bat in your jhola. Quick slot it, hold Z'; }) });
+          out.push({ label: 'Bamboo lathi', note: 'Five feet of seasoned bamboo', price: r10(180 * mul), act: pay(r10(180 * mul), () => { L.add('lathi'); return 'Lathi in your jhola'; }) });
+        }
         this.fun(out, ctx, mul); break;
       case 'lodge': {
         const price = r10(1200 * mul);

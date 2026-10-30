@@ -72,6 +72,7 @@ import { ModFX } from './modfx.js';
 import { CityEdge } from './edge.js';
 import { Calendar } from './calendar.js';
 import { Gym } from './gym.js';
+import { Arms } from './arms.js';
 import { Diary } from '../ui/diary.js';
 
 export class Game {
@@ -253,7 +254,7 @@ export class Game {
     this.approachSt = new StreetApproach(this);
     applySettings(this);
     this.trial = new Trial(this);
-    this.garageUI = new GarageUI(this); this.modfx = new ModFX(this); this.edge = new CityEdge(this); this.calendar = new Calendar(this); this.gym = new Gym(this);
+    this.garageUI = new GarageUI(this); this.modfx = new ModFX(this); this.edge = new CityEdge(this); this.calendar = new Calendar(this); this.gym = new Gym(this); this.arms = new Arms(this);
     // the traffic is the neighbourhood's: Koregaon Park and Baner get the German sedans and the odd supercar,
     // the peths scooters and cycles, Lohegaon and Wagholi autos, tempos and Thars
     { const RICH = /koregaon park|boat club|bund garden|kalyani nagar|baner|balewadi|aundh|prabhat road|model colony|viman nagar|dhole patil|sopan baug|pashan|bavdhan|erandwane|salunke vihar|nibm|magarpatta city/i,
@@ -1394,6 +1395,7 @@ export class Game {
       this.vehicleWear(dt);
       this.modfx.update(dt);
       this.edge.update(dt);
+      this.arms.update(dt);
       if ((this._calT = (this._calT || 0) - dt) <= 0) { this._calT = 2; this.traffic.busyMul = this.calendar.trafficMul(this.hour); this.people.busyMul = this.calendar.crowdMul(this.hour); }
       if (this.input.took('KeyV')) this.rig.setMode(this.rig.mode + 1);
       if (this.input.took('KeyL')) this.lights.toggle();

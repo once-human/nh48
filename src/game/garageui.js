@@ -117,6 +117,12 @@ export class GarageUI {
       if (this.isAuto) bay.push({ job: true, name: 'Wash and polish', note: L.s.washed === day ? 'Already shining today' : 'Passengers tip a little more today', price: wash, off: L.s.washed === day ? 'Done today' : '', icon: 'drop', act: () => { if (!G.shops.spend(wash)) return false; L.s.washed = day; return 'Shining'; } });
       if (this.base && !cyc) bay.push({ job: true, name: 'Insurance, three claims', note: m.ins ? `${m.ins} free repairs left` : 'The next three repairs here are on the house', price: $(5000), off: m.ins ? 'Covered' : '', icon: 'shield', act: () => { if (!G.shops.spend($(5000), true)) return false; m.ins = 3; return 'Insured. Drive like nobody’s watching'; } });
       if (m.nitro) bay.push({ job: true, name: 'Refill the nitrous', note: `Bottle at ${Math.round((m.n2o || 0) * 10)}%`, price: $(900), off: (m.n2o || 0) >= 9.9 ? 'Full' : '', icon: 'nitro', act: () => { if (!G.shops.spend($(900))) return false; m.n2o = 10; return 'Full bottle. Hold Shift'; } });
+      // under the counter, at the kind of garage that asks nothing: a katta and rounds (Arms Act: serious if found)
+      if (G.hustle && G.hustle.isChop(this.ctx)) {
+        const L2 = this.life;
+        bay.push({ job: true, name: 'Under the counter: a katta', note: 'Country-made pistol, six rounds. Illegal: if a cop frisks you, it’s the lock-up', price: 32000, off: (L2.s.inv.katta || 0) > 0 ? 'You have one' : '', icon: 'warn', act: () => { if (!G.shops.spend(32000, true)) return false; L2.add('katta'); L2.s.ammo = (L2.s.ammo || 0) + 6; L2.change('karma', -4); return 'Wrapped in newspaper. Quick slot it, hold Z'; } });
+        bay.push({ job: true, name: 'Six more rounds', note: 'No receipt', price: 1800, off: (L2.s.inv.katta || 0) > 0 ? '' : 'Nothing to fire them from', icon: 'warn', act: () => { if (!G.shops.spend(1800)) return false; L2.s.ammo = (L2.s.ammo || 0) + 6; return `${L2.s.ammo} rounds`; } });
+      }
       // a vehicle that isn't yours: papers, or cash for it, at the kind of garage that asks nothing
       if (!this.mine && !this.gov && here.stolen) {
         const chop = G.hustle && G.hustle.isChop(this.ctx), v0 = VALUE[type] || 100000;
