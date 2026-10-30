@@ -36,6 +36,7 @@ export const ITEMS = {
   book: { name: 'Paperback novel', use: { mood: 0.08, energy: -0.02 } },
   lottery: { name: 'Lottery ticket', note: 'Scratch it from the bag', scratch: true },
   torch: { name: 'Torch', note: 'Lights the way after dark. L to switch it on or off', tool: true },
+  dogfood: { name: 'Dog food pouch', note: 'Feed a street dog (F near one): it follows you all evening', feed: 'dog' },
   beer: { name: 'Beer (pint)', use: { drunk: 0.3, thirst: 0.1, mood: 0.05 } },
 };
 
@@ -62,7 +63,7 @@ export class Life {
   xp() {
     const G = this.g, s = this.s, T = s.tally || {}, st = s.story1 || {};
     return Math.round((st.m || 0) * 250 + Math.max(0, st.step || 0) * 25 + ((G.stats && G.stats.rides) || 0) * 20 + (T.deliveries || 0) * 15 + (T.parcels || 0) * 10
-      + (T.fightsWon || 0) * 10 + (T.fed || 0) * 5 + (T.racesWon || 0) * 40 + (s.props || []).length * 150);
+      + (T.fightsWon || 0) * 10 + (T.fed || 0) * 5 + (T.racesWon || 0) * 40 + (s.props || []).length * 150 + (T.studied || 0) * 40 + (T.movies || 0) * 10 + (T.games || 0) * 5);
   }
   level() {
     const xp = this.xp(), need = (L) => 150 * (L - 1) * L;     // level 2 at 300, 3 at 900, 5 at 3,000, 8 at 8,400
@@ -94,6 +95,7 @@ export class Life {
     if (!it || !this.has(id)) return '';
     if (it.scratch) { this.take(id); return this.scratch(); }
     if (it.tool) return this.g.lights ? this.g.lights.setTorch(!this.g.lights.torchOn) : '';
+    if (!it.use) return it.feed === 'dog' ? 'Find a street dog and press F' : '';     // (dog food: for the dogs)
     this.take(id);
     this.apply(it.use);
     return `${it.name}: ${describe(it.use)}`;
@@ -119,6 +121,7 @@ export class Life {
     else if (kind === 'peth' || kind === 'colony') score = kurta || saree ? 0.9 : 0.65;
     else if (kind === 'college') score = western ? 0.85 : 0.55;
     if ((this.s.upg.shoes || 0) > 0) score += 0.05;
+    if (this.s.pressed === Math.floor((this.g.clock || 0) / 24)) score += 0.08;      // ironed today
     if (this.s.shades && (kind === 'polished' || kind === 'college')) score += this.s.shades === 'premium' ? 0.1 : 0.06;
     return { score: clamp(score, 0, 1), odd };
   }

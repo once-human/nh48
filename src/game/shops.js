@@ -32,6 +32,14 @@ const col = (h) => new THREE.Color(h).convertSRGBToLinear();
 export function kindOf(name, cat) {
   const n = (name || '').toLowerCase();
   if (cat === 'police') return 'chowki';
+  // new: things to do, from real places (the cinema, the bowling alley, the laundry, the pet shop, the reading room)
+  if (cat === 'cinema' || /\bcinemas?\b|multiplex|\bpvr\b|\binox\b|cinepolis|carnival cinemas|talkies|chitra ?mandir|\bcinema hall/.test(n)) return 'cinema';
+  if (/bowling|gaming|game ?zone|arcade|timezone|smaaash|\bvr\b|play ?zone|trampoline|go[ -]?kart|escape room/.test(n)) return 'gaming';
+  if (/laundry|laundromat|dry ?clean|ironing|\bistri\b|press ?wala/.test(n)) return 'laundry';
+  if (/pet ?shop|pet ?store|\bpets\b|pet care|pet supplies|aquarium/.test(n)) return 'petshop';
+  if (/library|abhyasika|अभ्यासिका|vachanalay|वाचनालय|reading room|study ?(room|centre|center|hall)/.test(n)) return 'library';
+  if (cat === 'temple') return 'temple';
+  if (cat === 'park') return /zoo|zoological/.test(n) ? 'zoo' : 'park';
   if (/\b(honda|bajaj|hero|tvs|suzuki|yamaha|maruti|hyundai|toyota|kia|mahindra|tata motors|royal enfield|ather|ola electric|skoda|volkswagen|renault|nissan|mg motor)\b|showroom|automobiles?\b|\bmotors\b/.test(n)) return 'dealer';
   if (/garage|service (centre|center|station)|auto ?works|motor ?works|tyres?|puncture|mechanic|auto parts|spares|car care|car wash/.test(n)) return 'garage';
   if (/estate|propert|realt|developers?\b|builders?\b|housing\b|homes\b/.test(n)) return 'estate';
@@ -65,7 +73,26 @@ export const KIND_INFO = {
   electronics: ['Electronics', 'इलेक्ट्रॉनिक्स', 'things'], books: ['Bookshop', 'पुस्तके', 'things'], florist: ['Florist', 'फुले', 'things'], paan: ['Paan', 'पान', 'things'],
   dealer: ['Vehicle showroom', 'शोरूम', 'vehicle'], garage: ['Garage', 'गॅरेज', 'vehicle'], fuel: ['Petrol & CNG', 'पेट्रोल पंप', 'vehicle'], travel: ['Travels', 'ट्रॅव्हल्स', 'vehicle'],
   chowki: ['Police chowki', 'पोलीस चौकी', 'place'], lodge: ['Lodge', 'लॉज', 'place'], estate: ['Estate agent', 'इस्टेट', 'place'],
+  cinema: ['Cinema', 'सिनेमा', 'fun'], gaming: ['Gaming & bowling', 'गेमिंग', 'fun'], laundry: ['Laundry & ironing', 'इस्त्री', 'look'], petshop: ['Pet shop', 'पेट शॉप', 'things'],
+  library: ['Reading room', 'अभ्यासिका', 'place'], temple: ['Temple', 'मंदिर', 'place'], park: ['Garden', 'बाग', 'place'], zoo: ['Zoo', 'प्राणीसंग्रहालय', 'place'],
+  landmark: ['Landmark', 'वारसा', 'place'], shop: ['Shop', 'दुकान', 'things'], college: ['Campus', 'कॉलेज', 'place'],
 };
+// real entry fees where there is one (a garden's gate, a zoo, a palace); every other garden is free, as most public ones are
+const ENTRY = [[/okayama|p\.? ?l\.? deshpande|pu\.? ?la deshpande/i, 10], [/empress/i, 20], [/rajiv gandhi zoo|katraj.*zoo|zoological/i, 40], [/aga ?khan/i, 25]];
+export const entryFee = (name) => { for (const [re, f] of ENTRY) if (re.test(name || '')) return f; return 0; };
+// a place from the map you've walked up to: what it is in the game
+const PIN_CAT = { food: 'food', bank: 'bank', fuel: 'fuel', police: 'police', temple: 'temple', park: 'park', cinema: 'cinema', landmark: null, shop: null, service: null, college: null, hospital: null, transit: null };
+export function pinKind(p) {
+  const n = (p.n || '').toLowerCase();
+  if (p.c === 'transit') return null;
+  if (p.c === 'hospital') return /pharma|chemist|medical stores?|drug/.test(n) ? 'pharmacy' : 'clinic';
+  const k = kindOf(p.n, PIN_CAT[p.c] || p.c);
+  if (k) return k;
+  if (p.c === 'shop') return 'shop';
+  if (p.c === 'landmark') return 'landmark';
+  if (p.c === 'college') return 'college';
+  return null;
+}
 // opening hours, Pune style: [opens, closes] (hours, may run past midnight), and the share of places of
 // that kind that stay open late into the night (a 24-hour chemist, a biryani place till 2). Around 40% of
 // the city is open after 11 PM: a little livelier than the real thing, it's a game
@@ -76,6 +103,7 @@ const HOURS = {
   clinic: [9, 21, 0.25], gym: [5.5, 22, 0.15], jeweller: [10.5, 20.5, 0], kirana: [7, 22, 0.3], mobile: [10.5, 21.5, 0.1],
   electronics: [10.5, 21, 0], books: [10, 21, 0], florist: [7, 21.5, 0.2], paan: [10, 24, 0.7], dealer: [10, 20, 0], garage: [9, 20.5, 0.1],
   fuel: [6, 23, 0.7], travel: [9, 21, 0.1], estate: [10, 20, 0],
+  cinema: [9, 25, 0.6], gaming: [11, 23, 0.3], laundry: [8, 21, 0], petshop: [10, 21, 0], library: [6, 23, 0.4], temple: [5, 22, 0.1], park: [6, 21, 0], zoo: [9.5, 17.5, 0], shop: [10, 21, 0.1],
 };
 const ALWAYS = new Set(['chowki', 'lodge', 'hospital']);
 const hhmm = (h) => { h = ((h % 24) + 24) % 24; const H = Math.floor(h), M = Math.round((h - H) * 60); return `${H % 12 || 12}${M ? ':' + String(M).padStart(2, '0') : ''} ${H < 12 ? 'AM' : 'PM'}`; };
@@ -330,6 +358,14 @@ export class Shops {
         if (dd < bd) { const inf = this.infoOf(d); if (inf) { bd = dd; best = inf; } }
       }
     }
+    // every real place on the map (Overture, OpenStreetMap): walk up to it and it's open to you
+    const CM = this.g.W.cityMap;
+    if (P.onFoot && CM && CM.placesNear) for (const p of CM.placesNear(P.x, P.z, 16)) {
+      const dd = Math.hypot(p.x - P.x, p.z - P.z), big = p.c === 'park' || p.c === 'landmark' || p.c === 'temple';
+      if (dd > (big ? 16 : 7) || (best && dd >= bd)) continue;
+      const kind = pinKind(p); if (!kind) continue;
+      best = { name: p.n, mr: p.mr || '', cat: p.c, kind, x: p.x, z: p.z, door: null, pin: true, tier: tierOf(kind, p.n, '') }; bd = dd;
+    }
     // pumps work from the driver's seat; chowkis and hospitals on foot
     for (const p of this.places) {
       const dd = Math.hypot(p.x - P.x, p.z - P.z);
@@ -366,7 +402,7 @@ export class Shops {
     const I = this.g.interiors;
     if (this.near.kind === 'ispot') { I.use(this.near.s); this.scanT = 0.3; return true; }
     // shut for the night (or not open yet): the shutter's down
-    const oh = this.near.door && openNow(this.near, this.g.hour);
+    const oh = (this.near.door || this.near.pin) && openNow(this.near, this.g.hour);
     if (oh && !oh.open) { this.g.hud.toast(`${this.near.name} is closed`, `Opens at ${oh.opens}`, 'info', 2.4); this.scanT = 0.6; return true; }
     // a storefront with a room behind it: walk in (a club at night wants its cover charge first)
     if (I && I.templateOf(this.near.kind) && this.near.door) {
@@ -387,7 +423,7 @@ export class Shops {
     if (n.kind === 'homeDoor') return 'Go home · काळे सदन';
     if (n.kind === 'metro' || n.kind === 'bus') return this.g.transit.label(n);
     if (n.kind === 'ispot') return n.s.label;
-    const oh = n.door && openNow(n, this.g.hour);
+    const oh = (n.door || n.pin) && openNow(n, this.g.hour);
     if (oh && !oh.open) return `${n.name} · Closed, opens ${oh.opens}`;
     if (this.g.interiors && this.g.interiors.templateOf(n.kind) && n.door) return `Go into ${n.name} · ${KIND_INFO[n.kind][0]}`;
     const K = KIND_INFO[n.kind];
@@ -468,12 +504,19 @@ export class Shops {
         else out.push({ label: L.s.zwiggy ? 'Zwiggy orders: on' : 'Zwiggy orders: off', note: 'Toggle delivery pings', price: 0, act: () => { L.s.zwiggy = !L.s.zwiggy; return L.s.zwiggy ? 'Orders on' : 'Orders off'; } });
         out.push({ label: 'Prepaid recharge, 28 days', note: 'Unlimited calls, 2 GB a day', price: 299, act: pay(299, () => { L.change('mood', 0.02); return 'Recharged'; }) });
         break;
-      case 'electronics':
+      case 'electronics': {
+        const own = (k2) => !!L.s.upg[k2];
+        const up = (k2, label, note, base, done, extra) => { const price = r10(base * mul); out.push({ label, note, price, tag: own(k2) ? 'owned' : '', disabled: own(k2) ? 'Yours' : '', act: pay(price, () => { L.s.upg[k2] = 1; if (extra) extra(); return done; }) }); };
+        up('earphones', 'Bluetooth earphones', 'Music on your walks, jogs and rides: +mood every time', 1499, 'In your ears. Walks and jogs feel better');
+        up('band', 'Fitness band', 'Counts your rounds: a jog in the garden is worth double', 2499, 'On your wrist. Go jog');
+        up('mixer', 'Mixer-grinder, for Aai', 'Her old one sounds like a tractor. +karma, and Aai will mention it', 3200, 'Delivered home. Aai is pretending not to be pleased', () => { L.change('karma', 3); L.change('mood', 0.08); });
+        if (L.s.phone) up('guard', 'Tempered-glass screen guard', 'For the next time it falls off the auto', 199, 'Fitted, one bubble in the corner');
         out.push({ label: 'LED torch', note: 'Bright, rechargeable. L switches it on', price: r10(450 * mul), act: pay(r10(450 * mul), () => { L.add('torch'); return 'In your jhola'; }) });
         out.push({ label: 'Speaker system for your auto', note: 'Bollywood on the go: passengers tip 15% more', price: r10(3500 * mul), tag: L.s.upg.speaker ? 'owned' : '', disabled: L.s.upg.speaker ? 'Fitted' : '', act: pay(r10(3500 * mul), () => { L.s.upg.speaker = 1; return 'Fitted. Passengers love it'; }) });
         out.push({ label: 'Dashcam', note: 'Argue a challan with evidence: better odds', price: r10(4999 * mul), tag: L.s.upg.dashcam ? 'owned' : '', disabled: L.s.upg.dashcam ? 'Fitted' : '', act: pay(r10(4999 * mul), () => { L.s.upg.dashcam = 1; return 'Dashcam on. The police argue less'; }) });
         if (!L.s.phone) out.push({ label: 'Smartphone', note: 'Upgrade from the brick: chats, UPI, Zwiggy, homes, garage, maps. No going back', price: r10(12999 * mul / 1.2), act: pay(r10(12999 * mul / 1.2), () => { L.s.phone = true; L.s.zwiggy = true; G.hud.flash('New smartphone', 'The old brick goes in a drawer. T opens your apps: chats, UPI, Zwiggy, homes, garage'); return 'Unboxed. T to open it'; }) });
         break;
+      }
       case 'books':
         out.push({ label: 'Paperback novel', note: 'Something to read at a tapri', price: r10(350 * mul), act: pay(r10(350 * mul), () => { L.add('book'); return 'In your bag'; }) });
         out.push({ label: 'Pune: a city guide', note: 'Every landmark marked; +respect for knowing your city', price: r10(499 * mul), disabled: L.s.upg.guide ? 'Read it' : '', act: pay(r10(499 * mul), () => { L.s.upg.guide = 1; L.change('respect', 2); return 'You know the city better than most'; }) });
@@ -495,6 +538,8 @@ export class Shops {
         out.push({ label: 'Lonavala day trip', note: 'The ghats are coming', price: 0, disabled: 'Coming soon' });
         break;
       case 'chowki': this.chowki(out); break;
+      case 'cinema': case 'gaming': case 'laundry': case 'petshop': case 'library': case 'temple': case 'park': case 'zoo': case 'landmark': case 'shop': case 'college':
+        this.fun(out, ctx, mul); break;
       case 'lodge': {
         const price = r10(1200 * mul);
         out.push({ label: 'A room for the night', note: 'Sleep till 7 AM: full energy, +health', price, act: pay(price, () => { this.close(); G.sleep(); return ''; }) });
@@ -505,6 +550,71 @@ export class Shops {
       case 'property': this.g.props.items(out, ctx.prop); break;
     }
     return out;
+  }
+  // the time it takes (a film, a study session): the clock moves on
+  pass(h) { const G = this.g; G.setHour((G.hour + h) % 24); G.clock = (G.clock || 0) + h; }
+  // things to do at real places: films, bowling, the laundry, the pet shop, a reading room, darshan, a walk in a garden
+  fun(out, ctx, mul) {
+    const G = this.g, L = this.life, k = ctx.kind, day = Math.floor((G.clock || 0) / 24), key = Math.round(ctx.x) + ',' + Math.round(ctx.z);
+    const pay = (price, fn) => () => { if (price && !this.spend(price)) return false; return fn(); };
+    const done = L.s.done || (L.s.done = {});            // once a day per place: darshan, a jog, a ticket
+    const today = (what) => done[what + '@' + key] === day, mark = (what) => { for (const q in done) if (done[q] !== day) delete done[q]; done[what + '@' + key] = day; };
+    if (k === 'cinema') {
+      const multi = /pvr|inox|cinepolis|carnival|city pride|e-?square|multiplex|mall/i.test(ctx.name);
+      const t = r10((multi ? 280 : 150) * mul);
+      out.push({ label: 'Movie ticket, next show', note: `${multi ? 'Recliner-ish seats, the AC on full' : 'Single screen: whistles, popcorn, the works'}. Two and a half hours. +mood`, price: t, act: pay(t, () => {
+        this.close(); this.pass(2.5); L.apply({ mood: 0.25, energy: -0.05 }); L.s.tally.movies = (L.s.tally.movies || 0) + 1; G.hud.toast('The film’s over', 'You walk out blinking into the street', 'good', 2.6); return ''; }) });
+      out.push({ label: 'Popcorn, large', note: 'Salted, or caramel if you’re like that', price: r10((multi ? 320 : 120) * mul), act: pay(r10((multi ? 320 : 120) * mul), () => { L.apply({ hunger: 0.12, mood: 0.03 }); return 'Crunchy'; }) });
+      out.push({ label: 'Cold drink', note: 'Fizzy, too cold', price: r10((multi ? 180 : 60) * mul), act: pay(r10((multi ? 180 : 60) * mul), () => { L.apply({ thirst: 0.25 }); return 'Ahh'; }) });
+      return;
+    }
+    if (k === 'gaming') {
+      for (const [label, note, base, fx] of [['Bowling, one game', 'Ten frames. Strikes optional', 350, { mood: 0.15, energy: -0.05 }], ['Arcade card, ₹300 of games', 'Racing sims, air hockey, the claw machine', 300, { mood: 0.12 }], ['VR ride', 'A rollercoaster that isn’t there', 400, { mood: 0.12, energy: -0.03 }]]) {
+        const price = r10(base * mul); out.push({ label, note, price, act: pay(price, () => { this.pass(0.75); L.apply(fx); L.s.tally.games = (L.s.tally.games || 0) + 1; return `${label.split(',')[0]}: ${describe(fx)}`; }) });
+      }
+      return;
+    }
+    if (k === 'laundry') {
+      const pr = L.s.pressed === day;
+      out.push({ label: 'Iron today’s clothes', note: pr ? 'Already crisp for today' : 'Sharp creases: people notice. +style for today', price: r10(60 * mul), disabled: pr ? 'Done' : '', act: pay(r10(60 * mul), () => { L.s.pressed = day; L.change('mood', 0.02); return 'Crisp. +style today'; }) });
+      out.push({ label: 'Dry-clean your outfit', note: 'Back the same evening, smelling of nothing. +style and mood', price: r10(250 * mul), act: pay(r10(250 * mul), () => { L.s.pressed = day; L.change('mood', 0.05); return 'Like new'; }) });
+      return;
+    }
+    if (k === 'petshop') {
+      out.push({ label: 'Dog food pouch', note: 'A street dog will follow you all evening for this. +karma', price: r10(60 * mul), act: pay(r10(60 * mul), () => { L.add('dogfood'); return 'In your jhola'; }) });
+      out.push({ label: 'Dog food, pack of 5', note: 'For the regulars on your lane', price: r10(270 * mul), act: pay(r10(270 * mul), () => { L.add('dogfood', 5); return 'Five pouches in your jhola'; }) });
+      out.push({ label: 'Bananas, for the cows', note: 'A dozen', price: r10(60 * mul), act: pay(r10(60 * mul), () => { L.add('banana', 2); return 'In your jhola'; }) });
+      return;
+    }
+    if (k === 'library') {
+      out.push({ label: 'Study for two hours', note: 'A desk, silence, a fan that ticks. +XP, a little tired after', price: r10(50 * mul), disabled: L.s.energy < 0.15 ? 'Too tired' : '', act: pay(r10(50 * mul), () => {
+        this.close(); this.pass(2); L.apply({ energy: -0.12, mood: 0.02 }); L.s.tally.studied = (L.s.tally.studied || 0) + 1; G.hud.toast('Two hours, gone', '+40 XP. Your eyes hurt', 'good', 2.4); return ''; }) });
+      out.push({ label: 'Read the papers', note: 'Sakal, Lokmat, the Times: what Pune is talking about', price: 0, act: () => { this.pass(0.25); L.change('mood', 0.02); return 'You catch up on the city'; } });
+      return;
+    }
+    if (k === 'temple') {
+      const d = today('darshan');
+      out.push({ label: 'Darshan', note: d ? 'You’ve been in today' : 'Fold your hands, ring the bell. +karma, +mood', price: 0, disabled: d ? 'Done today' : '', act: () => { mark('darshan'); L.change('karma', 1.5); L.change('mood', 0.06); G.audio.bell?.(); return 'A moment of quiet'; } });
+      out.push({ label: 'Offer flowers and prasad', note: 'Marigolds and pedhe from the stall outside. +karma', price: r10(51), act: pay(r10(51), () => { L.change('karma', 2); L.change('mood', 0.04); return 'Prasad, shared with whoever’s nearby'; }) });
+      out.push({ label: 'Donation, ₹101', note: 'Into the box. +karma, +respect round here', price: 101, act: pay(101, () => { L.change('karma', 3); L.change('respect', 1); return 'They write your name in the book'; }) });
+      return;
+    }
+    if (k === 'park' || k === 'zoo' || k === 'landmark') {
+      const fee = entryFee(ctx.name), paid = today('entry');
+      const gate = (fn) => () => { if (fee && !paid) { if (!this.spend(fee)) return false; mark('entry'); } return fn(); };
+      const tag = fee ? (paid ? 'Ticket paid today' : `Entry ₹${fee}`) : 'Free entry';
+      if (k === 'zoo') { out.push({ label: 'See the animals', note: `${tag}. Tigers, the snake park, elephants. An hour and a half. +mood`, price: paid ? 0 : fee, act: gate(() => { this.pass(1.5); L.apply({ mood: 0.18, energy: -0.08, thirst: -0.08 }); return 'The tiger ignored you'; }) }); return; }
+      if (k === 'landmark') { out.push({ label: 'Look around', note: `${tag}. Half an hour of history. +mood`, price: paid ? 0 : fee, act: gate(() => { this.pass(0.5); L.apply({ mood: 0.08 }); L.s.upg.seen = (L.s.upg.seen || 0) + (today('seen') ? 0 : 1); mark('seen'); return 'You read every plaque'; }) }); return; }
+      const morning = G.hour >= 5 && G.hour < 10, jog = today('jog');
+      out.push({ label: 'Walk round the garden', note: `${tag}. Twenty minutes under the trees. +mood`, price: paid ? 0 : fee, act: gate(() => { this.pass(0.33); L.apply({ mood: 0.1 + (L.s.upg.earphones ? 0.05 : 0), energy: 0.03 }); return 'Bit of green'; }) });
+      out.push({ label: 'Jog a few rounds', note: morning ? (jog ? 'You ran here today' : 'With the morning walkers. +fitness, thirsty after') : 'Mornings, 5 to 10, with the walkers', price: paid ? 0 : fee, disabled: !morning ? 'Mornings' : jog ? 'Done today' : L.s.energy < 0.2 ? 'Too tired' : '', act: gate(() => { mark('jog'); this.pass(0.5); const f = L.s.upg.band ? 2 : 1; L.s.fitness = Math.min(40, (L.s.fitness || 0) + f); L.apply({ energy: -0.15, thirst: -0.12, mood: 0.06 + (L.s.upg.earphones ? 0.05 : 0) }); return `+${f} fitness`; }) });
+      out.push({ label: 'Sit on a bench', note: 'Watch the city go past. +energy', price: paid ? 0 : fee, act: gate(() => { this.pass(0.25); L.apply({ energy: 0.05, mood: 0.03 }); return 'A pigeon judges you'; }) });
+      return;
+    }
+    if (k === 'college') { out.push({ label: 'Walk the campus', note: 'Canteen chai, notice boards, someone’s band practising', price: 0, act: () => { this.pass(0.33); L.change('mood', 0.04); return 'Feels like being twenty again'; } }); return; }
+    // any other shop on the street: a look around
+    out.push({ label: 'Look around', note: 'Browse a bit. The owner watches you from the counter', price: 0, act: () => { this.pass(0.15); L.change('mood', 0.01); return 'Nothing you need today'; } });
+    out.push({ label: 'Ask the way', note: 'Shopkeepers know every lane round here', price: 0, act: () => { const M = this.g.W.landmarks || [], P = this.g.player; let b = null, bd = 1e12; for (const l of M) { const d = Math.hypot(l.x - P.x, l.z - P.z); if (d < bd) { bd = d; b = l; } } if (b) { this.g.setWaypoint({ x: b.x, z: b.z, name: b.name }); return `“${b.name}? Straight, then left.” Waypoint set`; } return '“Ask someone else, bhau”'; } });
   }
   isClub(ctx) { const a = this.g.people.areas.at(ctx.x, ctx.z); return /club|lounge|social|brew|pub/i.test(ctx.name) || (a && a.kind === 'polished'); }
   hello(kind) { return HELLO[kind] ? this.rng.pick(HELLO[kind]) : null; }

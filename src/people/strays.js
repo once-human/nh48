@@ -22,16 +22,17 @@ export class Strays {
   }
   label(a) {
     const L = this.g.life;
-    if (a.kind === 'dog') return L.has('biscuit') ? 'Feed the dog a Parle-G' : a.free && a.free.mode === 'follow' ? 'Pet your dog' : 'Pet the dog';
+    if (a.kind === 'dog') return L.has('dogfood') ? 'Feed the dog a pouch' : L.has('biscuit') ? 'Feed the dog a Parle-G' : a.free && a.free.mode === 'follow' ? 'Pet your dog' : 'Pet the dog';
     return L.has('banana') ? 'Feed the cow a banana' : 'Touch the cow’s forehead (namaskar)';
   }
   // F next to an animal
   interact(a) {
     const G = this.g, L = G.life, P = G.player;
     if (a.kind === 'dog') {
-      if (L.take('biscuit')) {
-        L.change('karma', 2); L.change('mood', 0.04); L.s.tally.fed++;
-        this.free(a, { mode: 'follow', t: 150 });
+      const pouch = L.take('dogfood');
+      if (pouch || L.take('biscuit')) {
+        L.change('karma', pouch ? 3 : 2); L.change('mood', 0.04); L.s.tally.fed++;
+        this.free(a, { mode: 'follow', t: pouch ? 420 : 150 });
         G.hud.toast('Best friends now', 'The dog follows you for a while, and barks at anyone who picks on you', 'good', 3.2);
         this.cheer(a, 'kind');
       } else { a.wag = 2; L.change('mood', 0.03); G.hud.toast('Good boy', 'The tail goes like a fan', 'info', 1.8); }
