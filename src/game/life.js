@@ -36,6 +36,7 @@ export const ITEMS = {
   book: { name: 'Paperback novel', use: { mood: 0.08, energy: -0.02 } },
   lottery: { name: 'Lottery ticket', note: 'Scratch it from the bag', scratch: true },
   torch: { name: 'Torch', note: 'Lights the way after dark. L to switch it on or off', tool: true },
+  roses: { name: 'A dozen roses', note: 'Give them on a date', gift: 0, use: { mood: 0.02 } },
   dogfood: { name: 'Dog food pouch', note: 'Feed a street dog (F near one): it follows you all evening', feed: 'dog' },
   beer: { name: 'Beer (pint)', use: { drunk: 0.3, thirst: 0.1, mood: 0.05 } },
 };
@@ -122,6 +123,7 @@ export class Life {
     else if (kind === 'college') score = western ? 0.85 : 0.55;
     if ((this.s.upg.shoes || 0) > 0) score += 0.05;
     if (this.s.pressed === Math.floor((this.g.clock || 0) / 24)) score += 0.08;      // ironed today
+    if (this.s.upg.chain) score += 0.06;                                                // a gold chain
     if (this.s.shades && (kind === 'polished' || kind === 'college')) score += this.s.shades === 'premium' ? 0.1 : 0.06;
     return { score: clamp(score, 0, 1), odd };
   }
@@ -163,7 +165,7 @@ export class Life {
     // rent from what you own, once a game day
     const day = Math.floor((G.clock || 0) / 24);
     if (s.lastRentDay < 0) s.lastRentDay = day;
-    if (day > s.lastRentDay && G.props) { s.lastRentDay = day; G.props.payRent(); G.hustle && G.hustle.daily(); }
+    if (day > s.lastRentDay && G.props) { s.lastRentDay = day; G.props.payRent(); G.hustle && G.hustle.daily(); G.shops && G.shops.daily && G.shops.daily(); }
     if ((this.saveT -= dt) <= 0) { this.saveT = 5; this.save(); }
   }
   warn(k, v, title, sub) {

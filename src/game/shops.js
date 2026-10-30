@@ -29,6 +29,10 @@ export const fmt = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
 const col = (h) => new THREE.Color(h).convertSRGBToLinear();
 
 // ---------------------------------------------------------------- which logic a storefront gets
+// the small local places that get to know you (regulars, udhaar)
+const LOCAL = new Set(['tapri', 'misal', 'thali', 'sweets', 'bakery', 'kirana', 'paan', 'juice', 'barber', 'southindian', 'florist', 'laundry', 'pharmacy', 'food', 'cafe']);
+const regKey = (ctx) => Math.round(ctx.x) + ',' + Math.round(ctx.z);
+const dayOf = (G) => Math.floor((G.clock || 0) / 24);
 export function kindOf(name, cat) {
   const n = (name || '').toLowerCase();
   if (cat === 'police') return 'chowki';
@@ -343,7 +347,9 @@ export class Shops {
     const st = this.g.rep ? this.g.rep.standing(x, z) : 0, k = st >= 0 ? 1 - st * 0.1 : 1 - st * (st < -0.45 ? 0.6 : 0.2);
     // charm gets you a better price (a smile, a bit of chat), the brand on the board a worse one
     const c = 1 - Math.max(0, this.life.charm - 0.5) * 0.12;
-    return (AREA_MUL[a ? a.kind : 'city'] || 1) * k * c * (tier ? TIER_MUL[tier] || 1 : 1);
+    // a regular pays less: 8% off after five visits, 15% after ten
+    const rg = (this.life.s.reg || {})[Math.round(x) + ',' + Math.round(z)], rk = rg ? (rg.n >= 10 ? 0.85 : rg.n >= 5 ? 0.92 : 1) : 1;
+    return (AREA_MUL[a ? a.kind : 'city'] || 1) * k * c * rk * (tier ? TIER_MUL[tier] || 1 : 1);
   }
   // nearest thing you could walk into
   scan() {
@@ -405,7 +411,7 @@ export class Shops {
     const oh = (this.near.door || this.near.pin) && openNow(this.near, this.g.hour);
     if (oh && !oh.open) { this.g.hud.toast(`${this.near.name} is closed`, `Opens at ${oh.opens}`, 'info', 2.4); this.scanT = 0.6; return true; }
     // a storefront with a room behind it: walk in (a club at night wants its cover charge first)
-    if (I && I.templateOf(this.near.kind) && this.near.door) {
+    if (I && I.templateOf(this.near.kind) && (this.near.door || this.near.pin)) {
       const covers = this.g.life.s.covers || {};
       const club = this.near.kind === 'bar' && this.isClub(this.near) && (this.g.hour >= 20.5 || this.g.hour < 1.5) && covers[venueKey(this.near)] !== nightOf(this.g);
       if (!club) { const ctx = this.near; if (I.enter(ctx)) { this.g.date && this.g.date.onEnter(I.cur.R, ctx); return true; } }
@@ -425,7 +431,7 @@ export class Shops {
     if (n.kind === 'ispot') return n.s.label;
     const oh = (n.door || n.pin) && openNow(n, this.g.hour);
     if (oh && !oh.open) return `${n.name} · Closed, opens ${oh.opens}`;
-    if (this.g.interiors && this.g.interiors.templateOf(n.kind) && n.door) return `Go into ${n.name} · ${KIND_INFO[n.kind][0]}`;
+    if (this.g.interiors && this.g.interiors.templateOf(n.kind) && (n.door || n.pin)) return `Go into ${n.name} · ${KIND_INFO[n.kind][0]}`;
     const K = KIND_INFO[n.kind];
     return `${n.name} · ${K ? K[0] : ''}`;
   }
@@ -453,6 +459,9 @@ export class Shops {
       }) });
     };
     const night = G.hour >= 20.5 || G.hour < 3;
+    const U = (L.s.udhaar || {})[regKey(ctx)];
+    if (U) out.push({ label: `Clear your udhaar: ${fmt(U.amt)}`, note: `Since day ${U.day + 1}. Pay it and they smile again`, price: U.amt, act: () => { if (!this.spend(U.amt)) return false; delete L.s.udhaar[regKey(ctx)]; L.change('respect', 0.5); return 'All square'; } });
+    this.extras(out, ctx, mul, pay);
     switch (k) {
       case 'tapri': case 'misal': case 'thali': case 'biryani': case 'southindian': case 'chinese': case 'fastfood': case 'cafe': case 'bakery': case 'sweets': case 'juice': case 'icecream':
         for (const id of MENUS[k]) food(id);
@@ -488,7 +497,7 @@ export class Shops {
         for (const [id, base] of [['medkit', 220], ['painkiller', 40], ['ors', 25], ['water', 20]]) { const price = r10(base * mul); out.push({ label: ITEMS[id].name, note: ITEMS[id].note || describe(ITEMS[id].use), price, act: pay(price, () => { L.add(id); return `${ITEMS[id].name}, in your bag`; }) }); }
         break;
       case 'gym': {
-        const price = r10(250 * mul);
+        const price = (L.s.gymUntil || -1) >= dayOf(G) ? 0 : r10(250 * mul);
         const gain = ctx.tier === 'premium' ? 4 : 3;
         out.push({ label: ctx.tier === 'premium' ? 'Session with a trainer' : 'Day pass: workout', note: `+${gain} max health, harder punches (now ${L.hpMax})`, price, disabled: L.s.energy < 0.2 ? 'Too tired' : L.s.fitness >= 40 ? 'Peak fitness' : '', act: pay(price, () => { L.change('fitness', gain); L.apply({ energy: -0.15, hunger: -0.08, thirst: -0.1, mood: 0.05 }); if (G.interiors && G.interiors.cur) { G.player.human.play('crouch', { restart: true }); G.player.act = { kind: 'hurt', t: 0, dur: 2.5 }; } return `Workout done. Max health ${L.hpMax}`; }) });
         out.push({ label: 'Protein shake', note: 'Chocolate, allegedly', price: r10(180 * mul), act: pay(r10(180 * mul), () => { L.apply({ hunger: 0.2, thirst: 0.15 }); return 'Gains'; }) });
@@ -551,6 +560,42 @@ export class Shops {
     }
     return out;
   }
+  // more to do at the shops you already know, each with something that carries on outside
+  extras(out, ctx, mul, pay) {
+    const G = this.g, L = this.life, s = L.s, k = ctx.kind, day = dayOf(G);
+    if (k === 'tapri') out.push({ label: 'Cutting chai and the gossip', note: 'The regulars know where the cops are checking today', price: r10(15 * mul), act: pay(r10(15 * mul), () => {
+      L.apply({ energy: 0.1, mood: 0.03 }); const N = G.police && G.police.naka;
+      if (N) { G.setWaypoint({ x: N.x, z: N.z, name: 'Nakabandi (from the tapri)' }); return '“Nakabandi on the main road, take the lane.” Marked on your map'; }
+      const t = G.story && G.story.target && G.story.target(); if (t) return `“Someone was asking for you near ${t.name}”`;
+      return '“Quiet today. Too quiet”'; }) });
+    if (k === 'kirana') {
+      out.push({ label: 'Monthly ration, for Aai', note: 'Rice, dal, oil, sugar, delivered home. +karma; Aai cooks something special', price: r10(2500 * mul), disabled: s.ration === day ? 'Sent today' : '', act: pay(r10(2500 * mul), () => { s.ration = day; L.change('karma', 3); L.change('mood', 0.06); return 'Delivered. Aai calls to scold you for spending'; }) });
+    }
+    if (k === 'sweets') out.push({ label: 'Box of pedhe, for Aai', note: 'Kandi pedhe. +karma, +mood', price: r10(320 * mul), act: pay(r10(320 * mul), () => { L.change('karma', 1.5); L.change('mood', 0.05); return 'Packed with a ribbon'; }) });
+    if (k === 'florist') out.push({ label: 'A dozen roses', note: 'For a date: it shows', price: r10(450 * mul), act: pay(r10(450 * mul), () => { L.add('roses'); return 'In your jhola. Give them on a date'; }) });
+    if (k === 'books') out.push({ label: 'MPSC exam guide', note: 'Study at a reading room and it counts for half again', price: r10(650 * mul), disabled: s.upg.examguide ? 'Yours' : '', act: pay(r10(650 * mul), () => { s.upg.examguide = 1; return 'Heavy. Very heavy'; }) });
+    if (k === 'pharmacy') {
+      out.push({ label: 'Hangover cure', note: 'Electral and an antacid. Sobers you right up', price: r10(60 * mul), disabled: (s.drunk || 0) < 0.05 ? 'You’re sober' : '', act: pay(r10(60 * mul), () => { s.drunk = 0; L.change('mood', -0.02); return 'Head clears'; }) });
+      out.push({ label: 'BP check', note: 'The machine on the counter. Free', price: 0, act: () => { const P = G.player, hp = (P.hp ?? 100) / L.hpMax; return hp > 0.7 ? '120 over 80. Fit' : hp > 0.35 ? '“Take rest, beta.” A bit low' : '“Go to a clinic. Now.”'; } });
+    }
+    if (k === 'gym') {
+      const mem = (s.gymUntil || -1) >= day;
+      out.push({ label: mem ? `Member till day ${s.gymUntil + 1}` : 'Monthly membership', note: mem ? 'Workouts here are free' : 'Thirty days of workouts at any gym, free. Pays for itself in six', price: mem ? 0 : r10(1500 * mul), disabled: mem ? ' ' : '', act: pay(r10(1500 * mul), () => { s.gymUntil = day + 30; return 'Member. Card in your wallet'; }) });
+    }
+    if (k === 'bar' && (ctx.inside || ctx.pin || ctx.door)) {
+      out.push({ label: 'Karaoke', note: 'One song. Kishore Kumar, obviously. +mood; +respect if the room likes it', price: r10(200 * mul), act: pay(r10(200 * mul), () => { L.change('mood', 0.12); const ok = s.mood > 0.6 || (s.drunk || 0) > 0.3; if (ok) L.change('respect', 1); return ok ? 'They cheer' : 'Polite clapping'; }) });
+      out.push({ label: 'Buy a round for the table', note: 'Everyone remembers who paid. +respect', price: r10(1200 * mul), act: pay(r10(1200 * mul), () => { L.change('respect', 2); L.apply({ drunk: 0.1, mood: 0.06 }); return '“Bhau, cheers!”'; }) });
+      out.push({ label: 'Pool, ₹200 on the game', note: 'Win and it’s doubled. Lose and it’s gone', price: r10(200), act: pay(r10(200), () => { const win = Math.random() < 0.45 + Math.max(0, L.charm - 0.5) * 0.2 - (s.drunk || 0) * 0.3; if (win) { G.stats.money += 400; G.saveStats(); L.change('respect', 0.5); return 'Black ball, corner pocket. +₹400'; } return 'Scratched on the eight'; }) });
+    }
+    if (k === 'lodge') out.push({ label: 'Freshen up', note: 'A shower and a clean towel. +energy, sober', price: r10(300 * mul), act: pay(r10(300 * mul), () => { s.drunk = 0; L.apply({ energy: 0.25, mood: 0.05 }); this.pass(0.5); return 'Human again'; }) });
+    if (k === 'jeweller') { const rate = this.goldRate ? this.goldRate() : 11800, p = Math.round(rate * 10 * 1.12 / 100) * 100;
+      out.push({ label: 'Gold chain, 10 g', note: 'Turns heads: +style, people take you seriously. Get knocked out and it’s gone', price: p, disabled: s.upg.chain ? 'Wearing it' : '', act: pay(p, () => { s.upg.chain = 1; L.change('respect', 1); return 'Round your neck'; }) }); }
+    if (k === 'chowki') out.push({ label: 'Report what you saw', note: 'A hit-and-run, a chain snatching. +karma, the havaldar remembers you', price: 0, disabled: s.reported === day ? 'Done today' : '', act: () => { s.reported = day; L.change('karma', 2); L.change('respect', 0.5); return 'They write it in the register'; } });
+    if (k === 'cafe') out.push({ label: 'Long coffee, phone on charge', note: 'An hour with a window seat. +energy, +mood', price: r10(220 * mul), act: pay(r10(220 * mul), () => { this.pass(1); L.apply({ energy: 0.15, mood: 0.06 }); return 'The barista knows your order now'; }) });
+    if (k === 'garage') out.push({ label: 'Wash and polish', note: 'Your ride gleams: passengers tip a little more today', price: r10(250 * mul), act: pay(r10(250 * mul), () => { s.washed = day; return 'Shining'; }) });
+    if (k === 'mobile' && s.phone) out.push({ label: 'Screen repair', note: 'Cracked from the last fall. Like new', price: r10(1800 * mul), act: pay(r10(1800 * mul), () => { L.change('mood', 0.04); return 'No more spiderweb'; }) });
+    if (k === 'clinic') out.push({ label: 'Full check-up', note: 'Bloods, BP, a lecture about chai. +max health for a week', price: r10(900 * mul), disabled: (s.checkup || -9) + 7 > day ? 'Done this week' : '', act: pay(r10(900 * mul), () => { s.checkup = day; G.player.hp = L.hpMax; return 'All clear. Fully healed'; }) });
+  }
   // the time it takes (a film, a study session): the clock moves on
   pass(h) { const G = this.g; G.setHour((G.hour + h) % 24); G.clock = (G.clock || 0) + h; }
   // things to do at real places: films, bowling, the laundry, the pet shop, a reading room, darshan, a walk in a garden
@@ -588,7 +633,7 @@ export class Shops {
     }
     if (k === 'library') {
       out.push({ label: 'Study for two hours', note: 'A desk, silence, a fan that ticks. +XP, a little tired after', price: r10(50 * mul), disabled: L.s.energy < 0.15 ? 'Too tired' : '', act: pay(r10(50 * mul), () => {
-        this.close(); this.pass(2); L.apply({ energy: -0.12, mood: 0.02 }); L.s.tally.studied = (L.s.tally.studied || 0) + 1; G.hud.toast('Two hours, gone', '+40 XP. Your eyes hurt', 'good', 2.4); return ''; }) });
+        this.close(); this.pass(2); L.apply({ energy: -0.12, mood: 0.02 }); L.s.tally.studied = (L.s.tally.studied || 0) + (L.s.upg.examguide ? 1.5 : 1); G.hud.toast('Two hours, gone', '+40 XP. Your eyes hurt', 'good', 2.4); return ''; }) });
       out.push({ label: 'Read the papers', note: 'Sakal, Lokmat, the Times: what Pune is talking about', price: 0, act: () => { this.pass(0.25); L.change('mood', 0.02); return 'You catch up on the city'; } });
       return;
     }
@@ -675,6 +720,15 @@ export class Shops {
     out.push({ label: `Balance ${fmt(L.s.bank)}`, note: 'Cash in the bank can’t be stolen when you’re knocked out. 0.4% interest a day', price: 0, disabled: ' ' });
     out.push({ label: 'Deposit ₹1,000', price: 0, act: dep(1000) }, { label: 'Deposit ₹10,000', price: 0, act: dep(10000) }, { label: 'Deposit everything', price: 0, act: dep('all') });
     out.push({ label: 'Withdraw ₹1,000', price: 0, act: wd(1000) }, { label: 'Withdraw ₹10,000', price: 0, act: wd(10000) }, { label: 'Withdraw everything', price: 0, act: wd('all') });
+    // fixed deposits: locked away, back with more; a personal loan, paid back a little every day
+    const G = this.g, day = dayOf(G), fd = (amt, days, rate) => () => { if (L.s.bank < amt) return `You need ${fmt(amt)} in the bank`; L.s.bank -= amt; (L.s.fd || (L.s.fd = [])).push({ amt, until: day + days, rate }); return `Locked in. Back on day ${day + days + 1} with ${fmt(Math.round(amt * (1 + rate)))}`; };
+    for (const f of L.s.fd || []) out.push({ label: `FD ${fmt(f.amt)} · matures day ${f.until + 1}`, note: `Comes back as ${fmt(Math.round(f.amt * (1 + f.rate)))}`, price: 0, disabled: ' ' });
+    out.push({ label: 'Fixed deposit, ₹10,000 for 7 days', note: 'Back with 5% more. From your bank balance', price: 0, act: fd(10000, 7, 0.05) });
+    out.push({ label: 'Fixed deposit, ₹50,000 for 14 days', note: 'Back with 12% more', price: 0, act: fd(50000, 14, 0.12) });
+    const ln = L.s.loan;
+    if (ln) out.push({ label: `Loan: ${ln.left} days left, ${fmt(ln.emi)} a day`, note: 'Comes out of the bank each morning (or your cash). Miss one and word gets round', price: 0, disabled: ' ' },
+      { label: 'Repay the loan now', note: '10% off what’s left for closing early', price: Math.round(ln.left * ln.emi * 0.9), act: () => { const p = Math.round(ln.left * ln.emi * 0.9); if (!this.spend(p, true)) return false; L.s.loan = null; L.change('respect', 1); return 'Loan closed'; } });
+    else out.push({ label: 'Personal loan, ₹25,000', note: '₹1,150 a day for 25 days, straight from your account. Miss a payment: −respect', price: 0, act: () => { L.s.loan = { left: 25, emi: 1150 }; this.g.stats.money += 25000; this.g.saveStats(); return '₹25,000 in your hand. The EMIs start tomorrow'; } });
   }
   goldRate() {
     // a slow daily drift plus hourly noise around the base: buy low, sell high
@@ -764,6 +818,12 @@ export class Shops {
     if (this.g.free) { this.g.audio.cash?.(); return true; }            // free roam: unlimited cash
     if (S.money >= price) { S.money -= price; this.g.saveStats(); this.g.audio.cash?.(); return true; }
     if (bankToo && S.money + L.s.bank >= price) { const fromBank = price - S.money; S.money = 0; L.s.bank -= fromBank; this.g.saveStats(); this.g.audio.cash?.(); return true; }
+    // short of cash at a place that knows you: on udhaar (up to ₹500 owed), pay it next time
+    const cc = this.creditCtx;
+    if (cc) {
+      const key = regKey(cc), U = L.s.udhaar || (L.s.udhaar = {}), owed = U[key] ? U[key].amt : 0;
+      if (owed + price <= 500) { U[key] = { amt: owed + price, day: U[key] ? U[key].day : dayOf(this.g), name: cc.name }; this.g.hud.toast('On udhaar', `${cc.name}: you owe ${fmt(owed + price)}. Pay it within a week`, 'info', 2.6); return true; }
+    }
     this.msg(bankToo ? `Not enough money, cash and bank together are short of ${fmt(price)}` : `Not enough cash for ${fmt(price)}${L.s.bank >= price ? ' (it’s in the bank)' : ''}`);
     return false;
   }
@@ -877,12 +937,40 @@ export class Shops {
   buy(i) {
     const it = this.cur && this.cur[i];
     if (!it || it.disabled || !it.act) return;
+    this.creditCtx = this.ctx && LOCAL.has(this.ctx.kind) && it.price && ((this.life.s.reg || {})[regKey(this.ctx)] || {}).n >= 5 ? this.ctx : null;
     const r = it.act();
+    this.creditCtx = null;
     if (r === false) return;
+    if (it.price && this.ctx && LOCAL.has(this.ctx.kind)) this.visit(this.ctx);
     if (this.ctx && it.price && ['menu', 'cafe', 'fast', 'neon'].includes(UI_OF[this.ctx.kind])) this.speak(this.ctx.kind, 'order');
     if (!this.open) return;
     if (r) this.msg(r, true);
     this.render();
+  }
+  // a place you keep coming back to: they know you (a discount, then udhaar)
+  visit(ctx) {
+    const R = this.life.s.reg || (this.life.s.reg = {}), key = regKey(ctx), day = dayOf(this.g), r = R[key] || (R[key] = { n: 0, last: -1, name: ctx.name });
+    if (r.last === day) return; r.last = day; r.n++;
+    if (r.n === 5) this.g.hud.toast(`A regular at ${ctx.name}`, '8% off from now, and udhaar if you’re short', 'good', 3.4);
+    if (r.n === 10) { this.g.hud.toast(`${ctx.name}: like family`, '15% off. They save the good stuff for you', 'good', 3.4); this.life.change('respect', 1); }
+  }
+  // once a game day (life.js): fixed deposits mature, loan EMIs come out, old udhaar starts to be talked about
+  daily() {
+    const G = this.g, L = this.life, s = L.s, S = G.stats, day = dayOf(G);
+    for (const f of s.fd || []) if (!f.done && day >= f.until) { f.done = 1; const back = Math.round(f.amt * (1 + f.rate)); s.bank += back; G.hud.sms('Bank', `Fixed deposit matured: ${fmt(back)} credited`, fmt(back), `Balance ${fmt(s.bank)}`); }
+    s.fd = (s.fd || []).filter(f => !f.done);
+    const ln = s.loan;
+    if (ln && ln.left > 0) {
+      if (s.bank >= ln.emi) s.bank -= ln.emi; else if (S.money >= ln.emi) S.money -= ln.emi;
+      else { ln.missed = (ln.missed || 0) + 1; L.change('respect', -2); G.hud.sms('Bank', `EMI of ${fmt(ln.emi)} bounced. A recovery agent will call`, '', 'Missed'); ln.left++; }
+      ln.left--; if (ln.left <= 0) { s.loan = null; G.hud.sms('Bank', 'Loan closed. Thank you for banking with us', '', 'Closed'); }
+    }
+    for (const [k, u] of Object.entries(s.udhaar || {})) {
+      const age = day - u.day;
+      if (age >= 7) { L.change('respect', -1); if (age >= 14) L.change('karma', -1); G.hud.toast(`${u.name} is asking about you`, `You owe them ${fmt(u.amt)} from ${age} days ago. People are talking`, 'warn', 3.4); }
+      void k;
+    }
+    G.saveStats?.();
   }
   msg(t, good) { const m = this.el.querySelector('.sh-msg'); m.textContent = t || ''; m.classList.toggle('good', !!good); }
   close() {

@@ -213,6 +213,7 @@ export function* buildBuildingsChunk(W, C, group) {
   W.sliceLabel = 'atlas';
   const local = yield* signs.chunkAtlas(C, (bi) => index.shopsByBld.get(bi), index.shopNames);
   const nearRecs = [];
+  const shut = [];                 // every shop opening on a frontage: its rolling shutter, down when the shop's shut
   W.sliceLabel = 'bld';
   const footprints = [];
   C.doors = [];                    // shop fronts people can walk into
@@ -252,6 +253,7 @@ export function* buildBuildingsChunk(W, C, group) {
     footprints.push({ bi, p, h: wallTop + dy });
     let u = 0;
     const shopsHere = index.shopsByBld.get(bi);
+    const slotDoor = new Map();
     for (let i = 0; i < n; i++) {
       if ((++ops & 15) === 0) yield;
       const j = (i + 1) % n;
@@ -302,6 +304,14 @@ export function* buildBuildingsChunk(W, C, group) {
           cb.addGeo(GEO.box, mat(px + nx * 0.15, y - 0.31, pz + nz * 0.15, 0.85, 0.04, 0.34, ry), [0.4, 0.4, 0.4]);    // bracket
         }
       }
+      // every opening on a shop frontage gets a shutter (down when its shop is shut, always down where no business is listed)
+      if (shop) {
+        const ns = Math.max(1, Math.floor(L / SHOP_CELL)), cw = L / ns, oh = gh - 0.85;
+        for (let k = 0; k < ns; k++) {
+          const t = (k + 0.5) * cw;
+          shut.push({ x: ax + tx * t + nx * 0.035, y: BASE + dy, z: az + tz * t + nz * 0.035, ry: Math.atan2(nx, nz), w: Math.max(0.6, cw - 0.36), h: oh, key: i * 4096 + k, sd: slotDoor });
+        }
+      }
       // ground-floor shop boards: on shop fronts, and on plain walls that carry a real business
       let boards = shop;
       if (!boards && shopsHere && L > 2.6) { const ns0 = Math.max(1, Math.floor(L / SHOP_CELL)); for (let k = 0; k < ns0 && !boards; k++) boards = shopsHere.has(i * 4096 + k); }
@@ -318,6 +328,7 @@ export function* buildBuildingsChunk(W, C, group) {
           const o = 0.1;
           const x0 = ax + tx * t0 + nx * o, z0 = az + tz * t0 + nz * o, x1 = ax + tx * t1 + nx * o, z1 = az + tz * t1 + nz * o;
           C.doors.push({ x: (x0 + x1) / 2 + nx * 0.25, z: (z0 + z1) / 2 + nz * 0.25, nx, nz, n: 0, shop: sh ? sh[3] : -1 });
+          slotDoor.set(i * 4096 + k, C.doors[C.doors.length - 1]);
           const ltr = (tx * nz - tz * nx) > 0;
           (board.local ? ob : sb).quad([x0, y0, z0], [x1, y0, z1], [x1, y1, z1], [x0, y1, z0], [nx, 0, nz], ltr ? board.u0 : board.u1, board.v0, ltr ? board.u1 : board.u0, board.v1);
           if (sh) nearRecs.push({ s: sh, x0, y0, z0, x1, y1, z1, nx, nz, ltr, mx: (x0 + x1) / 2, mz: (z0 + z1) / 2 });
@@ -392,12 +403,50 @@ export function* buildBuildingsChunk(W, C, group) {
     const m = new THREE.Mesh(yield* ob.buildSliced(), localMat); m.receiveShadow = true; group.add(m);
   }
   if (W.nearBoards) W.nearBoards.addChunk(C.ci, C.cx, C.cz, nearRecs);
+  // the shutters, one instance each; game.js lifts the ones whose shop is open (and keeps them in step with the clock)
+  let shutMesh = null;
+  if (shut.length) {
+    shutMesh = new THREE.InstancedMesh(shutterGeo(), shutterMat(), shut.length);
+    shutMesh.frustumCulled = false; shutMesh.receiveShadow = true;
+    for (const r of shut) { r.door = r.sd.get(r.key) || null; delete r.sd; }
+    C.shutters = { im: shutMesh, list: shut, fresh: true };
+    setShutters(C, () => false);
+    group.add(shutMesh);
+  }
   return () => {
+    if (shutMesh) { shutMesh.dispose(); C.shutters = null; }
     W.footprintsByChunk.delete(C.ci);
     if (W.nearBoards) W.nearBoards.dropChunk(C.ci);
     if (local.tex) local.tex.dispose();
     if (localMat) { W.signMats.delete(localMat); localMat.dispose(); }
   };
+}
+
+// ---------------------------------------------------------------- rolling shutters
+let SHG = null, SHM = null;
+function shutterGeo() { if (!SHG) { SHG = new THREE.PlaneGeometry(1, 1); SHG.translate(0, 0.5, 0); SHG.userData.shared = true; } return SHG; }
+function shutterMat() {
+  if (SHM) return SHM;
+  // corrugated steel slats, a little grime at the bottom, the lock bar
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256; const x = cv.getContext('2d');
+  x.fillStyle = '#8a9298'; x.fillRect(0, 0, 128, 256);
+  for (let y = 0; y < 256; y += 8) { x.fillStyle = 'rgba(255,255,255,.18)'; x.fillRect(0, y, 128, 2); x.fillStyle = 'rgba(0,0,0,.28)'; x.fillRect(0, y + 6, 128, 2); }
+  const g = x.createLinearGradient(0, 160, 0, 256); g.addColorStop(0, 'rgba(60,45,30,0)'); g.addColorStop(1, 'rgba(60,45,30,.45)'); x.fillStyle = g; x.fillRect(0, 160, 128, 96);
+  x.fillStyle = '#3a3e42'; x.fillRect(54, 236, 20, 12); x.fillStyle = '#c9a227'; x.fillRect(60, 240, 8, 6);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  SHM = new THREE.MeshStandardMaterial({ map: t, roughness: 0.55, metalness: 0.45 });
+  return SHM;
+}
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Euler(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+// open(door) → true lifts that shutter; slots with no business stay down
+export function setShutters(C, open) {
+  const S = C.shutters; if (!S) return;
+  S.list.forEach((r, i) => {
+    if (r.door && open(r.door)) { S.im.setMatrixAt(i, ZERO); return; }
+    _p.set(r.x, r.y, r.z); _q.setFromEuler(_e.set(0, r.ry, 0)); _s.set(r.w, r.h, 1);
+    S.im.setMatrixAt(i, _m.compose(_p, _q, _s));
+  });
+  S.im.instanceMatrix.needsUpdate = true;
 }
 
 function insideRing(x, z, p) {

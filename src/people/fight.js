@@ -285,7 +285,7 @@ export class Brawl {
   knockOut() {
     const P = this.P, G = this.g;
     P.ko = true; P.act = null; P.downT = 7;
-    if (G.life) { G.life.s.tally.knockedOut++; G.life.change('respect', -3); G.life.change('mood', -0.15); }
+    if (G.life) { G.life.s.tally.knockedOut++; G.life.change('respect', -3); G.life.change('mood', -0.15); } if (G.life && G.life.s.upg.chain) { G.life.s.upg.chain = 0; G.hud.toast('Your gold chain’s gone', 'Snatched while you were down', 'bad', 3); }
     P.human.play('death', { once: true, fade: 0.1 });
     // beaten by a cop: you're arrested, not robbed
     const cop = this.people.list.find(p => p.foe === P && p.cop);

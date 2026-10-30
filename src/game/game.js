@@ -20,7 +20,7 @@ import { Crowd } from '../people/crowd.js';
 import { Brawl } from '../people/fight.js';
 import * as Save from './save.js';
 import { Life } from './life.js';
-import { Shops, lookFromJSON, DEALER } from './shops.js';
+import { Shops, lookFromJSON, DEALER, openNow } from './shops.js';
 import { Props } from './props.js';
 import { Gigs } from './gigs.js';
 import { Hustle } from './hustle.js';
@@ -61,6 +61,7 @@ import { Fauna } from '../people/animals.js';
 import { Puddles } from './puddles.js';
 import { Cutscene } from './cutscene.js';
 import { Home } from './home.js';
+import { setShutters } from '../world/buildingsChunk.js';
 import { Postcards } from './postcards.js';
 import { LiveView } from '../ui/liveview.js';
 import { MenuBar } from '../ui/menubar.js';
@@ -1041,7 +1042,7 @@ export class Game {
       const hours = 6; this.hour = (this.hour + hours) % 24; this.clock += hours;
       P.ko = false; P.downT = 0; P.hp = L.hpMax * 0.7; P.hurtT = 0;
       L.s.hunger = Math.max(L.s.hunger, 0.5); L.s.thirst = Math.max(L.s.thirst, 0.55); L.s.energy = Math.max(L.s.energy, 0.5); L.s.drunk = 0;
-      L.s.tally.knockedOut++; L.change('mood', -0.1);
+      L.s.tally.knockedOut++; L.change('mood', -0.1); if (L.s.upg.chain) { L.s.upg.chain = 0; this.hud.toast('Your gold chain’s gone', 'Taken while you were out cold', 'bad', 3); }
       if ((cause === 'beaten' || robbed) && this.rng.chance(0.7)) this.lights.lose('Lost while you were out cold');
       if (P.human) P.human.play('idle', { fade: 0.3 });
       this.rig.footMode = false;
@@ -1269,6 +1270,12 @@ export class Game {
     if (this.menubar) this.menubar.update(this.realDt || dt);
     if (this.postcards && this.W) this.postcards.update(this.realDt || dt);
     if (this.liveView) this.liveView.update(this.realDt || dt);
+    // shutters: up on the shops that are open now, down on the rest (new chunks straight away, the rest every couple of seconds)
+    if (this.shops && this.W && this.W.streamer) {
+      const all = (this._shT = (this._shT || 0) - (this.realDt || dt)) <= 0; if (all) this._shT = 2;
+      const H = this.hour, sh = this.shops;
+      for (const c of this.W.streamer.built) if (c.shutters && (all || c.shutters.fresh)) { c.shutters.fresh = false; setShutters(c, (d) => { const inf = sh.infoOf(d); return !!inf && openNow(inf, H).open; }); }
+    }
     if (this.audio) this.audio.hour = this.hour;
     // audio parameters at a steady 30 / 20 a second (scheduling them every frame clogged the audio thread)
     this._aT = (this._aT || 0) + dt; this._eT = (this._eT || 0) + dt;

@@ -298,7 +298,8 @@ export function facadeMaterial(T) {
           float si = floor(x / sc2);
           float sx = x - (si + 0.5) * sc2;
           float shopSeed = nhHash(vec2(si + seed * 31.0, 7.0));
-          float open = step(shopSeed, 0.85) * uShopsOpen;
+          // every opening shows its shop; a real shutter (buildingsChunk.js) comes down over the ones that are shut
+          float open = 1.0 + 0.0 * uShopsOpen;
           float ph = gh - 0.85;                      // fascia/sign zone above
           if (abs(sx) < sc2 * 0.5 - 0.18 && h < ph) {
             if (open > 0.5 && fwU > 0.035) {
@@ -349,8 +350,8 @@ export function facadeMaterial(T) {
               // far away the room collapses to its average colour (no sparkle)
               c = mix(c, vec3(0.5, 0.47, 0.42), smoothstep(0.012, 0.035, fwidth(x)));
               wall = c * mix(0.32, 0.15, uNight);
-              fEmit = c * (0.08 + uNight * 0.42) * (0.75 + 0.25 * shopSeed);
-              fRough = 0.85;
+              fEmit = c * (0.12 + uNight * 0.55) * (0.75 + 0.25 * shopSeed);
+              fRough = 0.16;           // through glass: the street's reflection over the lit room
               // rolled-up shutter box at the top of the opening
               if (h > ph - 0.28) { wall = vec3(0.42, 0.44, 0.45); fEmit = vec3(0.0); fMetal = 0.5; fRough = 0.5; }
             } else {
