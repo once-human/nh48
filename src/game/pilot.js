@@ -469,6 +469,7 @@ export class Pilot {
     if (this.onFoot) return;
     if (Math.abs(veh.v) > 2.5 && !force) { this.hud?.toast('Slow down first', 'You can only get out below ~9 km/h', 'warn', 1.6); return; }
     const S = veh === this.auto ? specOf('auto') : veh.spec;
+    if (veh !== this.auto && CAR_DOOR.has(veh.type) && !force) { const D = this.openDoor(veh, veh.type); D.veh = veh; D.closeAt = 0.6; }      // (the door opens as you step out, and shuts behind you)
     const hx = Math.cos(veh.th), hz = Math.sin(veh.th);
     // Indian cars are right-hand drive: out of the right door; off a two-wheeler to the left
     const side = S.two ? -1 : 1;
