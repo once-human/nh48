@@ -10,7 +10,7 @@ import { lookOf, savedCharacter } from '../people/characters.js';
 import { ikArm, leanRider, RIDER_HIPS, RIDER_LEAN } from '../people/humans.js';
 // handlebar grips in each vehicle's own frame: [forward, up, half width]
 const _side = new THREE.Vector3();
-const GRIPS = { auto: [0.72, 1.07, 0.33], scooter: [0.62, 1.0, 0.3], bike: [0.6, 1.08, 0.34], cycle: [0.44, 1.0, 0.28] };
+const GRIPS = { auto: [0.72, 1.07, 0.33], scooter: [0.62, 1.0, 0.3], bike: [0.6, 1.08, 0.34], bullet: [0.6, 1.08, 0.34], superbike: [0.6, 1.08, 0.34], cycle: [0.44, 1.0, 0.28] };
 const _grip = new THREE.Vector3(), _pole = new THREE.Vector3();
 import { WATER_Y } from '../world/groundChunk.js';
 const SWIM_Y = WATER_Y - 1.0;      // holder height while swimming: head and shoulders above the water
@@ -30,6 +30,7 @@ function seatFor(veh, S, isAuto) {
   return C;
 }
 const CAR_SEAT = {};
+const CAR_DOOR = new Set(['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super']);
 const SHOUTS = [
   ['Arre, gaadi kyon cheen rahe ho?!', 'Hey, why are you taking my vehicle?!'],
   ['Thamba! Maazi gaadi aahe ti!', 'Stop! That’s my vehicle!'],
@@ -118,6 +119,8 @@ export class Pilot {
     // vehicles left behind settle and stay solid
     for (const d of this.dropped) if (d.veh !== this.cur && d.veh.sync) d.veh.sync(0);
     this.updateNpcs(dt);
+    if (this.entering) this.tickEnter(dt);
+    this.tickDoors(dt);
     // what can I get into?
     this.offerT -= dt;
     if (this.offerT <= 0) { this.offerT = 0.15; this.offer = this.findOffer(traffic); }
@@ -359,6 +362,18 @@ export class Pilot {
 
   enter(offer, traffic) {
     if (offer.kind === 'pet') { this.events.push({ type: 'pet', a: offer.a }); return; }
+    // a car: walk to the driver's door (the right side), open it, haul the driver out if there is one, get in, shut it
+    const carKind = offer.kind === 'traffic' ? offer.o.type : offer.kind === 'parked' ? offer.r.kind : offer.kind === 'dropped' ? offer.d.veh.type : null;
+    if (!this.entering && carKind && CAR_DOOR.has(carKind) && !offer.now) {
+      const src = offer.kind === 'traffic' ? offer.o : offer.kind === 'parked' ? offer.r : offer.d.veh;
+      const hx = src.hx ?? Math.cos(src.th), hz = src.hz ?? Math.sin(src.th), S = carSpec(carKind);
+      const dx = (S.L / 2 - S.hood - 0.9), side = S.W / 2 + 0.55;
+      const door = { x: src.x + hx * dx - hz * side, z: src.z + hz * dx + hx * side };
+      if (offer.kind === 'traffic') { offer.o.v = 0; offer.o.argue = 3; }           // (the car stops while you're at its door)
+      this.entering = { offer, traffic, t: 0, door, src, kind: carKind, phase: 'walk' };
+      this.frozen = true; this.puppet = door; this.busy = 3;
+      return;
+    }
     let veh = null;
     if (offer.kind === 'dropped') {
       if (offer.d.towed && this.onRelease && !this.onRelease(offer.d)) return;
@@ -389,13 +404,61 @@ export class Pilot {
       veh.stolen = true; veh.plate = this.randomPlate();
       const idx = traffic.list.indexOf(o);
       if (idx >= 0) traffic.despawn(idx);
-      this.spawnAngryDriver(o);
+      const dr = this.spawnAngryDriver(o);
+      if (dr && offer.dragged) { dr.fallen = 1.6; dr.react = 3; }                 // hauled out onto the road
       this.events.push({ type: 'carjack', who: o.type, x: o.x, z: o.z });
     }
     if (!veh) return;
     this.switchTo(veh);
     this.busy = 0.6;
     this.audio?.blip?.();
+  }
+  tickEnter(dt) {
+    const E = this.entering, F = this.foot; E.t += dt;
+    const near = Math.hypot(F.x - E.door.x, F.z - E.door.z) < 0.45;
+    if (E.phase === 'walk' && (near || E.t > 1.6)) {
+      E.phase = 'open'; E.t2 = 0; this.puppet = null;
+      F.yaw = Math.atan2(E.src.z - F.z, E.src.x - F.x);
+      this.human && this.human.play(E.offer.kind === 'traffic' ? 'push' : 'yes', { once: true, restart: true, speed: 1.2 });
+      E.dooring = this.openDoor(E.src, E.kind);
+    }
+    if (E.phase === 'open') {
+      E.t2 += dt;
+      // a driver at the wheel: dragged out, onto the road
+      if (E.offer.kind === 'traffic' && !E.pulled && E.t2 > 0.4) { E.pulled = true; E.offer.dragged = true; this.audio?.thud?.(0.4); }
+      if (E.t2 > (E.offer.kind === 'traffic' ? 0.75 : 0.45)) {
+        this.entering = null; this.frozen = false;
+        const o = E.offer; o.now = true;
+        this.enter(o, E.traffic);
+        if (E.dooring) { E.dooring.veh = this.cur; E.dooring.closeAt = 0.35; }
+      }
+    }
+  }
+  // a door that swings open on its front hinge (over the painted one, with the dark of the cabin behind it), then shuts
+  openDoor(src, kind) {
+    const S = carSpec(kind), col = src.paint || (src.col ? src.col : [0.6, 0.6, 0.6]);
+    const g = new THREE.Group(), L = 1.05, h = S.beltY + 0.42 - (S.sill + 0.05);
+    const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(col[0], col[1], col[2]), roughness: 0.35, metalness: 0.15 });
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(L, h * 0.62, 0.05), mat); panel.position.set(-L / 2, (S.sill + 0.05) + h * 0.31, 0); g.add(panel);
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(L * 0.9, h * 0.36, 0.02), new THREE.MeshStandardMaterial({ color: 0x15191d, roughness: 0.05, metalness: 0.3 })); glass.position.set(-L / 2, (S.sill + 0.05) + h * 0.8, 0); g.add(glass);
+    const hole = new THREE.Mesh(new THREE.PlaneGeometry(L, h), new THREE.MeshBasicMaterial({ color: 0x0b0b0c })); hole.position.set(-L / 2, (S.sill + 0.05) + h / 2, -0.012); g.add(hole);
+    const hx = S.L / 2 - S.hood - 0.12, hz = S.W / 2 + 0.02;
+    const pivot = new THREE.Group(); pivot.position.set(hx, 0, hz); pivot.add(g);
+    const root = new THREE.Group(); root.position.set(src.x, src.y || 0, src.z); root.rotation.y = -(src.th ?? Math.atan2(src.hz, src.hx)); root.add(pivot);
+    this.scene.add(root);
+    const D = { root, pivot, hole, t: 0, closeAt: null, veh: null };
+    (this.doors || (this.doors = [])).push(D); return D;
+  }
+  tickDoors(dt) {
+    if (!this.doors) return;
+    for (let i = this.doors.length - 1; i >= 0; i--) {
+      const D = this.doors[i]; D.t += dt;
+      if (D.veh && D.veh.root) { D.root.position.copy(D.veh.root.position); D.root.position.y = D.veh.y || 0; D.root.rotation.y = D.veh.root.rotation.y; }
+      let a = Math.min(1, D.t / 0.35) * 1.1;
+      if (D.closeAt != null) { D.closeAt -= dt; if (D.closeAt <= 0) { D.shut = (D.shut || 0) + dt; a = Math.max(0, 1.1 - D.shut / 0.25 * 1.1); } }
+      D.pivot.rotation.y = a;
+      if (D.shut > 0.25 || D.t > 6) { this.audio?.thud?.(0.3); D.root.parent && D.root.parent.remove(D.root); D.root.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); this.doors.splice(i, 1); }
+    }
   }
   randomPlate() {
     const L = 'ABCDEFGHJKLMNPRSTUVWXYZ', r = this.rng;
@@ -455,7 +518,7 @@ export class Pilot {
     v.tilt.updateWorldMatrix(true, false);
     // on a two-wheeler: the hips on the seat (the seated clip carries them behind the body's origin), leaning into the bars
     const two = v !== this.auto && v.spec && v.spec.two && v.type !== 'cycle';
-    const sx = two ? (/^bike/.test(v.type) ? 0.0 : 0.04) + RIDER_HIPS : seat[0] - 0.05;
+    const sx = two ? (/^bike|bullet|superbike/.test(v.type) ? 0.0 : 0.04) + RIDER_HIPS : seat[0] - 0.05;
     const p = new THREE.Vector3(sx, seat[1] - 0.62, seat[2] || 0).applyMatrix4(v.tilt.matrixWorld);
     H.holder.position.copy(p);
     H.holder.rotation.set(0, -v.th, 0);
@@ -466,7 +529,7 @@ export class Pilot {
     const g = GRIPS[v === this.auto ? 'auto' : v.type];
     if (g) {
       const m = v.tilt.matrixWorld;
-      if (two) { H.holder.updateMatrixWorld(true); leanRider(H, _side.set(0, 0, 1).transformDirection(m), RIDER_LEAN[/^bike/.test(v.type) ? 'bike' : 'scooter']); }
+      if (two) { H.holder.updateMatrixWorld(true); leanRider(H, _side.set(0, 0, 1).transformDirection(m), RIDER_LEAN[/^bike|bullet|superbike/.test(v.type) ? 'bike' : 'scooter']); }
       for (const sd of [1, -1]) {
         _grip.set(g[0], g[1], g[2] * sd).applyMatrix4(m);
         _pole.set(-0.2, -0.7, sd).transformDirection(m);

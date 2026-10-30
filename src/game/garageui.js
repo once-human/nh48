@@ -11,8 +11,8 @@ import { fmt, STICKERS } from './shops.js';
 import { modsOf, applyMods, statsOf, illegalOf, classOf, sameCol, COLOURS, NEON, HORNS, FINISH, RIMS, LIVERY, FLAPS, PATYA, EXHAUST, FANCY } from '../vehicles/mods.js';
 
 const r10 = (v) => Math.max(10, Math.round(v / 10) * 10);
-const F_OF = { auto: 1, cycle: 0.3, scooter: 0.8, scooterP: 0.8, bike: 0.9, bikeP: 0.9, bullet: 1.2, hatch: 4, sedan: 4.5, taxi: 4, suv: 5, jeep: 5, lux: 9, sports: 14, super: 20, tempo: 2.2, bus: 8 };
-const VALUE = { cycle: 7500, scooter: 84000, bike: 96000, bullet: 215000, hatch: 690000, sedan: 880000, suv: 1590000, jeep: 1650000, lux: 7900000, sports: 19500000, super: 39000000, taxi: 700000, auto: 280000, tempo: 700000, bus: 4000000 };
+const F_OF = { auto: 1, cycle: 0.3, scooter: 0.8, scooterP: 0.8, bike: 0.9, bikeP: 0.9, bullet: 1.2, superbike: 6, hatch: 4, sedan: 4.5, taxi: 4, suv: 5, jeep: 5, lux: 9, sports: 14, super: 20, tempo: 2.2, bus: 8 };
+const VALUE = { cycle: 7500, scooter: 84000, bike: 96000, bullet: 215000, superbike: 1850000, hatch: 690000, sedan: 880000, suv: 1590000, jeep: 1650000, lux: 7900000, sports: 19500000, super: 39000000, taxi: 700000, auto: 280000, tempo: 700000, bus: 4000000 };
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const css = (p) => `rgb(${p.map(c => Math.round(Math.pow(Math.min(1, Math.max(0, c)), 1 / 2.2) * 255)).join(',')})`;
 // where each category points the camera: yaw round the vehicle (0 = its nose), height, distance
@@ -175,8 +175,10 @@ export class GarageUI {
       [ex('nitro', 'No nitrous', '', 0, (d) => !d.nitro, (d) => { d.nitro = 0; }), ex('nitro', 'Nitrous kit', 'Past your top speed, flames out the back', $(cl === 'auto' ? 22000 : 30000), (d) => !!d.nitro, (d) => { d.nitro = 1; d.n2o = 10; })], !cyc);
     cat('brakes', 'Brakes', 'disc', 'Performance', ['Stock', 'Street', 'Sport'][m.brakes || 0], 'Shorter stops, for Pune’s sudden U-turns',
       ['Stock brakes', 'Street brakes', 'Sport brakes'].map((n, i) => ex('brakes', n, i ? `Stops ${i * 15}% shorter` : '', (base) => i <= (base.brakes || 0) ? 0 : [0, 4000, 9000].slice((base.brakes || 0) + 1, i + 1).reduce((a, b) => a + $(b), 0), (d) => (d.brakes || 0) === i, (d) => { d.brakes = i; })));
-    cat('tyres', 'Tyres', 'tyre', 'Performance', m.bulletproof ? 'Bulletproof' : m.tyres ? 'Grip' : 'Stock', 'Rubber for the monsoon',
-      [tog('tyres', 'Grip tyres', 'Corners harder, wet or dry', $(5000)), ...(cyc ? [] : [tog('bulletproof', 'Bulletproof tyres', 'Run-flat: the spikes at a nakabandi don’t stop you', $(15000))])]);
+    const TY = [['', 'Stock tyres', 'What it came with'], ['sport', 'Sport tyres', 'Soft compound: 12% more grip, harder to unstick'], ['drift', 'Drift tyres', 'Hard and slick: the back lets go early and slides long. Less grip for everything else'],
+      ['offroad', 'Off-road tyres', 'Chunky tread: kerbs, dirt and broken roads barely slow you'], ['rain', 'Monsoon tyres', 'Deep grooves: keep their grip on a wet road']];
+    cat('tyres', 'Tyres', 'tyre', 'Performance', (TY.find(t => t[0] === (m.tyre || (m.tyres ? 'sport' : ''))) || TY[0])[1].replace(' tyres', '') + (m.bulletproof ? ' · bulletproof' : ''), 'They decide how it grips, slides and handles the monsoon',
+      [...TY.map(([k, n, note]) => ex('tyre', n, note, k ? $(k === 'sport' ? 6000 : k === 'drift' ? 5500 : 4500) : 0, (d) => (d.tyre || (d.tyres ? 'sport' : '')) === k, (d) => { d.tyre = k; d.tyres = 0; })), ...(cyc ? [] : [tog('bulletproof', 'Bulletproof inserts', 'Run-flat: the spikes at a nakabandi don’t stop you', $(15000))])]);
     cat('susp', 'Suspension', 'spring', 'Performance', ({ '-1': 'Lifted', 0: 'Stock', 1: 'Lowered', 2: 'Slammed' })[m.lower || 0], 'Ride height. Pune has a speed breaker every hundred metres',
       [[-1, 'Lifted', 'Sits higher: potholes and breakers barely felt', 7000], [0, 'Stock height', 'Back to factory', 0], [1, 'Lowered', '3.5 cm lower, a little more grip', 6000], [2, 'Slammed', '7 cm lower. Breakers will scrape the floor', 11000]].map(([lv, n, note, b]) => ex('susp', n, note, b ? $(b) : 0, (d) => (d.lower || 0) === lv, (d) => { d.lower = lv; })), !two && !cyc);
     cat('armor', 'Armour', 'shield', 'Performance', `${(m.armor || 0) * 20}%`, 'Steel plate behind the panels',

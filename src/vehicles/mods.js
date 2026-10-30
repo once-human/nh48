@@ -75,7 +75,8 @@ export function statsOf(type, m = {}) {
   const top = S.vTop * tune, to = cl === 'car' ? 60 / 3.6 : Math.min(40 / 3.6, top * 0.85);
   let v = 0, t = 0;
   while (v < to && t < 60) { const a = acc * Math.max(0, 1 - Math.pow(v / top, 3)) - 0.12 - S.drag * v * v; if (a <= 0.02) { t = 60; break; } v += a * 0.02; t += 0.02; }
-  const brake = S.brake * (1 + (m.brakes || 0) * 0.15), mu = S.mu * (1 + (m.tyres ? 0.06 : 0) + Math.max(0, m.lower || 0) * 0.03);
+  const ty = m.tyre || (m.tyres ? 'sport' : '');
+  const brake = S.brake * (1 + (m.brakes || 0) * 0.15), mu = S.mu * (1 + ({ sport: 0.12, drift: -0.14, offroad: -0.04, rain: 0.02 }[ty] || 0) + Math.max(0, m.lower || 0) * 0.03);
   const tough = 1 / (1 - (m.armor || 0) * 0.2) * (m.bullbar ? 1.1 : 1);
   return {
     top: Math.round(top * 3.6 * (S.drag > 0.002 ? 0.97 : 0.99)), to: Math.round(to * 3.6), t0: t >= 60 ? 99 : Math.round(t * 10) / 10,
@@ -94,7 +95,9 @@ export function applyMods(G, v, extra = {}) {
   v.econ = (m.ecu === 'eco' ? 1.3 : 1) * (m.cng ? 1.15 : 1);
   v.cngKit = !!m.cng;
   v.brakeMul = 1 + (m.brakes || 0) * 0.15;
-  v.gripMul = 1 + (m.tyres ? 0.06 : 0) + Math.max(0, m.lower || 0) * 0.03;
+  const ty = m.tyre || (m.tyres ? 'sport' : '');
+  v.gripMul = 1 + ({ sport: 0.12, drift: -0.14, offroad: -0.04, rain: 0.02 }[ty] || 0) + Math.max(0, m.lower || 0) * 0.03;
+  v.driftEase = ty === 'drift' ? 1.9 : ty === 'sport' ? 0.8 : 1; v.offroad = ty === 'offroad' || m.lower < 0; v.rainTyre = ty === 'rain';
   v.armorMul = (1 - (m.armor || 0) * 0.2) * (m.bullbar ? 0.9 : 1) * (m.crash ? 0.85 : 1);
   v.lower = (m.lower || 0) * 0.035;                       // (−1: lifted, sits higher)
   v.soft = m.lower < 0 ? 0.45 : m.lower === 2 ? 1.35 : 1;

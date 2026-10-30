@@ -28,6 +28,7 @@ export const SPECS = {
   jeep: { name: '4x4', model: 'Thar-style 2.2 diesel 4x4', vTop: 42, acc: 3.4, brake: 7.6, drag: 0.0014, wb: 2.45, steerMax: 0.6, mu: 7.9, gears: [6, 11, 17, 24, 32], mass: 1750, L: 3.98, W: 1.82, honk: 'car' },
   sports: { name: 'Sports coupé', model: '911-style 3.0 flat-six', vTop: 82, acc: 8.8, brake: 10.8, drag: 0.00026, wb: 2.45, steerMax: 0.56, mu: 10.8, gears: [10, 17, 25, 33, 42, 52, 64], mass: 1500, L: 4.52, W: 1.85, honk: 'car' },
   super: { name: 'Supercar', model: 'Huracán-style 5.2 V10', vTop: 90, acc: 10.5, brake: 11.5, drag: 0.0002, wb: 2.62, steerMax: 0.55, mu: 11.6, gears: [11, 19, 28, 38, 49, 62, 76], mass: 1420, L: 4.52, W: 1.93, honk: 'car' },
+  superbike: { name: 'Superbike', model: 'ZX-10R-style 1000 cc', vTop: 83, acc: 11.5, brake: 10.5, drag: 0.00055, wb: 1.45, steerMax: 0.55, mu: 11.2, gears: [11, 19, 27, 36, 46, 58], two: true, mass: 210, L: 2.1, W: 0.75, seat: [-0.2, 0.86], honk: 'scooter', helmet: true },
   bullet: { name: 'Bullet', model: 'Classic 350-style thumper', vTop: 31, acc: 3.3, brake: 6.9, drag: 0.0026, wb: 1.39, steerMax: 0.62, mu: 8.3, gears: [6, 11, 17, 23], two: true, mass: 195, L: 2.15, W: 0.8, seat: [-0.25, 0.85], honk: 'scooter', helmet: true },
   bus: { name: 'PMPML bus', model: '12 m CNG city bus', vTop: 18.5, acc: 1.05, brake: 4.5, drag: 0.0028, wb: 5.4, steerMax: 0.58, mu: 6.0, gears: [4, 8, 12.5], mass: 11000, L: 11.4, W: 2.55, honk: 'bus' },
 };
@@ -42,7 +43,7 @@ function modelFor(type) {
 function buildModel(type) {
   switch (type) {
     case 'scooter': case 'scooterP': return buildScooter({ parked: true });
-    case 'bike': case 'bikeP': case 'bullet': return buildBike({ parked: true });
+    case 'bike': case 'bikeP': case 'bullet': case 'superbike': return buildBike({ parked: true });
     case 'cycle': return buildCycle({ parked: true });
     case 'hatch': case 'sedan': case 'suv': case 'taxi': case 'lux': case 'jeep': case 'sports': case 'super': return buildCar(type, { interior: true });
     case 'tempo': return buildTempo();
@@ -170,7 +171,7 @@ export class Vehicle {
       a = eng - brk * S.brake * (this.brakeMul || 1) * Math.sign(v || 1);
       if (v < 0) a += brk * S.brake * 2;
     }
-    const foot = this.onFootpath ? (S.two ? 0.25 : 0.9) : 0;
+    const foot = this.onFootpath ? (S.two ? 0.25 : 0.9) * (this.offroad ? 0.35 : 1) : 0;          // (off-road tyres: kerbs and dirt barely slow you)
     a -= Math.sign(v) * (0.12 + S.drag * v * v + foot);
     if (inp.handbrake) a -= Math.sign(v) * (S.two ? 3.5 : 4.5);
     this.v = v + a * dt;
@@ -193,16 +194,19 @@ export class Vehicle {
     this.steer += clamp(target - this.steer, -rate * dt, rate * dt);
     let wT = this.v * Math.tan(this.steer) / S.wb;
     if (inp.handbrake && sp > 4 && !S.two) wT *= 1.4;
-    const mu = (inp.handbrake ? S.mu * 0.6 : S.mu) * (this.gripMul || 1);
+    // grip: the tyres (the garage), and the road: wet in the rain, worse off the tarmac
+    const wet = (W.wet || 0) * (this.rainTyre ? 0.3 : 1);
+    const mu = (inp.handbrake ? S.mu * 0.6 : S.mu) * (this.gripMul || 1) * (1 - wet * 0.25) * (this.onFootpath && !this.offroad ? 0.85 : 1);
     const latDemand = sp * Math.abs(wT);
     let slide = 0;
     if (latDemand > mu && sp > 0.5) { const k = mu / latDemand; slide = 1 - k; wT *= lerp(1, k, 0.7); }
     // drifting: past ~25 km/h a flick of the handbrake (or, in the fast ones, a bootful of throttle in a corner)
     // breaks the back loose; it keeps sliding, the turn carries on its own, opposite lock catches it, and it
     // scrubs speed. The faster you go in, the bigger and longer the slide. Not on two wheels.
-    const kick = !S.two && sp > 7 && (inp.handbrake && Math.abs(inp.steer) > 0.2 || (thr > 0.85 && slide > 0.12 && S.acc * (this.accMul || 1) > 5.5));
-    const caught = Math.abs(this.vl) < 1.1 || sp < 5;
-    this.drift = clamp((this.drift || 0) + (kick ? dt * 3.5 : -dt * (caught ? 3 : 0.45)), 0, 1);
+    const ease = (this.driftEase || 1) * (1 + wet * 0.8);             // drift tyres (and a wet road) let go sooner and slide longer
+    const kick = !S.two && sp > 7 / ease && (inp.handbrake && Math.abs(inp.steer) > 0.2 || (thr > 0.85 && slide > 0.12 / ease && S.acc * (this.accMul || 1) > 5.5 / ease));
+    const caught = Math.abs(this.vl) < 1.1 / ease || sp < 5;
+    this.drift = clamp((this.drift || 0) + (kick ? dt * 3.5 : -dt * (caught ? 3 : 0.45 / ease)), 0, 1);
     const D = this.drift;
     if (D > 0) wT += Math.sign(this.w || inp.steer || 1) * D * Math.min(1.1, sp / 22) * 0.55 * (1 - Math.max(0, -Math.sign(this.w) * inp.steer) * 0.9);
     this.w += (wT - this.w) * Math.min(1, dt * (S.two ? 8 : lerp(10, 2.6, D)));

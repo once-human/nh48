@@ -538,7 +538,7 @@ export const PAINTS = {
 // ---------------------------------------------------------------- far-LOD proxies (a few boxes each)
 export function buildLow(kind, parked = false) {
   const b = newB(true);
-  const two = ['scooter', 'scooterP', 'bike', 'bikeP', 'cycle', 'bullet'].includes(kind);
+  const two = ['scooter', 'scooterP', 'bike', 'bikeP', 'cycle', 'bullet', 'superbike'].includes(kind);
   if (two) {
     box(b, -0.8, 0.12, -0.05, 0.8, 0.6, 0.05, TYRE);
     box(b, -0.55, 0.45, -0.17, 0.55, 0.85, 0.17, [1, 1, 1], 1);

@@ -318,6 +318,7 @@ export const DEALER = [
   ['sedan', 'Compact sedan', 'Dzire-style', 880000],
   ['suv', 'SUV', 'Creta-style 1.5 diesel', 1590000],
   ['bullet', 'Bullet 350', 'Classic 350-style thumper; dhak-dhak', 215000],
+  ['superbike', 'Superbike', 'ZX-10R-style 1000 cc, 0-100 in 2.8 s, 299 km/h', 1850000],
   ['jeep', '4x4', 'Thar-style 2.2 diesel, soft top', 1650000],
   ['lux', 'Luxury sedan', 'E-Class-style 2.0 turbo, chauffeur seat in the back', 7900000],
   ['sports', 'Sports coupé', '911-style 3.0 flat-six, 0-100 in 3.5 s', 19500000],

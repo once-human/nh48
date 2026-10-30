@@ -1396,6 +1396,7 @@ export class Game {
       this.modfx.update(dt);
       this.edge.update(dt);
       this.arms.update(dt);
+      this.W.wet = this.weather && !this.interiors.inside ? this.weather.cur.rain : 0;        // (wet roads grip less: vehicle.js)
       if ((this._calT = (this._calT || 0) - dt) <= 0) { this._calT = 2; this.traffic.busyMul = this.calendar.trafficMul(this.hour); this.people.busyMul = this.calendar.crowdMul(this.hour); }
       if (this.input.took('KeyV')) this.rig.setMode(this.rig.mode + 1);
       if (this.input.took('KeyL')) this.lights.toggle();
