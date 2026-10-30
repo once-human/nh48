@@ -378,16 +378,17 @@ export class Audio {
     E.osc.frequency.setTargetAtTime(f, t, 0.04);
     E.osc2.frequency.setTargetAtTime(f * 2.01, t, 0.04);
     E.lfo.frequency.setTargetAtTime(f, t, 0.04);
-    E.lp.frequency.setTargetAtTime((260 + rpm * 900 + throttle * 300) * (kind === 'two' ? 1.5 : 1), t, 0.05);
+    const loud = this.engLoud || 1;            // a loud silencer from the garage: deeper and louder
+    E.lp.frequency.setTargetAtTime((260 + rpm * 900 + throttle * 300) * (kind === 'two' ? 1.5 : 1) * (loud > 1 ? 0.8 : 1), t, 0.05);
     E.bp.frequency.setTargetAtTime((700 + rpm * 1400) * mul, t, 0.05);
-    E.out.gain.setTargetAtTime(synth ? (0.16 + throttle * 0.1 + rpm * 0.06) * (kind === 'two' ? 0.7 : 1) : 0, t, 0.08);
+    E.out.gain.setTargetAtTime(synth ? (0.16 + throttle * 0.1 + rpm * 0.06) * (kind === 'two' ? 0.7 : 1) * loud : 0, t, 0.08);
     // recorded engines for cars and buses
     for (const [k, name] of [['car', 'car_idle'], ['bus', 'diesel_idle']]) {
       const on = running && kind === k;
       if (on && !this.loops[name] && this.buf[name]) this.loops[name] = this.loop(name, 0);
       const l = this.loops[name];
       if (!l) continue;
-      l.g.gain.setTargetAtTime(on ? 0.22 + throttle * 0.18 : 0, t, 0.12);
+      l.g.gain.setTargetAtTime(on ? (0.22 + throttle * 0.18) * loud : 0, t, 0.12);
       l.src.playbackRate.setTargetAtTime((on ? (k === 'bus' ? 0.85 : 0.9) + rpm * (k === 'bus' ? 0.7 : 1.3) : 1) * (this.rateMul || 1), t, 0.08);
     }
     if (!running && kind !== 'none') for (const k of ['street', 'traffic', 'ride']) this.setLoop(k, 0, 0.3);

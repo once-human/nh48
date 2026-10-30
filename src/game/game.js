@@ -67,6 +67,8 @@ import { Postcards } from './postcards.js';
 import { LiveView } from '../ui/liveview.js';
 import { MenuBar } from '../ui/menubar.js';
 import { Jhola } from '../ui/jhola.js';
+import { GarageUI } from './garageui.js';
+import { ModFX } from './modfx.js';
 import { Diary } from '../ui/diary.js';
 
 export class Game {
@@ -248,6 +250,7 @@ export class Game {
     this.approachSt = new StreetApproach(this);
     applySettings(this);
     this.trial = new Trial(this);
+    this.garageUI = new GarageUI(this); this.modfx = new ModFX(this);
     this.people.reaction = () => this.life.reaction();
     player.hpMax = () => this.life.hpMax;
     // sprinting tires you (about 15 s flat out, then you're down to a jog till you've got your breath back); shot or
@@ -427,10 +430,10 @@ export class Game {
     if (v.fuel === undefined) v.fuel = v === P.auto ? 1 : 0.35 + Math.random() * 0.6;
     if (v.dmg === undefined) v.dmg = 0;
     // forgiving: a full tank of CNG in the auto lasts ~60 km, a two-wheeler ~70, a car ~100
-    const range = v === P.auto ? 60000 : S.two ? (S.name === 'Bicycle' ? 1e12 : 70000) : 100000;
+    const range = (v === P.auto ? 60000 : S.two ? (S.name === 'Bicycle' ? 1e12 : 70000) : 100000) * (v.econ || 1);
     const was = v.fuel;
     v.fuel = Math.max(0, v.fuel - Math.abs(v.v) * dt / range * (0.6 + (v.throttle || 0) * 0.6));
-    const kind = v === P.auto ? 'CNG' : 'Petrol';
+    const kind = v === P.auto || v.cngKit ? 'CNG' : 'Petrol';
     if (was > 0.15 && v.fuel <= 0.15) this.hud.toast(`${kind} low`, `About 15% left. Nearest pump: ${this.nearestPump()}`, 'warn', 4);
     if (was > 0 && v.fuel <= 0) this.hud.toast(`Out of ${kind}`, 'Running on fumes: slow, but enough to get you to a pump', 'bad', 4);
     const fuelMul = v.fuel > 0 ? 1 : 0.38;
@@ -846,6 +849,7 @@ export class Game {
   closeMenus() {
     if (this.date && this.date.cur) this.date.close();
     if (this.trial && this.trial.open) this.trial.close();
+    if (this.garageUI && this.garageUI.open) this.garageUI.close();
     if (this.shops && this.shops.open) this.shops.close();
     if (this.club && this.club.on) this.club.leave();
     if (this.transit && this.transit.open) this.transit.close();
@@ -1232,7 +1236,11 @@ export class Game {
       }
       if (ev.type === 'bark' || ev.type === 'dogChase') { const d = Math.hypot(ev.x - P.x, ev.z - P.z); if (d < 60) this.audio.at(ev.x, ev.z, () => this.audio.bark(0.7, 0)); }
       if (ev.type === 'dogChase' && (this._dogT || 0) < this.t) { this._dogT = this.t + 30; this.hud.toast('A street dog is chasing you', 'Classic. Keep going, it’ll give up.', 'info', 2.4); }
-      if (ev.type === 'bump') { this.rig.shake(Math.min(0.25, ev.strength * 0.03)); this.audio.thud(Math.min(0.6, ev.strength * 0.12)); }
+      if (ev.type === 'bump') {
+        this.rig.shake(Math.min(0.25, ev.strength * 0.03)); this.audio.thud(Math.min(0.6, ev.strength * 0.12));
+        const v = !P.onFoot && P.cur;          // slammed (the garage): a breaker or a pothole scrapes the floor
+        if (v && (v.lower || 0) >= 0.07 && ev.strength > 0.9) { v.dmg = Math.min(0.9, (v.dmg || 0) + 0.006); this.audio.noiseBurst?.(0.18, 900, 0.6, 0.3); if (!this._scrapeT || this.t - this._scrapeT > 90) { this._scrapeT = this.t; this.hud.toast('Scraped the floor', 'Slammed and Pune’s speed breakers don’t mix', 'warn', 2.4); } }
+      }
       if (ev.type === 'tip') { this.rig.shake(0.5); this.audio.crash(0.8); this.hud.toast('Auto tipped over!', 'Corner slower, autos lift a wheel easily', 'warn', 3); }
       if (ev.type === 'hit') { this.audio.crash(Math.min(1, ev.speed / 6)); }
       if (ev.type === 'knock') { this.audio.crash(0.7); this.hud.toast('You knocked over a two-wheeler', 'They’re fine. Very, very angry, but fine.', 'warn', 2.6); }
@@ -1367,6 +1375,7 @@ export class Game {
       // a rental goes back at the end of its day
       for (const d of P.dropped) if (d.veh.owned && d.veh.owned.rental && this.clock > d.veh.owned.until && d.veh !== P.cur) { P.removeDropped(d, this.traffic); d.veh.dispose(); this.hud.toast('Rental returned', 'The travels picked up their scooter', 'info', 2.6); break; }
       this.vehicleWear(dt);
+      this.modfx.update(dt);
       if (this.input.took('KeyV')) this.rig.setMode(this.rig.mode + 1);
       if (this.input.took('KeyL')) this.lights.toggle();
       this.rig.lookBack = this.input.key('KeyB');
@@ -1426,6 +1435,8 @@ export class Game {
     this.lights.update(dt, night);
     if (this.state === 'play' || this.state === 'shop') this.phone.update(this.realDt || dt);
     if (this.story.talking) this.story.cam(dt);
+    if (this.garageUI && this.garageUI.open) this.garageUI.update(this.realDt || dt);
+    else if (this.state !== 'play' && this.modfx) this.modfx.update(dt);
     if (this.lightPools) { this.lightPools.mesh.visible = night > 0.05; this.lightPools.mesh.material.opacity = night * 0.55; }
     this.people.render(P.x, P.z);
     { const rn = this.weather && !(this.interiors && this.interiors.inside) ? this.weather.cur.rain : 0; this.people.rain = rn; this.people.hour = this.hour; if (this.crowd) this.crowd.rain = rn; }

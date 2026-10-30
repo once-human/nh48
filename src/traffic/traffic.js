@@ -428,6 +428,12 @@ export class Traffic {
     if (gk && gk.length) for (let i = 0; i < gk.length; i++) { const dx = gk[i].x - v.x, dz = gk[i].z - v.z, d2 = dx * dx + dz * dz; if (d2 < 900) vDes = Math.min(vDes, 2.4 + Math.sqrt(d2) * 0.12); }
     // buses pull in to the kerb at their stops and sit there a while (and the traffic behind goes round)
     if (v.type === 'bus' && !v.jc) vDes = this.busStop(v, vDes, dt);
+    // a siren or a beacon coming up behind: over to the kerb and slow (your police duty, or the garage's laal batti)
+    const Y = this.yieldTo;
+    if (Y && !v.jc) {
+      const dx = v.x - Y.x, dz = v.z - Y.z, along = dx * Y.hx + dz * Y.hz;
+      if (along > 2 && along < 55 && Math.abs(-dx * Y.hz + dz * Y.hx) < 7 && (v.hx * Y.hx + v.hz * Y.hz) > 0.4) { v.latT = latBounds(v.l)[1]; vDes = Math.min(vDes, 2.2); }
+    }
     // --- obstacles
     const look = 7 + v.v * 2.4;
     const ob = this.scan(v, 0, look);

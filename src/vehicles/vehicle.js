@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { bumpsAt } from '../world/groundChunk.js';
 import { flyResolve, flyTrack, flyHeight } from '../world/flyover.js';
-import { buildScooter, buildBike, buildCycle, buildCar, buildBus, buildTempo, buildAuto, PAINTS } from './models.js';
+import { buildScooter, buildBike, buildCycle, buildCar, buildBus, buildTempo, buildAuto, PAINTS, wheelsOf } from './models.js';
 import { buildCarCockpit } from './cockpit.js';
 import { clamp, lerp, wrapAngle } from '../core/util.js';
 import { lin } from '../world/geo.js';
@@ -30,7 +30,7 @@ export function specOf(type) { const s = SPECS[type]; return s && s.alias ? SPEC
 // models are built once per type (taking a vehicle used to rebuild its whole mesh on the spot)
 const MODELS = new Map();
 function modelFor(type) {
-  if (!MODELS.has(type)) MODELS.set(type, buildModel(type));
+  if (!MODELS.has(type)) MODELS.set(type, wheelsOf(() => buildModel(type)));
   return MODELS.get(type);
 }
 function buildModel(type) {
@@ -86,9 +86,10 @@ export class Vehicle {
     body.instanceColor.setXYZ(0, this.paint[0], this.paint[1], this.paint[2]);
     this.tilt.add(body);
     this.bodyMesh = body;
+    this.wheels = m.wh || [];
     if (m.glass && m.glass.attributes.position.count) {
       const g = new THREE.Mesh(m.glass, vmats.glass);
-      this.tilt.add(g);
+      this.tilt.add(g); this.glassMesh = g;          // (window film from the garage swaps its material)
     }
     // driver's-seat view: cars get a real interior (dashboard, turning wheel, live cluster)
     if (['hatch', 'sedan', 'suv', 'taxi'].includes(type)) {
@@ -153,7 +154,9 @@ export class Vehicle {
     } else {
       const load = 1 + this.load * 0.1;
       const vTop = S.vTop * (this.powerMul ?? 1);
-      let eng = thr * S.acc * (this.accMul || 1) * Math.min(1.1, this.powerMul ?? 1) / load * Math.max(0, 1 - Math.pow(Math.max(0, v) / vTop, 3));
+      const n2o = this.boost ? 1.3 : 1;                                   // nitrous (the garage): harder, and past the usual top speed
+      let eng = thr * S.acc * (this.accMul || 1) * Math.min(1.1, this.powerMul ?? 1) / load * Math.max(0, 1 - Math.pow(Math.max(0, v) / (vTop * n2o), 3));
+      if (this.boost && thr > 0.1) eng += 3.2;
       if (this.shiftT > 0) { this.shiftT -= dt; eng *= 0.3; }
       a = eng - brk * S.brake * (this.brakeMul || 1) * Math.sign(v || 1);
       if (v < 0) a += brk * S.brake * 2;
@@ -199,7 +202,7 @@ export class Vehicle {
     const half = S.wb / 2;
     const hF = this.heightAt(this.x + hx * half, this.z + hz * half), hR = this.heightAt(this.x - hx * half, this.z - hz * half);
     const jolt = Math.max(Math.abs(hF - this.prevH[0]), Math.abs(hR - this.prevH[1]));
-    if (jolt > 0.05 && sp > 2.5) { this.vy += jolt * sp * (S.two ? 0.7 : 0.45); this.events.push({ type: 'bump', strength: jolt * sp }); }
+    if (jolt > 0.05 && sp > 2.5) { const soft = this.soft ?? 1; this.vy += jolt * sp * (S.two ? 0.7 : 0.45) * soft; this.events.push({ type: 'bump', strength: jolt * sp * soft }); }   // (soft: lifted suspension from the garage)
     this.prevH = [hF, hR];
     this.onFootpath = !W.surf.isRoad(this.x, this.z);
     this.vy += (((hF + hR) / 2 - this.y) * 160 - this.vy * 14) * dt;
@@ -294,6 +297,7 @@ export class Vehicle {
   dispose() {
     this.root.parent?.remove(this.root);
     this.bodyMesh.dispose();                   // the model geometry is shared; only the instance goes
+    if (this.bodyMesh.userData.ownGeo) this.bodyMesh.geometry.dispose();     // (a resprayed auto has its own copy)
     if (this.cockpit) this.cockpit.group.traverse(o => { if (o.material && o.material.map && o.material.map.isCanvasTexture) o.material.map.dispose(); });
   }
 }

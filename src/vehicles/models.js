@@ -42,7 +42,10 @@ function box(b, x0, y0, z0, x1, y1, z1, c, paint = 0, glow = 0) {
   b.addGeo(G.box, M((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0)), c, glow, paint);
 }
 const MATTE = -1;       // glow channel value for matte parts (see vehmat.js)
+let WHEELS = null;                    // collecting wheel positions for the model being built (see wheelsOf)
+export function wheelsOf(build) { WHEELS = []; const m = build(); m.wh = WHEELS; WHEELS = null; return m; }
 function wheel(b, x, y, z, r, w, hub = RIM) {
+  if (WHEELS) WHEELS.push({ x, y, z, r, w });
   b.addGeo(G.cyl16, M(x, y, z, r, w, r, Math.PI / 2), TYRE, MATTE);
   b.addGeo(G.cyl8, M(x, y, z, r * 0.55, w + 0.01, r * 0.55, Math.PI / 2), hub);
 }

@@ -50,6 +50,7 @@ export const FINES = {
   pickpocket: { amt: 3000, name: 'Pickpocketing (theft)', law: 'BNS s.303' },
   stolengoods: { amt: 10000, name: 'Carrying stolen property', law: 'BNS s.317' },
   racing:    { amt: 5000, name: 'Racing on a public road', law: 'MV Act s.189' },
+  alter:     { amt: 5000, name: 'Illegal alteration to a vehicle', law: 'MV Act s.52, s.182A(4)' },     // per alteration (the garage's mods, modfx.js)
 };
 // what you're wanted for decides what the marshals shout and what you're booked under when caught
 const SERIOUS = new Set(['theft', 'assault', 'hurt', 'hitrun', 'fled', 'pickpocket', 'murder', 'blast']);
@@ -57,7 +58,7 @@ const CHARGE_ORDER = ['murder', 'blast', 'assault', 'hitrun', 'theft', 'pickpock
 const TOW = { two: 200, three: 200, four: 400, fine: 500 };   // towing charges + no-parking fine
 const SPEED_LIMIT = 50;                                         // km/h on city arterials
 const COP_NAMES = ['Havaldar Shinde', 'Havaldar Jadhav', 'PSI Kulkarni', 'Havaldar Pawar', 'Havaldar Gaikwad', 'ASI Deshmukh', 'Havaldar More', 'PSI Patil', 'Havaldar Sawant', 'Havaldar Kamble'];
-const STOP_LINE = { signal: 'stop_signal', helmet: 'stop_helmet', wrong: 'stop_wrong', speed: 'stop_speed', horn: 'stop_horn', check: 'stop_check', rash: 'stop_speed', suspended: 'stop_check', theft: 'caught_theft', assault: 'caught_assault', hurt: 'caught_hurt', hitrun: 'caught_hitrun', fled: 'caught_fled', disobey: 'caught_disobey', pickpocket: 'caught_pickpocket', murder: 'caught_assault', blast: 'caught_assault' };
+const STOP_LINE = { alter: 'stop_check', signal: 'stop_signal', helmet: 'stop_helmet', wrong: 'stop_wrong', speed: 'stop_speed', horn: 'stop_horn', check: 'stop_check', rash: 'stop_speed', suspended: 'stop_check', theft: 'caught_theft', assault: 'caught_assault', hurt: 'caught_hurt', hitrun: 'caught_hitrun', fled: 'caught_fled', disobey: 'caught_disobey', pickpocket: 'caught_pickpocket', murder: 'caught_assault', blast: 'caught_assault' };
 
 export class Police {
   constructor(game) {
@@ -143,6 +144,7 @@ export class Police {
     let amt = F.amt;
     if (kind === 'speed' && S) amt = S.two || this.g.player.inAuto ? F.amt : S.L > 5 ? F.heavy : F.car;
     if (F.repeat && (this.record[kind] || 0) > 0) amt = F.repeat;
+    if (kind === 'alter') amt = F.amt * Math.min(3, this.alterN || 1);
     return amt;
   }
   // a rule was broken at (x, z). Cop nearby → maybe a stop. Camera → e-challan later. Else nothing.
@@ -151,6 +153,7 @@ export class Police {
     if (this.stop || (this.cool[kind] || 0) > 0) return;
     const P = this.g.player;
     if (P.onFoot) return;
+    if (kind === 'alter') { this.alterN = info.n || 1; this.alterWhat = info.what || []; }
     // Pune reality: most offences go unnoticed. A havaldar right there may stop you, or just blow the
     // whistle and wave you on; cameras only watch the big junctions. At most one challan every ~2 minutes.
     this.cool[kind] = kind === 'helmet' ? 90 : 45;
@@ -371,7 +374,7 @@ export class Police {
       if (serious) s.opts[2] = { id: 'run', t: P.onFoot ? 'Run for it' : 'Floor it', s: 'They will chase you' };
     }
     s.view = {
-      who: cop.name, rank: cop.marshal ? (cop.marshal.role === 'qrt' ? 'QRT, Pune Police' : cop.marshal.jeep ? 'Patrol, Pune Police' : 'Beat Marshal, Pune Police') : 'Traffic Police, Pune', mood: cop.mood, kind: (s.kind === 'check' && s.found ? FINES[s.found].name : FINES[s.kind].name) + (s.kind !== 'disobey' && this.charges.has('disobey') && serious ? ' + ignoring a police signal' : ''), law: FINES[s.kind].law,
+      who: cop.name, rank: cop.marshal ? (cop.marshal.role === 'qrt' ? 'QRT, Pune Police' : cop.marshal.jeep ? 'Patrol, Pune Police' : 'Beat Marshal, Pune Police') : 'Traffic Police, Pune', mood: cop.mood, kind: (s.kind === 'check' && s.found ? FINES[s.found].name : FINES[s.kind].name) + (s.kind === 'alter' && this.alterWhat && this.alterWhat.length ? `: ${this.alterWhat.join(', ').toLowerCase()}` : '') + (s.kind !== 'disobey' && this.charges.has('disobey') && serious ? ' + ignoring a police signal' : ''), law: FINES[s.kind].law,
       amt: s.kind === 'check' && !s.found ? '' : fmtRupees(total), line: LINES[line][4], tr: LINES[line][5], opts: s.opts,
       foot: `${dues ? `Pending challans ${fmtRupees(dues)}` : 'No pending challans'} · ${this.suspended ? 'Licence suspended' : 'Licence valid'} · ${fmtRupees(G.stats.money)} on you`,
     };
@@ -412,7 +415,8 @@ export class Police {
       }
     } else if (o.id === 'argue') {
       // arguing works when you were actually right (amber), and rarely otherwise
-      const chance = s.amber ? 0.75 : 0.08 * (0.5 + cop.mood);
+      const cam = P.cur && P.cur.dashcam;          // (a dashcam from the garage: the footage settles it)
+      const chance = s.amber ? (cam ? 0.97 : 0.75) : 0.08 * (0.5 + cop.mood) * (cam && s.kind !== 'alter' ? 1.8 : 1);
       if (r < chance) { line = 'r_argue_ok'; res = s.amber ? 'You were right' : 'He let it go'; sub = s.amber ? 'It was amber when you crossed. He knows it.' : 'Lucky. He’s in a good mood.'; kind = 'meter'; }
       else {
         line = 'r_argue_no';
@@ -495,6 +499,8 @@ export class Police {
       if (s.cop.ped) s.phase = 'leave'; else this.stop = null;
       return;
     }
+    // fined for the garage's alterations: they come off, there and then
+    if (s.kind === 'alter' && kind !== 'meter' && !/changes hands/.test(res)) { const gone = G.modfx && G.modfx.confiscate(); if (gone) sub += ` He has you take off the ${gone}.`; }
     if (line) line = this.say(line, cop) || line;
     s.phase = 'result'; s.t = 0;
     G.hud.stopResult(res, sub, kind, LINES[line] ? LINES[line][4] : '', LINES[line] ? LINES[line][5] : '');

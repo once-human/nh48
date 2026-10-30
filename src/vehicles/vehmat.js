@@ -26,3 +26,26 @@ export function vehicleMaterials() {
   // makes the renderer swap shaders back and forth on every draw
   return { body, solid, glass, glassI: glass.clone() };
 }
+
+// garage paint finishes (mods.js): the same paint shader, with its own roughness and metal on the painted panels only
+// (trim, tyres and lamps keep theirs). One material per finish, shared by every vehicle that has it
+const FIN = new Map();
+export function finishMaterial(key, rough, metal, env) {
+  if (FIN.has(key)) return FIN.get(key);
+  const m = glowable(paintable(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rough, metalness: metal, envMapIntensity: env }), 'vehfin'), 'vehfin');
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => {
+    prev(sh, r);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vPaintF;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvPaintF = paint;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vPaintF;')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nif (abs(vPaintF - 1.0) > 0.5) { metalnessFactor = 0.08; roughnessFactor = max(roughnessFactor, 0.45); }');
+  };
+  m.customProgramCacheKey = () => 'md-paint-vehfin-glow';
+  FIN.set(key, m); return m;
+}
+// window film: near-black glass you can't see into
+const TINT = new Map();
+export function tintMaterial(level) {
+  if (!TINT.has(level)) TINT.set(level, new THREE.MeshStandardMaterial({ color: [0x15191d, 0x0b0d10, 0x060708, 0x020203][level] || 0x15191d, roughness: 0.04, metalness: 0.45, envMapIntensity: 1.2 + level * 0.25 }));
+  return TINT.get(level);
+}

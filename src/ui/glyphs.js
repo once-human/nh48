@@ -52,12 +52,40 @@ const P = {
   film: 'M3 4h18v16H3zm2 2v2h2V6zm12 0v2h2V6zM5 10v2h2v-2zm12 0v2h2v-2zM5 14v2h2v-2zm12 0v2h2v-2zM9 6v12h6V6z',
   college: 'M12 3 1 8.5 12 14l9-4.5V16h2V8.5zM5.5 12.6V17c0 1.7 2.9 3.5 6.5 3.5s6.5-1.8 6.5-3.5v-4.4L12 15.9z',
   building: 'M4 21V3h11v6h5v12zm3-15v2h2V6zm4 0v2h2V6zM7 10v2h2v-2zm4 0v2h2v-2zm6 2v2h1v-2zM7 14v2h2v-2zm4 0v2h2v-2zm6 2v2h1v-2zm-8 2v3h2v-3z',
+  // the garage
+  spray: 'M8 8h8v13a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1zM10 4.5h4V7h-4zM15.5 2h2v1.6h-2zM19 1.2h1.6v1.6H19zM19 4h1.6v1.6H19z',
+  piston: 'M6 2.5h12V11H6zm2 2.2v1.6h8V4.7zm0 3.2v1.6h8V7.9zM10.6 11h2.8v4.4a3.2 3.2 0 1 1-2.8 0zM11 18.2a1 1 0 1 0 2 0 1 1 0 0 0-2 0z',
+  turbo: 'M12 10.2c.3-3.6 2-7.2 5.2-6.7 2.6.4 2.4 3.9-.4 5.6-1.4.9-3.1 1.3-4.8 1.1zm1.8 1.8c3.6.3 7.2 2 6.7 5.2-.4 2.6-3.9 2.4-5.6-.4-.9-1.4-1.3-3.1-1.1-4.8zM12 13.8c-.3 3.6-2 7.2-5.2 6.7-2.6-.4-2.4-3.9.4-5.6 1.4-.9 3.1-1.3 4.8-1.1zM10.2 12c-3.6-.3-7.2-2-6.7-5.2.4-2.6 3.9-2.4 5.6.4.9 1.4 1.3 3.1 1.1 4.8z',
+  disc: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 6.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7zM12 4.3a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2zm0 13.2a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2zM4.3 12a1.1 1.1 0 1 0 2.2 0 1.1 1.1 0 0 0-2.2 0zm13.2 0a1.1 1.1 0 1 0 2.2 0 1.1 1.1 0 0 0-2.2 0z',
+  tyre: 'M12 1.5a10.5 10.5 0 1 0 0 21 10.5 10.5 0 0 0 0-21zm0 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zm0 3.2a3.3 3.3 0 1 0 0 6.6 3.3 3.3 0 0 0 0-6.6z',
+  rim: 'M12 1.5a10.5 10.5 0 1 0 0 21 10.5 10.5 0 0 0 0-21zm-1 3.6v4.3a2.7 2.7 0 0 0-1.4 1L5.6 9a6.9 6.9 0 0 1 5.4-3.9zm2 0A6.9 6.9 0 0 1 18.4 9l-4 1.4a2.7 2.7 0 0 0-1.4-1zM5.2 11l4.1 1.3a2.7 2.7 0 0 0 .5 1.7l-2.5 3.5A6.9 6.9 0 0 1 5.2 11zm13.6 0a6.9 6.9 0 0 1-2.1 6.5L14.2 14a2.7 2.7 0 0 0 .5-1.7zM11 14.6a2.7 2.7 0 0 0 2 0l2.5 3.5a6.9 6.9 0 0 1-7 0z',
+  spring: 'M5 1.5h14V4H5zM5 20h14v2.5H5zM6.5 5.5 18 8v2.3L6.5 7.8zm0 4.4L18 12.4v2.3L6.5 12.2zm0 4.4L18 16.8V19L6.5 16.6z',
+  bulb: 'M12 1.5a7 7 0 0 0-4 12.7V17h8v-2.8a7 7 0 0 0-4-12.7zM9 18.3h6V20H9zm1 2.4h4V22h-4z',
+  beam: 'M3 7.5A5.5 5.5 0 0 1 8.5 2H10v20H8.5A5.5 5.5 0 0 1 3 16.5zM12 4.5l9.5-1.5v2.4L12 6.9zm0 6.3h9.5v2.4H12zm0 6.3 9.5 2.4V21.9L12 19.5z',
+  horn: 'M2.5 9h4.5l9.5-5.5v17L7 15H2.5zM18.5 8.8a3.6 3.6 0 0 1 0 6.4zM7 16h3.2l1.3 5.5H8.3z',
+  seat: 'M7.2 2h5.6a2 2 0 0 1 2 2.2L14 12.5h4.8A2.2 2.2 0 0 1 21 14.7V17H8.7a2 2 0 0 1-2-1.7L5.2 4.3A2 2 0 0 1 7.2 2zM8.5 18.5h3V22h-3zm7.5 0h3V22h-3z',
+  numplate: 'M1.5 6.5h21v11h-21zm2 2v7h17v-7zM5.5 10h2.6v4H5.5zm3.8 0h2.6v4H9.3zm4.4 0h2.6v4h-2.6zm3.8 0h1.6v4h-1.6z',
+  exhaust: 'M1.5 12.5h11a3.5 3.5 0 0 1 0 7h-11zM17.8 8.2a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zM21 3.2a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4zM14.6 4a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2z',
+  window: 'M2.5 19.5 6.6 5.5h10.8l4.1 14zm4.4-2.2h10.2L14.6 7.7h-5.2z',
+  beacon: 'M6.5 12.5a5.5 5.5 0 0 1 11 0v5h-11zM4.5 18.8h15V22h-15zM11 1.5h2v3.2h-2zM3.2 5.2l1.4-1.4 2.3 2.3-1.4 1.4zm17.6 0-1.4-1.4-2.3 2.3 1.4 1.4z',
+  speaker: 'M6 1.5h12A1.5 1.5 0 0 1 19.5 3v18a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 21V3A1.5 1.5 0 0 1 6 1.5zm6 9.3a4.6 4.6 0 1 0 0 9.2 4.6 4.6 0 0 0 0-9.2zm0 3a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2zM12 4.2a2.2 2.2 0 1 0 0 4.4 2.2 2.2 0 0 0 0-4.4z',
+  nitro: 'M10 1.5h4v2.2h-4zM9 4.8h6a2.2 2.2 0 0 1 2.2 2.2v13a2.2 2.2 0 0 1-2.2 2.2H9A2.2 2.2 0 0 1 6.8 20V7A2.2 2.2 0 0 1 9 4.8zm1 5.4v6.6h4v-6.6z',
+  hydro: 'M12 1 5.5 7.5H10V11h4V7.5h4.5zM12 23l6.5-6.5H14V13h-4v3.5H5.5z',
+  cam: 'M3 6.5h11A2.2 2.2 0 0 1 16.2 8.7v1.7l5.3-3.2v9.6l-5.3-3.2v1.7A2.2 2.2 0 0 1 14 17.5H3A2.2 2.2 0 0 1 .8 15.3V8.7A2.2 2.2 0 0 1 3 6.5z',
+  brush: 'M14.2 2.5l7.3 7.3-7.6 7.6-7.3-7.3zM5.4 11.4l7.2 7.2c-1.1 2.3-3.4 3.4-6.1 3.4H2v-2c1.3 0 2.1-1 2.1-2.5 0-2.5.1-4.7 1.3-6.1z',
+  chip: 'M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3zm2.2 5.2v5.6h5.6V9.2zM8 1h2v3H8zm6 0h2v3h-2zM8 20h2v3H8zm6 0h2v3h-2zM1 8h3v2H1zm0 6h3v2H1zm19-6h3v2h-3zm0 6h3v2h-3z',
+  flame: 'M12.4 1.5c1 4.2 5.6 6.4 5.6 11.8a6 6 0 0 1-12 0c0-2.8 1.5-4.6 2.9-5.7 0 2.2 1.1 3.4 2.3 3.4 0-3.3-1.6-5.6 1.2-9.5z',
+  warn: 'M12 1.8 1 21.5h22zm-1.2 6.4h2.4v7h-2.4zm0 8.6h2.4v2.4h-2.4z',
+  body: 'M3.2 11.5 6 6.5h9.5l4 5 2.5.6V17h-2.2a2.8 2.8 0 0 0-5.6 0H9.8a2.8 2.8 0 0 0-5.6 0H2v-4.6zM7 8.4l-1.5 3H11v-3zm6 0v3h4.5L15 8.4zM7 15.6a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2zm10 0a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2zM16 3h6v2h-6z',
 };
 // each glyph's own colour (bold, the way games colour-code things); pass a colour to override
 const C = { heart: '#ff4d5e', food: '#ff8a3d', drop: '#3ea8ff', bolt: '#ffd23f', run: '#f1ece2', smile: '#3ddc84', glass: '#e8b04a', rupee: '#6fdc8c', cash: '#6fdc8c', bank: '#6aa8ff', gold: '#ffc83d',
   auto: '#ffd23f', bag: '#ff9f43', fist: '#f3c9a0', paw: '#f1ece2', burst: '#ff6b5e', plate: '#f1ece2', star: '#ffd23f', receipt: '#f1ece2', card: '#3ddc84', shield: '#5aa2ff', home: '#f1ece2', pin: '#ff6b5e',
   user: '#f1ece2', rank: '#ffd23f', flag: '#ffd23f', road: '#f1ece2', phone: '#f1ece2', clock: '#f1ece2', pagdi: '#ffb224', lotus: '#5aa2ff', shirt: '#ff5a5f', dumbbell: '#3ddc84', cart: '#ff9f43',
   pad: '#f1ece2', diamond: '#ffc83d', chat: '#3ddc84', car: '#a78bfa', cross: '#ff4d5e', fuel: '#a08cff', bus: '#33d17a', wrench: '#f1ece2', check: '#3ddc84', lock: '#8a8f98', pencil: '#f1ece2', tree: '#5bbf6a',
-  temple: '#ff9f43', film: '#ff6ec7', college: '#c08cff', building: '#9aa0aa' };
+  temple: '#ff9f43', film: '#ff6ec7', college: '#c08cff', building: '#9aa0aa',
+  spray: '#ff5fa2', piston: '#ff8a3d', turbo: '#5ad1ff', disc: '#ff5e5e', tyre: '#c9ced6', rim: '#e8ecf2', spring: '#ffd23f', bulb: '#b58cff', beam: '#fff1b8', horn: '#ffb224',
+  seat: '#e0a26b', numplate: '#ffd23f', exhaust: '#b8bec8', window: '#6fb8ff', beacon: '#ff3b3b', speaker: '#a78bfa', nitro: '#3ea8ff', hydro: '#3ddc84', cam: '#f1ece2', brush: '#ff7a45',
+  chip: '#3ddc84', flame: '#ff6a2b', warn: '#ff4d5e', body: '#a78bfa' };
 export const g = (name, cls = '', col) => P[name] ? `<svg class="gy ${cls}" viewBox="0 0 24 24" aria-hidden="true" style="color:${col || C[name] || 'currentColor'}"><path fill-rule="evenodd" d="${P[name]}"/></svg>` : '';
 export const GLYPH = P;

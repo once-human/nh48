@@ -184,9 +184,11 @@ export class PlayerAuto {
       // torque falls off towards the top of 4th; passengers and luggage make it slower to pull
       const load = 1 + (this.load || 0) * 0.12;
       const vTop = V_TOP * (this.powerMul ?? 1);          // garage tune, fuel and damage (game.vehicleWear)
-      let eng = thr * 2.35 * Math.min(1.1, this.powerMul ?? 1) / load * Math.max(0, 1 - Math.pow(Math.max(0, v) / vTop, 3));
+      const n2o = this.boost ? 1.3 : 1;                  // nitrous, turbo, brakes, grip: the garage's mods (mods.js)
+      let eng = thr * 2.35 * (this.accMul || 1) * Math.min(1.1, this.powerMul ?? 1) / load * Math.max(0, 1 - Math.pow(Math.max(0, v) / (vTop * n2o), 3));
+      if (this.boost && thr > 0.1) eng += 3.0;
       if (this.shiftT > 0) { this.shiftT -= dt; eng *= 0.25; }
-      a = eng - brk * 6.2 * Math.sign(v || 1);
+      a = eng - brk * 6.2 * (this.brakeMul || 1) * Math.sign(v || 1);
       if (v < 0) a += brk * 6.2 * 2;     // brake while rolling back
     }
     const drag = 0.13 + 0.0025 * v * v + (this.onFootpath ? 0.5 : 0);
@@ -211,7 +213,7 @@ export class PlayerAuto {
     let wT = this.v * Math.tan(this.steer) / WB;
     if (inp.handbrake && sp > 4) wT *= 1.45;
     // grip limit (autos tip before they slide; this mostly matters with the handbrake)
-    const mu = inp.handbrake ? 5.0 : 8.5;
+    const mu = (inp.handbrake ? 5.0 : 8.5) * (this.gripMul || 1);
     const latDemand = sp * Math.abs(wT);
     let slide = 0;
     if (latDemand > mu && sp > 0.5) { const k = mu / latDemand; slide = (1 - k); wT *= lerp(1, k, 0.6); }
@@ -249,8 +251,9 @@ export class PlayerAuto {
     // jolts from kerbs / breakers / potholes
     const jolt = Math.max(Math.abs(hF - this.prevH[0]), Math.abs(hL - this.prevH[1]), Math.abs(hR - this.prevH[2]));
     if (jolt > 0.05 && sp > 2.5) {
-      this.vy += jolt * sp * 0.55;
-      this.events.push({ type: 'bump', strength: jolt * sp });
+      const soft = this.soft ?? 1;
+      this.vy += jolt * sp * 0.55 * soft;
+      this.events.push({ type: 'bump', strength: jolt * sp * soft });
     }
     this.prevH = [hF, hL, hR];
     this.onFootpath = !this.W.surf.isRoad(this.x, this.z);
@@ -361,7 +364,7 @@ export class PlayerAuto {
     const t = performance.now() / 1000;
     const shiver = (this.v === 0 && this.tipped === 0) ? Math.sin(t * 95) * 0.0035 + Math.sin(t * 61) * 0.002 : Math.sin(t * 140) * 0.0012;
     const tipRoll = -this.tipAng * this.tipSide;      // falls to the outside of the turn
-    this.tilt.position.set(0, this.y + shiver + this.lift * 0.5 + Math.abs(tipRoll) * 0.45, 0);
+    this.tilt.position.set(0, this.y + shiver + this.lift * 0.5 + Math.abs(tipRoll) * 0.45 - (this.lower || 0), 0);
     // roll about the forward axis (x), pitch about the right axis (z)
     this.tilt.rotation.set(this.roll - this.lift * Math.sign(this.latAcc) + tipRoll, 0, this.pitch, 'YXZ');
     // wheels: spin + steer
