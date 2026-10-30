@@ -49,6 +49,13 @@ export class Studio {
     else if (frame === 'shoe') { C.fov = 24; C.position.set(0.5, 0.5, 0.78); C.lookAt(0, 0.07, 0.05); }
     else if (frame === 'head') { C.fov = 26; C.position.set(hp.x, hp.y - 0.05, hp.z + 1.6); C.lookAt(hp.x, hp.y - 0.17, hp.z); }
     else { C.fov = this.opts.fov ?? 24; const mid = hp.y * 0.53; C.position.set(0, mid + 0.25, 5.4); C.lookAt(0, mid, 0); }
+    return this.grab();
+  }
+  // anything else in the studio (a vehicle): the camera where you say
+  shootCam(px, py, pz, lx, ly, lz, fov = 24) { const C = this.cam; C.fov = fov; C.position.set(px, py, pz); C.lookAt(lx, ly, lz); return this.grab(); }
+  grab() {
+    const G = this.g, R = G.renderer, C = this.cam;
+    this.sc.updateMatrixWorld(true);
     C.aspect = this.w / this.h; C.updateProjectionMatrix(); C.updateMatrixWorld();
     const prev = R.getRenderTarget(), ex = R.toneMappingExposure;
     const cc = R.getClearColor(new THREE.Color()), ca = R.getClearAlpha(); if (this.sc.background === null) R.setClearColor(0x000000, 0);

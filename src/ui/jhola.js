@@ -11,6 +11,7 @@ import { itemArt, photo } from './itemArt.js';
 import { bagOrder } from '../game/bag.js';
 import { CLOTHES, SHOES, applyWear, fmt } from '../game/shops.js';
 import { Studio } from '../game/studio.js';
+import { Vehicle, defaultPaint, specOf } from '../vehicles/vehicle.js';
 import { real } from './materials2d.js';
 import { missionsRoom, statsRoom } from './rooms.js';
 
@@ -227,6 +228,17 @@ export class Jhola {
     const G = this.g;
     try {
       if (!this.studio) { this.studio = new Studio(G, 320, 320, { bg: null, floor: false }); }
+      if (job.veh) {
+        // a vehicle, three-quarter front, low, the way a showroom shoots it
+        const v = new Vehicle(G.W, this.studio.sc, G.vmats, job.type, job.paint || defaultPaint(job.type, { next: () => 0.3 }));
+        const S = specOf(job.type), L = S.L || 3, H = (S.H || 1.6);
+        v.root.position.set(0, 0, 0); v.root.rotation.y = 0;
+        const cv = this.studio.shootCam(L * 1.15, H * 0.9 + 0.4, L * 1.55, 0, H * 0.42, 0, 26);
+        v.dispose();
+        const url = trim(cv); this.renders.set(job.key, url);
+        for (const im of document.querySelectorAll(`img[data-r="${CSS.escape(job.key)}"]`)) { im.src = url; im.hidden = false; }
+        return;
+      }
       const g = col(MANNEQUIN), L = { ...job.lookFn() };
       if (!job.raw) { L.skin = g; L.hair = g; L.beard = false; L.bindi = false; }
       if (!job.raw) {
@@ -280,16 +292,19 @@ export class Jhola {
     this.tab = k;
     if (k === 'inv') { G.state = 'play'; G.timeWarp = 1 / 60; G.audio.hush?.(false); G.audio.slowmo?.(2); }
     else { G.state = 'shop'; G.timeWarp = 1; G.audio.hush?.(true); }
+    // the rooms sit over the city blurred and dimmed, the way the pause menu does it
+    G.renderer && G.renderer.domElement.classList.toggle('paused', k !== 'inv');
     this.paint();
   }
   // toMenu: going straight on to the map or settings (keep the mouse, they pause the world themselves)
   close(toMenu) {
     if (!this.on) return;
     const G = this.g;
-    this.on = false; this.tab = null; this.ctx(null); this.inspect(null); G.hud && G.hud.root && G.hud.root.classList.remove('in-jl');
+    this.on = false; this.tab = null; this._rt = null; this.ctx(null); this.inspect(null); G.hud && G.hud.root && G.hud.root.classList.remove('in-jl');
     this.qb.classList.remove('open');
     this.el.classList.remove('in'); this.el.classList.add('out'); setTimeout(() => { if (!this.on) this.el.hidden = true; }, 240);
     G.state = 'play'; G.timeWarp = 1; G.audio.slowmo?.(0); G.audio.hush?.(false);
+    G.renderer && G.renderer.domElement.classList.remove('paused');
     if (this.from && Math.abs(G.camera.fov - this.from.fov) > 0.01) { G.camera.fov = this.from.fov; G.camera.updateProjectionMatrix(); }
     if (G.rig) G.rig.inited = false;
     G.life.save(); if (!toMenu) G.lockMouse?.();
@@ -308,6 +323,9 @@ export class Jhola {
     el.querySelector('.iv-stats').hidden = true;
     el.classList.toggle('room', stats);
     const room = el.querySelector('.iv-room'); room.hidden = !stats;
+    // a room you've just come into slides in; picking something inside it only moves what changed
+    const ent = this._rt !== this.tab; this._rt = this.tab; clearTimeout(this._et);
+    room.classList.toggle('enter', ent); if (ent) this._et = setTimeout(() => room.classList.remove('enter'), 600);
     if (stats) { const sc = room.querySelector('.rm-l .rm-scroll'), top = sc ? sc.scrollTop : 0; room.innerHTML = this.tab === 'stats' ? statsRoom(this) : missionsRoom(this); const sc2 = room.querySelector('.rm-l .rm-scroll'); if (sc2) sc2.scrollTop = top;
       const lc = this.tab === 'missions' && this.mloc && room.querySelector('.rm-pic.live canvas'); if (lc && G.liveView) G.liveView.show(this.mloc, lc); }
     el.querySelector('.iv-keys').hidden = stats; el.querySelector('.iv-qcard').hidden = stats; el.classList.toggle('t-inv', this.tab === 'inv');
@@ -382,6 +400,13 @@ export class Jhola {
       <div class="ic-h"><span class="st-who">Standing</span></div>
       ${lean('Respect', s.respect || 0, 'Laughed at', 'Known')}${lean('Karma', s.karma || 0, 'Avoided', 'Blessed')}
       <div class="ic-chips"><span><small>Style here</small>${st ? (st.odd ? 'Bold' : st.score > 0.85 ? 'Spot on' : st.score > 0.65 ? 'Fine' : 'Off') : '–'}</span><span><small>Fitness</small>+${Math.round(s.fitness || 0)}</span>${s.drunk > 0.15 ? `<span><small>Drink</small>${s.drunk > 0.6 ? 'Drunk' : 'Tipsy'}</span>` : ''}</div>`;
+  }
+  // a vehicle, rendered in the studio (for the stats): type and paint
+  vehShot(type, paint) {
+    const key = 'veh:' + type + ':' + (paint ? paint.map(v => v.toFixed(2)).join(',') : '');
+    const r = this.renders.get(key); if (r !== undefined) return { key, url: r };
+    if (!this.queue.some(q => q.key === key)) this.queue.push({ key, veh: true, type, paint });
+    return { key, url: null };
   }
   // you, head and shoulders, as you are now (for the stats)
   portrait() {
