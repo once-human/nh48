@@ -33,7 +33,7 @@ export class LiveView {
   show(p, canvas) {
     const G = this.g; if (!p || !canvas) { this.stop(); return; }
     this.init();
-    if (this.on && this.p === p) { this.cv = canvas; this.cx = canvas.getContext('2d'); return; }     // (the card redrawn, same place)
+    if (this.on && this.p && Math.abs(this.p.x - p.x) < 0.5 && Math.abs(this.p.z - p.z) < 0.5) { this.cv = canvas; this.cx = canvas.getContext('2d'); return; }     // (the card redrawn, same place)
     this.p = p; this.cv = canvas; this.cx = canvas.getContext('2d'); this.img = this.cx.createImageData(W_, H_);
     this.on = true; this.live = false; this.a = Math.atan2(G.player.z - p.z, G.player.x - p.x) + 0.6; this.t = 0;
     this.real = Math.hypot(p.x - G.player.x, p.z - G.player.z) < NEAR && !(G.interiors && G.interiors.inside);

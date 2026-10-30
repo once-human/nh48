@@ -2077,3 +2077,8 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .bm-c-r i { width: 8px; height: 8px; border-radius: 50%; } .bm-c-r i.no { background: rgba(255,255,255,.25); } .bm-c-r b { font-weight: 650; color: var(--paper); text-align: right; }
 .bm-hint .ms { width: 13px; height: 18px; color: var(--paper); flex: none; } .bm-hint .ms-dr { font-style: normal; font-size: 12px; color: var(--paper-3); margin: 0 -2px 0 -4px; }
 #ui.mb-on .bm-card { max-height: calc(100% - 140px); overflow-y: auto; scrollbar-width: thin; }
+.rm-pic.live { position: relative; display: block; background: #0d0e11; }
+.rm-pic.live canvas { width: 100%; height: 100%; display: block; object-fit: cover; image-rendering: auto; }
+.rm-pic-l { position: absolute; left: 12px; bottom: 10px; display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 8px; background: rgba(8, 9, 11, .78); font-size: 12px; font-weight: 650; }
+.rm-pic-l i { width: 7px; height: 7px; border-radius: 50%; background: #ff4b3e; box-shadow: 0 0 0 3px rgba(255, 75, 62, .25); animation: rmlive 1.6s ease-in-out infinite; } @keyframes rmlive { 50% { opacity: .35; } }
+.rm-photos { display: flex; gap: 6px; margin-top: 6px; } .rm-photos img { width: 96px; height: 54px; object-fit: cover; border-radius: 8px; }

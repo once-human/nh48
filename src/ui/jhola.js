@@ -308,7 +308,8 @@ export class Jhola {
     el.querySelector('.iv-stats').hidden = true;
     el.classList.toggle('room', stats);
     const room = el.querySelector('.iv-room'); room.hidden = !stats;
-    if (stats) { const sc = room.querySelector('.rm-l .rm-scroll'), top = sc ? sc.scrollTop : 0; room.innerHTML = this.tab === 'stats' ? statsRoom(this) : missionsRoom(this); const sc2 = room.querySelector('.rm-l .rm-scroll'); if (sc2) sc2.scrollTop = top; }
+    if (stats) { const sc = room.querySelector('.rm-l .rm-scroll'), top = sc ? sc.scrollTop : 0; room.innerHTML = this.tab === 'stats' ? statsRoom(this) : missionsRoom(this); const sc2 = room.querySelector('.rm-l .rm-scroll'); if (sc2) sc2.scrollTop = top;
+      const lc = this.tab === 'missions' && this.mloc && room.querySelector('.rm-pic.live canvas'); if (lc && G.liveView) G.liveView.show(this.mloc, lc); }
     el.querySelector('.iv-keys').hidden = stats; el.querySelector('.iv-qcard').hidden = stats; el.classList.toggle('t-inv', this.tab === 'inv');
     // what you're wearing
     const L = P.look || {};

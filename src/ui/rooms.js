@@ -28,7 +28,7 @@ const SIDE = [
 ];
 
 export function missionsRoom(J) {
-  PC = J.g.postcards || null;
+  PC = J.g.postcards || null; J.mloc = null;
   const G = J.g, S = G.story, st = S ? S.st : { m: 0, step: -1 }, ms = S && S.list ? S.list() : [];
   const filt = J.mfilt || 'all';
   const items = [];
@@ -54,12 +54,17 @@ export function missionsRoom(J) {
     const tx = []; for (const q of m.texts || []) { const v = q.fn ? q.fn() : [q]; for (const r of v) tx.push(r); }
     const steps = (m.steps || []).filter(s => !s.flash && !s.scene).map((s, k) => ({ t: typeof s.obj === 'function' ? s.obj() : s.obj, sub: s.sub, done: x.done || (x.cur && k < st.step), now: x.cur && k === st.step }));
     const u = pic(m.id), phs = (G.life.s.photos || []).filter(p => p.m === x.i).slice(-3);
+    // where it happens, shown live (the map's live view): the current step's place, else the first place it names
+    let loc = x.cur && t ? t : null;
+    if (!loc) for (const sp of m.steps || []) { const w = sp.where; if (!w) continue; try { const r = typeof w === 'function' ? w() : w; if (r && isFinite(r.x)) { loc = r; break; } } catch (e) { /* */ } }
+    J.mloc = loc;
     const who = tx[0] ? S.name(tx[0][0]) : (m.steps[0] && m.steps[0].who && typeof m.steps[0].who === 'string' ? S.name(m.steps[0].who) : '—');
     const inAct = ms.filter(q => q.act === m.act), doneInAct = inAct.filter(q => ms.indexOf(q) < st.m).length;
     const xpGain = 250 + steps.length * 25;
     mid = `<div class="rm-k">Main story · ${m.act ? 'Act ' + m.act : 'Prologue'}</div><h2>${esc(m.title)} <span lang="mr">${esc(m.mr || '')}</span></h2>
       ${tx.slice(0, 2).map(q => `<p class="rm-msg"><b>${esc(S.name(q[0]))}</b>${esc(q[2] || q[1])}</p>`).join('')}
-      <div class="rm-pic${u || phs.length ? '' : ' none'}">${u ? `<img alt="" src="${u}">` : phs.length ? phs.map(p => `<img alt="" src="${p.url}">`).join('') : `<span lang="mr">${esc(m.mr || m.title)}</span>`}</div>
+      ${loc ? `<div class="rm-pic live"><canvas width="320" height="180"></canvas><span class="rm-pic-l"><i></i>${esc(loc.name || 'Live')}</span></div>${phs.length ? `<div class="rm-photos">${phs.map(p => `<img alt="" src="${p.url}">`).join('')}</div>` : ''}`
+        : `<div class="rm-pic${u || phs.length ? '' : ' none'}">${u ? `<img alt="" src="${u}">` : phs.length ? phs.map(p => `<img alt="" src="${p.url}">`).join('') : `<span lang="mr">${esc(m.mr || m.title)}</span>`}</div>`}
       <div class="rm-k">Objectives</div><ul class="rm-obj">${steps.map(s => `<li class="${s.done ? 'done' : s.now ? 'now' : ''}"><i></i><span>${esc(s.t)}${s.now && s.sub ? `<small>${esc(s.sub)}</small>` : ''}</span>${s.now && dist != null ? `<em>${km(dist)}</em>` : ''}</li>`).join('')}</ul>`;
     right = `<div class="rm-card rm-act"><small>${esc(a[0])}</small><h3>${m.act ? 'Act ' + m.act : 'Prologue'} · ${esc(a[1])}</h3>
         <div class="rm-prog"><span>${doneInAct} / ${inAct.length} chapters</span><i><b style="width:${inAct.length ? doneInAct / inAct.length * 100 : 0}%"></b></i></div><p>${esc(a[2])}</p></div>
