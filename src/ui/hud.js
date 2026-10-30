@@ -412,11 +412,7 @@ export class HUD {
           <div class="pz-head"><span class="pz-k">Paused</span><b id="p-who">Paused</b><div class="pz-meta" id="p-meta"></div></div>
           <nav class="pz-menu">
             <button class="pz-i" id="p-resume">Resume</button>
-            <div class="pz-quick">
-              <button class="pz-i pz-q" id="p-map"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zm0 0v14m6-12v14"/></svg><span>Map</span><em>M</em></button>
-              <button class="pz-i pz-q" id="p-photo"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></svg><span>Photo</span><em>K</em></button>
-              <button class="pz-i pz-q" id="p-share"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="6" r="2.6"/><circle cx="18" cy="18" r="2.6"/><path d="m8.3 10.8 7.4-3.6m-7.4 6 7.4 3.6"/></svg><span>Share</span></button>
-            </div>
+
             <button class="pz-i" data-pane="guide">Guide</button>
             <button class="pz-i" data-pane="set">Settings</button>
             <button class="pz-i" data-pane="ctrl">Controls</button>
@@ -439,9 +435,6 @@ export class HUD {
             ${settingsHTML('game')}
             <div class="gt">Version</div>
             <div class="group"><div class="row"><div class="rl">Puneri<small id="p-ver"></small></div><div class="rc"><button class="btn small" id="p-upd">Check for updates</button></div></div></div>
-            <div class="gt">Danger zone</div>
-            <div class="group danger"><div class="row"><div class="rl">Reset settings<small>Sound, picture and controls back to how they came</small></div><div class="rc"><button class="btn small" id="p-rset">Reset</button></div></div>
-              <div class="row"><div class="rl">Start over<small>Wipes your progress. Can’t be undone</small></div><div class="rc"><button class="btn bad small" id="p-wipe">Start over</button></div></div></div>
           </section>
           <section class="pane" data-pane="ctrl"><h2>Controls</h2>
             <div id="p-ctl">${controlsHTML()}</div>
@@ -461,6 +454,7 @@ export class HUD {
             <div class="fine">Map data © OpenStreetMap contributors (ODbL); buildings and places from Overture Maps Foundation (ODbL, CDLA-Permissive-2.0), including Google Open Buildings and Microsoft footprints. Terrain: SRTM (NASA) via Terrain Tiles on AWS. Shop and place names are the real ones from OpenStreetMap and Overture; national and international chains appear as parodies. Pune Metro Line 3 opens 3 Nov 2026; fares on it are estimates. People and animals: Quaternius (CC0). Voices: Kokoro-82M (Apache-2.0) and Piper mr_IN, trained on Google’s crowdsourced Marathi speech (OpenSLR 64, CC BY-SA 4.0). Sounds: Freesound (CC0). Fines follow the MV Act as reported for Pune and may be out of date.</div>
           </section>
         </div>
+        <div class="pz-dock"><button class="pz-d" id="p-photo"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></svg><span>Photo</span><em>K</em></button><button class="pz-d" id="p-share"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="6" r="2.6"/><circle cx="18" cy="18" r="2.6"/><path d="m8.3 10.8 7.4-3.6m-7.4 6 7.4 3.6"/></svg><span>Share</span></button><i class="pz-sep"></i><button class="pz-d" id="p-rset2"><span>Reset settings</span></button><button class="pz-d bad" id="p-wipe2"><span>Start over</span></button></div>
         <div class="pz-keys"><span><span class="kbd">W</span><span class="kbd">S</span> Select</span><span><span class="kbd">A</span><span class="kbd">D</span> Change</span><span><span class="kbd">Enter</span> Open</span><span><span class="kbd">Esc</span> Resume</span></div>
       </div>`;
     this.pauseMenu(p);
@@ -468,7 +462,6 @@ export class HUD {
     this.pause = p;
     p.addEventListener('click', (e) => { if (e.target === p) this.game.togglePause(false); });
     p.querySelector('#p-resume').onclick = () => { this.game.goFullscreen?.(); this.game.togglePause(false); };
-    p.querySelector('#p-map').onclick = () => { this.game.togglePause(false); this.game.toggleMap(true); };
     p.querySelector('#p-share').onclick = async () => {
       const text = 'I\u2019m driving around Pune in my browser. FC Road, Shaniwar Wada, Parvati, autos on the meter.', url = 'https://pune.onkar.buzz';
       try { if (navigator.share) { await navigator.share({ title: 'Puneri', text, url }); return; } } catch (e) { /* closed the sheet */ return; }
@@ -497,8 +490,8 @@ export class HUD {
       } catch (err) { b.textContent = 'Couldn’t check'; }
       b.disabled = false;
     };
-    p.querySelector('#p-rset').onclick = () => { const G = this.game, fs = G.settings.fullscreen; G.settings = { ...DEFAULTS, fullscreen: fs }; saveSettings(G.settings); resetKeys(); applySettings(G); syncSettings(p, G); this.toast('Settings reset', 'Back to how they came', 'info', 2); };
-    p.querySelector('#p-wipe').onclick = () => { this.pausePane('me'); const r = p.querySelector('#p-reset'); if (r) r.click(); };
+    p.querySelector('#p-rset2').onclick = () => { const G = this.game, fs = G.settings.fullscreen; G.settings = { ...DEFAULTS, fullscreen: fs }; saveSettings(G.settings); resetKeys(); applySettings(G); syncSettings(p, G); this.toast('Settings reset', 'Back to how they came', 'info', 2); };
+    p.querySelector('#p-wipe2').onclick = () => { const b = p.querySelector('.pz-i[data-pane="me"]'); if (b) b.click(); const r = p.querySelector('#p-reset'); if (r && !r.hidden) r.click(); };
     bindSettings(p, this.game);
     bindControls(p.querySelector('#p-ctl'), () => { const g = p.querySelector('.guide'); if (g) g.innerHTML = guideHTML(); });
   }

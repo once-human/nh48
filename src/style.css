@@ -2082,3 +2082,13 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .rm-pic-l { position: absolute; left: 12px; bottom: 10px; display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 8px; background: rgba(8, 9, 11, .78); font-size: 12px; font-weight: 650; }
 .rm-pic-l i { width: 7px; height: 7px; border-radius: 50%; background: #ff4b3e; box-shadow: 0 0 0 3px rgba(255, 75, 62, .25); animation: rmlive 1.6s ease-in-out infinite; } @keyframes rmlive { 50% { opacity: .35; } }
 .rm-photos { display: flex; gap: 6px; margin-top: 6px; } .rm-photos img { width: 96px; height: 54px; object-fit: cover; border-radius: 8px; }
+/* the pause menu's dock, bottom right: photo, share, and the two things you can't take back */
+.pz-dock { position: absolute; right: max(48px, 6vw); bottom: calc(62px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 8px; z-index: 2; animation: pzup .5s var(--ease) .1s both; }
+.pz-d { appearance: none; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .06); color: var(--paper); font: 600 13px var(--font-ui); cursor: pointer; transition: background .15s, border-color .15s; }
+.pz-d:hover { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .22); }
+.pz-d svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.pz-d em { font-style: normal; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: rgba(255, 255, 255, .12); color: var(--paper-2); }
+.pz-d.bad { color: #ff8b7d; border-color: rgba(255, 90, 79, .35); } .pz-d.bad:hover { background: rgba(255, 90, 79, .14); }
+.pz-sep { width: 1px; height: 24px; background: rgba(255, 255, 255, .12); margin: 0 4px; }
+.pz-r { padding-bottom: 76px !important; }
+@media (max-width: 900px) { .pz-dock { left: 16px; right: 16px; bottom: 12px; flex-wrap: wrap; } }
