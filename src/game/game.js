@@ -69,6 +69,7 @@ import { MenuBar } from '../ui/menubar.js';
 import { Jhola } from '../ui/jhola.js';
 import { GarageUI } from './garageui.js';
 import { ModFX } from './modfx.js';
+import { CityEdge } from './edge.js';
 import { Diary } from '../ui/diary.js';
 
 export class Game {
@@ -250,7 +251,7 @@ export class Game {
     this.approachSt = new StreetApproach(this);
     applySettings(this);
     this.trial = new Trial(this);
-    this.garageUI = new GarageUI(this); this.modfx = new ModFX(this);
+    this.garageUI = new GarageUI(this); this.modfx = new ModFX(this); this.edge = new CityEdge(this);
     // the traffic is the neighbourhood's: Koregaon Park and Baner get the German sedans and the odd supercar,
     // the peths scooters and cycles, Lohegaon and Wagholi autos, tempos and Thars
     { const RICH = /koregaon park|boat club|bund garden|kalyani nagar|baner|balewadi|aundh|prabhat road|model colony|viman nagar|dhole patil|sopan baug|pashan|bavdhan|erandwane|salunke vihar|nibm|magarpatta city/i,
@@ -1216,7 +1217,7 @@ export class Game {
         if (ev.speed > 8 && ev.kind !== 3) this.brain && this.brain.incident('crash', ev.x ?? P.x, ev.z ?? P.z, { byYou: true });
         this.rig.shake(Math.min(0.5, ev.speed * 0.06)); this.audio.crash(Math.min(1, ev.speed / 8));
         if (!P.onFoot && ev.speed > 3) { const v = P.cur; knock(v, ev.speed, 0.007); if (v.dmg > 0.6 && !this._dmgWarn) { this._dmgWarn = true; this.date && this.date.event('crash'); this.hud.toast('Your vehicle is badly damaged', 'It’s slower now. Any garage can fix it', 'warn', 3.4); } if (v.dmg < 0.3) this._dmgWarn = false; }
-        if (ev.kind === 3) this.hud.toast('End of the shift area', 'Turn back, the map ends here', 'warn', 2);
+        if (ev.kind === 3 && this.edge) this.edge.turnBack(Math.atan2(this.edge.n[1], this.edge.n[0]));      // (the wall behind the mist: out of the white, facing town)
       }
       if (ev.type === 'hit' && ev.o && !P.onFoot && ev.speed > 2.5 && ev.speed < 12 && ev.o.T && !ev.o.T.two && !ev.o.service) this.fenderBender(ev.o);
       if (ev.type === 'scrape') this.audio.thud(0.15);
@@ -1390,6 +1391,7 @@ export class Game {
       for (const d of P.dropped) if (d.veh.owned && d.veh.owned.rental && this.clock > d.veh.owned.until && d.veh !== P.cur) { P.removeDropped(d, this.traffic); d.veh.dispose(); this.hud.toast('Rental returned', 'The travels picked up their scooter', 'info', 2.6); break; }
       this.vehicleWear(dt);
       this.modfx.update(dt);
+      this.edge.update(dt);
       if (this.input.took('KeyV')) this.rig.setMode(this.rig.mode + 1);
       if (this.input.took('KeyL')) this.lights.toggle();
       this.rig.lookBack = this.input.key('KeyB');
