@@ -58,7 +58,7 @@ export class Bag {
     addEventListener('pointerup', () => { dg = null; });
     el.addEventListener('click', (e) => {
       if (e.target.closest('[data-close]')) { this.close(); return; }
-      const t = e.target.closest('[data-t]'); if (t) { if (t.dataset.t === 'bag' || t.dataset.t === 'story') { const k = t.dataset.t; this.close(); k === 'bag' ? G.jhola.open() : G.diary.open(); return; } this.tab = t.dataset.t; this.msg(''); this.render(); return; }
+      const t = e.target.closest('[data-t]'); if (t) { if (t.dataset.t === 'bag' || t.dataset.t === 'story') { const k = t.dataset.t; this.close(); k === 'bag' ? G.jhola.open() : G.jhola.open('missions'); return; } this.tab = t.dataset.t; this.msg(''); this.render(); return; }
       const g = e.target.closest('[data-g]'); if (g) { this.group = g.dataset.g; this.render(); return; }
       const b = e.target.closest('[data-act]'); if (b && !b.disabled) this.act(b.dataset.act, b.dataset.arg);
     });

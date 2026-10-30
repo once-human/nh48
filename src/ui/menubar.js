@@ -37,7 +37,6 @@ export class MenuBar {
     // leave where you are, without taking the mouse back (you're staying in the menus)
     if (cur === 'map') G.toggleMap(false);
     else if (cur === 'settings') this.leavePause();
-    if (k === 'missions' && !J.renderMissions) { if (J.on) J.close(true); G.diary && G.diary.open(); return; }     // (until the missions room is built)
     if (k === 'map') { if (J.on) J.close(true); G.toggleMap(true); }
     else if (k === 'settings') {
       if (J.on) J.close(true);

@@ -295,7 +295,7 @@ export class Game {
       if (this.free && this.state === 'play' && (e.code === 'BracketLeft' || e.code === 'BracketRight')) this.setHour((this.hour + (e.code === 'BracketRight' ? 1 : 23)) % 24);
       if (e.code === 'KeyE' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.jhola.open(); }
       if (e.code === 'Tab' && this.state === 'play') { e.preventDefault(); this.jhola.open(); }
-      if (e.code === 'KeyJ' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.diary.open(); }
+      if (e.code === 'KeyJ' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.jhola.open('missions'); }
       if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space') && !(this.hud.pickerOpen)) this.begin();
     });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'play') this.togglePause(true); });

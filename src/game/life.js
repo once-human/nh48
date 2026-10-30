@@ -57,6 +57,18 @@ export class Life {
   load() { const st = safeStorage(); try { return st ? JSON.parse(st.getItem(KEY) || 'null') : null; } catch (e) { return null; } }
   save() { const st = safeStorage(); if (st) try { st.setItem(KEY, JSON.stringify(this.s)); } catch (e) { /* ignore */ } }
 
+  // experience: what you've lived through here, counted from what you've done (so every old save has it too):
+  // the story, rides and deliveries, fights won, strays fed, races, homes bought. Levels get further apart
+  xp() {
+    const G = this.g, s = this.s, T = s.tally || {}, st = s.story1 || {};
+    return Math.round((st.m || 0) * 250 + Math.max(0, st.step || 0) * 25 + ((G.stats && G.stats.rides) || 0) * 20 + (T.deliveries || 0) * 15 + (T.parcels || 0) * 10
+      + (T.fightsWon || 0) * 10 + (T.fed || 0) * 5 + (T.racesWon || 0) * 40 + (s.props || []).length * 150);
+  }
+  level() {
+    const xp = this.xp(), need = (L) => 150 * (L - 1) * L;     // level 2 at 300, 3 at 900, 5 at 3,000, 8 at 8,400
+    let L = 1; while (xp >= need(L + 1)) L++;
+    return { L, xp, from: need(L), to: need(L + 1) };
+  }
   get hpMax() { return 100 + Math.round(this.s.fitness); }
   change(k, d) {
     const s = this.s;

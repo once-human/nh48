@@ -12,6 +12,7 @@ import { bagOrder } from '../game/bag.js';
 import { CLOTHES, SHOES, applyWear, fmt } from '../game/shops.js';
 import { Studio } from '../game/studio.js';
 import { real } from './materials2d.js';
+import { missionsRoom, statsRoom } from './rooms.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const col = (h) => new THREE.Color(h).convertSRGBToLinear();
@@ -47,7 +48,7 @@ const MANNEQUIN = 0x7d8086;
 export class Jhola {
   constructor(G) {
     this.g = G; this.on = false; this.t = 0; this.tab = 'inv'; this.cat = 'all'; this.sel = null; this.orb = 0;
-    this.renders = new Map(); this.queue = [];
+    this.renders = new Map(); this.queue = []; this.renderMissions = true;
     const el = this.el = document.createElement('div'); el.className = 'iv'; el.hidden = true;
     el.innerHTML = `<div class="iv-dim"></div><div class="iv-spot"></div>
       <div class="iv-panel">
@@ -67,6 +68,7 @@ export class Jhola {
             <figure class="jl-v tf"><canvas width="120" height="150"></canvas><figcaption>Food · <span></span></figcaption></figure></div>
           <div class="iv-sbars"></div>
         </section>
+        <div class="iv-room" hidden></div>
         <div class="iv-keys"><span><span class="kbd">Drag</span>Quick slot</span><span><span class="kbd">F</span>Use</span><span><span class="kbd">R</span>Drop</span><span><span class="kbd">Esc</span>Back</span></div>
       </div>
       <div class="iv-strip"></div>
@@ -80,6 +82,10 @@ export class Jhola {
     this.paintQuick();
 
     el.addEventListener('click', (e) => {
+      const mf = e.target.closest('[data-mf]'); if (mf) { this.mfilt = mf.dataset.mf; this.paint(); return; }
+      const ms = e.target.closest('[data-msel]'); if (ms) { this.msel = ms.dataset.msel; this.paint(); return; }
+      if (e.target.closest('[data-mtrack]')) { this.track(); return; }
+      if (e.target.closest('[data-rename]')) { this.close(); G.hud.showPicker && G.hud.showPicker(); return; }
       if (e.target.closest('[data-sort]')) { this.sortBy = SORTS[(SORTS.indexOf(this.sortBy) + 1) % SORTS.length]; this.paint(); return; }
       const ct = e.target.closest('[data-cat]'); if (ct) { this.cat = ct.dataset.cat; this.paint(); return; }
       const eq = e.target.closest('[data-eq]'); if (eq) { this.cat = 'wear'; const k = eq.dataset.k; if (k) this.sel = k; this.paint(); return; }
@@ -139,6 +145,7 @@ export class Jhola {
       if (c === 'Escape' || c === 'Tab') { stop(); this.close(); return; }
       if (c === 'KeyQ' || c === 'KeyE') { stop(); G.menubar && G.menubar.step(c === 'KeyE' ? 1 : -1); return; }
       if (c === 'KeyJ') { stop(); this.goTab('missions'); return; }
+      if (c === 'KeyM' && this.tab === 'missions') { stop(); this.track(); return; }
       // the world is still running (slowly) behind the jhola: nothing else reaches it, so you don't walk off
       if (this.tab !== 'inv') { if (!/^F\d+$/.test(c)) e.stopImmediatePropagation(); return; }
       if (c === 'KeyF' || c === 'Enter') { stop(); this.useSel(); return; }
@@ -221,12 +228,13 @@ export class Jhola {
     try {
       if (!this.studio) { this.studio = new Studio(G, 320, 320, { bg: null, floor: false }); }
       const g = col(MANNEQUIN), L = { ...job.lookFn() };
-      L.skin = g; L.hair = g; L.beard = false; L.bindi = false;
+      if (!job.raw) { L.skin = g; L.hair = g; L.beard = false; L.bindi = false; }
+      if (!job.raw) {
       if (job.keep !== 'head') { L.glasses = false; L.shades = false; L.hat = false; }
       if (job.keep !== 'top') { if (!(L.cut && L.cut.w >= 1 && job.keep === 'bottom')) L.top = g; }
       if (job.keep !== 'bottom' && !(L.cut && L.cut.w >= 1)) L.bottom = g;
-      if (job.keep !== 'shoe') L.shoe = g;
-      this.studio.yaw = job.frame === 'shoe' ? 0 : 0.42;
+      if (job.keep !== 'shoe') L.shoe = g; }
+      this.studio.yaw = job.frame === 'shoe' ? 0 : job.raw ? 0.25 : 0.42;
       this.studio.dress(L);
       const cv = this.studio.shoot(job.frame);
       this.studio.undress();
@@ -235,6 +243,7 @@ export class Jhola {
       for (const im of this.el.querySelectorAll(`img[data-r="${CSS.escape(job.key)}"]`)) { im.src = url; im.hidden = false; }
       for (const im of this.qb.querySelectorAll(`img[data-r="${CSS.escape(job.key)}"]`)) { im.src = url; im.hidden = false; }
       if (this._all) { const e = this._all.find(x => x.k === job.key || x.r === job.key); if (e) e.img = url; }
+      if (job.raw && this.on && this.tab === 'stats') this.paint();
     } catch (e) { this.renders.set(job.key, ''); }
   }
   // what you're wearing now, a piece at a time (for the slots down the left)
@@ -295,8 +304,11 @@ export class Jhola {
     void hh; void mm; void day;
     this.paintStrip();
     el.querySelector('.iv-sort b').textContent = { kind: 'Kind', name: 'Name', count: 'Count', weight: 'Weight' }[this.sortBy || 'kind'];
-    const stats = this.tab === 'stats';
-    el.querySelector('.iv-inv').hidden = stats; el.querySelector('.iv-det').hidden = stats; el.querySelector('.iv-stats').hidden = !stats;
+    const stats = this.tab === 'stats' || this.tab === 'missions';
+    el.querySelector('.iv-stats').hidden = true;
+    el.classList.toggle('room', stats);
+    const room = el.querySelector('.iv-room'); room.hidden = !stats;
+    if (stats) { const sc = room.querySelector('.rm-l .rm-scroll'), top = sc ? sc.scrollTop : 0; room.innerHTML = this.tab === 'stats' ? statsRoom(this) : missionsRoom(this); const sc2 = room.querySelector('.rm-l .rm-scroll'); if (sc2) sc2.scrollTop = top; }
     el.querySelector('.iv-keys').hidden = stats; el.querySelector('.iv-qcard').hidden = stats; el.classList.toggle('t-inv', this.tab === 'inv');
     // what you're wearing
     const L = P.look || {};
@@ -307,7 +319,7 @@ export class Jhola {
       return `<button class="iv-eq${has ? '' : ' empty'}" data-eq="${k}">${w ? `<img alt="" data-r="${esc(w.key)}" ${w.url ? `src="${w.url}"` : 'hidden'}>` : ''}<span>${n}</span></button>`;
     }).join('');
     const sw = el.querySelector('.jhola-sw'); if (sw) sw.style.backgroundImage = real('cloth') || 'none';
-    if (stats) { this.paintStats(); return; }
+    if (stats) return;
     // the kinds
     const all = this._all || (this._all = this.entries());
     for (const b of el.querySelectorAll('[data-cat]')) { const k = b.dataset.cat; b.classList.toggle('on', k === this.cat); b.classList.toggle('none', k !== 'all' && !all.some(e => e.cat === k)); }
@@ -370,6 +382,17 @@ export class Jhola {
       ${lean('Respect', s.respect || 0, 'Laughed at', 'Known')}${lean('Karma', s.karma || 0, 'Avoided', 'Blessed')}
       <div class="ic-chips"><span><small>Style here</small>${st ? (st.odd ? 'Bold' : st.score > 0.85 ? 'Spot on' : st.score > 0.65 ? 'Fine' : 'Off') : '–'}</span><span><small>Fitness</small>+${Math.round(s.fitness || 0)}</span>${s.drunk > 0.15 ? `<span><small>Drink</small>${s.drunk > 0.6 ? 'Drunk' : 'Tipsy'}</span>` : ''}</div>`;
   }
+  // you, head and shoulders, as you are now (for the stats)
+  portrait() {
+    const L = this.g.player.look; if (!L) return null;
+    const hx = (c) => (c && c.getHex ? c.getHex().toString(16) : '-');
+    const key = 'por:' + [hx(L.skin), hx(L.hair), hx(L.top), L.style, L.beard ? 1 : 0, L.glasses ? 1 : 0, L.female ? 1 : 0].join('|');
+    const r = this.renders.get(key); if (r !== undefined) return r;
+    if (!this.queue.some(q => q.key === key)) this.queue.unshift({ key, lookFn: () => ({ ...L }), frame: 'head', keep: 'head', raw: true });
+    return null;
+  }
+  // the chapter you're on, onto the map
+  track() { const G = this.g, t = G.story && G.story.trackNow && G.story.trackNow(); if (t) { G.hud.toast('Tracking', t.name, 'meter', 2); G.menubar && G.menubar.go('map'); } }
   select(k) { this.sel = k; for (const b of this.el.querySelectorAll('.iv-slot[data-k]')) b.classList.toggle('sel', b.dataset.k === k); this.paintDet(); }
 
   // ------------------------------------------------------------------ doing things with them
@@ -490,7 +513,7 @@ export class Jhola {
       if (P.human) { P.human.holder.visible = true; if (G.state !== 'play') P.human.mixer.update(dt); }
     }
     if ((this._ct = (this._ct || 0) - rd) <= 0) { this._ct = 0.5; this.paintStrip(); }
-    if (this.tab === 'stats' && (this._vt = (this._vt || 0) - dt) <= 0) { this._vt = 1 / 30; this.vitals(); }
+    if (false && (this._vt = (this._vt || 0) - dt) <= 0) { this._vt = 1 / 30; this.vitals(); }
   }
   // a photo from assets/items, once it has loaded (null until then, and the painted one draws)
   pic(id) {
