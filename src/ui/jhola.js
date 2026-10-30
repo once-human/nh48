@@ -489,7 +489,9 @@ export class Jhola {
   update(dt) {
     const G = this.g;
     if (!G.life || !G.player) return;
-    { const pl = G.state === 'play' && !(G.cut && G.cut.on) && !(G.phone && G.phone.on); if (pl !== this._pl) { this._pl = pl; this.qb.classList.toggle('play', pl); } }
+    { const pl = G.state === 'play' && !(G.cut && G.cut.on) && !(G.phone && G.phone.on); if (pl !== this._pl) { this._pl = pl; this.qb.classList.toggle('play', pl); }
+      // subtitles and prompts sit above the quick bar while it's up
+      const up = pl && !this.on && this.qb.classList.contains('some'); if (up !== this._qup) { this._qup = up; G.hud && G.hud.root && G.hud.root.classList.toggle('qb-on', up); } }
     if (!this.on) {
       // the quick bar keeps up with what you buy and eat
       if ((this._qt = (this._qt || 0) - dt) <= 0) { this._qt = 0.5; const sig = JSON.stringify([G.life.s.quick || [], G.life.s.inv]); if (sig !== this._qsig) { this._all = null; this.paintQuick(); } }

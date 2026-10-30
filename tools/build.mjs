@@ -141,7 +141,7 @@ const body = tpl
   .replace('/*FONTS*/', () => fontCss)
   .replace('/*CSS*/', () => css)
   .replace('<!--IMPORTMAP-->', () => importMap)
-  .replace('/*MANIFEST*/', () => JSON.stringify({ ...sizes, __voices: voiceIndex, __v: hashes, __pv: PV }))
+  .replace('/*MANIFEST*/', () => JSON.stringify({ ...sizes, __voices: voiceIndex, __v: hashes, __pv: PV, __built: new Date().toISOString() }))
   .replace('/*JS*/', () => js.replace(/<\/script/gi, '<\\/script'));
 fs.writeFileSync(path.join(dist, 'index.html'), body);
 // the deployed page (vercel copies test.html to index.html): what a link shows when it's shared on WhatsApp,

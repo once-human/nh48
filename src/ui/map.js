@@ -422,9 +422,10 @@ export class MapScreen {
       <div class="bm-card glass" id="bm-card" hidden>
         <div class="bm-c-cat" id="bm-c-cat"></div><div class="bm-c-n" id="bm-c-n"></div><div class="bm-c-mr" lang="mr" id="bm-c-mr"></div>
         <div class="bm-c-b" id="bm-c-b"></div>
+        <div class="bm-c-rep" id="bm-c-rep"></div>
         <div class="bm-c-act"><button class="btn primary small" id="bm-c-go">Set waypoint</button><button class="btn small" id="bm-c-ft">Take a rickshaw</button><button class="btn small" id="bm-c-x">Close</button></div>
       </div>
-      <div class="bm-foot"><span class="bm-scale" id="bm-scale"><i></i><b></b></span><span class="bm-hint">Drag to move · scroll to zoom · right-click to drop a pin · <span class="kbd" data-k="M">M</span> close</span><span class="bm-credit">© OpenStreetMap contributors · Overture Maps · SRTM terrain</span></div>`;
+      <div class="bm-foot"><span class="bm-scale" id="bm-scale"><i></i><b></b></span><span class="bm-hint"><span><span class="kbd">Right-click</span>Place waypoint</span><span><span class="kbd">Scroll</span>Zoom</span><span><span class="kbd">Drag</span>Pan</span><span><span class="kbd">Space</span>Recenter</span><span><span class="kbd">/</span>Search</span><span><span class="kbd" data-k="M">M</span>Close</span></span><span class="bm-credit">© OpenStreetMap contributors · Overture Maps · SRTM terrain</span></div>`;
     root.appendChild(m);
     this.el = m;
     this.cv = m.querySelector('.bm-canvas');
@@ -570,6 +571,10 @@ export class MapScreen {
     ft.textContent = this.g.free ? 'Go there now' : `Take a rickshaw · ₹${cost}`;
     ft.disabled = !!why || this.g.stats.money < cost || d < 40;
     ft.title = why || (this.g.stats.money < cost ? `You have ₹${this.g.stats.money}` : 'Skip the drive');
+    // how people round there take you
+    { const R = this.g.rep, el = this.$('bm-c-rep');
+      if (R && !this.g.free) { const v = R.standing(p.x, p.z), w = v > 0.45 ? 'One of ours' : v > 0.15 ? 'Liked' : v < -0.45 ? 'Trouble' : v < -0.15 ? 'Wary' : 'Neutral';
+        el.innerHTML = `<span>Round here</span><i><b style="left:${(50 + v * 50).toFixed(1)}%"></b></i><em class="${v > 0.15 ? 'g' : v < -0.15 ? 'r' : ''}">${w}</em>`; el.hidden = false; } else el.hidden = true; }
     const wp = this.g.waypoint;
     this.$('bm-c-go').textContent = wp && wp.x === p.x && wp.z === p.z ? 'Remove waypoint' : 'Set waypoint';
   }

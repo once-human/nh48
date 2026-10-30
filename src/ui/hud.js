@@ -3,7 +3,8 @@ import { icon } from './icons.js';
 // Desktop first. The HUD sits in the corners with no boxes where text alone reads, location
 // top-left, wallet top-right, map bottom-left, the vehicle bottom-right, prompts and subtitles
 // bottom-centre, toasts under the objective.
-import { settingsHTML, bindSettings, syncSettings, controlsHTML, bindControls } from '../game/settings.js';
+import { settingsHTML, bindSettings, syncSettings, controlsHTML, bindControls, DEFAULTS, saveSettings, applySettings } from '../game/settings.js';
+import { resetKeys } from '../game/keys.js';
 import { keyLabel } from '../game/keys.js';
 import * as THREE from 'three';
 import { fmtRupees, isTouch } from '../core/util.js';
@@ -69,7 +70,7 @@ export class HUD {
       <div class="loc-area cap"><i class="tick"></i><span id="h-area">Deccan</span></div>
       <div class="loc-street" id="h-street"></div>
       <div class="loc-mr" lang="mr" id="h-street-mr"></div>
-      <div class="loc-time"><span id="h-clock">4:30 PM</span><i class="dot"></i><span id="h-mode">Free roam</span></div>`);
+      <div class="loc-time"><span id="h-clock">4:30 PM</span><i class="dot"></i><span id="h-wx"></span><i class="dot"></i><span id="h-mode">Free roam</span></div>`);
     this.wallet = el('div', 'h wallet', `
       <div class="money num"><span class="cur">₹</span><span id="h-money">0</span></div>
       <div class="sub" id="h-rides"></div>
@@ -436,6 +437,11 @@ export class HUD {
             ${settingsHTML('sound')}
             <div class="gt">Game</div>
             ${settingsHTML('game')}
+            <div class="gt">Version</div>
+            <div class="group"><div class="row"><div class="rl">Puneri<small id="p-ver"></small></div><div class="rc"><button class="btn small" id="p-upd">Check for updates</button></div></div></div>
+            <div class="gt">Danger zone</div>
+            <div class="group danger"><div class="row"><div class="rl">Reset settings<small>Sound, picture and controls back to how they came</small></div><div class="rc"><button class="btn small" id="p-rset">Reset</button></div></div>
+              <div class="row"><div class="rl">Start over<small>Wipes your progress. Can’t be undone</small></div><div class="rc"><button class="btn bad small" id="p-wipe">Start over</button></div></div></div>
           </section>
           <section class="pane" data-pane="ctrl"><h2>Controls</h2>
             <div id="p-ctl">${controlsHTML()}</div>
@@ -479,6 +485,20 @@ export class HUD {
     p.querySelectorAll('#p-wx button').forEach(b => b.onclick = () => { if (this.game.weather) this.game.weather.set(b.dataset.w); this.syncPause(); });
     p.querySelectorAll('#p-q button').forEach(b => b.onclick = () => { this.game.setQuality(b.dataset.q); this.syncPause(); });
     p.querySelector('#p-ch-pay').onclick = () => { if (this.game.police) this.game.police.payDues(); this.syncPause(); };
+    // which build this is, and whether there's a newer one up
+    const built = (() => { try { return JSON.parse(document.getElementById('manifest').textContent).__built || ''; } catch (e) { return ''; } })();
+    p.querySelector('#p-ver').textContent = built ? 'Build of ' + new Date(built).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Local build';
+    p.querySelector('#p-upd').onclick = async (e) => {
+      const b = e.currentTarget; if (b.dataset.ready) { location.reload(); return; }
+      b.disabled = true; b.textContent = 'Checking…';
+      try {
+        const t = await (await fetch(location.pathname + '?u=' + Date.now(), { cache: 'no-store' })).text(), m = /"__built":"([^"]+)"/.exec(t);
+        if (m && built && m[1] !== built) { b.textContent = 'Update ready · Reload'; b.dataset.ready = '1'; b.classList.add('primary'); } else b.textContent = 'You’re up to date';
+      } catch (err) { b.textContent = 'Couldn’t check'; }
+      b.disabled = false;
+    };
+    p.querySelector('#p-rset').onclick = () => { const G = this.game, fs = G.settings.fullscreen; G.settings = { ...DEFAULTS, fullscreen: fs }; saveSettings(G.settings); resetKeys(); applySettings(G); syncSettings(p, G); this.toast('Settings reset', 'Back to how they came', 'info', 2); };
+    p.querySelector('#p-wipe').onclick = () => { this.pausePane('me'); const r = p.querySelector('#p-reset'); if (r) r.click(); };
     bindSettings(p, this.game);
     bindControls(p.querySelector('#p-ctl'), () => { const g = p.querySelector('.guide'); if (g) g.innerHTML = guideHTML(); });
   }
@@ -554,6 +574,9 @@ export class HUD {
     }
     this.T('h-rides', g.stats.rides ? `${g.stats.rides} ${g.stats.rides === 1 ? 'ride' : 'rides'} · ${g.stats.rating.toFixed(1)} rating` : '');
     this.T('h-clock', clock(g.hour, g.settings && g.settings.clock24));
+    // the sky: the part of the day and the weather
+    { const h = g.hour, wk = g.weather && g.weather.kind, part = h < 5 || h >= 20 ? 'Night' : h < 8 ? 'Dawn' : h < 17 ? 'Day' : h < 19.5 ? 'Evening' : 'Dusk';
+      this.T('h-wx', wk && wk !== 'clear' ? String(wk).replace(/^\w/, c => c.toUpperCase()) : part); }
     if (this.pcT > 0) { this.pcT -= dt; if (this.pcT <= 0) this.placeEl.classList.remove('show'); if (this.pcT < -0.5) this.placeEl.hidden = true; }
     // fare meter only on a shift
     const shift = g.rides && g.rides.enabled;
@@ -605,7 +628,9 @@ export class HUD {
     // objective
     const o = g.objective();
     this.T('h-obj', o.main || '');
-    this.T('h-obj-sub', o.sub || '');
+    // how far the story's next thing is
+    { const t = !o.urgent && g.story && g.story.on && g.story.target ? g.story.target() : null, d = t ? Math.hypot(t.x - p.x, t.z - p.z) : 0;
+      this.T('h-obj-sub', (o.sub || '') + (t && d > 30 && o.main ? `${o.sub ? ' · ' : ''}${d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d / 10) * 10 + ' m'}` : '')); }
     this.C(this.obj, 'urgent', !!o.urgent);
     // gps chip
     const dest = g.rides && g.rides.current && g.rides.routeLeft;
