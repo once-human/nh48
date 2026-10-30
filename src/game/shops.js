@@ -486,7 +486,7 @@ export class Shops {
         const club = this.isClub(ctx);
         if (ctx.inside) { for (const id of MENUS.bar) food(id); break; }
         if (club && night) {
-          const cover = r10(1500 * mul / 1.3);
+          const cm = G.calendar ? G.calendar.clubMul() : 1, cover = r10(1500 * mul / 1.3 * (cm > 1.3 ? 1.4 : cm < 0.8 ? 0.7 : 1));      // (Friday and Saturday nights cost more)
           out.push({ label: 'Cover charge, on the dance floor', note: 'Includes one drink. Dance off the day', price: cover, act: pay(cover, () => { const cv = G.life.s.covers || (G.life.s.covers = {}); for (const k in cv) if (cv[k] < nightOf(G) - 1) delete cv[k]; cv[venueKey(ctx)] = nightOf(G); this.close(); if (G.interiors.enter(ctx)) G.date && G.date.onEnter(G.interiors.cur.R, ctx); return ''; }) });
         } else if (club) out.push({ label: 'Club night', note: 'Opens at 8:30 PM, come back later', price: 0, disabled: 'Opens 8:30 PM' });
         for (const id of MENUS.bar) food(id);

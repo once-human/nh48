@@ -11,7 +11,7 @@ export class MenuBar {
     const el = this.el = document.createElement('nav'); el.className = 'mb'; el.hidden = true;
     el.innerHTML = `<div class="mb-brand">${MARK}<b>PUNERI</b></div>
       <div class="mb-tabs"><span class="kbd">Q</span>${TABS.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join('')}<span class="kbd">E</span></div>
-      <div class="mb-r pz-meta"><span class="mb-where"></span><span class="mb-when"></span><span class="mb-cash"></span></div><i class="mb-glow" aria-hidden="true"></i>`;
+      <div class="mb-r"><span class="mb-cal"><b class="mb-cd"></b><span class="mb-cdate"></span><em class="mb-fest" hidden></em></span><span class="mb-time"></span><span class="mb-cash"></span></div><i class="mb-glow" aria-hidden="true"></i>`;
     (document.getElementById('hud') || document.body).appendChild(el);
     el.addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) this.go(b.dataset.tab); });
     // Q / E on the map and in settings (the jhola handles its own)
@@ -61,10 +61,12 @@ export class MenuBar {
     const G = this.g, h = G.hour || 0, day = Math.floor((G.clock || 0) / 24);
     const hh = Math.floor(h), mm = String(Math.floor((h % 1) * 60)).padStart(2, '0');
     const t = G.settings && G.settings.clock24 ? `${String(hh).padStart(2, '0')}:${mm}` : `${((hh + 11) % 12) + 1}:${mm} ${hh < 12 ? 'am' : 'pm'}`;
-    const $ = (id) => document.getElementById(id), area = ($('h-area') && $('h-area').textContent) || 'Pune', street = ($('h-street') && $('h-street').textContent) || '';
-    this.el.querySelector('.mb-where').textContent = street || area;
+    // the calendar (calendar.js): the weekday, the date, a festival if it's one; the time; your money
+    const C = G.calendar ? G.calendar.label() : { day: DAYS[day % 7], date: `Day ${day + 1}` };
+    this.el.querySelector('.mb-cd').textContent = C.day; this.el.querySelector('.mb-cdate').textContent = C.date;
+    const fe = this.el.querySelector('.mb-fest'); fe.hidden = !C.fest; if (C.fest) fe.textContent = C.fest.name;
+    this.el.querySelector('.mb-time').textContent = t;
     this.el.querySelector('.mb-cash').textContent = '₹' + Math.round(G.stats ? G.stats.money : 0).toLocaleString('en-IN');
-    this.el.querySelector('.mb-when').textContent = `${DAYS[day % 7]} · day ${day + 1} · ${t}`;
     const c = this.cur; for (const b of this.el.querySelectorAll('[data-tab]')) b.classList.toggle('on', b.dataset.tab === c);
   }
 }

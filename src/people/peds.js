@@ -394,7 +394,7 @@ export class People {
       const o = {};
       this.actHere = this.act.around(px, pz, 110);
       this.act.at(px, pz, o); this.nightHere = o.night;
-      this.target = Math.round(this.max * clamp(Math.sqrt(this.actHere / 14), 0.15, 1.6));
+      this.target = Math.round(this.max * clamp(Math.sqrt(this.actHere / 14) * (this.busyMul || 1), 0.15, 1.8));
     }
     let tries = 5;
     let walkers = 0;

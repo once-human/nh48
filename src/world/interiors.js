@@ -657,7 +657,7 @@ export class Interiors {
     G.rig.update(0.016, P); G.rig.footYaw = Math.PI / 2; G.rig.footPitch = 0.12;
     G.camera.far = 80; G.camera.updateProjectionMatrix();
     G.hud.enterPlace?.(ctx);
-    if (G.crowd) { this.capWas = G.crowd.cap; G.crowd.cap = Math.max(G.crowd.cap, tpl === 'club' ? 22 : 14); }
+    if (G.crowd) { this.capWas = G.crowd.cap; G.crowd.cap = Math.max(G.crowd.cap, tpl === 'club' ? Math.round(22 * Math.min(1.6, G.calendar ? G.calendar.clubMul() : 1)) : 14); }
     G.audio.duck?.(0.2, 2);
     if (tpl === 'club') G.club.beat(true);
     G.shops.speak(ctx.kind, 'hello');

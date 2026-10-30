@@ -293,7 +293,7 @@ export class Traffic {
       if ((d > 300 && !(avoidView && avoidView(v.x, v.z) && d < 420)) || !v.alive || behind) this.despawn(i);
     }
     // fewer vehicles at 3 am than at 6 pm; the far ones drop out as it thins
-    const target = Math.round(this.max * curve(TRAFFIC, this.hour));
+    const target = Math.round(this.max * Math.min(1.35, curve(TRAFFIC, this.hour) * (this.busyMul || 1)));      // (the calendar: a Sunday morning, a festival night)
     for (let i = this.list.length - 1; i >= 0 && this.list.length > target * 1.1; i--) {
       const v = this.list[i];
       if (Math.hypot(v.x - px, v.z - pz) > 150 && (!avoidView || !avoidView(v.x, v.z))) this.despawn(i);
