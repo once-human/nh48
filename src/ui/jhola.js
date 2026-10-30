@@ -86,6 +86,7 @@ export class Jhola {
       const mf = e.target.closest('[data-mf]'); if (mf) { this.mfilt = mf.dataset.mf; this.paint(); return; }
       const ms = e.target.closest('[data-msel]'); if (ms) { this.msel = ms.dataset.msel; this.paint(); return; }
       if (e.target.closest('[data-mtrack]')) { this.track(); return; }
+      const gt = e.target.closest('[data-goto]'); if (gt) { this.goto(gt.dataset.goto); return; }
       if (e.target.closest('[data-rename]')) { this.close(); G.hud.showPicker && G.hud.showPicker(); return; }
       if (e.target.closest('[data-sort]')) { this.sortBy = SORTS[(SORTS.indexOf(this.sortBy) + 1) % SORTS.length]; this.paint(); return; }
       const ct = e.target.closest('[data-cat]'); if (ct) { this.cat = ct.dataset.cat; this.paint(); return; }
@@ -147,6 +148,7 @@ export class Jhola {
       if (c === 'KeyQ' || c === 'KeyE') { stop(); G.menubar && G.menubar.step(c === 'KeyE' ? 1 : -1); return; }
       if (c === 'KeyJ') { stop(); this.goTab('missions'); return; }
       if (c === 'KeyM' && this.tab === 'missions') { stop(); this.track(); return; }
+      if (this.tab === 'stats' && (c === 'KeyH' || c === 'KeyP' || c === 'KeyV')) { stop(); this.goto(c === 'KeyH' ? 'challans' : 'own'); return; }
       // the world is still running (slowly) behind the jhola: nothing else reaches it, so you don't walk off
       if (this.tab !== 'inv') { if (!/^F\d+$/.test(c)) e.stopImmediatePropagation(); return; }
       if (c === 'KeyF' || c === 'Enter') { stop(); this.useSel(); return; }
@@ -246,10 +248,12 @@ export class Jhola {
       if (job.keep !== 'top') { if (!(L.cut && L.cut.w >= 1 && job.keep === 'bottom')) L.top = g; }
       if (job.keep !== 'bottom' && !(L.cut && L.cut.w >= 1)) L.bottom = g;
       if (job.keep !== 'shoe') L.shoe = g; }
-      this.studio.yaw = job.frame === 'shoe' ? 0 : job.raw ? 0.25 : 0.42;
-      this.studio.dress(L);
-      const cv = this.studio.shoot(job.frame);
-      this.studio.undress();
+      // (you get a taller studio of your own: half-length, like a portrait)
+      const ST = job.raw ? (this.studioP || (this.studioP = new Studio(G, 300, 380, { bg: null, floor: false }))) : this.studio;
+      ST.yaw = job.frame === 'shoe' ? 0 : job.raw ? 0.3 : 0.42;
+      ST.dress(L);
+      const cv = ST.shoot(job.frame);
+      ST.undress();
       const url = trim(cv);
       this.renders.set(job.key, url);
       for (const im of this.el.querySelectorAll(`img[data-r="${CSS.escape(job.key)}"]`)) { im.src = url; im.hidden = false; }
@@ -412,10 +416,16 @@ export class Jhola {
   portrait() {
     const L = this.g.player.look; if (!L) return null;
     const hx = (c) => (c && c.getHex ? c.getHex().toString(16) : '-');
-    const key = 'por:' + [hx(L.skin), hx(L.hair), hx(L.top), L.style, L.beard ? 1 : 0, L.glasses ? 1 : 0, L.female ? 1 : 0].join('|');
+    const key = 'por2:' + [hx(L.skin), hx(L.hair), hx(L.top), L.style, L.beard ? 1 : 0, L.glasses ? 1 : 0, L.female ? 1 : 0].join('|');
     const r = this.renders.get(key); if (r !== undefined) return r;
-    if (!this.queue.some(q => q.key === key)) this.queue.unshift({ key, lookFn: () => ({ ...L }), frame: 'head', keep: 'head', raw: true });
+    if (!this.queue.some(q => q.key === key)) this.queue.unshift({ key, lookFn: () => ({ ...L }), frame: 'bust', keep: 'head', raw: true });
     return null;
+  }
+  // the stats' buttons: your challans (settings), your homes and vehicles (the old jhola's Owned list)
+  goto(k) {
+    const G = this.g;
+    if (k === 'challans') { G.menubar && G.menubar.go('settings'); const b = G.hud.pause && G.hud.pause.querySelector('.pz-i[data-pane="ch"]'); if (b) b.click(); return; }
+    if (k === 'own') { this.close(); G.bag && G.bag.show('own'); }
   }
   // the chapter you're on, onto the map
   track() { const G = this.g, t = G.story && G.story.trackNow && G.story.trackNow(); if (t) { G.hud.toast('Tracking', t.name, 'meter', 2); G.menubar && G.menubar.go('map'); } }

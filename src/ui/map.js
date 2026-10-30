@@ -1,6 +1,7 @@
 // City map: tiles drawn on demand from the same map data the world is built from, a places index
 // for search, and the full-screen map screen (drag, zoom, search, filters, waypoint + GPS).
 // The minimap draws through the same tile cache, so both always agree with the streets you drive.
+import { g as glyph } from './glyphs.js';
 import { versioned } from '../core/assets.js';
 import { cmRing } from '../world/geo.js';
 import TRANSIT from '../game/transit.json';
@@ -41,6 +42,7 @@ const ICON_PATHS = {
 };
 const ICON2D = {};
 const iconPath = (n) => ICON2D[n] || (ICON_PATHS[n] ? (ICON2D[n] = new Path2D(ICON_PATHS[n])) : null);
+const GL = { landmark: 'star', police: 'shield', hospital: 'cross', food: 'food', shop: 'cart', bank: 'bank', fuel: 'fuel', transit: 'bus', park: 'tree', temple: 'temple', college: 'college', cinema: 'film', service: 'building' };
 const FOOD = new Set(['food', 'cafe', 'bar', 'icecream', 'sweets', 'bakery']);
 const SHOPC = { bank: 'bank', atm: 'bank', police: 'police', clinic: 'hospital' };
 
@@ -451,13 +453,15 @@ export class MapScreen {
       <button class="btn small bm-close" id="bm-close">Close <span class="kbd" data-k="M">M</span></button>
       <div class="bm-card glass" id="bm-card" hidden>
         <div class="bm-c-pic" id="bm-c-pic"></div>
-        <div class="bm-c-cat" id="bm-c-cat"></div><div class="bm-c-n" id="bm-c-n"></div><div class="bm-c-mr" lang="mr" id="bm-c-mr"></div>
+        <div class="bm-c-top"><div><div class="bm-c-n" id="bm-c-n"></div><div class="bm-c-cat" id="bm-c-cat"></div></div><em class="bm-c-here" id="bm-c-here" hidden>You are here</em></div>
+        <div class="bm-c-mr" lang="mr" id="bm-c-mr"></div>
         <div class="bm-c-b" id="bm-c-b"></div>
         <div class="bm-c-rep" id="bm-c-rep"></div>
         <div class="bm-c-near" id="bm-c-near"></div>
-        <div class="bm-c-act"><button class="btn primary small" id="bm-c-go">Set waypoint</button><button class="btn small" id="bm-c-ft">Take a rickshaw</button><button class="btn small" id="bm-c-x">Close</button></div>
+        <div class="bm-c-act"><button class="bm-c-main" id="bm-c-go"><span>Set waypoint</span><span class="kbd">F</span></button><button class="bm-c-sec" id="bm-c-ft">Take a rickshaw</button></div>
+        <button class="bm-c-x" id="bm-c-x" aria-label="Close">×</button>
       </div>
-      <div class="bm-foot"><span class="bm-scale" id="bm-scale"><i></i><b></b></span><span class="bm-hint"><span><svg class="ms" viewBox="0 0 16 22" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="19" rx="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v7" stroke="currentColor" stroke-width="1.2"/><path d="M8 2.2v6.3H2.2V8a5.8 5.8 0 0 1 5.8-5.8z" fill="currentColor"/></svg>Select</span><span><svg class="ms" viewBox="0 0 16 22" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="19" rx="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v7" stroke="currentColor" stroke-width="1.2"/><path d="M8 2.2v6.3h5.8V8A5.8 5.8 0 0 0 8 2.2z" fill="currentColor"/></svg>Drop pin</span><span><svg class="ms" viewBox="0 0 16 22" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="19" rx="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v7" stroke="currentColor" stroke-width="1.2"/><rect x="6.6" y="4" width="2.8" height="5" rx="1.4" fill="currentColor"/></svg>Zoom</span><span><svg class="ms" viewBox="0 0 16 22" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="19" rx="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v7" stroke="currentColor" stroke-width="1.2"/><path d="M8 2.2v6.3H2.2V8a5.8 5.8 0 0 1 5.8-5.8z" fill="currentColor"/></svg><i class="ms-dr">⇔</i>Pan</span><span><span class="kbd">Space</span>Recenter</span><span><span class="kbd">/</span>Search</span></span><span class="bm-credit">© OpenStreetMap contributors · Overture Maps · SRTM terrain</span></div>`;
+      <div class="bm-foot"><span class="bm-scale" id="bm-scale"><i></i><b></b></span><span class="bm-hint"><span><svg class="ms" viewBox="0 0 16 22" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="19" rx="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v7" stroke="currentColor" stroke-width="1.2"/><path d="M8 2.2v6.3H2.2V8a5.8 5.8 0 0 1 5.8-5.8z" fill="currentColor"/></svg>Select</span><span><svg class="ms" viewBox="0 0 16 22" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="19" rx="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v7" stroke="currentColor" stroke-width="1.2"/><path d="M8 2.2v6.3h5.8V8A5.8 5.8 0 0 0 8 2.2z" fill="currentColor"/></svg>Drop pin</span><span><svg class="ms" viewBox="0 0 16 22" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="19" rx="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v7" stroke="currentColor" stroke-width="1.2"/><rect x="6.6" y="4" width="2.8" height="5" rx="1.4" fill="currentColor"/></svg>Zoom</span><span><svg class="ms" viewBox="0 0 16 22" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="19" rx="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v7" stroke="currentColor" stroke-width="1.2"/><path d="M8 2.2v6.3H2.2V8a5.8 5.8 0 0 1 5.8-5.8z" fill="currentColor"/></svg>Pan</span><span><span class="kbd">Space</span>Recenter</span><span><span class="kbd">/</span>Search</span></span><span class="bm-credit">© OpenStreetMap contributors · Overture Maps · SRTM terrain</span></div>`;
     root.appendChild(m);
     this.el = m;
     this.cv = m.querySelector('.bm-canvas');
@@ -467,7 +471,7 @@ export class MapScreen {
     for (const [k, [label, col]] of Object.entries(CATS)) {
       const b = document.createElement('button');
       b.className = 'chip'; b.dataset.k = k; b.setAttribute('aria-pressed', 'false');
-      b.innerHTML = `<i style="background:${col}"></i>${label}`;
+      b.innerHTML = `${glyph(GL[k] || 'pin', '', col)}<span>${label}</span>`;
       b.onclick = () => { const on = !this.legend.has(k); on ? this.legend.add(k) : this.legend.delete(k); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); F.classList.toggle('some', this.legend.size > 0); };
       F.appendChild(b);
     }
@@ -559,6 +563,7 @@ export class MapScreen {
         return;
       }
       if (e.key === '/') { e.preventDefault(); this.$('bm-q').focus(); }
+      else if (e.code === 'KeyF' && this.sel) { e.preventDefault(); this.$('bm-c-go').click(); }
       else if (e.key === '+' || e.key === '=') this.zoomAt(1.5);
       else if (e.key === '-' || e.key === '_') this.zoomAt(1 / 1.5);
       else if (e.code === 'Space') { e.preventDefault(); this.centerOnMe(); }
@@ -632,13 +637,16 @@ export class MapScreen {
       const pol = list.filter(q => q.c === 'police').length + (this.city.placesIn ? this.city.placesIn(p.x - 1500, p.z - 1500, p.x + 1500, p.z + 1500).filter(q => q.c === 'police').length : 0) * 0.3;
       const rows = [['Area', a ? a.n : 'Pune'], ...[['food', 'Food & drink'], ['shop', 'Shops'], ['transit', 'Transit'], ['temple', 'Temples'], ['hospital', 'Health'], ['bank', 'Banks'], ['fuel', 'Fuel']].filter(([k]) => n[k]).map(([k, l]) => [l, n[k], CATS[k][1]]),
         ['Police round here', pol >= 3 ? 'High' : pol >= 1 ? 'Medium' : 'Low']];
-      el.innerHTML = `<div class="bm-c-k">Within 500 m</div>` + rows.map(([l, v, c]) => `<div class="bm-c-r">${c ? `<i style="background:${c}"></i>` : '<i class="no"></i>'}<span>${l}</span><b>${v}</b></div>`).join(''); }
+      const IC = { 'Food & drink': 'food', Shops: 'cart', Transit: 'bus', Temples: 'temple', Health: 'cross', Banks: 'bank', Fuel: 'fuel', Area: 'pin', 'Police round here': 'shield' };
+      el.innerHTML = rows.map(([l, v, c]) => `<div class="bm-c-r">${glyph(IC[l] || 'pin', '', c || undefined)}<span>${l}</span><b>${v}</b></div>`).join(''); }
     // how people round there take you
     { const R = this.g.rep, el = this.$('bm-c-rep');
       if (R && !this.g.free) { const v = R.standing(p.x, p.z), w = v > 0.45 ? 'One of ours' : v > 0.15 ? 'Liked' : v < -0.45 ? 'Trouble' : v < -0.15 ? 'Wary' : 'Neutral';
-        el.innerHTML = `<span>Round here</span><i><b style="left:${(50 + v * 50).toFixed(1)}%"></b></i><em class="${v > 0.15 ? 'g' : v < -0.15 ? 'r' : ''}">${w}</em>`; el.hidden = false; } else el.hidden = true; }
+        const c = v > 0.15 ? '#3ddc84' : v < -0.15 ? '#ff5a5f' : '#4a9dff';
+        el.innerHTML = `<div class="bm-c-k">Reputation</div><div class="bm-c-rb"><i><b style="width:${Math.max(6, (v + 1) * 50).toFixed(0)}%;background:${c}"></b></i><em style="color:${c}">${w === 'Wary' ? 'Low' : w}</em></div>`; el.hidden = false; } else el.hidden = true; }
     const wp = this.g.waypoint;
-    this.$('bm-c-go').textContent = wp && wp.x === p.x && wp.z === p.z ? 'Remove waypoint' : 'Set waypoint';
+    this.$('bm-c-go').firstChild.textContent = wp && wp.x === p.x && wp.z === p.z ? 'Remove waypoint' : 'Set waypoint';
+    this.$('bm-c-here').hidden = d > 150;
   }
   bindSearch() {
     const q = this.$('bm-q'), res = this.$('bm-res');

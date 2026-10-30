@@ -90,56 +90,60 @@ export function statsRoom(J) {
   const area = document.getElementById('h-area')?.textContent || 'Pune', street = document.getElementById('h-street')?.textContent || '';
   const home = G.props && G.props.list ? G.props.list.filter(p => G.props.owned(p)) : [];
   const tags = [];
-  if ((G.stats.rides || 0) >= 10) tags.push(['auto', 'Auto-wala']); if ((T.deliveries || 0) >= 10) tags.push(['bag', 'Delivery partner']); if ((T.fightsWon || 0) >= 5) tags.push(['fist', 'Street fighter']);
-  if ((T.fed || 0) >= 8) tags.push(['paw', 'Feeds the strays']); if ((s.karma || 0) > 25) tags.push(['heart', 'Good soul']); if ((s.karma || 0) < -25) tags.push(['burst', 'Trouble']); if ((s.respect || 0) > 40) tags.push(['star', 'Known face']);
-  if (home.length) tags.push(['home', 'Owns a home']); if ((s.wardrobe || []).length >= 5) tags.push(['user', 'Dresses up']); if ((T.racesWon || 0) > 0) tags.push(['flag', 'Racer']); if ((s.gold || 0) >= 10) tags.push(['gold', 'Buys gold']);
-  if (!tags.length) tags.push(['pin', 'Just back in Pune']);
-  const bar = (ic, n, v, c, txt) => { const f = Math.max(0, Math.min(1, v)); return `<div class="rs-b" style="--c:${c}">${g(ic)}<span>${n}</span><i><b style="width:${(f * 100).toFixed(1)}%"></b></i><em>${txt ?? Math.round(f * 100)}</em></div>`; };
+  if ((G.stats.rides || 0) >= 10) tags.push('Auto-wala'); if ((T.deliveries || 0) >= 10) tags.push('Delivery partner'); if ((T.fightsWon || 0) >= 5) tags.push('Street fighter');
+  if ((T.fed || 0) >= 8) tags.push('Feeds the strays'); if ((s.karma || 0) > 25) tags.push('Good soul'); if ((s.karma || 0) < -25) tags.push('Trouble'); if ((s.respect || 0) > 40) tags.push('Known face');
+  if (home.length) tags.push('Owns a home'); if ((s.wardrobe || []).length >= 5) tags.push('Dresses up'); if ((T.racesWon || 0) > 0) tags.push('Racer'); if ((s.gold || 0) >= 10) tags.push('Buys gold');
+  if (!tags.length) tags.push('Just back in Pune', 'Explorer');
+  const bar = (ic, n, v, c, txt) => { const f = Math.max(0, Math.min(1, v)); return `<div class="rs-b">${g(ic)}<span>${n}</span><i><b style="width:${(f * 100).toFixed(1)}%;background:${c}"></b></i><em>${txt ?? Math.round(f * 100) + ' / 100'}</em></div>`; };
   let st = null; try { st = L.style && L.style(); } catch (e) { /* */ }
-  const tile = (k, val, note, f) => `<div class="rs-t"><b lang="mr">${WORD[k][0]}</b><span>${WORD[k][1]}</span><strong class="num">${val}</strong><i><b style="width:${Math.max(0, Math.min(100, f * 100)).toFixed(0)}%"></b></i><small>${esc(note)}</small></div>`;
   const rp = s.respect || 0, ka = s.karma || 0;
+  const tile = (ic, label, val, note, f, c) => `<div class="rs-t">${g(ic)}<span>${label}</span><strong style="color:${c}">${val}</strong><small>${esc(note)}</small><i><b style="width:${Math.max(0, Math.min(100, f * 100)).toFixed(0)}%;background:${c}"></b></i></div>`;
   const subs = (G.hud && G.hud.suburbs) || [], seen = [];
   if (G.rep && subs.length) {
     const cur = subs.reduce((b, q) => (q.x - P.x) ** 2 + (q.z - P.z) ** 2 < (b ? (b.x - P.x) ** 2 + (b.z - P.z) ** 2 : 1e18) ? q : b, null);
-    for (const o of subs.map(q => { const v = G.rep.at(q.x, q.z); return { q, w: v.good + v.bad, sd: G.rep.standing(q.x, q.z) }; }).filter(o => o.w > 0.05 || o.q === cur).sort((a, b) => (b.q === cur) - (a.q === cur) || b.w - a.w).slice(0, 6)) seen.push(o);
+    for (const o of subs.map(q => { const v = G.rep.at(q.x, q.z); return { q, w: v.good + v.bad, sd: G.rep.standing(q.x, q.z) }; }).filter(o => o.w > 0.05 || o.q === cur).sort((a, b) => (b.q === cur) - (a.q === cur) || b.w - a.w).slice(0, 7)) seen.push(o);
   }
-  const repRow = (o) => { const v = o.sd, w = v > 0.45 ? 'One of ours' : v > 0.15 ? 'Liked' : v < -0.45 ? 'Trouble' : v < -0.15 ? 'Wary' : 'Neutral'; return `<div class="rs-rep">${g('pin')}<span>${esc(o.q.n)}</span><i><b style="left:${50 + v * 50}%"></b></i><em class="${v > 0.15 ? 'g' : v < -0.15 ? 'r' : ''}">${w}</em></div>`; };
+  const repRow = (o) => { const v = o.sd, w = v > 0.45 ? 'One of ours' : v > 0.15 ? 'Liked' : v < -0.45 ? 'Trouble' : v < -0.15 ? 'Low' : 'Neutral', c = v > 0.15 ? '#3ddc84' : v < -0.15 ? '#ff5a5f' : '#4a9dff';
+    return `<div class="rs-rep"><span>${esc(o.q.n)}</span><i><b style="width:${Math.max(6, (v + 1) * 50).toFixed(0)}%;background:${c}"></b></i><em style="color:${c}">${w}</em></div>`; };
   const pol = G.police || {}, heat = pol.heat || 0, dues = pol.duesTotal || 0;
-  const veh = [{ type: 'auto', name: 'The stand’s auto', sub: 'Bapu Kaka’s stand' }, ...(s.vehicles || []).map(v => ({ type: v.type, paint: Array.isArray(v.col) ? v.col : null, name: VNAME[v.type] || v.type, sub: v.plate || '' }))];
-  const vCard = (v) => { const r = J.vehShot(v.type, v.paint); return `<div class="rs-v"><div class="rs-vi">${r.url ? `<img alt="" src="${r.url}">` : `<img alt="" data-r="${esc(r.key)}" hidden>`}</div><b>${esc(v.name)}</b><small>${esc(v.sub)}</small></div>`; };
-  const tl = (ic, label, val, extra = '', cls = '') => `<div class="rs-tl">${g(ic)}<small>${label}</small><b class="${cls}">${val}</b>${extra}</div>`;
-  const por = J.portrait();
-  return `<section class="rm rm-stats">
-    <div class="rm-col rs-1">
-      <div class="rm-k">${g('user')}You</div>
+  const veh = [{ type: 'auto', name: 'The stand’s auto', fuel: G.player && G.player.cur && G.player.cur.type === 'auto' ? G.player.cur.fuel : null, hp: G.player && G.player.cur && G.player.cur.type === 'auto' ? G.player.cur.hp : null },
+    ...(s.vehicles || []).map(v => ({ type: v.type, paint: Array.isArray(v.col) ? v.col : null, name: VNAME[v.type] || v.type, fuel: v.fuel, plate: v.plate }))];
+  const pct = (v) => v == null ? '–' : Math.round((v > 1.5 ? v / 100 : v) * 100) + '%';
+  const vCard = (v) => { const r = J.vehShot(v.type, v.paint); return `<div class="rs-v"><div class="rs-vi">${r.url ? `<img alt="" src="${r.url}">` : `<img alt="" data-r="${esc(r.key)}" hidden>`}</div><b>${esc(v.name)}</b><div class="rs-vs">${g('fuel', '', '#ffb224')}<span>${pct(v.fuel)}</span>${g('wrench', '', '#9aa0aa')}<span>${pct(v.hp)}</span></div></div>`; };
+  const tl = (ic, label, val, extra = '', vc = '') => `<div class="rs-tl">${g(ic)}<small>${label}</small><b${vc ? ` style="color:${vc}"` : ''}>${val}</b>${extra}</div>`;
+  const por = J.portrait(), pc = G.postcards;
+  const homes = home.length ? home.map(p => ({ n: p.name, at: p.area || '', cur: !(G.props.rentedOut && G.props.rentedOut(p)), note: G.props.rentedOut && G.props.rentedOut(p) ? `Rented out · ${rs(p.rent)} a day` : '' })) : [{ n: 'Aai’s house', at: 'Sadashiv Peth', cur: true, note: '' }];
+  const homeImg = (h) => { const u = pc && (pc.get('ar:' + h.at) || pc.get('ar:Sadashiv Peth')); return u ? `<img alt="" src="${u}">` : g('home'); };
+  return `<section class="rm rm-stats rf">
+    <div class="rf-card rs-1">
+      <h4>Player</h4>
       <div class="rs-me"><div class="rs-por">${por ? `<img alt="" src="${por}">` : ''}</div>
-        <div class="rs-who"><h2>${esc(name)}</h2><button class="rs-edit" data-rename>Edit name and look</button>
-          <div class="rs-lv">${g('rank')}<b>Level ${lv.L}</b><span>${(lv.xp - lv.from).toLocaleString('en-IN')} / ${(lv.to - lv.from).toLocaleString('en-IN')} XP</span></div><i class="rs-xp"><b style="width:${((lv.xp - lv.from) / Math.max(1, lv.to - lv.from) * 100).toFixed(1)}%"></b></i>
-          <div class="rs-at">${g('pin')}<span>${esc(street ? street + ', ' + area : area)}</span></div><div class="rs-at">${g('home')}<span>${esc(home[0] ? home[0].name : 'Sadashiv Peth, with Aai')}</span></div></div></div>
-      <div class="rm-k">Playstyle</div><div class="rs-tags">${tags.map(([ic, t]) => `<span>${g(ic)}${esc(t)}</span>`).join('')}</div>
-      <div class="rm-k">Body</div>
-      ${bar('heart', 'Health', (P.hp ?? 100) / L.hpMax, '#ff375f', `${Math.round(P.hp ?? 100)}`)}${bar('food', 'Food', s.hunger, '#ffb224')}${bar('drop', 'Water', s.thirst, '#40c8ff')}${bar('bolt', 'Energy', s.energy, '#a8e43a')}${bar('run', 'Stamina', P.stam ?? 1, '#30e0b0')}${bar('smile', 'Mood', s.mood, '#c58cff')}${bar('glass', 'Drunk', s.drunk || 0, '#e8c27a')}
+        <div class="rs-who"><div class="rs-nm"><h2>${esc(name)}</h2><button class="rs-edit" data-rename title="Change name and look">${g('pencil')}</button></div>
+          <div class="rs-lvl">Level ${lv.L}</div><div class="rs-xpl">${(lv.xp - lv.from).toLocaleString('en-IN')} / ${(lv.to - lv.from).toLocaleString('en-IN')} XP</div>
+          <i class="rs-xp"><b style="width:${((lv.xp - lv.from) / Math.max(1, lv.to - lv.from) * 100).toFixed(1)}%"></b></i>
+          <div class="rs-box"><div>${g('pin', '', '#f1ece2')}<span><small>Current location</small><b>${esc(street ? street + ', ' + area : area)}</b></span></div><div>${g('home')}<span><small>Home</small><b>${esc(homes[0].at || 'Pune')}</b></span></div></div>
+          <p class="rs-q">“Back in Pune with ten thousand rupees and an auto that isn’t mine.”</p></div></div>
+      <h4>Playstyle</h4><div class="rs-tags">${tags.map(t => `<span>${esc(t)}</span>`).join('')}</div>
+      <h4>Body status</h4>
+      ${bar('heart', 'Health', (P.hp ?? 100) / L.hpMax, '#ff4d5e', `${Math.round(P.hp ?? 100)} / ${L.hpMax}`)}${bar('food', 'Food', s.hunger, '#ff8a3d')}${bar('drop', 'Water', s.thirst, '#3ea8ff')}${bar('bolt', 'Energy', s.energy, '#ffd23f')}${bar('run', 'Stamina', P.stam ?? 1, '#f1ece2')}${bar('smile', 'Mood', s.mood, '#3ddc84')}${bar('glass', 'Drunk', s.drunk || 0, '#e8b04a')}
     </div>
-    <div class="rm-col rs-2">
-      <div class="rm-k">Personality</div>
-      <div class="rs-tiles">${tile('respect', Math.round(rp), rp > 40 ? 'People listen' : rp > 10 ? 'Some know you' : rp < -10 ? 'Laughed at' : 'Nobody yet', (rp + 100) / 200)}
-        ${tile('karma', Math.round(ka), ka > 25 ? 'Aajis bless you' : ka > 5 ? 'Mostly good' : ka < -25 ? 'Avoided' : ka < -5 ? 'A worry' : 'Even', (ka + 100) / 200)}
-        ${tile('style', st ? Math.round(st.score * 100) : '–', st ? (st.odd ? 'Bold, here' : st.score > 0.85 ? 'Spot on' : st.score > 0.65 ? 'Fine here' : 'Off here') : '', st ? st.score : 0)}
-        ${tile('fitness', '+' + Math.round(s.fitness || 0), (s.fitness || 0) > 20 ? 'Strong' : (s.fitness || 0) > 5 ? 'Getting there' : 'Hit the gym', Math.min(1, (s.fitness || 0) / 50))}</div>
-      <div class="rm-k">Reputation</div>
+    <div class="rf-card rs-2">
+      <h4>Personality</h4>
+      <div class="rs-tiles">${tile('pagdi', 'Respect', Math.round(rp), rp > 40 ? 'People listen to you.' : rp > 10 ? 'Some know your name.' : rp < -10 ? 'People laugh at you.' : 'Nobody knows you yet.', (rp + 100) / 200, '#ffb224')}
+        ${tile('lotus', 'Karma', Math.round(ka), ka > 25 ? 'Aajis bless you.' : ka > 5 ? 'Mostly good.' : ka < -25 ? 'People cross the road.' : ka < -5 ? 'A bit of a worry.' : 'Even, so far.', (ka + 100) / 200, '#4a9dff')}
+        ${tile('shirt', 'Style', st ? Math.round(st.score * 100) : '–', st ? (st.odd ? 'Bold, round here.' : st.score > 0.85 ? 'You got a look.' : st.score > 0.65 ? 'Fine for here.' : 'Off for here.') : '', st ? st.score : 0, '#ff5a5f')}
+        ${tile('dumbbell', 'Fitness', Math.round(s.fitness || 0), (s.fitness || 0) > 20 ? 'Strong.' : (s.fitness || 0) > 5 ? 'Getting there.' : 'Hit the gym.', Math.min(1, (s.fitness || 0) / 50), '#3ddc84')}</div>
+      <h4>Reputation</h4><p class="rs-sub">How people see you across Pune.</p>
       <div class="rs-reps">${seen.length ? seen.map(repRow).join('') : '<p class="rm-p">Nobody has made up their mind about you yet.</p>'}</div>
-      <div class="rm-k">Law</div>
-      <div class="rs-stars">${[1, 2, 3, 4, 5].map(k => `<i class="${k <= heat ? 'on' : ''}">${g('star')}</i>`).join('')}<span>${heat ? 'Wanted' : 'Not wanted'}</span></div>
-      <div class="rs-grid">${tl('receipt', 'E-challans', (pol.history || []).length)}${tl('rupee', 'Unpaid', rs(dues), '', dues ? 'r' : '')}${tl('card', 'Licence', pol.suspended ? 'Suspended' : 'Valid', '', pol.suspended ? 'r' : 'g')}</div>
+      <h4>Law &amp; legal record</h4>
+      <div class="rs-law"><span>Wanted level</span><div class="rs-stars">${[1, 2, 3, 4, 5].map(k => `<i class="${k <= heat ? 'on' : ''}">${g('star', '', k <= heat ? '#ffd23f' : 'rgba(255,255,255,.18)')}</i>`).join('')}</div><b>${heat} / 5</b><button class="rf-btn" data-goto="challans">View history <span class="kbd">H</span></button></div>
+      <div class="rs-grid">${tl('receipt', 'Total challans', (pol.history || []).length)}${tl('card', 'Driving licence', pol.suspended ? 'Suspended' : `${g('check')} Valid`, '', pol.suspended ? '#ff5a5f' : '#3ddc84')}${tl('shield', 'Unpaid fines', rs(dues), '', dues ? '#ff8b7d' : '')}</div>
     </div>
-    <div class="rm-col rs-3">
-      <div class="rm-k">Money</div>
-      <div class="rs-grid">${tl('rupee', 'Cash', rs(G.stats.money))}${tl('bank', 'Bank', rs(s.bank))}${tl('gold', 'Gold', (s.gold || 0) + ' g')}</div>
-      <div class="rm-k">Record</div>
-      <div class="rs-grid">${tl('auto', 'Rides', G.stats.rides || 0, G.stats.rides ? `<em>${g('star')}${(G.stats.rating || 0).toFixed(1)}</em>` : '')}${tl('bag', 'Deliveries', T.deliveries || 0)}${tl('fist', 'Fights won', T.fightsWon || 0)}${tl('paw', 'Strays fed', T.fed || 0)}${tl('burst', 'Knocked out', T.knockedOut || 0)}${tl('plate', 'Meals', T.meals || 0)}</div>
-      <div class="rm-k">Vehicles</div>
-      <div class="rs-veh">${veh.map(vCard).join('')}</div>
-      <div class="rm-k">Homes</div>
-      <div class="rs-own">${home.length ? home.map(p => `<div class="rs-o">${g('home')}<span><b>${esc(p.name)}</b><small>${G.props.rentedOut && G.props.rentedOut(p) ? `Rented out · ${rs(p.rent)} a day` : 'You live here'}</small></span></div>`).join('') : `<div class="rs-o">${g('home')}<span><b>Aai’s house</b><small>Sadashiv Peth. Six more are for sale on the map</small></span></div>`}</div>
+    <div class="rs-3">
+      <div class="rf-card"><h4>Money</h4><div class="rs-grid">${tl('cash', 'Cash', rs(G.stats.money))}${tl('bank', 'Bank', rs(s.bank))}${tl('gold', 'Gold', (s.gold || 0) + ' g', '', '#ffc83d')}</div></div>
+      <div class="rf-card"><h4>Records</h4><div class="rs-grid four">${tl('auto', 'Rides completed', G.stats.rides || 0, G.stats.rides ? `<em>${g('star')}${(G.stats.rating || 0).toFixed(1)} avg</em>` : '')}${tl('bag', 'Deliveries', T.deliveries || 0)}${tl('fist', 'Fights won', T.fightsWon || 0)}${tl('paw', 'Strays fed', T.fed || 0)}</div></div>
+      <div class="rf-card"><div class="rf-h"><h4>Owned properties</h4><button class="rf-btn" data-goto="own">Manage <span class="kbd">P</span></button></div>
+        ${homes.map(h => `<div class="rs-home"><div class="rs-hi">${homeImg(h)}</div><span><b>${esc(h.n)}</b><small>${g('pin', '', '#9aa0aa')}${esc(h.note || h.at)}</small></span>${h.cur ? '<em>Current</em>' : ''}</div>`).join('')}</div>
+      <div class="rf-card"><div class="rf-h"><h4>Owned vehicles</h4><button class="rf-btn" data-goto="own">Manage <span class="kbd">V</span></button></div><div class="rs-veh">${veh.slice(0, 3).map(vCard).join('')}</div></div>
     </div></section>`;
 }

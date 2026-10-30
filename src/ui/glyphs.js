@@ -29,5 +29,33 @@ const P = {
   road: 'M9.5 3h5l5 18h-6.3l-.4-3.5h-1.6l-.4 3.5H4.5zm1.7 4.5-.2 2h2l-.2-2zm-.5 5-.3 3h3.2l-.3-3z',
   phone: 'M7 2h10a1.5 1.5 0 0 1 1.5 1.5v17A1.5 1.5 0 0 1 17 22H7a1.5 1.5 0 0 1-1.5-1.5v-17A1.5 1.5 0 0 1 7 2zm1 3v12h8V5zm4 13.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z',
   clock: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 5h-2v6l5 3 1-1.7-4-2.4z',
+  pagdi: 'M12 2.6l1.6 2.6c4.5.6 7.9 3.9 7.9 8.1v.9h-19v-.9c0-4.2 3.4-7.5 7.9-8.1zM6 12.2c1.6-.9 3.6-1.4 6-1.4s4.4.5 6 1.4c-.8-2.5-3.2-4.3-6-4.3s-5.2 1.8-6 4.3zM3 16h18l-1.4 3.6a1.5 1.5 0 0 1-1.4.9H5.8a1.5 1.5 0 0 1-1.4-.9z',
+  lotus: 'M12 3.5c1.9 2.1 2.9 4.4 2.9 6.8S13.9 14.9 12 17c-1.9-2.1-2.9-4.4-2.9-6.7S10.1 5.6 12 3.5zM3.6 8.6c2.7.3 4.8 1.7 5.9 3.9.6 1.3.8 2.7.6 4.3-2.7-.3-4.8-1.9-5.8-4.1-.5-1.2-.7-2.6-.7-4.1zm16.8 0c0 1.5-.2 2.9-.7 4.1-1 2.2-3.1 3.8-5.8 4.1-.2-1.6 0-3 .6-4.3 1.1-2.2 3.2-3.6 5.9-3.9zM2.5 18.6h19c-1.7 1.7-5.4 2.7-9.5 2.7s-7.8-1-9.5-2.7z',
+  shirt: 'M8.2 3 12 4.8 15.8 3 22 6.6l-2.6 4.6-2.4-1.2V21H7V10l-2.4 1.2L2 6.6z',
+  dumbbell: 'M1.5 10.5h2v3h-2zM4 8h2.6v8H4zM7.2 5.8h2.4v12.4H7.2zM9.6 10.8h4.8v2.4H9.6zM14.4 5.8h2.4v12.4h-2.4zM17.4 8H20v8h-2.6zm3.1 2.5h2v3h-2z',
+  cash: 'M2 6h20v12H2zm3.2 2.4a2 2 0 0 1-1.6 1.6v4a2 2 0 0 1 1.6 1.6h13.6a2 2 0 0 1 1.6-1.6v-4a2 2 0 0 1-1.6-1.6zM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z',
+  cart: 'M2.5 3.5h2.8l.8 2.3H21l-2.6 8.5H8.6l.6 1.8H19v2H7.7L4 5.5H2.5zM9 22a1.6 1.6 0 1 1 0-3.2A1.6 1.6 0 0 1 9 22zm8.5 0a1.6 1.6 0 1 1 0-3.2 1.6 1.6 0 0 1 0 3.2z',
+  pad: 'M7 6.5h10a5 5 0 0 1 4.8 6.4l-1.3 4.4a2.6 2.6 0 0 1-4.6.8L14.4 16H9.6l-1.5 2.1a2.6 2.6 0 0 1-4.6-.8l-1.3-4.4A5 5 0 0 1 7 6.5zM6.8 9.5V11H5.3v1.6h1.5v1.5h1.6v-1.5h1.5V11H8.4V9.5zM16 9.6a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2zm2.2 2.2a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2z',
+  diamond: 'M12 2l10 10-10 10L2 12zm0 5.2L7.2 12l4.8 4.8 4.8-4.8z',
+  chat: 'M4 3.5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9.5L4 21.5v-4a2 2 0 0 1-2-2v-10a2 2 0 0 1 2-2zm3 5v2h10v-2zm0 4v2h6v-2z',
+  car: 'M4.6 10.6 6.5 6a2 2 0 0 1 1.9-1.3h7.2A2 2 0 0 1 17.5 6l1.9 4.6h.8a1 1 0 0 1 1 1V17h-2v1.6a1.6 1.6 0 0 1-3.2 0V17H8v1.6a1.6 1.6 0 0 1-3.2 0V17h-2v-5.4a1 1 0 0 1 1-1zm2.4 0h10l-1.3-3.4H8.3zM6.5 12.4a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zm11 0a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6z',
+  cross: 'M9 3h6v6h6v6h-6v6H9v-6H3V9h6z',
+  fuel: 'M4 3h10v18H4zm2.2 2.2v5h5.6v-5zM15 7.2l1.5-1.4 3.5 3.5v8.9a2 2 0 0 1-4 0V14h-1v-2.4h3.4v6.6h.2V10.2z',
+  bus: 'M6 2h12a3 3 0 0 1 3 3v12.5h-1.2V21h-3.3v-3.5h-9V21H4.2v-3.5H3V5a3 3 0 0 1 3-3zm-.3 3.5v6h12.6v-6zM7 13.4a1.6 1.6 0 1 0 .01 0zm10 0a1.6 1.6 0 1 0 .01 0z',
+  wrench: 'M21 6.6a5.5 5.5 0 0 1-7.3 5.2l-7 6.9a2 2 0 0 1-2.8-2.8l6.9-7A5.5 5.5 0 0 1 17.4 1.6l-3.3 3.2.6 3 3 .6z',
+  check: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 13.7-4.1-4.1 1.5-1.5 2.6 2.6 5.5-5.5 1.5 1.5z',
+  pencil: 'M3 17.2V21h3.8L17.8 10 14 6.2zM20.7 7a1 1 0 0 0 0-1.4l-2.3-2.3a1 1 0 0 0-1.4 0l-1.8 1.8 3.8 3.8z',
+  tree: 'M12 1.8 4.5 12.5h4L4 19h7v3.2h2V19h7l-4.5-6.5h4z',
+  temple: 'M12 1.5 13 4h-2zM8.5 5h7l1.5 4h-10zM5 10h14v2H5zm1.5 3h11v7h-3.5v-4h-4v4H6.5zM3 21h18v1.5H3z',
+  film: 'M3 4h18v16H3zm2 2v2h2V6zm12 0v2h2V6zM5 10v2h2v-2zm12 0v2h2v-2zM5 14v2h2v-2zm12 0v2h2v-2zM9 6v12h6V6z',
+  college: 'M12 3 1 8.5 12 14l9-4.5V16h2V8.5zM5.5 12.6V17c0 1.7 2.9 3.5 6.5 3.5s6.5-1.8 6.5-3.5v-4.4L12 15.9z',
+  building: 'M4 21V3h11v6h5v12zm3-15v2h2V6zm4 0v2h2V6zM7 10v2h2v-2zm4 0v2h2v-2zm6 2v2h1v-2zM7 14v2h2v-2zm4 0v2h2v-2zm6 2v2h1v-2zm-8 2v3h2v-3z',
 };
-export const g = (name, cls = '') => P[name] ? `<svg class="gi ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="${P[name]}"/></svg>` : '';
+// each glyph's own colour (bold, the way games colour-code things); pass a colour to override
+const C = { heart: '#ff4d5e', food: '#ff8a3d', drop: '#3ea8ff', bolt: '#ffd23f', run: '#f1ece2', smile: '#3ddc84', glass: '#e8b04a', rupee: '#6fdc8c', cash: '#6fdc8c', bank: '#6aa8ff', gold: '#ffc83d',
+  auto: '#ffd23f', bag: '#ff9f43', fist: '#f3c9a0', paw: '#f1ece2', burst: '#ff6b5e', plate: '#f1ece2', star: '#ffd23f', receipt: '#f1ece2', card: '#3ddc84', shield: '#5aa2ff', home: '#f1ece2', pin: '#ff6b5e',
+  user: '#f1ece2', rank: '#ffd23f', flag: '#ffd23f', road: '#f1ece2', phone: '#f1ece2', clock: '#f1ece2', pagdi: '#ffb224', lotus: '#5aa2ff', shirt: '#ff5a5f', dumbbell: '#3ddc84', cart: '#ff9f43',
+  pad: '#f1ece2', diamond: '#ffc83d', chat: '#3ddc84', car: '#a78bfa', cross: '#ff4d5e', fuel: '#a08cff', bus: '#33d17a', wrench: '#f1ece2', check: '#3ddc84', pencil: '#f1ece2', tree: '#5bbf6a',
+  temple: '#ff9f43', film: '#ff6ec7', college: '#c08cff', building: '#9aa0aa' };
+export const g = (name, cls = '', col) => P[name] ? `<svg class="gi ${cls}" viewBox="0 0 24 24" aria-hidden="true" style="color:${col || C[name] || 'currentColor'}"><path fill-rule="evenodd" d="${P[name]}"/></svg>` : '';
+export const GLYPH = P;

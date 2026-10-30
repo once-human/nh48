@@ -47,6 +47,7 @@ export class Studio {
     const PIECE = { top: [0.74, 1.95], long: [0.6, 2.7], saree: [0.5, 3.6], bottom: [0.3, 2.6] }[frame];
     if (PIECE) { C.fov = 24; const y = hp.y * PIECE[0]; C.position.set(0, y + 0.12, PIECE[1]); C.lookAt(0, y, 0); }
     else if (frame === 'shoe') { C.fov = 24; C.position.set(0.5, 0.5, 0.78); C.lookAt(0, 0.07, 0.05); }
+    else if (frame === 'bust') { C.fov = 24; C.position.set(hp.x, hp.y - 0.32, hp.z + 2.5); C.lookAt(hp.x, hp.y - 0.4, hp.z); }
     else if (frame === 'head') { C.fov = 26; C.position.set(hp.x, hp.y - 0.05, hp.z + 1.6); C.lookAt(hp.x, hp.y - 0.17, hp.z); }
     else { C.fov = this.opts.fov ?? 24; const mid = hp.y * 0.53; C.position.set(0, mid + 0.25, 5.4); C.lookAt(0, mid, 0); }
     return this.grab();
