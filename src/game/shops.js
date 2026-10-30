@@ -510,8 +510,14 @@ export class Shops {
       case 'gym': {
         const price = (L.s.gymUntil || -1) >= dayOf(G) ? 0 : r10(250 * mul);
         const gain = ctx.tier === 'premium' ? 4 : 3;
-        out.push({ label: ctx.tier === 'premium' ? 'Session with a trainer' : 'Day pass: workout', note: `+${gain} max health, harder punches (now ${L.hpMax})`, price, disabled: L.s.energy < 0.2 ? 'Too tired' : L.s.fitness >= 40 ? 'Peak fitness' : '', act: pay(price, () => { L.change('fitness', gain); L.apply({ energy: -0.15, hunger: -0.08, thirst: -0.1, mood: 0.05 }); if (G.interiors && G.interiors.cur) { G.player.human.play('crouch', { restart: true }); G.player.act = { kind: 'hurt', t: 0, dur: 2.5 }; } return `Workout done. Max health ${L.hpMax}`; }) });
-        out.push({ label: 'Protein shake', note: 'Chocolate, allegedly', price: r10(180 * mul), act: pay(r10(180 * mul), () => { L.apply({ hunger: 0.2, thirst: 0.15 }); return 'Gains'; }) });
+        // the workouts are on the machines now (gym.js): this desk sells the way in, a trainer, a shake
+        G.gymTier = ctx.tier;
+        const pass = L.s.gymPass === dayOf(G) || price === 0;
+        out.push({ label: pass ? 'You’re in for today' : 'Day pass', note: pass ? 'Walk up to a machine: bench, squats, curls, the bag, the treadmill' : 'Use any machine today', price: pass ? 0 : price, disabled: pass ? ' ' : '', act: pay(price, () => { L.s.gymPass = dayOf(G); return 'Pick a machine'; }) });
+        if (ctx.tier === 'premium') out.push({ label: 'Session with a trainer', note: 'He fixes your form: the green is wider for today', price: r10(900 * mul), act: pay(r10(900 * mul), () => { L.s.gymPass = dayOf(G); L.s.trainerDay = dayOf(G); return 'Form check done. Go'; }) });
+        const F = G.gym ? G.gym.fit() : { str: 0, sta: 0 };
+        out.push({ label: `Strength ${Math.round(F.str)} · Stamina ${Math.round(F.sta)}`, note: `Max health ${L.hpMax}${G.gym && G.gym.sore() ? ' · sore today' : ''}`, price: 0, disabled: ' ' });
+        out.push({ label: 'Protein shake', note: 'Chocolate, allegedly', price: r10(180 * mul), act: pay(r10(180 * mul), () => { L.apply({ hunger: 0.2, thirst: 0.15 }); L.s.shakeAt = G.clock || 0; return 'Your next workout counts for more'; }) });
         break;
       }
       case 'bank': this.bank(out); break;

@@ -71,6 +71,7 @@ import { GarageUI } from './garageui.js';
 import { ModFX } from './modfx.js';
 import { CityEdge } from './edge.js';
 import { Calendar } from './calendar.js';
+import { Gym } from './gym.js';
 import { Diary } from '../ui/diary.js';
 
 export class Game {
@@ -252,7 +253,7 @@ export class Game {
     this.approachSt = new StreetApproach(this);
     applySettings(this);
     this.trial = new Trial(this);
-    this.garageUI = new GarageUI(this); this.modfx = new ModFX(this); this.edge = new CityEdge(this); this.calendar = new Calendar(this);
+    this.garageUI = new GarageUI(this); this.modfx = new ModFX(this); this.edge = new CityEdge(this); this.calendar = new Calendar(this); this.gym = new Gym(this);
     // the traffic is the neighbourhood's: Koregaon Park and Baner get the German sedans and the odd supercar,
     // the peths scooters and cycles, Lohegaon and Wagholi autos, tempos and Thars
     { const RICH = /koregaon park|boat club|bund garden|kalyani nagar|baner|balewadi|aundh|prabhat road|model colony|viman nagar|dhole patil|sopan baug|pashan|bavdhan|erandwane|salunke vihar|nibm|magarpatta city/i,
@@ -271,8 +272,8 @@ export class Game {
     // sprinting tires you (about 15 s flat out, then you're down to a jog till you've got your breath back); shot or
     // limping, you can't run at all
     // out of breath slows you gradually (from a third left down to a jog), not off a cliff
-    player.sprintMul = () => { const P = this.player, st = P.stam ?? 1; return this.life.sprintMul * (st < 0.33 ? 0.6 + 0.4 * st / 0.33 : 1) * (P.limpT > 0 ? 0.5 : 1); };
-    player.stamDrain = () => { const s = this.life.s; return (s.energy < 0.3 ? 1.5 : 1) * (s.hunger < 0.15 ? 1.25 : 1) * (s.drunk > 0.4 ? 1.3 : 1); };
+    player.sprintMul = () => { const P = this.player, st = P.stam ?? 1; return this.life.sprintMul * (this.gym && this.gym.sore() ? 0.9 : 1) * (1 + (this.gym ? this.gym.stamina() / 500 : 0)) * (st < 0.33 ? 0.6 + 0.4 * st / 0.33 : 1) * (P.limpT > 0 ? 0.5 : 1); };
+    player.stamDrain = () => { const s = this.life.s, g = this.gym; return (s.energy < 0.3 ? 1.5 : 1) * (s.hunger < 0.15 ? 1.25 : 1) * (s.drunk > 0.4 ? 1.3 : 1) * (g ? (1 - g.stamina() / 110) * (g.sore() ? 1.2 : 1) : 1); };     // (gym stamina: sprint longer; sore legs: shorter)
     player.drunk = () => this.life.s.drunk;
     player.useHook = () => this.shops.tryUse();
     this.origLook = player.look ? { ...player.look, top: player.look.top.clone(), bottom: player.look.bottom.clone(), shoe: player.look.shoe.clone(), hair: player.look.hair.clone(), cut: player.look.cut.clone() } : null;
@@ -1453,6 +1454,7 @@ export class Game {
     this.lights.update(dt, night);
     if (this.state === 'play' || this.state === 'shop') this.phone.update(this.realDt || dt);
     if (this.story.talking) this.story.cam(dt);
+    if (this.gym && this.gym.on) this.gym.update(this.realDt || dt);
     if (this.garageUI && this.garageUI.open) this.garageUI.update(this.realDt || dt);
     else if (this.state !== 'play' && this.modfx) this.modfx.update(dt);
     if (this.lightPools) { this.lightPools.mesh.visible = night > 0.05; this.lightPools.mesh.material.opacity = night * 0.55; }

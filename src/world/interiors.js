@@ -485,7 +485,21 @@ export class Interiors {
       for (let i = 0; i < rows - 1; i++) { const x = -W / 2 + 4 + i * 2.6; box(B, x, 0.7, D - 2.5, 0.8, 1.4, 1.8, 0x1b1c1f); box(B, x, 1.4, D - 3.2, 0.7, 0.05, 0.4, 0x2a2a2e); solid(x, D - 2.5, 0.8, 1.8, 2); }   // treadmills
       box(B, 0, 0.02, 2.2, W * 0.8, 0.04, 1.8, 0x2f2f33);
       box(B, -W / 2 + 0.03, 1.5, D / 2, 0.03, 2.2, D * 0.7, 0xbcd0dc);                   // the mirror wall
-      spot(-1.4, 3.3, 1.4, 'workout', 'Work out');
+      // the machines, each its own exercise (gym.js)
+      const st = (x, z, sub, label) => spot(x, z, 0.9, 'workout', label, { sub });
+      // a bench press: bench, uprights, the bar loaded with plates
+      box(B, -2.4, 0.45, 2.2, 0.4, 0.12, 1.4, 0x1b1c1f); for (const s2 of [-0.55, 0.55]) box(B, -2.4 + s2, 0.6, 1.6, 0.06, 1.2, 0.06, 0x8e9093); box(B, -2.4, 1.15, 1.6, 1.6, 0.04, 0.04, 0xb8bcc2); for (const s2 of [-0.7, 0.7]) box(B, -2.4 + s2, 1.15, 1.6, 0.05, 0.4, 0.4, 0x1b1c1f); solid(-2.4, 2.0, 1.2, 1.6, 2);
+      st(-2.4, 3.0, 'bench', 'Bench press');
+      // a squat rack: the cage, the bar on the hooks
+      for (const [a, b] of [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]]) box(B, 1.6 + a, 1.1, 2.0 + b, 0.07, 2.2, 0.07, 0x2a2a2e); box(B, 1.6, 1.45, 1.4, 1.8, 0.04, 0.04, 0xb8bcc2); for (const s2 of [-0.8, 0.8]) box(B, 1.6 + s2, 1.45, 1.4, 0.05, 0.42, 0.42, 0xe0b23a); solid(1.6, 2.0, 1.3, 1.3, 2);
+      st(1.6, 3.0, 'squat', 'Squat rack');
+      // dumbbells on their rack by the mirror
+      box(B, -W / 2 + 0.6, 0.5, D / 2, 0.5, 0.06, 3.0, 0x2a2a2e); for (let k = 0; k < 8; k++) { box(B, -W / 2 + 0.6, 0.62, D / 2 - 1.3 + k * 0.37, 0.3, 0.1 + k * 0.012, 0.12, 0x1b1c1f); } solid(-W / 2 + 0.6, D / 2, 0.5, 3.0, 2);
+      st(-W / 2 + 1.7, D / 2, 'curl', 'Dumbbells');
+      // the heavy bag on its chain
+      box(B, W / 2 - 1.6, H - 0.4, D / 2, 0.04, 0.8, 0.04, 0x6b6b6b); box(B, W / 2 - 1.6, 1.4, D / 2, 0.42, 1.1, 0.42, 0x7a1e1e); C.addCircle(O.x + W / 2 - 1.6, O.z + D / 2, 0.35, 2);
+      st(W / 2 - 1.6, D / 2 - 1.0, 'bag', 'Heavy bag');
+      st(-W / 2 + 4, D - 4.0, 'tread', 'Treadmill');
       spot(W / 2 - 1.4, D - 1.4, 1.2, 'counter', 'Front desk');
       counter(W / 2 - 1.4, D - 0.6, 1.6, 0.6, S.counter);
       kp(W / 2 - 1.4, D - 0.25, -Math.PI / 2, 'idle', 'keeper');
@@ -906,7 +920,7 @@ export class Interiors {
       case 'stand': if (!C.eating) this.stand(); return;
       case 'dance': this.dance(true); return;
       case 'undance': this.dance(false); return;
-      case 'workout': G.shops.show({ ...ctx, kind: 'gym', inside: true }); return;
+      case 'workout': if (s.sub && G.gym) { G.gymTier = ctx.tier || G.gymTier; G.gym.start(s.sub); } else G.shops.show({ ...ctx, kind: 'gym', inside: true }); return;
       case 'sleep': if (G.sleep) G.sleep(); return;
       case 'wardrobe': G.jhola && G.jhola.open('inv', 'wear'); return;
       case 'aai': this.aaiTalk(); return;

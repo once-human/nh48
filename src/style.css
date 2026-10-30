@@ -2607,3 +2607,17 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border: 0; bord
 .mb .mb-fest { font-style: normal; font-size: 11.5px; font-weight: 800; color: var(--cream-ink, #17130c); background: linear-gradient(90deg, var(--g1), var(--g3)); padding: 3px 8px; border-radius: 999px; }
 .mb .mb-time { color: var(--tx2, rgba(245,245,247,.72)); font-variant-numeric: tabular-nums; }
 .mb .mb-cash { font-family: 'Archivo', var(--font-ui) !important; font-weight: 800 !important; font-stretch: 112%; font-size: 17px !important; color: #fff; }
+/* a workout (gym.js) */
+.gymx { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); z-index: 44; pointer-events: auto; }
+.gx2-card { width: min(520px, 92vw); padding: 18px 22px; border-radius: 22px; background: rgba(16,16,19,.9); border: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(14px); color: #f5f5f7; box-shadow: 0 24px 60px -24px rgba(0,0,0,.7); }
+.gx2-k { font: 700 11px var(--font-ui); letter-spacing: .12em; text-transform: uppercase; color: #3ddc84; }
+.gx2-card h3 { margin: 4px 0 2px; font: 800 24px 'Archivo', var(--font-ui); font-stretch: 112%; }
+.gx2-card p { margin: 0 0 12px; font-size: 12.5px; color: rgba(245,245,247,.66); }
+.gx2-bar { position: relative; height: 22px; border-radius: 11px; background: rgba(255,255,255,.08); overflow: hidden; }
+.gx2-zone { position: absolute; top: 0; bottom: 0; background: rgba(61,220,132,.28); }
+.gx2-sweet { position: absolute; top: 0; bottom: 0; background: rgba(61,220,132,.75); }
+.gx2-bar u { position: absolute; top: -3px; bottom: -3px; width: 4px; margin-left: -2px; border-radius: 2px; background: var(--cream, #f1e6cf); box-shadow: 0 0 10px rgba(241,230,207,.8); }
+.gx2-row { display: flex; justify-content: space-between; margin-top: 10px; font: 700 13px var(--font-ui); }
+.gx2-form.ok { color: #7ff0ae; } .gx2-form.meh { color: #ffd27a; } .gx2-form.bad { color: #ff9aa4; }
+.gx2-hint { margin-top: 8px; font-size: 11.5px; color: rgba(245,245,247,.5); }
+.gx2-hint .kbd { background: var(--cream, #f1e6cf) !important; color: var(--cream-ink, #17130c) !important; border-radius: 6px !important; padding: 1px 6px; }

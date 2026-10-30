@@ -165,7 +165,7 @@ export class Life {
     // rent from what you own, once a game day
     const day = Math.floor((G.clock || 0) / 24);
     if (s.lastRentDay < 0) s.lastRentDay = day;
-    if (day > s.lastRentDay && G.props) { s.lastRentDay = day; G.props.payRent(); G.hustle && G.hustle.daily(); G.shops && G.shops.daily && G.shops.daily(); }
+    if (day > s.lastRentDay && G.props) { s.lastRentDay = day; G.props.payRent(); G.hustle && G.hustle.daily(); G.shops && G.shops.daily && G.shops.daily(); G.gym && G.gym.daily(day); }
     if ((this.saveT -= dt) <= 0) { this.saveT = 5; this.save(); }
   }
   warn(k, v, title, sub) {
@@ -182,7 +182,7 @@ export class Life {
   // tiredness, hunger and drink as gameplay
   get sprintMul() { const s = this.s; return (s.energy < 0.15 ? 0.75 : 1) * (s.hunger < 0.08 ? 0.85 : 1) * (s.drunk > 0.6 ? 0.85 : 1); }
   // a man hits harder (built stronger), and the gym adds to anyone
-  get punchMul() { return (this.g && this.g.player && this.g.player.look && !this.g.player.look.female ? 1.35 : 1) + this.s.fitness / 80; }
+  get punchMul() { return (this.g && this.g.player && this.g.player.look && !this.g.player.look.female ? 1.35 : 1) + (this.s.fit ? this.s.fit.str / 55 : this.s.fitness / 80); }     // (gym strength)
 }
 
 function describe(eff) {
