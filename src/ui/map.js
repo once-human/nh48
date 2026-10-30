@@ -421,6 +421,7 @@ export class MapScreen {
       <button class="btn primary small bm-track" id="bm-track" title="Route to your current mission">◆ Track mission</button>
       <button class="btn small bm-close" id="bm-close">Close <span class="kbd" data-k="M">M</span></button>
       <div class="bm-card glass" id="bm-card" hidden>
+        <div class="bm-c-pic" id="bm-c-pic"></div>
         <div class="bm-c-cat" id="bm-c-cat"></div><div class="bm-c-n" id="bm-c-n"></div><div class="bm-c-mr" lang="mr" id="bm-c-mr"></div>
         <div class="bm-c-b" id="bm-c-b"></div>
         <div class="bm-c-rep" id="bm-c-rep"></div>
@@ -573,6 +574,9 @@ export class MapScreen {
     ft.textContent = this.g.free ? 'Go there now' : `Take a rickshaw · ₹${cost}`;
     ft.disabled = !!why || this.g.stats.money < cost || d < 40;
     ft.title = why || (this.g.stats.money < cost ? `You have ₹${this.g.stats.money}` : 'Skip the drive');
+    // its picture: taken by the game when you're there (postcards.js)
+    { const el = this.$('bm-c-pic'), pc = this.g.postcards, u = pc ? pc.forPlace(p) : null;
+      el.innerHTML = u ? `<img alt="" src="${u}">` : `<span>No picture yet</span><small>Go there by day and it’s photographed</small>`; el.classList.toggle('none', !u); }
     // how people round there take you
     { const R = this.g.rep, el = this.$('bm-c-rep');
       if (R && !this.g.free) { const v = R.standing(p.x, p.z), w = v > 0.45 ? 'One of ours' : v > 0.15 ? 'Liked' : v < -0.45 ? 'Trouble' : v < -0.15 ? 'Wary' : 'Neutral';

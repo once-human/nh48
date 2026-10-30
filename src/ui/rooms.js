@@ -14,7 +14,9 @@ export const ACTS = { 0: ['उपोद्घात', 'Prologue', 'Back in Pune 
   4: ['भाग ४', 'Lights', 'Diwali. Everything you chose comes to your door.'],
   5: ['भाग ५', 'Winter', 'The end of the year. What you do with what you know.'] };
 // a picture for a chapter: assets/missions/<id>.webp when there is one, else your own photos from it
-const pic = (id) => { const u = 'assets/missions/' + id + '.webp'; return assetVersion(u) ? versioned(u) : null; };
+// a picture for a chapter: the game's own shot of where it happens (postcards.js), once you've been there
+let PC = null;
+const pic = (id) => { const u = 'assets/missions/' + id + '.webp'; return assetVersion(u) ? versioned(u) : PC ? PC.get('m:' + id) : null; };
 const SIDE = [
   { k: 'side', id: 'rides', title: 'Auto rides', sub: 'Turn the meter on, anywhere', body: 'Drive your auto and passengers wave you down. A good ride, on the meter, is money, a better rating and a little respect.', how: 'Get in your auto. Hail-waving passengers show on the minimap.' },
   { k: 'side', id: 'delivery', title: 'Deliveries', sub: 'DropKart orders', body: 'Pick up from a restaurant, drop at a door. Quick money between rides, and the riders at the counters talk.', how: 'Your phone pings with orders once you’re signed up.' },
@@ -26,6 +28,7 @@ const SIDE = [
 ];
 
 export function missionsRoom(J) {
+  PC = J.g.postcards || null;
   const G = J.g, S = G.story, st = S ? S.st : { m: 0, step: -1 }, ms = S && S.list ? S.list() : [];
   const filt = J.mfilt || 'all';
   const items = [];
