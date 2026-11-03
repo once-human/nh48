@@ -191,7 +191,7 @@ export class Pilot {
     }
     // traffic: get shoved / knocked down
     if (traffic) traffic.near(F.x, F.z, 6, (o) => {
-      if (o.isPlayer || !o.T && !o.parked) return;
+      if (o.isPlayer || !o.T && !o.parked || Math.abs((o.y || 0) - (F.agent.y || 0)) > 2) return;
       const T = o.T || { L: o.L, W: o.W };
       const rx = F.x - o.x, rz = F.z - o.z;
       const al = rx * o.hx + rz * o.hz, ac = -rx * o.hz + rz * o.hx;
@@ -237,7 +237,7 @@ export class Pilot {
         F.vy = 0;
       }
     } else F.y = damp(F.y, gy, 18, dt);
-    Object.assign(F.agent, { x: F.x, z: F.z, hx: Math.cos(F.yaw), hz: Math.sin(F.yaw), v: F.v });
+    Object.assign(F.agent, { x: F.x, z: F.z, y: F.deck >= 0 ? F.y : 0, hx: Math.cos(F.yaw), hz: Math.sin(F.yaw), v: F.v });
     // animation
     if (this.downT > 0) {
       this.downT -= dt;
@@ -294,7 +294,7 @@ export class Pilot {
       F.vx = C.nx * 1.2; F.vz = C.nz * 1.2;
       H.play('jump_loop', { fade: 0.15 });
     }
-    Object.assign(F.agent, { x: F.x, z: F.z, hx: Math.cos(F.yaw), hz: Math.sin(F.yaw), v: 0 });
+    Object.assign(F.agent, { x: F.x, z: F.z, y: F.deck >= 0 ? F.y : 0, hx: Math.cos(F.yaw), hz: Math.sin(F.yaw), v: 0 });
     H.holder.position.set(F.x, F.y, F.z);
     H.holder.rotation.set(0, -F.yaw, 0);
     H.mixer.update(dt);
@@ -348,7 +348,7 @@ export class Pilot {
     }
     // traffic: slow or stopped vehicles can be taken from their driver
     if (traffic) traffic.near(F.x, F.z, 8, (o) => {
-      if (!o.T || o.isPlayer || o.parked || o.fallen > 0 || o.wreck) return;
+      if (!o.T || o.isPlayer || o.parked || o.fallen > 0 || o.wreck || Math.abs((o.y || 0) - (F.agent.y || 0)) > 2) return;
       const dist = this.distToBox(F.x, F.z, o.x, o.z, o.hx, o.hz, o.T.L, o.T.W);
       if (dist < 1.4 && o.v < 3.5) consider(dist + 0.4, { kind: 'traffic', o, label: `Take the ${specOf(o.type).name.toLowerCase()} from its driver`, key: 'F' });
     });
@@ -400,6 +400,7 @@ export class Pilot {
       veh = new Vehicle(this.W, this.scene, this.vmats, o.type, o.col);
       veh.reset(o.x, o.z, Math.atan2(o.hz, o.hx));
       veh.v = 0;
+      if ((o.y || 0) > 0.5 && this.W.fly) { const q = this.W.fly.probe(o.x, o.z); if (q) { veh.deck = q.s.f; veh.y = q.h; } }      // taken up on a flyover: it stays up there
       veh.helmet = false;                       // the rider keeps theirs
       veh.stolen = true; veh.plate = this.randomPlate();
       const idx = traffic.list.indexOf(o);

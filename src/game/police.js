@@ -1054,8 +1054,8 @@ class Marshal {
       this.scanT = 0.2;
       const blocked = (lat) => {
         let b = 99;
-        G.traffic.near(v.x + hx * 7, v.z + hz * 7, 10, (o) => { if (o === v.agent || (!o.T && !o.parked) || o.isPlayer) return; const rx = o.x - v.x, rz = o.z - v.z, al = rx * hx + rz * hz, ac = -rx * hz + rz * hx, w = (o.T ? o.T.W : o.W || 1.8) / 2 + (this.jeep ? 1.2 : 0.6); if (al > 0.8 && al < 14 && Math.abs(ac - lat) < w) b = Math.min(b, al); });
-        for (const p of G.people.list) { if (p.hidden || p.cop || p.crew) continue; const rx = p.x - v.x, rz = p.z - v.z, al = rx * hx + rz * hz, ac = -rx * hz + rz * hx; if (al > 0.5 && al < 11 && Math.abs(ac - lat) < (this.jeep ? 1.7 : 1.2)) b = Math.min(b, al); }
+        G.traffic.near(v.x + hx * 7, v.z + hz * 7, 10, (o) => { if (o === v.agent || (!o.T && !o.parked) || o.isPlayer || Math.abs((o.y || 0) - (v.agent.y || 0)) > 2) return; const rx = o.x - v.x, rz = o.z - v.z, al = rx * hx + rz * hz, ac = -rx * hz + rz * hx, w = (o.T ? o.T.W : o.W || 1.8) / 2 + (this.jeep ? 1.2 : 0.6); if (al > 0.8 && al < 14 && Math.abs(ac - lat) < w) b = Math.min(b, al); });
+        if (!(v.agent.y > 2)) for (const p of G.people.list) { if (p.hidden || p.cop || p.crew) continue; const rx = p.x - v.x, rz = p.z - v.z, al = rx * hx + rz * hz, ac = -rx * hz + rz * hx; if (al > 0.5 && al < 11 && Math.abs(ac - lat) < (this.jeep ? 1.7 : 1.2)) b = Math.min(b, al); }
         return b;
       };
       this.block = close ? 99 : blocked(0); this.off = 0;

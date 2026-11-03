@@ -42,11 +42,11 @@ export class Driver {
     const G = this.G, v = this.v, hx = Math.cos(v.th), hz = Math.sin(v.th), S = v.spec, wHalf = (S.W || 1.8) / 2 + 0.55, look = 7 + Math.abs(v.v) * 1.6;
     let gap = 99, still = false, person = false;
     G.traffic.near(v.x + hx * look / 2, v.z + hz * look / 2, look / 2 + 6, (o) => {
-      if (o === v.agent) return;
+      if (o === v.agent || Math.abs((o.y || 0) - (v.agent.y || 0)) > 2) return;
       const rx = o.x - v.x, rz = o.z - v.z, al = rx * hx + rz * hz, ac = -rx * hz + rz * hx, ow = ((o.T ? o.T.W : o.W) || 1.8) / 2;
       if (al > 0.5 && al < look && Math.abs(ac - lat) < wHalf + ow && al < gap) { gap = al; still = Math.abs(o.v || 0) < 0.6; }
     });
-    for (const p of G.people.list) {
+    if (!(v.agent.y > 2)) for (const p of G.people.list) {
       if (p.hidden || p.crew || p.cop) continue;
       const rx = p.x - v.x, rz = p.z - v.z; if (Math.abs(rx) > look + 2 || Math.abs(rz) > look + 2) continue;
       const al = rx * hx + rz * hz, ac = -rx * hz + rz * hx;

@@ -241,7 +241,7 @@ export class PlayerAuto {
     // ---- collisions with the city
     flyTrack(this);
     this.collideStatic();
-    if (traffic && !(this.deck >= 0 && this.y > 2.2)) this.collideTraffic(traffic);
+    if (traffic) this.collideTraffic(traffic);
 
     // ---- suspension & terrain
     const fx = this.x + nhx * 1.0, fz = this.z + nhz * 1.0;
@@ -256,7 +256,7 @@ export class PlayerAuto {
       this.events.push({ type: 'bump', strength: jolt * sp * soft });
     }
     this.prevH = [hF, hL, hR];
-    this.onFootpath = !this.W.surf.isRoad(this.x, this.z);
+    this.onFootpath = this.deck < 0 && !this.W.surf.isRoad(this.x, this.z);          // (a deck is road, whatever's underneath it)
     const hT = (hF + (hL + hR) / 2) / 2;
     this.vy += ((hT - this.y) * 160 - this.vy * 14) * dt;
     this.y += this.vy * dt;
@@ -298,7 +298,7 @@ export class PlayerAuto {
     const hx = Math.cos(this.th), hz = Math.sin(this.th);
     const mine = [[1.0, 0.5], [0.0, 0.7], [-0.95, 0.7]].map(([o, r]) => [this.x + hx * o, this.z + hz * o, r]);
     traffic.near(this.x, this.z, 9, (o) => {
-      if (o.isPlayer || o.T === undefined) return;
+      if (o.isPlayer || o.T === undefined || Math.abs((o.y || 0) - this.agent.y) > 2) return;
       const T = o.T;
       const n = Math.max(1, Math.round(T.L / T.W));
       for (let k = 0; k < n; k++) {
@@ -357,7 +357,7 @@ export class PlayerAuto {
 
   sync(dt = 0) {
     const hx = Math.cos(this.th), hz = Math.sin(this.th);
-    this.agent.x = this.x; this.agent.z = this.z; this.agent.hx = hx; this.agent.hz = hz; this.agent.v = Math.abs(this.v);
+    this.agent.x = this.x; this.agent.z = this.z; this.agent.y = this.deck >= 0 ? this.y : 0; this.agent.hx = hx; this.agent.hz = hz; this.agent.v = Math.abs(this.v);
     this.root.position.set(this.x, 0, this.z);
     this.root.rotation.set(0, -this.th, 0);
     // idle shiver of a single-cylinder engine

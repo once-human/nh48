@@ -219,14 +219,14 @@ export class Vehicle {
     this.x += (hx * this.v - hz * this.vl) * dt; this.z += (hz * this.v + hx * this.vl) * dt;
     flyTrack(this);
     this.collideStatic();
-    if (traffic && !(this.deck >= 0 && this.y > 2.2)) this.collideTraffic(traffic);
+    if (traffic) this.collideTraffic(traffic);
     // ---- suspension
     const half = S.wb / 2;
     const hF = this.heightAt(this.x + hx * half, this.z + hz * half), hR = this.heightAt(this.x - hx * half, this.z - hz * half);
     const jolt = Math.max(Math.abs(hF - this.prevH[0]), Math.abs(hR - this.prevH[1]));
     if (jolt > 0.05 && sp > 2.5) { const soft = this.soft ?? 1; this.vy += jolt * sp * (S.two ? 0.7 : 0.45) * soft; this.events.push({ type: 'bump', strength: jolt * sp * soft }); }   // (soft: lifted suspension from the garage)
     this.prevH = [hF, hR];
-    this.onFootpath = !W.surf.isRoad(this.x, this.z);
+    this.onFootpath = this.deck < 0 && !W.surf.isRoad(this.x, this.z);          // (a deck is road, whatever's underneath it)
     this.vy += (((hF + hR) / 2 - this.y) * 160 - this.vy * 14) * dt;
     this.y += this.vy * dt;
     this.pitch += (Math.atan2(hF - hR, S.wb) - clamp(a * 0.006, -0.025, 0.025) - this.pitch) * Math.min(1, dt * 12);
@@ -260,7 +260,7 @@ export class Vehicle {
     const mine = this.circles.map(([o, r]) => [this.x + hx * o, this.z + hz * o, r]);
     traffic.near(this.x, this.z, S.L / 2 + 8, (o) => {
       // (a police or emergency vehicle bumps into you too, and you into it: they're solid both ways)
-      if ((o.isPlayer && !this.service) || o === this.agent || o.T === undefined && !o.parked) return;
+      if ((o.isPlayer && !this.service) || o === this.agent || o.T === undefined && !o.parked || Math.abs((o.y || 0) - this.agent.y) > 2) return;
       const T = o.T || { L: o.L, W: o.W, mass: 1000, two: false };
       const n = Math.max(1, Math.round(T.L / T.W));
       for (let k = 0; k < n; k++) {
@@ -298,7 +298,7 @@ export class Vehicle {
 
   sync(dt = 0) {
     const hx = Math.cos(this.th), hz = Math.sin(this.th);
-    Object.assign(this.agent, { x: this.x, z: this.z, hx, hz, v: Math.abs(this.v) });
+    Object.assign(this.agent, { x: this.x, z: this.z, y: this.deck >= 0 ? this.y : 0, hx, hz, v: Math.abs(this.v) });
     this.root.position.set(this.x, 0, this.z);
     this.root.rotation.set(0, -this.th, 0);
     const idle = this.v === 0 ? Math.sin(performance.now() / 1000 * (this.spec.two ? 70 : 40)) * 0.0015 : 0;

@@ -386,7 +386,7 @@ export class Game {
   // a dent means a discussion, in Pune: the car you hit stops, its driver gets out, comes round to your window and
   // has his say (the people on the footpath have theirs), then goes back and drives off. Drive away if you like
   fenderBender(o) {
-    if (this.free || (this._argT || 0) > this.t || o.argue > 0) return;
+    if (this.free || (this._argT || 0) > this.t || o.argue > 0 || (o.y || 0) > 0.5) return;      // (nobody gets out for words on a flyover)
     this._argT = this.t + 40;
     o.argue = 22; o.v = 0;
     this.later(1.4, () => {

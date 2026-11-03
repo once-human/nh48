@@ -6,6 +6,7 @@ import { TRAFFIC, curve } from '../world/activity.js';
 import { RNG, clamp, lerp, wrapAngle } from '../core/util.js';
 import { buildAuto, buildScooter, buildBike, buildCar, buildBus, buildTempo, buildCycle, buildLow, PAINTS } from '../vehicles/models.js';
 import { lin } from '../world/geo.js';
+import { deckY, deckSlope } from '../world/flyover.js';
 
 export const TYPES = {
   scooter: { w: 30, L: 1.85, W: 0.75, vMul: [1.0, 1.25], A: 2.6, B: 5, T: 0.55, s0: 0.6, agile: 1.0, mass: 160, two: true, honk: 'beep' },
@@ -50,6 +51,11 @@ function linkAt(graph, l, s, out) {
 }
 function linkEnd(l) { return l.dir > 0 ? l.e.b : l.e.a; }
 function linkStart(l) { return l.dir > 0 ? l.e.a : l.e.b; }
+// the node a link ends at or starts from (a flyover's links carry their own: the street graph doesn't know about decks)
+function endOf(g, l) { return l.e.fly ? (l.dir > 0 ? l.e.B : l.e.A) : g.nodes[linkEnd(l)]; }
+function startOf(g, l) { return l.e.fly ? (l.dir > 0 ? l.e.A : l.e.B) : g.nodes[linkStart(l)]; }
+// a deck and the street under it are different places: what's 2 m above you isn't in your way
+function otherLevel(a, b) { return Math.abs((a.y || 0) - (b.y || 0)) > 2; }
 // lateral bounds (driver's left positive)
 function latBounds(l) {
   const hw = l.e.w / 2 - 0.55;
@@ -149,10 +155,14 @@ export class Traffic {
     // almost never land near you once all of Pune is loaded
     // one cache per radius: the spawner asks for two (round you, and down the road ahead)
     const C = (this._nearC = this._nearC || {})[rMax] || (this._nearC[rMax] = { list: null, x: 0, z: 0 });
-    if (!C.list || Math.hypot(px - C.x, pz - C.z) > 60) { C.list = [...this.graph.gridQuery(px, pz, rMax)]; C.x = px; C.z = pz; }
+    if (!C.list || Math.hypot(px - C.x, pz - C.z) > 60) {
+      C.list = [...this.graph.gridQuery(px, pz, rMax)]; C.x = px; C.z = pz;
+      C.decks = this.W.fly && this.W.fly.decks.length ? this.W.fly.edgesNear(px, pz, rMax) : [];
+    }
     const edges = C.list.length ? C.list : this.graph.liveEdges;
     for (let tries = 0; tries < 40; tries++) {
-      const e = edges[Math.floor(this.rng.next() * edges.length)];
+      // the flyovers have traffic on them too (a deck is one long edge: picked by edge alone it'd be nearly empty)
+      const e = C.decks.length && this.rng.next() < 0.22 ? C.decks[Math.floor(this.rng.next() * C.decks.length)] : edges[Math.floor(this.rng.next() * edges.length)];
       if (e.rank < 2) continue;
       if (this.rng.next() > [0, 0, 0.2, 0.45, 0.8, 1, 1][e.rank]) continue;
       const s = this.rng.range(2, Math.max(2.1, e.len - 2));
@@ -182,7 +192,8 @@ export class Traffic {
       ignore: null, ignoreT: 0, fallen: 0, alive: true, redRunner: this.rng.chance(T.two ? 0.12 : 0.03), id: Math.floor(this.rng.next() * 1e9),
       col: null, colB: null, colC: null, angry: 0, prevV: 0,
     });
-    v.latT = v.lat; v.dwell = 0; v.stopAt = null; v.lastStop = null;
+    v.latT = v.lat; v.dwell = 0; v.stopAt = null; v.lastStop = null; v.slope = 0;
+    linkAt(this.graph, r.l, r.s, tmpB); this.pickGoal(v, r.x, r.z, tmpB[2], tmpB[3]);
     v.v = SPEED_BY_RANK[r.l.e.rank] * v.vMul * this.rng.range(0.3, 0.8);
     // colours
     const P = PAINTS;
@@ -207,14 +218,63 @@ export class Traffic {
   }
 
   // ---------------------------------------------------------------- routing
+  // everyone's going somewhere: a place a few km off, roughly the way they're already headed
+  pickGoal(v, x, z, hx, hz) {
+    const a = Math.atan2(hz, hx) + this.rng.range(-1.2, 1.2), d = this.rng.range(1500, 5000);
+    v.gx = x + Math.cos(a) * d; v.gz = z + Math.sin(a) * d;
+  }
+  // a flyover coming up beside this road: take it if it brings you down nearer where you're going. Decided once
+  // per vehicle and ramp (the hash), so nobody dithers at the foot of one
+  rampAhead(v) {
+    const e = v.l.e;
+    if (e.ramps === undefined) e.ramps = !e.fly && e.rank >= 2 && this.W.fly && this.W.fly.decks.length ? this.W.fly.rampsFor(e) : null;
+    if (!e.ramps) return null;
+    for (const { r, s } of e.ramps) {
+      const at = v.l.dir > 0 ? s : e.len - s, ahead = at - v.s;
+      if (ahead < -2 || ahead > 45) continue;
+      linkAt(this.graph, v.l, clamp(at, 0, e.len), tmpA);
+      const dot = tmpA[2] * r.hx + tmpA[3] * r.hz, cross = tmpA[2] * r.hz - tmpA[3] * r.hx;
+      if (dot < 0.25) continue;                               // it starts the other way, or across you
+      const prog = (Math.hypot(v.gx - r.x, v.gz - r.z) - Math.hypot(v.gx - r.ex, v.gz - r.ez)) / Math.max(1, r.span);
+      // the road you're on ends here and the only way on is up
+      const onward = endOf(this.graph, v.l).out.some(o => o.e !== e && o.e.rank >= 2), last = !onward && e.len - at < 30;
+      const chance = last ? 1 : (prog > 0.45 ? 0.94 : prog > 0 ? 0.5 : 0.05) * (v.type === 'cycle' ? 0.25 : 1);   // (few pedal up one)
+      if (((v.id ^ Math.imul(r.id + 1, 2654435761)) >>> 0) % 1000 >= chance * 1000) continue;
+      return { l: r.l, turn: Math.atan2(cross, dot), at: Math.max(v.s, at - 6), s2: Math.min(12, r.l.e.len * 0.45) };
+    }
+    return null;
+  }
+  // coming down a ramp: the street the foot lands on, going the same way
+  groundLink(node, hx, hz) {
+    let best = null;
+    for (const e of this.graph.gridQuery(node.x, node.z, 25)) {
+      if (e.dead || e.rank < 2) continue;
+      const p = e.pts;
+      for (let k = 0; k + 3 < p.length; k += 2) {
+        const dx = p[k + 2] - p[k], dz = p[k + 3] - p[k + 1], L = Math.hypot(dx, dz) || 1e-6, u = ((node.x - p[k]) * dx + (node.z - p[k + 1]) * dz) / (L * L), t = u < 0 ? 0 : u > 1 ? 1 : u;
+        const d = Math.hypot(node.x - p[k] - dx * t, node.z - p[k + 1] - dz * t);
+        if (d > 25) continue;
+        const dot = (dx * hx + dz * hz) / L, dir = dot >= 0 ? 1 : -1;
+        if (dir < 0 && e.oneway || Math.abs(dot) < 0.15) continue;
+        const score = d + (1 - Math.abs(dot)) * 16;
+        if (!best || score < best.score) {
+          const s = e.cum[k / 2] + L * t;
+          best = { score, l: { e, dir }, s2: Math.min(e.len, (dir > 0 ? s : e.len - s) + 8), dot: Math.abs(dot), cross: (dx * hz - dz * hx) / L * -dir };
+        }
+      }
+    }
+    return best;
+  }
   chooseNext(v) {
-    const node = this.graph.nodes[linkEnd(v.l)];
+    const node = endOf(this.graph, v.l);
     if (node.portal) return null;
     const outs = node.out;
     linkAt(this.graph, v.l, linkLen(v.l), tmpA);
     const inx = tmpA[2], inz = tmpA[3];
     let best = null, tot = 0;
     const cands = [];
+    if (!(Math.hypot(v.gx - node.x, v.gz - node.z) >= 150)) this.pickGoal(v, node.x, node.z, inx, inz);
+    const gL = Math.hypot(v.gx - node.x, v.gz - node.z) || 1, gx = (v.gx - node.x) / gL, gz = (v.gz - node.z) / gL;
     for (const o of outs) {
       if (o.e === v.l.e) continue;     // no U-turns unless dead end
       if (o.e.rank < 2) continue;
@@ -225,10 +285,13 @@ export class Traffic {
       let w = Math.pow(o.e.rank + 1, 1.4);
       if (dot > 0.8) w *= 3;
       else if (dot < -0.3) w *= 0.25;
-      if (this.graph.nodes[linkEnd(o)].portal) w *= 0.5;
+      if (endOf(this.graph, o).portal) w *= 0.5;
+      w *= 1 + 0.7 * (tmpB[2] * gx + tmpB[3] * gz);        // the way you're going
       cands.push([o, w, cross, dot]);
       tot += w;
     }
+    // the foot of a ramp: onto the street it lands on
+    if (node.foot) { const g = this.groundLink(node, inx, inz); if (g) { const w = 20; cands.push([g.l, w, g.cross, g.dot, g.s2]); tot += w; } }
     if (!cands.length) {
       // dead end: turn around if allowed
       const back = outs.find(o => o.e === v.l.e);
@@ -237,14 +300,14 @@ export class Traffic {
     let x = this.rng.next() * tot;
     for (const c of cands) { x -= c[1]; if (x <= 0) { best = c; break; } }
     best = best || cands[0];
-    return { l: best[0], turn: Math.atan2(best[2], best[3]) };
+    return { l: best[0], turn: Math.atan2(best[2], best[3]), s2: best[4] };
   }
 
   // build the junction connector curve from current position to the next link
   startJunction(v) {
     const n = v.next;
-    const node = this.graph.nodes[linkEnd(v.l)];
-    const r = Math.min(node.jr, n.l.e.len * 0.45);
+    const node = endOf(this.graph, v.l);
+    const r = n.s2 !== undefined ? n.s2 : Math.min(node.jr, n.l.e.len * 0.45);
     linkAt(this.graph, n.l, r, tmpB);
     const [lo, hi] = latBounds(n.l);
     let lat2 = clamp(v.lat, lo, hi);
@@ -270,6 +333,9 @@ export class Traffic {
       L += Math.hypot(x - px, z - pz); px = x; pz = z;
     }
     v.jc = { p0x, p0z, cx, cz, p2x, p2z, L: Math.max(0.5, L), t: 0, s2: r, lat2, turn: n.turn };
+    // onto, off or along a deck: the height carries across the join
+    const De = n.l.e;
+    if (v.l.e.fly || De.fly) { v.jc.dk = true; v.jc.y0 = v.y || 0; v.jc.y2 = De.fly ? deckY(De, n.l.dir > 0 ? r : De.len - r) : 0; }
   }
 
   // ---------------------------------------------------------------- per-frame update
@@ -353,7 +419,7 @@ export class Traffic {
       l.push(a);
     };
     for (const v of this.list) put(v);
-    if (this.player && !(this.player.y > 2.2)) put(this.player.agent);     // up on a flyover: not in the street's way
+    if (this.player) put(this.player.agent);
     if (this.extra) for (const a of this.extra) put(a);
     if (this.peds) for (const p of this.peds.roadAgents()) put(p);
     if (this.statics) {
@@ -381,7 +447,7 @@ export class Traffic {
     const cx = v.x + nx * latOffset, cz = v.z + nz * latOffset;
     let best = null;
     this.near(v.x + hx * look * 0.5, v.z + hz * look * 0.5, look * 0.6 + 4, (o) => {
-      if (o === v || (v.ignore && o === v.ignore && v.ignoreT > 0)) return;
+      if (o === v || (v.ignore && o === v.ignore && v.ignoreT > 0) || otherLevel(o, v)) return;
       const rx = o.x - cx, rz = o.z - cz;
       const along = rx * hx + rz * hz;
       if (along <= 0 || along > look) return;
@@ -432,7 +498,8 @@ export class Traffic {
     let vDes = SPEED_BY_RANK[e.rank] * v.vMul;
     if (!v.jc) {
       // slow for upcoming turn
-      const remain = e.len - v.s;
+      if (!v.next) v.next = this.rampAhead(v);
+      const remain = (v.next && v.next.at !== undefined ? v.next.at : e.len) - v.s;
       if (!v.next && remain < 30) v.next = this.chooseNext(v);
       if (v.next && Math.abs(v.next.turn) > 0.5) {
         const turnV = 3.2 + (1 - Math.min(1, Math.abs(v.next.turn) / 1.6)) * 5;
@@ -443,7 +510,7 @@ export class Traffic {
     const gk = this.gawk;
     if (gk && gk.length) for (let i = 0; i < gk.length; i++) { const dx = gk[i].x - v.x, dz = gk[i].z - v.z, d2 = dx * dx + dz * dz; if (d2 < 900) vDes = Math.min(vDes, 2.4 + Math.sqrt(d2) * 0.12); }
     // buses pull in to the kerb at their stops and sit there a while (and the traffic behind goes round)
-    if (v.type === 'bus' && !v.jc) vDes = this.busStop(v, vDes, dt);
+    if (v.type === 'bus' && !v.jc && !e.fly) vDes = this.busStop(v, vDes, dt);
     // a siren or a beacon coming up behind: over to the kerb and slow (your police duty, or the garage's laal batti)
     const Y = this.yieldTo;
     if (Y && !v.jc) {
@@ -457,7 +524,7 @@ export class Traffic {
     if (ob) { gap = ob.gap; vo = ob.v; agent = ob.agent; }
     // signal stop line
     if (!v.jc) {
-      const endNode = this.graph.nodes[linkEnd(v.l)];
+      const endNode = endOf(this.graph, v.l);
       if (endNode.signal) {
         const st = this.signals.state(endNode.i, v.l);
         const stopAt = e.len - Math.min(endNode.jr, e.len * 0.45) - 3.5;
@@ -530,13 +597,13 @@ export class Traffic {
       if (j.t >= 1) {
         const over = (j.t - 1) * j.L;
         v.l = v.next.l; v.s = j.s2 + over; v.lat = j.lat2; v.latT = j.lat2; v.next = null; v.jc = null;
-        if (this.graph.nodes[linkStart(v.l)].portal && v.l.e.len < 5) v.alive = false;
+        if (startOf(this.graph, v.l).portal && v.l.e.len < 5) v.alive = false;
       }
     } else {
       v.s += ds;
-      const node = this.graph.nodes[linkEnd(v.l)];
+      const node = endOf(this.graph, v.l);
       const r = Math.min(node.jr, e.len * 0.45);
-      if (v.s >= e.len - r) {
+      if (v.s >= (v.next && v.next.at !== undefined ? v.next.at : e.len - r)) {
         if (!v.next) v.next = this.chooseNext(v);
         // the end of the streets streamed in so far: only drop out where nobody's looking, else wait there
         if (!v.next) { if (this._seen && this._seen(v.x, v.z)) { v.s = e.len - r; v.v = 0; return; } v.alive = false; return; }
@@ -577,7 +644,13 @@ export class Traffic {
     } else v.yaw = yaw;
     v.hx = Math.cos(v.yaw); v.hz = Math.sin(v.yaw);
     v.x = x; v.z = z;
-    v.y = this.W.surf.isRoad(x, z) ? 0 : 0.15;
+    // up on a flyover: its height and slope, not the ground's
+    const de = !v.jc && v.l.e.fly ? v.l.e : null;
+    let slope = 0;
+    if (de) { const s = v.l.dir > 0 ? v.s : de.len - v.s; v.y = deckY(de, s); slope = deckSlope(de, s) * v.l.dir; }
+    else if (v.jc && v.jc.dk) v.y = lerp(v.jc.y0, v.jc.y2, clamp(v.jc.t, 0, 1));
+    else v.y = this.W.surf.isRoad(x, z) ? 0 : 0.15;
+    v.slope = dt > 0 ? (v.slope || 0) + (Math.atan(slope) - (v.slope || 0)) * Math.min(1, dt * 6) : Math.atan(slope);
   }
 
   render() {
@@ -597,7 +670,7 @@ export class Traffic {
       const I = this.inst[seated ? v.type.replace(/P$/, '') + 'E' : v.type] || this.inst[v.type];
       const far = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) > L2;
       const roll = v.fallen > 0 ? 1.3 : v.roll;
-      e.set(roll, -(v.ryaw ?? v.yaw), v.pitch, 'YXZ');
+      e.set(roll, -(v.ryaw ?? v.yaw), v.pitch + (v.slope || 0), 'YXZ');
       q.setFromEuler(e);
       p.set(v.rx ?? v.x, (v.y || 0) + (v.fallen > 0 ? 0.3 : 0), v.rz ?? v.z);
       m.compose(p, q, s);

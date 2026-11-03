@@ -25,7 +25,7 @@ export class Flyovers {
       const deck = { i: fi, w, hw: w / 2, ow: !!ow, pts, h, name: (W.M.names[nid] || [''])[0] };
       this.decks.push(deck);
       for (let k = 0; k + 3 < pts.length; k += 2) {
-        const s = { f: fi, ax: pts[k], az: pts[k + 1], bx: pts[k + 2], bz: pts[k + 3], ha: h[k / 2], hb: h[k / 2 + 1], first: k === 0, last: k + 4 >= pts.length };
+        const s = { f: fi, ax: pts[k], az: pts[k + 1], bx: pts[k + 2], bz: pts[k + 3], ha: h[k / 2], hb: h[k / 2 + 1], first: k === 0, last: k + 4 >= pts.length, k: k / 2 };
         s.len = Math.hypot(s.bx - s.ax, s.bz - s.az) || 1e-6;
         this.segs.push(s);
         const x0 = Math.min(s.ax, s.bx) - deck.hw, x1 = Math.max(s.ax, s.bx) + deck.hw, z0 = Math.min(s.az, s.bz) - deck.hw, z1 = Math.max(s.az, s.bz) + deck.hw;
@@ -117,6 +117,92 @@ export class Flyovers {
       if (d < p.r + r) return { nx: dx / (d || 1), nz: dz / (d || 1), depth: p.r + r - d };
     }
     return null;
+  }
+  // The decks as roads for the traffic: their own little network (the flat street graph doesn't know about them, and
+  // nothing else in the game should snap to a deck). A piece that ends on another deck, at its end or part-way along,
+  // joins it there; the low ends are the ramp feet, where the network meets the streets.
+  get net() { return this._net || (this._net = this.buildNet()); }
+  buildNet() {
+    const parent = new Map(), find = (k) => { let p; while ((p = parent.get(k)) !== undefined) k = p; return k; };
+    const union = (a, b) => { a = find(a); b = find(b); if (a !== b) parent.set(a, b); };
+    const splits = this.decks.map(d => new Set([0, d.h.length - 1]));
+    this.decks.forEach((d, f) => {
+      for (const i of [0, d.h.length - 1]) {
+        const x = d.pts[2 * i], z = d.pts[2 * i + 1], near = new Map();
+        for (const s of this.grid.get(Math.floor(x / CELL) + ',' + Math.floor(z / CELL)) || []) {
+          if (s.f === f) continue;
+          const dx = s.bx - s.ax, dz = s.bz - s.az, u = ((x - s.ax) * dx + (z - s.az) * dz) / (s.len * s.len), t = u < 0 ? 0 : u > 1 ? 1 : u;
+          const q = Math.hypot(x - s.ax - dx * t, z - s.az - dz * t);
+          if (q > 1.6 || Math.abs(s.ha + (s.hb - s.ha) * t - d.h[i]) > 1.2) continue;
+          const b = near.get(s.f);
+          if (!b || q < b.q) near.set(s.f, { q, idx: t < 0.5 ? s.k : s.k + 1 });
+        }
+        for (const [o, { idx }] of near) {
+          const m = this.decks[o].h.length, j = idx <= 1 ? 0 : idx >= m - 2 ? m - 1 : idx;
+          splits[o].add(j); union(f + ':' + i, o + ':' + j);
+        }
+      }
+    });
+    const nodes = new Map(), edges = [];
+    const nodeAt = (f, i) => {
+      const k = find(f + ':' + i), d = this.decks[f];
+      let n = nodes.get(k);
+      if (!n) nodes.set(k, n = { i: -1, x: d.pts[2 * i], z: d.pts[2 * i + 1], h: d.h[i], out: [], jr: 3, signal: false, portal: false, foot: d.h[i] < 0.6, deck: true });
+      return n;
+    };
+    this.decks.forEach((d, f) => {
+      const cut = [...splits[f]].sort((a, b) => a - b);
+      for (let c = 0; c + 1 < cut.length; c++) {
+        const i0 = cut[c], i1 = cut[c + 1], pts = d.pts.slice(2 * i0, 2 * i1 + 2), h = d.h.slice(i0, i1 + 1), cum = [0];
+        for (let k = 2; k < pts.length; k += 2) cum.push(cum[cum.length - 1] + Math.hypot(pts[k] - pts[k - 2], pts[k + 1] - pts[k - 1]));
+        const len = cum[cum.length - 1];
+        if (len < 0.5) continue;
+        const A = nodeAt(f, i0), B = nodeAt(f, i1);
+        const E = { i: -1, fly: true, deckI: f, A, B, a: -1, b: -1, w: d.w, rank: 5, oneway: d.ow, sw: 0, pts, cum, h, len, bridge: true, restricted: false, x0: 1e9, x1: -1e9, z0: 1e9, z1: -1e9 };
+        for (let k = 0; k < pts.length; k += 2) { E.x0 = Math.min(E.x0, pts[k]); E.x1 = Math.max(E.x1, pts[k]); E.z0 = Math.min(E.z0, pts[k + 1]); E.z1 = Math.max(E.z1, pts[k + 1]); }
+        edges.push(E);
+        A.out.push({ e: E, dir: 1 });
+        if (!E.oneway) B.out.push({ e: E, dir: -1 });
+      }
+    });
+    // the way up from each foot, and where that flyover brings you down (straight on at any fork):
+    // whether it's worth taking depends on where you're going
+    const dirAt = (l, end) => { const p = l.e.pts, n = p.length, fw = l.dir > 0; const a = end === fw ? n - 4 : 0, sg = fw ? 1 : -1, L = Math.hypot(p[a + 2] - p[a], p[a + 3] - p[a + 1]) || 1; return [(p[a + 2] - p[a]) / L * sg, (p[a + 3] - p[a + 1]) / L * sg]; };
+    const ramps = [];
+    for (const n of nodes.values()) {
+      if (!n.foot) continue;
+      for (const l of n.out) {
+        let cur = l, end = l.dir > 0 ? l.e.B : l.e.A;
+        for (let hop = 0; hop < 40 && !end.foot; hop++) {
+          const [hx, hz] = dirAt(cur, true);
+          let next = null, bd = -2;
+          for (const o of end.out) { if (o.e === cur.e) continue; const [ox, oz] = dirAt(o, false), dt = hx * ox + hz * oz; if (dt > bd) { bd = dt; next = o; } }
+          if (!next) break;
+          cur = next; end = next.dir > 0 ? next.e.B : next.e.A;
+        }
+        const [hx, hz] = dirAt(l, false);
+        ramps.push({ id: ramps.length, l, x: n.x, z: n.z, hx, hz, ex: end.x, ez: end.z, span: Math.hypot(end.x - n.x, end.z - n.z), reach: end.foot });
+      }
+    }
+    return { edges, ramps };
+  }
+  edgesNear(x, z, r) { const out = []; for (const e of this.net.edges) if (x > e.x0 - r && x < e.x1 + r && z > e.z0 - r && z < e.z1 + r) out.push(e); return out; }
+  // the ramp feet beside a street: where on it (s, along the edge) you'd peel off for each
+  rampsFor(e, reach = 18) {
+    let out = null, x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    const p = e.pts;
+    for (let k = 0; k < p.length; k += 2) { x0 = Math.min(x0, p[k]); x1 = Math.max(x1, p[k]); z0 = Math.min(z0, p[k + 1]); z1 = Math.max(z1, p[k + 1]); }
+    for (const r of this.net.ramps) {
+      if (!r.reach || r.x < x0 - reach || r.x > x1 + reach || r.z < z0 - reach || r.z > z1 + reach) continue;
+      let bd = reach, bs = -1;
+      for (let k = 0; k + 3 < p.length; k += 2) {
+        const dx = p[k + 2] - p[k], dz = p[k + 3] - p[k + 1], L2 = dx * dx + dz * dz || 1e-9, u = ((r.x - p[k]) * dx + (r.z - p[k + 1]) * dz) / L2, t = u < 0 ? 0 : u > 1 ? 1 : u;
+        const d = Math.hypot(r.x - p[k] - dx * t, r.z - p[k + 1] - dz * t);
+        if (d < bd) { bd = d; bs = e.cum[k / 2] + Math.sqrt(L2) * t; }
+      }
+      if (bs >= 0) (out || (out = [])).push({ r, s: bs });
+    }
+    return out;
   }
   // only the flyovers within sight draw (and only the close ones cast shadows)
   update(x, z) {
@@ -217,6 +303,15 @@ export class Flyovers {
   }
 }
 
+// a deck edge's height, and its slope, at distance s from its first point (the points are evenly spaced)
+export function deckY(e, s) {
+  const n = e.h.length - 1, u = Math.max(0, Math.min(1, s / e.len)) * n, k = Math.min(n - 1, u | 0);
+  return e.h[k] + (e.h[k + 1] - e.h[k]) * (u - k);
+}
+export function deckSlope(e, s) {
+  const n = e.h.length - 1, u = Math.max(0, Math.min(1, s / e.len)) * n, k = Math.min(n - 1, u | 0);
+  return (e.h[k + 1] - e.h[k]) * n / e.len;
+}
 // shared by the player's auto and every other drivable vehicle
 export function flyResolve(veh, x, z, r) {
   const F = veh.W.fly;

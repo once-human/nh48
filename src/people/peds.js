@@ -420,14 +420,16 @@ export class People {
     if ((this.venueT = (this.venueT || 0) - dt) <= 0) { this.venueT = 0.7; this.venueCrowds(px, pz, avoidView); this.clubCrowds(px, pz, avoidView); }
     this.svc = this.servicesOf ? this.servicesOf() : null;
     this.talkTick(dt, player);
-    if ((this._vcT = (this._vcT || 0) - dt) <= 0) { this._vcT = 0.5; this.vendorCalls(0.5, player); }
+    if ((this._vcT = (this._vcT || 0) - dt) <= 0) { this._vcT = 0.5; if (!(!player.onFoot && player.cur && player.cur.deck >= 0 && player.y > 2.2)) this.vendorCalls(0.5, player); }
     const pv = Math.abs(player.v);
     const phx = Math.cos(player.th), phz = Math.sin(player.th);
     this.lineT -= dt;
     if ((this._stallT = (this._stallT || 0) - dt) <= 0) { this._stallT = 2; this.populateStalls(px, pz); }
     if (player.onFoot) this.bumpPlayer(player);
-    for (const p of this.list) this.step(p, dt, player, player.onFoot ? 0 : pv, phx, phz);
-    for (const a of this.animals) this.stepAnimal(a, dt, px, pz, player);
+    // up on a flyover you're no business of the street below: nobody scrambles, nothing gets hit
+    const overhead = !player.onFoot && player.cur && player.cur.deck >= 0 && player.y > 2.2;
+    for (const p of this.list) this.step(p, dt, player, player.onFoot || overhead ? 0 : pv, phx, phz);
+    for (const a of this.animals) this.stepAnimal(a, dt, px, pz, overhead ? null : player);
   }
 
   step(p, dt, player, pv, phx, phz) {
@@ -775,7 +777,7 @@ export class People {
     const cars = this.cars ? this.cars() : null;
     if (cars) for (const v of cars) {
       const ex = p.x - v.x, ez = p.z - v.z;
-      if (Math.abs(ex) > 4 || Math.abs(ez) > 4 || !v.T) continue;
+      if (Math.abs(ex) > 4 || Math.abs(ez) > 4 || !v.T || (v.y || 0) > 2) continue;       // (not one going over on a deck)
       const hl = v.T.L / 2 + 0.25, hw = v.T.W / 2 + 0.25, lx = ex * v.hx + ez * v.hz, lz = -ex * v.hz + ez * v.hx;
       if (Math.abs(lx) >= hl || Math.abs(lz) >= hw) continue;
       // out of the box, but at a stumble, not a jump
