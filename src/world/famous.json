@@ -1092,8 +1092,8 @@
 "name": "The Mills",
 "mr": "द मिल्स",
 "kind": null,
-"x": 626.1,
-"z": -616.5,
+"x": 621.1,
+"z": -560.2,
 "osm": "osm: Raja Bahadur International Limited (The Mills), Raja Bahadur Mill Marg",
 "pinOff": null
 },
@@ -1109,18 +1109,18 @@
 {
 "name": "Dimora Dance & Kitchen",
 "mr": "डिमोरा",
-"kind": "bar",
-"x": 584.6,
-"z": -616.7,
+"kind": "club",
+"x": 670.7,
+"z": -673.0,
 "osm": "osm: Dimora Dance & Kitchen, amenity=nightclub",
 "pinOff": null
 },
 {
 "name": "Millers The Luxury Club",
 "mr": "मिलर्स",
-"kind": "bar",
-"x": 584.9,
-"z": -564.5,
+"kind": "club",
+"x": 614.0,
+"z": -554.8,
 "osm": "osm: Millers The Luxury Club",
 "pinOff": null
 }

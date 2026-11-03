@@ -38,7 +38,7 @@ const TEMPLATE = {
 };
 // How big each kind of room is (w across, d deep, h tall) before the brand scales it
 const ROOM = {
-  eatery: [20, 15, 3.8], cafe: [18, 13, 3.7], club: [28, 22, 6], salon: [16, 11, 3.5], boutique: [22, 16, 4],
+  eatery: [20, 15, 3.8], cafe: [18, 13, 3.7], club: [28, 22, 6], pub: [20, 15, 4.4], salon: [16, 11, 3.5], boutique: [22, 16, 4],
   bank: [20, 14, 4.2], shop: [16, 12, 3.6], clinic: [16, 12, 3.4], gym: [22, 15, 4.8], showroom: [26, 17, 6],
   lodge: [14, 11, 3.4], chowki: [13, 10, 3.4], office: [14, 10, 3.4], home: [14, 12, 3.3],
   garage: [16, 14, 5], station: [36, 22, 10], cinema: [20, 30, 8], temple: [14, 18, 6.5], arcade: [20, 20, 4.6], laundry: [9, 8, 3.4], library: [14, 14, 3.6],
@@ -94,7 +94,8 @@ const BOLD = (h) => 'bold' + (h % 4);
 // pick a room: template, look, layout and size from the kind and the name on the board
 export function designOf(ctx) {
   if (ctx.kind === 'home') return { tpl: 'home', aes: 'heritage', layout: 'home', scale: 1, kind: '', key: 'home:kale' };
-  const k = ctx.kind, tpl = TEMPLATE[k], n = (ctx.name || '').toLowerCase(), h = hash(n), pick = (a) => a[h % a.length];
+  // only a real club has a dance floor; every other bar is a room with a bar in it
+  const k = ctx.kind, tpl = k === 'bar' ? (ctx.venue === 'club' ? 'club' : 'pub') : TEMPLATE[k], n = (ctx.name || '').toLowerCase(), h = hash(n), pick = (a) => a[h % a.length];
   const tier = ctx.tier || tierOf(k, ctx.name, ctx.flag), chain = ctx.flag === 'brand' || tier === 'chain' || tier === 'brand';
   let aes = 'local', layout = 'grid', scale = 1;
   switch (tpl) {
@@ -117,6 +118,11 @@ export function designOf(ctx) {
       else if (k === 'bakery') { aes = pick(['bakery', 'pastel', 'heritage']); layout = 'counter'; }
       else if (k === 'juice') { aes = pick([BOLD(h), 'pastel', 'local']); layout = 'counter'; scale = 0.85; }
       else { aes = pick(['minimal', 'industrial', 'heritage', 'pastel', 'cafe']); layout = pick(['grid', 'lounge', 'communal']); }
+      break;
+    case 'pub':
+      if (ctx.venue === 'lounge') { aes = pick(['luxe', 'luxe', 'minimal']); layout = 'lounge'; }
+      else if (ctx.venue === 'pub' || /brew|taproom|\bpub\b/.test(n)) { aes = /brew|tap|craft/.test(n) ? 'industrial' : pick(['industrial', 'heritage', 'bold3']); layout = /brew|tap|craft/.test(n) ? 'brew' : 'pub'; }
+      else { aes = 'local'; layout = 'permit'; scale = 0.75; }                                  // a neighbourhood bar: tube lights, steel tables, a TV
       break;
     case 'club': aes = /brew|tap|craft|factory|warehouse|mill/.test(n) ? 'warehouse' : /lounge|sky|roof|terrace|social/.test(n) ? 'lounge' : pick(['warehouse', 'lounge', 'bollywood']); break;
     case 'salon': {
@@ -336,6 +342,37 @@ export class Interiors {
       }
       R.board = { x: 0, y: Math.min(2.6, H - 1.1), z: D - 0.02, w: 3.4, h: 1.2 };
       R.customers = Math.min(16, Math.round(R.seats.length * 0.4));
+    } else if (tpl === 'pub') {
+      // a bar down the left wall, stools at it, and the rest of the room by what kind of place it is: no dance floor
+      const barD = D * 0.62, x0 = -W / 2 + 5, x1 = W / 2 - 1.8, zEnd = D - (lay === 'permit' ? 1.6 : 3);
+      counter(-W / 2 + 1.7, D / 2, 1.0, barD, S.counter);
+      if (lay !== 'permit') box(GL, -W / 2 + 1.2, 1.3, D / 2, 0.05, 0.08, barD, accent);
+      for (let i = 0; i < 10; i++) box(lay === 'permit' ? B : GL, -W / 2 + 0.25, 1.5 + (i % 3) * 0.45, D / 2 - barD / 2 + 0.4 + i * (barD - 0.8) / 9, 0.14, 0.34, 0.1, [0x7a4a1f, 0x2f6b3a, 0xb8a06a][i % 3]);   // bottles on the shelf
+      for (let z = D / 2 - barD / 2 + 0.6; z <= D / 2 + barD / 2 - 0.5; z += 1.05) chair(-W / 2 + 2.7, z, Math.PI, -W / 2 + 1.7, z, { stool: true });
+      kp(-W / 2 + 0.8, D / 2, 0, 'idle', 'bartender');
+      spot(-W / 2 + 3.5, D / 2, 2.2, 'bar', 'Order at the bar');
+      if (lay === 'lounge') {
+        for (let x = x0 + 0.6; x <= x1 - 0.6; x += 4) for (let z = 2.8; z <= zEnd - 0.6; z += 3.3) {
+          box(B, x, 0.22, z, 1.1, 0.04, 0.7, S.top); box(B, x, 0.11, z, 0.9, 0.2, 0.5, S.legs || 0x1a1a1a); C.addCircle(O.x + x, O.z + z, 0.55, 2);
+          sofa(x, z + 1.1, -Math.PI / 2, 1.8, S.chair || accent);
+          R.seats.push({ x: O.x + x - 0.4, z: O.z + z + 1.0, yaw: -Math.PI / 2, table: { x: O.x + x, z: O.z + z }, used: false }, { x: O.x + x + 0.4, z: O.z + z + 1.0, yaw: -Math.PI / 2, table: { x: O.x + x, z: O.z + z }, used: false });
+        }
+      } else if (lay === 'brew') {
+        // the brewhouse behind the far end: steel tanks with their pipes, and long shared tables
+        for (let x = x0 - 1; x <= x1; x += 2.3) { box(B, x, 1.75, D - 1.1, 1.5, 3.1, 1.5, 0xb4b8bd); box(B, x, 3.4, D - 1.1, 1.0, 0.2, 1.0, 0x8a8e94); box(B, x, H - 0.45, D - 1.1, 0.12, 0.12, 2, 0x8a8e94); solid(x, D - 1.1, 1.5, 1.5); }
+        const len = Math.min(x1 - x0, 8), mid = (x0 + x1) / 2;
+        for (let z = 2.6; z <= D - 4.6; z += 2.9) { tableTop(mid, z, len, 0.9); for (let x = mid - len / 2 + 0.5; x <= mid + len / 2 - 0.4; x += 1.1) { chair(x, z + 0.7, -Math.PI / 2, x, z); chair(x, z - 0.7, Math.PI / 2, x, z); } }
+      } else {
+        for (let x = x0; x <= x1 + 0.01; x += lay === 'permit' ? 2.6 : 3.2) for (let z = 2.3; z <= zEnd - 1; z += 2.6) (lay === 'pub' && ((x + z) | 0) % 2 === 0 ? table4 : table2)(x, z);
+        if (lay === 'pub') {
+          // a DJ's corner, not a dance floor: decks and two speakers on a low riser, a screen for the match
+          box(B, x1 - 1.2, 0.15, D - 1.3, 3.6, 0.3, 1.8, 0x18181f); box(B, x1 - 1.2, 0.85, D - 1.1, 1.8, 0.9, 0.6, 0x101014); box(GL, x1 - 1.2, 1.32, D - 1.1, 1.5, 0.03, 0.4, accent); solid(x1 - 1.2, D - 1.3, 3.6, 1.8);
+          for (const s of [-1, 1]) box(B, x1 - 1.2 + s * 1.5, 0.95, D - 1.2, 0.55, 1.3, 0.5, 0x0c0c10);
+        }
+      }
+      box(lay === 'permit' ? B : GL, x0 + 1, 2.7, D - 0.05, 2.6, 1.4, 0.05, lay === 'permit' ? 0x20242a : 0x2a3a5a);       // the screen
+      R.board = { x: 0, y: Math.min(2.6, H - 1.1), z: D - 0.02, w: 3.4, h: 1.2 };
+      R.customers = Math.min(lay === 'permit' ? 8 : 16, Math.round(R.seats.length * 0.45));
     } else if (tpl === 'club') {
       const v = style || 'bollywood';
       // the bar runs down the left wall
@@ -700,7 +737,7 @@ export class Interiors {
 
   // ---------------------------------------------------------------- going in and out
   enter(ctx) {
-    const G = this.g, P = G.player, tpl = this.templateOf(ctx.kind);
+    const G = this.g, P = G.player, tpl = this.templateOf(ctx.kind) && designOf(ctx).tpl;
     if (!tpl || !P.onFoot || this.cur || P.x > SLOT0 - 1000) return false;      // never from inside another room
     const R = this.room(designOf(ctx));
     this.cur = { R, ctx, door: { x: P.x, z: P.z, yaw: P.th }, plate: null, seat: null, dancing: false, talk: null };
@@ -797,11 +834,11 @@ export class Interiors {
         const s = free.splice(rng.int(0, free.length - 1), 1)[0];
         s.used = true; const q = make(s.x, s.z, s.yaw, s.wait ? rng.pick(['sit', 'sit', 'phone']) : rng.pick(['sit', 'sit_talk']), rng.chance(0.4));
         if (q.anim === 'phone') q.anim = q.idle = 'sit';
-        if (/cafe|eatery/.test(R.tpl) && rng.chance(0.5)) name(q);
+        if (/cafe|eatery|pub/.test(R.tpl) && rng.chance(0.5)) name(q);
       } else if (stand.length) {
         const [x, z] = stand.splice(rng.int(0, stand.length - 1), 1)[0];
         const q = make(x + rng.range(-0.3, 0.3), z + rng.range(-0.3, 0.3), rng.range(0, 6.28), rng.pick(['idle', 'phone', 'idle']), rng.chance(0.45));
-        if (/cafe|eatery/.test(R.tpl) && rng.chance(0.4)) name(q);
+        if (/cafe|eatery|pub/.test(R.tpl) && rng.chance(0.4)) name(q);
       }
     }
     // a full dance floor (busier late), people at the bar
@@ -1053,7 +1090,7 @@ export class Interiors {
   // if you're a woman. They walk over, then it's your call: talk, dance, smile them off, or turn them down
   approachTick(dt) {
     const G = this.g, C = this.cur, D = G.date, P = G.player, R = C.R;
-    if (!D || !R.peds || !/club|cafe|eatery/.test(R.tpl)) return;
+    if (!D || !R.peds || !/club|pub|cafe|eatery/.test(R.tpl)) return;
     const A = C.appr;
     if (A) {
       const p = A.p, tx = A.phase === 'back' ? A.home.x : P.x, tz = A.phase === 'back' ? A.home.z : P.z;

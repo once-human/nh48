@@ -85,6 +85,7 @@ TRADE = {'food': 'food', 'thali': 'food', 'misal': 'food', 'biryani': 'food', 's
 
 def kind_of(name, coarse=None, osm=None):
     n = (name or '').lower()
+    if coarse in ('club', 'pub', 'lounge', 'restobar', 'memberclub'): return coarse, coarse     # read from its listing (venues.py)
     if osm:
         for (k, v), kind in OSM_KIND.items():
             if osm.get(k) and (v == '*' or osm.get(k) == v): return kind, TRADE.get(kind, 'generic')

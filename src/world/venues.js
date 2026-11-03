@@ -14,8 +14,7 @@ export const NIGHTLIFE = [
   ['Millers The Luxury Club', 'मिलर्स', 585, -564],
   ['Dimora Dance & Kitchen', 'डिमोरा', 585, -617],
   ['The Game Palacio', 'द गेम पॅलासिओ', 629, -736],
-  ['Bira Taproom', 'बीरा टॅपरूम', 638, -660],
-  ['Drama 9', 'ड्रामा ९', 641, -668],
+  ['Drama 9', 'ड्रामा ९', 641, -668, 'club'],
   // Sheraton Grand Pune, Raja Bahadur Motilal Road
   ['Toyroom', 'टॉयरूम', 656, -325],
   // Koregaon Park, Kalyani Nagar, Mundhwa
@@ -33,7 +32,7 @@ export const NIGHTLIFE = [
   ['1000 Oaks', '१००० ओक्स', 1575, 1806],
   ['Effingut', 'एफिंगट', 1521, 1168],
   // Senapati Bapat Road
-  ['JW Marriott Club', 'जेडब्ल्यू मॅरियट क्लब', -3742, -592],
+  ['JW Marriott Club', 'जेडब्ल्यू मॅरियट क्लब', -3742, -592, 'club'],
   // Baner, Balewadi
   ['1BHK Superbar', '1BHK सुपरबार', -9872, -4497],
   ['Elephant & Co.', 'एलिफंट अँड को.', -8934, -4139],
@@ -78,6 +77,7 @@ export function fixVenues(D, rect) {
     // the data's own storefront for it, if any (by name), on any building in the tile
     const key = norm(name).slice(0, 8);
     let si = D.shops.findIndex(s => { const n = D.shopNames[s[3]]; return n && norm(n[0]).startsWith(key); });
+    if (si >= 0 && D.shops[si][4] === 3) continue;                   // placed from its coordinates (tools/venues.py): it's right
     let ni;
     if (si >= 0) { ni = D.shops[si][3]; Object.assign(D.shopNames[ni], { 0: name, 1: mr, 2: kind || 'bar' }); }
     else { ni = D.shopNames.length; D.shopNames.push([name, mr, kind || 'bar', '']); }
@@ -101,7 +101,7 @@ export function fixPins(list) {
   for (const f of FAMOUS) {
     const k = key(f.name), fx = Math.round(f.x * 100), fz = Math.round(f.z * 100);
     const same = out.find(p => key(p[0]) === k && Math.hypot(p[3] - fx, p[4] - fz) < 30000);
-    if (same) { same[0] = f.name; if (f.mr) same[1] = f.mr; same[2] = 'landmark'; same[3] = fx; same[4] = fz; }
+    if (same) { same[0] = f.name; if (f.mr) same[1] = f.mr; same[2] = /^(club|pub|lounge|restobar)$/.test(f.kind) ? f.kind : 'landmark'; same[3] = fx; same[4] = fz; }
     else out.push([f.name, f.mr || '', 'landmark', fx, fz, 1]);
   }
   return out;

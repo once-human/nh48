@@ -31,7 +31,7 @@ export const KINDS = {
   food: ['Restaurants', '#ffb020', 'food'], thali: ['Thali', '#f5a623', 'plate'], misal: ['Misal & vada pav', '#ff7a2f', 'food'], biryani: ['Biryani', '#e0752d', 'food'],
   southindian: ['South Indian', '#f5c542', 'plate'], chinese: ['Chinese', '#ff5e5e', 'food'], fastfood: ['Pizza & burgers', '#ffa33a', 'food'], tapri: ['Tapri & chai', '#e8b04a', 'glass'],
   cafe: ['Cafés', '#c08b5c', 'glass'], bakery: ['Bakeries', '#e9b97a', 'food'], sweets: ['Sweets', '#ff9ecb', 'diamond'], juice: ['Juice & mastani', '#7bdc5a', 'drop'], icecream: ['Ice cream', '#ffb3d9', 'drop'],
-  bar: ['Bars, pubs & clubs', '#b58cff', 'cocktail'], cinema: ['Cinemas', '#ff6ec7', 'film'], gaming: ['Gaming & bowling', '#ff6b5e', 'burst'],
+  club: ['Nightclubs', '#ff4fc3', 'disco'], pub: ['Pubs & breweries', '#ffb347', 'mug'], lounge: ['Lounges', '#b58cff', 'cocktail'], bar: ['Bars', '#8f7bd8', 'cocktail'], restobar: ['Restaurant bars', '#ff9a5c', 'plate'], memberclub: ['Members’ clubs', '#b9a77a', 'building'], cinema: ['Cinemas', '#ff6ec7', 'film'], gaming: ['Gaming & bowling', '#ff6b5e', 'burst'],
   barber: ['Salons', '#ff7ab6', 'scissors'], clothes: ['Clothes', '#ff5a5f', 'shirt'], shoes: ['Footwear', '#ff8f6b', 'run'], optician: ['Opticians', '#6fb8ff', 'eye'], laundry: ['Laundry & ironing', '#6fb8ff', 'shirt'],
   kirana: ['Kirana & grocery', '#7fd1ff', 'cart'], shop: ['Other shops', '#7fd1ff', 'bag'], mobile: ['Mobile shops', '#5ad1ff', 'phone'], electronics: ['Electronics', '#ffd23f', 'bolt'],
   books: ['Books', '#c9a0ff', 'pad'], florist: ['Florists', '#ff7ab6', 'lotus'], paan: ['Paan', '#4fbf5a', 'leaf'], petshop: ['Pet shops', '#f1ece2', 'paw'], jeweller: ['Jewellers', '#ffc83d', 'gold'],
@@ -43,12 +43,12 @@ export const KINDS = {
 // what each kind is filed under (how far out it shows, its colour family); the ones you can't walk into only show up close
 export const KIND_GROUP = { landmark: 'landmark', temple: 'temple', park: 'park', zoo: 'park', transit: 'transit', fuel: 'fuel', police: 'police', chowki: 'police',
   hospital: 'hospital', clinic: 'hospital', pharmacy: 'hospital', gym: 'hospital', bank: 'bank', college: 'college', classes: 'college', library: 'college',
-  cinema: 'cinema', gaming: 'cinema', mall: 'cinema', office: 'service', services: 'service', estate: 'service', service: 'service' };
-for (const k in KINDS) if (!KIND_GROUP[k]) KIND_GROUP[k] = /food|thali|misal|biryani|southindian|chinese|fastfood|tapri|cafe|bakery|sweets|juice|bar/.test(k) ? 'food' : 'shop';
+  cinema: 'cinema', gaming: 'cinema', mall: 'cinema', office: 'service', services: 'service', estate: 'service', service: 'service', memberclub: 'service' };
+for (const k in KINDS) if (!KIND_GROUP[k]) KIND_GROUP[k] = /food|thali|misal|biryani|southindian|chinese|fastfood|tapri|cafe|bakery|sweets|juice|bar|club|pub|lounge/.test(k) ? 'food' : 'shop';
 // what a place is for, in the game
 const DOES = { food: 'Order a meal: hunger and mood back up.', thali: 'Unlimited thali: the best value hunger fix in town.', misal: 'Misal, vada pav, bhel: cheap, fast, Puneri.', biryani: 'Biryani to eat in or parcel.',
   southindian: 'Dosa, idli, filter coffee.', chinese: 'Indo-Chinese: Manchurian, noodles, momos.', fastfood: 'Pizza and burgers, quick.', tapri: 'Cutting chai and a bun maska: a little energy.', cafe: 'Coffee, a seat, Wi-Fi: energy and mood.',
-  bakery: 'Khari, nankatai, cakes.', sweets: 'Sweets and farsan: gifts that please Aai.', juice: 'Juice, mastani, ice cream: cools you down.', bar: 'Drinks, music, dancing; cover charge at night, busiest Friday to Sunday.',
+  bakery: 'Khari, nankatai, cakes.', sweets: 'Sweets and farsan: gifts that please Aai.', juice: 'Juice, mastani, ice cream: cools you down.', club: 'Dance floor, DJ, a cover charge at the door after 8:30 PM. Packed Friday to Sunday.', pub: 'Beer, food, music, the match on a screen. No cover.', lounge: 'Cocktails and sofas. Dress up, it costs more.', bar: 'A neighbourhood bar: cheap beer, a TV, regulars.', restobar: 'A family restaurant that also serves drinks.', memberclub: 'Members only: they won’t let you in.',
   cinema: 'Watch a film.', gaming: 'Bowling, arcade games.', mall: 'A mall: shops, food court, a cinema.', barber: 'A haircut, a shave, a new look.', clothes: 'Try on and buy clothes.', shoes: 'Shoes and chappals.',
   optician: 'Glasses and sunglasses.', laundry: 'Washing and ironing: clothes look sharper.', kirana: 'Groceries, water, snacks, the everyday things.', shop: 'Hardware and household things.',
   mobile: 'Phones, SIMs, recharges, screen repairs.', electronics: 'Electronics and gadgets.', books: 'Books and stationery.', florist: 'Flowers, garlands for the temple.', paan: 'Paan and mouth fresheners.',
@@ -60,6 +60,8 @@ const DOES = { food: 'Order a meal: hunger and mood back up.', thali: 'Unlimited
 const kindFor = (p) => { if (KINDS[p.sub] && p.sub !== 'shop' && p.sub !== 'food' && p.sub !== 'service') return p.sub; const k = p.c === 'transit' ? 'transit' : p.c === 'police' ? 'police' : pinKind(p); return KINDS[k] ? k : KINDS[p.c] ? p.c : 'service'; };
 // one filled icon set (24 x 24) for every pin on the map and minimap
 const ICON_PATHS = {
+  disco: 'M11 1h2v3.1a8.5 8.5 0 1 1-2 0zM20 2l.8 2.2L23 5l-2.2.8L20 8l-.8-2.2L17 5l2.2-.8z',
+  mug: 'M5 4h11v3h2.5A2.5 2.5 0 0 1 21 9.5v5a2.5 2.5 0 0 1-2.5 2.5H16v3a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1zm11 5v6h2.2V9z',
   star: 'M12 2.6l2.8 5.9 6.5.8-4.8 4.5 1.2 6.4L12 17.1l-5.7 3.1 1.2-6.4-4.8-4.5 6.5-.8z',
   shield: 'M12 2 4 5.2v6.3c0 4.8 3.3 9 8 10.5 4.7-1.5 8-5.7 8-10.5V5.2z',
   cross: 'M9 3h6v6h6v6h-6v6H9v-6H3V9h6z',
@@ -82,7 +84,7 @@ const ICON2D = {};
 for (const [k, v] of Object.entries({ star: 'star', shield: 'shield', cross: 'cross', food: 'food', bag: 'cart', bank: 'bank', fuel: 'fuel', bus: 'bus', tree: 'tree', temple: 'temple', cap: 'college', film: 'film', building: 'building' })) if (GLYPH[v]) ICON_PATHS[k] = GLYPH[v];
 const iconPath = (n) => ICON2D[n] || (ICON_PATHS[n] || GLYPH[n] ? (ICON2D[n] = new Path2D(ICON_PATHS[n] || GLYPH[n])) : null);
 const GL = { landmark: 'star', police: 'shield', hospital: 'cross', food: 'food', shop: 'cart', bank: 'bank', fuel: 'fuel', transit: 'bus', park: 'tree', temple: 'temple', college: 'college', cinema: 'film', service: 'building' };
-const FOOD = new Set(['food', 'cafe', 'bar', 'icecream', 'sweets', 'bakery']);
+const FOOD = new Set(['food', 'cafe', 'bar', 'club', 'pub', 'lounge', 'restobar', 'icecream', 'sweets', 'bakery']);
 const SHOPC = { bank: 'bank', atm: 'bank', police: 'police', clinic: 'hospital', pharmacy: 'hospital', garage: 'service' };
 
 // a line for any place on the map: what kind of place it is, from its name and kind, and what it's good for in the game

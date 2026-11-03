@@ -87,6 +87,7 @@ const CAT_STYLE = {
   optician: ['modern', '#ffffff', '#0f4c8a', '#0f4c8a'], electronics: ['modern', '#141f33', '#ffffff', '#33a1fd'], travel: ['flex', '#0f4c8a', '#ffffff', '#f2c230'],
   police: ['bank', '#0b3d91', '#ffffff', '#e8b923'],
   office: ['plate', '#e9ecef', '#22272e', '#8a929c'], classes: ['flex', '#fff6d8', '#1d3f7a', '#e23a3a'], gym: ['modern', '#0c0d0f', '#3ddc84', '#3ddc84'], garage: ['flex', '#1b1c1f', '#f2c230', '#f2c230'],
+  club: ['modern', '#0b0b0d', '#ff5ec4', '#8a6cf0'], pub: ['modern', '#1f1408', '#f2c230', '#c8873a'], lounge: ['modern', '#14121c', '#e8d8b0', '#c9a227'], restobar: ['flex', '#6a1f2b', '#ffdca8', '#f2c230'], memberclub: ['plate', '#e9ecef', '#22272e', '#8a929c'],
   icecream: ['modern', '#fff2f5', '#b3125a', '#f28fb0'], generic: ['flex', '#f7f1e1', '#0f4c8a', '#b3121b'],
 };
 const FLEX_BG = [['#b3121b', '#ffe7a1'], ['#f2c230', '#2a1a0c'], ['#0f4c8a', '#ffffff'], ['#1e6b3a', '#fff6d8'], ['#ffffff', '#b3121b'],

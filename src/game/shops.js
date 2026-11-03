@@ -34,8 +34,15 @@ const col = (h) => new THREE.Color(h).convertSRGBToLinear();
 const LOCAL = new Set(['tapri', 'misal', 'thali', 'sweets', 'bakery', 'kirana', 'paan', 'juice', 'barber', 'southindian', 'florist', 'laundry', 'pharmacy', 'food', 'cafe']);
 const regKey = (ctx) => Math.round(ctx.x) + ',' + Math.round(ctx.z);
 const dayOf = (G) => Math.floor((G.clock || 0) / 24);
+// what a listing really is (tools/venues.py): a club has a dance floor and a cover charge, a pub a bar and a DJ corner, a lounge
+// sofas, a neighbourhood bar plastic chairs; a family restaurant with a bar is a restaurant first. A members' club won't have you
+const VENUE_KIND = { club: 'bar', pub: 'bar', lounge: 'bar', bar: 'bar', restobar: 'food', memberclub: null };
+const VENUE_NAME = { club: ['Nightclub', 'क्लब'], pub: ['Pub', 'पब'], lounge: ['Lounge', 'लाउंज'], bar: ['Bar', 'बार'], restobar: ['Restaurant & bar', 'बार अँड रेस्टॉरंट'] };
+const VENUE_MUL = { club: 1.25, lounge: 1.15, bar: 0.7, restobar: 0.85 };
+const venueOf = (c) => (c in VENUE_KIND && c !== 'memberclub' ? c : undefined);
 export function kindOf(name, cat) {
   const n = (name || '').toLowerCase();
+  if (cat in VENUE_KIND) return VENUE_KIND[cat];
   if (cat === 'police') return 'chowki';
   // new: things to do, from real places (the cinema, the bowling alley, the laundry, the pet shop, the reading room)
   if (cat === 'cinema' || /\bcinemas?\b|multiplex|\bpvr\b|\binox\b|cinepolis|carnival cinemas|talkies|chitra ?mandir|\bcinema hall/.test(n)) return 'cinema';
@@ -90,6 +97,7 @@ const PIN_CAT = { food: 'food', bank: 'bank', fuel: 'fuel', police: 'police', te
 export function pinKind(p) {
   const n = (p.n || '').toLowerCase();
   if (p.c === 'transit') return null;
+  if (p.sub in VENUE_KIND) return VENUE_KIND[p.sub];
   if (p.sub === 'pharmacy') return 'pharmacy';
   if (/^(office|services|service|classes|mall|college|estate)$/.test(p.sub || '')) return p.sub === 'estate' ? 'estate' : null;     // (offices, services, classes: you can't walk in)
   if (p.sub && KIND_INFO[p.sub] && p.sub !== 'shop' && p.sub !== 'food') return p.sub;                                          // (the bake's kind, from the name)
@@ -351,7 +359,7 @@ export class Shops {
     if (!n) return null;
     const kind = kindOf(n[0], n[2]);
     if (!kind) return null;
-    return { name: n[0], mr: n[1], cat: n[2], kind, x: door.x, z: door.z, door, tier: tierOf(kind, n[0], n[3]) };
+    return { name: n[0], mr: n[1], cat: n[2], kind, venue: venueOf(n[2]), x: door.x, z: door.z, door, tier: tierOf(kind, n[0], n[3]) };
   }
   priceMul(x, z, tier) {
     const a = this.g.people.areas.at(x, z);
@@ -382,7 +390,7 @@ export class Shops {
       const dd = Math.hypot(p.x - P.x, p.z - P.z), big = p.c === 'park' || p.c === 'landmark' || p.c === 'temple';
       if (dd > (big ? 16 : 7) || (best && dd >= bd)) continue;
       const kind = pinKind(p); if (!kind) continue;
-      best = { name: p.n, mr: p.mr || '', cat: p.c, kind, x: p.x, z: p.z, door: null, pin: true, tier: tierOf(kind, p.n, '') }; bd = dd;
+      best = { name: p.n, mr: p.mr || '', cat: p.c, kind, venue: venueOf(p.sub), x: p.x, z: p.z, door: null, pin: true, tier: tierOf(kind, p.n, '') }; bd = dd;
     }
     // pumps work from the driver's seat; chowkis and hospitals on foot
     for (const p of this.places) {
@@ -443,7 +451,7 @@ export class Shops {
     if (n.kind === 'ispot') return n.s.label;
     const oh = (n.door || n.pin) && openNow(n, this.g.hour);
     if (oh && !oh.open) return `${n.name} · Closed, opens ${oh.opens}`;
-    if (this.g.interiors && this.g.interiors.templateOf(n.kind) && (n.door || n.pin)) return `Go into ${n.name} · ${KIND_INFO[n.kind][0]}`;
+    if (this.g.interiors && this.g.interiors.templateOf(n.kind) && (n.door || n.pin)) return `Go into ${n.name} · ${(VENUE_NAME[n.venue] || KIND_INFO[n.kind])[0]}`;
     const K = KIND_INFO[n.kind];
     return `${n.name} · ${K ? K[0] : ''}`;
   }
@@ -452,7 +460,7 @@ export class Shops {
   items(ctx) {
     const G = this.g, L = this.life, P = this.g.player, k = ctx.kind;
     const tierPrices = ['barber', 'gym'].includes(k) || ctx.tier === 'chain' || ctx.tier === 'premium';
-    const mul = this.priceMul(ctx.x, ctx.z, tierPrices && !['clinic', 'optician'].includes(k) ? ctx.tier : null);
+    const mul = this.priceMul(ctx.x, ctx.z, tierPrices && !['clinic', 'optician'].includes(k) ? ctx.tier : null) * (VENUE_MUL[ctx.venue] || 1);
     const out = [];
     const area = G.people.areas.at(ctx.x, ctx.z), ak = area ? area.kind : 'city';
     const pay = (price, fn) => () => { if (!this.spend(price)) return false; return fn(); };
@@ -481,6 +489,7 @@ export class Shops {
         break;
       case 'food':
         for (const id of AREA_FOOD[ak] || ['thali', 'misal', 'vadapav', 'chai', 'water']) food(id);
+        if (ctx.venue === 'restobar') { food('beer'); food('mocktail'); }
         this.gigItem(out, ctx);
         break;
       case 'bar': {
@@ -686,7 +695,7 @@ export class Shops {
     out.push({ label: 'Look around', note: 'Browse a bit. The owner watches you from the counter', price: 0, act: () => { this.pass(0.15); L.change('mood', 0.01); return 'Nothing you need today'; } });
     out.push({ label: 'Ask the way', note: 'Shopkeepers know every lane round here', price: 0, act: () => { const M = this.g.W.landmarks || [], P = this.g.player; let b = null, bd = 1e12; for (const l of M) { const d = Math.hypot(l.x - P.x, l.z - P.z); if (d < bd) { bd = d; b = l; } } if (b) { this.g.setWaypoint({ x: b.x, z: b.z, name: b.name }); return `“${b.name}? Straight, then left.” Waypoint set`; } return '“Ask someone else, bhau”'; } });
   }
-  isClub(ctx) { const a = this.g.people.areas.at(ctx.x, ctx.z); return /club|lounge|social|brew|pub/i.test(ctx.name) || (a && a.kind === 'polished'); }
+  isClub(ctx) { return ctx.venue === 'club'; }
   hello(kind) { return HELLO[kind] ? this.rng.pick(HELLO[kind]) : null; }
   // the keeper says it out loud (shop_lines.json), never the same line twice in a row
   speak(kind, sc) {
@@ -903,7 +912,7 @@ export class Shops {
     if (G.trial && !ctx.list && ['clothes', 'shoes', 'barber'].includes(ctx.kind)) { G.trial.show(ctx, ctx.kind === 'barber' ? 'salon' : ctx.kind === 'shoes' ? 'shoes' : 'clothes', ctx.sub); return; }
     this.ctx = ctx; this.open = true;
     G.state = 'shop'; G.audio.updateEngine?.(0, 0, false);
-    const K = ctx.kind === 'property' ? ['Property', 'मालमत्ता'] : KIND_INFO[ctx.kind];
+    const K = ctx.kind === 'property' ? ['Property', 'मालमत्ता'] : VENUE_NAME[ctx.venue] || KIND_INFO[ctx.kind];
     const tl = ctx.tier && ['optician', 'clinic', 'barber', 'gym', 'clothes'].includes(ctx.kind) ? TIER_LABEL[ctx.tier] : null;
     this.el.querySelector('.sh-k').textContent = `${tl || K[0]} · ${K[1]}`;
     this.el.querySelector('.sh-t').textContent = ctx.name;
