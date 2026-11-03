@@ -218,8 +218,9 @@ async function main() {
   const game = new Game({ W, scene, camera, renderer, sky, player, traffic, rig, input, quality, params, QUALITY, vmats, post, sounds });
   ctxGame = game;
   window.__game = game;
-  W.cityMap = game.city;
   W.tiles?.attachGame(game);
+  // (the map only exists once game.init has run: what's downloaded before then waits for it)
+  let cityUp; const cityReady = new Promise((r) => { cityUp = r; });
   // voices never hold up the start: the street voices first, a few seconds in, then the shopkeepers' and the
   // people-you-talk-to packs one after another (the city around you gets the bandwidth first)
   {
@@ -229,18 +230,19 @@ async function main() {
     game.preloads = game.preloads || [];
     if (W.tiles) game.preloads.push(bg.bytes('assets/pune/base_map.json.gz').then(async (b) => {
       const d = JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
-      W.cityMap && W.cityMap.setCoarse(d.coarse, d.cwater);
+      await cityReady; W.cityMap.setCoarse(d.coarse, d.cwater);
     }).catch(() => { /* names fill in as you go */ }));
     // every shop and place in Pune onto the map (names and spots only, about a megabyte)
     if (W.tiles) game.preloads.push(bg.bytes('assets/pune/pins.json.gz').then(async (b) => {
       const list = JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
-      W.cityMap && W.cityMap.addPins(fixPins(list));
+      await cityReady; W.cityMap.allPins(fixPins(list));
     }).catch(() => { /* the map fills in as you go */ }));
     // the voice lines (about 40 MB in all) aren't downloaded up front any more: each clip is fetched the first
     // time someone says it (a ranged read from its pack), so the game stays light in memory
     game.voiceRemote = { idx, urls: [VOICE_BIN, 'assets/voices_k.mp3', 'assets/voices_d.mp3', 'assets/voices_pk.mp3', 'assets/voices_vb.mp3', 'assets/voices_vb2.mp3'] }; void pack;
   }
   await game.init(progress);
+  cityUp();
   if (game.audio && game.voiceRemote) game.audio.remote = game.voiceRemote;
   // warm the chunks around the start before the first frame
   await progress('Building the streets', 0.86);

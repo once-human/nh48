@@ -127,16 +127,12 @@ export class CityMap {
     const P = [];
     for (const l of M.landmarks || []) P.push({ n: l[0], mr: l[1], c: 'landmark', x: l[2] / 100, z: l[3] / 100, blurb: l[4], k: l[5] });
     for (const p of M.places || []) P.push({ n: p[0], mr: p[1], c: p[2], x: p[3] / 100, z: p[4] / 100 });
-    // every real place at its source position (tools/bake_shops.py); boards in the street carry the same names
-    for (const q of M.pins || []) {
-      const c = q[2];
-      if (c === 'police') continue;                      // police come from `places`
-      P.push({ n: q[0], mr: q[1], c: FOOD.has(c) ? 'food' : (SHOPC[c] || (c === 'service' ? 'service' : 'shop')), sub: c, x: q[3] / 100, z: q[4] / 100 });
-    }
     this.places = P;
     // grid of places for hit tests and culling
     this.pgrid = new Map(); this.pcell = 120;
     for (const p of P) { const k = this.key(p.x, p.z); if (!this.pgrid.has(k)) this.pgrid.set(k, []); this.pgrid.get(k).push(p); }
+    // every real place at its source position; boards in the street carry the same names
+    this.addPins(M.pins || []);
     // areas (suburbs) and districts for labels at low zoom
     // (the 32 big ones first, then every locality OpenStreetMap knows: Lohegaon, Dhanori, Kharadi...)
     const big = new Set((M.areas || []).map(a => a[0].toLowerCase()));
@@ -178,13 +174,20 @@ export class CityMap {
     const seen = this.pinSeen || (this.pinSeen = new Set());
     for (const q of pins) {
       const c = q[2], id = q[0] + '@' + q[3] + ',' + q[4];
-      if (seen.has(id)) continue;
+      if (seen.has(id) || c === 'police') continue;                      // (police come from `places`)
       seen.add(id);
       const p = { n: q[0], mr: q[1], c: KIND_GROUP[c] || (CATS[c] ? c : FOOD.has(c) ? 'food' : (SHOPC[c] || 'shop')), sub: c, x: q[3] / 100, z: q[4] / 100 };
-      p.k = kindFor(p);
+      p.k = kindFor(p); p.pin = true;
       this.places.push(p);
       const k = this.key(p.x, p.z); if (!this.pgrid.has(k)) this.pgrid.set(k, []); this.pgrid.get(k).push(p);
     }
+  }
+  // the whole city's list has arrived: it stands in for whatever tiles got here first (and later tiles add nothing)
+  allPins(pins) {
+    this.places = this.places.filter(p => !p.pin);
+    this.pgrid = new Map(); this.pinSeen = new Set(); this.pinsDone = true;
+    for (const p of this.places) { const k = this.key(p.x, p.z); if (!this.pgrid.has(k)) this.pgrid.set(k, []); this.pgrid.get(k).push(p); }
+    this.addPins(pins);
   }
   key(x, z) { return Math.floor(x / this.pcell) + ',' + Math.floor(z / this.pcell); }
   placesNear(x, z, r) {
@@ -735,7 +738,7 @@ export class MapScreen {
       if (!t) { res.hidden = true; items = []; return; }
       const pl = this.g.player, out = [];
       for (const [p, w] of pool()) {
-        const n = norm(p.n) + ' ' + (p.mr || '');
+        const n = p._q || (p._q = norm(p.n) + ' ' + (p.mr || ''));         // (60,000 names: worked out once)
         const i = n.indexOf(t);
         if (i < 0) continue;
         const wordStart = i === 0 || n[i - 1] === ' ';

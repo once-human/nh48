@@ -173,7 +173,7 @@ export class Game {
     }
     this.wrecks = [];
     this.traffic.peds = this.people;
-    this.city = new CityMap(W);
+    this.city = W.cityMap = new CityMap(W);
     this.city.warm(0);
     // waypoint beacon: a soft column of light you can see over the rooftops
     {

@@ -93,14 +93,26 @@ export function fixVenues(D, rect) {
   }
 }
 // the city-wide map pins: drop what isn't real
+const SAME_PLACE = {
+  'Katakirr Misal': 'Katakirrr', 'Chitale Bandhu': 'Chitale Bandhu Mithaiwale', 'SP’s Biryani House': "SP's Biryani",
+  'Pataleshwar Caves': 'Pataleshwar cave temple', 'ISKCON NVCC': 'ISKCON NVCC Temple', 'Guruji Talim Ganpati': 'Guruji Talim',
+  'Empress Garden': 'Empress Botanical Garden', 'Rajiv Gandhi Zoo': 'Rajiv Gandhi Zoological Park', 'Omkareshwar Temple': 'Omkareshwar Mandir',
+  'National War Memorial': 'National War Memorial Southern Command', 'Amanora Mall': 'Amanora Town Center Mall', 'Abhiruchi Mall': 'Abhiruchi Mall and Multiplex',
+  'Swargate Bus Stand': 'Swargate MSRTC Bus Stand', 'Mahatma Phule Mandai': 'Mahatma Fule Market', 'E-Square': 'E-Square Multiplex',
+  'City Pride Satara Road': 'City Pride Multiplex', 'Shivsrushti': 'Shivsrushti Historical Theme Park Pune', 'World Trade Center Pune': 'World Trade Center',
+  'Pimpri-Chinchwad Science Park': 'Pimpri Chinchwad Science Centre',
+};
 export function fixPins(list) {
   const out = list.filter(p => !NOT_REAL.has(p[0]));
   // Pune's famous places, checked against OpenStreetMap, as stars on the map
   // (the city's own pin for the same place becomes the star, at OSM's spot; never two stars for one place)
-  const key = (n) => n.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 7);
+  // (the whole name, or a name in SAME_PLACE: "Swargate Police Station" is not Swargate Bus Stand)
+  const full = (n) => n.toLowerCase().replace(/[^a-z0-9]/g, ''), byName = new Map();
+  for (const p of out) { const k = full(p[0]); if (byName.has(k)) byName.get(k).push(p); else byName.set(k, [p]); }
   for (const f of FAMOUS) {
-    const k = key(f.name), fx = Math.round(f.x * 100), fz = Math.round(f.z * 100);
-    const same = out.find(p => key(p[0]) === k && Math.hypot(p[3] - fx, p[4] - fz) < 30000);
+    const fx = Math.round(f.x * 100), fz = Math.round(f.z * 100);
+    const within = (n) => (byName.get(full(n)) || []).find(p => Math.hypot(p[3] - fx, p[4] - fz) < 30000);
+    const same = within(f.name) || (SAME_PLACE[f.name] && within(SAME_PLACE[f.name]));
     if (same) { same[0] = f.name; if (f.mr) same[1] = f.mr; same[2] = /^(club|pub|lounge|restobar)$/.test(f.kind) ? f.kind : 'landmark'; same[3] = fx; same[4] = fz; }
     else out.push([f.name, f.mr || '', 'landmark', fx, fz, 1]);
   }
