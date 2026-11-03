@@ -38,6 +38,7 @@ export const QUALITY = {
 
 const params = new URLSearchParams(location.search);
 const EXPO = +(params.get('expo') || 1.0);
+const STUDIO_SKY = new THREE.Color(0xffffff), STUDIO_GND = new THREE.Color(0x3a3630);      // (game/studio.js's fill)
 export const TEST = params.has('test');
 // all of Pune, streamed in 4 km tiles: the default whenever the build carries the tiles (?city=classic for the
 // old central map)
@@ -364,10 +365,14 @@ async function main() {
     sky.update(game.lightHour ? game.lightHour() : game.hour, focus, dt);
     renderer.toneMappingExposure *= EXPO;
     if (game.weather && !(game.interiors && game.interiors.inside)) game.weather.apply(dt, sky, scene, renderer, camera);
-    // the jhola's studio light: everything but you falls into the dark
+    // the jhola's studio light: the same at any hour, the sky's light becomes the studio's soft fill and the city drops back behind you
     { const st = game.jhola ? game.jhola.lit || 0 : 0;
-      if (st > 0.001) { sky.sun.intensity *= 1 - 0.88 * st; sky.hemi.intensity *= 1 - 0.82 * st; scene.environmentIntensity = 0.35 * (1 - 0.75 * st); game._studioWas = true; }
-      else if (game._studioWas) { scene.environmentIntensity = 0.35; game._studioWas = false; } }     // (sky.js's value)
+      if (st > 0.001) {
+        sky.sun.intensity *= 1 - 0.85 * st;
+        sky.hemi.intensity += (1.15 - sky.hemi.intensity) * st; sky.hemi.color.lerp(STUDIO_SKY, st); sky.hemi.groundColor.lerp(STUDIO_GND, st);
+        renderer.toneMappingExposure += (1 - renderer.toneMappingExposure) * st;
+        scene.environmentIntensity = 0.35 * (1 - 0.5 * st); game._studioWas = true;
+      } else if (game._studioWas) { scene.environmentIntensity = 0.35; game._studioWas = false; } }     // (sky.js's value)
     U.uShopsOpen.value = game.hour > 22.8 || game.hour < 8.5 ? 0.25 : 1;
     updateWorldMaterials(W);
     camera.updateMatrixWorld();

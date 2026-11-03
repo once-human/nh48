@@ -578,7 +578,7 @@ export class Jhola {
     if (!G.life || !G.player) return;
     if (!this.spot && G.scene) this.makeSpot();
     if (!this.on) {
-      if (this.spot && this.lit > 0.001) this.lightTick(G.player.foot, dt, false);
+      if (this.spot && this.lit > 0) this.lightTick(G.player.foot, dt, false);
       // the quick bar keeps up with what you buy and eat
       if ((this._qt = (this._qt || 0) - dt) <= 0) { this._qt = 0.5; const sig = JSON.stringify([G.life.s.quick || [], G.life.s.inv]); if (sig !== this._qsig) { this._all = null; this.paintQuick(); } }
       if (this.queue.length && G.state === 'play') this.renderOne();
@@ -605,73 +605,28 @@ export class Jhola {
     if ((this._ct = (this._ct || 0) - rd) <= 0) { this._ct = 0.5; this.paintStrip(); }
     if (false && (this._vt = (this._vt || 0) - dt) <= 0) { this._vt = 1 / 30; this.vitals(); }
   }
-  // a studio key light, made at the start at zero (adding a light later recompiles every shader: a freeze): a real
-  // spotlight with a soft shadow straight down on you, a warm rim from behind, and the beam itself in the air (a cone
-  // that's brightest where you look through the most of it, fading to nothing at the floor) with dust turning in it.
-  // While it's on, the world around you is taken down (main.js, studioDim): you're the only thing lit
+  // the same lighting as the studio photos of your clothes (game/studio.js), made at the start at zero (adding a
+  // light later recompiles every shader: a freeze): a big soft key from the camera's side, up and to the right, and a
+  // warm rim behind you; the fill is the sky's own light, set to the studio's in main.js. No shadows of their own: a
+  // soft key doesn't draw hard shapes across your chest, and no awning or tree can get in its way
   makeSpot() {
     const G = this.g;
-    const L = this.spot = new THREE.SpotLight(0xfff0da, 0, 14, 0.3, 0.7, 1.4);
-    L.castShadow = true; L.shadow.mapSize.set(1024, 1024); L.shadow.bias = -0.0005; L.shadow.normalBias = 0.03; L.shadow.radius = 5;
-    L.shadow.camera.near = 0.3; L.shadow.camera.far = 0.05;           // (off: nothing in its frustum, so its shadow pass costs nothing)
+    const L = this.spot = new THREE.SpotLight(0xfff3e2, 0, 12, 0.6, 1, 2);
     const T = this.spotT = new THREE.Object3D(); L.target = T;
-    const R = this.rim = new THREE.SpotLight(0xffc98f, 0, 10, 0.55, 0.9, 1.6); const RT = this.rimT = new THREE.Object3D(); R.target = RT;
+    const R = this.rim = new THREE.SpotLight(0xffc58a, 0, 10, 0.6, 1, 2); const RT = this.rimT = new THREE.Object3D(); R.target = RT;
     G.scene.add(L, T, R, RT);
-    // the beam
-    const cone = new THREE.ConeGeometry(1, 1, 64, 12, true); cone.translate(0, -0.5, 0);          // apex at the origin, opening down
-    this.beam = new THREE.Mesh(cone, new THREE.ShaderMaterial({
-      uniforms: { uCol: { value: new THREE.Color(0xffe8c8) }, uOp: { value: 0 }, uTime: { value: 0 } },
-      vertexShader: `varying float vH; varying vec3 vN; varying vec3 vV; varying vec3 vW;
-        void main() { vH = -position.y; vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = -mv.xyz; vN = normalize(normalMatrix * normal); vW = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * mv; }`,
-      fragmentShader: `uniform vec3 uCol; uniform float uOp; uniform float uTime; varying float vH; varying vec3 vN; varying vec3 vV; varying vec3 vW;
-        float h3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
-        float n3(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
-          return mix(mix(mix(h3(i), h3(i + vec3(1,0,0)), f.x), mix(h3(i + vec3(0,1,0)), h3(i + vec3(1,1,0)), f.x), f.y), mix(mix(h3(i + vec3(0,0,1)), h3(i + vec3(1,0,1)), f.x), mix(h3(i + vec3(0,1,1)), h3(i + vec3(1,1,1)), f.x), f.y), f.z); }
-        void main() {
-          float face = abs(dot(normalize(vN), normalize(vV)));
-          float thick = pow(face, 2.2);                                   // looking through the middle of the beam, not its skin
-          float fall = pow(1.0 - clamp(vH, 0.0, 1.0), 0.55) * smoothstep(0.0, 0.12, vH);   // bright near the lamp, gone at the lamp itself
-          float floorFade = smoothstep(1.0, 0.72, vH);                     // no hard ring where it meets the ground
-          float haze = 0.75 + 0.5 * n3(vW * 2.2 + vec3(0.0, -uTime * 0.12, uTime * 0.05));
-          gl_FragColor = vec4(uCol * thick * fall * floorFade * haze * uOp, 1.0);
-        }`,
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false }));
-    this.beam.frustumCulled = false; this.beam.visible = false; this.beam.renderOrder = 5;
-    // dust motes, lit only inside the beam
-    const N = 220, pos = new Float32Array(N * 3), seed = new Float32Array(N * 4);
-    for (let i = 0; i < N; i++) { seed[i * 4] = Math.random(); seed[i * 4 + 1] = Math.random(); seed[i * 4 + 2] = Math.random() * 6.283; seed[i * 4 + 3] = 0.5 + Math.random(); }
-    const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); this._seed = seed;
-    this.dust = new THREE.Points(dg, new THREE.ShaderMaterial({
-      uniforms: { uOp: { value: 0 }, uPx: { value: G.renderer ? G.renderer.getPixelRatio() : 1 } },
-      vertexShader: `uniform float uPx; attribute float a; varying float vA; void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = uPx * 22.0 / -mv.z; vA = 1.0; gl_Position = projectionMatrix * mv; }`,
-      fragmentShader: `uniform float uOp; void main() { float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.0, d); gl_FragColor = vec4(vec3(1.0, 0.94, 0.84) * a * a * uOp, 1.0); }`,
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
-    this.dust.frustumCulled = false; this.dust.visible = false;
-    G.scene.add(this.beam, this.dust);
     this.lit = 0;           // (how far up the light is, 0 to 1; this.studio is the photo studio for your clothes)
   }
-  // the beam, the dust and the lights on you (every frame while the jhola's open, and fading out after)
+  // the lights on you, placed as the studio's are around its camera (every frame while the jhola's open, and fading out after)
   lightTick(F, dt, on) {
-    const y = F.y || 0, fx = Math.cos(F.yaw), fz = Math.sin(F.yaw);
+    const y = F.y || 0, th = F.yaw + 0.42 + (this.orb || 0), vx = Math.cos(th), vz = Math.sin(th), rx = vz, rz = -vx;      // (v: towards the camera, r: its right)
     this.lit += ((on ? 1 : 0) - this.lit) * (1 - Math.exp(-dt * (on ? 2.2 : 4)));
-    const s = this.lit, L = this.spot, lx = F.x + fx * 0.7, ly = y + 6.2, lz = F.z + fz * 0.7;
-    L.position.set(lx, ly, lz); this.spotT.position.set(F.x, y + 0.2, F.z); this.spotT.updateMatrixWorld();
-    L.intensity = 190 * s; L.shadow.camera.far = s > 0.01 ? 12 : 0.05; L.shadow.camera.updateProjectionMatrix();
-    this.rim.position.set(F.x - fx * 2.4, y + 3.2, F.z - fz * 2.4); this.rimT.position.set(F.x, y + 1.3, F.z); this.rimT.updateMatrixWorld();
-    this.rim.intensity = 38 * s;
-    // the cone, from the lamp to the floor
-    const B = this.beam, gx = F.x, gz = F.z, dx = gx - lx, dy = y - ly, dz = gz - lz, len = Math.hypot(dx, dy, dz), r = len * Math.tan(L.angle) * 0.95;
-    B.visible = s > 0.01; B.position.set(lx, ly, lz); B.scale.set(r, len, r);
-    B.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), new THREE.Vector3(dx / len, dy / len, dz / len));
-    B.material.uniforms.uOp.value = 0.075 * s; B.material.uniforms.uTime.value = this.t || 0;
-    // dust: slow, turning, inside the cone
-    const D = this.dust, P = D.geometry.attributes.position, S = this._seed, t = this.t || 0;
-    D.visible = s > 0.01; D.material.uniforms.uOp.value = 0.55 * s;
-    for (let i = 0; i < P.count; i++) {
-      const h = (S[i * 4] + t * 0.012 * S[i * 4 + 3]) % 1, a = S[i * 4 + 2] + t * 0.05 * S[i * 4 + 3], rr = Math.sqrt(S[i * 4 + 1]) * r * h * 0.92;
-      P.setXYZ(i, lx + dx * h + Math.cos(a) * rr, ly + dy * h, lz + dz * h + Math.sin(a) * rr);
-    }
-    P.needsUpdate = true;
+    if (!on && this.lit <= 0.001) this.lit = 0;
+    const s = this.lit, L = this.spot, R = this.rim;
+    L.position.set(F.x + rx * 1.4 + vx * 2.8, y + 3.6, F.z + rz * 1.4 + vz * 2.8); this.spotT.position.set(F.x, y + 1, F.z); this.spotT.updateMatrixWorld();
+    L.intensity = 28 * s;                                              // (at 4 m: as bright as the studio's key)
+    R.position.set(F.x - rx * 1.2 - vx * 2.6, y + 3.2, F.z - rz * 1.2 - vz * 2.6); this.rimT.position.set(F.x, y + 1, F.z); this.rimT.updateMatrixWorld();
+    R.intensity = 14 * s;
   }
   // a photo from assets/items, once it has loaded (null until then, and the painted one draws)
   pic(id) {
