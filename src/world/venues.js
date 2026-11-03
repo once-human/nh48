@@ -1,45 +1,9 @@
-// Pune's real nightlife, checked: the clubs and pubs on Pune Police's list of licensed pubs and discos (RTI,
-// June 2024) and the venues confirmed at The Mills (Raja Bahadur Mill compound) and around the city, each
-// at its own map pin. The open map data has most of them but files many as "food" or "service", so the game
-// never made them clubs. As a tile streams in, every venue here gets a club storefront on the building at its
-// pin (added if the data has none, moved if it's on the wrong building). Places the data invents are dropped.
-// x, z: metres on the game map (the pins in data/pune/pins.json.gz)
+// Fixes as a tile streams in. Bars, pubs and clubs come only from tools/venues.py, at their listed coordinates; here a famous
+// place (src/world/famous.json) gets its storefront on the building at its pin, and places the data invents are dropped.
 import { cmRing } from './geo.js';
 import LM from './landmarks.json';
 import FAMOUS from './famous.json';
 
-export const NIGHTLIFE = [
-  // The Mills, Raja Bahadur Mill Road (Sangamwadi)
-  ['2BHK Diner & Key Club', '2BHK डायनर अँड की क्लब', 608, -602],
-  ['Millers The Luxury Club', 'मिलर्स', 585, -564],
-  ['Dimora Dance & Kitchen', 'डिमोरा', 585, -617],
-  ['The Game Palacio', 'द गेम पॅलासिओ', 629, -736],
-  ['Drama 9', 'ड्रामा ९', 641, -668, 'club'],
-  // Sheraton Grand Pune, Raja Bahadur Motilal Road
-  ['Toyroom', 'टॉयरूम', 656, -325],
-  // Koregaon Park, Kalyani Nagar, Mundhwa
-  ['High Spirits', 'हाय स्पिरिट्स', 4255, -1371],
-  ['The Westin Club', 'द वेस्टिन क्लब', 4339, -1335],
-  ['Orilla', 'ओरिला', 5031, -1251],
-  ['Cosie', 'कोझी', 4674, -1183],
-  ['Penthouze', 'पेंटहाउझ', 3666, -955],
-  ['Elrow', 'एलरो', 4903, -1945],
-  ['SWIG', 'स्विग', 3043, -1413],
-  ['Effingut Brewerkz', 'एफिंगट', 3587, -774],
-  ['Oak Lounge', 'ओक लाउंज', 4778, -585],
-  ['Elephant & Co.', 'एलिफंट अँड को.', 3800, -2193],
-  // Camp
-  ['1000 Oaks', '१००० ओक्स', 1575, 1806],
-  ['Effingut', 'एफिंगट', 1521, 1168],
-  // Senapati Bapat Road
-  ['JW Marriott Club', 'जेडब्ल्यू मॅरियट क्लब', -3742, -592, 'club'],
-  // Baner, Balewadi
-  ['1BHK Superbar', '1BHK सुपरबार', -9872, -4497],
-  ['Elephant & Co.', 'एलिफंट अँड को.', -8934, -4139],
-  ['Coastal Culture', 'कोस्टल कल्चर', -9350, -4565],
-  ['SWIG Bar & Eatery', 'स्विग', -9554, -4704],
-  ['Effingut', 'एफिंगट', -9437, -4485],
-];
 // in the open data, but not real places (or not what they're labelled as)
 const NOT_REAL = new Set(['The Mills Sociable', 'Themillspune']);
 
@@ -67,7 +31,7 @@ export function fixVenues(D, rect) {
   if (D.pins) D.pins = D.pins.filter(p => !NOT_REAL.has(p[0]));
   let cents = null;
   const used = new Set(D.shops.map(s => s[0] * 4096 + s[1] * 64 + s[2]));
-  for (const [name, mr, x, z, kind] of [...NIGHTLIFE, ...FAMOUS.filter(f => f.kind).map(f => [f.name, f.mr || f.name, f.x, f.z, f.kind])]) {
+  for (const [name, mr, x, z, kind] of FAMOUS.filter(f => f.kind).map(f => [f.name, f.mr || f.name, f.x, f.z, f.kind])) {
     if (rect && (x < rect[0] - 40 || x > rect[2] + 40 || z < rect[1] - 40 || z > rect[3] + 40)) continue;   // not in this tile
     cents = cents || D.buildings.map(B => { const p = cmRing(B[1]); return { c: centroid(p), p }; });
     // the building at the pin (its centre within 35 m), in this tile
@@ -75,8 +39,8 @@ export function fixVenues(D, rect) {
     cents.forEach((b, i) => { const d = (b.c[0] - x) ** 2 + (b.c[1] - z) ** 2; if (d < bd) { bd = d; bi = i; } });
     if (bi < 0) continue;
     // the data's own storefront for it, if any (by name), on any building in the tile
-    const key = norm(name).slice(0, 8);
-    let si = D.shops.findIndex(s => { const n = D.shopNames[s[3]]; return n && norm(n[0]).startsWith(key); });
+    const key = norm(name);                                          // (the whole name: "Vaishali Medical" is not Vaishali)
+    let si = D.shops.findIndex(s => { const n = D.shopNames[s[3]]; return n && norm(n[0]) === key; });
     if (si >= 0 && D.shops[si][4] === 3) continue;                   // placed from its coordinates (tools/venues.py): it's right
     let ni;
     if (si >= 0) { ni = D.shops[si][3]; Object.assign(D.shopNames[ni], { 0: name, 1: mr, 2: kind || 'bar' }); }

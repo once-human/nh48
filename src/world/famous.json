@@ -1098,15 +1098,6 @@
 "pinOff": null
 },
 {
-"name": "The Mills Social",
-"mr": "द मिल्स सोशल",
-"kind": "bar",
-"x": 624.4,
-"z": -586.0,
-"osm": "osm: The Mills Social, amenity=bar",
-"pinOff": null
-},
-{
 "name": "Dimora Dance & Kitchen",
 "mr": "डिमोरा",
 "kind": "club",

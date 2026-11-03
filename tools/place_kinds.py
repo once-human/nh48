@@ -5,6 +5,10 @@ import re
 
 # (pattern on the lower-cased name, kind)  - first match wins, so the specific go before the general
 RULES = [
+  # (a club that's a gym, a society that's an office: before nightlife, which goes by the word)
+  (r'\b(fitness|gym|gymnasium|health club|crossfit|yoga|sports? club)\b', 'gym'),
+  (r'\b(foundation|network|society|association|rotary|lions club|council)\b', 'office'),
+  (r'\b(tuition|coaching)\b', 'classes'),
   # nightlife first: a brewpub's name rarely says "bar"
   (r'\b(bar|pub|brew\w*|taproom|tap room|lounge|night ?club|cocktail|beer|wine|whisky|liquor|toit|effingut|doolally|high spirits|kiki|hard rock|independence brewing|swig|permit room|club|social|sociable|dance (&|and) kitchen|kitchen (&|and) bar|millers|dimora|disc|lounge bar)\b', 'bar'),
   (r'(\bmall$|^the mills$|^phoenix market ?city|^amanora town cent|^seasons mall|^westend mall|^the pavilion|^kumar pacific|^ishanya|^elpro city square)', 'mall'),

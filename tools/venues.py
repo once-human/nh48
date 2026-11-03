@@ -8,7 +8,7 @@ Only the name, the kind and the position are baked: ratings, reviews, phones and
 Safe to rerun, and the CSVs of later searches can be added to the list.
 In: CSVs. Out: data/pune/t_*.json.gz, pins.json.gz, src/world/famous.json.
 usage: python3 tools/venues.py [--review out.csv] [--dry] a.csv b.csv ..."""
-import csv, glob, gzip, json, math, os, re, sys, collections
+import csv, difflib, functools, glob, gzip, json, math, os, re, sys, collections, unicodedata
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from place_kinds import kind_of, TRADE
 from shopnames import brand_parody
@@ -45,7 +45,7 @@ def clean(t):
     t = re.sub(r'^(discover|bar in pune\s*-)\s*', '', t.strip(), flags=re.I)
     t = re.split(r'\s*\|\s*|\s+[-–—]\s*|\s*[-–—]\s+|\s*\(|\s*\[|\.\s| also ', t, flags=re.I)[0].strip(' ,-')
     if ',' in t and len(t.split(',')[0]) >= 4: t = t.split(',')[0].strip()
-    if len(t) > 34: t = t[:34].rsplit(' ', 1)[0]
+    if len(t) > 34: t = re.sub(r'\s+(and|&|n|of|the|by|at|in|-)$', '', t[:34].rsplit(' ', 1)[0], flags=re.I)
     t = re.sub(r'\s+(pune|koregaon park|kharadi|baner|hinjewadi|hinjawadi|wakad|viman nagar|kalyani nagar|camp)$', '', t, flags=re.I) if len(t.split()) > 1 else t
     return t
 
@@ -105,7 +105,8 @@ for r in R.values():
     venues.append(r)
 # the same place twice under two ids: a name, within 40 m
 seen, uniq = collections.defaultdict(list), []
-strip = lambda s: re.sub(r'^the', '', re.sub(r'[^a-z0-9]', '', (s or '').lower()))
+fold = lambda s: unicodedata.normalize('NFKD', s or '').encode('ascii', 'ignore').decode().lower().replace('&', ' and ')     # (Açai is Acai)
+strip = lambda s: re.sub(r'^the', '', re.sub(r'[^a-z0-9]', '', fold(s)))
 for r in sorted(venues, key=lambda r: -int(r['review_count'] or 0)):
     k = strip(r['_name'])
     if any(math.hypot(r['x'] - x, r['z'] - z) < 40 for x, z in seen[k]): continue
@@ -164,15 +165,61 @@ def around(x, z, R=0):
             t = tile((a, b))
             if t: out.append(t)
     return out
-GENERIC = re.compile(r'(pune|poona|brewery|brewing|brew|bar|pub|and|n|restaurant|resturant|restro|resto|kitchen|club|cafe|lounge|eatery|bistro|nightclub|night|india|co|company)*')
-norm = lambda s: re.sub(r'^the', '', re.sub(r'[^a-z0-9]', '', (s or '').lower()))
+# ---------------------------------------------------------------- is it the same place?
+# Only the words that tell a place apart count: "Toit" and "Toit Brewery" are one place, "Samruddhi Classes" and "Samruddhi Pure
+# Veg" are two. All of one's words in the other is only believed close by, and only of something you eat or drink at.
+COMMON = set(('the and n pune poona india co company pvt ltd brewery brewing brew bar bars pub restaurant resturant restraunt restro resto rest o reto kitchen club cafe '
+    'lounge eatery bistro nightclub night hotel family veg pure non multicuisine multi cuisine garden rooftop sky terrace dine dining banquets banquet diner grill '
+    'mills camp baner balewadi wakad hinjewadi hinjawadi kothrud kharadi aundh koregaon park kalyani nagar viman mundhwa high street sb road fc').split())
+@functools.lru_cache(maxsize=None)
+def core(name):
+    name = re.split(r'\bby\b', fold(name))[0] or fold(name)                 # ("Glint by Plunge" isn't Plunge, "Slounge by Lemon Tree" isn't the Lemon Tree)
+    w = [t for t in re.split(r'[^a-z0-9]+', name) if t]
+    return tuple(t for t in w if t not in COMMON and not t.isdigit()), ''.join(w)
 def sameName(a, b):
-    if not a or not b: return False
-    if a == b: return True
-    s = min(len(a), len(b))
-    sh, lo = (a, b) if len(a) < len(b) else (b, a)
-    if len(sh) >= 4 and lo.startswith(sh) and GENERIC.fullmatch(lo[len(sh):]): return True      # "Toit" and "Toit Pune Brewery"
-    return s >= 6 and a[:max(6, min(8, s))] == b[:max(6, min(8, s))]
+    """-> 'same', 'part' or None"""
+    (A, fa), (B, fb) = core(a), core(b)
+    if fa == fb and fa: return 'same'
+    if not A or not B: return None
+    if A == B or sorted(A) == sorted(B): return 'same'
+    if len(A) == len(B) and A[0][:3] == B[0][:3] and difflib.SequenceMatcher(None, ''.join(A), ''.join(B)).ratio() >= 0.88: return 'same'     # (Mahableshwar, Mahabaleshwar)
+    sh, lo = (A, B) if len(A) < len(B) else (B, A)
+    return 'part' if set(sh) <= set(lo) and len(''.join(sh)) >= 4 else None
+EATS = {'food', 'cafe', 'bar', 'pub', 'club', 'lounge', 'restobar', 'tapri', 'thali', 'misal', 'biryani', 'southindian', 'chinese', 'fastfood', 'juice'}
+OWN_TRADE = set('snacks snack center centre sports shop shoppe shopee shoppee beer wine wines juice chai tea bakery sweets lodge oyo rooms salon academy classes mart medical'.split())
+NEVER = {'temple', 'park', 'college', 'hospital', 'clinic', 'chowki', 'fuel', 'bank', 'transit', 'mall', 'landmark', 'zoo', 'cinema'}
+def isOld(name, kind, vname, d):
+    """is this older pin (or board, by its trade) the listing's own?"""
+    m = sameName(vname, name)
+    if not m: return False
+    (A, _), (B, _) = core(vname), core(name)
+    if re.search(r'\bveg\b', fold(name)) and not re.search(r'\b(veg|restaurant|resto|restro|family)\b', fold(vname)): return False     # (Apsara Veg isn't Apsara Bar)
+    if m == 'same': return d < (200 if len(''.join(A)) >= 6 else 80) and kind not in NEVER                  # (a short name is a common one)
+    return d < 60 and kind in EATS and not (set(B) - set(A)) & OWN_TRADE                                    # (Swagat Snacks isn't Swagat Resto Bar)
+
+# Told to us, or checked: not there
+GONE = {'OLA head office', 'Drama 9', 'The Game Palacio', 'The Mills Social', 'The Mills Sociable', 'Themillspune'}
+# A "bar" in the older data because its name says club or social: what it really is. Any other older bar with no listing is held out:
+# the searches covered the whole city, and these are the pins nobody can vouch for. A name that doesn't even say it serves a drink
+# stays on the map as a plain listing, for what it is: we only know its name
+NOT_A_BAR = [(re.compile(p, re.I), k) for p, k in (
+    (r'wine shop|beer shop|wine (and|&) beer|beer (and|&) wine|beer shopp?e|(?<!dine )(?<!dine & )(?<!dine and )wines?$|wines (and|&)|liquor|beer point', 'shop'), (r'juice', 'juice'),
+    (r'fitness|\bgym\b|gymnasium|health club|crossfit|wellness|yoga|martial|karate|badminton|swimming|aquatic|workout|\bfit bar\b|\bsports? club', 'gym'),
+    (r'foundation|network|pubmatic|software|technolog|solutions|society|association|rotary|lions club|council|\bngo\b|forum|group$|housing|services$|consult|welfare|commissioner', 'office'),
+    (r'\bchai\b|tea bar', 'tapri'), (r'sandwich|salad|pav ?bhaji|snack|vada|misal|pizzeria', 'food'), (r'baker|bakes|cake', 'bakery'), (r'\bsalon\b|beauty|hair', 'barber'),
+    (r'kids club|play ?school|tuition|classes|academy', 'classes'), (r'snooker|gaming|billiard', 'gaming'), (r'tattoo', 'services'))]
+SERVES = re.compile(r'\b(hard rock|nightclub|night club|brewco|peg|pint|taproom|bars?|pub|resto|restro|restaurant|restraunt|lounge|cocktails?|taproom|brew ?pub|brewery|brewing|brews?|beer|wine|theka|permit|kitchen|dine|diner|bistro|hotel|spirits?)\b', re.I)
+COFFEE = re.compile(r'coffee|\bbeans\b|\bcafe\b|\bread and brew\b|benne', re.I)
+def barFate(name):
+    """an older 'bar' with no listing -> the kind it really is, or None to hold it out"""
+    k = next((v for rx, v in NOT_A_BAR if rx.search(name)), None)
+    if k: return k
+    if COFFEE.search(name) and not re.search(r'\b(bar|pub|lounge|cocktails?|beer|hard rock)\b', name, re.I): return 'cafe'
+    return None if SERVES.search(name) or re.search(r'road$', name, re.I) else 'services'
+JUNK = {'pune', 'head office', 'office', 'shop', 'hotel', 'restaurant', 'bank', 'atm', 'headquarters'}
+SPAM = {'Math Tuition Classes Cuemath', 'Maths Tuition Classes', 'Home Cleaning Services'}       # home tutors and cleaners listed by the hundred at people's flats: nobody's shop
+REKIND = [(re.compile(r'tuition|coaching|\bclasses\b', re.I), 'classes', {'temple', 'park', 'food', 'bar'}), (re.compile(r'(head|registered|corporate|regional) office', re.I), 'office', {'temple', 'park', 'food', 'bar', 'shop'})]
+removed = []                 # (why, by what, name, kind, x, z): every pin taken off the map, for reading (scratch/venue_removed.csv)
 
 pinsAll = json.load(gzip.open(os.path.join(ROOT, 'data/pune/pins.json.gz')))
 pgrid = collections.defaultdict(set)
@@ -186,10 +233,12 @@ def nameIdx(t, en, mr, trade, flag):
     N.append(key); return len(N) - 1
 
 # the hand-written list follows the coordinates (and a famous place keeps the name the game knows it by)
-Fp = os.path.join(ROOT, 'src/world/famous.json'); FAM = json.load(open(Fp, encoding='utf-8')); moved = []
+Fp = os.path.join(ROOT, 'src/world/famous.json'); FAM = [f for f in json.load(open(Fp, encoding='utf-8')) if f['name'] not in GONE]; moved = []
 for f in FAM:
-    m = [r for r in venues if sameName(norm(r['_name']), norm(f['name'])) and math.hypot(r['x'] - f['x'], r['z'] - f['z']) < 300]
-    if not m: continue
+    m = [r for r in venues if sameName(r['_name'], f['name']) == 'same' and math.hypot(r['x'] - f['x'], r['z'] - f['z']) < 300]
+    if not m:
+        if f.get('kind') in ('club', 'pub', 'lounge', 'bar', 'restobar'): print('famous nightlife with no listing:', f['name'])
+        continue
     r = min(m, key=lambda r: math.hypot(r['x'] - f['x'], r['z'] - f['z']))
     moved.append((f['name'], round(math.hypot(r['x'] - f['x'], r['z'] - f['z']))))
     f['x'], f['z'] = round(r['x'], 1), round(r['z'], 1); r['_name'] = f['name']
@@ -235,23 +284,60 @@ def newBuilding(x, z):
     L = math.hypot(ring[(e + 1) % 4][0] - ring[e][0], ring[(e + 1) % 4][1] - ring[e][1])
     d, u = seg(x, z, *ring[e], *ring[(e + 1) % 4])
     return (0, t, b, e, u, L, d, False)
+# what's plainly labelled wrong gets its label first, so a gym can't be taken for the restaurant next door
+for p in pinsAll:
+    if p[2] == 'bar':
+        k = next((v for rx, v in NOT_A_BAR if rx.search(p[0])), None)
+        if k: p[2] = k; tot['bar pins that were something else'] += 1
 # first the old pins and boards of everyone (so a venue's old board doesn't hold the slot it wants), held places left alone
 for r in venues:
-    k, x, z = norm(r['_name']), r['x'], r['z']; X, Z = x * 100, z * 100
-    par = brand_parody(r['_name']); pk = norm(par[0]) if par else None
+    name, x, z = r['_name'], r['x'], r['z']; X, Z = x * 100, z * 100
+    par = brand_parody(name); alt = par[0] if par else None
     for i in range(int(X // 40000) - 1, int(X // 40000) + 2):
         for j in range(int(Z // 40000) - 1, int(Z // 40000) + 2):
             for pi in pgrid.get((i, j), ()):
                 p = pinsAll[pi]
-                if pi not in deadPins and math.hypot(p[3] - X, p[4] - Z) < 40000 and sameName(k, norm(p[0])): deadPins.add(pi); tot['old pins removed'] += 1
-    for t in around(x, z, 400):
+                if pi in deadPins: continue
+                d = math.hypot(p[3] - X, p[4] - Z) / 100
+                if isOld(p[0], p[2], name, d) or (alt and d < 60 and sameName(alt, p[0]) == 'same'):
+                    deadPins.add(pi); tot['old pins removed'] += 1; removed.append(('same place as a listing', name, p[0], p[2], p[3], p[4]))
+    for t in around(x, z, 200):
         N = t.T['shopNames']; keep = []
         for s in t.T['shops']:
-            if s[4] != 0 and s[3] < len(N) and (sameName(k, norm(N[s[3]][0])) or (pk and sameName(pk, norm(N[s[3]][0])))):
-                P = t.polys[s[0]]
-                if P and math.hypot(P[0][0] - x, P[0][1] - z) < 450: tot['old boards removed'] += 1; dirty.add(t.key); continue
+            P = t.polys[s[0]]
+            if s[4] != 0 and s[3] < len(N) and P:
+                d = max(0, min(math.hypot(q[0] - x, q[1] - z) for q in P) - 8)
+                k = 'food' if N[s[3]][2] in ('food', 'cafe', 'bar', 'pub', 'club', 'lounge', 'restobar', 'hotel') else 'other'
+                if isOld(N[s[3]][0], k, name, d) or (alt and d < 60 and sameName(alt, N[s[3]][0]) == 'same'): tot['old boards removed'] += 1; dirty.add(t.key); continue
             keep.append(s)
         t.T['shops'] = keep
+# then what's left of the older data: what we know is wrong, what's labelled wrong, and bars nobody lists
+Vcore = {core(r['_name'])[0] for r in venues}
+Vword = {w for r in venues for w in core(r['_name'])[0] if len(w) >= 5}       # (Doolally here, the Doolally Taproom listed over there: it's over there)
+listedElsewhere = lambda n: core(n)[0] in Vcore or (core(n)[0] and all(w in Vword for w in core(n)[0]))
+for pi, p in enumerate(pinsAll):
+    if pi in deadPins: continue
+    n, k = p[0], p[2]
+    why = 'known wrong' if n in GONE else 'listed by the hundred' if n in SPAM else 'not a name' if fold(n).strip() in JUNK else None
+    if not why and k == 'bar':
+        new = None if listedElsewhere(n) else barFate(n)                    # (the same name listed elsewhere: that's where it is)
+        if new: p[2] = new; tot['bar pins that were something else'] += 1; continue
+        why = 'older bar, no listing'
+    if why: deadPins.add(pi); tot[why] += 1; removed.append((why, '', n, k, p[3], p[4])); continue
+    for rx, v, frm in REKIND:
+        if k in frm and rx.search(n): p[2] = v; tot['pins relabelled'] += 1; break
+for key in list(paths):
+    t = tile(key); N = t.T['shopNames']; keep = []
+    for s in t.T['shops']:
+        n = N[s[3]] if s[3] < len(N) else None
+        if n and (n[0] in GONE or n[0] in SPAM): tot['wrong boards removed'] += 1; dirty.add(key); continue
+        if n and s[4] in (1, 2) and n[2] == 'bar':
+            new = None if listedElsewhere(n[0]) else barFate(n[0])
+            dirty.add(key)
+            if not new: tot['older bar boards removed'] += 1; continue
+            s[3] = nameIdx(t, n[0], n[1], TRADE.get(new, 'generic'), n[3]); tot['bar boards that were something else'] += 1
+        keep.append(s)
+    t.T['shops'] = keep
 # then each venue, most reviewed first, gets the slot nearest its coordinates
 for r in sorted(venues, key=lambda r: -int(r['review_count'] or 0)):
     x, z, kind, name = r['x'], r['z'], r['_kind'], r['_name']
@@ -289,9 +375,7 @@ for r in sorted(venues, key=lambda r: -int(r['review_count'] or 0)):
         if slot is None: tot['no free wall'] += 1
         else:
             t.T['shops'] = [s for s in t.T['shops'] if (s[0], s[1], s[2]) != (b, e, slot)]
-            par = brand_parody(name)
-            en, flag = (par[0], 'brand') if par else (name, '')
-            t.T['shops'].append([b, e, slot, nameIdx(t, en, MR.get(kind, en), trade, flag), VERIFIED]); dirty.add(t.key)
+            t.T['shops'].append([b, e, slot, nameIdx(t, name, MR.get(kind, name), trade, ''), VERIFIED]); dirty.add(t.key)     # (the name on its listing, chain or not)
             P = t.polys[b]; (ax, az), (bx, bz) = P[e], P[(e + 1) % len(P)]; L = math.hypot(bx - ax, bz - az); ns = max(1, int(L // SLOT)); q = (slot + 0.5) / ns
             r['_d'] = math.hypot(ax + (bx - ax) * q - x, az + (bz - az) * q - z); dist.append(r['_d']); tot['on the building it stands in' if ins else 'on the nearest building'] += 1
     pin = [name, '', kind, round(x * 100), round(z * 100), 1]
@@ -299,17 +383,30 @@ for r in sorted(venues, key=lambda r: -int(r['review_count'] or 0)):
 
 # ---------------------------------------------------------------- write
 kill = {(pinsAll[i][0], pinsAll[i][3], pinsAll[i][4]) for i in deadPins}
-out = [p for i, p in enumerate(pinsAll) if i not in deadPins] + newPins
-for key in {tkey(pinsAll[i][3] / 100, pinsAll[i][4] / 100) for i in deadPins} | set(addPin):
-    t = tile(key)
-    if not t: continue
-    before = len(t.T.get('pins') or [])
-    t.T['pins'] = [p for p in t.T.get('pins') or [] if (p[0], p[3], p[4]) not in kill] + addPin.get(key, [])
-    if len(t.T['pins']) != before or key in addPin: dirty.add(key)
+# the same name twice on one spot: one pin (the listing's, if it's one of them)
+def once(L, log=True):
+    keep, grid = [], collections.defaultdict(list)
+    for p in L:
+        f = strip(p[0]); c = (f, p[3] // 2500, p[4] // 2500)
+        if f and any(q[2] == p[2] and math.hypot(q[3] - p[3], q[4] - p[4]) < 2500 for a in (-1, 0, 1) for b in (-1, 0, 1) for q in grid[(f, c[1] + a, c[2] + b)]):
+            if log: removed.append(('twice on one spot', '', p[0], p[2], p[3], p[4]))
+            continue
+        grid[c].append(p); keep.append(p)
+    return keep
+out = once(newPins + [p for i, p in enumerate(pinsAll) if i not in deadPins])
+live = collections.defaultdict(list)
+for p in out: live[tkey(p[3] / 100, p[4] / 100)].append(p)
+for key in paths:                                                    # (a tile's pins are the citywide list's, cut to the tile)
+    t = tile(key); before = t.T.get('pins') or []; pins = live.get(key, [])
+    if sorted(map(tuple, before)) != sorted(map(tuple, pins)): dirty.add(key)
+    t.T['pins'] = pins
 for key in dirty:
     with gzip.open(paths[key], 'wb', 9) as fh: fh.write(json.dumps(cache[key].T, separators=(',', ':'), ensure_ascii=False).encode())
 with gzip.open(os.path.join(ROOT, 'data/pune/pins.json.gz'), 'wb', 9) as fh: fh.write(json.dumps(out, separators=(',', ':'), ensure_ascii=False).encode())
 json.dump(FAM, open(Fp, 'w', encoding='utf-8'), ensure_ascii=False, indent=0)
+with open(os.path.join(ROOT, 'scratch/venue_removed.csv'), 'w', newline='', encoding='utf-8') as fh:
+    w = csv.writer(fh); w.writerow(['why', 'because of', 'name', 'kind', 'x', 'z']); w.writerows(sorted(removed))
+json.dump([{'name': r['_name'], 'pin': r['_name'], 'kind': r['_kind'], 'x': r['x'], 'z': r['z'], 'door': round(r.get('_d', -1), 1)} for r in venues if tkey(r['x'], r['z']) in paths], open(os.path.join(ROOT, 'scratch/venues_in.json'), 'w', encoding='utf-8'), ensure_ascii=False)
 d = sorted(dist)
 print(dict(tot)); print('map pins', len(out), '| tiles rewritten', len(dirty))
 print('door to coordinates: median %.1f m, within 10 m %d of %d, within 25 m %d, max %.0f m' % (d[len(d) // 2], sum(v <= 10 for v in d), len(d), sum(v <= 25 for v in d), d[-1]))
