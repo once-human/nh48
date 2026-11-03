@@ -121,6 +121,11 @@ if dry: sys.exit(0)
 
 # ---------------------------------------------------------------- tiles
 tkey = lambda x, z: (int((x * 100 + 2000000) // 100000), int((z * 100 + 2400000) // 100000))
+META = json.load(gzip.open(os.path.join(ROOT, 'data/pune/base.json.gz')))['meta']
+# a building's first field is the map chunk it belongs to
+def chunkOf(x, z):
+    i, j = int((x - META['vis'][0] / 100) // META['chunk']), int((z - META['vis'][1] / 100) // META['chunk'])
+    return i + j * META['ncx']
 paths = {tuple(map(int, re.findall(r't_(\d+)_(\d+)', f)[0])): f for f in glob.glob(os.path.join(ROOT, 'data/pune/t_*.json.gz'))}
 cache, dirty = {}, set()
 def inside(x, z, P):
@@ -221,7 +226,7 @@ def newBuilding(x, z):
     if sign * sum(ring[i][0] * ring[i - 1][1] - ring[i - 1][0] * ring[i][1] for i in range(4)) < 0: ring.reverse()
     tpl = B[min(range(len(B)), key=lambda b: (t.polys[b][0][0] - x) ** 2 + (t.polys[b][0][1] - z) ** 2 if t.polys[b] else 1e18)] if B else [0, [], 2, 1, 0, '', 0, 0, 0, 0, '']
     built += 1
-    B.append([9000000 + t.key[0] * 100000 + t.key[1] * 1000 + len(B) % 1000, [round(v * 100) for q in ring for v in q], 3, 1, tpl[4], '1111', tpl[6], 0, tpl[8], tpl[9], ''])
+    B.append([chunkOf(sum(q[0] for q in ring) / 4, sum(q[1] for q in ring) / 4), [round(v * 100) for q in ring for v in q], 3, 1, tpl[4], '1111', tpl[6], 0, tpl[8], tpl[9], ''])
     b = len(B) - 1; t.polys.append(ring); dirty.add(t.key)
     xs, zs = [q[0] for q in ring], [q[1] for q in ring]
     for i in range(int(min(xs) // 20), int(max(xs) // 20) + 1):
