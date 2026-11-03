@@ -6,6 +6,7 @@
 // blade of grass written four times over), so the edges are smoothed after the frame instead, in the one
 // pass that also tone-maps: only pixels on an edge are touched, so signs and textures stay as sharp.
 import * as THREE from 'three';
+import { Painted } from './painted.js';
 
 export class Post {
   constructor(renderer, scene, camera, q) {
@@ -14,8 +15,9 @@ export class Post {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.exposure = 1;
     this.fxaa = !!(q && q.fxaa);
+    this.paint = new Painted(renderer, scene, camera);      // Experimental graphics (nothing is made until it's picked)
   }
-  setSize(w, h) { this.renderer.setSize(w, h, false); if (this.rt) { this.rt.dispose(); this.rt = null; } }
+  setSize(w, h) { this.renderer.setSize(w, h, false); if (this.rt) { this.rt.dispose(); this.rt = null; } this.paint.setSize(); }
   setExposure(e) { this.renderer.toneMappingExposure = e; this.exposure = e; }
   // the picture the final pass reads. Flagged as an XR target so three tone-maps into it exactly as it does onto
   // the screen (lights and screens that skip tone mapping still do): the final pass only smooths and encodes
@@ -73,6 +75,7 @@ export class Post {
   }
   // drunk > 0.35: double vision and a soft blur in the final pass (only while drunk)
   render() {
+    if (this.paint.on) return this.paint.render();
     const R = this.renderer, d = this.drunk || 0;
     if (d < 0.35 && !this.fxaa) { R.render(this.scene, this.camera); return; }
     const rt = this.target();

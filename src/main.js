@@ -1,6 +1,7 @@
 // NH48, entry point. Stage 1 boot: renderer + post-processing, asset loading with honest progress,
 // the streamed PBR city, and a free camera for checking the world. Gameplay plugs in on top.
 import * as THREE from 'three';
+import './gfx/painted.js';         // hooks every material before any is made (Experimental graphics)
 import './game/keys.js';            // key rebinding: its listener goes first
 import { Loader, stripToArray, bitmapTexture, upgradeArray } from './core/assets.js';
 import { buildWorld, updateWorldMaterials } from './world/world.js';

@@ -160,6 +160,7 @@ export class HUD {
           <nav class="pz-menu">
             <button class="pz-i sel" id="t-roam">Story</button>
             <button class="pz-i" id="t-free">Free roam</button>
+            <button class="pz-i" id="t-paint">Experimental graphics</button>
             <button class="pz-i" id="t-who">New character</button>
             <button class="pz-i" id="t-wipe">Start over</button>
           </nav>
@@ -174,6 +175,7 @@ export class HUD {
     this.title = t;
     t.querySelector('#t-roam').onclick = () => this.game.begin();
     t.querySelector('#t-free').onclick = () => this.game.beginFree();
+    t.querySelector('#t-paint').onclick = () => this.game.beginPainted();
     t.querySelector('#t-who').onclick = () => this.showPicker(() => this.syncTitle());
     t.querySelector('#t-wipe').onclick = () => { t.querySelector('#t-wipe-c').hidden = false; };
     t.querySelector('#t-wipe-n').onclick = () => { t.querySelector('#t-wipe-c').hidden = true; };
@@ -543,7 +545,7 @@ export class HUD {
     this.$('h-sub').classList.remove('show');
     this.setMode();
   }
-  setMode() { this.$('h-mode').textContent = this.game.free ? 'Free roam' : this.game.rides && this.game.rides.enabled ? 'On shift' : 'On foot in Pune'; }
+  setMode() { this.$('h-mode').textContent = this.game.free ? (this.game.post && this.game.post.paint.on ? 'Free roam · painted' : 'Free roam') : this.game.rides && this.game.rides.enabled ? 'On shift' : 'On foot in Pune'; }
   setFree(on) { this.root.classList.toggle('free', !!on); this.setMode(); const g = this.pause && this.pause.querySelector('#p-time-g'); if (g) g.hidden = !on; }
 
   // ---------------------------------------------------------------- per frame

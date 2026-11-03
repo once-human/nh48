@@ -786,7 +786,8 @@ export class Game {
   // ---------------------------------------------------------------- state changes
   // Start: pick who you are the first time, then you're in your auto (the shift runs while you drive it)
   // Free roam: no police, unlimited cash, any time of day, go anywhere from the map. Your story game is left alone
-  beginFree() {
+  beginFree(painted = false) {
+    if (!painted && this.post && this.post.paint.on) this.setPainted(false);
     if (!this.free) { const P = this.player; this._story = { money: this.stats.money, hour: this.hour, x: P.x, z: P.z, th: P.onFoot ? P.foot.yaw : P.th, foot: P.onFoot, life: JSON.stringify(this.life.s) }; this.free = true; this.stats.money = 99999999; this.hour = 17.2; this.wadaIntro = true; }   // a fresh game every time, from Shaniwar Wada at golden hour
     this.hud.setFree?.(true);
     if (!this.hud.hasCharacter || this.hud.hasCharacter()) return this.startPlay(false);
@@ -794,6 +795,7 @@ export class Game {
   }
   leaveFree() {
     if (!this.free) return;
+    if (this.post && this.post.paint.on) this.setPainted(false);
     if (this.police) this.police.heat = 0;
     {
       // back to the story: your money, your time of day, and where you were, as if free roam never happened
@@ -802,6 +804,23 @@ export class Game {
       try { if (S.foot) this.player.teleportFoot(S.x, S.z, S.th, this.traffic); else this.player.reset(S.x, S.z, S.th); this.rig.inited = false; } catch (e) { /* stay */ }
     }
     this.hud.syncTitle?.();
+  }
+  // Experimental graphics: free roam, painted (gfx/painted.js). The look is made now, behind the loading screen,
+  // and never before; it goes again when you leave free roam
+  async beginPainted() {
+    if (this._painting) return;
+    await this.setPainted(true);
+    this.beginFree(true);
+  }
+  async setPainted(on) {
+    const P = this.post && this.post.paint;
+    if (!P || P.on === on || this._painting) return;
+    this._painting = true;
+    const ld = document.getElementById('loading'), msg = document.getElementById('ld-msg'), fill = document.getElementById('ld-fill');
+    const show = (m, f) => { if (msg) msg.textContent = m; if (fill) fill.style.width = Math.round(f * 100) + '%'; };
+    if (ld) { ld.classList.remove('done'); show(on ? 'Experimental graphics' : 'Back to the city', 0.05); await new Promise(r => setTimeout(r, 750)); }   // (the screen is up before the work starts)
+    try { await P.set(on, show); } catch (e) { console.warn('painted', e); }
+    finally { this._painting = false; if (ld) ld.classList.add('done'); }
   }
   begin() {
     this.leaveFree();
