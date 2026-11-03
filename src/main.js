@@ -365,7 +365,7 @@ async function main() {
     renderer.toneMappingExposure *= EXPO;
     if (game.weather && !(game.interiors && game.interiors.inside)) game.weather.apply(dt, sky, scene, renderer, camera);
     // the jhola's studio light: everything but you falls into the dark
-    { const st = game.jhola ? game.jhola.studio || 0 : 0;
+    { const st = game.jhola ? game.jhola.lit || 0 : 0;
       if (st > 0.001) { sky.sun.intensity *= 1 - 0.88 * st; sky.hemi.intensity *= 1 - 0.82 * st; scene.environmentIntensity = 0.35 * (1 - 0.75 * st); game._studioWas = true; }
       else if (game._studioWas) { scene.environmentIntensity = 0.35; game._studioWas = false; } }     // (sky.js's value)
     U.uShopsOpen.value = game.hour > 22.8 || game.hour < 8.5 ? 0.25 : 1;

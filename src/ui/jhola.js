@@ -578,7 +578,7 @@ export class Jhola {
     if (!G.life || !G.player) return;
     if (!this.spot && G.scene) this.makeSpot();
     if (!this.on) {
-      if (this.spot && this.studio > 0.001) this.lightTick(G.player.foot, dt, false);
+      if (this.spot && this.lit > 0.001) this.lightTick(G.player.foot, dt, false);
       // the quick bar keeps up with what you buy and eat
       if ((this._qt = (this._qt || 0) - dt) <= 0) { this._qt = 0.5; const sig = JSON.stringify([G.life.s.quick || [], G.life.s.inv]); if (sig !== this._qsig) { this._all = null; this.paintQuick(); } }
       if (this.queue.length && G.state === 'play') this.renderOne();
@@ -648,13 +648,13 @@ export class Jhola {
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
     this.dust.frustumCulled = false; this.dust.visible = false;
     G.scene.add(this.beam, this.dust);
-    this.studio = 0;
+    this.lit = 0;           // (how far up the light is, 0 to 1; this.studio is the photo studio for your clothes)
   }
   // the beam, the dust and the lights on you (every frame while the jhola's open, and fading out after)
   lightTick(F, dt, on) {
     const y = F.y || 0, fx = Math.cos(F.yaw), fz = Math.sin(F.yaw);
-    this.studio += ((on ? 1 : 0) - this.studio) * (1 - Math.exp(-dt * (on ? 2.2 : 4)));
-    const s = this.studio, L = this.spot, lx = F.x + fx * 0.7, ly = y + 6.2, lz = F.z + fz * 0.7;
+    this.lit += ((on ? 1 : 0) - this.lit) * (1 - Math.exp(-dt * (on ? 2.2 : 4)));
+    const s = this.lit, L = this.spot, lx = F.x + fx * 0.7, ly = y + 6.2, lz = F.z + fz * 0.7;
     L.position.set(lx, ly, lz); this.spotT.position.set(F.x, y + 0.2, F.z); this.spotT.updateMatrixWorld();
     L.intensity = 190 * s; L.shadow.camera.far = s > 0.01 ? 12 : 0.05; L.shadow.camera.updateProjectionMatrix();
     this.rim.position.set(F.x - fx * 2.4, y + 3.2, F.z - fz * 2.4); this.rimT.position.set(F.x, y + 1.3, F.z); this.rimT.updateMatrixWorld();
