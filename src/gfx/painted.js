@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 
 const S = { on: false, epoch: 0 };
+export const paintedOn = () => S.on;
 
 // A material only rebuilds its program when its version changes, and only gets a new one when its program key does.
 // Both carry the look, so every material follows it, even those that aren't in the scene when the look changes
@@ -120,7 +121,7 @@ void main(){
   c*=1.+(Tm-.5)*.2;
   c=mix(c,c*1.08+vec3(.06,.055,.045),smoothstep(.66,.72,sk)*.4*far);
   h=clamp(h,0.,1.)*(1.-smoothstep(90.,220.,z));
-  c=mix(c,c*vec3(.58,.58,.66),h*.45);
+  c=mix(c,c*vec3(.6,.6,.68),h*.36);
   // ink: the line, and a lighter second try beside it
   float e=crease(uv+wob*.6,1.*dpr);
   vec2 w2=(vec2(vn(fp*.035+20.),vn(fp*.035+31.))-.5)*px*5.*dpr; float e2=crease(uv+w2,.8*dpr);

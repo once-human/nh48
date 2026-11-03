@@ -3,6 +3,8 @@
 // Poly Haven CC0 PBR sets packed into texture arrays (albedo / normal / AO-rough-metal).
 import * as THREE from 'three';
 import { U } from './materials.js';
+import { paintedOn } from './painted.js';
+import { paintSurface } from './paintSurfaces.js';
 
 // ---------------------------------------------------------------- shared GLSL
 const NOISE = `
@@ -20,7 +22,7 @@ mat3 nhTangentFrame(vec3 eye, vec3 N, vec2 uv) {
 `;
 
 function patch(mat, key, fn) {
-  mat.onBeforeCompile = (sh) => fn(sh);
+  mat.onBeforeCompile = (sh) => { fn(sh); if (paintedOn()) paintSurface(sh, key); };   // Experimental graphics: painted surfaces
   mat.customProgramCacheKey = () => key;
   return mat;
 }
