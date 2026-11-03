@@ -316,7 +316,9 @@ export class People {
   }
   spawnAnimals() {
     const r = this.rng;
-    const edges = this.g.liveEdges.filter(e => e.rank >= 2 && e.rank <= 4 && e.len > 30);
+    let edges = this.g.liveEdges.filter(e => e.rank >= 2 && e.rank <= 4 && e.len > 30);
+    if (!edges.length) edges = this.g.liveEdges.filter(e => e.len > 12);         // (you saved in a lane: only its tiles are in yet)
+    if (!edges.length) return;
     for (let k = 0; k < 14; k++) {
       const e = r.pick(edges), s = r.range(5, e.len - 5), side = r.chance(0.5) ? 1 : -1;
       const cow = k < 6;
