@@ -1,7 +1,7 @@
 // What's in your hand, held the way a hand holds it. The torch sits in your grip, not floating off the wrist; the arm
 // points it where you look only as far as an arm goes (about 60 degrees either side of your chest, a little up, more
 // down); look further and your body turns with you. The beam comes out of the torch, the way the torch points, not
-// out of the camera.
+// out of the camera. (Which hand punches with the torch up: game/fists.js.)
 import * as THREE from 'three';
 import { Lights } from '@orig/game/lights.js';
 import { ikArm } from '@orig/people/humans.js';
@@ -56,39 +56,4 @@ Lights.prototype.update = function (dt, night) {
   t.position.copy(_h);
   t.target.position.set(_h.x + this.aim.x*10, _h.y + this.aim.y*10, _h.z + this.aim.z*10);
   t.target.updateMatrixWorld();
-};
-
-// ---------------------------------------------------------------- fists
-// Which arm each punch throws, read off the clips themselves (how far each arm's bones swing). With the torch up in
-// your right hand only the left-hand punches come; and every punch turns you square to whoever you're hitting.
-import { Brawl } from '@orig/people/fight.js';
-const swing = (clip, side) => {
-  let m = 0;
-  for (const t of clip.tracks) {
-    if (!t.name.endsWith('.quaternion') || !new RegExp(`(upperarm|lowerarm)_${side}\\.`).test(t.name)) continue;
-    const v = t.values, n = v.length/4;
-    for (let i = 0; i < n; i += 2) for (let j = i + 2; j < n; j += 2) { const d = Math.abs(v[i*4]*v[j*4] + v[i*4 + 1]*v[j*4 + 1] + v[i*4 + 2]*v[j*4 + 2] + v[i*4 + 3]*v[j*4 + 3]); m = Math.max(m, 2*Math.acos(Math.min(1, d))); }
-  }
-  return m;
-};
-let HANDS = null;
-function hands(kit) {
-  if (HANDS || !kit || !kit.clips) return HANDS;
-  HANDS = {};
-  for (const n of ['punch', 'cross', 'hook']) { const c = kit.clips[n]; if (c) { const l = swing(c, 'l'), r = swing(c, 'r'); HANDS[n] = l > r*1.2 ? 'l' : r > l*1.2 ? 'r' : 'both'; } }
-  return HANDS;
-}
-const attack = Brawl.prototype.attack;
-Brawl.prototype.attack = function () {
-  const P = this.P, G = this.g, busyR = !!(G.lights && G.lights.torchOn && P.onFoot && G.lights.tm && G.lights.tm.visible);
-  const H = hands(G.W && G.W.kit);
-  if (busyR && H) {
-    // only what the free hand throws, in turn
-    const free = ['punch', 'cross', 'hook'].filter(n => H[n] === 'l');
-    if (free.length) { const want = free[(this._lc = ((this._lc ?? -1) + 1) % free.length)]; this.combo = ['punch', 'cross', 'hook'].indexOf(want); this.comboT = 1; }
-  }
-  const r = attack.call(this);
-  const A = P.act, T = A && A.target, F = P.foot;
-  if (T && F) F.yaw = Math.atan2(T.z - F.z, T.x - F.x);
-  return r;
 };
