@@ -54,6 +54,7 @@ export function buildChunk(job, area, kind = 'base') {
   const cells = [];
   if (kind === 'near') {
     const bs = [0, 1, 2, 3].map(() => new WB(2048)), cbs = [0, 1, 2, 3].map(() => new WB(256));
+    for (const w of bs) w.rich = job.rich ?? 1;
     blds(job, area, bs, cbs);
     if (job.foot) { try { footpath(job.foot, area, (x, z) => bs[cellOf(job, x, z)]); } catch (e) { if (globalThis.BETA_THROW) throw e; } }
     for (let c = 0; c < 4; c++) cells.push({ main: pk(bs[c]), cut: pk(cbs[c]) });
@@ -201,10 +202,12 @@ function edge(b, cb, G, F, i, len, fl, ctx) {
   // the wall itself (back walls: the shader paints their windows)
   if (L.wk === K.curtain && !blank) { b.set(K.curtain, L.wall, L.wear, wseed); F.rect(b, 0, len, y0, wallTop - 0.9, 0); b.set(K.cladding, L.wall, L.wear); F.rect(b, 0, len, wallTop - 0.9, wallTop, 0); }
   else {
-    if (!front && !blank && st !== 8 && st !== 13 && st !== 11 && L.wk !== K.curtain) b.set(K.facadeWin, L.wall, L.wear, wseed + (L.grille ? 8 / 255 : 0));
+    if (!front && !blank && st !== 8 && st !== 13 && st !== 11 && L.wk !== K.curtain && !(b.rich > 1 && len > 2.5)) b.set(K.facadeWin, L.wall, L.wear, wseed + (L.grille ? 8 / 255 : 0));
     else if (L.wk === K.curtain) b.set(K.cladding, L.wall, L.wear);
     F.rect(b, 0, len, y0, wallTop, 0);
   }
+  b.set(L.wk, L.wall, L.wear);
+  structure(b, cb, G, F, i, len, front, blank, y0);
   b.set(L.wk, L.wall, L.wear);
   if (L.accent && front && len > 4 && R() < 0.3) { b.col(L.accent); F.box(b, len - 1.2, len - 0.2, BASE + gh, wallTop, 0, 0.08, 2 | 8); b.col(L.wall); }
   if (!front) {
@@ -246,6 +249,55 @@ function edge(b, cb, G, F, i, len, fl, ctx) {
   // cables along the front of the old streets (and the boxes they end in)
   if (L.wires > 0.5 && len > 3 && R() < L.wires) facadeWires(b, G, F, len);
   if (len > 6) ctx.fronts.push({ F, len, y: BASE + gh + 0.4, top: G.top, w: L.wires, B: G.B });
+}
+// what a wall is really made of, close up: the frame it's built on (columns and beams standing a little proud of the
+// infill), the coping on its parapet, a plinth; a side wall's patched plaster, pipes, vents and meter box. It has
+// chances of its own, so drawing it never changes how the rest of the building comes out.
+function structure(b, cb, G, F, i, len, front, blank, y0) {
+  if (b.lod || !b.rich) return;
+  const { L, gh, fh, levels, top, wallTop, st, B } = G;
+  if (L.wk === K.curtain || st === 8 || st === 13 || st === 11 || st === 7) return;
+  const R = rng((B.seed ^ (i*0x9e3779)) | 0), wall = L.wall, wear = L.wear, shade = mulc(wall, 0.92), lit = mixc(wall, [1, 1, 1], 0.1), frame = L.wk === K.brick ? K.plaster : L.wk === K.stone ? K.stone : K.concrete;
+  // the parapet's coping: a drip edge all along, and a band below it
+  if (wallTop > top + 0.2) { b.set(K.concrete, mulc(wall, 0.84), Math.min(1, wear + 0.15), R()); F.box(b, -0.03, len + 0.03, wallTop - 0.07, wallTop + 0.03, 0, 0.055, 2); F.box(b, 0, len, top - 0.04, top + 0.09, 0, 0.03, 2); }
+  // the floors' beams
+  b.set(frame, lit, wear, R());
+  for (let f = 1; f < levels; f++) { const y = BASE + gh + (f - 1)*fh; if (y >= y0 && y < top - 0.5) F.box(b, 0, len, y - 0.09, y + 0.14, 0, front ? 0.016 : 0.028, 2); }
+  // the columns: at the corners and between the bays
+  const cell = front ? len/Math.max(1, Math.floor(len/L.space + 0.25)) : Math.min(4.2, Math.max(2.8, len/Math.max(1, Math.round(len/3.6)))), nc = Math.max(1, Math.round(len/cell));
+  b.set(frame, shade, wear, R());
+  for (let k = 0; k <= nc; k++) { const u = k*len/nc, w = k === 0 || k === nc ? 0.17 : front ? 0.1 : 0.15; F.box(b, Math.max(0, u - w), Math.min(len, u + w), y0, top - 0.01, 0, front ? 0.024 : 0.034, 2 | 8); }
+  // a plinth where none was drawn
+  if (!front) { b.set(K.concrete, mulc(wall, 0.72), Math.min(1, wear + 0.25), R()); F.box(b, 0, len, 0, BASE + 0.32 + R()*0.2, 0, 0.035, 2 | 8); }
+  if (front) {
+    // an old front's moulded cornice, a new one's plain sunshade band under the parapet
+    if ((L.type === 'peth' || G.type === 'peth' || G.type === 'colonial') && levels > 0 && top > BASE + 3) { b.set(K.plaster, lit, wear, R()); F.box(b, 0, len, top - 0.32, top - 0.2, 0, 0.09, 2); F.box(b, 0, len, top - 0.2, top - 0.12, 0, 0.16, 2); F.box(b, 0, len, top - 0.12, top - 0.04, 0, 0.23, 2); }
+    if (G.type === 'colonial' && b.rich > 1) { b.set(K.plaster, mulc(wall, 0.97), wear, R()); for (const uq of [0, len - 0.42]) for (let y = BASE + 0.5; y < top - 0.5; y += 0.56) F.box(b, uq, uq + (Math.round(y*4)%2 ? 0.42 : 0.3), y, y + 0.26, 0, 0.04, 2); }
+    return;
+  }
+  // the side of a building nobody painted for you
+  // windows of its own
+  if (!blank && b.rich > 1 && len > 2.5) {
+    const keep = G.R; G.R = R; const nb = Math.max(1, Math.floor(len/Math.max(2.6, L.space))), c2 = len/nb, S = STYLE[st] || STYLE[0];
+    for (let f = 0; f < levels; f++) { const fy = f === 0 ? BASE : BASE + gh + (f - 1)*fh, flH = f === 0 ? gh : fh; if (fy + 1.2 > top) break; for (let k = 0; k < nb; k++) { if (R() < 0.18) continue; const ww = Math.min(c2*0.5, G.type === 'vasti' ? 0.7 : Math.max(0.7, S[2]*0.8 || 0.9)), wh = Math.min(flH - 1.1, Math.max(0.8, (S[3] || 1.1)*0.9)); win(b, cb, G, F, (k + 0.5)*c2, fy + (f === 0 ? 1.0 : S[5] || 0.9), ww, wh, f === 0); } }
+    G.R = keep;
+  }
+  // old repairs: a patch of newer plaster, plaster fallen off the brick
+  const np = Math.floor(len*(top - BASE)/(blank ? 14 : 30)*(0.4 + wear)) + (blank ? 1 : 0);
+  for (let k = 0; k < np && k < 14; k++) { const w = 0.4 + R()*R()*3, h = 0.3 + R()*R()*2.4, u = R()*Math.max(0.1, len - w), y = BASE + 0.4 + R()*Math.max(0.1, top - BASE - h - 0.6), brick = R() < wear*0.55;
+    if (brick) { b.set(K.brick, [0.52, 0.3, 0.23], 0.7, R()); F.rect(b, u, u + w, y, y + h, 0.004); F.rect(b, u + w*0.15, u + w*1.1 > len ? len : u + w*1.1, y + h*0.2, y + h*0.8, 0.0045); }
+    else { b.set(K.plaster, mulc(wall, 0.84 + R()*0.28), Math.min(1, wear + 0.2), R()); F.box(b, u, u + w, y, y + h, 0, 0.007, 2 | 8); } }
+  if (len < 3) return;
+  // a soil stack and a rainwater pipe, with collars at every floor, an elbow in at each one
+  const pipes = 1 + (R() < 0.5 ? 1 : 0) + (levels > 3 && R() < 0.5 ? 1 : 0);
+  for (let q = 0; q < pipes; q++) { const u = 0.4 + R()*(len - 0.8), cp = R() < 0.6 ? 0x3a3c3e : R() < 0.5 ? 0xd8d4c8 : 0x1c1c1e, rr = 0.035 + R()*0.03;
+    b.set(K.plain, cp, 0.6, R()); b.cyl(...F.P(u, 0, 0.09).slice(0, 1), BASE, F.P(u, 0, 0.09)[2], rr, rr, top - BASE, 8, 0);
+    for (let f = 0; f < levels; f++) { const y = f === 0 ? BASE + 1 : BASE + gh + (f - 1)*fh + 0.5; if (y > top) break; const p = F.P(u, y, 0.09); b.cyl(p[0], y, p[2], rr + 0.012, rr + 0.012, 0.09, 8, 0); if (R() < 0.5) b.tube(F.P(u + (R() < 0.5 ? -0.5 : 0.5), y + 0.28, 0.02), [p[0], y + 0.03, p[2]], rr*0.7, 5); }
+    const sp = F.P(u, top + 0.04, 0.09); b.tube(sp, [sp[0], top + 0.3, sp[2]], rr, 6); }
+  // a line of vent blocks, a meter box and its cable, a spout's stain
+  if (R() < 0.4 && top > BASE + 4) { b.set(K.plain, 0x1c1a18, 0.4, R()); const u = 0.5 + R()*(len - 1.6), y = BASE + 2 + R()*(top - BASE - 3); for (let a = 0; a < 3; a++) for (let c = 0; c < 2; c++) F.rect(b, u + a*0.15, u + a*0.15 + 0.1, y + c*0.14, y + c*0.14 + 0.09, 0.005); }
+  if (R() < 0.45) { const u = 0.3 + R()*(len - 0.9); b.set(K.metal, 0x5a6060, 0.6, R()); F.box(b, u, u + 0.42, BASE + 1.25, BASE + 1.85, 0, 0.14, 2); b.set(K.metal, 0x3a3f3f, 0.4); F.box(b, u + 0.03, u + 0.39, BASE + 1.3, BASE + 1.8, 0.14, 0.145, 2 | 8 | 4); b.set(K.plain, 0x161414, 0.2); const c0 = F.P(u + 0.2, BASE + 1.85, 0.08), c1 = F.P(u + 0.3, top, 0.06); b.tube(c0, c1, 0.012, 3); }
+  for (let k = 0, nst = 1 + (R()*3 | 0); k < nst; k++) { const u = R()*(len - 0.5); b.set(K.stain, 0x2a2622, 0.8, R()); F.rect(b, u, u + 0.12 + R()*0.3, top - 1.2 - R()*3, top, 0.003); }
 }
 function hasShops(G, i, len) { const ns = Math.max(1, Math.floor(len / SHOP_CELL)); for (let k = 0; k < ns; k++) if (G.shops.has(i * 4096 + k)) return true; return false; }
 

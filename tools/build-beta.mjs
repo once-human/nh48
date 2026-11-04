@@ -35,6 +35,7 @@ if (process.env.NH_LOCAL) {
 // importer (or '*' for any importer outside src/beta) -> original module -> its /beta stand-in
 const SWAPS = [
   ['*', S('gfx/textures.js'), S('beta/gfx/textures.js')],
+  ['*', S('world/landmarks.js'), S('beta/world/landmarks.js')],
   [S('world/world.js'), S('world/buildingsChunk.js'), S('beta/world/buildings.js')],
   [S('world/world.js'), S('world/groundChunk.js'), S('beta/world/ground.js')],
   [S('world/world.js'), S('gfx/pbr.js'), S('beta/gfx/pbr.js')],

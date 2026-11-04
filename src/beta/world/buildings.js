@@ -158,7 +158,7 @@ function jobOf(W, C, kind) {
     if (sh) for (const [key, s] of sh) { const nm = index.shopNames[s[3]]; shops.push([key, nm ? nm[2] : 'generic', nm ? nm[3] || '' : '']); }
     blds.push({ bi, ring: cmRing(ringCm), levels: B[2], style: B[3], roof: B[4], flags: B[5], y: B.y || 0, seed: hash2(ringCm[0] * 31 + ringCm[1] * 17, bi) | 0, shops });
   }
-  return { cx: C.cx, cz: C.cz, blds, foot: kind === 'near' ? footJob(C) : null };
+  return { cx: C.cx, cz: C.cz, blds, rich: painter.rich ?? 1, foot: kind === 'near' ? footJob(C) : null };
 }
 // made here (no workers)
 function drawHere(W, C, kind) { const t0 = performance.now(); const out = buildChunk(jobOf(W, C, kind), painter.area, kind); W.paintMs = performance.now() - t0; return out; }

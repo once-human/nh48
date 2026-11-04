@@ -56,6 +56,7 @@ export function footpath(F, area, b) {
       const ax = p[k], az = p[k + 1], bx = p[k + 2], bz = p[k + 3], L = Math.hypot(bx - ax, bz - az);
       if (L < 0.3) continue;
       const tx = (bx - ax) / L, tz = (bz - az) / L, nx = -tz, nz = tx;      // n: away from the road, into the footpath
+      if (b(ax, az).rich) kerbSide(b, R, ax, az, tx, tz, nx, nz, L, Y, onPath, broken, mess);
       let s = carry;
       while (s < L) {
         const x = ax + tx * s, z = az + tz * s;
@@ -67,6 +68,67 @@ export function footpath(F, area, b) {
   }
 }
 
+// the kerb itself, stone by stone (each with its own colour, height and lean, its road edge chamfered), and what
+// collects along it: the storm drain's grates, tar patches, cracks, litter in the gutter, the paving a little uneven.
+function kerbSide(b, R, ax, az, tx, tz, nx, nz, L, Y, onPath, broken, mess) {
+  const P = (x, z, d, y) => [x + nx * d, y, z + nz * d];
+  for (let s = 0; s < L;) {
+    const len = Math.min(0.5 + R() * 0.5, L - s); if (len < 0.08) break;
+    const x0 = ax + tx * (s + 0.005), z0 = az + tz * (s + 0.005), x1 = ax + tx * (s + len - 0.005), z1 = az + tz * (s + len - 0.005), w = b(x0, z0);
+    const tone = 0.74 + R() * 0.34, c = [0.58 * tone, 0.57 * tone, 0.53 * tone], top = Y + 0.002 + R() * 0.016 * (1 + broken), lean = R() * 0.01, ch = 0.028;
+    w.set(K.concrete, c, 0.45 + R() * 0.5, R());
+    w.quad(P(x0, z0, -0.032, 0), P(x1, z1, -0.032, 0), P(x1, z1, -0.032, top - ch), P(x0, z0, -0.032, top - ch), [-nx, 0, -nz]);
+    w.quad(P(x0, z0, -0.032, top - ch), P(x1, z1, -0.032, top - ch), P(x1, z1, -0.004, top), P(x0, z0, -0.004, top), [-nx * 0.7, 0.7, -nz * 0.7]);
+    w.quad(P(x0, z0, -0.004, top), P(x1, z1, -0.004, top), P(x1, z1, 0.15, top - lean), P(x0, z0, 0.15, top - lean), [0, 1, 0]);
+    w.quad(P(x0, z0, 0.15, top - lean), P(x1, z1, 0.15, top - lean), P(x1, z1, 0.15, Y - 0.01), P(x0, z0, 0.15, Y - 0.01), [nx, 0, nz]);
+    w.quad(P(x1, z1, -0.032, 0), P(x1, z1, 0.15, 0), P(x1, z1, 0.15, top - lean), P(x1, z1, -0.032, top), [tx, 0, tz]);
+    w.quad(P(x0, z0, -0.032, 0), P(x0, z0, 0.15, 0), P(x0, z0, 0.15, top - lean), P(x0, z0, -0.032, top), [-tx, 0, -tz]);
+    s += len;
+  }
+  const RY = 0.016;
+  // grates in the gutter
+  for (let s = 3 + R() * 14; s < L - 0.7; s += 14 + R() * 26) {
+    const x = ax + tx * s - nx * 0.24, z = az + tz * s - nz * 0.24, w = b(x, z), yaw = Math.atan2(tz, tx);
+    w.set(K.concrete, 0x5a5854, 0.7, R()); w.ybox(x, 0.004, z, 0.96, RY + 0.006, 0.42, yaw, 8);
+    w.set(K.plain, 0x0c0c0c, 0.2); w.ybox(x, 0.006, z, 0.82, RY + 0.009, 0.3, yaw, 8);
+    w.set(K.metal, 0x34302c, 0.8, R()); for (let k = -3; k <= 3; k++) w.ybox(x + tx * k * 0.11, 0.008, z + tz * k * 0.11, 0.04, RY + 0.014, 0.31, yaw, 8);
+  }
+  // tar patches and cracks on the road, cracks in the paving
+  for (let s = R() * 18; s < L; s += 8 + R() * (28 - broken * 14)) {
+    const d = -(0.3 + R() * 2.6), x = ax + tx * s + nx * d, z = az + tz * s + nz * d, w = b(x, z);
+    if (R() < 0.45) { w.set(K.oldRoad, R() < 0.5 ? 0x2e2e30 : 0x3e3c3a, 0.5 + R() * 0.5, R()); ragged(w, x, 0.011 + R() * 0.003, z, 0.7 + R() * 3, 0.5 + R() * 1.4, Math.atan2(tz, tx), R, 12); }
+    else crack(w, R, x, 0.013, z, 3 + R() * 5);
+  }
+  for (let s = R() * 12; s < L; s += 6 + R() * 16) {
+    const d = 0.25 + R() * 2.2, x = ax + tx * s + nx * d, z = az + tz * s + nz * d; if (onPath(x, z)) crack(b(x, z), R, x, Y + 0.004, z, 2 + R() * 4);
+  }
+  // litter: along the gutter mostly
+  const LIT = [0xe8e4d8, 0xe8e4d8, 0xc9c0ac, 0xd83a2a, 0x2a5ab8, 0xf2c230, 0x3a8a2a, 0x7a5a3a, 0x9a7a4a];
+  for (let s = R() * 2; s < L; s += 0.5 + R() * (4.5 - mess * 3.2)) {
+    const onRoad = R() < 0.72, d = onRoad ? -(0.05 + R() * R() * 0.8) : 0.2 + R() * 2, x = ax + tx * s + nx * d, z = az + tz * s + nz * d, y = onRoad ? RY : Y + 0.004;
+    if (!onRoad && !onPath(x, z)) continue;
+    const w = b(x, z), r = R();
+    if (r < 0.55) { const a = R() * 6.28, c = Math.cos(a), si = Math.sin(a), hu = 0.03 + R() * 0.07, hv = 0.02 + R() * 0.05, lift = 0.004 + R() * 0.012; w.set(K.plain, LIT[(R() * LIT.length) | 0], 0.6, R()); w.quad([x - c * hu - si * hv, y, z - si * hu + c * hv], [x + c * hu - si * hv, y + lift, z + si * hu + c * hv], [x + c * hu + si * hv, y, z + si * hu - c * hv], [x - c * hu + si * hv, y + lift * 0.5, z - si * hu - c * hv], [0, 1, 0]); }
+    else if (r < 0.85) { w.set(K.leaf, R() < 0.5 ? 0x7a5a2a : 0x5a4a22, 0.5, R()); for (let k = 0; k < 3; k++) { const a = R() * 6.28, q = 0.04 + R() * 0.03, ox = (R() - 0.5) * 0.2, oz = (R() - 0.5) * 0.2; w.tri([x + ox, y + 0.002, z + oz], [x + ox + Math.cos(a) * q, y + 0.002, z + oz + Math.sin(a) * q], [x + ox + Math.cos(a + 1.2) * q, y + 0.012, z + oz + Math.sin(a + 1.2) * q], [0, 1, 0]); } }
+    else if (r < 0.93) { const a = R() * 6.28; w.set(K.plain, R() < 0.5 ? 0xa8c8d8 : 0xdcdcd4, 0.2, R()); w.tube([x, y + 0.03, z], [x + Math.cos(a) * 0.2, y + 0.03, z + Math.sin(a) * 0.2], 0.03, 6); }
+    else { w.set(K.stone, 0x6a665e, 0.5, R()); w.blob(x, y, z, 0.03 + R() * 0.05, 0.02 + R() * 0.03, 0.03 + R() * 0.04, 5); }
+  }
+  // the paving, a paver here and there sitting proud of the rest (every one, in Ultra)
+  if (b(ax, az).rich > 1) for (let s = 0; s < L; s += 0.5 + R() * 0.9) {
+    const x = ax + tx * s + nx * (0.25 + R() * 2.3), z = az + tz * s + nz * (0.25 + R() * 2.3); if (!onPath(x, z)) continue;
+    const w = b(x, z); w.set(K.paver, 0x9a8a78, 0.5 + R() * 0.4, R()); w.ybox(x, Y - 0.01, z, 0.215, Y + 0.002 + R() * 0.012, 0.105, Math.atan2(tz, tx) + (R() < 0.5 ? 0 : Math.PI / 2) + (R() - 0.5) * 0.08, 8);
+  }
+}
+// a patch with a torn edge
+function ragged(b, x, y, z, w, d, yaw, R, n) { blobPatch(b, x, y, z, w, d, yaw, R, n); }
+// a crack: a thin dark line wandering across a surface, with a branch
+function crack(b, R, x, y, z, len) {
+  b.set(K.stain, 0x121110, 0.8, R());
+  let a = R() * 6.28, px = x, pz = z; const n = Math.ceil(len / 0.35);
+  for (let i = 0; i < n; i++) { a += (R() - 0.5) * 1.1; const q = 0.2 + R() * 0.3, qx = px + Math.cos(a) * q, qz = pz + Math.sin(a) * q, w = 0.007 + R() * 0.012, ox = -Math.sin(a) * w, oz = Math.cos(a) * w; b.quad([px - ox, y, pz - oz], [qx - ox, y, qz - oz], [qx + ox, y, qz + oz], [px + ox, y, pz + oz], [0, 1, 0]);
+    if (R() < 0.18) { const b2 = a + (R() < 0.5 ? 1 : -1) * (0.6 + R()), ex = px + Math.cos(b2) * 0.3, ez = pz + Math.sin(b2) * 0.3; b.quad([px - ox * 0.6, y, pz - oz * 0.6], [ex, y, ez], [ex, y, ez], [px + ox * 0.6, y, pz + oz * 0.6], [0, 1, 0]); }
+    px = qx; pz = qz; }
+}
 // one thing on the footpath at (x, z), the kerb running along t; returns how far to the next
 function thing(b, R, x, z, tx, tz, nx, nz, onPath, broken, mess, A, Y) {
   const r = R();

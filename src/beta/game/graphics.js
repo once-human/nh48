@@ -37,6 +37,7 @@ export const SETTINGS = [
   { id: 'mb', label: 'Motion blur', sub: 'Samples, from the camera moving', side: 'gpu', w: 1, val: [0, 0, 0, 0, 6, 16], fmt: (v) => onOff(v, x => x + ' samples'), apply: (G, v, C) => fx(C, { mb: v }) },
   { group: 'World' },
   { id: 'dist', label: 'View distance', sub: 'How much of the city is built around you', side: 'both', w: 2, val: [260, 360, 520, 720, 1000, 1400], fmt: M, apply: (G, v) => G.W.streamer.setRadius(v) },
+  { id: 'geo', label: 'World geometry', sub: 'Walls, kerbs and roads close up. Applies to what gets built as you move', fixed: true, val: [0, 0, 1, 1, 2, 2], fmt: (v) => ['Standard', 'Structured', 'Every window and stone'][v], apply: (G, v) => { if (G.W && G.W.painter) { G.W.painter.rich = v; G.W.painter.geoAt = (G.W.painter.geoAt || 0) + 1; } } },
   { id: 'vdist', label: 'Vehicle detail', sub: 'How far the full models go', side: 'gpu', w: 3, val: [15, 30, 50, 80, 120, 200], fmt: M, apply: (G, v) => G.setVehicleDetail(v) },
   { id: 'trees', label: 'Trees', sub: 'Full trees to, then any trees to', side: 'gpu', w: 3, val: [[14, 60, 300], [26, 100, 450], [50, 180, 700], [90, 320, 1100], [130, 480, 1500], [200, 700, 2000]], fmt: (v) => v[1] + ' m / ' + v[2] + ' m', apply: (G, v) => { const T = G.W.trees; if (T) { T.nearR = v[0]; T.midR = v[1]; T.R = v[2]; T.lastX = 1e9; } } },
   { id: 'grass', label: 'Grass', sub: 'How far it is drawn', side: 'gpu', w: 2, val: [0, .35, .7, 1, 1.4, 2], fmt: (v) => (v ? Math.round(v*64) + ' m' : 'Off'), apply: (G, v) => { if (G.W.grass) G.W.grass.level = v; } },
