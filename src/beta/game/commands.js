@@ -38,6 +38,19 @@ export function freeTerminal(G) {
   const binds = keep.bind || {}, autoexec = keep.autoexec || [];
   const persist = () => { try { localStorage.setItem(STORE, JSON.stringify({ alias: sh.userAlias, bind: binds, autoexec })); } catch (e) { /* private window */ } };
   const P = () => G.player, T = () => G.traffic, W = () => G.W;
+  // real Earth coordinates: the city is laid out from OSM, so every point has its own latitude and longitude
+  const meta = () => W().M.meta;
+  const toLL = (x, z) => { const m = meta(); return { lat: m.lat0 - z / m.mlat, lon: m.lon0 + x / m.mlon }; };
+  const fromLL = (lat, lon) => { const m = meta(); return { x: (lon - m.lon0)*m.mlon, z: -(lat - m.lat0)*m.mlat }; };
+  const ll = (x, z, d = 5) => { const q = toLL(x, z); return `${Math.abs(q.lat).toFixed(d)}°${q.lat >= 0 ? 'N' : 'S'} ${Math.abs(q.lon).toFixed(d)}°${q.lon >= 0 ? 'E' : 'W'}`; };
+  // "18.5204 73.8567", "18.5204, 73.8567" (as Google Maps copies it) or "18.5204N 73.8567E"
+  const readLL = (a) => {
+    const t = a.join(' ').replace(/[°,]/g, ' ').trim().split(/\s+/);
+    if (t.length !== 2) return null;
+    const num = (v, pos, neg) => { const m = /^(-?\d+(?:\.\d+)?)([a-z])?$/i.exec(v); if (!m) return NaN; const n = +m[1], h = (m[2] || '').toUpperCase(); return h === neg ? -n : (h && h !== pos ? NaN : n); };
+    const lat = num(t[0], 'N', 'S'), lon = num(t[1], 'E', 'W');
+    return lat > 17.5 && lat < 19.5 && lon > 73 && lon < 75 ? { lat, lon } : null;
+  };
   const St = { flight: null, flySpeed: 1, fov: 0, god: false, noclip: false, fuel: false, hourLock: null, scale: 1, fly: null, watches: [], timers: [], spawned: [], rates: {}, baseW: null, baseMax: 0, hud: false, wasFree: true, foot: 1 };
   let armed = false;
 
@@ -67,6 +80,7 @@ export function freeTerminal(G) {
     if (s[0] === '@') { const t = vehType(s.slice(1)), o = nearest(t); if (!o) throw new Error(`no ${t} in traffic right now. Try: rate ${t} 200; traffic flush`); return { x: o.x, z: o.z, name: 'nearest ' + t, keep: true }; }
     if (s[0] === '#') { const p = found[+s.slice(1)]; if (!p) throw new Error('nothing at that number. Run: find <name>'); return { x: p.x, z: p.z, name: p.n, safe: true }; }
     const num = (v, base) => { const r = v[0] === '~'; const n = r ? (v.length > 1 ? +v.slice(1) : 0) : +v; return Number.isFinite(n) ? (r ? base + n : n) : NaN; };
+    const q = readLL(a); if (q) { const p = fromLL(q.lat, q.lon); return { x: p.x, z: p.z, name: `${q.lat.toFixed(5)}, ${q.lon.toFixed(5)}`, safe: true }; }
     if (s[0] === '^' && a[1] && a[1][0] === '^') { const c = Math.cos(P().th), n = Math.sin(P().th), R = +a[0].slice(1) || 0, F = +a[1].slice(1) || 0; return { x: P().x + c*F - n*R, z: P().z + n*F + c*R, name: 'relative' }; }
     if (a.length >= 2 && !Number.isNaN(num(a[0], 0)) && !Number.isNaN(num(a[1], 0))) return { x: num(a[0], P().x), z: num(a[1], P().z), name: `${a[0]} ${a[1]}` };
     const hit = search(a.join(' '), 1)[0];
@@ -255,16 +269,20 @@ export function freeTerminal(G) {
   }, { group: 'vehicles' });
 
   // ------------------------------------------------------------ where you are
-  sh.reg('tp <where:place|at> [z:str...]', 'teleport. Names, x z, ~dx ~dz, ^right ^forward, @super, @wp, #n from find', async (a) => { const t = target(a), r = await go(t); say(`${t.name || ''} (${r.x.toFixed(1)}, ${r.z.toFixed(1)})`, 'ok'); }, { group: 'world', more: ['tp fc road', 'tp ~ ~200', 'tp ^0 ^50', 'tp @super'] });
+  sh.reg('tp <where:place|at> [z:str...]', 'teleport. Names, lat lon, game x z, ~dx ~dz, ^right ^forward, @super, @wp, #n from find', async (a) => { const t = target(a), r = await go(t); say(`${t.name || ''}  ${ll(r.x, r.z)}`, 'ok'); }, { group: 'world', more: ['tp 18.51962, 73.84106   (real coordinates, as Google Maps copies them)', 'tp fc road', 'tp ~ ~200', 'tp ^0 ^50', 'tp @super'] });
+  sh.reg('gmaps', 'open where you are in Google Maps', () => { const q = toLL(P().x, P().z); window.open(`https://www.google.com/maps/@${q.lat.toFixed(6)},${q.lon.toFixed(6)},19z`, '_blank'); say(ll(P().x, P().z, 6), 'ok'); }, { group: 'world' });
   sh.reg('find <name:place> [more:str...]', 'search every place in Pune', (a) => {
     found = search(a.join(' '), 15);
     if (!found.length) { say('nothing'); return; }
-    sh.table(found.map((p, i) => ['#' + i, p.n, p.c, Math.round(Math.hypot(p.x - P().x, p.z - P().z)) + ' m', `${p.x.toFixed(0)} ${p.z.toFixed(0)}`]));
+    sh.table(found.map((p, i) => ['#' + i, p.n, p.c, Math.round(Math.hypot(p.x - P().x, p.z - P().z)) + ' m', ll(p.x, p.z)]));
     say('tp #0 goes to the first.', 'dim');
   }, { group: 'world' });
   sh.reg('where', 'your position, road, area', () => {
     const Pl = P(), e = W().graph?.nearest?.(Pl.x, Pl.z, 40), name = e && W().graph.names?.[e.e?.name]?.[0];
-    say(`x ${Pl.x.toFixed(1)}  z ${Pl.z.toFixed(1)}  y ${Pl.y.toFixed(2)}  th ${Pl.th.toFixed(3)}  ${Pl.onFoot ? 'on foot' : Pl.cur.type}`);
+    const q = toLL(Pl.x, Pl.z);
+    say(`${ll(Pl.x, Pl.z, 6)}   ${Math.round(((Math.PI/2 + Pl.th)*180/Math.PI % 360 + 360) % 360)}° heading   ${Pl.onFoot ? 'on foot' : Pl.cur.type}`);
+    say(`game x ${Pl.x.toFixed(1)}  z ${Pl.z.toFixed(1)}  y ${Pl.y.toFixed(2)}`, 'dim');
+    try { navigator.clipboard?.writeText(`${q.lat.toFixed(6)}, ${q.lon.toFixed(6)}`); say('copied: paste it into Google Maps', 'dim'); } catch (e) { /* no clipboard */ }
     const z = T().zoneAt?.(Pl.x, Pl.z); say(`${name || 'off-road'} · traffic zone: ${z || 'ordinary'}`, 'dim');
   }, { group: 'world' });
   sh.reg('time [when:str]', 'set the hour: 21:30 or 21.5. "time lock" holds it, "time unlock" lets it go', ([w]) => {
@@ -396,7 +414,7 @@ export function freeTerminal(G) {
 
   // ------------------------------------------------------------ the terminal and its readout
   const term = new Terminal(sh, {
-    status: () => { const Pl = P(), hh = G.hour || 0, two = (n) => String(Math.floor(n)).padStart(2, '0'); return `x ${Math.round(Pl.x)}  z ${Math.round(Pl.z)}   ${two(hh)}:${two(hh%1*60)}   ${Math.round(fps.cur)} fps   ${Pl.onFoot ? 'on foot' : Pl.cur.type}   traffic ${T().list.length}/${T().max}   ${G.weather?.kind || ''}`; },
+    status: () => { const Pl = P(), hh = G.hour || 0, two = (n) => String(Math.floor(n)).padStart(2, '0'); return `${ll(Pl.x, Pl.z)}   ${two(hh)}:${two(hh%1*60)}   ${Math.round(fps.cur)} fps   ${Pl.onFoot ? 'on foot' : Pl.cur.type}   traffic ${T().list.length}/${T().max}   ${G.weather?.kind || ''}`; },
     onOpen: () => { G.input?.keys?.clear(); G.input?.pressed?.clear(); G.releaseMouse?.(); },
     onClose: () => { G.input?.keys?.clear(); G.input?.pressed?.clear(); G.lockMouse?.(); },
   });
@@ -412,7 +430,7 @@ export function freeTerminal(G) {
     const hh = G.hour || 0, lines = [
       `${fps.cur.toFixed(0).padStart(3)} fps  ${fps.ms.toFixed(1)} ms  worst ${fps.worst.toFixed(1)} ms`,
       `calls ${n(s.calls)}  tris ${n(s.tris)}  chunks ${n(s.chunks)}`,
-      `xz ${Pl.x.toFixed(0)} ${Pl.z.toFixed(0)}  ${(Math.abs(Pl.v || 0)*3.6).toFixed(0)} km/h  ${Pl.onFoot ? 'foot' : Pl.cur.type}`,
+      `${ll(Pl.x, Pl.z)}  ${(Math.abs(Pl.v || 0)*3.6).toFixed(0)} km/h  ${Pl.onFoot ? 'foot' : Pl.cur.type}`,
       `${String(Math.floor(hh)).padStart(2, '0')}:${String(Math.floor(hh%1*60)).padStart(2, '0')}${St.hourLock !== null ? ' lock' : ''}  ${G.weather?.kind || ''}  traffic ${T().list.length}/${T().max}${St.scale !== 1 ? `  ${St.scale}×` : ''}`,
     ];
     const flags = [St.god && 'god', St.noclip && 'noclip', St.flight && 'flying', St.fly && 'freecam', St.foot !== 1 && `run ${St.foot}×`, Object.keys(St.rates).length && `rates ${Object.entries(St.rates).map(([k, v]) => `${k}:${v}`).join(' ')}`].filter(Boolean);
