@@ -9,6 +9,7 @@ import { People } from '@orig/people/peds.js';
 import { KbNav } from '@orig/ui/kbnav.js';
 import { CAST } from '@orig/people/cast.js';
 import { who } from './ask.js';
+import { outing } from './outing.js';
 
 const one = (rng, a) => a[Math.floor(rng.next()*a.length)];
 const WHO = { kaka: 'Kaka', ajoba: 'Ajoba', dada: 'Dada', kaku: 'Kaku', aaji: 'Aaji', tai: 'Tai', bhaiya: 'Bhaiya', collegeboy: 'A college guy', collegegirl: 'A college girl', aunty: 'Aunty', kpguy: 'A KP guy', kpgirl: 'A KP girl' };
@@ -186,6 +187,8 @@ class Talk {
     this._t = performance.now() + 600;
     // in a vehicle: your passenger, else whoever is at your window
     if (!P.onFoot) {
+      const o = outing();
+      if (o && o.ride && o.p && G.date) { G.date.talk(o.p, o.p._room); return true; }
       const f = G.rides && G.rides.current;
       if (f && f.state === 'onboard') return this.open(f.p || { persona: f.persona, female: f.fem, name: f.name, id: 0 }, null, 'fare', f);
       const v = P.cur; if (!v || Math.abs(P.v || 0) > 4) return false;
@@ -206,7 +209,11 @@ class Talk {
       if (best.dateWith && G.date) { G.date.talk(best, C); return true; }
       return this.open(best, C);
     }
+    // the one you're out with, right beside you (not in front): them first
+    const o = outing();
+    if (o && o.met && o.p && !o.p.hidden && Math.hypot(o.p.x - P.x, o.p.z - P.z) < 3 && G.date) { G.date.talk(o.p, o.p._room); return true; }
     const p = who(G.people, P);
+    if (p && p.dateWith && G.date) { G.date.talk(p, p._room); return true; }
     return p ? this.open(p, null) : false;
   }
   // who they are where you found them

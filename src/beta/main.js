@@ -25,6 +25,7 @@ import './vehicles/physics.js';
 import './traffic/rates.js';
 import './game/prompt2.js';
 import './game/ask.js';           // what people tell you: the way, food, where you are, a lift
+import './game/outing.js';
 import './game/talk.js';          // T at anyone: talk
 import './game/hands.js';
 import './game/fists.js';
