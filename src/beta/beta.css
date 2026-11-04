@@ -7,17 +7,17 @@
 .g-sec[hidden] { display: none !important; }
 .g-head { margin: 16px 0 4px; font: 700 12px var(--font-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--tx3); }
 #fps-counter { position: fixed; top: 58px; right: 18px; z-index: 40; padding: 5px 9px; border-radius: 8px; background: rgba(0, 0, 0, .55); color: #9dffb0; font: 600 12px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre; pointer-events: none; text-align: right; }
-/* free roam's terminal, in the portfolio's language: paper, ink, one quiet grey, no accent. Big lowercase word, the rest set
+/* free roam's terminal, in the portfolio's language turned dark: ink sheet, paper type, one quiet grey, no accent. Big lowercase word, the rest set
    in mono like a real terminal, hairline rules for the columns. The sheet's top edge is torn like the game's frame. */
-.nhc { --pp: #f6f3ec; --ink: #0d0d0d; --q: #6e6e6e; --rule: rgba(13, 13, 13, .14); --mono: 'JetBrains Mono', 'IBM Plex Mono', 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
-  position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-end; justify-content: center; padding: 0 14px; box-sizing: border-box; background: rgba(8, 8, 8, .28); -webkit-user-select: none; user-select: none; }
+.nhc { --pp: #0c0c0b; --ink: #ecebe6; --q: #7d7c77; --rule: rgba(236, 235, 230, .12); --mono: 'JetBrains Mono', 'IBM Plex Mono', 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
+  position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-end; justify-content: center; padding: 0 14px; box-sizing: border-box; background: rgba(0, 0, 0, .42); -webkit-user-select: none; user-select: none; }
 .nhc *, .nhc *::before { box-sizing: border-box; }
 .nhc[hidden] { display: none; }
-.nhc-card { position: relative; isolation: isolate; width: min(1360px, 100%); height: min(64vh, 640px); min-height: 340px; padding-top: 14px; display: grid; grid-template: auto minmax(0, 1fr) / minmax(0, 1.1fr) minmax(320px, 1fr); color: var(--ink); background: var(--pp); font: 12.5px/1.55 var(--mono); box-shadow: 0 -18px 60px rgba(0, 0, 0, .35);
+.nhc-card { position: relative; isolation: isolate; width: min(1360px, 100%); height: min(64vh, 640px); min-height: 340px; padding-top: 14px; display: grid; grid-template: auto minmax(0, 1fr) / minmax(0, 1.1fr) minmax(320px, 1fr); color: var(--ink); background: var(--pp); font: 12.5px/1.55 var(--mono); box-shadow: 0 -18px 60px rgba(0, 0, 0, .55);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 16' preserveAspectRatio='none'%3E%3Cpath d='M0 16V9l7-2 6 3 9-4 8 2 5-3 10 4 7-2 9 1 6-4 8 3 10-1 5 3 9-4 7 2 11-3 6 4 8-1 9-3 6 3 10-2 7 3 8-4 9 2 6-1 10 3 7-4 9 3 5-2 11 2 6-3 8 4 10-3 7 2 9-2 6 3 8-4 10 3 6-1 9 2 7-3 8 2 11-1 5-3 9 4 7-2 8 2 10-4 6 3 9-1 7 2 8-3 10 3 6-2 9 2 7-1 8-3 9 4 V16z'/%3E%3C/svg%3E") top / 100% 16px no-repeat, linear-gradient(#000, #000) top 15px left 0 / 100% calc(100% - 15px) no-repeat;
           mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 16' preserveAspectRatio='none'%3E%3Cpath d='M0 16V9l7-2 6 3 9-4 8 2 5-3 10 4 7-2 9 1 6-4 8 3 10-1 5 3 9-4 7 2 11-3 6 4 8-1 9-3 6 3 10-2 7 3 8-4 9 2 6-1 10 3 7-4 9 3 5-2 11 2 6-3 8 4 10-3 7 2 9-2 6 3 8-4 10 3 6-1 9 2 7-3 8 2 11-1 5-3 9 4 7-2 8 2 10-4 6 3 9-1 7 2 8-3 10 3 6-2 9 2 7-1 8-3 9 4 V16z'/%3E%3C/svg%3E") top / 100% 16px no-repeat, linear-gradient(#000, #000) top 15px left 0 / 100% calc(100% - 15px) no-repeat; }
 /* the paper's tooth */
-.nhc-card::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: .5; mix-blend-mode: multiply; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .52 0 0 0 0 .47 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.nhc-card::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: .35; mix-blend-mode: screen; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .9 0 0 0 0 .88 0 0 0 0 .82 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E"); }
 .nhc-head { grid-column: 1 / -1; display: flex; align-items: flex-end; gap: 22px; padding: 6px 22px 12px; border-bottom: 1px solid var(--ink); }
 .nhc-head h2 { margin: 0 0 -4px; font: 800 58px/.78 var(--font-display); font-stretch: 100%; letter-spacing: -.045em; text-transform: lowercase; white-space: nowrap; }
 .nhc-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-bottom: 1px; }
@@ -48,9 +48,9 @@
 .nhc-in { display: flex; gap: 10px; align-items: center; padding: 11px 22px 13px; border-top: 1px solid var(--ink); cursor: text; }
 .nhc-p { flex: none; font-weight: 700; }
 .nhc-w { position: relative; flex: 1; min-width: 0; font-size: 14px; }
-.nhc-ghost { position: absolute; inset: 0; color: rgba(13, 13, 13, .3); white-space: pre; overflow: hidden; pointer-events: none; }
-.nhc-w input { position: relative; display: block; width: 100%; padding: 0; border: 0; outline: 0; background: none; color: var(--ink); font: inherit; caret-color: var(--ink); -webkit-user-select: text; user-select: text; }
-.nhc-w input::placeholder { color: rgba(13, 13, 13, .32); }
+.nhc-ghost { position: absolute; inset: 0; color: rgba(236, 235, 230, .3); white-space: pre; overflow: hidden; pointer-events: none; }
+.nhc-w input { position: relative; display: block; width: 100%; padding: 0; border: 0; outline: 0; background: none; color: var(--ink); font: inherit; caret-color: var(--ink); caret-shape: block; -webkit-user-select: text; user-select: text; }
+.nhc-w input::placeholder { color: rgba(236, 235, 230, .28); }
 .nhc-side { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .nhc-count { padding: 10px 16px 4px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; white-space: pre; }
 /* the list is a table: number, command, its arguments, what it does */
@@ -65,10 +65,10 @@
 .nhc-s b { font-weight: 700; }
 .nhc-s code { font: inherit; color: var(--q); }
 .nhc-s i { font-style: normal; color: var(--q); }
-.nhc-s:hover { background: rgba(13, 13, 13, .06); }
+.nhc-s:hover { background: rgba(236, 235, 230, .07); }
 /* what's chosen is inverted, ink on paper turned round */
 .nhc-s.on, .nhc-s.on:hover { background: var(--ink); }
 .nhc-s.on, .nhc-s.on .n, .nhc-s.on code, .nhc-s.on i { color: var(--pp); }
-.nhc-tel { position: fixed; top: 12px; left: 12px; z-index: 8999; margin: 0; padding: 7px 11px; background: rgba(246, 243, 236, .92); color: #0d0d0d; font: 11.5px/1.5 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; pointer-events: none; white-space: pre; border-left: 2px solid #0d0d0d; }
+.nhc-tel { position: fixed; top: 12px; left: 12px; z-index: 8999; margin: 0; padding: 7px 11px; background: rgba(12, 12, 11, .86); color: #ecebe6; font: 11.5px/1.5 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; pointer-events: none; white-space: pre; border-left: 2px solid #ecebe6; }
 .nhc-tel[hidden] { display: none; }
 @media (max-width: 760px) { .nhc { padding: 0; } .nhc-card { height: 88vh; grid-template: auto minmax(0, 1fr) minmax(0, 1fr) / minmax(0, 1fr); } .nhc-main { border-right: 0; border-bottom: 1px solid var(--ink); } .nhc-head h2 { font-size: 40px; } .nhc-tip { display: none; } .nhc-cols, .nhc-s { grid-template-columns: 30px max-content minmax(0, 1fr); } .nhc-cols span:nth-child(4), .nhc-s i { display: none; } }
