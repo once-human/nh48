@@ -35,6 +35,7 @@ import './draw/falls.js';
 import './draw/fauna.js';
 import './vehicles/mount.js';
 import './vehicles/cardoor.js';
+import './vehicles/getout.js';
 import './world/shutters.js';      // shutters that roll, with the rattle, and board lights that go with them
 import './world/flyovers.js';
 import './world/hills.js';
