@@ -131,8 +131,22 @@ export function buildAuto(opts = {}) {
   const b = newB(!opts.solid), gl = newB(false);
   const sh = opts.sepShield ? newB(false) : gl;     // windshield: separate (transparent) for the player
   const R = 0.21, xr = -0.98, xf = 1.0;
-  // chassis + floor
-  box(b, -1.3, 0.27, -0.6, 0.95, 0.33, 0.6, BLACK);
+  // chassis + floor, and what hangs under it: frame rails, engine and gearbox, rear axle and its dampers, exhaust
+  const SEAT = [0.12, 0.1, 0.09], SEAM2 = [0.045, 0.04, 0.038], DARK = [0.13, 0.13, 0.14], RUB = [0.03, 0.03, 0.033], STL = [0.5, 0.5, 0.52];
+  rbox(b, -1.3, 0.25, -0.6, 0.6, 0.345, 0.6, BLACK);
+  rbox(b, 0.4, 0.25, -0.44, 1.02, 0.34, 0.44, BLACK);
+  for (const s of [-1, 1]) rbox(b, -1.32, 0.23, s*0.34 - 0.03, 0.9, 0.29, s*0.34 + 0.03, DARK);
+  rbox(b, -1.2, 0.2, -0.26, -0.72, 0.42, 0.14, [0.2, 0.2, 0.21]);                                       // engine
+  for (let k = 0; k < 5; k++) rbox(b, -1.14 + k*0.09, 0.19, -0.27, -1.11 + k*0.09, 0.4, 0.15, [0.28, 0.28, 0.29]);       // its fins
+  b.addGeo(G.cyl16, M(-0.86, 0.3, 0.22, 0.14, 0.1, 0.14, Math.PI/2), [0.24, 0.24, 0.25]);            // the clutch cover
+  b.addGeo(G.cyl12, M(xr, R, 0, 0.032, 1.1, 0.032, Math.PI/2), DARK);
+  rbox(b, xr - 0.09, R - 0.08, -0.12, xr + 0.09, R + 0.08, 0.12, [0.16, 0.16, 0.17]);
+  for (const s of [-1, 1]) {
+    rod(b, [xr + 0.02, R + 0.02, s*0.48], [xr + 0.14, 0.62, s*0.46], 0.016, CHROME);
+    rod(b, [xr + 0.03, R + 0.06, s*0.48], [xr + 0.1, 0.46, s*0.47], 0.03, [0.2, 0.2, 0.21]);
+  }
+  tube(b, [[-0.8, 0.26, -0.2], [-1.1, 0.24, -0.36], [-1.34, 0.26, -0.42], [-1.46, 0.27, -0.42]], 0.02, [0.25, 0.25, 0.26], 10, 6);
+  rbox(b, -1.36, 0.22, -0.48, -1.12, 0.31, -0.36, [0.3, 0.3, 0.31]);                                  // silencer
   // rear body tub: one moulded shell with rounded corners, black with the yellow band
   loft(b, [
     { x: -1.4, w: 0.62, yb: 0.31, yt: 0.7, n: 4 },
@@ -143,16 +157,41 @@ export function buildAuto(opts = {}) {
   // rear mudguard flares
   for (const s of [-1, 1]) guard(b, xr, R + 0.04, s * 0.6, R + 0.08, 0.16, BLACK);
   // tail lamps + plate on the rear face
-  for (const s of [-1, 1]) b.addGeo(G.sph2, M(-1.405, 0.47, s * 0.5, 0.012, 0.045, 0.075), TAIL, 0, 0.9);
-  box(b, -1.41, 0.36, -0.17, -1.4, 0.47, 0.17, [0.98, 0.82, 0.12]);
+  for (const s of [-1, 1]) {
+    rbox(b, -1.42, 0.41, s*0.42, -1.395, 0.53, s*0.58, RUB);
+    b.addGeo(G.sph2, M(-1.415, 0.47, s*0.5, 0.012, 0.045, 0.07), TAIL, 0, 0.9);
+    b.addGeo(G.sph2, M(-1.412, 0.52, s*0.55, 0.008, 0.012, 0.018), AMBER, 0, 0.5);
+    rbox(b, -1.2, 0.36, s*0.665, -0.76, 0.385, s*0.672, [0.3, 0.3, 0.32]);                             // rubbing strip
+    // the engine's side louvres
+    for (let k = 0; k < 6; k++) rbox(b, -1.22 + k*0.05, 0.47, s*0.664, -1.2 + k*0.05, 0.545, s*0.672, [0.03, 0.03, 0.033]);
+    rbox(b, xr - 0.15, 0.11, s*0.6, xr - 0.13, 0.36, s*0.7, RUB);                                       // mud flap
+  }
+  rbox(b, -1.425, 0.35, -0.19, -1.395, 0.485, 0.19, RUB);
+  box(b, -1.428, 0.365, -0.17, -1.42, 0.47, 0.17, [0.98, 0.82, 0.12]);
+  for (const [z0, n] of [[-0.14, 4], [0.03, 4]]) for (let k = 0; k < n; k++) box(b, -1.431, 0.39, z0 + k*0.028, -1.428, 0.445, z0 + k*0.028 + 0.016, [0.05, 0.05, 0.05]);  // the plate's letters
+  tube(b, [[-1.34, 0.4, -0.63], [-1.44, 0.4, -0.6], [-1.48, 0.4, -0.3], [-1.48, 0.4, 0.3], [-1.44, 0.4, 0.6], [-1.34, 0.4, 0.63]], 0.013, CHROME, 18, 6);   // bumper bar
   // passenger bench + backrest
-  box(b, -1.25, 0.72, -0.6, -0.62, 0.9, 0.6, [0.12, 0.1, 0.09]);
-  box(b, -1.33, 0.9, -0.6, -1.2, 1.32, 0.6, [0.12, 0.1, 0.09]);
+  box(b, -1.23, 0.72, -0.56, -0.66, 0.8, 0.56, [0.08, 0.08, 0.085]);
+  for (let k = 0; k < 3; k++) {
+    const a = -0.6 + k*0.4;
+    rbox(b, -1.25, 0.77, a, -0.62, 0.91, a + 0.4, SEAT);                                                 // three cushions on the bench
+    rbox(b, -1.335, 0.9, a + 0.005, -1.195, 1.33, a + 0.395, SEAT);
+    for (let q = 0; q < 3; q++) box(b, -1.2, 0.97 + q*0.11, a + 0.05, -1.193, 0.978 + q*0.11, a + 0.35, SEAM2);   // stitched rows
+    for (let q = 1; q < 3; q++) box(b, -1.21 + q*0.19, 0.905, a + 0.05, -1.206 + q*0.19, 0.911, a + 0.35, SEAM2);
+  }
+  for (const s of [-1, 1]) { rod(b, [-1.3, 0.92, s*0.61], [-0.72, 0.92, s*0.61], 0.012, CHROME); rod(b, [-0.72, 0.92, s*0.61], [-0.72, 0.76, s*0.61], 0.012, CHROME); }   // armrests
+  // the floor's rubber ribs; a bar to hold behind the driver, padded in the middle
+  for (let k = 0; k < 8; k++) box(b, -0.58 + k*0.05, 0.33, -0.5, -0.56 + k*0.05, 0.342, 0.5, RUB);
+  rod(b, [-0.2, 1.06, -0.6], [-0.2, 1.06, 0.6], 0.014, CHROME);
+  rod(b, [-0.2, 1.06, -0.26], [-0.2, 1.06, 0.26], 0.026, SEAT);
   // driver area floor sides & legshield
-  box(b, -0.2, 0.33, -0.55, 0.62, 0.42, 0.55, BLACK);
+  rbox(b, -0.2, 0.32, -0.55, 0.62, 0.42, 0.55, BLACK);
   // driver seat
-  box(b, 0.1, 0.62, -0.24, 0.55, 0.76, 0.24, [0.13, 0.11, 0.1]);
-  box(b, 0.2, 0.33, -0.12, 0.45, 0.62, 0.12, [0.15, 0.15, 0.15]);
+  rbox(b, 0.08, 0.63, -0.25, 0.57, 0.78, 0.25, [0.13, 0.11, 0.1]);
+  for (const q of [-0.1, 0.1]) box(b, 0.1, 0.775, q - 0.003, 0.55, 0.781, q + 0.003, SEAM2);
+  rbox(b, 0.2, 0.33, -0.13, 0.45, 0.65, 0.13, [0.15, 0.15, 0.15]);
+  rod(b, [0.08, 0.72, -0.2], [0.02, 0.96, -0.2], 0.012, DARK); rod(b, [0.08, 0.72, 0.2], [0.02, 0.96, 0.2], 0.012, DARK);
+  rbox(b, -0.03, 0.88, -0.24, 0.05, 1.08, 0.24, [0.13, 0.11, 0.1]);                                     // the driver's backrest
   // front cowl: a rounded nose, black with a yellow brow over the windscreen base
   loft(b, [
     { x: 0.55, w: 0.5, yb: 0.3, yt: 1.0, n: 5 },
@@ -166,15 +205,43 @@ export function buildAuto(opts = {}) {
     return [...BLACK, 0];
   }, { ring: 28 });
   extrude(b, [[0.8, 0.97], [0.93, 0.97], [0.93, 1.075], [0.8, 1.07]], -0.52, 0.52, BLACK, 0, 0.01);        // dash ledge (inside)
+  // the dash: speedo in its pod, switches, the fare meter on its bracket, and a lime and chillies on a thread for luck
+  rbox(b, 0.78, 1.04, -0.11, 0.86, 1.13, 0.11, DARK);
+  b.addGeo(G.circle, M(0.778, 1.087, 0, 0.038, 0.038, 1, 0, -Math.PI / 2), [0.85, 0.85, 0.8]);
+  rod(b, [0.777, 1.087, 0], [0.777, 1.11, 0.02], 0.002, [0.9, 0.2, 0.1]);
+  for (const q of [-0.3, -0.24, 0.24, 0.3]) b.addGeo(G.cyl8, M(0.8, 1.07, q, 0.012, 0.016, 0.012, 0, 0, Math.PI / 2), RUB);
+  rod(b, [0.88, 1.07, -0.42], [0.83, 1.18, -0.42], 0.008, RUB);
+  rbox(b, 0.78, 1.15, -0.5, 0.86, 1.27, -0.32, [0.04, 0.04, 0.045]);
+  box(b, 0.777, 1.2, -0.48, 0.78, 1.25, -0.34, [1, 0.15, 0.05], 0, 0.8);
+  rod(b, [0.84, 1.66, 0.3], [0.84, 1.42, 0.3], 0.002, [0.85, 0.82, 0.75]);
+  b.addGeo(G.sphLo, M(0.84, 1.4, 0.3, 0.022, 0.024, 0.022), [0.72, 0.8, 0.2]);
+  for (const a of [-0.5, 0, 0.5]) rod(b, [0.84, 1.38, 0.3], [0.84 + a*0.03, 1.29, 0.3 + a*0.04], 0.006, [0.1, 0.42, 0.1]);
   // headlamp + indicators + horn grille
-  b.addGeo(G.cyl12, M(1.27, 0.7, 0, 0.09, 0.05, 0.09, 0, 0, Math.PI / 2), CHROME);
-  b.addGeo(G.circle, M(1.30, 0.7, 0, 0.075, 0.075, 1, 0, Math.PI / 2), HEAD, 0, 1.0);
-  for (const s of [-1, 1]) b.addGeo(G.sphLo, M(1.2, 0.86, s * 0.36, 0.04, 0.04, 0.04), AMBER, 0, 0.7);
-  box(b, 1.22, 0.48, -0.12, 1.25, 0.56, 0.12, [0.2, 0.2, 0.2]);
+  b.addGeo(G.cyl16, M(1.25, 0.7, 0, 0.105, 0.09, 0.105, 0, 0, Math.PI / 2), BLACK);
+  b.addGeo(RING_G, M(1.298, 0.7, 0, 0.098, 0.098, 0.14, 0, Math.PI / 2, 0), CHROME);
+  b.addGeo(G.sph2, M(1.283, 0.7, 0, 0.022, 0.09, 0.09), HEAD, 0, 1.0);
+  for (const s of [-1, 1]) {
+    rbox(b, 1.17, 0.81, s*0.32, 1.235, 0.9, s*0.41, RUB);
+    b.addGeo(G.sph2, M(1.228, 0.855, s*0.365, 0.012, 0.036, 0.036), AMBER, 0, 0.7);
+    tube(b, [[0.62, 0.32, s*0.5], [0.95, 0.31, s*0.5], [1.12, 0.33, s*0.46], [1.22, 0.38, s*0.38]], 0.008, [0.03, 0.03, 0.033], 10, 4);  // the panel's lower seam
+    tube(b, [[0.62, 0.98, s*0.505], [0.9, 0.98, s*0.505]], 0.006, [0.03, 0.03, 0.033], 3, 4);
+    rod(b, [1.02, 0.58, s*0.46], [1.02, 0.72, s*0.46], 0.005, [0.03, 0.03, 0.033]);
+  }
+  rbox(b, 1.2, 0.44, -0.14, 1.262, 0.58, 0.14, RUB);
+  for (let k = 0; k < 5; k++) box(b, 1.255, 0.46 + k*0.022, -0.115, 1.268, 0.47 + k*0.022, 0.115, [0.3, 0.3, 0.31]);       // the horn's grille
+  rbox(b, 1.08, 0.31, -0.16, 1.2, 0.41, 0.16, [0.14, 0.14, 0.15]);
+  box(b, 1.19, 0.325, -0.13, 1.204, 0.4, 0.13, [0.98, 0.82, 0.12]);                                       // front plate
   // windshield frame + glass + yellow visor
-  box(b, 0.92, 1.0, -0.56, 0.95, 1.52, -0.52, BLACK); box(b, 0.92, 1.0, 0.52, 0.95, 1.52, 0.56, BLACK);
-  box(b, 0.9, 1.5, -0.58, 1.02, 1.6, 0.58, AUTO_Y);
-  sh.addGeo(G.box, M(0.935, 1.26, 0, 0.012, 0.48, 1.04, 0, 0, 0.08), opts.sepShield ? [0.75, 0.82, 0.86] : [0.1, 0.12, 0.14]);
+  const scrX = (y, z) => 0.957 - (y - 1.26)*0.08 - 0.05*(z*z)/(0.54*0.54);
+  for (const s of [-1, 1]) tube(b, [[scrX(1.0, 0.54), 1.0, s*0.54], [scrX(1.26, 0.54), 1.26, s*0.54], [scrX(1.52, 0.54), 1.52, s*0.54]], 0.021, BLACK, 6, 6);
+  rbox(b, 0.89, 1.5, -0.59, 1.03, 1.6, 0.59, AUTO_Y);                                                     // the yellow brow
+  rbox(b, 0.98, 1.495, -0.56, 1.05, 1.525, 0.56, BLACK);                                                  // its lip
+  for (const q of [-1, 1]) tube(b, [[scrX(1.03, 0.5), 1.03, q*0.5], [scrX(1.26, 0.5), 1.26, q*0.5], [scrX(1.49, 0.5), 1.49, q*0.5]], 0.009, RUB, 5, 4);
+  tube(b, [[scrX(1.03, 0.5), 1.03, -0.5], [scrX(1.02, 0), 1.022, 0], [scrX(1.03, 0.5), 1.03, 0.5]], 0.009, RUB, 8, 4);
+  tube(b, [[scrX(1.49, 0.5), 1.49, -0.5], [scrX(1.5, 0), 1.495, 0], [scrX(1.49, 0.5), 1.49, 0.5]], 0.009, RUB, 8, 4);
+  patch(sh, 12, 6, (u, v) => { const y = 1.03 + 0.46*v, z = (u - 0.5)*1.02; return [scrX(y, z), y, z]; }, opts.sepShield ? [0.75, 0.82, 0.86, 0] : [0.1, 0.12, 0.14, 0], [1, 0.08, 0]);
+  rod(b, [scrX(1.04, 0.1), 1.05, 0.1], [scrX(1.36, 0.34) + 0.012, 1.36, 0.34], 0.004, RUB);               // wiper
+  b.addGeo(G.cyl8, M(scrX(1.04, 0.1) + 0.004, 1.05, 0.1, 0.012, 0.018, 0.012, 0, 0, Math.PI / 2), RUB);
   // handlebar (separate for the player so it can turn with the steering, pivot at the column top)
   const hb = opts.sepBar ? newB(false) : b, bo = opts.sepBar ? AUTO_BAR_PIVOT : [0, 0, 0];
   hb.addGeo(G.cyl8, M(0.72 - bo[0], 1.06 - bo[1], 0, 0.018, 0.78, 0.018, Math.PI / 2), CHROME);
@@ -194,23 +261,26 @@ export function buildAuto(opts = {}) {
   // mirrors
   for (const s of [-1, 1]) {
     b.addGeo(G.cyl8, M(0.98, 1.25, s * 0.62, 0.01, 0.3, 0.01, s * 0.6, 0, 0), BLACK);
-    b.addGeo(G.cyl12, M(1.0, 1.38, s * 0.72, 0.07, 0.02, 0.05, 0, 0, Math.PI / 2), [0.2, 0.2, 0.22]);
+    b.addGeo(G.sph2, M(1.0, 1.38, s * 0.72, 0.016, 0.075, 0.055), [0.05, 0.05, 0.055]);
+    b.addGeo(G.sph2, M(0.992, 1.38, s * 0.72, 0.012, 0.066, 0.047), [0.55, 0.62, 0.66]);
   }
   // canopy: one rounded canvas hood over a frame, roof, rear wall and rear quarter panels; the sides
   // are open over the passenger bench and the driver (inside faces are drawn too)
-  const roofY = 1.66;
+  const roofY = 1.66, HOOD_SEAMS = [-0.5, 0, 0.45];
   loft(b, [
     { x: -1.43, w: 0.66, yb: 0.74, yt: roofY + 0.02, n: 7, seg: 'quarter' },
     { x: -1.37, w: 0.7, yb: 0.74, yt: roofY + 0.04, n: 8, seg: 'quarter' },
+    ...[-1.2].flatMap(c => [c - 0.009, c + 0.009].map(x => ({ x, w: 0.7, yb: 0.74, yt: roofY + 0.04, n: 8, seg: 'quarter' }))),
     { x: -0.97, w: 0.7, yb: 0.74, yt: roofY + 0.04, n: 8, seg: 'open' },
+    ...HOOD_SEAMS.flatMap(c => [c - 0.009, c + 0.009].map(x => { const k = (x + 0.97)/1.87; return { x, w: 0.7 - 0.04*k, yb: 0.74, yt: roofY + 0.04 - 0.02*k, n: 8, seg: 'open' }; })),
     { x: 0.9, w: 0.66, yb: 0.74, yt: roofY + 0.02, n: 8, seg: 'nose' },
     { x: 1.0, w: 0.6, yb: 1.46, yt: roofY - 0.02, n: 5 },
   ], (seg, q) => {
-    const CANVAS = [...BLACK, 1, MATTE];
+    const seam = [-1.2, ...HOOD_SEAMS].some(c => Math.abs(q.x - c) < 0.009 ), CANVAS = seam ? [0.022, 0.022, 0.024, 0, MATTE] : [...BLACK, 1, MATTE];
     if (seg === 'capRear') return CANVAS;
     if (seg === 'capFront') return [...AUTO_Y, 0];
     if (q.ny < -0.5) return null;                                          // no floor in the hood
-    if (seg === 'nose') return q.y > 1.42 ? (q.y < 1.6 && q.nx > 0.3 ? [...AUTO_Y, 0] : CANVAS) : null;
+    if (seg === 'nose') return q.y > 1.52 ? (q.y < 1.6 && q.nx > 0.3 ? [...AUTO_Y, 0] : CANVAS) : null;
     if (seg === 'open') return q.y > 1.5 ? CANVAS : null;
     // rear quarters: canvas down to the tub, with a yellow trim line along the bottom edge
     if (q.y < 0.95) return null;
@@ -221,12 +291,22 @@ export function buildAuto(opts = {}) {
     b.addGeo(G.cyl8, M(0.6, 1.33, s * 0.6, 0.018, 0.62, 0.018), BLACK);           // front strut
     b.addGeo(G.cyl8, M(-0.97, 1.2, s * 0.66, 0.02, 0.95, 0.02), BLACK);           // hood frame at the opening
   }
-  // rear window (clear plastic) with chrome frame, on the back wall
-  gl.addGeo(G.box, M(-1.435, 1.36, 0, 0.01, 0.2, 0.62), [0.1, 0.12, 0.14]);
-  box(b, -1.442, 1.25, -0.33, -1.434, 1.27, 0.33, CHROME); box(b, -1.442, 1.45, -0.33, -1.434, 1.47, 0.33, CHROME);
+  // the hood's seams and the bows under the canvas, and the side curtains rolled up and strapped
+  for (const s of [-1, 1]) {
+    tube(b, [[-0.95, 1.5, s*0.685], [-0.3, 1.51, s*0.69], [0.5, 1.5, s*0.668]], 0.036, [0.09, 0.085, 0.08], 14, 7, 0, MATTE);
+    b.addGeo(G.sph2, M(-0.95, 1.5, s*0.685, 0.036, 0.036, 0.036), [0.09, 0.085, 0.08]); b.addGeo(G.sph2, M(0.5, 1.5, s*0.668, 0.036, 0.036, 0.036), [0.09, 0.085, 0.08]);
+    for (const x of [-0.72, -0.2, 0.28]) { const z = s*(0.69 - (x > 0 ? x*0.03 : 0)); tube(b, [[x, 1.56, z - s*0.025], [x, 1.52, z + s*0.04], [x, 1.46, z + s*0.012]], 0.007, [0.035, 0.035, 0.038], 6, 4); }
+    for (let k = 0; k < 4; k++) b.addGeo(G.cyl8, M(-1.33 + k*0.11, 1.03, s*0.702, 0.012, 0.008, 0.012, Math.PI/2), CHROME);    // press studs along the quarter's hem
+  }
+  // rear window (clear plastic) with a stitched canvas surround, on the back wall
+  patch(b, 8, 4, (u, v) => [-1.433, 1.235 + 0.25*v, (u - 0.5)*0.72], [0.035, 0.035, 0.038, 0], [-1, 0, 0]);
+  gl.addGeo(G.box, M(-1.436, 1.36, 0, 0.01, 0.2, 0.62), [0.1, 0.12, 0.14]);
+  box(b, -1.442, 1.25, -0.33, -1.434, 1.262, 0.33, CHROME); box(b, -1.442, 1.458, -0.33, -1.434, 1.47, 0.33, CHROME);
   b.addGeo(G.cyl8, M(-1.44, 0.8, 0, 0.02, 1.0, 0.02, Math.PI / 2), CHROME);   // rear grab rail
   // front fork + mudguard
   b.addGeo(G.cyl8, M(xf + 0.02, 0.48, 0, 0.03, 0.55, 0.03, 0, 0, 0.25), CHROME);
+  for (const s of [-1, 1]) { rod(b, [xf, R, s*0.075], [xf + 0.1, 0.58, s*0.05], 0.018, BLACK); rod(b, [xf + 0.03, R + 0.08, s*0.082], [xf + 0.12, 0.54, s*0.06], 0.026, [0.2, 0.2, 0.21]); }
+  b.addGeo(G.cyl12, M(xf, R, 0, 0.022, 0.2, 0.022, Math.PI / 2), STL);
   guard(b, xf, R + 0.02, 0, R + 0.06, 0.16, BLACK);
   // driver (only when asked: player version draws its own)
   if (opts.driver) {
@@ -791,56 +871,177 @@ export function buildCar(kind, opts = {}) {
 }
 
 // ---------------------------------------------------------------- city bus (fictional Pune livery)
+const PANE = [0.07, 0.085, 0.1, 4], RUBBER = [0.03, 0.03, 0.033], STEEL = [0.5, 0.5, 0.52];
+// a body of stations along x: outline(x) gives half the section, bottom middle round to the roof's middle, as [z, y]. `at`
+// shapes the ends (where a height's face really is at that x); both ends are closed off.
+function shell(b, xs, outline, at, colorOf, closeN = 6) {
+  const rows = [], put = (x, zs) => { const O = outline(x), row = []; for (const [z, y] of O) { const q = at(x, y, z*zs); row.push([q, y, z*zs]); } for (let i = O.length - 2; i > 0; i--) { const [z, y] = O[i], q = at(x, y, -z*zs); row.push([q, y, -z*zs]); } rows.push(row); };
+  const F = [1, .97, .88, .66, .34, 0.001];
+  for (let i = closeN - 1; i > 0; i--) put(xs[0], F[i]);
+  for (const x of xs) put(x, 1);
+  for (let i = 1; i < closeN; i++) put(xs[xs.length - 1], F[i]);
+  gridSurface(b, rows, colorOf, { closed: true });
+}
+// ---------------------------------------------------------------- city bus
 export function buildBus() {
   const b = newB(true), gl = newB(false);
   const L = 11.4, W = 2.55, H = 3.15, hl = L / 2, hw = W / 2;
-  const red = [0.72, 0.12, 0.1], cream = [0.93, 0.88, 0.76];
-  box(b, -hl, 0.4, -hw, hl, 1.35, hw, red);
-  box(b, -hl, 1.35, -hw, hl, 2.25, hw, cream);
-  box(b, -hl, 2.25, -hw, hl, H, hw, cream);
-  box(b, -hl + 0.05, 2.95, -hw + 0.05, hl - 0.05, H + 0.05, hw - 0.05, [0.85, 0.85, 0.82]);
-  // stripe
-  box(b, -hl - 0.005, 1.28, -hw - 0.005, hl + 0.005, 1.36, hw + 0.005, [0.98, 0.7, 0.1]);
-  // windows (glass band) + front windscreen
-  box(gl, -hl + 0.6, 1.45, -hw - 0.01, hl - 1.2, 2.3, hw + 0.01, [0.1, 0.12, 0.14]);
-  box(gl, hl + 0.005, 1.15, -hw + 0.12, hl + 0.01, 2.55, hw - 0.12, [0.1, 0.12, 0.14]);
-  box(gl, -hl - 0.01, 1.6, -hw + 0.3, -hl - 0.005, 2.4, hw - 0.3, [0.1, 0.12, 0.14]);
-  // window pillars
-  for (let x = -hl + 1.4; x < hl - 1.2; x += 1.15) box(b, x - 0.05, 1.42, -hw - 0.02, x + 0.05, 2.32, hw + 0.02, cream);
-  // door openings (dark) on the left side (z<0 is the driver's left)
-  box(b, hl - 1.15, 0.4, -hw - 0.012, hl - 0.25, 2.3, -hw + 0.02, [0.08, 0.08, 0.08]);
-  box(b, -0.6, 0.4, -hw - 0.012, 0.4, 2.3, -hw + 0.02, [0.08, 0.08, 0.08]);
-  // destination board (LED orange) front & rear
-  box(b, hl + 0.01, 2.62, -0.9, hl + 0.02, 2.95, 0.9, [1.0, 0.45, 0.05], 0, 0.85);
-  box(b, -hl - 0.02, 2.62, -0.7, -hl - 0.01, 2.9, 0.7, [1.0, 0.45, 0.05], 0, 0.7);
+  const red = [0.72, 0.12, 0.1], cream = [0.93, 0.88, 0.76], roofC = [0.84, 0.84, 0.8], band = [0.98, 0.7, 0.1], WX = [hl - 2.4, -hl + 3.0], AR = 0.64;
+  const front = (y) => hl - (y > 1.08 ? 0.03 + 0.42*Math.pow((y - 1.08)/2.1, 1.3) : 0.035*(1.08 - y)), rear = (y) => -hl + (y > 2.3 ? 0.12*(y - 2.3)/0.9 : 0) + (y < 0.7 ? 0.08*(0.7 - y)/0.3 : 0);
+  const at = (x, y, z) => { const c = Math.pow(Math.abs(z)/hw, 3.4); return Math.max(rear(y) + 0.16*c, Math.min(front(y) - 0.2*c, x)); };
+  const yArch = (x) => { let yb = 0; for (const w of WX) { const d = Math.abs(x - w); if (d < AR) yb = Math.max(yb, 0.5 + Math.sqrt(AR*AR - d*d)); } return yb; };
+  const outline = (x) => { const a = yArch(x), yb = Math.max(0.42, a), low = Math.max(yb + 0.03, 0.56); return [[0, 0.42], [hw - 0.42, 0.42], [hw - 0.42, yb], [hw - 0.03, yb], [hw, low], [hw, Math.max(low + 0.05, 0.86)], [hw, Math.max(low + 0.1, 1.1)], [hw, 1.32], [hw, 1.38], [hw - 0.01, 1.66], [hw - 0.02, 2.0], [hw - 0.032, 2.32], [hw - 0.06, 2.66], [hw - 0.13, 2.88], [hw - 0.34, 3.05], [hw - 0.72, 3.13], [hw*0.3, 3.165], [0, 3.175]]; };
+  const xs = stationsOf([-hl, -hl + 0.12, ...Array.from({ length: 46 }, (_, i) => -hl + (i + 1)*L/47), hl - 0.12, hl, ...WX.flatMap(w => [-1, -.92, -.75, -.5, -.25, 0, .25, .5, .75, .92, 1].map(k => w + k*AR))], 0.02);
+  const sideZ = (y) => hw - Math.max(0, y - 1.38)*0.034;
+  shell(b, xs, outline, at, (q) => {
+    if (q.ny < -0.55 || Math.abs(q.z) < hw - 0.05 && q.y < 1.0 && Math.abs(q.nx) < 0.7) return [...RUBBER, 0];
+    if (q.y > 2.92) return [...roofC, 0];
+    if (q.y > 1.3 && q.y < 1.385) return [...band, 0];
+    return q.y < 1.34 ? [...red, 0] : [...cream, 0];
+  });
+  // chassis, axles, what's under there
+  box(b, -hl + 0.5, 0.28, -0.5, hl - 0.6, 0.44, 0.5, RUBBER);
+  for (const w of WX) { b.addGeo(G.cyl12, M(w, 0.5, 0, 0.09, 2.1, 0.09, Math.PI/2), [0.12, 0.12, 0.13]); rbox(b, w - 0.16, 0.34, -0.2, w + 0.16, 0.64, 0.2, [0.1, 0.1, 0.11]); for (const s of [-1, 1]) { rbox(b, w - 0.56, 0.42, s*0.72 - .05, w + 0.56, 0.5, s*0.72 + .05, [0.14, 0.14, 0.15]); wheel(b, w, 0.5, s*(hw - 0.25), 0.5, 0.3); } }
+  for (const w of WX) for (const s of [-1, 1]) { rbox(b, w - AR - 0.02, 0.32, s*(hw - 0.12), w - AR + 0.03, 0.72, s*(hw - 0.01), RUBBER); tube(b, [[w - AR*.97, 0.98, s*(hw + .012)], [w - AR*.6, 1.03 + .12, s*(hw + .012)], [w, 1.16, s*(hw + .012)], [w + AR*.6, 1.15, s*(hw + .012)], [w + AR*.97, 0.98, s*(hw + .012)]], 0.015, [0.15, 0.15, 0.16], 14, 5); }
+  // the sides: panels and their rivets, rubbing strip, reflectors, a flap, windows between pillars with sliding panes
+  const bay = 1.15, x0 = -hl + 0.72, x1 = hl - 1.22;
   for (const s of [-1, 1]) {
-    box(b, hl + 0.005, 0.7, s * (hw - 0.4), hl + 0.02, 0.88, s * (hw - 0.12), HEAD, 0, 1);
-    box(b, -hl - 0.02, 0.7, s * (hw - 0.35), -hl - 0.005, 0.95, s * (hw - 0.12), TAIL, 0, 0.9);
+    tube(b, [[-hl + 0.1, 0.92, s*(hw + .012)], [hl - 0.1, 0.92, s*(hw + .012)]], 0.014, [0.45, 0.1, 0.09], 2, 5);
+    tube(b, [[-hl + 0.14, 2.9, s*(sideZ(2.75) - .03)], [hl - 0.5, 2.9, s*(sideZ(2.75) - .03)]], 0.03, [0.2, 0.2, 0.2], 2, 6);    // the rain gutter
+    for (let x = -hl + 0.4; x < hl - 0.3; x += 0.58) { if (yArch(x) > 0.1) continue; box(b, x - 0.006, 0.6, s*hw, x + 0.006, 1.28, s*(hw + 0.004), [0.4, 0.09, 0.08]); for (let y = 0.68; y < 1.28; y += 0.14) b.addGeo(G.sph2, M(x + .02, y, s*(hw + .002), .006, .006, .005), STEEL); }
+    for (const rx of [-hl + 0.34, -0.9, hl - 1.1]) box(b, rx - 0.05, 0.72, s*hw, rx + 0.05, 0.78, s*(hw + 0.008), [1, 0.5, 0.08], 0, 0.3);
+    rbox(b, -1.5, 0.72, s*hw, -0.9, 1.14, s*(hw + 0.012), [0.6, 0.14, 0.12]);                 // service flap
+    for (let x = x0; x + bay*0.5 < x1; x += bay) {
+      const a = x + 0.05, e = Math.min(x1, x + bay) - 0.05, door = s < 0 && ((a < hl - 0.2 && e > hl - 1.2) || (a < 0.45 && e > -0.65)); if (door) continue;
+      patch(b, 3, 3, (u, v) => [a + (e - a)*u, 1.5 + 0.82*v, s*(sideZ(1.5 + 0.82*v) + 0.005)], [...RUBBER, 0], [0, 0, s]);
+      patch(b, 3, 3, (u, v) => [a + 0.035 + (e - a - 0.07)*u, 1.535 + 0.75*v, s*(sideZ(1.53 + 0.75*v) + 0.012)], PANE, [0, 0, s]);
+      box(b, a, 1.885, s*sideZ(1.9), e, 1.915, s*(sideZ(1.9) + 0.024), RUBBER);                 // top sash of the slider
+      box(b, (a + e)/2 - 0.012, 1.915, s*sideZ(2.1), (a + e)/2 + 0.012, 2.3, s*(sideZ(2.1) + 0.02), [0.55, 0.55, 0.57]);
+    }
+    rbox(b, x0 - 0.02, 1.47, s*sideZ(1.47), x1 + 0.02, 1.5, s*(sideZ(1.47) + 0.02), [0.55, 0.55, 0.57]);
+    rbox(b, x0 - 0.02, 2.33, s*sideZ(2.33), x1 + 0.02, 2.36, s*(sideZ(2.33) + 0.02), [0.55, 0.55, 0.57]);
   }
-  for (const x of [hl - 2.4, -hl + 3.0]) for (const s of [-1, 1]) wheel(b, x, 0.5, s * (hw - 0.25), 0.5, 0.3);
-  box(b, -hl + 0.5, 3.15, -0.6, -hl + 2.5, 3.45, 0.6, [0.82, 0.82, 0.8]);   // CNG cylinders housing
+  // doors: folding, glass nearly to the step, grab rails, the step lit
+  for (const [a, e] of [[hl - 1.17, hl - 0.25], [-0.62, 0.42]]) {
+    const m = (a + e)/2, z = -(hw + 0.007);
+    rbox(b, a - 0.04, 0.44, z - 0.012, e + 0.04, 2.42, z + 0.02, RUBBER);
+    for (const [u0, u1] of [[a + 0.015, m - 0.008], [m + 0.008, e - 0.015]]) {
+      rbox(b, u0, 0.5, z - 0.018, u1, 2.36, z, [0.82, 0.78, 0.68]);
+      patch(b, 2, 3, (u, v) => [u0 + 0.05 + (u1 - u0 - 0.1)*u, 1.42 + 0.86*v, z - 0.02], PANE, [0, 0, -1]);
+      patch(b, 2, 3, (u, v) => [u0 + 0.05 + (u1 - u0 - 0.1)*u, 0.62 + 0.68*v, z - 0.02], PANE, [0, 0, -1]);
+      rod(b, [u1 - 0.07, 0.95, z - 0.035], [u1 - 0.07, 1.95, z - 0.035], 0.012, [0.88, 0.75, 0.2]);
+    }
+    box(b, a, 0.34, -hw - 0.02, e, 0.44, -hw + 0.3, [0.25, 0.25, 0.26]);
+  }
+  // the front: windscreen in two curved panes, wipers, a route board under a hood, grille, lamps, bumper
+  const fz = (y, z) => front(y) - 0.2*Math.pow(Math.abs(z)/hw, 3.4) + 0.006;
+  for (const s of [-1, 1]) {
+    patch(b, 10, 8, (u, v) => { const y = 1.18 + 1.42*v, z = s*(0.012 + (hw - 0.14)*u); return [fz(y, z), y, z]; }, [...RUBBER, 0], [1, 0.1, 0]);
+    patch(b, 10, 8, (u, v) => { const y = 1.22 + 1.34*v, z = s*(0.04 + (hw - 0.21)*u); return [fz(y, z) + 0.006, y, z]; }, PANE, [1, 0.1, 0]);
+    rod(b, [fz(1.25, s*0.8) + 0.04, 1.25, s*0.8], [fz(1.95, s*0.34) + 0.03, 1.95, s*0.34], 0.007, RUBBER);
+    rod(b, [fz(1.2, s*0.8) + 0.04, 1.2, s*0.8], [fz(1.25, s*0.8) + 0.04, 1.26, s*0.8], 0.018, RUBBER);
+    // headlamps, indicator, fog lamp
+    rbox(b, hl - 0.03, 0.66, s*0.66, hl + 0.02, 0.94, s*(hw - 0.1), [0.1, 0.1, 0.11]);
+    for (const q of [0.82, 1.03]) { b.addGeo(G.cyl12, M(hl + 0.012, 0.8, s*q, 0.092, 0.03, 0.092, 0, 0, Math.PI/2), CHROME); b.addGeo(G.circle, M(hl + 0.03, 0.8, s*q, 0.078, 0.078, 1, 0, Math.PI/2), HEAD, 0, 1); }
+    b.addGeo(G.sph2, M(hl + 0.01, 1.01, s*(hw - 0.2), 0.05, 0.03, 0.09), AMBER, 0, 0.7);
+    // mirrors on long arms
+    tube(b, [[hl - 0.26, 2.68, s*(hw - 0.06)], [hl + 0.08, 2.74, s*(hw + 0.14)], [hl + 0.12, 2.42, s*(hw + 0.18)]], 0.014, RUBBER, 10, 6);
+    rbox(b, hl + 0.07, 1.94, s*(hw + 0.1), hl + 0.17, 2.46, s*(hw + 0.3), RUBBER);
+    box(gl, hl + 0.06, 1.97, s*(hw + 0.12), hl + 0.065, 2.43, s*(hw + 0.28), [0.5, 0.56, 0.6]);
+    box(b, hl - 0.3, 3.01, s*(hw - 0.5), hl - 0.17, 3.05, s*(hw - 0.3), [1, 0.45, 0.05], 0, 0.5);      // marker lamps
+  }
+  box(b, fz(1.2, 0) - .01, 1.18, -0.022, fz(1.2, 0) + 0.018, 2.6, 0.022, RUBBER);
+  rbox(b, fz(2.74, 0) - 0.08, 2.61, -1.03, fz(2.74, 0) + 0.08, 2.98, 1.03, [0.03, 0.03, 0.03]);       // the route board in its housing
+  box(b, fz(2.74, 0) + 0.08, 2.65, -0.92, fz(2.74, 0) + 0.085, 2.94, 0.92, [1, 0.45, 0.05], 0, 0.85);
+  rbox(b, fz(2.94, 0) - 0.05, 2.97, -1.08, fz(2.94, 0) + 0.2, 3.01, 1.08, cream);
+  rbox(b, hl - 0.09, 0.38, -hw - 0.012, hl + 0.09, 0.62, hw + 0.012, [0.12, 0.12, 0.13]);             // bumper
+  rbox(b, hl + 0.06, 0.42, -0.26, hl + 0.095, 0.56, 0.26, [0.96, 0.96, 0.9]);
+  for (let k = 0; k < 7; k++) rbox(b, hl - 0.015, 0.68 + k*0.045, -0.48, hl + 0.018, 0.7 + k*0.045, 0.48, [0.09, 0.09, 0.1]);
+  // the back: its window, the engine's louvres, lamps, a board, ladder rungs
+  const rx = (y) => rear(y) - 0.006;
+  patch(b, 8, 6, (u, v) => { const y = 1.62 + 0.86*v, z = (u - .5)*(W - 0.62); return [rx(y) + .16*Math.pow(Math.abs(z)/hw, 3.4), y, z]; }, [...RUBBER, 0], [-1, 0, 0]);
+  patch(b, 8, 6, (u, v) => { const y = 1.66 + 0.78*v, z = (u - .5)*(W - 0.7); return [rx(y) - 0.006 + .16*Math.pow(Math.abs(z)/hw, 3.4), y, z]; }, PANE, [-1, 0, 0]);
+  for (let k = 0; k < 12; k++) rbox(b, -hl - 0.022, 0.62 + k*0.058, -0.86, -hl + 0.02, 0.645 + k*0.058, 0.86, [0.09, 0.09, 0.1]);
+  rbox(b, -hl - 0.09, 0.38, -hw - 0.012, -hl + 0.09, 0.6, hw + 0.012, [0.12, 0.12, 0.13]);
+  box(b, rx(2.76) - 0.012, 2.62, -0.7, rx(2.76) + 0.01, 2.9, 0.7, [1, 0.45, 0.05], 0, 0.7);
+  for (const s of [-1, 1]) { rbox(b, -hl - 0.03, 0.72, s*(hw - 0.3), -hl + 0.02, 1.04, s*(hw - 0.06), [0.1, 0.1, 0.1]); for (const q of [0.8, 0.96]) b.addGeo(G.sph2, M(-hl - 0.02, q, s*(hw - 0.18), 0.03, 0.07, 0.09), TAIL, 0, 0.9); b.addGeo(G.sph2, M(-hl - 0.02, 1.1, s*(hw - 0.18), 0.03, 0.04, 0.08), AMBER, 0, 0.7); rod(b, [-hl + 0.1, 0.42, s*0.55], [-hl - 0.02, 0.2, s*0.55], 0.02, RUBBER); }
+  box(b, -hl - 0.03, 0.46, -0.17, -hl - 0.015, 0.56, 0.17, [0.98, 0.9, 0.3]);
+  // the roof: the gas tanks' long housing with its ribs and vents, hatches, an antenna
+  for (let x = -hl + 0.6; x < -hl + 4.6; x += 0.5) rbox(b, x + 0.02, 3.13, -0.72, x + 0.46, 3.44, 0.72, [0.82, 0.82, 0.79]);
+  for (let x = -hl + 0.8; x < -hl + 4.6; x += 0.5) for (const s of [-1, 1]) for (let k = 0; k < 4; k++) box(b, x + k*0.08, 3.22, s*0.721, x + k*0.08 + 0.05, 3.36, s*0.726, [0.3, 0.3, 0.3]);
+  for (const x of [0.4, 2.8]) { rbox(b, x - 0.48, 3.15, -0.42, x + 0.48, 3.25, 0.42, [0.74, 0.74, 0.7]); rbox(b, x - 0.4, 3.24, -0.34, x + 0.4, 3.28, 0.34, [0.1, 0.12, 0.13]); }
+  for (let x = 0.9; x < hl - 1; x += 0.6) for (const s of [-1, 1]) box(b, x, 3.1, s*0.62 - .01, x + 0.012, 3.17, s*0.62 + .01, [0.68, 0.68, 0.64]);
+  rod(b, [2.1, 3.16, 0.2], [1.9, 3.72, 0.22], 0.008, RUBBER);
   return { body: b.build(), glass: gl.build(), dims: { L, W, H, wb: 5.4 } };
 }
 
 // ---------------------------------------------------------------- tempo (mini truck)
 export function buildTempo() {
   const b = newB(true), gl = newB(false);
-  const L = 3.8, W = 1.55, hl = L / 2, hw = W / 2;
-  const cab = [1, 1, 1];
-  extrude(b, [[0.7, 0.4], [1.9, 0.4], [1.9, 1.05], [1.75, 1.85], [0.75, 1.9], [0.7, 1.9]], -hw, hw, cab, 1, 0.06);
-  box(gl, 1.75, 1.15, -hw + 0.1, 1.86, 1.75, hw - 0.1, [0.1, 0.12, 0.14]);
-  box(gl, 0.95, 1.2, -hw - 0.005, 1.55, 1.7, hw + 0.005, [0.1, 0.12, 0.14]);
-  // cargo bed with low sides + load
-  box(b, -hl, 0.55, -hw, 0.68, 0.65, hw, [0.35, 0.3, 0.25]);
-  for (const s of [-1, 1]) box(b, -hl, 0.65, s * hw, 0.68, 1.05, s * (hw - 0.05), [0.9, 0.55, 0.1]);
-  box(b, -hl, 0.65, -hw, -hl + 0.05, 1.05, hw, [0.9, 0.55, 0.1]);
-  for (let k = 0; k < 6; k++) b.addGeo(G.sphLo, M(-1.6 + (k % 3) * 0.7, 0.95 + Math.floor(k / 3) * 0.3, (k % 2 ? 0.3 : -0.3), 0.36, 0.22, 0.3), [0.85, 0.82, 0.72], 0, 3);
+  const L = 3.8, W = 1.55, hl = L / 2, hw = W / 2, cab = [1, 1, 1], R = 0.32, FX = 1.25, RX = -1.2, side = [0.9, 0.55, 0.1], wood = [0.42, 0.3, 0.2], AR = 0.4;
+  // the cab, in one piece: nose, bonnet, raked windscreen, roof, a flat back; its wheel arch cut in
+  const roofY = (x) => { const t = [[0.7, 1.9], [1.05, 1.93], [1.36, 1.92], [1.5, 1.86], [1.62, 1.62], [1.73, 1.28], [1.78, 1.16], [1.88, 1.12], [1.95, 1.04], [1.99, 0.94]]; for (let i = 0; i < t.length - 1; i++) if (x <= t[i + 1][0]) { const k = (x - t[i][0])/(t[i + 1][0] - t[i][0]); return t[i][1] + (t[i + 1][1] - t[i][1])*k; } return 0.94; };
+  const yArch = (x) => { const d = Math.abs(x - FX); return d < AR ? R + Math.sqrt(AR*AR - d*d) : 0; };
+  const outline = (x) => { const rt = roofY(x), yb = Math.max(0.42, yArch(x)), y2 = Math.max(yb + 0.04, 0.52), sh = Math.min(1.14, rt - 0.02), hasGlass = rt > 1.2, O = [[0, 0.42], [hw - 0.2, 0.42], [hw - 0.2, yb], [hw - 0.02, yb], [hw, y2], [hw, Math.max(y2 + .03, 0.78)], [hw, Math.max(y2 + .05, sh - 0.14)], [hw, sh]]; if (hasGlass) O.push([hw - 0.035, sh + (rt - sh)*0.5], [hw - 0.07, rt - 0.09], [hw - 0.17, rt - 0.02], [hw*0.45, rt], [0, rt + 0.006]); else O.push([hw - 0.06, rt - 0.01], [hw*0.45, rt + 0.004], [0, rt + 0.006]); return O; };
+  const noseAt = (x, y, z) => { const c = Math.pow(Math.abs(z)/hw, 3); return Math.min(x, 1.99 - 0.13*c - (y > 1.0 ? (y - 1)*.12 : (1 - y)*.05)); };
+  const xs = stationsOf([0.7, 0.72, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.36, 1.43, 1.5, 1.56, 1.62, 1.68, 1.73, 1.78, 1.83, 1.88, 1.92, 1.95, 1.97, 1.99, ...[-1, -.9, -.7, -.45, 0, .45, .7, .9, 1].map(k => FX + k*AR)], 0.012);
+  // shell() wants all its row lengths equal, so the rows are padded to the longest outline
+  const outline2 = (x) => { const O = outline(x); while (O.length < 13) O.splice(O.length - 1, 0, [(O[O.length - 2][0] + O[O.length - 1][0])/2, (O[O.length - 2][1] + O[O.length - 1][1])/2]); return O; };
+  shell(b, xs, outline2, noseAt, (q) => (q.ny < -0.55 || (Math.abs(q.z) < hw - 0.05 && q.y < 0.9 && Math.abs(q.nx) < 0.7)) ? [...RUBBER, 0] : [...cab, 1]);
+  // chassis
+  box(b, -hl + 0.1, 0.34, -0.42, 0.75, 0.46, -0.32, RUBBER); box(b, -hl + 0.1, 0.34, 0.32, 0.75, 0.46, 0.42, RUBBER);
+  for (const x of [-1.6, -1.1, -0.6, -0.1, 0.4]) box(b, x, 0.42, -0.5, x + 0.06, 0.55, 0.5, [0.12, 0.12, 0.13]);
+  b.addGeo(G.cyl12, M(RX, R, 0, 0.05, 1.35, 0.05, Math.PI/2), [0.12, 0.12, 0.13]); rbox(b, RX - 0.12, R - 0.1, -0.13, RX + 0.12, R + 0.1, 0.13, [0.1, 0.1, 0.11]);
+  for (const s of [-1, 1]) { rbox(b, RX - 0.55, 0.36, s*0.4 - .03, RX + 0.55, 0.42, s*0.4 + .03, [0.15, 0.15, 0.16]); wheel(b, FX, R, s*(hw - 0.15), R, 0.18); wheel(b, RX, R, s*(hw - 0.15), R, 0.18); rbox(b, RX - AR - 0.04, 0.2, s*(hw - 0.17), RX - AR, 0.58, s*(hw - 0.01), RUBBER); }
+  tube(b, [[0.2, 0.33, 0.3], [-0.8, 0.31, 0.32], [-1.72, 0.33, 0.38], [-1.86, 0.36, 0.38]], 0.024, [0.2, 0.2, 0.2], 10, 6);    // exhaust
+  b.addGeo(G.cyl12, M(-0.25, 0.32, -0.1, 0.17, 0.2, 0.17, Math.PI/2), [0.06, 0.06, 0.06]);                                         // the spare slung under it
+  // glass: windscreen, door windows, a small back window; pillars, doors, handles, wipers, mirrors
+  const wx = (y, z) => noseAt(1.99, y, z) - 0.01, wsY = (x) => roofY(x);
+  const ws = (u, v, m, lift) => { const x = 1.5 + m + (1.76 - 1.5 - 2*m)*v, zw = hw - 0.17 - m, z = (2*u - 1)*zw, c = Math.abs(z)/(hw - 0.17); return [x + lift*0.8, wsY(x) - 0.02*c*c*c + lift, z]; };
+  patch(b, 16, 8, (u, v) => ws(u, v, 0, 0.009), [...RUBBER, 0], [1, 1, 0]);
+  patch(b, 16, 8, (u, v) => ws(u, v, 0.022, 0.014), PANE, [1, 1, 0]);
   for (const s of [-1, 1]) {
-    box(b, 1.89, 0.62, s * (hw - 0.3), 1.92, 0.75, s * (hw - 0.08), HEAD, 0, 1);
-    box(b, -hl - 0.01, 0.6, s * (hw - 0.25), -hl + 0.02, 0.72, s * (hw - 0.05), TAIL, 0, 0.9);
+    patch(b, 6, 4, (u, v) => { const x = 0.98 + 0.5*u; return [x - v*0.0, 1.2 + (Math.min(1.78, roofY(x) - 0.12) - 1.2)*v, s*(hw - 0.035*v - 0.002 + 0.007)]; }, PANE, [0, 0, s]);
+    box(b, 0.95, 1.14, s*hw, 0.98, 1.82, s*(hw + 0.006), RUBBER);
+    rbox(b, 0.92, 0.6, s*hw, 0.94, 1.8, s*(hw + 0.005), [0.05, 0.05, 0.055]);             // door shuts
+    rbox(b, 1.52, 0.6, s*hw, 1.54, 1.15, s*(hw + 0.005), [0.05, 0.05, 0.055]);
+    rbox(b, 0.92, 0.58, s*hw, 1.54, 0.6, s*(hw + 0.005), [0.05, 0.05, 0.055]);
+    rbox(b, 1.0, 1.05, s*(hw + 0.002), 1.14, 1.09, s*(hw + 0.022), [0.08, 0.08, 0.085]);       // handle
+    rod(b, [1.56, 1.42, s*(hw - 0.02)], [1.62, 1.5, s*(hw + 0.16)], 0.009, RUBBER);
+    rbox(b, 1.58, 1.42, s*(hw + 0.12), 1.64, 1.67, s*(hw + 0.26), RUBBER);
+    rod(b, [1.77, 1.2, s*0.62], [1.62, 1.6, s*0.2], 0.006, RUBBER);
+    // lamps, indicator, the fender's stripe, bumper ends
+    rbox(b, 1.94, 0.76, s*0.48, 2.0, 0.96, s*0.72, [0.8, 0.8, 0.82]);
+    b.addGeo(G.sph2, M(1.99, 0.86, s*0.6, 0.03, 0.08, 0.1), HEAD, 0, 1);
+    b.addGeo(G.sph2, M(1.97, 0.7, s*0.62, 0.025, 0.03, 0.07), AMBER, 0, 0.7);
+    // tail lamps on the bed's end
+    rbox(b, -hl - 0.03, 0.56, s*(hw - 0.3), -hl + 0.02, 0.74, s*(hw - 0.06), [0.1, 0.1, 0.1]); b.addGeo(G.sph2, M(-hl - 0.03, 0.65, s*(hw - 0.18), 0.02, 0.07, 0.1), TAIL, 0, 0.9);
+    rbox(b, RX - 0.44, 0.12, s*(hw - 0.26), RX - 0.41, 0.48, s*(hw - 0.04), RUBBER);          // mud flaps
   }
-  box(b, -hl - 0.02, 0.42, -0.25, -hl - 0.01, 0.55, 0.25, [0.98, 0.82, 0.12]);
-  for (const x of [1.25, -1.2]) for (const s of [-1, 1]) wheel(b, x, 0.32, s * (hw - 0.15), 0.32, 0.18);
+  // the grille, its bars and badge; bumper, plate
+  rbox(b, 1.955, 0.7, -0.44, 2.0, 0.96, 0.44, [0.05, 0.05, 0.055]);
+  for (let k = 0; k < 5; k++) rbox(b, 1.985, 0.72 + k*0.05, -0.42, 2.012, 0.74 + k*0.05, 0.42, [0.5, 0.5, 0.52]);
+  b.addGeo(G.sph2, M(2.012, 0.84, 0, 0.012, 0.04, 0.06), CHROME);
+  rbox(b, 1.9, 0.5, -hw - 0.01, 2.04, 0.66, hw + 0.01, [0.14, 0.14, 0.15]); box(b, 2.035, 0.53, -0.2, 2.045, 0.62, 0.2, [0.96, 0.96, 0.9]);
+  // the bed: planks, posts, hinged sides, a tailgate with chains and latches
+  rbox(b, -hl, 0.5, -hw, 0.68, 0.56, hw, [0.2, 0.18, 0.16]);
+  for (let z = -hw + 0.04; z < hw - 0.04; z += 0.14) box(b, -hl + 0.02, 0.56, z, 0.66, 0.595, z + 0.125, wood);
+  for (const s of [-1, 1]) {
+    for (let k = 0; k < 3; k++) rbox(b, -hl + 0.02, 0.62 + k*0.145, s*hw - 0.022, 0.66, 0.75 + k*0.145, s*hw + 0.022, side);
+    for (const x of [-1.78, -1.0, -0.2, 0.62]) { rbox(b, x - 0.04, 0.54, s*hw - 0.03, x + 0.04, 1.1, s*hw + 0.032, [0.14, 0.14, 0.15]); }
+    for (const x of [-1.4, -0.6, 0.2]) { b.addGeo(G.cyl8, M(x, 0.62, s*(hw + 0.026), 0.015, 0.06, 0.015, 0, 0, Math.PI/2), [0.15, 0.15, 0.15]); rod(b, [x, 0.98, s*(hw + 0.024)], [x, 1.02, s*(hw + 0.036)], 0.012, STEEL); }
+  }
+  for (let k = 0; k < 3; k++) rbox(b, -hl - 0.025, 0.62 + k*0.145, -hw + 0.03, -hl + 0.025, 0.75 + k*0.145, hw - 0.03, side);
+  for (const x of [-hl, 0.66]) rbox(b, x - 0.02, 1.07, -hw, x + 0.02, 1.11, hw, [0.14, 0.14, 0.15]);
+  for (const s of [-1, 1]) tube(b, [[-hl - 0.03, 1.02, s*(hw - 0.03)], [-hl - 0.09, 0.9, s*(hw - 0.03)], [-hl - 0.03, 0.78, s*(hw + 0.02)]], 0.005, STEEL, 8, 4);
+  box(b, 0.68, 0.56, -hw, 0.71, 1.32, hw, [0.2, 0.2, 0.2]);                             // the cab's guard
+  for (let z = -hw + 0.06; z < hw; z += 0.1) rod(b, [0.67, 1.1, z], [0.67, 1.32, z], 0.006, [0.14, 0.14, 0.15]);
+  box(b, -hl - 0.03, 0.44, -0.2, -hl - 0.01, 0.55, 0.2, [0.98, 0.82, 0.12]);
+  // the load: sacks, a rope over them
+  const load = [[-1.55, -0.32], [-1.55, 0.3], [-0.95, -0.32], [-0.95, 0.3], [-0.35, -0.32], [-0.35, 0.3], [0.25, -0.32], [0.25, 0.3]];
+  for (const [x, z] of load) b.addGeo(RB, M(x, 0.76, z, 0.62, 0.32, 0.52), [0.85, 0.82, 0.72], 0, 3);
+  for (const [x, z] of load.slice(0, 5)) b.addGeo(RB, M(x + 0.16, 1.03, z*.6, 0.6, 0.28, 0.5), [0.8, 0.77, 0.66], 0, 3);
+  for (const x of [-1.25, -0.25]) tube(b, [[x, 1.1, -hw], [x, 1.26, -0.3], [x, 1.28, 0.3], [x, 1.1, hw]], 0.008, [0.72, 0.7, 0.6], 12, 4);
   return { body: b.build(), glass: gl.build(), dims: { L, W, H: 1.95, wb: 2.45 } };
 }
 
