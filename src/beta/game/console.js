@@ -1,10 +1,14 @@
-// The Test bench's terminal. A small language, not a cheat menu: a command is `name args --flag=value`, statements chain with
+// Free roam's terminal. A small language, not a cheat menu: a command is `name args --flag=value`, statements chain with
 // `;`, arguments complete from the live game by type. Every command declares its signature as a string, like
 //   spawn <vehicle:vehicle> [count:int] [--paint:paint] [--drive]
 // and that one string is its help, its usage line and its tab completion. Nothing here knows about the game: commands.js does.
-const esc = (s) => String(s);
+import { guard } from './guard.js';
+
+const esc = (s) => String(s), MAX = 2000;
 
 // ---------------------------------------------------------------- the language
+// a signature as you'd read it: <vehicle> rather than <vehicle:vehicle>
+export const plain = (sig) => sig.replace(/:[\w|-]+/g, '');
 export function tokenize(line) {
   const out = []; let i = 0, cur = '', on = false, q = '', start = 0;
   const flush = (end) => { if (on) { out.push({ v: cur, start, end, quoted: !!q }); cur = ''; on = false; } };
@@ -57,6 +61,7 @@ export class Shell {
   type(name, fn) { this.types[name] = fn; }
   print(text, cls = '') { this.printer(esc(text), cls); }
   table(rows, head) {
+    if (this.tabler) return this.tabler(rows, head);
     const all = head ? [head, ...rows] : rows, n = Math.max(...all.map(r => r.length)), w = [];
     for (let c = 0; c < n; c++) w[c] = Math.max(...all.map(r => String(r[c] ?? '').length));
     const fmt = (r) => r.map((v, c) => String(v ?? '').padEnd(w[c] + 2)).join('').trimEnd();
@@ -81,25 +86,33 @@ export class Shell {
         if (m) flags[m[1]] = m[2] === undefined ? true : m[2]; else args.push(a.v);
       }
       const need = c.args.filter(a => !a.opt).length;
-      if (args.length < need) { this.print('usage: ' + c.sig, 'err'); continue; }
+      if (args.length < need) { this.print('usage: ' + plain(c.sig), 'err'); continue; }
       for (const f in flags) if (!(f in c.flags)) this.print(`${head}: unknown flag --${f}`, 'warn');
       try { await c.run(args, flags, st); }
       catch (e) { this.print(`${head}: ${e && e.message || e}`, 'err'); console.warn('console', st, e); }
     }
   }
+  // every command, in the order they were registered, grouped
+  listing() {
+    const pretty = (a) => a.replace(/:[\w|-]+/, '');
+    return [...this.cmds.values()].map(c => ({ v: c.name, note: c.about, group: c.group || 'other', args: c.sig.split(/\s+/).slice(1).map(pretty).join(' ') }))
+      .concat(Object.keys(this.userAlias || {}).map(v => ({ v, note: 'your alias: ' + this.userAlias[v], group: 'yours' })))
+      .map((c, i) => [(this.order || []).indexOf(c.group), i, c]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]);
+  }
   // what could go at the end of the line. Returns { from, items: [{ v, note }], sig, argIndex }
   complete(line) {
     const st0 = line.lastIndexOf(';') + 1, st = line.slice(st0), toks = tokenize(st), endsSpace = !st.length || /\s$/.test(st);
-    if (!st.trim()) return { from: line.length, items: [], sig: null };
+    if (!st.trim()) return { from: line.length, items: this.listing(), sig: null, all: true };
     const cur = endsSpace ? '' : (toks[toks.length - 1]?.v ?? ''), from = st0 + (endsSpace ? st.length : toks[toks.length - 1].start);
     const pick = (list, q0 = cur) => {
       const q = q0.toLowerCase(), a = [], b = [];
       for (const it of list) { const o = it && it.v !== undefined ? it : { v: it }, l = String(o.v).toLowerCase(); if (l.startsWith(q)) a.push(o); else if (q && l.includes(q)) b.push(o); }
-      return [...a, ...b].slice(0, 40);
+      return [...a, ...b].slice(0, MAX);
     };
     if (toks.length === 1 && !endsSpace) {
-      const all = [...this.cmds.values()].map(c => ({ v: c.name, note: c.about })).concat(Object.keys(this.userAlias || {}).map(v => ({ v, note: 'alias' })));
-      return { from, items: pick(all), sig: null };
+      // by name first, then anything whose description mentions it ("teleport" finds tp)
+      const all = this.listing(), named = pick(all), q = cur.toLowerCase(), said = all.filter(o => !named.includes(o) && String(o.note).toLowerCase().includes(q));
+      return { from, items: [...named, ...said], sig: null, all: true };
     }
     const c = this.find(toks[0].v);
     if (!c) return { from, items: [], sig: null };
@@ -113,37 +126,65 @@ export class Shell {
     const first = c.args[0] && c.args[0].t.split('|').map(t => this.types[t]).find(f => f && f.span);
     if (first && toks.length > 1 && !/^[~^@#\d-]/.test(toks[1].v)) {
       const q = st.slice(toks[1].start).replace(/^["']/, '');
-      return { from: st0 + toks[1].start, items: first(q.trim()).slice(0, 40), sig: c, argIndex: 0 };
+      return { from: st0 + toks[1].start, items: first(q.trim()).slice(0, MAX), sig: c, argIndex: 0 };
     }
     const arg = c.args[Math.min(pos, c.args.length - 1)], use = arg && (pos < c.args.length || arg.rest) ? arg : null;
     if (!use) return { from, items: [], sig: c, argIndex: -1 };
     let items = [];
     for (const t of use.t.split('|')) { const fn = this.types[t]; if (fn) items = items.concat(fn.own ? fn(cur, c, used) : pick(fn(cur, c, used))); }
-    return { from, items: items.slice(0, 40), sig: c, argIndex: Math.min(pos, c.args.length - 1) };
+    return { from, items: items.slice(0, MAX), sig: c, argIndex: Math.min(pos, c.args.length - 1), argName: use.n };
   }
 }
 
 // ---------------------------------------------------------------- the terminal
 const HIST = 'nh48_console_hist';
+// each group of commands gets its own colour off the palette
+const DABS = ['#f2b705', '#e0714f', '#7fa6c9', '#a8b86a', '#c98ab0', '#e3a35c', '#69b3a8', '#b49ad6'];
 export class Terminal {
   constructor(shell, opts = {}) {
-    this.sh = shell; this.opts = opts; this.open = false; this.hist = []; this.hi = -1; this.sel = -1; this.draft = '';
+    this.sh = shell; this.opts = opts; this.open = false; this.hist = []; this.hi = -1; this.sel = -1; this.draft = ''; this.dabs = {};
     try { this.hist = JSON.parse(localStorage.getItem(HIST) || '[]'); } catch (e) { /* private window */ }
     const el = this.el = document.createElement('div');
     el.className = 'nhc'; el.hidden = true;
-    el.innerHTML = '<div class="nhc-log" role="log"></div><div class="nhc-sug" hidden></div><div class="nhc-sig" hidden></div><label class="nhc-in"><span class="nhc-p"></span><span class="nhc-w"><span class="nhc-ghost"></span><input spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Command"></span></label>';
+    el.innerHTML = `<div class="nhc-card">
+      <header class="nhc-head"><h2>Terminal</h2><span class="nhc-tip"><kbd>Tab</kbd> complete <kbd>↓</kbd> walk the list <kbd>↑</kbd> last command <kbd>Esc</kbd> close</span><button class="nhc-copy" type="button">Copy log</button></header>
+      <div class="nhc-main"><div class="nhc-log" role="log"></div><div class="nhc-sig" hidden></div>
+        <label class="nhc-in"><span class="nhc-p"></span><span class="nhc-w"><span class="nhc-ghost"></span><input spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Type a command, or pick one from the list"></span></label></div>
+      <aside class="nhc-side"><div class="nhc-count"></div><div class="nhc-sug" role="listbox"></div></aside>
+    </div>`;
     (opts.parent || document.body).appendChild(el);
-    this.log = el.querySelector('.nhc-log'); this.sug = el.querySelector('.nhc-sug'); this.sigEl = el.querySelector('.nhc-sig');
+    this.log = el.querySelector('.nhc-log'); this.sug = el.querySelector('.nhc-sug'); this.sigEl = el.querySelector('.nhc-sig'); this.count = el.querySelector('.nhc-count');
     this.input = el.querySelector('input'); this.ghost = el.querySelector('.nhc-ghost');
-    el.querySelector('.nhc-p').textContent = opts.prompt || '$';
     shell.printer = (t, c) => this.line(t, c);
+    shell.tabler = (rows, head) => this.tableOut(rows, head);
     this.input.addEventListener('input', () => { this.hi = -1; this.refresh(); });
-    this.input.addEventListener('keydown', (e) => this.key(e));
-    // nothing typed here reaches the game, the page or the pointer lock
-    for (const k of ['keydown', 'keypress']) el.addEventListener(k, (e) => e.stopPropagation());
+    el.querySelector('.nhc-copy').addEventListener('click', (e) => { const b = e.currentTarget; navigator.clipboard?.writeText(this.log.innerText).then(() => { b.textContent = 'Copied'; setTimeout(() => { b.textContent = 'Copy log'; }, 1200); }); this.input.focus(); });
+    // a click off the card puts it away; a click on the card keeps the typing going, unless you're selecting text to copy
+    el.addEventListener('mousedown', (e) => { if (e.target === el) { e.preventDefault(); this.hide(); } });
+    el.addEventListener('mouseup', () => { if (!String(getSelection())) this.input.focus(); });
+    for (const k of ['wheel', 'pointerdown', 'pointerup', 'click', 'contextmenu']) el.addEventListener(k, (e) => e.stopPropagation());
+    this.keys = (e) => {
+      // Every key stops here, before the game. The text still lands in the input: only the listeners are skipped
+      if (e.type === 'keydown') {
+        if (document.activeElement !== this.input && !e.ctrlKey && !e.metaKey && !['Control', 'Meta', 'Shift', 'Alt'].includes(e.key)) this.input.focus();
+        this.key(e);
+      }
+      e.stopImmediatePropagation();
+    };
   }
   line(text, cls = '') {
     const d = document.createElement('div'); d.className = 'nhc-l' + (cls ? ' ' + cls : ''); d.textContent = text;
+    this.add(d);
+  }
+  tableOut(rows, head) {
+    const n = Math.max(...(head ? [head, ...rows] : rows).map(r => r.length)), t = document.createElement('div');
+    t.className = 'nhc-t'; t.style.gridTemplateColumns = `repeat(${n}, auto)`;
+    const cells = (r, cls) => { for (let c = 0; c < n; c++) { const d = document.createElement('span'); d.textContent = r[c] ?? ''; if (cls) d.className = cls; t.appendChild(d); } };
+    if (head) cells(head, 'dim');
+    for (const r of rows) cells(r);
+    this.add(t);
+  }
+  add(d) {
     this.log.appendChild(d);
     while (this.log.children.length > 600) this.log.firstChild.remove();
     this.log.scrollTop = this.log.scrollHeight;
@@ -151,14 +192,14 @@ export class Terminal {
   clear() { this.log.textContent = ''; }
   show(prefill = '') {
     if (this.open) return;
-    this.open = true; this.el.hidden = false;
-    this.input.value = prefill; this.refresh();
+    this.open = true; this.el.hidden = false; guard.on = this.keys;
+    this.input.value = prefill; this.hi = -1; this.refresh();
     this.input.focus();
     this.opts.onOpen && this.opts.onOpen();
   }
   hide() {
     if (!this.open) return;
-    this.open = false; this.el.hidden = true; this.input.blur();
+    this.open = false; this.el.hidden = true; this.input.blur(); guard.on = null;
     this.opts.onClose && this.opts.onClose();
   }
   push(line) {
@@ -168,32 +209,39 @@ export class Terminal {
   }
   key(e) {
     const inp = this.input, C = this.c;
-    if (e.key === 'Escape') { e.preventDefault(); this.hide(); return; }
+    if (e.key === 'Escape' || (e.code === 'Backquote' && !inp.value)) { e.preventDefault(); this.hide(); return; }
+    if (e.code === 'Slash' && !inp.value) { e.preventDefault(); return; }           // (the habit of typing /spawn)
     if (e.key === 'Tab') {
       e.preventDefault();
       if (!C || !C.items.length) return;
-      if (C.items.length === 1 || this.sel >= 0) { this.accept(C.items[Math.max(0, this.sel)]); return; }
-      // the part every candidate shares first, the way a shell does; then walk the list
-      const pre = commonPrefix(C.items.map(i => String(i.v))), cur = inp.value.slice(C.from);
+      if (this.sel >= 0) { this.accept(C.items[this.sel]); return; }
+      // what starts with what you typed decides, not what only mentions it: one of those is taken, several give the part they
+      // share, the way a shell does; then Tab walks the list
+      const cur = inp.value.slice(C.from), names = C.items.filter(i => cur && String(i.v).toLowerCase().startsWith(cur.toLowerCase()));
+      if (names.length === 1 || C.items.length === 1) { this.accept(names[0] || C.items[0]); return; }
+      const pre = commonPrefix(names.map(i => String(i.v)));
       if (pre.length > cur.length) { inp.value = inp.value.slice(0, C.from) + pre; this.refresh(); return; }
-      this.sel = e.shiftKey ? C.items.length - 1 : 0; this.paint();
+      this.pick(e.shiftKey ? C.items.length - 1 : 0);
       return;
     }
+    if (e.key === 'PageUp' || e.key === 'PageDown') { e.preventDefault(); this.sug.scrollTop += (e.key === 'PageUp' ? -1 : 1)*this.sug.clientHeight*.85; return; }
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
-      const dir = e.key === 'ArrowUp' ? -1 : 1;
-      if (this.sel >= 0 && C) { this.sel = (this.sel + dir + C.items.length) % C.items.length; this.paint(); return; }
-      if (this.hi < 0) { if (dir > 0) return; this.draft = inp.value; this.hi = this.hist.length; }
+      const dir = e.key === 'ArrowUp' ? -1 : 1, n = C ? C.items.length : 0;
+      // ↓ walks down the list, ↑ walks back up it and out of the top. With nothing picked, ↑ is your last command
+      if (this.sel >= 0) { this.pick(this.sel + dir >= n ? this.sel : this.sel + dir); return; }
+      if (dir > 0 && this.hi < 0) { if (n) this.pick(0); return; }
+      if (this.hi < 0) { this.draft = inp.value; this.hi = this.hist.length; }
       this.hi = Math.max(0, Math.min(this.hist.length, this.hi + dir));
-      inp.value = this.hi >= this.hist.length ? this.draft : this.hist[this.hi];
+      inp.value = this.hi >= this.hist.length ? this.draft : this.hist[this.hi] ?? '';
       if (this.hi >= this.hist.length) this.hi = -1;
-      this.sug.hidden = true; this.c = null; this.ghost.textContent = '';
+      this.refresh();
       return;
     }
     if (e.key === 'Enter') {
       e.preventDefault();
       if (this.sel >= 0 && C) { this.accept(C.items[this.sel]); return; }
-      const v = inp.value.trim(); inp.value = ''; this.hi = -1; this.refresh();
+      const v = inp.value.trim().replace(/^\//, ''); inp.value = ''; this.hi = -1; this.refresh();
       if (v) { this.push(v); this.sh.exec(v); }
       return;
     }
@@ -210,24 +258,40 @@ export class Terminal {
     try { c = this.sh.complete(this.input.value); } catch (e) { console.warn('complete', e); }
     this.c = c; this.sel = -1; this.paint(); this.log.scrollTop = this.log.scrollHeight;
   }
+  // choose a row of the list, -1 for none, and keep it in view
+  pick(i) {
+    const rows = this.rows || [];
+    if (rows[this.sel]) rows[this.sel].classList.remove('on');
+    this.sel = i;
+    if (rows[i]) { rows[i].classList.add('on'); rows[i].scrollIntoView({ block: 'nearest' }); }
+    this.ghostOn();
+  }
+  ghostOn() {
+    const C = this.c, inp = this.input; this.ghost.textContent = '';
+    if (!C || !C.items.length || !inp.value) return;
+    const cur = inp.value.slice(C.from), top = String(C.items[Math.max(0, this.sel)].v);
+    if (top.toLowerCase().startsWith(cur.toLowerCase())) this.ghost.textContent = inp.value + top.slice(cur.length);
+  }
+  dab(g) { return this.dabs[g] || (this.dabs[g] = DABS[Object.keys(this.dabs).length % DABS.length]); }
   paint() {
-    const C = this.c, S = this.sug, inp = this.input;
-    this.ghost.textContent = '';
-    if (!C || !C.items.length || (C.items.length === 1 && inp.value.slice(C.from) === String(C.items[0].v))) { S.hidden = true; }
-    else {
-      S.hidden = false; S.textContent = '';
-      const n = Math.min(10, C.items.length), first = this.sel >= n ? this.sel - n + 1 : 0;
-      for (let i = first; i < first + n && i < C.items.length; i++) {
-        const it = C.items[i], d = document.createElement('div'); d.className = 'nhc-s' + (i === this.sel ? ' on' : '');
-        const a = document.createElement('b'); a.textContent = it.v; d.appendChild(a);
-        if (it.note) { const m = document.createElement('i'); m.textContent = it.note; d.appendChild(m); }
-        d.addEventListener('mousedown', (e) => { e.preventDefault(); this.accept(it); });
-        S.appendChild(d);
-      }
-      if (C.items.length > n) { const d = document.createElement('div'); d.className = 'nhc-s more'; d.textContent = `+${C.items.length - n} more`; S.appendChild(d); }
-      const cur = inp.value.slice(C.from), top = String(C.items[Math.max(0, this.sel)].v);
-      if (top.toLowerCase().startsWith(cur.toLowerCase())) this.ghost.textContent = inp.value + top.slice(cur.length);
-    }
+    const C = this.c, S = this.sug, items = C ? C.items : [], frag = document.createDocumentFragment(), rows = [];
+    let group = null;
+    items.forEach((it, i) => {
+      // a heading wherever the group changes, but only over the whole list: when filtering, the matches come first
+      if (it.group && it.group !== group && C.all && !this.input.value.trim().split(';').pop().trim()) { group = it.group; const h = document.createElement('div'); h.className = 'nhc-g'; h.textContent = group; h.style.setProperty('--dab', this.dab(group)); frag.appendChild(h); }
+      const d = document.createElement('div'); d.className = 'nhc-s'; d.setAttribute('role', 'option');
+      if (it.group) d.style.setProperty('--dab', this.dab(it.group));
+      const top = document.createElement('div'); top.className = 'nhc-st';
+      const a = document.createElement('b'); a.textContent = it.v; top.appendChild(a);
+      if (it.args) { const g = document.createElement('code'); g.textContent = it.args; top.appendChild(g); }
+      d.appendChild(top);
+      if (it.note !== undefined && it.note !== '') { const m = document.createElement('i'); m.textContent = it.note; d.appendChild(m); }
+      d.addEventListener('mousedown', (e) => { e.preventDefault(); this.accept(it); });
+      frag.appendChild(d); rows.push(d);
+    });
+    S.textContent = ''; S.appendChild(frag); S.scrollTop = 0; this.rows = rows;
+    this.count.textContent = !C ? '' : C.all ? (this.input.value.trim().split(';').pop().trim() ? `${items.length} matching` : `All commands · ${items.length}`) : items.length ? `${C.argName || 'options'} · ${items.length}` : 'Nothing to pick here, type it in';
+    this.ghostOn();
     const G = this.sigEl;
     if (C && C.sig) {
       G.hidden = false; G.textContent = '';
@@ -235,7 +299,7 @@ export class Terminal {
       for (const p of parts) {
         const s = document.createElement('span'), isArg = /^[<\[](?!--)/.test(p);
         if (isArg) arg++;
-        s.textContent = p + ' '; if (isArg && arg === C.argIndex) s.className = 'on';
+        s.textContent = p.replace(/:[\w|-]+/, '') + ' '; if (isArg && arg === C.argIndex) s.className = 'on';
         G.appendChild(s);
       }
       const m = document.createElement('em'); m.textContent = C.sig.about; G.appendChild(m);

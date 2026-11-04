@@ -1,6 +1,6 @@
-// The Test bench: a mode of its own on /beta's title. It's free roam (nothing it does can reach your story game: saves are
-// shut for as long as it runs) with a terminal on / or `. Rates, spawns and the rest all go back when you leave it.
-import { Shell, Terminal } from './console.js';
+// Free roam's terminal, on / or `. Nothing it does can reach your own game: saves are shut for as long as free roam runs,
+// and rates, spawns and the rest all go back when you leave it.
+import { Shell, Terminal, plain } from './console.js';
 import { Vehicle, SPECS, specOf, defaultPaint } from '@orig/vehicles/vehicle.js';
 import { TYPES } from '@orig/traffic/traffic.js';
 import { WEATHERS } from '@orig/gfx/weather.js';
@@ -32,13 +32,13 @@ const fmt = (v) => {
   return `${name && name !== 'Object' ? name + ' ' : ''}{ ${keys.slice(0, 10).map(k => { const q = v[k]; return k + ': ' + (typeof q === 'object' && q ? '…' : typeof q === 'function' ? 'ƒ' : fmt(q)); }).join(', ')}${keys.length > 10 ? `, … ${keys.length} keys` : ''} }`;
 };
 
-export function testBench(G) {
+export function freeTerminal(G) {
   const sh = new Shell(), STORE = 'nh48_console', keep = (() => { try { return JSON.parse(localStorage.getItem(STORE) || '{}'); } catch (e) { return {}; } })();
   sh.userAlias = keep.alias || {};
   const binds = keep.bind || {}, autoexec = keep.autoexec || [];
   const persist = () => { try { localStorage.setItem(STORE, JSON.stringify({ alias: sh.userAlias, bind: binds, autoexec })); } catch (e) { /* private window */ } };
   const P = () => G.player, T = () => G.traffic, W = () => G.W;
-  const St = { god: false, noclip: false, fuel: false, hourLock: null, scale: 1, fly: null, watches: [], timers: [], spawned: [], rates: {}, baseW: null, baseMax: 0, hud: true, wasFree: true, foot: 1 };
+  const St = { god: false, noclip: false, fuel: false, hourLock: null, scale: 1, fly: null, watches: [], timers: [], spawned: [], rates: {}, baseW: null, baseMax: 0, hud: false, wasFree: true, foot: 1 };
   let armed = false;
 
   // ------------------------------------------------------------ places and things to point at
@@ -147,7 +147,7 @@ export function testBench(G) {
   // ------------------------------------------------------------ what completes what
   sh.type('vehicle', () => [...Object.keys(SPECS).filter(k => !SPECS[k].alias).map(v => ({ v, note: `${SPECS[v].model} · ${Math.round(SPECS[v].vTop*3.6)} km/h` })), ...Object.keys(NICK).map(v => ({ v, note: '→ ' + NICK[v] }))]);
   sh.type('rate', () => ['*', ...Object.keys(TYPES)].map(v => ({ v, note: v === '*' ? 'everything' : `now ${(St.rates[v] ?? 1)}×` })).concat(Object.keys(NICK).map(v => ({ v, note: '→ ' + NICK[v] }))));
-  const placeT = (cur) => cur.length < 2 || /^[~^@#\d-]/.test(cur) ? [] : search(cur, 12).map(p => ({ v: p.n, note: p.c + ' · ' + Math.round(Math.hypot(p.x - P().x, p.z - P().z)) + ' m' }));
+  const placeT = (cur) => /^[~^@#\d-]/.test(cur) ? [] : (cur ? search(cur, 400) : allPlaces().filter(p => p.c === 'area').sort((a, b) => a.l < b.l ? -1 : 1)).map(p => ({ v: p.n, note: p.c + ' · ' + Math.round(Math.hypot(p.x - P().x, p.z - P().z)) + ' m' }));
   placeT.own = true; placeT.span = true;
   sh.type('place', placeT);
   sh.type('at', () => ['@wp', ...Object.keys(TYPES).map(k => '@' + k)].map(v => ({ v, note: v === '@wp' ? 'waypoint' : 'nearest in traffic' })));
@@ -169,7 +169,7 @@ export function testBench(G) {
 
   // ------------------------------------------------------------ commands: finding your way
   sh.reg('help [command:cmd]', 'every command, or one in detail', ([c]) => {
-    if (c) { const k = sh.find(c); if (!k) throw new Error('no such command'); say(k.sig, 'ok'); say(k.about); if (k.more) for (const l of k.more) say('  ' + l, 'dim'); return; }
+    if (c) { const k = sh.find(c); if (!k) throw new Error('no such command'); say(plain(k.sig), 'ok'); say(k.about); if (k.more) for (const l of k.more) say('  ' + l, 'dim'); return; }
     const grp = {}; for (const k of sh.cmds.values()) (grp[k.group || 'other'] = grp[k.group || 'other'] || []).push(k);
     for (const g in grp) { say(g, 'head'); sh.table(grp[g].map(k => [k.name, k.about])); }
     say('Tab completes from the live game. ; chains commands. help <command> for detail.', 'dim');
@@ -185,7 +185,7 @@ export function testBench(G) {
     if (!r.length) { delete binds[k]; persist(); say(`${k} unbound`); return; }
     binds[k] = tail(raw, 2); persist(); say(`${k} → ${binds[k]}`, 'ok');
   }, { group: 'shell', more: ['Keys are KeyboardEvent codes: F2, KeyG, Digit1. bind F2 "spawn super --drive"'] });
-  sh.reg('autoexec [command:str...]', 'run commands whenever the bench starts. "autoexec clear" empties it', (a, f, raw) => {
+  sh.reg('autoexec [command:str...]', 'run commands whenever free roam starts. "autoexec clear" empties it', (a, f, raw) => {
     if (!a.length) { if (!autoexec.length) say('nothing'); else autoexec.forEach((l, i) => say(`${i}  ${l}`)); return; }
     if (a[0] === 'clear') { autoexec.length = 0; persist(); say('emptied'); return; }
     autoexec.push(tail(raw, 1)); persist(); say(`added: ${autoexec[autoexec.length - 1]}`, 'ok');
@@ -305,7 +305,7 @@ export function testBench(G) {
   sh.reg('stats', 'what the renderer is drawing right now', () => { const s = window.__nh?.stats?.() || {}; sh.table(Object.entries(s).map(([k, v]) => [k, fmt(v)])); }, { group: 'picture' });
   sh.reg('readout [on:onoff]', 'the numbers top left', ([a]) => { St.hud = onoff(a, St.hud); tel.hidden = !St.hud; }, { group: 'picture', also: ['hud'] });
 
-  // ------------------------------------------------------------ checking the bench itself
+  // ------------------------------------------------------------ checking the terminal itself
   sh.reg('doctor', 'test every hook this terminal has into the game, and say which work', async () => {
     const check = async (name, f) => { try { const r = await f(); if (r === false) throw new Error('no'); say(`PASS  ${name}`, 'ok'); return 1; } catch (e) { say(`FAIL  ${name}: ${e && e.message || e}`, 'err'); return 0; } };
     const tests = [
@@ -334,10 +334,13 @@ export function testBench(G) {
 
   // ------------------------------------------------------------ the terminal and its readout
   const term = new Terminal(sh, {
-    prompt: 'nh48@pune:~$',
     onOpen: () => { G.input?.keys?.clear(); G.input?.pressed?.clear(); G.releaseMouse?.(); },
-    onClose: () => { G.lockMouse?.(); },
+    onClose: () => { G.input?.keys?.clear(); G.input?.pressed?.clear(); G.lockMouse?.(); },
   });
+  sh.order = ['vehicles', 'world', 'you', 'picture', 'live', 'shell', 'yours'];
+  // the "click to take the mouse" hint has no business showing while you're typing
+  const lockHint = G.hud?.setLockHint?.bind(G.hud);
+  if (lockHint) G.hud.setLockHint = (on) => lockHint(on && !term.open);
   const tel = document.createElement('pre'); tel.className = 'nhc-tel'; tel.hidden = true; document.body.appendChild(tel);
   const fps = { n: 0, t: 0, low: 0, cur: 0, ms: 0, worst: 0 };
   function readout() {
@@ -390,17 +393,17 @@ export function testBench(G) {
     if (St.trafficStop) for (const o of T().list) { o.v = 0; o.argue = Math.max(o.argue || 0, 0.5); }
     for (let i = St.timers.length - 1; i >= 0; i--) { const t = St.timers[i]; t.t -= dt; if (t.t <= 0) { St.timers.splice(i, 1); sh.exec(t.c, true); } }
   }
-  // the hooks go in once and do nothing unless the bench is on
+  // the hooks go in once and do nothing outside free roam
   let hooked = false;
   function hook() {
     if (hooked) return; hooked = true;
     const frame = G.frame.bind(G), fixed = G.fixed.bind(G);
-    G.frame = (dt) => { if (!armed) return frame(dt); const r = frame(dt*St.scale); try { tick(dt*St.scale, dt); } catch (e) { console.warn('bench', e); } return r; };
+    G.frame = (dt) => { if (!armed) return frame(dt); const r = frame(dt*St.scale); try { tick(dt*St.scale, dt); } catch (e) { console.warn('terminal', e); } return r; };
     G.fixed = (h) => fixed(armed ? h*St.scale : h);
     const C = W().collision, res = C.resolve.bind(C);
     C.resolve = (...a) => armed && St.noclip ? null : res(...a);
     const Pl = P(), mul = Pl.sprintMul; Pl.sprintMul = () => (mul ? mul() : 1)*(armed ? St.foot : 1);
-    // the shut saves: nothing written while the bench runs, whatever it did to you
+    // the shut saves: nothing written during free roam, whatever the terminal did to you
     const Lf = G.life, ls = Lf.save.bind(Lf); Lf.save = () => { if (!armed) ls(); };
     const ss = G.saveStats.bind(G); G.saveStats = (...a) => armed ? undefined : ss(...a);
     const S = G.debugSave?.Save; if (S && S.save) { const o = S.save; S.save = function (...a) { return armed ? undefined : o.apply(this, a); }; }
@@ -417,12 +420,12 @@ export function testBench(G) {
 
   // ------------------------------------------------------------ in and out
   function arm() {
-    if (armed) return; armed = true; hook(); G.testMode = true;
+    if (armed) return; armed = true; hook();
     tel.hidden = !St.hud; readout();
     term.clear();
-    say('NH48 test bench. Saves are shut: nothing here reaches your game.', 'head');
-    say('Tab completes from the live game · help lists everything · doctor checks the hooks · Esc puts this away.', 'dim');
-    say('Try: roster   ·   spawn lambo --paint=verde --drive   ·   rate super 500; traffic flush   ·   tp fc road', 'dim');
+    say('Free roam terminal. Nothing here reaches your own game.', 'head');
+    say('Every command is in the list. Type to narrow it, Tab or a click to take one.', 'dim');
+    say('Try: spawn lambo --paint=verde --drive   ·   rate super 500; traffic flush   ·   tp fc road', 'dim');
     for (const l of autoexec) St.timers.push({ t: 0.5, c: l });
   }
   function disarm() {
@@ -432,10 +435,11 @@ export function testBench(G) {
     St.rates = {}; if (St.baseW) { for (const k in TYPES) TYPES[k].w = St.baseW[k]; St.baseW = null; }
     if (St.baseMax) { T().max = St.baseMax; St.baseMax = 0; }
     Object.assign(St, { god: false, noclip: false, hourLock: null, scale: 1, watches: [], timers: [], foot: 1, trafficStop: false });
-    term.hide(); tel.hidden = true; armed = false; G.testMode = false;
+    term.hide(); tel.hidden = true; armed = false; St.hud = false;
   }
   const leave = G.leaveFree.bind(G);
   G.leaveFree = () => { const r = leave(); disarm(); return r; };
-  G.beginTest = () => { arm(); G.beginFree(); };
-  G.bench = { sh, term, arm, disarm };
+  const begin = G.beginFree.bind(G);
+  G.beginFree = (...a) => { arm(); const r = begin(...a); setTimeout(() => { if (armed) G.hud?.toast?.('Terminal', 'Press / any time in free roam', 'info', 5); }, 1500); return r; };
+  G.terminal = { sh, term, arm, disarm };
 }
