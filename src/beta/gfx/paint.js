@@ -40,7 +40,15 @@ export const PU = {
   uStyle: { value: STYLE_PARAMS.map(p => new THREE.Vector4(p[0], p[1], p[2], p[3])) },
   uStyle2: { value: STYLE_PARAMS.map(p => new THREE.Vector4(p[4], p[5], p[7], p[8])) },
   uTime: GU.uTime, uNight: GU.uNight, uWindowLit: GU.uWindowLit, uShopsOpen: GU.uShopsOpen, uWet: GU.uWet,
+  tLamp: { value: null }, lampC: { value: new THREE.Vector4(0, 0, 1/256, 0) }, lampY: { value: 0 }, headP: { value: new THREE.Vector4() }, headD: { value: new THREE.Vector4(1, 0, 0, .85) },
 };
+// the light of lamps and your own headlight or torch on a surface (gfx/lamps.js keeps it up to date)
+export const LAMP = `uniform sampler2D tLamp; uniform vec4 lampC, headP, headD; uniform float lampY;
+vec3 lampAt(vec3 w, vec3 n){ vec3 c = vec3(0.); if (lampC.w > 0.) { vec2 q = (w.xz - lampC.xy)*lampC.z + .5;
+    c = vec3(1., .72, .44)*.95*texture(tLamp, q).r*(.5 + .5*max(n.y, 0.))*(1. - smoothstep(8., 13., w.y - lampY))*lampC.w; }
+  if (headP.w > 0.) { vec3 d = w - headP.xyz; float r = length(d); d /= r; c += vec3(1., .93, .78)*headP.w*3.*smoothstep(headD.w, headD.w + .1, dot(d, headD.xyz))*max(dot(n, -d), .2)/(1. + r*r*.035); }
+  return c; }
+`;
 
 const NOISE = `
 float h12(vec2 p){ vec3 q=fract(vec3(p.xyx)*.1031); q+=dot(q,q.yzx+33.33); return fract((q.x+q.y)*q.z); }
@@ -145,6 +153,7 @@ uniform vec3 sunDir, sunCol, shadeCol, sunLc, skyCol, fogCol; uniform float fogD
 uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform float shadowTexel, shadowOn, pScale, dpr;
 uniform sampler2D tNoise;
 uniform float uTime, uNight, uWindowLit, uShopsOpen, uWet;
+${LAMP}
 uniform vec4 uStyle[15], uStyle2[15];
 in vec3 vW; in vec3 vN; in vec3 vC; flat in float vK; in vec2 vA; in vec2 vU; in float vZ;
 #if defined(FMT_FACADE)
@@ -396,6 +405,7 @@ void main(){
   vec3 cl = base*sunCol;
   vec3 cs = base*shadeCol*(.92 + .16*max(n.y, 0.)) + vec3(.025, .03, .045)*dayK;
   vec3 c = mix(cs, cl, L);
+  c += base*lampAt(w, n);
   // glass takes the sky by day
   c = mix(c, mix(c, skyCol*.85, .25), gGlass*(1. - uNight)*(1. - L*.5));
   // wet: the ground darkens, takes the sky in its puddles
@@ -524,7 +534,8 @@ export class Paint {
       const sun = [s.color.r * s.intensity / PI, s.color.g * s.intensity / PI, s.color.b * s.intensity / PI];
       const up = Math.max(0, Math.min(1, _v.y * 4 + 0.15));
       const tm = (x) => Math.min(1.25, Math.pow(Math.max(0, x), 1 / 2.2));
-      PU.shadeCol.value.set(tm(amb[0] * ex * 1.15) * 0.85, tm(amb[1] * ex * 1.15) * 0.85, tm(amb[2] * ex * 1.15) * 0.85);
+      const nf = GU.uNight.value;
+      PU.shadeCol.value.set(tm(amb[0] * ex * 1.15) * 0.85 + nf*.07, tm(amb[1] * ex * 1.15) * 0.85 + nf*.09, tm(amb[2] * ex * 1.15) * 0.85 + nf*.17);
       PU.sunCol.value.set(tm((amb[0] + sun[0] * 0.8 * up) * ex), tm((amb[1] + sun[1] * 0.8 * up) * ex), tm((amb[2] + sun[2] * 0.8 * up) * ex));
       PU.sunLc.value.set(s.color.r * s.intensity, s.color.g * s.intensity, s.color.b * s.intensity);
       PU.dayK.value = Math.max(0, Math.min(1, (s.intensity * up) / 1.2));

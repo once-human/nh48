@@ -3,7 +3,7 @@
 // the game's meshes are never drawn. Each frame the bones of whoever's close go into one texture, and each part of a
 // person (body, shirt, trousers, hair...) is one instanced draw that reads them. Those closest get a smoother body.
 import * as THREE from 'three';
-import { PU } from '../gfx/paint.js';
+import { PU, LAMP } from '../gfx/paint.js';
 import { RNG } from '@orig/core/util.js';
 
 const TEX_W = 256, LOOK = 200, SLOTS = 96, CAST2 = 45*45;
@@ -38,6 +38,7 @@ const SHADOW_FS = `precision highp float; out vec4 o; void main(){ o = vec4(0.);
 const COMMON = `precision highp float; precision highp sampler2D; precision highp sampler2DShadow;
 in vec3 vN, vW, vB, vC; in vec2 vU; in float vZ; flat in int vS; out vec4 o;
 uniform sampler2D tSkin, tMap, tNoise; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, fogCol; uniform float shadowTexel, shadowOn, fogDensity, dayK;
+${LAMP}
 vec4 LK(int i){ return texelFetch(tSkin, ivec2(${LOOK} + i, vS), 0); }
 float nz(vec2 p){ return texture(tNoise, p/16.).r; }
 float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.05 + .002*vZ), 1.); if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.;
@@ -48,7 +49,7 @@ vec3 paint(vec3 b, vec3 n, vec3 w, float sss){
   float sh = (shadowOn > .5 && lit > 0.) ? smoothstep(.3, .7, shadowAt(w, n) + e*.3) : 1., L = lit*sh*dayK;
   vec3 cl = b*sunCol, cs = b*shadeCol*(.92 + .16*max(n.y, 0.)) + vec3(.02)*dayK;
   cs += b*vec3(.3, .08, .03)*sss*smoothstep(-.35, .05, ndl);
-  vec3 c = mix(cs, cl, L);
+  vec3 c = mix(cs, cl, L) + b*lampAt(w, n);
   float h = smoothstep(.5, .72, fract((gl_FragCoord.x + gl_FragCoord.y)*.17 + e*.9))*(1. - L)*(1. - smoothstep(10., 34., vZ));
   c = mix(c, c*.7, h*.6);
   float f = fogDensity*vZ; return mix(c, fogCol, 1. - exp(-f*f));

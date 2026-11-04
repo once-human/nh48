@@ -2,6 +2,7 @@
 // happens is the game's own code; what's different here is how it's drawn (src/beta/gfx, src/beta/world) and that
 // /beta keeps its own saves, starts you on foot with no auto of your own, and has no story.
 import * as THREE from 'three';
+import { inside } from './gfx/repaint.js';
 import './core/storage.js';         // /beta's saves and settings live apart from the game's (first, before anything reads them)
 import './gfx/legacy.js';           // the look for everything still drawn with three's materials (before any is made)
 import '@orig/gfx/painted.js';
@@ -32,6 +33,7 @@ import { fixPins } from '@orig/world/venues.js';
 import { Streamer } from '@orig/world/index.js';
 import { Actors } from './draw/actors.js';
 import { Shadows } from './gfx/shadows.js';
+import { Lamps } from './gfx/lamps.js';
 import { trackBodies } from './draw/skin.js';
 import { Graphics } from './game/graphics.js';
 
@@ -307,7 +309,7 @@ async function main() {
   }
   await game.init(progress);
   betaTitle(game);
-  { const actors = new Actors(game, scene); post.beforeDraw = (dt, cam) => actors.update(dt, cam); post.shadows = new Shadows(renderer, scene, sky, 2048); post.shadowFocus = () => (game.player.onFoot ? game.player.foot : game.player); game.swapShadows = (on, size) => post.shadows.set(on, size); game.shadowsOn = () => post.shadows.on; }
+  { const actors = new Actors(game, scene); const lamps = new Lamps(game); post.beforeDraw = (dt, cam) => { actors.update(dt, cam); lamps.update(); inside.value = game.interiors && game.interiors.inside ? 1 : 0; }; post.shadows = new Shadows(renderer, scene, sky, 2048); post.shadowFocus = () => (game.player.onFoot ? game.player.foot : game.player); game.swapShadows = (on, size) => post.shadows.set(on, size); game.shadowsOn = () => post.shadows.on; }
   game.gfx = new Graphics(game, { gpu: GPU, post }); game.gfx.install();
   cityUp();
   if (game.audio && game.voiceRemote) game.audio.remote = game.voiceRemote;

@@ -7,7 +7,12 @@ import { PU } from './paint.js';
 
 const STILL = 6, MOVES = 7, HALF = 95, FAR = 500, STEP = 24;
 const STILL_ROOT = /^(chunk|landmark|hills)/;
-const VS = `void main(){ vec4 p = vec4(position, 1.);
+const VS = `#include <common>
+#include <skinning_pars_vertex>
+void main(){ vec3 transformed = vec3(position);
+#include <skinbase_vertex>
+#include <skinning_vertex>
+  vec4 p = vec4(transformed, 1.);
 #ifdef USE_INSTANCING
   p = instanceMatrix*p;
 #endif
@@ -33,7 +38,7 @@ export class Shadows {
   free() { if (this.a) { for (const t of [this.a, this.b]) { t.depthTexture.dispose(); t.dispose(); } this.a = this.b = null; } }
   depth(m) {
     if (m.customDepthMaterial) return m.customDepthMaterial;
-    const f = Array.isArray(m.material) ? m.material[0] : m.material, side = SIDES[f.side], inst = !!m.isInstancedMesh, ic = !!(inst && m.instanceColor), k = side*4 + (inst ? 1 : 0) + (ic ? 2 : 0);
+    const f = Array.isArray(m.material) ? m.material[0] : m.material, side = SIDES[f.side], inst = !!m.isInstancedMesh, ic = !!(inst && m.instanceColor), k = side*8 + (inst ? 1 : 0) + (ic ? 2 : 0) + (m.isSkinnedMesh ? 4 : 0);
     let d = this.mats.get(k); if (!d) { d = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: 'void main(){}', side, colorWrite: false, toneMapped: false, fog: false }); this.mats.set(k, d); } return d;
   }
   // who casts, walking only what's being shown. Tree meshes are in the list of still things by their tag

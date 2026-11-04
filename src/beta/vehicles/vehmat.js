@@ -3,7 +3,7 @@
 // painted shader instead of the game's: poster colour in two tones, pencil in the shade, the sky and street along the
 // body as brushed bands, a sun glint on paint and chrome, lit glass, tyres matte, lamps that burn at night.
 import * as THREE from 'three';
-import { PU } from '../gfx/paint.js';
+import { PU, LAMP } from '../gfx/paint.js';
 
 const VS = `attribute float glow; attribute float paint;
 #ifdef USE_INSTANCING
@@ -36,6 +36,7 @@ const CHUNK = `precision highp float; precision highp sampler2DShadow;
 varying vec3 vN, vW, vC, vL; varying float vG, vP, vZ;
 uniform sampler2D tNoise; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, skyCol, fogCol, uTint; uniform float shadowTexel, shadowOn, fogDensity, dayK, uNight, uRough, uMetal;
 float nz(vec2 p){ return texture2D(tNoise, p/16.).r; }
+${LAMP}
 float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.05 + .002*vZ), 1.); if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.;
   float z = s.z - .0006; return .5*(texture(shadowTex, vec3(s.xy + vec2(-.6, .3)*shadowTexel, z)) + texture(shadowTex, vec3(s.xy + vec2(.6, -.3)*shadowTexel, z))); }
 `;
@@ -46,7 +47,7 @@ const FS = CHUNK + `void main(){
   float grime = (1. - smoothstep(.15, .7, vW.y))*(.6 + .6*nz(vL.xz*9.))*(1. - matte);
   b = mix(b, b*vec3(.62, .56, .48), grime*.4);
   if (matte > .5) b *= .9 + .2*nz(vL.xy*60.);
-  vec3 c = mix(b*shadeCol*(.92 + .16*max(n.y, 0.)) + vec3(.022)*dayK, b*sunCol, L);
+  vec3 c = mix(b*shadeCol*(.92 + .16*max(n.y, 0.)) + vec3(.022)*dayK, b*sunCol, L) + b*lampAt(vW, n);
   if (matte < .5) {
     // the world along the body: sky above a hard horizon, the road below, brushed on
     vec3 R = reflect(-V, n); float hz = smoothstep(-.02, .06, R.y + e*.08), fres = pow(1. - max(dot(n, V), 0.), 3.);
