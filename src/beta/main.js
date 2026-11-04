@@ -21,6 +21,7 @@ import { U } from '@orig/gfx/materials.js';
 import { installAtmosphere } from '@orig/gfx/atmos.js';
 import { vehicleMaterials } from './vehicles/vehmat.js';
 import * as VM from './vehicles/models.js';
+import './vehicles/physics.js';     // vehicles as boxes on four wheels
 import { PU } from './gfx/paint.js';
 import { PlayerAuto } from '@orig/vehicles/player.js';
 import { Traffic } from '@orig/traffic/traffic.js';

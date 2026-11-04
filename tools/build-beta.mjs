@@ -51,12 +51,18 @@ const SWAPS = [
 ];
 // a line in a game file swapped as it's bundled: only for what a module swap can't reach. Fails the build if the line has moved
 const PATCHES = {
-  [S('vehicles/vehicle.js')]: [["case 'bike': case 'bikeP': case 'bullet': case 'superbike': return buildBike({ parked: true });", "case 'bike': case 'bikeP': return buildBike({ parked: true }); case 'bullet': case 'superbike': return buildBike({ parked: true, kind: type });"]],
   // compound walls along the roads: not Pune, Onkar wants them gone. Neither drawn nor solid (the city's edge wall is separate)
   [S('world/index.js')]: [["for (const w of D.walls) put('walls', at(w[0] / 100, w[1] / 100), cmRing(w));", "/* /beta: no compound walls */"]],
   [S('world/tiles.js')]: [["for (let j = 0; j < D.walls.length; j += 60) {", "for (let j = 0; j < 0; j += 60) {"]],
   [S('world/propsChunk.js')]: [["for (const w of M.walls) {", "for (const w of []) {"]],
   [S('world/props.js')]: [["for (const w of M.walls) {", "for (const w of []) {"]],
+  // the four-wheel ground of beta/vehicles/physics.js
+  [S('vehicles/vehicle.js')]: [
+    ["case 'bike': case 'bikeP': case 'bullet': case 'superbike': return buildBike({ parked: true });", "case 'bike': case 'bikeP': return buildBike({ parked: true }); case 'bullet': case 'superbike': return buildBike({ parked: true, kind: type });"],
+    ["    const hF = this.heightAt(this.x + hx * half, this.z + hz * half), hR = this.heightAt(this.x - hx * half, this.z - hz * half);\n    const jolt = Math.max(Math.abs(hF - this.prevH[0]), Math.abs(hR - this.prevH[1]));", "    const gr = this.ground(hx, hz, sp), hF = gr.f, hR = gr.r, jolt = gr.jolt;"],
+    ["this.onFootpath = this.deck < 0 && !W.surf.isRoad(this.x, this.z);", "this.onFootpath = this.deck < 0 && gr.off > 0.5;"],
+    ["-clamp(this.latAcc * 0.01, -0.06, 0.06);", "-clamp(this.latAcc * 0.01, -0.06, 0.06) + gr.roll;"],
+  ],
   [S('traffic/traffic.js')]: [["bullet: buildBike({ helmet: true }), superbike: buildBike({ helmet: true }),", "bullet: buildBike({ helmet: true, kind: 'bullet' }), superbike: buildBike({ helmet: true, kind: 'superbike' }),"]],
 };
 const swapPlugin = {
