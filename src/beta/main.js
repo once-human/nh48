@@ -30,6 +30,7 @@ import './game/hands.js';
 import './game/fists.js';
 import './world/staff.js';
 import './world/walkin.js';
+import './world/busy.js';
 import './draw/alive.js';
 import './draw/falls.js';
 import './draw/fauna.js';
