@@ -96,7 +96,8 @@ const PATCHES = {
   // talk to anyone: no hearts over strangers any more (yours keep theirs: blue in your phone, black your partner), and
   // anyone with a name in a room can be talked to; it opens the talk (beta/game/talk.js), chatting them up leads to dating
   [S('world/interiors.js')]: [
-    ["      if (!p.name || (G.date && G.date.blocked(p)) || !(p.dateWith || G.date && G.date.eligible(p))) continue;", "      if (!p.name || (G.date && G.date.blocked(p)) || !(p.dateWith || G.date && G.date.eligible(p)) || (!p.dateWith && this.heartKind(p) === 'new')) continue;"],
+    // a mark only over people you know: a small dot for a contact, blue for someone you could see, black for your partner
+    ["      if (!p.name || (G.date && G.date.blocked(p)) || !(p.dateWith || G.date && G.date.eligible(p))) continue;", "      if (!p.name || (G.date && G.date.blocked(p)) || (!p.dateWith && this.heartKind(p) === 'new')) continue;"],
     ["if (!p.name || p.walkedOff || !(p.dateWith || D && D.eligible(p)) || (C.seat && !p.dateWith)) continue;", "if (!p.name || p.walkedOff || !p.dateWith) continue;"],
   ],
   [S('game/shops.js')]: [
