@@ -15,8 +15,8 @@ const STEPS = [
 ];
 // first-time hints: when it applies, and what to say
 const HINTS = [
-  { id: 'shop', keys: ['F'], main: 'Go in', sub: 'F at the door: shops, cafés, clubs. Near a vehicle too, F takes whichever is closer. 1 to 9 picks in any menu', when: (G) => G.player.onFoot && /enter|go in|shop|café|cafe/i.test(G.hud.$('h-prompt-t')?.textContent || '') },
-  { id: 'ask', keys: ['Z'], main: 'Lost?', sub: 'Walk up to someone and press Z to ask the way. Not everyone will help', when: (G) => G.player.onFoot && !!G.waypoint && Math.hypot(G.waypoint.x - G.player.x, G.waypoint.z - G.player.z) > 300 },
+  { id: 'shop', keys: ['F'], main: 'Go in', sub: 'F at the door: shops, cafés, clubs. V is for vehicles. 1 to 9 picks in any menu', when: (G) => G.player.onFoot && /enter|go in|shop|café|cafe/i.test(G.hud.$('h-prompt-t')?.textContent || '') },
+  { id: 'ask', keys: ['F'], main: 'Lost?', sub: 'Walk up to anyone and press F to talk: the way, food, a lift. Not everyone will help', when: (G) => G.player.onFoot && !!G.waypoint && Math.hypot(G.waypoint.x - G.player.x, G.waypoint.z - G.player.z) > 300 },
   { id: 'night', keys: ['L'], main: 'Torch', sub: 'It’s dark: L for your torch on foot, your headlights in a vehicle', when: (G) => G.hour > 19.3 || G.hour < 5.5 },
   { id: 'hungry', keys: ['E'], main: 'You’re hungry', sub: 'Eat from your jhola (E), or any tapri, misal place or hawker', when: (G) => G.life && G.life.s && (G.life.s.hunger ?? 1) < 0.3 },
   { id: 'thirsty', keys: ['E'], main: 'You’re thirsty', sub: 'A bottle from your jhola, or a juice centre', when: (G) => G.life && G.life.s && (G.life.s.thirst ?? 1) < 0.3 },

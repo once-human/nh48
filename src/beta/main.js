@@ -24,7 +24,8 @@ import * as VM from './vehicles/models.js';
 import './vehicles/physics.js';
 import './traffic/rates.js';
 import './game/prompt2.js';
-import './game/ask.js';           // stop someone and ask the way
+import './game/ask.js';           // what people tell you: the way, food, where you are, a lift
+import './game/talk.js';          // F at anyone: talk
 import './game/hands.js';         // what you hold, in your hand: the torch aimed by the arm, the body turning
 import './world/shutters.js';      // shutters that roll, with the rattle, and board lights that go with them
 import './world/flyovers.js';

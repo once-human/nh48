@@ -29,7 +29,7 @@ const SIDE = { left: ['डावीकडे', 'left'], right: ['उजवीक
 const one = (rng, a) => a[Math.floor(rng.next()*a.length)];
 const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
-function who(ppl, P) {
+export function who(ppl, P) {
   if (!P.onFoot) return null;
   const fx = Math.cos(P.th), fz = Math.sin(P.th); let best = null, bd = 2.6;
   for (const p of ppl.list) {
@@ -42,7 +42,7 @@ function who(ppl, P) {
 const hungry = (G) => { const s = G.life?.s; return s && typeof s.hunger === 'number' && s.hunger < 0.35; };
 
 // how this person is with strangers: their own, then pushed by your karma and the hour
-function attitude(ppl, p, G) {
+export function attitude(ppl, p, G) {
   if (p.cop) return ppl.rng.next() < 0.5 ? 'curt' : 'normal';
   if (!p._att0) {
     const r = ppl.rng.next();
@@ -57,7 +57,7 @@ function attitude(ppl, p, G) {
 }
 
 // the way from here to (x, z), as you'd say it
-function directions(G, P, x, z) {
+export function directions(G, P, x, z) {
   const Gr = G.W.graph, from = Gr.nearest(P.x, P.z, 80), to = Gr.nearest(x, z, 250);
   const r = from && to && (Gr.route(from, to, true) || Gr.route(from, to, false));
   if (!r) return null;
@@ -75,20 +75,19 @@ function directions(G, P, x, z) {
   }
   return { total, first, turns, ahead: at(Math.min(30, total)) };
 }
-const roadAt = (G, x, z) => { const e = G.W.graph.nearest(x, z, 25), n = e && G.W.graph.names?.[e.e?.name]; return n && n[0] || null; };
-const markAt = (G, x, z, r = 70) => { let best = null, bd = r; for (const q of G.city?.places || []) { if (q.c !== 'landmark') continue; const d = Math.hypot(q.x - x, q.z - z); if (d < bd) { bd = d; best = q; } } return best; };
+export const roadAt = (G, x, z) => { const e = G.W.graph.nearest(x, z, 25), n = e && G.W.graph.names?.[e.e?.name]; return n && n[0] || null; };
+export const markAt = (G, x, z, r = 70) => { let best = null, bd = r; for (const q of G.city?.places || []) { if (q.c !== 'landmark') continue; const d = Math.hypot(q.x - x, q.z - z); if (d < bd) { bd = d; best = q; } } return best; };
 // a parked bike or car of theirs, close to them
-function rideNear(G, p) {
+export function rideNear(G, p) {
   let best = null, bd = 22;
   for (const r of G.W.parkedList || []) { if (r.taken) continue; const d = Math.hypot(r.x - p.x, r.z - p.z); if (d < bd) { bd = d; best = r; } }
   return best;
 }
 
-People.prototype.ask = function (P, G) {
-  const p = who(this, P);
-  if (!p || (this._askT || 0) > performance.now()) return false;
-  this._askT = performance.now() + 1200;
-  const name = p.cop ? 'Havaldar' : p.female ? 'Lady' : 'Man', say = (mr, en, t = 6) => G.hud.say(name, mr, en, t), rng = this.rng;
+// before anything: what they know of you, and whether they'll talk to a stranger at all. Returns their attitude, or
+// null when that was the end of it (they've said their piece, run, or not even looked at you)
+People.prototype.gate = function (p, P, G, say) {
+  const rng = this.rng;
   const look = (x, z, t) => { this.watch(p, x, z, t); p.yaw = Math.atan2(z - p.z, x - p.x); };
   const mem = (this.mem && this.mem.get(p.id)) || {}, now = performance.now(), heat = G.police?.heat || 0, karma = G.life?.s?.karma || 0;
   const rep = this.rep ? this.rep.at(p.x, p.z) : { bad: 0, good: 0 }, h = G.hour ?? 12, late = h >= 22.5 || h < 5;
@@ -97,30 +96,38 @@ People.prototype.ask = function (P, G) {
     look(P.x, P.z, 2);
     if (rng.next() < 0.5) { this.flee(p, P.x, P.z, 20); say(one(rng, ['तू? लांब राहा माझ्यापासून!', 'परत तूच? जा!']), 'You? Keep away from me!'); }
     else { p.angry = 4; p.grudge = 12; say('आधी मारलं, आता पत्ता विचारतोय?', 'First you hit me, now you want directions?'); }
-    return true;
+    return null;
   }
-  if (heat >= 2 && !p.cop) { look(P.x, P.z, 1.5); say(one(rng, ['पोलीस तुम्हालाच शोधतायत ना? जा इथून.', 'माझं नाव घेऊ नका. जा.']), 'Aren\'t the police after you? Go, leave me out of it.'); this.flee(p, P.x, P.z, 10); return true; }
-  if (p.cop && heat >= 1) { look(P.x, P.z, 4); say('पत्ता नंतर. आधी इकडे या.', 'Directions later. Come here first.'); return true; }
-  if (mem.asked && now - mem.askedT < 60000) { look(P.x, P.z, 2); say(one(rng, ['आत्ताच सांगितलं ना! लक्ष कुठे असतं?', 'किती वेळा सांगू?']), 'I just told you! Where is your mind?'); return true; }
-  if ((rep.bad > 3 || karma < -40) && rng.next() < 0.6) { look(P.x, P.z, 1.5); say('तुमच्याबद्दल ऐकलंय मी. काही सांगायचं नाही.', 'I\'ve heard about you. I\'ve nothing to tell you.'); p.anim = 'no'; return true; }
+  if (heat >= 2 && !p.cop) { look(P.x, P.z, 1.5); say(one(rng, ['पोलीस तुम्हालाच शोधतायत ना? जा इथून.', 'माझं नाव घेऊ नका. जा.']), 'Aren\'t the police after you? Go, leave me out of it.'); this.flee(p, P.x, P.z, 10); return null; }
+  if (p.cop && heat >= 1) { look(P.x, P.z, 4); say('पत्ता नंतर. आधी इकडे या.', 'Directions later. Come here first.'); return null; }
+  if ((rep.bad > 3 || karma < -40) && rng.next() < 0.6) { look(P.x, P.z, 1.5); say('तुमच्याबद्दल ऐकलंय मी. काही सांगायचं नाही.', 'I\'ve heard about you. I\'ve nothing to tell you.'); p.anim = 'no'; return null; }
 
   const att = attitude(this, p, G);
   // the ones who won't: no look at all, or a shake of the head and off
-  if (att === 'ignore') return true;
+  if (att === 'ignore') return null;
   if (att === 'walkaway') {
     look(P.x, P.z, 0.8); p.anim = 'no';
-    if (rng.next() < 0.6) say(one(rng, ['नको, नको.', 'मला नाही माहीत.', 'घाईत आहे.']), one(rng, ['No, no.', 'I don\'t know.', 'I\'m in a hurry.']), 3);
+    if (rng.next() < 0.6) say(one(rng, ['नको, नको.', 'मला वेळ नाही.', 'घाईत आहे.']), one(rng, ['No, no.', 'I don\'t have time.', 'I\'m in a hurry.']), 3);
     setTimeout(() => { if (p.mode === 'watch') this.flee(p, P.x, P.z, 6); }, 900);
-    return true;
+    return null;
   }
-  look(P.x, P.z, 3);
-  if (rng.next() < (late ? 0.15 : 0.05) && att !== 'kind' && att !== 'eager') { say('पाटी वाचता येत नाही का?', 'Can\'t you read the signboard?'); return true; }
-  this.remember(p, 'asked'); this.mem.get(p.id).askedT = now;
+  look(P.x, P.z, 30);
+  return att;
+};
+// one thing asked: the way (to your waypoint), food, where you are, or a lift
+People.prototype.answer = function (p, P, G, what, att, say) {
+  const rng = this.rng, now = performance.now(), h = G.hour ?? 12, late = h >= 22.5 || h < 5;
+  const look = (x, z, t) => { this.watch(p, x, z, t); p.yaw = Math.atan2(z - p.z, x - p.x); };
+  const mem = (this.mem && this.mem.get(p.id)) || {};
+  if (mem['t_' + what] && now - mem['t_' + what] < 60000) { say(one(rng, ['आत्ताच सांगितलं ना! लक्ष कुठे असतं?', 'किती वेळा सांगू?']), 'I just told you! Where is your mind?'); return true; }
+  if (what === 'way' && rng.next() < (late ? 0.15 : 0.05) && att !== 'kind' && att !== 'eager') { say('पाटी वाचता येत नाही का?', 'Can\'t you read the signboard?'); return true; }
+  this.remember(p, 'asked'); this.mem.get(p.id)['t_' + what] = now;
   const pre = late && att !== 'curt' ? ['एवढ्या रात्री? जपून जा. ', 'At this hour? Go carefully. '] : att === 'eager' || att === 'kind' ? one(rng, [['हां, सांगतो. ', 'Yes, I\'ll tell you. '], ['अरे, सोपं आहे. ', 'Oh, that\'s easy. '], ['बघा, ', 'Look, ']]) : ['', ''];
   // where to: the waypoint, else food when you're hungry, else just where you are
-  let x, z, what;
-  if (G.waypoint) { x = G.waypoint.x; z = G.waypoint.z; what = G.waypoint.name || 'there'; }
-  else if (hungry(G)) {
+  let x, z;
+  const topic = what;
+  if ((topic === 'way' || topic === 'lift') && G.waypoint) { x = G.waypoint.x; z = G.waypoint.z; what = G.waypoint.name || 'there'; }
+  else if (topic === 'food') {
     const s = (G.shops?.nearby?.(P.x, P.z, 900) || []).filter(q => MENUS[q.kind] && q.x !== undefined)[0];
     if (!s) { say(pre[0] + 'इथे जवळ खायला काही नाही.', pre[1] + 'Nothing to eat round here.'); return true; }
     x = s.x; z = s.z; what = s.name || 'a place to eat';
@@ -146,10 +153,11 @@ People.prototype.ask = function (P, G) {
     return true;
   }
   // the kind ones: their bike or car is right here, and it's a fair way
-  if (att === 'kind' && D.total > 500 && G.transit && !this.lift) {
+  if ((att === 'kind' || (topic === 'lift' && att === 'eager' && rng.next() < 0.4)) && D.total > 500 && G.transit && !this.lift) {
     const r = rideNear(G, p);
-    if (r) { offerLift(this, G, p, r, { x, z, name: what }, D.total); return true; }
+    if (r) { offerLift(this, G, p, r, { x, z, name: what }, D.total, say); return true; }
   }
+  if (topic === 'lift') { say(...one(rng, [['माझी गाडी नाही इथे. रिक्षा करा.', 'My vehicle isn\'t here. Take an auto.'], ['मी उलट्या बाजूला चाललोय.', 'I\'m going the other way.'], ['सॉरी, जमणार नाही.', 'Sorry, can\'t do it.']])); return true; }
   const parts = [[], []];
   if (Math.abs(D.first) > 2.4) parts[0].push('आधी मागे फिरा'), parts[1].push('turn back first');
   if (!t0) { parts[0].push(`सरळ जा, ${kmMr(D.total)}`); parts[1].push(`straight on, ${km(D.total)}`); }
@@ -168,8 +176,8 @@ People.prototype.ask = function (P, G) {
 };
 
 // ---------------------------------------------------------------- a lift from someone kind
-function offerLift(ppl, G, p, r, to, dist) {
-  const S = specOf(r.kind), two = !!S.two, say = (mr, en, t = 5) => G.hud.say(p.female ? 'Lady' : 'Man', mr, en, t);
+export function offerLift(ppl, G, p, r, to, dist, say0) {
+  const S = specOf(r.kind), two = !!S.two, say = say0 || ((mr, en, t = 5) => G.hud.say(p.female ? 'Lady' : 'Man', mr, en, t));
   say(two ? 'मी तिकडेच चाललोय. बसा मागे, सोडतो तुम्हाला.' : 'मी तिकडेच चाललोय. चला, गाडीत बसा, सोडतो.', two ? 'I\'m going that way. Get on the back, I\'ll drop you.' : 'I\'m going that way. Come, get in, I\'ll drop you.', 5);
   r.taken = true; p.lift = true;
   ppl.lift = { p, r, to, dist, two, t: 0, phase: 'walk', said: false };
@@ -208,6 +216,5 @@ People.prototype.update = function (dt, player, ...a) {
 addEventListener('keydown', (e) => {
   if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
   const G = window.__nhAskG; if (!G || G.state !== 'play' || /INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
-  if (e.code === 'KeyZ' && G.player?.onFoot) G.people.ask(G.player, G);
   if (e.code === 'KeyY' && G.people.lift) hopOn(G.people, G);
 });
