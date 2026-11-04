@@ -79,7 +79,11 @@ const PATCHES = {
     ["    if (input.took('KeyF') && this.busy <= 0) {", "    if (input.took('KeyV') && this.busy <= 0) { if (this.onFoot && this.offer && this.offer.kind === 'pet') this.enter(this.offer, traffic); else if (this.useHook) this.useHook(); }\n    if (input.took('KeyF') && this.busy <= 0) {"],
     ["'Pet the dog', key: 'F' });", "'Pet the dog', key: 'V' });"],
   ],
-  [S('game/shops.js')]: [["if (e.code === 'Escape' || e.code === 'KeyF' || e.code === 'KeyE') {", "if (e.code === 'Escape' || e.code === 'KeyF' || e.code === 'KeyV' || e.code === 'KeyE') {"]],
+  [S('game/shops.js')]: [
+    ["if (e.code === 'Escape' || e.code === 'KeyF' || e.code === 'KeyE') {", "if (e.code === 'Escape' || e.code === 'KeyF' || e.code === 'KeyV' || e.code === 'KeyE') {"],
+    // eat here or parcel: only where there's food (a chowki has a bench, not a kitchen)
+    ["const dineIn = !!(ctx.inside && ctx.spot === 'counter'", "const dineIn = !!(MENUS[k] && ctx.inside && ctx.spot === 'counter'"],
+  ],
   // a one-off gesture (a wave as they pass) is upper body too: the legs keep walking under it
   [S('people/crowd.js')]: [["if (mv > 0.3 && !once && !LOCO.has(name)) {", "if (mv > 0.3 && (!once || UPPER.has(name)) && !LOCO.has(name)) {"]],
   // animals: the walk follows how far they really move (no gliding when the game moves them, no 2.6x cap when they run)
