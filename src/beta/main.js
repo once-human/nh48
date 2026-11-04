@@ -31,6 +31,7 @@ import * as Save from '@orig/game/save.js';
 import { fixPins } from '@orig/world/venues.js';
 import { Streamer } from '@orig/world/index.js';
 import { Actors } from './draw/actors.js';
+import { trackBodies } from './draw/skin.js';
 import { Graphics } from './game/graphics.js';
 
 // The streamer, taught two things about the painted city (when it builds, never what):
@@ -218,7 +219,7 @@ async function main() {
     loader.bitmap(ASSETS.bark), loader.bitmap(ASSETS.barkN), loader.bitmap(ASSETS.palm)]);
   await sndJob;
   let kit = null;
-  try { const [gm, gf] = await Promise.all([loader.gltf(ASSETS.peopleM), loader.gltf(ASSETS.peopleF)]); kit = new HumanKit(gm, gf); } catch (e) { console.warn('people models failed', e); }
+  try { const [gm, gf] = await Promise.all([loader.gltf(ASSETS.peopleM), loader.gltf(ASSETS.peopleF)]); kit = new HumanKit(gm, gf); trackBodies(kit); } catch (e) { console.warn('people models failed', e); }
   let animalKit = null;
   try {
     const ents = Object.entries(ASSETS.animals);

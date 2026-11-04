@@ -13,6 +13,7 @@ export const SETTINGS = [
   { id: 'trees', label: 'Trees', sub: 'How far they go', side: 'gpu', w: 2, val: [240, 360, 520, 800], fmt: (v) => v + ' m', apply: (G, v) => { if (G.W.trees) { G.W.trees.R = v; G.W.trees.lastX = 1e9; } } },
   { id: 'grass', label: 'Grass', sub: 'How much of it', side: 'gpu', w: 2, val: [0, .35, .7, 1], fmt: (v) => (v ? pct(v) : 'Off'), apply: (G, v) => { if (G.W.grass) G.W.grass.level = v; } },
   { id: 'dist', label: 'View distance', sub: 'How much of the city is built around you', side: 'both', w: 2, val: [260, 360, 520, 720], fmt: (v) => v + ' m', apply: (G, v) => G.W.streamer.setRadius(v) },
+  { id: 'bodies', label: 'Detailed people', sub: 'How many have full bodies, and how close the finest ones are', side: 'both', w: 3, val: [[16, 0], [32, 6], [64, 12], [96, 22]], fmt: (v) => v[0] + ', finest to ' + v[1] + ' m', apply: (G, v) => { if (G.skin) { G.skin.max = v[0]; G.skin.hiR = v[1]; } } },
   { id: 'people', label: 'People', sub: 'On the streets', side: 'cpu', w: 3, val: [60, 90, 130, 170], fmt: (v) => String(v), apply: (G, v) => { if (G.people) G.people.max = Math.min(v, G.people.cap - 120); } },
   { id: 'traffic', label: 'Traffic', sub: 'On the roads', side: 'cpu', w: 3, val: [40, 70, 100, 130], fmt: (v) => String(v), apply: (G, v) => { if (G.traffic) G.traffic.max = v; } },
 ];
