@@ -225,7 +225,7 @@ function aim(b, from, to) {
   b.updateMatrixWorld(true);
 }
 // the leg as ikArm does the arm: hip, knee, foot, the knee pushed toward the pole
-function ikLeg(H, side, target, pole, w) {
+export function ikLeg(H, side, target, pole, w) {
   const u = bone(H, 'thigh_' + side), l = bone(H, 'calf_' + side), f = bone(H, 'foot_' + side);
   if (!u || !l || !f || w <= 0) return;
   H.root.updateMatrixWorld(true);

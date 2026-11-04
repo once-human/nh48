@@ -32,7 +32,8 @@ import './world/staff.js';
 import './world/walkin.js';
 import './draw/alive.js';
 import './draw/falls.js';
-import './draw/fauna.js';         // what you hold, in your hand: the torch aimed by the arm, the body turning
+import './draw/fauna.js';
+import './vehicles/mount.js';         // what you hold, in your hand: the torch aimed by the arm, the body turning
 import './world/shutters.js';      // shutters that roll, with the rattle, and board lights that go with them
 import './world/flyovers.js';
 import './world/hills.js';
