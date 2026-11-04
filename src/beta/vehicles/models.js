@@ -1284,6 +1284,43 @@ export function buildBus() {
   for (const x of [0.4, 2.8]) { rbox(b, x - 0.48, 3.15, -0.42, x + 0.48, 3.25, 0.42, [0.74, 0.74, 0.7]); rbox(b, x - 0.4, 3.24, -0.34, x + 0.4, 3.28, 0.34, [0.1, 0.12, 0.13]); }
   for (let x = 0.9; x < hl - 1; x += 0.6) for (const s of [-1, 1]) box(b, x, 3.1, s*0.62 - .01, x + 0.012, 3.17, s*0.62 + .01, [0.68, 0.68, 0.64]);
   rod(b, [2.1, 3.16, 0.2], [1.9, 3.72, 0.22], 0.008, RUBBER);
+  // inside: the ribbed floor up from the steps, panelled walls under and over the windows, seats two and two down an
+  // aisle (none across the doors), yellow poles and the roof rails to hold, tube lights, the driver's cab at the front
+  const seatC = [0.42, 0.13, 0.11], frameC = [0.6, 0.6, 0.62], pole = [0.9, 0.72, 0.12], panel = [0.86, 0.84, 0.78], fl = 0.88;
+  box(b, -hl + 0.25, fl - 0.04, -hw + 0.07, hl - 0.4, fl, hw - 0.07, [0.24, 0.24, 0.25]);
+  for (let x = -hl + 0.4; x < hl - 0.5; x += 0.12) box(b, x, fl, -0.3, x + 0.03, fl + 0.006, 0.3, [0.32, 0.32, 0.33]);
+  box(b, -hl + 0.25, 2.86, -hw + 0.1, hl - 0.4, 2.9, hw - 0.1, panel);
+  for (const s of [-1, 1]) {
+    box(b, -hl + 0.25, fl, s*(hw - 0.08), hl - 0.4, 1.46, s*(hw - 0.06), panel);
+    box(b, -hl + 0.25, 2.38, s*(hw - 0.12), hl - 0.4, 2.86, s*(hw - 0.1), panel);
+    box(b, -hl + 0.5, 2.8, s*0.62, hl - 1.6, 2.84, s*0.66, [1, 0.98, 0.92], 0, 0.8);                       // the tube lights
+    rod(b, [-hl + 0.6, 2.62, s*0.4], [hl - 1.5, 2.62, s*0.4], 0.016, frameC);                                 // the roof rails
+    for (let x = -hl + 1.0; x < hl - 1.6; x += 1.4) { rod(b, [x, 2.62, s*0.4], [x, 2.86, s*0.4], 0.01, frameC); rod(b, [x, 2.6, s*0.4], [x, 2.42, s*0.4], 0.008, [0.15, 0.15, 0.16]); }
+    let r = 0;
+    for (let x = -hl + 0.95; x < hl - 1.75; x += 0.78, r++) {
+      if (s < 0 && ((x > hl - 1.5) || (x > -0.85 && x < 0.65))) continue;                                   // the doors on the left
+      const z0 = s*0.3, z1 = s*(hw - 0.1);
+      rbox(b, x - 0.22, fl + 0.4, Math.min(z0, z1), x + 0.22, fl + 0.48, Math.max(z0, z1), seatC);           // the cushion
+      rbox(b, x - 0.28, fl + 0.48, Math.min(z0, z1), x - 0.22, fl + 1.05, Math.max(z0, z1), seatC);          // the back
+      rod(b, [x - 0.28, fl + 1.07, z0], [x - 0.28, fl + 1.07, z1], 0.015, frameC);                            // the grab bar on top
+      rod(b, [x, fl, s*0.36], [x, fl + 0.4, s*0.36], 0.018, frameC);
+      if (r % 2 === 0) rod(b, [x + 0.3, fl, s*0.3], [x + 0.3, 2.86, s*0.3], 0.02, pole);
+    }
+  }
+  // the doorways: the steps up, poles either side
+  for (const [a, e] of [[hl - 1.17, hl - 0.25], [-0.62, 0.42]]) {
+    box(b, a, 0.6, -hw + 0.02, e, 0.64, -hw + 0.42, [0.2, 0.2, 0.21]);
+    box(b, a, 0.6, -hw + 0.42, e, fl, -hw + 0.46, [0.98, 0.8, 0.1]);
+    rod(b, [a + 0.05, fl, -hw + 0.3], [a + 0.05, 2.4, -hw + 0.3], 0.02, pole); rod(b, [e - 0.05, fl, -hw + 0.3], [e - 0.05, 2.4, -hw + 0.3], 0.02, pole);
+  }
+  // the driver's cab: a partition behind, the seat, the dash, the big flat wheel
+  box(b, hl - 2.0, fl, 0.15, hl - 1.96, 2.0, hw - 0.1, [0.5, 0.5, 0.52]);
+  rbox(b, hl - 1.55, fl + 0.38, 0.45, hl - 1.1, fl + 0.48, 1.05, [0.15, 0.15, 0.16]); rbox(b, hl - 1.6, fl + 0.48, 0.45, hl - 1.52, fl + 1.2, 1.05, [0.15, 0.15, 0.16]);
+  rbox(b, hl - 0.75, fl, -hw + 0.1, hl - 0.25, fl + 0.55, hw - 0.1, [0.2, 0.2, 0.22]);
+  rbox(b, hl - 0.55, fl + 0.55, 0.2, hl - 0.25, fl + 0.72, hw - 0.12, [0.12, 0.12, 0.13]);
+  { const cx = hl - 0.85, cy = fl + 0.95, cz = 0.75, rr = 0.24, pts = [];
+    for (let i = 0; i <= 16; i++) { const a = i/16*Math.PI*2; pts.push([cx + Math.sin(a)*rr*0.45, cy + Math.cos(a)*rr*0.9, cz + Math.sin(a)*rr]); }
+    tube(b, pts, 0.016, [0.08, 0.08, 0.09], 16, 6); rod(b, [cx, cy, cz], [hl - 0.55, fl + 0.6, cz], 0.03, [0.1, 0.1, 0.11]); }
   return { body: b.build(), glass: gl.build(), dims: { L, W, H, wb: 5.4 } };
 }
 
