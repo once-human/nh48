@@ -41,7 +41,7 @@ void main(){
     float brk = smoothstep(.2, .45, nR(fp*.05 + 2.));
     vec3 ink = mix(c*.4, vec3(.14, .12, .13), .6);
     float fade = 1. - smoothstep(35., 140., z);
-    c = mix(c, ink, max(e, ec)*(.5 + .4*brk)*fade);
+    c = mix(c, ink, max(e, ec*(1. - smoothstep(10., 38., z)))*(.5 + .4*brk)*fade);
     c = mix(c, ink, e2*.28*step(.5, nR(fp*.04 + 8.))*fade);
   }
   if (drunk > 0.) {
@@ -97,6 +97,7 @@ export class Post {
   }
   render(dt = 0.016) {
     const R = this.renderer, cam = this.camera, U = this.U;
+    if (this.beforeDraw) this.beforeDraw(dt || 0.016, cam);
     this.paintLook.update(this.sky, cam, this.scene);
     const rt = this.target();
     R.setRenderTarget(rt); R.render(this.scene, cam);

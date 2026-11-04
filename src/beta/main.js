@@ -30,6 +30,7 @@ import { TileManager, cityFromBase } from '@orig/world/tiles.js';
 import * as Save from '@orig/game/save.js';
 import { fixPins } from '@orig/world/venues.js';
 import { Streamer } from '@orig/world/index.js';
+import { Actors } from './draw/actors.js';
 
 // The streamer, taught two things about the painted city (when it builds, never what):
 //  - when it builds everything at once (loading screens, arriving somewhere) the buildings are drawn right there,
@@ -115,6 +116,8 @@ function gpuClass() {
   } catch (e) { return 'unknown'; }
 }
 const GPU = gpuClass();
+// the stress test's rule: one pass a pixel at screen resolution, no MSAA
+for (const k in QUALITY) { QUALITY[k].pixelRatio = Math.min(1, QUALITY[k].pixelRatio); QUALITY[k].msaa = false; }
 function pickQuality() {
   const q = params.get('q');
   if (q && QUALITY[q]) return { ...QUALITY[q] };
@@ -302,6 +305,7 @@ async function main() {
   }
   await game.init(progress);
   betaTitle(game);
+  { const actors = new Actors(game, scene); post.beforeDraw = (dt, cam) => actors.update(dt, cam); }
   cityUp();
   if (game.audio && game.voiceRemote) game.audio.remote = game.voiceRemote;
   // warm the chunks around the start before the first frame
