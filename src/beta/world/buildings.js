@@ -18,6 +18,8 @@ import { footJob } from './footpath.js';
 import { paint, packGeo } from '../gfx/paint.js';
 
 export { setShutters, BASE };
+// a sign material whose boards each carry their own light (aGlow): its own program, not a plain sign's
+export const litMat = (m) => { m.userData.glow = true; m.customProgramCacheKey = () => 'glow'; return m; };
 
 // ---------------------------------------------------------------- the workers
 // A chunk's drawings are made on a few workers from the map alone, while the game works out its own part of the
@@ -235,7 +237,7 @@ export function* buildBuildingsChunk(W, C, group) {
   const local = yield* signs.chunkAtlas(C, (bi) => index.shopsByBld.get(bi), index.shopNames);
   W.sliceLabel = 'bld';
   const sb = new QuadBuilder(), ob = new QuadBuilder();
-  const nearRecs = [], shut = [], footprints = [];
+  const nearRecs = [], shut = [], footprints = [], glowRecs = [];
   C.doors = [];
   let ops = 0;
   for (const bi of C.bld) {
@@ -293,8 +295,9 @@ export function* buildBuildingsChunk(W, C, group) {
         C.doors.push({ x: (x0 + x1) / 2 + nx * 0.25, z: (z0 + z1) / 2 + nz * 0.25, nx, nz, n: 0, shop: sh ? sh[3] : -1 });
         slotDoor.set(i * 4096 + k, C.doors[C.doors.length - 1]);
         const ltr = (tx * nz - tz * nx) > 0;
+        glowRecs.push({ o: !!board.local, v: (board.local ? ob : sb).c, door: C.doors[C.doors.length - 1] });
         (board.local ? ob : sb).quad([x0, y0 + dy, z0], [x1, y0 + dy, z1], [x1, y1 + dy, z1], [x0, y1 + dy, z0], [nx, 0, nz], ltr ? board.u0 : board.u1, board.v0, ltr ? board.u1 : board.u0, board.v1);
-        if (sh) nearRecs.push({ s: sh, x0, y0: y0 + dy, z0, x1, y1: y1 + dy, z1, nx, nz, ltr, mx: (x0 + x1) / 2, mz: (z0 + z1) / 2 });
+        if (sh) nearRecs.push({ door: C.doors[C.doors.length - 1], s: sh, x0, y0: y0 + dy, z0, x1, y1: y1 + dy, z1, nx, nz, ltr, mx: (x0 + x1) / 2, mz: (z0 + z1) / 2 });
       }
     }
   }
@@ -334,14 +337,17 @@ export function* buildBuildingsChunk(W, C, group) {
   W.sliceLabel = 'emit';
   if (!hb.empty) { const m = new THREE.Mesh(packGeo(hb.pack()), paint.world); m.castShadow = true; m.receiveShadow = true; group.add(m); }
   yield;
-  if (!sb.empty) { const m = new THREE.Mesh(yield* sb.buildSliced(), mats.sign); m.receiveShadow = true; group.add(m); }
+  // each board's light, one number a vertex, that its shutter takes down (world/shutters.js)
+  const glowOn = (g, o) => { const a = new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(1), 1); g.setAttribute('aGlow', a); C.glow = C.glow || { recs: glowRecs }; C.glow[o ? 'o' : 's'] = a; };
+  litMat(mats.sign);
+  if (!sb.empty) { const g = yield* sb.buildSliced(); glowOn(g, false); const m = new THREE.Mesh(g, mats.sign); m.receiveShadow = true; group.add(m); }
   yield;
   let localMat = null;
   if (!ob.empty && local.tex) {
     localMat = mats.sign.clone();
-    localMat.map = local.tex; localMat.emissiveMap = local.tex;
+    localMat.map = local.tex; localMat.emissiveMap = local.tex; litMat(localMat);
     W.signMats.add(localMat);
-    const m = new THREE.Mesh(yield* ob.buildSliced(), localMat); m.receiveShadow = true; group.add(m);
+    const g = yield* ob.buildSliced(); glowOn(g, true); const m = new THREE.Mesh(g, localMat); m.receiveShadow = true; group.add(m);
   }
   if (W.nearBoards) W.nearBoards.addChunk(C.ci, C.cx, C.cz, nearRecs);
   // the shutters, one instance each; game.js lifts the ones whose shop is open (and keeps them in step with the clock)

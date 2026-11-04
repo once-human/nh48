@@ -101,6 +101,11 @@ const PATCHES = {
     ["      const look2 = kit.randomLook(this.rng, { female: o.type === 'scooterP' ? this.rng.chance(0.75) : this.rng.chance(0.2), avoid: P.look });",
      "      const look2 = R1 ? R1.look : kit.randomLook(this.rng, { female: o.type === 'scooterP' ? this.rng.chance(0.75) : this.rng.chance(0.2), avoid: P.look });"],
   ],
+  // shutters roll instead of jumping: each keeps where it should be (t) and where it is (k); the first two calls on a
+  // chunk (built, then put in step with the clock) set it straight, later ones leave the rolling to beta/world/shutters.js
+  [S('world/buildingsChunk.js')]: [
+    ["  S.list.forEach((r, i) => {\n    if (r.door && open(r.door)) { S.im.setMatrixAt(i, ZERO); return; }", "  S.seen = (S.seen || 0) + 1;\n  S.list.forEach((r, i) => {\n    r.t = r.door && open(r.door) ? 1 : 0;\n    if (S.seen > 2 && r.k !== undefined) { if (r.k !== r.t) S.moving = true; return; }\n    r.k = r.t;\n    if (r.t) { S.im.setMatrixAt(i, ZERO); return; }"],
+  ],
   [S('game/game.js')]: [
     ["player.useHook = () => this.shops.tryUse();", "player.useHook = () => this.shops.tryUse(); player.shopNear = () => this.shops.near; this.people._G = window.__nhAskG = this;"],
     ["if (this.state === 'play' && !this.player.onFoot && this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);", "if (this.state === 'play' && this.input.took('KeyC')) this.rig.toggleView(this.player.onFoot);"],

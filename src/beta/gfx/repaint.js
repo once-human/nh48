@@ -14,7 +14,13 @@ varying vec3 vN, vW; varying float vZ;
 #ifdef MASK
 varying vec2 vMaskUV;
 #endif
+#ifdef GLOW
+attribute float aGlow; varying float vGlow;
+#endif
 void main(){
+#ifdef GLOW
+  vGlow = aGlow;
+#endif
 #include <uv_vertex>
 #include <color_vertex>
 #ifdef MASK
@@ -42,6 +48,9 @@ uniform vec3 fogCol; uniform float fogDensity;
 varying vec3 vN, vW; varying float vZ;
 #ifdef MASK
 uniform sampler2D tMask; varying vec2 vMaskUV;
+#endif
+#ifdef GLOW
+varying float vGlow;
 #endif
 #ifdef PAINT_LIT
 #include <emissivemap_pars_fragment>
@@ -91,6 +100,9 @@ void main(){
 #endif
     float h = smoothstep(.5, .72, fract((gl_FragCoord.x + gl_FragCoord.y)*.17 + e*.9))*(1. - L)*(1. - smoothstep(10., 34., vZ)); c = mix(c, c*.72, h*.55*(1. - uReal));
   }
+#ifdef GLOW
+  totalEmissiveRadiance *= vGlow;           // a shop's board goes dark with its shutter (world/shutters.js)
+#endif
   c += totalEmissiveRadiance;
 #endif
 #ifdef USE_FOG
@@ -100,7 +112,7 @@ void main(){
 }`;
 
 function paint(m, sh) {
-  const lit = m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial, head = (lit ? '#define PAINT_LIT\n' : '') + (sh.uniforms.tMask ? '#define MASK\n' : '');
+  const lit = m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial, head = (lit ? '#define PAINT_LIT\n' : '') + (sh.uniforms.tMask ? '#define MASK\n' : '') + (m.userData.glow ? '#define GLOW\n' : '');
   sh.vertexShader = head + VS; sh.fragmentShader = head + FS;
   Object.assign(sh.uniforms, { uReal: PU.uReal, uTaps: PU.uTaps, uSoft: PU.uSoft, sunDir: PU.sunDir, sunCol: PU.sunCol, shadeCol: PU.shadeCol, fogCol: PU.fogCol, fogDensity: PU.fogDensity, tNoise: PU.tNoise, shadowTex: PU.shadowTex, shadowMat: PU.shadowMat, shadowTexel: PU.shadowTexel, shadowOn: PU.shadowOn, dayK: PU.dayK, uInside: inside, tLamp: PU.tLamp, lampC: PU.lampC, lampY: PU.lampY, headP: PU.headP, headD: PU.headD });
 }
