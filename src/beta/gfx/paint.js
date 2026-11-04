@@ -49,6 +49,9 @@ vec3 lampAt(vec3 w, vec3 n){ vec3 c = vec3(0.); if (lampC.w > 0.) { vec2 q = (w.
     c = vec3(1., .72, .44)*.95*texture(tLamp, q).r*(.5 + .5*max(n.y, 0.))*(1. - smoothstep(8., 13., w.y - lampY))*lampC.w; }
   if (headP.w > 0.) { vec3 d = w - headP.xyz; float r = length(d); d /= r; c += vec3(1., .93, .78)*headP.w*3.*smoothstep(headD.w, headD.w + .1, dot(d, headD.xyz))*max(dot(n, -d), .2)/(1. + r*r*.035); }
   return c; }
+// sunlight on something pale: the sun can go up to 1.25, so white went past the top and lost its carving. Bright colours are
+// eased into what's left instead, keeping their hue; everything darker than the knee is untouched
+vec3 sunRoll(vec3 c){ float m = max(c.r, max(c.g, c.b)); if (m <= .72) return c; float t = min((m - .72)/.6, 1.); return c*(.72 + .24*(1. - pow(1. - t, 1.5)))/m; }
 `;
 
 // how the sun's shadow is read: a couple of filtered looks (the painted hard edge), or a disc of them, softer with every setting
@@ -414,7 +417,7 @@ void main(){
   float paintE = e*(1. - uReal), lit = sunOn(ndl, paintE*.14, .0, .1);
   float sh = (shadowOn > .5 && lit > 0.) ? shadeOf(shadowAt(w, n, e), paintE*.3) : 1.;
   float L = lit*sh*dayK;
-  vec3 cl = base*sunCol;
+  vec3 cl = sunRoll(base*sunCol);
   vec3 cs = base*shadeCol*mix(.92 + .16*max(n.y, 0.), .74 + .42*max(n.y, 0.) + .12*max(-n.y, 0.), uReal) + vec3(.025, .03, .045)*dayK;
   vec3 c = mix(cs, cl, L);
   c += base*lampAt(w, n);

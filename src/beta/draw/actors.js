@@ -4,18 +4,25 @@ import * as THREE from 'three';
 import { paintMaterial, paintNoise, U } from '@orig/experiment/paint.js';
 import { Crowd, NEAR, makeLook, B } from '@orig/experiment/people.js';
 import { rng } from '@orig/experiment/geo.js';
-import { PU } from '../gfx/paint.js';
+import { PU, LAMP } from '../gfx/paint.js';
 import { Skin } from './skin.js';
 
 // the stress test paints in screen colour; /beta's picture is linear until its last pass
 const linear = (m) => { for (const s of [m]) s.fragmentShader = s.fragmentShader.replace('fragColor = vec4(c, 1.);', 'fragColor = vec4(pow(max(c, vec3(0.)), vec3(2.2)), 1.);').replace('fragColor = vec4(mix(c, fogCol, smoothstep(fogR.x, fogR.y, vZ)*.9), 1.);', 'fragColor = vec4(pow(max(mix(c, fogCol, smoothstep(fogR.x, fogR.y, vZ)*.9), vec3(0.)), vec3(2.2)), 1.);'); return m; };
+// and it reads the same sun, shade, lamps and sun curve as everything else, so it goes dark at night and lights up under a lamp
+const lit = (m) => {
+  const fs = m.fragmentShader.replace('out vec4 fragColor;', `uniform float dayK;\n${LAMP}\nout vec4 fragColor;`).replace('float L = lit*sh;', 'float L = lit*sh*dayK;').replace('+ vec3(.025, .03, .045);', '+ vec3(.025, .03, .045)*dayK;').replace('vec3 cl = base*sunCol;', 'vec3 cl = sunRoll(base*sunCol);').replace('if (k == 13) c = mix(c, base*1.05, .7);', 'c += base*lampAt(w, n);\n  if (k == 13) c = mix(c, base*1.05, .7);');
+  if (!fs.includes('lampAt(w, n)') || !fs.includes('sunRoll(base') || !fs.includes('lit*sh*dayK')) throw new Error('far crowd: the light lines have moved');
+  m.fragmentShader = fs; for (const k of ['tLamp', 'lampC', 'headP', 'headD', 'lampY', 'dayK', 'shadeCol', 'sunCol']) m.uniforms[k] = PU[k];
+  return m;
+};
 const CAP = 500;
 
 export class Actors {
   constructor(G, scene) {
     this.G = G;
     U.tNoise.value = paintNoise();
-    const pm = linear(paintMaterial({ people: true }));
+    const pm = lit(linear(paintMaterial({ people: true })));
     this.crowd = new Crowd(CAP, pm); U.crowdTex.value = this.crowd.tex;
     const R = rng(21); for (let i = 1; i < CAP; i++) this.crowd.look(i, makeLook(R));
     this.crowd.look(0, { shirt: 0xeeeeea, lower: 0x161a2a, skin: 0xa06a48, hair: 0x1a1512, acc: 0xeeeeea, acc2: 0xeeeeea, mask: B.CURLY, h: 1, girth: .55 });
@@ -36,7 +43,7 @@ export class Actors {
     for (const m of this.all) m.visible = on;
     // what the stress test's paint reads, from the sky of the moment
     U.time.value = this.t; U.sunDir.value.copy(PU.sunDir.value); if (PU.shadowTex.value) U.shadowTex.value = PU.shadowTex.value; U.shadowMat.value.copy(PU.shadowMat.value); U.shadowTexel.value = PU.shadowTexel.value; if (PU.shadowOn) U.shadowOn.value = PU.shadowOn.value;
-    const s = PU.sunCol.value, f = PU.fogCol.value; U.sunCol.value.set(Math.pow(s.x ?? s.r, .45), Math.pow(s.y ?? s.g, .45), Math.pow(s.z ?? s.b, .45)); U.fogCol.value.set(Math.pow(f.r, .45), Math.pow(f.g, .45), Math.pow(f.b, .45)); U.fogR.value.set(90, 700);
+    const f = PU.fogCol.value; U.fogCol.value.set(Math.pow(f.r, .45), Math.pow(f.g, .45), Math.pow(f.b, .45)); U.fogR.value.set(90, 700);
     this.hideOld();
     this.skin.update(camera, P.human);
     if (!on) return;
