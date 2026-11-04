@@ -38,7 +38,7 @@ export function freeTerminal(G) {
   const binds = keep.bind || {}, autoexec = keep.autoexec || [];
   const persist = () => { try { localStorage.setItem(STORE, JSON.stringify({ alias: sh.userAlias, bind: binds, autoexec })); } catch (e) { /* private window */ } };
   const P = () => G.player, T = () => G.traffic, W = () => G.W;
-  const St = { god: false, noclip: false, fuel: false, hourLock: null, scale: 1, fly: null, watches: [], timers: [], spawned: [], rates: {}, baseW: null, baseMax: 0, hud: false, wasFree: true, foot: 1 };
+  const St = { flight: null, flySpeed: 1, fov: 0, god: false, noclip: false, fuel: false, hourLock: null, scale: 1, fly: null, watches: [], timers: [], spawned: [], rates: {}, baseW: null, baseMax: 0, hud: false, wasFree: true, foot: 1 };
   let armed = false;
 
   // ------------------------------------------------------------ places and things to point at
@@ -280,7 +280,8 @@ export function freeTerminal(G) {
   // ------------------------------------------------------------ you
   sh.reg('god [on:onoff]', 'no damage, no hunger, full tank', ([a]) => { St.god = onoff(a, St.god); say(`god ${St.god ? 'on' : 'off'}`, 'ok'); }, { group: 'you' });
   sh.reg('noclip [on:onoff]', 'walk and drive through walls', ([a]) => { St.noclip = onoff(a, St.noclip); say(`noclip ${St.noclip ? 'on' : 'off'}`, 'ok'); }, { group: 'you' });
-  sh.reg('fly [on:onoff]', 'detached camera: WASD, Q down, E up, Shift fast, the mouse looks', ([a]) => setFly(onoff(a, !!St.fly)), { group: 'you' });
+  sh.reg('fly [on:onoff]', 'fly, you yourself: WASD, Space up, Q down, Shift fast. Double-tap Space does it too', ([a]) => setFlight(onoff(a, !!St.flight)), { group: 'you' });
+  sh.reg('freecam [on:onoff]', 'detached camera: WASD, Q down, E up, Shift fast, the mouse looks', ([a]) => setFly(onoff(a, !!St.fly)), { group: 'you' });
   sh.reg('run <multiplier:num>', 'how fast you run', ([m]) => { St.foot = +m; say(`${m}×`, 'ok'); }, { group: 'you' });
   sh.reg('money <amount:int>', 'set your cash', ([n]) => { G.stats.money = +n; say(`₹${(+n).toLocaleString('en-IN')}`, 'ok'); }, { group: 'you' });
   sh.reg('give <item:item> [count:int]', 'put something in the jhola', ([k, n]) => { if (!ITEMS[k]) throw new Error('no such item. Tab lists them'); const L = G.life.s; L.inv = L.inv || {}; L.inv[k] = (L.inv[k] || 0) + (+n || 1); say(`${ITEMS[k].name} × ${L.inv[k]}`, 'ok'); }, { group: 'you' });
@@ -332,13 +333,75 @@ export function freeTerminal(G) {
     say(`${ok}/${total} passed`, ok === total ? 'ok' : 'err');
   }, { group: 'shell' });
 
+  // ------------------------------------------------------------ the long list: one command for each thing you'd reach for
+  const slug = (t) => String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const one = (name, about, run, group) => { if (!name || sh.cmds.has(name)) return; sh.reg(name, about, run, { group }); };
+  const x = (c) => () => sh.exec(c, true);
+  function families() {
+    const types = Object.keys(SPECS).filter(k => !SPECS[k].alias);
+    one('fly.on', 'take off', () => setFlight(true), 'flight'); one('fly.off', 'come down and land', () => setFlight(false), 'flight');
+    for (const m of [0.5, 1, 2, 4, 8]) one(`fly.speed.${m}x`, `flight speed ${m}× (15 m/s cruising, 48 with Shift, at 1×)`, () => { St.flySpeed = m; say(`flight ${m}×`, 'ok'); }, 'flight');
+    one('fly.up', 'straight up 100 m', () => { if (!St.flight) setFlight(true); P().foot.y += 100; }, 'flight');
+    one('fly.high', 'up to 400 m, over the whole city', () => { if (!St.flight) setFlight(true); P().foot.y = Math.max(P().foot.y, 400); }, 'flight');
+    one('freecam.on', 'detached camera', () => setFly(true), 'flight'); one('freecam.off', 'back to you', () => setFly(false), 'flight');
+    one('cam.toggle', 'first or third person (C)', () => G.rig.toggleView(P().onFoot), 'camera');
+    for (let f = 40; f <= 120; f += 5) one(`cam.fov.${f}`, `field of view ${f}°`, () => { St.fov = f; say(`fov ${f}`, 'ok'); }, 'camera');
+    one('cam.fov.reset', 'the camera\'s own field of view', () => { St.fov = 0; say('fov as the camera likes it', 'ok'); }, 'camera');
+    for (const t of types) {
+      const S = SPECS[t], nm = `${S.name} (${S.model})`;
+      one(`spawn.${t}`, `spawn a ${nm}`, x(`spawn ${t}`), 'spawn');
+      one(`spawn.${t}.x4`, `four ${S.name}s in a row`, x(`spawn ${t} 4`), 'spawn');
+      one(`drive.${t}`, `spawn a ${nm} and get in`, x(`drive ${t}`), 'drive');
+      for (const c of Object.keys(COLOURS)) one(`spawn.${t}.${c}`, `a ${c} ${S.name}, and get in`, x(`spawn ${t} --paint=${c} --drive`), 'paint jobs');
+      if (!TYPES[t]) continue;
+      one(`only.${t}`, `nothing but ${S.name}s on the road`, x(`only ${t}`), 'traffic');
+      for (const [m, w] of [[0, 'never'], [0.5, 'half as often'], [1.5, '1.5× as often'], [2, 'twice as often'], [5, '5× as often'], [10, '10× as often'], [100, 'everywhere']]) one(`rate.${t}.${m}x`, `${S.name}: ${w}`, x(`rate ${t} ${m}`), 'traffic');
+      one(`rate.${t}.reset`, `${S.name}: as the game has it`, x(`rate ${t}`), 'traffic');
+    }
+    for (const c of Object.keys(COLOURS)) one(`paint.${c}`, `respray what you drive ${c}`, x(`paint ${c}`), 'paint jobs');
+    for (const [w, a] of [['flush', 'clear the road and fill it again'], ['stop', 'everyone stands'], ['go', 'and off again'], ['census', 'what is out there now']]) one(`traffic.${w}`, a, x(`traffic ${w}`), 'traffic');
+    for (const n of [0, 10, 25, 50, 75, 100, 150, 200, 300]) one(`traffic.density.${n}`, `up to ${n} vehicles at once`, x(`traffic density ${n}`), 'traffic');
+    one('traffic.density.reset', 'as many as the game likes', x('traffic density'), 'traffic');
+    for (let h = 0; h < 24; h++) for (const m of ['00', '30']) one(`time.${String(h).padStart(2, '0')}${m}`, `${String(h).padStart(2, '0')}:${m}`, x(`time ${h}:${m}`), 'clock');
+    for (const [w, h] of [['dawn', '5:45'], ['sunrise', '6:20'], ['morning', '8:30'], ['noon', '12:00'], ['afternoon', '15:30'], ['golden', '17:50'], ['sunset', '18:25'], ['dusk', '19:00'], ['night', '21:30'], ['midnight', '0:00'], ['late', '2:30']]) one(`time.${w}`, `go to ${h}`, x(`time ${h}`), 'clock');
+    one('time.lock', 'hold the hour', x('time lock'), 'clock'); one('time.unlock', 'let it run', x('time unlock'), 'clock');
+    for (const v of [0, 0.1, 0.25, 0.5, 1, 2, 4, 8, 16]) one(`ts.${v}`, v === 1 ? 'normal speed' : v < 1 ? `slow motion, ${v}×` : `fast forward, ${v}×`, x(`timescale ${v}`), 'clock');
+    for (const k of Object.keys(WEATHERS)) one(`weather.${k}`, `the sky: ${k}`, x(`weather ${k}`), 'sky');
+    for (const n of [0, 1, 2, 3, 4, 5]) one(`wanted.${n}`, n ? `police heat ${n}` : 'nobody is after you', x(`wanted ${n}`), 'body');
+    for (const n of [0, 1000, 10000, 100000, 1000000, 10000000]) one(`money.${n}`, `₹${n.toLocaleString('en-IN')} in your pocket`, x(`money ${n}`), 'body');
+    for (const m of [0.5, 1, 1.5, 2, 3, 5, 10]) one(`run.${m}x`, `run ${m}× as fast`, x(`run ${m}`), 'body');
+    for (const w of ['on', 'off']) { one(`god.${w}`, `god mode ${w}`, x(`god ${w}`), 'body'); one(`noclip.${w}`, `through walls ${w}`, x(`noclip ${w}`), 'body'); one(`readout.${w}`, `numbers top left ${w}`, x(`readout ${w}`), 'picture'); }
+    for (const k of Object.keys(ITEMS)) { one(`give.${k}`, `a ${ITEMS[k].name}`, x(`give ${k}`), 'jhola'); one(`give.${k}.x10`, `ten of ${ITEMS[k].name}`, x(`give ${k} 10`), 'jhola'); }
+    for (const p of ['auto', 'lite', 'low', 'medium', 'high', 'veryhigh', 'ultra']) one(`preset.${p}`, `graphics preset: ${p}`, x(`preset ${p}`), 'graphics');
+    for (const S of SETTINGS) {
+      if (!S.id) continue;
+      const nv = Math.min(6, (S.val && S.val.length) || 6);
+      for (let i = 0; i < nv; i++) { let t = ''; try { t = S.fmt ? S.fmt(S.val[i]) : fmt(S.val[i]); } catch (e) { t = ''; } one(`gfx.${S.id}.${i}`, `${S.label}: level ${i}${t ? ' (' + t + ')' : ''}`, x(`gfx ${S.id} ${i}`), 'graphics'); }
+      one(`gfx.${S.id}.auto`, `${S.label}: let Auto choose`, x(`gfx ${S.id}`), 'graphics');
+    }
+    one('gfx.reset', 'every setting back to the preset', x('gfx reset'), 'graphics');
+  }
+  // what needs the city loaded: a command for every area of Pune and every landmark, and your stats
+  let placed = false;
+  function placeFamilies() {
+    if (placed) return; placed = true;
+    for (const p of allPlaces()) {
+      if (p.c !== 'area' && p.c !== 'landmark') continue;
+      const s0 = slug(p.n); if (!s0) continue;
+      one(`${p.c === 'area' ? 'tp' : 'go'}.${s0}`, `${p.c === 'area' ? 'teleport to' : 'go to'} ${p.n}`, async () => { const r = await go({ x: p.x, z: p.z, name: p.n, safe: true }); say(`${p.n} (${r.x.toFixed(0)}, ${r.z.toFixed(0)})`, 'ok'); }, p.c === 'area' ? 'areas' : 'landmarks');
+    }
+    const L = G.life?.s || {};
+    for (const k of Object.keys(L)) if (typeof L[k] === 'number' && L[k] >= 0 && L[k] <= 1) for (const [w, v] of [['full', 1], ['half', 0.5], ['empty', 0]]) one(`stat.${k}.${w}`, `${k}: ${w}`, x(`stat ${k} ${v}`), 'body');
+  }
+
   // ------------------------------------------------------------ the terminal and its readout
   const term = new Terminal(sh, {
     status: () => { const Pl = P(), hh = G.hour || 0, two = (n) => String(Math.floor(n)).padStart(2, '0'); return `x ${Math.round(Pl.x)}  z ${Math.round(Pl.z)}   ${two(hh)}:${two(hh%1*60)}   ${Math.round(fps.cur)} fps   ${Pl.onFoot ? 'on foot' : Pl.cur.type}   traffic ${T().list.length}/${T().max}   ${G.weather?.kind || ''}`; },
     onOpen: () => { G.input?.keys?.clear(); G.input?.pressed?.clear(); G.releaseMouse?.(); },
     onClose: () => { G.input?.keys?.clear(); G.input?.pressed?.clear(); G.lockMouse?.(); },
   });
-  sh.order = ['vehicles', 'world', 'you', 'picture', 'live', 'shell', 'yours'];
+  sh.order = ['vehicles', 'world', 'you', 'picture', 'live', 'shell', 'flight', 'camera', 'spawn', 'drive', 'paint jobs', 'traffic', 'areas', 'landmarks', 'clock', 'sky', 'body', 'jhola', 'graphics', 'yours'];
+  families();
   // the "click to take the mouse" hint has no business showing while you're typing
   const lockHint = G.hud?.setLockHint?.bind(G.hud);
   if (lockHint) G.hud.setLockHint = (on) => lockHint(on && !term.open);
@@ -352,7 +415,7 @@ export function freeTerminal(G) {
       `xz ${Pl.x.toFixed(0)} ${Pl.z.toFixed(0)}  ${(Math.abs(Pl.v || 0)*3.6).toFixed(0)} km/h  ${Pl.onFoot ? 'foot' : Pl.cur.type}`,
       `${String(Math.floor(hh)).padStart(2, '0')}:${String(Math.floor(hh%1*60)).padStart(2, '0')}${St.hourLock !== null ? ' lock' : ''}  ${G.weather?.kind || ''}  traffic ${T().list.length}/${T().max}${St.scale !== 1 ? `  ${St.scale}×` : ''}`,
     ];
-    const flags = [St.god && 'god', St.noclip && 'noclip', St.fly && 'fly', St.foot !== 1 && `run ${St.foot}×`, Object.keys(St.rates).length && `rates ${Object.entries(St.rates).map(([k, v]) => `${k}:${v}`).join(' ')}`].filter(Boolean);
+    const flags = [St.god && 'god', St.noclip && 'noclip', St.flight && 'flying', St.fly && 'freecam', St.foot !== 1 && `run ${St.foot}×`, Object.keys(St.rates).length && `rates ${Object.entries(St.rates).map(([k, v]) => `${k}:${v}`).join(' ')}`].filter(Boolean);
     if (flags.length) lines.push(flags.join('  '));
     for (const w of St.watches) { let v; try { v = fmt(walk(w).value); } catch (e) { v = '×'; } lines.push(`${w} = ${v}`); }
     tel.textContent = lines.join('\n');
@@ -379,7 +442,63 @@ export function freeTerminal(G) {
       const f = St.fly; St.fly = null;
       rig.update = f.up; rig.updateFoot = f.foot; G.focus = f.focus; Pl.frozen = false; rig.inited = false;
     }
-    say(`fly ${on ? 'on' : 'off'}`, 'ok');
+    say(`freecam ${on ? 'on' : 'off'}`, 'ok');
+  }
+  // flight: you leave the ground and the body goes with it. Hovering treads the air upright, moving tips you forward
+  // into a glide (about the hips, not the feet), turning banks you, and switching it off brings you down to land
+  const HIP = 0.95, ease = (v, t, k, dt) => v + (t - v)*(1 - Math.exp(-k*dt));
+  function setFlight(on) {
+    const Pl = P(), F = Pl.foot;
+    if (on) {
+      if (St.fly) setFly(false);
+      if (!Pl.onFoot) Pl.exit(T(), true);
+      if (St.flight) { St.flight.landing = false; return; }
+      St.flight = { vx: 0, vy: 3, vz: 0, pitch: 0, roll: 0, t: 0, yaw: F.yaw, landing: false, mode: '' };
+      F.air = false; F.vy = 0; F.swim = false; F.climb = null;
+      Pl.human.play('jump_start', { once: true, fade: 0.08 });
+      say('flying. Double-tap Space or "fly off" to land', 'ok');
+    } else if (St.flight) { St.flight.landing = true; say('landing', 'ok'); }
+  }
+  function flyFoot(dt, input, camYaw) {
+    const Pl = P(), F = Pl.foot, H = Pl.human, f = St.flight, k = (...c) => input.key(...c);
+    f.t += dt;
+    const fw = (k('KeyW', 'ArrowUp') ? 1 : 0) - (k('KeyS', 'ArrowDown') ? 1 : 0), sd = (k('KeyD', 'ArrowRight') ? 1 : 0) - (k('KeyA', 'ArrowLeft') ? 1 : 0);
+    let up = (k('Space') ? 1 : 0) - (k('KeyQ', 'ControlLeft', 'ControlRight') ? 1 : 0);
+    const fast = k('ShiftLeft', 'ShiftRight'), top = (fast ? 48 : 15)*St.flySpeed;
+    const c = Math.cos(camYaw), n = Math.sin(camYaw), len = Math.hypot(fw, sd) || 1;
+    let tx = (c*fw - n*sd)/len*top, tz = (n*fw + c*sd)/len*top;
+    const g = W().surf.height(F.x, F.z);
+    if (f.landing) { tx *= 0.3; tz *= 0.3; up = -1; }
+    f.vx = ease(f.vx, tx, fw || sd ? 1.6 : 2.4, dt); f.vz = ease(f.vz, tz, fw || sd ? 1.6 : 2.4, dt);
+    f.vy = ease(f.vy, up*(fast ? 14 : 7)*Math.max(1, St.flySpeed*0.6), 3, dt);
+    F.x += f.vx*dt; F.z += f.vz*dt; F.y = Math.min(F.y + f.vy*dt, 900);
+    const hs = Math.hypot(f.vx, f.vz);
+    if (F.y < g + 0.02) {
+      F.y = g + 0.02;
+      if (f.landing || (hs < 1 && up < 0)) {     // down: on your feet again
+        St.flight = null; F.air = false; F.vy = 0; F.vx = F.vz = 0; F.v = 0;
+        H.holder.rotation.set(0, -F.yaw, 0); H.holder.position.set(F.x, F.y, F.z);
+        H.play('jump_land', { once: true, fade: 0.1 }); H.mixer.update(dt); say('landed', 'dim');
+        return;
+      }
+    }
+    const was = F.yaw;
+    if (hs > 1.2) { let d = Math.atan2(f.vz, f.vx) - F.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); F.yaw += d*(1 - Math.exp(-5*dt)); }
+    let turn = (F.yaw - was)/Math.max(dt, 1e-3); turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+    F.v = hs; F.vx = f.vx; F.vz = f.vz;
+    // the pose: tip forward with speed (up to about 78 degrees), lean back a little climbing, bank into turns
+    const tip = Math.min(hs/42, 1)*1.36 - Math.max(-0.35, Math.min(0.35, f.vy*0.03)), bank = Math.max(-0.75, Math.min(0.75, -turn*0.32));
+    f.pitch = ease(f.pitch, Math.max(0, tip), 3.5, dt); f.roll = ease(f.roll, bank, 4, dt);
+    const mode = hs < 3 ? 'swim_idle' : 'jump_loop';
+    if (H.cur?.getClip?.().name !== 'jump_start' || H.cur.time > 0.25) if (mode !== f.mode) { f.mode = mode; H.play(mode, { fade: 0.35, speed: mode === 'swim_idle' ? 0.8 : 0.6 }); }
+    const p = f.pitch, r = f.roll, b = -F.yaw, bob = hs < 3 ? Math.sin(f.t*2.2)*0.06 : 0;
+    // the hips stay where F is (plus a metre); the feet swing back behind them
+    const ox = HIP*Math.sin(p), oy = HIP*Math.cos(p)*Math.cos(r), oz = HIP*Math.cos(p)*Math.sin(r);
+    const wx = ox*Math.cos(b) + oz*Math.sin(b), wz = -ox*Math.sin(b) + oz*Math.cos(b);
+    H.holder.rotation.set(r, b, -p, 'YXZ');
+    H.holder.position.set(F.x - wx, F.y + HIP - oy + bob, F.z - wz);
+    H.mixer.update(dt);
+    if (Pl.postPose) Pl.postPose(H, dt);
   }
   function tick(dt, raw) {
     fps.n++; fps.t += raw; fps.worst = Math.max(fps.worst, raw*1000);
@@ -403,7 +522,11 @@ export function freeTerminal(G) {
     G.fixed = (h) => fixed(armed ? h*St.scale : h);
     const C = W().collision, res = C.resolve.bind(C);
     C.resolve = (...a) => armed && St.noclip ? null : res(...a);
-    const Pl = P(), mul = Pl.sprintMul; Pl.sprintMul = () => (mul ? mul() : 1)*(armed ? St.foot : 1);
+    const Pl = P(), uf = Pl.updateFoot.bind(Pl);
+    Pl.updateFoot = (dt, input, tr, camYaw) => armed && St.flight ? flyFoot(dt, input, camYaw) : uf(dt, input, tr, camYaw);
+    const R = G.rig;
+    for (const m of ['update', 'updateFoot']) { const o = R[m]; R[m] = function (...a) { const r = o.apply(this, a); if (armed && St.fov && this.cam) { this.cam.fov = St.fov; this.cam.updateProjectionMatrix(); } return r; }; }
+    const mul = Pl.sprintMul; Pl.sprintMul = () => (mul ? mul() : 1)*(armed ? St.foot : 1);
     // the shut saves: nothing written during free roam, whatever the terminal did to you
     const Lf = G.life, ls = Lf.save.bind(Lf); Lf.save = () => { if (!armed) ls(); };
     const ss = G.saveStats.bind(G); G.saveStats = (...a) => armed ? undefined : ss(...a);
@@ -415,27 +538,29 @@ export function freeTerminal(G) {
     if (!armed || G.state !== 'play' && !term.open) return;
     if (term.open) { if (e.target !== term.input) { term.input.focus(); } return; }
     if (e.repeat) return;
+    if (e.code === 'Space' && P().onFoot && !St.fly) { const t = performance.now(); if (t - (St.spaceT || 0) < 300) { St.spaceT = 0; setFlight(!St.flight || St.flight.landing); } else St.spaceT = t; }
     if (e.code === 'Slash' || e.code === 'Backquote') { e.preventDefault(); e.stopImmediatePropagation(); term.show(); return; }
     if (binds[e.code]) { e.preventDefault(); e.stopImmediatePropagation(); sh.exec(binds[e.code], true); }
   }, true);
 
   // ------------------------------------------------------------ in and out
   function arm() {
-    if (armed) return; armed = true; hook();
+    if (armed) return; armed = true; hook(); placeFamilies();
     tel.hidden = !St.hud; readout();
     term.clear();
     say('Free roam terminal. Nothing here reaches your own game.', 'head');
-    say('Every command is in the list. Type to narrow it, Tab or a click to take one.', 'dim');
+    say(`${sh.cmds.size} commands, every one in the list. Type to narrow it, Tab or a click to take one. Double-tap Space to fly.`, 'dim');
     say('Try: spawn lambo --paint=verde --drive   ·   rate super 500; traffic flush   ·   tp fc road', 'dim');
     for (const l of autoexec) St.timers.push({ t: 0.5, c: l });
   }
   function disarm() {
     if (!armed) return;
     if (St.fly) setFly(false);
+    if (St.flight) { const H = P().human, F = P().foot; St.flight = null; H.holder.rotation.set(0, -F.yaw, 0); F.air = true; F.vy = 0; }
     removeSpawned();
     St.rates = {}; if (St.baseW) { for (const k in TYPES) TYPES[k].w = St.baseW[k]; St.baseW = null; }
     if (St.baseMax) { T().max = St.baseMax; St.baseMax = 0; }
-    Object.assign(St, { god: false, noclip: false, hourLock: null, scale: 1, watches: [], timers: [], foot: 1, trafficStop: false });
+    Object.assign(St, { fov: 0, flySpeed: 1, god: false, noclip: false, hourLock: null, scale: 1, watches: [], timers: [], foot: 1, trafficStop: false });
     term.hide(); tel.hidden = true; armed = false; St.hud = false;
   }
   const leave = G.leaveFree.bind(G);
