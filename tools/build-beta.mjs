@@ -80,6 +80,13 @@ const PATCHES = {
     ["'Pet the dog', key: 'F' });", "'Pet the dog', key: 'V' });"],
   ],
   [S('game/shops.js')]: [["if (e.code === 'Escape' || e.code === 'KeyF' || e.code === 'KeyE') {", "if (e.code === 'Escape' || e.code === 'KeyF' || e.code === 'KeyV' || e.code === 'KeyE') {"]],
+  // a one-off gesture (a wave as they pass) is upper body too: the legs keep walking under it
+  [S('people/crowd.js')]: [["if (mv > 0.3 && !once && !LOCO.has(name)) {", "if (mv > 0.3 && (!once || UPPER.has(name)) && !LOCO.has(name)) {"]],
+  // animals: the walk follows how far they really move (no gliding when the game moves them, no 2.6x cap when they run)
+  [S('people/animals.js')]: [
+    ["      const lie = !a.moving && a.kind !== 'cow' && !a.cow;\n      m.play(a.moving ? (a.cow ? 'WalkSlow' : 'Walk') : 'Idle', a.moving ? (a.cow ? 0.9 : Math.min(2.6, Math.max(1, a.v / 1.1))) : 1);",
+     "      const q = m._lx === undefined ? 0 : Math.hypot(a.x - m._lx, a.z - m._lz); m._lx = a.x; m._lz = a.z;\n      if (q < 3 && dt > 0) m._v = (m._v || 0) + (q / dt - (m._v || 0)) * Math.min(1, dt * 6);\n      const mv = m._v || 0, walking = mv > 0.12, cowS = a.cow || a.kind === 'cow', slow = cowS && mv < 0.9;\n      if (walking && mv > 2.4) { m._ph = (m._ph || 0) + dt * mv * 2.2; m.holder.position.y += Math.abs(Math.sin(m._ph)) * Math.min(0.07, (mv - 2.4) * 0.02); }\n      const lie = !walking && a.kind !== 'cow' && !a.cow;\n      m.play(walking ? (slow ? 'WalkSlow' : 'Walk') : 'Idle', walking ? Math.max(0.45, mv / (cowS ? (slow ? 0.7 : 1.1) : a.kind === 'cat' ? 0.6 : 0.95)) : 1);"],
+  ],
   [S('people/fight.js')]: [["if (input.took('KeyC') && !busyDown", "if (input.took('KeyQ') && !busyDown"]],
   [S('game/game.js')]: [
     ["if (this.state === 'play' && !this.player.onFoot && this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);", "if (this.state === 'play' && this.input.took('KeyC')) this.rig.toggleView(this.player.onFoot);"],

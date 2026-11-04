@@ -54,9 +54,12 @@ export class Actors {
       A.iPos.array.set([x, y, z, Math.PI/2 - yaw], o*4); A.iAnim.array.set([ph, amp, id, 0], o*4); };
     for (const p of (G.people ? G.people.list : [])) {
       if (p.hidden || p.pax || p.body) continue;     // (who has a real body close by is drawn by the skin)
-      if (!p._dk) { p._dk = this.next; this.next = this.next%(CAP - 1) + 1; p._dph = Math.random()*9; }
-      const v = Math.abs(p.v || 0); p._dph += dt*v/.68*Math.PI;
-      put(p.x, p.y || 0, p.z, p.yaw || 0, p._dph, Math.min(1, v/1.2), p._dk);
+      if (!p._dk) { p._dk = this.next; this.next = this.next%(CAP - 1) + 1; p._dph = Math.random()*9; p._lx = p.x; p._lz = p.z; p._dv = 0; }
+      // the legs go with how far they really moved this frame (not the speed they mean to walk at), so nobody glides:
+      // a step is about 0.68 m, half a cycle
+      const m = Math.hypot(p.x - p._lx, p.z - p._lz); p._lx = p.x; p._lz = p.z;
+      if (m < 3 && dt > 0) { p._dv += (m/dt - p._dv)*Math.min(1, dt*6); p._dph += m/.68*Math.PI; }
+      put(p.x, p.y || 0, p.z, p.yaw || 0, p._dph, Math.min(1, p._dv/1.1), p._dk);
     }
     C.near.geometry.instanceCount = a; C.far.geometry.instanceCount = b; nA.iPos.needsUpdate = nA.iAnim.needsUpdate = fA.iPos.needsUpdate = fA.iAnim.needsUpdate = true;
   }
