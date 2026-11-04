@@ -527,7 +527,12 @@ export function freeTerminal(G) {
     if (f.landing) { tx *= 0.3; tz *= 0.3; up = -1; }
     f.vx = ease(f.vx, tx, fw || sd ? 1.6 : 2.4, dt); f.vz = ease(f.vz, tz, fw || sd ? 1.6 : 2.4, dt);
     f.vy = ease(f.vy, up*(fast ? 14 : 7)*Math.max(1, St.flySpeed*0.6), 3, dt);
-    F.x += f.vx*dt; F.z += f.vz*dt; F.y = Math.min(F.y + f.vy*dt, 900);
+    // walls are walls: slide along a building you're below the roof of, never through it (over the top is fine)
+    { const S = W().surf, nx = F.x + f.vx*dt, nz = F.z + f.vz*dt, ny = Math.min(F.y + f.vy*dt, 900), hit = (x, z) => S.bldTop && S.bldTop(x, z) > ny + 0.1;
+      if (!St.noclip && hit(nx, nz)) { if (!hit(nx, F.z)) { F.x = nx; f.vz = 0; } else if (!hit(F.x, nz)) { F.z = nz; f.vx = 0; } else { f.vx = f.vz = 0; } }
+      else { F.x = nx; F.z = nz; }
+      // over a roof you can't sink into it (land on the street)
+      const top = S.bldTop ? S.bldTop(F.x, F.z) : -1; F.y = top > 0 && F.y >= top - 0.05 ? Math.max(ny, top) : ny; }
     const hs = Math.hypot(f.vx, f.vz);
     if (F.y < g + 0.02) {
       F.y = g + 0.02;
