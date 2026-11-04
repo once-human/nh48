@@ -104,6 +104,25 @@ const PATCHES = {
     ["  inBuilding(x, z) { return this.test(this.bld, x, z); }", "  inBuilding(x, z) { return this.test(this.bld, x, z); }\n  bldTop(x, z) { const l = this.bld.get(this.chunkOf(x, z)); let t = -1; if (l) for (const p of l) { if (x < p.bb[0] || x > p.bb[2] || z < p.bb[1] || z > p.bb[3]) continue; if (p.top > t && pointInRings(x, z, p.rings)) t = p.top; } return t; }"],
   ],
   [S('world/interiors.js')]: [
+    // a Pune bakery, not a café with a counter: glass cases down both sides (khari, toast, nankatai, puffs, cream
+    // rolls), jars of biscuits on top, the bread on the shelves behind the till, a lit cake fridge, two tables
+    ["else if (k === 'bakery') { aes = pick(['bakery', 'pastel', 'heritage']); layout = 'counter'; }", "else if (k === 'bakery') { aes = pick(['bakery', 'heritage', 'local']); layout = 'bakery'; scale = 0.8; }"],
+    ["      } else if (lay === 'lounge') {", `      } else if (lay === 'bakery') {
+        const goods = [0xd9a35b, 0xe8c27a, 0xc98a3a, 0xf0e0b0, 0xf2d8a0, 0xb8742e, 0xfaf3e3];
+        const lenC = Math.min(D - 4.2, 6), z0 = 1.8, zc = z0 + lenC / 2;
+        for (const s of [-1, 1]) {
+          const x = s * (W / 2 - 0.75);
+          box(B, x, 0.45, zc, 0.8, 0.9, lenC, S.counter || 0xe8e4dc); solid(x, zc, 0.8, lenC);
+          box(GL, x, 1.12, zc, 0.78, 0.44, lenC - 0.04, 0xf6efe0);
+          let i = 0;
+          for (let z = z0 + 0.25; z < z0 + lenC - 0.2; z += 0.36) box(B, x, 0.93, z, 0.6, 0.05, 0.28, goods[(i++ * 5 + (s > 0 ? 2 : 0)) % goods.length]);
+          for (let z = z0 + 0.3; z < z0 + lenC - 0.2; z += 0.45) { box(B, x, 1.48, z, 0.16, 0.28, 0.16, 0xe8e0c8); box(B, x, 1.64, z, 0.17, 0.04, 0.17, 0xc8302a); }
+          for (let z = z0 + 0.8; z < z0 + lenC; z += 1.6) browse(x - s * 0.9, z);
+        }
+        shelf(0, D - 0.35, Math.min(W - 3, 8), false, 5, 2.4, [0xd9a35b, 0xc98a3a, 0xfaf3e3, 0xe8c27a, 0xf2d8a0, 0xb8742e]);
+        box(GL, W / 2 - 1.2, 0.95, D - 1.0, 0.9, 1.9, 0.7, 0xfff4e6); solid(W / 2 - 1.2, D - 1.0, 0.9, 0.7);
+        table2(-1.6, 1.4); table2(1.6, 1.4);
+      } else if (lay === 'lounge') {`],
     // a mark only over people you know: a small dot for a contact, blue for someone you could see, black for your partner
     ["      if (!p.name || (G.date && G.date.blocked(p)) || !(p.dateWith || G.date && G.date.eligible(p))) continue;", "      if (!p.name || (G.date && G.date.blocked(p)) || (!p.dateWith && this.heartKind(p) === 'new')) continue;"],
     ["if (!p.name || p.walkedOff || !(p.dateWith || D && D.eligible(p)) || (C.seat && !p.dateWith)) continue;", "if (!p.name || p.walkedOff || !p.dateWith) continue;"],

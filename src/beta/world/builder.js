@@ -29,7 +29,7 @@ for (const k of ['GAO', 'VILLAGE']) TYPE[KI[k]] = 'village';
 for (const k of ['MIDC', 'HWY']) TYPE[KI[k]] = 'industrial';
 
 // shop trades (the map's categories) -> how the inside is stocked
-const TRADE = { grocery: 0, generic: 0, hardware: 8, sweets: 11, bakery: 11, food: 1, hotel: 1, restobar: 1, cafe: 1, bar: 1, icecream: 1, clinic: 2, pharmacy: 2,
+const TRADE = { grocery: 0, generic: 0, hardware: 8, sweets: 11, bakery: 13, food: 1, hotel: 1, restobar: 1, cafe: 1, bar: 1, icecream: 1, clinic: 2, pharmacy: 2,
   optician: 2, bank: 3, atm: 3, office: 3, travel: 3, classes: 3, clothes: 4, jewellery: 5, mobile: 6, electronics: 6, books: 7, garage: 9, salon: 10, gym: 10, shoes: 12 };
 const POP = [0x2f5fd0, 0xf08a24, 0x2f8a5a, 0xd83a2a, 0xf2c230, 0x2a8a8a, 0xc8306a, 0x7a3ab8];
 const CLOTH = [0xd83a2a, 0x2f5fd0, 0xf2c230, 0x2f8a5a, 0xe86a9a, 0xf08a24, 0xeeeae0, 0x7a3ab8, 0x1a1a2a, 0x8a1a2a, 0x3ab0c8];
@@ -525,6 +525,7 @@ const GOODS = [
   [0xe8e0d8, 0x2a2a2e, 0xd8a0b0],                                                      // salon
   [0xf2c230, 0xf08a24, 0xeee8dc, 0xd86a8a, 0x8a5a2a],                                 // sweets
   [0x2a2a2e, 0x8a5a3a, 0xe8e8ec, 0xd83a2a],                                           // shoes
+  [0xd9a35b, 0xe8c27a, 0xc98a3a, 0xf0e0b0, 0xf2d8a0, 0xb8742e, 0xfaf3e3],             // bakery
 ];
 function shopInside(b, cb, G, F, a, c, oh, trade, lux, sh, famous) {
   const { R, L } = G;
@@ -543,7 +544,7 @@ function shopInside(b, cb, G, F, a, c, oh, trade, lux, sh, famous) {
   // the tube light
   b.set(K.glow, trade === 5 ? [1, 0.92, 0.75] : [0.95, 0.98, 1], 0, 0.9); F.box(b, a + 0.3, Math.min(c - 0.3, a + 1.5), yt - 0.06, yt - 0.02, -D * 0.4 - 0.04, -D * 0.4, 0);
   // the stock: shelves painted on the back wall (one quad), then a few real things
-  if (trade !== 3 && trade !== 9 && trade !== 10) { b.set(K.goods, 0xffffff, 0.2, (trade * 16 + ((R() * 16) | 0)) / 255); F.rect(b, c - 0.05, a + 0.05, yb + 0.3, yt - 0.15, -D + 0.04, 1); }
+  if (trade !== 3 && trade !== 9 && trade !== 10 && trade !== 13) { b.set(K.goods, 0xffffff, 0.2, (trade * 16 + ((R() * 16) | 0)) / 255); F.rect(b, c - 0.05, a + 0.05, yb + 0.3, yt - 0.15, -D + 0.04, 1); }
   const gc = GOODS[Math.max(0, trade)] || GOODS[0];
   const pc = () => gc[(R() * gc.length) | 0];
   const w = c - a;
@@ -583,6 +584,23 @@ function shopInside(b, cb, G, F, a, c, oh, trade, lux, sh, famous) {
       b.set(K.wood, 0x6a4a32, 0.2); F.box(b, a + 0.3, c - 0.3, yb, yb + 0.9, -D + 0.35, -D + 0.9, 2 | 8);
       if (R() < 0.6) { const P0 = F.P(a + 0.4, 0, -0.35); b.set(K.cloth, pc(), 0.1); b.cyl(P0[0], yb, P0[2], 0.16, 0.2, 1.1, 6, 1); b.set(K.plain, 0xe8d8c8, 0); b.blob(P0[0], yb + 1.3, P0[2], 0.1, 0.13, 0.1, 4); }
       if (lux > 0.6) { b.set(K.glass, 0x8aa0a8, 0, R()); F.rect(b, a, c, yb, yt, 0.0); }
+      break;
+    }
+    case 13: {                                                             // a Pune bakery: the glass case at the front, jars on it, bread behind
+      b.set(K.wood, [0x8a5a32, 0xe8e4dc, 0x5a3a22][(R() * 3) | 0], L.wear); F.box(b, a + 0.15, c - 0.15, yb, yb + 0.75, -0.9, -0.4, 2 | 8);
+      b.set(K.glass, 0xd8e8e0, 0, R()); F.box(b, a + 0.15, c - 0.15, yb + 0.75, yb + 1.15, -0.9, -0.4, 2 | 8);
+      for (let uu = a + 0.25; uu < c - 0.4; uu += 0.32) { b.set(K.plain, pc(), 0.2); F.box(b, uu, uu + 0.26, yb + 0.78, yb + 0.84, -0.8, -0.5, 2); }
+      for (let uu = a + 0.3; uu < c - 0.35; uu += 0.28) { if (R() < 0.3) continue; b.set(K.glass, 0xe8e2cc, 0, R()); F.box(b, uu, uu + 0.16, yb + 1.15, yb + 1.4, -0.75, -0.6, 2 | 4 | 8); b.set(K.plain, 0xc8302a, 0.1); F.box(b, uu - 0.005, uu + 0.165, yb + 1.4, yb + 1.44, -0.755, -0.595, 2); }
+      if (D > 1.2) {
+        b.set(K.wood, 0x6a4a32, 0.3);
+        for (let s = 0; s < 4; s++) {
+          const y = yb + 0.5 + s * 0.45; if (y > yt - 0.3) break;
+          F.box(b, a + 0.1, c - 0.1, y, y + 0.03, -D + 0.05, -D + 0.4, 2);
+          for (let uu = a + 0.15; uu < c - 0.3; uu += 0.22 + R() * 0.08) { b.set(K.plain, pc(), 0.2); F.box(b, uu, uu + 0.18, y + 0.03, y + 0.15 + R() * 0.08, -D + 0.1, -D + 0.32, 2 | 4 | 8); }
+          b.set(K.wood, 0x6a4a32, 0.3);
+        }
+      }
+      if (w > 2.2 && D > 1.8) { b.set(K.glow, [1, 0.96, 0.88], 0, 0.85); F.box(b, c - 0.75, c - 0.15, yb, yb + 1.8, -D + 0.45, -D + 1.0, 2); }
       break;
     }
     case 7: { b.set(K.wood, 0x5a4232, 0.3); F.box(b, a + 0.2, c - 0.2, yb, yb + 0.9, -0.9, -0.4, 2 | 8); break; }      // books: a table of them at the front
