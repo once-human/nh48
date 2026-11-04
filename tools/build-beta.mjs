@@ -67,10 +67,19 @@ const PATCHES = {
   [S('game/keys.js')]: [
     ["{ id: 'roll', label: 'Roll; camera when driving', group: 'Do', def: 'KeyC' }", "{ id: 'roll', label: 'Roll', group: 'Do', def: 'KeyQ' }"],
     ["{ id: 'cam', label: 'Change camera', group: 'Vehicle', def: 'KeyV' }", "{ id: 'cam', label: 'First or third person', group: 'Move', def: 'KeyC' }"],
+    // F is for vehicles only; V walks in, talks, pets, fuels: a car parked by a shop no longer hides the shop
+    ["{ id: 'use', label: 'Talk, walk in, get in or out', group: 'Do', def: 'KeyF' },", "{ id: 'use', label: 'Get in or out of a vehicle', group: 'Do', def: 'KeyF' }, { id: 'visit', label: 'Walk in, talk, pet, fuel up', group: 'Do', def: 'KeyV' },"],
   ],
+  [S('game/pilot.js')]: [
+    ["      if (!(this.onFoot && this.offer) && this.useHook && this.useHook()) { /* walked in */ }\n      else if (this.onFoot && this.offer) this.enter(this.offer, traffic);", "      if (this.onFoot && this.offer && this.offer.kind !== 'pet') this.enter(this.offer, traffic);"],
+    ["    if (input.took('KeyF') && this.busy <= 0) {", "    if (input.took('KeyV') && this.busy <= 0) { if (this.onFoot && this.offer && this.offer.kind === 'pet') this.enter(this.offer, traffic); else if (this.useHook) this.useHook(); }\n    if (input.took('KeyF') && this.busy <= 0) {"],
+    ["'Pet the dog', key: 'F' });", "'Pet the dog', key: 'V' });"],
+  ],
+  [S('game/shops.js')]: [["if (e.code === 'Escape' || e.code === 'KeyF' || e.code === 'KeyE') {", "if (e.code === 'Escape' || e.code === 'KeyF' || e.code === 'KeyV' || e.code === 'KeyE') {"]],
   [S('people/fight.js')]: [["if (input.took('KeyC') && !busyDown", "if (input.took('KeyQ') && !busyDown"]],
   [S('game/game.js')]: [
-    ["if (this.state === 'play' && !this.player.onFoot && this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);", "if (this.state === 'play' && (this.input.took('KeyC') || this.input.took('KeyV'))) this.rig.toggleView(this.player.onFoot);"],
+    ["if (this.state === 'play' && !this.player.onFoot && this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);", "if (this.state === 'play' && this.input.took('KeyC')) this.rig.toggleView(this.player.onFoot);"],
+    ["      if (P.offer && P.onFoot) this.hud.prompt(P.offer.key, P.offer.label, 0.3);\n      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);", "      if (P.offer && P.onFoot) { this.hud.prompt(P.offer.key, P.offer.label, 0.3); if (sl && this.state === 'play') this.hud.prompt2('V', sl, 0.3); }\n      else if (sl && this.state === 'play') this.hud.prompt('V', sl, 0.3);"],
   ],
   [S('traffic/traffic.js')]: [["bullet: buildBike({ helmet: true }), superbike: buildBike({ helmet: true }),", "bullet: buildBike({ helmet: true, kind: 'bullet' }), superbike: buildBike({ helmet: true, kind: 'superbike' }),"]],
 };

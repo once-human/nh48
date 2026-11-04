@@ -72,3 +72,4 @@
 .nhc-tel { position: fixed; top: 12px; left: 12px; z-index: 8999; margin: 0; padding: 7px 11px; background: rgba(12, 12, 11, .86); color: #ecebe6; font: 11.5px/1.5 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; pointer-events: none; white-space: pre; border-left: 2px solid #ecebe6; }
 .nhc-tel[hidden] { display: none; }
 @media (max-width: 760px) { .nhc { padding: 0; } .nhc-card { height: 88vh; grid-template: auto minmax(0, 1fr) minmax(0, 1fr) / minmax(0, 1fr); } .nhc-main { border-right: 0; border-bottom: 1px solid var(--ink); } .nhc-head h2 { font-size: 40px; } .nhc-tip { display: none; } .nhc-cols, .nhc-s { grid-template-columns: 30px max-content minmax(0, 1fr); } .nhc-cols span:nth-child(4), .nhc-s i { display: none; } }
+#h-prompt2 { margin-top: 6px; }
