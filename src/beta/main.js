@@ -16,7 +16,7 @@ import { painter, paintLod } from './world/buildings.js';
 import { betaGame, betaTitle } from './game/beta.js';
 import { U } from '@orig/gfx/materials.js';
 import { installAtmosphere } from '@orig/gfx/atmos.js';
-import { vehicleMaterials } from '@orig/vehicles/vehmat.js';
+import { vehicleMaterials } from './vehicles/vehmat.js';
 import { PlayerAuto } from '@orig/vehicles/player.js';
 import { Traffic } from '@orig/traffic/traffic.js';
 import { CameraRig } from '@orig/game/camera.js';

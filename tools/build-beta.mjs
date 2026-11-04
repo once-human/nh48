@@ -40,6 +40,7 @@ const SWAPS = [
   [S('world/world.js'), S('gfx/materials.js'), S('beta/gfx/materials.js')],
   [S('world/world.js'), S('world/trees.js'), S('beta/world/trees.js')],
   [S('world/world.js'), S('world/grass.js'), S('beta/world/grass.js')],
+  ['*', S('vehicles/vehmat.js'), S('beta/vehicles/vehmat.js')],
   ['*', S('game/story.js'), S('beta/game/story.js')],
   ['*', S('game/tutorial.js'), S('beta/game/tutorial.js')],
 ];

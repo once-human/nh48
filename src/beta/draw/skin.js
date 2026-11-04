@@ -40,7 +40,7 @@ float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.05 + .002*vZ), 1
 vec3 paint(vec3 b, vec3 n, vec3 w, float sss){
   float e = nz(gl_FragCoord.xy*.11) - .5, ndl = dot(n, sunDir), lit = smoothstep(.0, .14, ndl + e*.12);
   float sh = (shadowOn > .5 && lit > 0.) ? smoothstep(.3, .7, shadowAt(w, n) + e*.3) : 1., L = lit*sh*dayK;
-  vec3 cl = b*sunCol, cs = b*shadeCol*(.92 + .16*max(n.y, 0.)) + vec3(.025, .03, .045)*dayK;
+  vec3 cl = b*sunCol, cs = b*shadeCol*(.92 + .16*max(n.y, 0.)) + vec3(.02)*dayK;
   cs += b*vec3(.3, .08, .03)*sss*smoothstep(-.35, .05, ndl);
   vec3 c = mix(cs, cl, L);
   float h = smoothstep(.5, .72, fract((gl_FragCoord.x + gl_FragCoord.y)*.17 + e*.9))*(1. - L)*(1. - smoothstep(10., 34., vZ));
