@@ -25,7 +25,7 @@ import './vehicles/physics.js';
 import './traffic/rates.js';
 import './game/prompt2.js';
 import './game/ask.js';           // what people tell you: the way, food, where you are, a lift
-import './game/talk.js';          // F at anyone: talk
+import './game/talk.js';          // T at anyone: talk
 import './game/hands.js';
 import './game/fists.js';
 import './world/staff.js';
@@ -33,7 +33,8 @@ import './world/walkin.js';
 import './draw/alive.js';
 import './draw/falls.js';
 import './draw/fauna.js';
-import './vehicles/mount.js';         // what you hold, in your hand: the torch aimed by the arm, the body turning
+import './vehicles/mount.js';
+import './vehicles/cardoor.js';
 import './world/shutters.js';      // shutters that roll, with the rattle, and board lights that go with them
 import './world/flyovers.js';
 import './world/hills.js';
