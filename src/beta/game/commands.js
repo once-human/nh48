@@ -334,6 +334,7 @@ export function freeTerminal(G) {
 
   // ------------------------------------------------------------ the terminal and its readout
   const term = new Terminal(sh, {
+    status: () => { const Pl = P(), hh = G.hour || 0, two = (n) => String(Math.floor(n)).padStart(2, '0'); return `x ${Math.round(Pl.x)}  z ${Math.round(Pl.z)}   ${two(hh)}:${two(hh%1*60)}   ${Math.round(fps.cur)} fps   ${Pl.onFoot ? 'on foot' : Pl.cur.type}   traffic ${T().list.length}/${T().max}   ${G.weather?.kind || ''}`; },
     onOpen: () => { G.input?.keys?.clear(); G.input?.pressed?.clear(); G.releaseMouse?.(); },
     onClose: () => { G.input?.keys?.clear(); G.input?.pressed?.clear(); G.lockMouse?.(); },
   });

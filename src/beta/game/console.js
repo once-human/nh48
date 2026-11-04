@@ -138,27 +138,25 @@ export class Shell {
 
 // ---------------------------------------------------------------- the terminal
 const HIST = 'nh48_console_hist';
-// each group of commands gets its own colour off the palette
-const DABS = ['#f2b705', '#e0714f', '#7fa6c9', '#a8b86a', '#c98ab0', '#e3a35c', '#69b3a8', '#b49ad6'];
 export class Terminal {
   constructor(shell, opts = {}) {
-    this.sh = shell; this.opts = opts; this.open = false; this.hist = []; this.hi = -1; this.sel = -1; this.draft = ''; this.dabs = {};
+    this.sh = shell; this.opts = opts; this.open = false; this.hist = []; this.hi = -1; this.sel = -1; this.draft = '';
     try { this.hist = JSON.parse(localStorage.getItem(HIST) || '[]'); } catch (e) { /* private window */ }
     const el = this.el = document.createElement('div');
     el.className = 'nhc'; el.hidden = true;
     el.innerHTML = `<div class="nhc-card">
-      <header class="nhc-head"><h2>Terminal</h2><span class="nhc-tip"><kbd>Tab</kbd> complete <kbd>↓</kbd> walk the list <kbd>↑</kbd> last command <kbd>Esc</kbd> close</span><button class="nhc-copy" type="button">Copy log</button></header>
+      <header class="nhc-head"><h2>terminal</h2><div class="nhc-meta"><div class="nhc-stat"></div><div class="nhc-tip">tab complete · ↓ list · ↑ history · pgup/pgdn scroll · ctrl+l clear · esc close</div></div><button class="nhc-copy" type="button">copy log</button></header>
       <div class="nhc-main"><div class="nhc-log" role="log"></div><div class="nhc-sig" hidden></div>
-        <label class="nhc-in"><span class="nhc-p"></span><span class="nhc-w"><span class="nhc-ghost"></span><input spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Type a command, or pick one from the list"></span></label></div>
-      <aside class="nhc-side"><div class="nhc-count"></div><div class="nhc-sug" role="listbox"></div></aside>
+        <label class="nhc-in"><span class="nhc-p">nh48 ›</span><span class="nhc-w"><span class="nhc-ghost"></span><input spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="command…"></span></label></div>
+      <aside class="nhc-side"><div class="nhc-count"></div><div class="nhc-cols"><span>#</span><span>command</span><span>args</span><span>what it does</span></div><div class="nhc-sug" role="listbox"></div></aside>
     </div>`;
     (opts.parent || document.body).appendChild(el);
-    this.log = el.querySelector('.nhc-log'); this.sug = el.querySelector('.nhc-sug'); this.sigEl = el.querySelector('.nhc-sig'); this.count = el.querySelector('.nhc-count');
+    this.log = el.querySelector('.nhc-log'); this.sug = el.querySelector('.nhc-sug'); this.sigEl = el.querySelector('.nhc-sig'); this.count = el.querySelector('.nhc-count'); this.stat = el.querySelector('.nhc-stat'); this.cols = el.querySelector('.nhc-cols');
     this.input = el.querySelector('input'); this.ghost = el.querySelector('.nhc-ghost');
     shell.printer = (t, c) => this.line(t, c);
     shell.tabler = (rows, head) => this.tableOut(rows, head);
     this.input.addEventListener('input', () => { this.hi = -1; this.refresh(); });
-    el.querySelector('.nhc-copy').addEventListener('click', (e) => { const b = e.currentTarget; navigator.clipboard?.writeText(this.log.innerText).then(() => { b.textContent = 'Copied'; setTimeout(() => { b.textContent = 'Copy log'; }, 1200); }); this.input.focus(); });
+    el.querySelector('.nhc-copy').addEventListener('click', (e) => { const b = e.currentTarget; navigator.clipboard?.writeText(this.log.innerText).then(() => { b.textContent = 'copied'; setTimeout(() => { b.textContent = 'copy log'; }, 1200); }); this.input.focus(); });
     // a click off the card puts it away; a click on the card keeps the typing going, unless you're selecting text to copy
     el.addEventListener('mousedown', (e) => { if (e.target === el) { e.preventDefault(); this.hide(); } });
     el.addEventListener('mouseup', () => { if (!String(getSelection())) this.input.focus(); });
@@ -174,6 +172,7 @@ export class Terminal {
   }
   line(text, cls = '') {
     const d = document.createElement('div'); d.className = 'nhc-l' + (cls ? ' ' + cls : ''); d.textContent = text;
+    const t = new Date(); d.dataset.t = [t.getHours(), t.getMinutes(), t.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
     this.add(d);
   }
   tableOut(rows, head) {
@@ -193,13 +192,15 @@ export class Terminal {
   show(prefill = '') {
     if (this.open) return;
     this.open = true; this.el.hidden = false; guard.on = this.keys;
+    const tick = () => { try { this.stat.textContent = this.opts.status ? this.opts.status() : ''; } catch (e) { /* the game's mid-change */ } };
+    tick(); clearInterval(this.statT); this.statT = setInterval(tick, 250);
     this.input.value = prefill; this.hi = -1; this.refresh();
     this.input.focus();
     this.opts.onOpen && this.opts.onOpen();
   }
   hide() {
     if (!this.open) return;
-    this.open = false; this.el.hidden = true; this.input.blur(); guard.on = null;
+    this.open = false; this.el.hidden = true; this.input.blur(); guard.on = null; clearInterval(this.statT);
     this.opts.onClose && this.opts.onClose();
   }
   push(line) {
@@ -272,25 +273,23 @@ export class Terminal {
     const cur = inp.value.slice(C.from), top = String(C.items[Math.max(0, this.sel)].v);
     if (top.toLowerCase().startsWith(cur.toLowerCase())) this.ghost.textContent = inp.value + top.slice(cur.length);
   }
-  dab(g) { return this.dabs[g] || (this.dabs[g] = DABS[Object.keys(this.dabs).length % DABS.length]); }
   paint() {
     const C = this.c, S = this.sug, items = C ? C.items : [], frag = document.createDocumentFragment(), rows = [];
     let group = null;
+    const whole = C && C.all && !this.input.value.trim().split(';').pop().trim(), counts = {};
+    if (whole) for (const it of items) counts[it.group] = (counts[it.group] || 0) + 1;
     items.forEach((it, i) => {
-      // a heading wherever the group changes, but only over the whole list: when filtering, the matches come first
-      if (it.group && it.group !== group && C.all && !this.input.value.trim().split(';').pop().trim()) { group = it.group; const h = document.createElement('div'); h.className = 'nhc-g'; h.textContent = group; h.style.setProperty('--dab', this.dab(group)); frag.appendChild(h); }
+      // over the whole list, a rule and a heading wherever the group changes; filtered, the matches just come in order
+      if (whole && it.group !== group) { group = it.group; const h = document.createElement('div'); h.className = 'nhc-g'; h.innerHTML = '<span></span><em></em>'; h.firstChild.textContent = group; h.lastChild.textContent = String(counts[group]).padStart(3, '0'); frag.appendChild(h); }
       const d = document.createElement('div'); d.className = 'nhc-s'; d.setAttribute('role', 'option');
-      if (it.group) d.style.setProperty('--dab', this.dab(it.group));
-      const top = document.createElement('div'); top.className = 'nhc-st';
-      const a = document.createElement('b'); a.textContent = it.v; top.appendChild(a);
-      if (it.args) { const g = document.createElement('code'); g.textContent = it.args; top.appendChild(g); }
-      d.appendChild(top);
-      if (it.note !== undefined && it.note !== '') { const m = document.createElement('i'); m.textContent = it.note; d.appendChild(m); }
+      const cell = (tag, t, c) => { const e = document.createElement(tag); e.textContent = t ?? ''; if (c) e.className = c; d.appendChild(e); };
+      cell('span', String(i + 1).padStart(3, '0'), 'n'); cell('b', it.v); cell('code', it.args || ''); cell('i', it.note);
+      d.title = [it.v, it.args, it.note].filter(Boolean).join('  ');
       d.addEventListener('mousedown', (e) => { e.preventDefault(); this.accept(it); });
       frag.appendChild(d); rows.push(d);
     });
     S.textContent = ''; S.appendChild(frag); S.scrollTop = 0; this.rows = rows;
-    this.count.textContent = !C ? '' : C.all ? (this.input.value.trim().split(';').pop().trim() ? `${items.length} matching` : `All commands · ${items.length}`) : items.length ? `${C.argName || 'options'} · ${items.length}` : 'Nothing to pick here, type it in';
+    this.count.textContent = !C ? '' : C.all ? (whole ? `commands  ${items.length}` : `match  ${items.length}`) : items.length ? `<${C.argName || 'value'}>  ${items.length}` : 'free text: type it in';
     this.ghostOn();
     const G = this.sigEl;
     if (C && C.sig) {
