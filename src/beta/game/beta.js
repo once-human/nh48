@@ -1,7 +1,10 @@
+import { testBench } from './commands.js';
+
 // What /beta changes about the game once it's made, from the outside (no game file is edited):
 //  - there's no auto of your own: you start on foot, and the auto the game keeps for you never shows up on the
 //    street, on the map or in a prompt (any other vehicle, autos in traffic included, is yours to take as always)
 //  - the title says Play instead of Story (there's no story here) and has no Experimental graphics: /beta is the new look
+//  - the title has a Test bench: free roam with a terminal (commands.js)
 export function betaGame(G) {
   const P = G.player;
   const hideAuto = () => {
@@ -22,13 +25,19 @@ export function betaGame(G) {
   G.frame = (dt) => { hideAuto(); return frame(dt); };
   const start = G.startPlay.bind(G);
   G.startPlay = (shift) => { const r = start(shift); hideAuto(); return r; };
-
+  testBench(G);
 }
 
 // the title screen (the HUD exists once the game's init has run)
 export function betaTitle(G) {
   const H = G.hud, title = () => {
     const t = document.querySelector('#t-paint'); if (t) { t.hidden = true; t.style.display = 'none'; }
+    const fr = document.querySelector('#t-free');
+    if (fr && !document.querySelector('#t-test')) {
+      const b = document.createElement('button'); b.className = 'pz-i'; b.id = 't-test'; b.textContent = 'Test bench';
+      b.onclick = () => G.beginTest();
+      fr.after(b);
+    }
     const r = document.querySelector('#t-roam'); if (r && /^Story/.test(r.textContent)) r.textContent = r.textContent.replace(/^Story/, 'Play');
     for (const e of (H && H.title ? H.title.querySelectorAll('p, div') : [])) if (!e.children.length && /^Start at Shaniwar Wada\. Run an auto/.test(e.textContent)) e.textContent = 'Start at Shaniwar Wada, on foot. Misal on FC Road, a date in Baner.';
   };
