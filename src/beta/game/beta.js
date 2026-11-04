@@ -4,7 +4,7 @@ import { freeTerminal } from './commands.js';
 //  - there's no auto of your own: you start on foot, and the auto the game keeps for you never shows up on the
 //    street, on the map or in a prompt (any other vehicle, autos in traffic included, is yours to take as always)
 //  - the title says Play instead of Story (there's no story here) and has no Experimental graphics: /beta is the new look
-//  - the title has a Test bench: free roam with a terminal (commands.js)
+//  - free roam has a terminal on / (commands.js)
 export function betaGame(G) {
   const P = G.player;
   const hideAuto = () => {
