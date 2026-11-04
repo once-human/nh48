@@ -29,7 +29,8 @@ import './game/talk.js';          // F at anyone: talk
 import './game/hands.js';
 import './game/fists.js';
 import './world/staff.js';
-import './world/walkin.js';         // what you hold, in your hand: the torch aimed by the arm, the body turning
+import './world/walkin.js';
+import './draw/alive.js';         // what you hold, in your hand: the torch aimed by the arm, the body turning
 import './world/shutters.js';      // shutters that roll, with the rattle, and board lights that go with them
 import './world/flyovers.js';
 import './world/hills.js';

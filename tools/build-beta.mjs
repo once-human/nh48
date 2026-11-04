@@ -83,6 +83,9 @@ const PATCHES = {
   ],
   [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'], ['E', 'Jhola'],", "['F', 'Walk in, counters, pet'], ['E', 'Get in or out of a vehicle'], ['T', 'Talk to someone'], ['Q', 'Jhola'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
   [S('game/pilot.js')]: [
+    // standing about a while: arms folded, the phone out (beta/draw/alive.js picks it)
+    ["      const a = F.v < 0.25 ? 'idle' : F.v < 2.2 ? 'walk' : F.v < 4.6 ? 'jog' : 'sprint';", "      const a = F.v < 0.25 ? (this._fid || 'idle') : F.v < 2.2 ? 'walk' : F.v < 4.6 ? 'jog' : 'sprint';"],
+    ["      this.human.play(a, { speed: a === 'idle' ? 1 : clamp(F.v / nat, 0.6, 1.6) });", "      this.human.play(a, { speed: !nat || a === 'idle' ? 1 : clamp(F.v / nat, 0.6, 1.6) });"],
     // you never vanish: from the driver's seat too your body stays, only the head is cut (beta/draw/skin.js)
     ["this.human.holder.visible = !!this.riderShown && !on;", "this.human.holder.visible = !!this.riderShown; this.human._fp = on;"],
     ["if (this.human && !this.cockpitOn && !this.human.holder.visible)", "if (this.human && !this.human.holder.visible)"],
@@ -114,7 +117,9 @@ const PATCHES = {
     ["if (dd > (big ? 16 : 7) || (best && dd >= bd)) continue;", "if (dd > (big ? 9 : 3.5) || (best && dd >= bd)) continue;"],
   ],
   // a one-off gesture (a wave as they pass) is upper body too: the legs keep walking under it
-  [S('people/crowd.js')]: [["if (mv > 0.3 && !once && !LOCO.has(name)) {", "if (mv > 0.3 && (!once || UPPER.has(name)) && !LOCO.has(name)) {"]],
+  [S('people/crowd.js')]: [["if (mv > 0.3 && !once && !LOCO.has(name)) {", "if (mv > 0.3 && (!once || UPPER.has(name)) && !LOCO.has(name)) {"],
+    // after each person's clip: where they look (beta/draw/alive.js)
+    ["H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; }", "H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; if (this.postPed && dd < 40) this.postPed(p, H, dt); }"]],
   // animals: the walk follows how far they really move (no gliding when the game moves them, no 2.6x cap when they run)
   [S('people/animals.js')]: [
     ["      const lie = !a.moving && a.kind !== 'cow' && !a.cow;\n      m.play(a.moving ? (a.cow ? 'WalkSlow' : 'Walk') : 'Idle', a.moving ? (a.cow ? 0.9 : Math.min(2.6, Math.max(1, a.v / 1.1))) : 1);",

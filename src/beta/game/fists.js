@@ -120,7 +120,7 @@ Brawl.prototype.attack = function (special) {
   this.stam = Math.max(0, (this.stam ?? 1) - (COST[name] || 0.12)); this.restT = 0;
   P.act = { kind: 'atk', name, t: 0, dur, hit, M, target: tg, done: false, side, proc: !!PROC[name] && !PROC[name].leg, leg: !!(PROC[name] && PROC[name].leg) };
   if (PROC[name]) P.human.play('idle', { fade: 0.12 });
-  else P.human.play(M.clip, { once: true, fade: 0.06, speed: M.speed*sp, restart: true });
+  else P.human.play(M.clip, { once: true, fade: 0.1, speed: M.speed*sp*0.92, restart: true });
   G.audio.whoosh?.(PROC[name] && PROC[name].leg ? 0.6 : 0.5);
 };
 
