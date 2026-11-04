@@ -36,6 +36,8 @@ if (process.env.NH_LOCAL) {
 const SWAPS = [
   ['*', S('gfx/textures.js'), S('beta/gfx/textures.js')],
   ['*', S('world/landmarks.js'), S('beta/world/landmarks.js')],
+  ['*', S('world/props.js'), S('beta/world/props.js')],
+  [S('world/world.js'), S('world/propsChunk.js'), S('beta/world/propsChunk.js')],
   [S('world/world.js'), S('world/buildingsChunk.js'), S('beta/world/buildings.js')],
   [S('world/world.js'), S('world/groundChunk.js'), S('beta/world/ground.js')],
   [S('world/world.js'), S('gfx/pbr.js'), S('beta/gfx/pbr.js')],
