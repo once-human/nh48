@@ -70,9 +70,17 @@ const PATCHES = {
     ["{ id: 'roll', label: 'Roll; camera when driving', group: 'Do', def: 'KeyC' }", "{ id: 'roll', label: 'Roll', group: 'Do', def: 'KeyQ' }"],
     ["{ id: 'punch', label: 'Punch (click works too)',", "{ id: 'punch', label: 'Punch (click works too; hold right-click to block)',"],
     ["{ id: 'cam', label: 'Change camera', group: 'Vehicle', def: 'KeyV' }", "{ id: 'cam', label: 'First or third person', group: 'Move', def: 'KeyC' }"],
-    // F for what's in front of you (shops, doors, pumps, animals, people: talk), V for vehicles (in, out, take one)
-    ["{ id: 'use', label: 'Talk, walk in, get in or out', group: 'Do', def: 'KeyF' },", "{ id: 'use', label: 'Walk in, talk to someone, pet, fuel up', group: 'Do', def: 'KeyF' }, { id: 'vehicle', label: 'Get in or out of a vehicle', group: 'Do', def: 'KeyV' },"],
+    // F for what's in front of you (shops, doors, counters, pumps, animals), V for vehicles (in, out, take one),
+    // T to talk to anyone (beta/game/talk.js); the phone moves to I
+    ["{ id: 'use', label: 'Talk, walk in, get in or out', group: 'Do', def: 'KeyF' },", "{ id: 'use', label: 'Walk in, counters, pet, fuel up', group: 'Do', def: 'KeyF' }, { id: 'vehicle', label: 'Get in or out of a vehicle', group: 'Do', def: 'KeyV' }, { id: 'talk', label: 'Talk to someone (ask them out too)', group: 'Do', def: 'KeyT' },"],
+    ["{ id: 'phone', label: 'Phone', group: 'Menus', def: 'KeyT' },", "{ id: 'phone', label: 'Phone', group: 'Menus', def: 'KeyI' },"],
   ],
+  [S('game/phone.js')]: [
+    ["if (e.code === 'KeyT' && this.g.state === 'play'", "if (e.code === 'KeyI' && this.g.state === 'play'"],
+    ["if (c === 'KeyT' || c === 'Escape')", "if (c === 'KeyI' || c === 'Escape')"],
+    ['this.badge.innerHTML = `<span class="kbd">T</span>', 'this.badge.innerHTML = `<span class="kbd">I</span>'],
+  ],
+  [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'],", "['F', 'Walk in, counters, pet'], ['V', 'Get in or out of a vehicle'], ['T', 'Talk to someone'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
   [S('game/pilot.js')]: [
     // you never vanish: from the driver's seat too your body stays, only the head is cut (beta/draw/skin.js)
     ["this.human.holder.visible = !!this.riderShown && !on;", "this.human.holder.visible = !!this.riderShown; this.human._fp = on;"],
@@ -88,8 +96,7 @@ const PATCHES = {
   // anyone with a name in a room can be talked to; it opens the talk (beta/game/talk.js), chatting them up leads to dating
   [S('world/interiors.js')]: [
     ["      if (!p.name || (G.date && G.date.blocked(p)) || !(p.dateWith || G.date && G.date.eligible(p))) continue;", "      if (!p.name || (G.date && G.date.blocked(p)) || !(p.dateWith || G.date && G.date.eligible(p)) || (!p.dateWith && this.heartKind(p) === 'new')) continue;"],
-    ["if (!p.name || p.walkedOff || !(p.dateWith || D && D.eligible(p)) || (C.seat && !p.dateWith)) continue;", "if (!p.name || p.walkedOff || (D && D.blocked(p)) || (C.seat && !p.dateWith)) continue;"],
-    ["        G.date && G.date.talk(s.p, C); return;", "        if (!s.p.dateWith && G.talkUI) { G.talkUI.open(s.p, C); return; }\n        G.date && G.date.talk(s.p, C); return;"],
+    ["if (!p.name || p.walkedOff || !(p.dateWith || D && D.eligible(p)) || (C.seat && !p.dateWith)) continue;", "if (!p.name || p.walkedOff || !p.dateWith) continue;"],
   ],
   [S('game/shops.js')]: [
     // eat here or parcel: only where there's food (a chowki has a bench, not a kitchen)
@@ -120,7 +127,7 @@ const PATCHES = {
     ["  S.list.forEach((r, i) => {\n    if (r.door && open(r.door)) { S.im.setMatrixAt(i, ZERO); return; }", "  S.seen = (S.seen || 0) + 1;\n  S.list.forEach((r, i) => {\n    r.t = r.door && open(r.door) ? 1 : 0;\n    if (S.seen > 2 && r.k !== undefined) { if (r.k !== r.t) S.moving = true; return; }\n    r.k = r.t;\n    if (r.t) { S.im.setMatrixAt(i, ZERO); return; }"],
   ],
   [S('game/game.js')]: [
-    ["player.useHook = () => this.shops.tryUse();", "player.useHook = () => this.shops.tryUse() || !!this.talkUI?.street(player); player.shopNear = () => this.shops.near; this.people._G = window.__nhAskG = this;"],
+    ["player.useHook = () => this.shops.tryUse();", "player.useHook = () => this.shops.tryUse(); player.shopNear = () => this.shops.near; this.people._G = window.__nhAskG = this;"],
     ["if (this.state === 'play' && !this.player.onFoot && this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);", "if (this.state === 'play' && this.input.took('KeyC')) this.rig.toggleView(this.player.onFoot);"],
     ["      if (P.offer && P.onFoot) this.hud.prompt(P.offer.key, P.offer.label, 0.3);\n      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);\n      else if (!P.onFoot && Math.abs(P.v) < 1 && this.state === 'play') this.hud.prompt('F',", "      if (P.offer && P.onFoot) { const pet = P.offer.kind === 'pet'; this.hud.prompt(pet ? 'F' : 'V', P.offer.label, 0.3); if (sl && !pet && this.state === 'play') this.hud.prompt2('F', sl, 0.3); }\n      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);\n      else if (!P.onFoot && Math.abs(P.v) < 1 && this.state === 'play') this.hud.prompt('V',"],
   ],
