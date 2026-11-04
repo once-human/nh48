@@ -613,12 +613,7 @@ function stilt(b, G, F, len) {
   b.set(K.inside, 0x5a5a56, 0.6, 0); F.rect(b, len, 0, BASE, yt - 0.45, -D, 1);
   b.quad(F.P(0, yt - 0.45, 0), F.P(len, yt - 0.45, 0), F.P(len, yt - 0.45, -D), F.P(0, yt - 0.45, -D), [0, -1, 0]);
   b.set(K.concrete, 0x6a6862, 0.6); b.quad(F.P(0, BASE, 0), F.P(len, BASE, 0), F.P(len, BASE, -D), F.P(0, BASE, -D), [0, 1, 0]);
-  // two-wheelers parked in a row, a car under a cover
-  for (let u = 0.6; u < len - 0.6; u += 0.85 + R() * 0.6) {
-    if (R() < 0.3) continue;
-    const P0 = F.P(u, 0, -D + 0.8), yaw = Math.atan2(F.nx, F.nz);
-    bike(b, P0[0], BASE, P0[2], yaw + (R() - 0.5) * 0.3, POP.concat([0x1c1c1e, 0x6a6a6e, 0xeeeeea])[(R() * 11) | 0]);
-  }
+  // (no drawn two-wheelers under the stilts: only vehicles you can ride are vehicles)
   if (len > 6 && D > 3 && R() < 0.5) { const P0 = F.P(len * 0.7, 0, -D + 1.6); b.set(K.cloth, [0x8a8a86, 0x3a4a6a, 0xb8b0a0][(R() * 3) | 0], 0.3); b.ybox(P0[0], BASE, P0[2], 4.0, BASE + 1.4, 1.8, Math.atan2(F.tz, F.tx), 8); }
   b.set(L.wk, L.wall, L.wear);
 }

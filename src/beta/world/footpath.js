@@ -201,18 +201,8 @@ function thing(b, R, x, z, tx, tz, nx, nz, onPath, broken, mess, A, Y) {
     b.quad([px, Y + 0.003, pz], [px + tx * len, Y + 0.003, pz + tz * len], [px + tx * len + nx * 0.35, Y + 0.003, pz + tz * len + nz * 0.35], [px + nx * 0.2, Y + 0.003, pz + nz * 0.2], [0, 1, 0]);
     return len + 2 + R() * 6;
   }
-  // two-wheelers parked on the footpath, nose to the shops (a row of them where it's busy)
-  if (r < 0.78 + 0.08 * mess) {
-    const n = 1 + Math.floor(R() * (1 + mess * 6));
-    let s = 0;
-    for (let i = 0; i < n; i++) {
-      const [px, pz] = at(1.1 + R() * 0.3); const qx = px + tx * s, qz = pz + tz * s;
-      if (!onPath(qx, qz)) break;
-      bike(b, qx, Y, qz, Math.atan2(-nx, -nz) + (R() - 0.5) * 0.4, BIKES[(R() * BIKES.length) | 0]);
-      s += 0.75 + R() * 0.35;
-    }
-    return s + 3 + R() * 10;
-  }
+  // (two-wheelers on the footpath are the game's own parked ones now, real and rideable: none drawn in here)
+  if (r < 0.78 + 0.08 * mess) return 3 + R() * 10;
   // a handcart of fruit, an umbrella over it
   if (r < 0.86 + 0.04 * mess && A.wealth < 0.8) {
     const [px, pz] = at(0.9); if (!onPath(px, pz)) return 3;
