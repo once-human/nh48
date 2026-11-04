@@ -49,9 +49,20 @@ const SWAPS = [
   ['*', S('game/story.js'), S('beta/game/story.js')],
   ['*', S('game/tutorial.js'), S('beta/game/tutorial.js')],
 ];
+// a line in a game file swapped as it's bundled: only for what a module swap can't reach. Fails the build if the line has moved
+const PATCHES = {
+  [S('vehicles/vehicle.js')]: [["case 'bike': case 'bikeP': case 'bullet': case 'superbike': return buildBike({ parked: true });", "case 'bike': case 'bikeP': return buildBike({ parked: true }); case 'bullet': case 'superbike': return buildBike({ parked: true, kind: type });"]],
+  [S('traffic/traffic.js')]: [["bullet: buildBike({ helmet: true }), superbike: buildBike({ helmet: true }),", "bullet: buildBike({ helmet: true, kind: 'bullet' }), superbike: buildBike({ helmet: true, kind: 'superbike' }),"]],
+};
 const swapPlugin = {
   name: 'beta-swap',
   setup(b) {
+    b.onLoad({ filter: /\.js$/ }, (a) => {
+      const list = PATCHES[a.path]; if (!list) return undefined;
+      let src = fs.readFileSync(a.path, 'utf8');
+      for (const [from, to] of list) { if (!src.includes(from)) throw new Error('build-beta: patch no longer fits ' + a.path + ': ' + from); src = src.replace(from, to); }
+      return { contents: src, loader: 'js' };
+    });
     b.onResolve({ filter: /^@orig\// }, (a) => ({ path: S(a.path.slice(6)) }));
     b.onResolve({ filter: /^\.\.?\// }, (a) => {
       if (!a.importer || a.importer.startsWith(S('beta') + path.sep)) return undefined;
