@@ -1,2 +1,6 @@
 /* /beta: the game's own UI, as it is (the new UI comes last). Only what the new look needs. */
 #gl { background: #efe9dc; }
+.pz .seg.g-tabs { margin: 0 0 18px; justify-content: flex-start; gap: 18px !important; }
+.pz .g-tabs button { display: block !important; color: var(--tx3) !important; }
+.pz .g-tabs button.on { color: var(--acc) !important; }
+.g-sec[hidden] { display: none !important; }

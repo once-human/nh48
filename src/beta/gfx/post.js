@@ -11,7 +11,7 @@ import { PU } from './paint.js';
 const VS = `in vec3 position; in vec2 uv; out vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }`;
 const FS = `precision highp float; precision highp sampler2D;
 in vec2 vUv; out vec4 o;
-uniform sampler2D tCol, tDep, tNoise; uniform vec2 res; uniform float dpr, cnear, cfar, time, drunk; uniform vec2 dOff;
+uniform sampler2D tCol, tDep, tNoise; uniform vec2 res; uniform float dpr, cnear, cfar, time, drunk, inkQ; uniform vec2 dOff;
 float h12(vec2 p){ vec3 q=fract(vec3(p.xyx)*.1031); q+=dot(q,q.yzx+33.33); return fract((q.x+q.y)*q.z); }
 vec2 rot(vec2 p,float a){ float c=cos(a),s=sin(a); return vec2(c*p.x+s*p.y,-s*p.x+c*p.y); }
 float lum(vec3 c){ return dot(c,vec3(.3,.59,.11)); }
@@ -34,15 +34,16 @@ void main(){
   if (sky) c *= 1. + (nR(rot(fp, .35)/vec2(18., 1.6)) - .5)*.07;          // brushed on, side to side
   else {
     float z = lz(uv);
-    float e = crease(uv + wob*.6, 1.*dpr);
-    vec2 w2 = (vec2(nR(fp*.035 + 20.), nR(fp*.035 + 31.)) - .5)*px*5.*dpr; float e2 = crease(uv + w2, .8*dpr);
-    vec3 a = col(uv - vec2(px.x, 0.)*dpr), b = col(uv + vec2(px.x, 0.)*dpr), u2 = col(uv + vec2(0., px.y)*dpr), dd = col(uv - vec2(0., px.y)*dpr);
-    float ec = smoothstep(.13, .3, abs(lum(a) - lum(b)) + abs(lum(u2) - lum(dd)))*.5;
+    float e = crease(uv + wob*.6, 1.*dpr), ec = 0.;
+    if (inkQ >= 1. && z < 38.) {
+      vec3 a = col(uv - vec2(px.x, 0.)*dpr), b = col(uv + vec2(px.x, 0.)*dpr), u2 = col(uv + vec2(0., px.y)*dpr), dd = col(uv - vec2(0., px.y)*dpr);
+      ec = smoothstep(.13, .3, abs(lum(a) - lum(b)) + abs(lum(u2) - lum(dd)))*.5;
+    }
     float brk = smoothstep(.2, .45, nR(fp*.05 + 2.));
     vec3 ink = mix(c*.4, vec3(.14, .12, .13), .6);
-    float fade = 1. - smoothstep(35., 140., z);
+    float fade = 1. - smoothstep(35., inkQ >= 3. ? 220. : 140., z);
     c = mix(c, ink, max(e, ec*(1. - smoothstep(10., 38., z)))*(.5 + .4*brk)*fade);
-    c = mix(c, ink, e2*.28*step(.5, nR(fp*.04 + 8.))*fade);
+    if (inkQ >= 2.) { vec2 w2 = (vec2(nR(fp*.035 + 20.), nR(fp*.035 + 31.)) - .5)*px*5.*dpr; float e2 = crease(uv + w2, .8*dpr); c = mix(c, ink, e2*.28*step(.5, nR(fp*.04 + 8.))*fade); }
   }
   if (drunk > 0.) {
     vec2 q = vUv - .5; float r = dot(q, q);
@@ -76,7 +77,7 @@ export class Post {
     this.paint = { on: false, set: async () => {}, setSize() {} };
     this.drunk = 0; this.t = 0;
     this.U = { tCol: { value: null }, tDep: { value: null }, tNoise: PU.tNoise, res: { value: new THREE.Vector2() }, dpr: { value: 1 }, cnear: { value: 0.1 }, cfar: { value: 1000 },
-      time: { value: 0 }, drunk: { value: 0 }, dOff: { value: new THREE.Vector2() } };
+      time: { value: 0 }, drunk: { value: 0 }, inkQ: { value: 2 }, dOff: { value: new THREE.Vector2() } };
     this.mat = new THREE.RawShaderMaterial({ vertexShader: VS, fragmentShader: FS, uniforms: this.U, glslVersion: THREE.GLSL3, depthTest: false, depthWrite: false });
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.mat); this.quad.frustumCulled = false;
     this.qs = new THREE.Scene(); this.qs.add(this.quad); this.qc = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -89,7 +90,7 @@ export class Post {
     if (this.rt) return this.rt;
     const R = this.renderer, v = R.getDrawingBufferSize(new THREE.Vector2());
     const dt = new THREE.DepthTexture(v.x, v.y, THREE.UnsignedIntType); dt.minFilter = dt.magFilter = THREE.NearestFilter;
-    this.rt = new THREE.WebGLRenderTarget(v.x, v.y, { type: THREE.HalfFloatType, samples: this.q && this.q.msaa ? 4 : 0, depthTexture: dt, depthBuffer: true, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+    this.rt = new THREE.WebGLRenderTarget(v.x, v.y, { type: THREE.HalfFloatType, samples: (this.q && this.q.samples) || 0, depthTexture: dt, depthBuffer: true, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
     this.rt.isXRRenderTarget = true;
     this.rt.texture.colorSpace = THREE.LinearSRGBColorSpace;
     this.U.tCol.value = this.rt.texture; this.U.tDep.value = dt; this.U.res.value.set(v.x, v.y);

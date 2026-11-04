@@ -31,6 +31,7 @@ import * as Save from '@orig/game/save.js';
 import { fixPins } from '@orig/world/venues.js';
 import { Streamer } from '@orig/world/index.js';
 import { Actors } from './draw/actors.js';
+import { Graphics } from './game/graphics.js';
 
 // The streamer, taught two things about the painted city (when it builds, never what):
 //  - when it builds everything at once (loading screens, arriving somewhere) the buildings are drawn right there,
@@ -117,7 +118,7 @@ function gpuClass() {
 }
 const GPU = gpuClass();
 // the stress test's rule: one pass a pixel at screen resolution, no MSAA
-for (const k in QUALITY) { QUALITY[k].pixelRatio = Math.min(1, QUALITY[k].pixelRatio); QUALITY[k].msaa = false; }
+for (const k in QUALITY) { QUALITY[k].pixelRatio = Math.min(1, QUALITY[k].pixelRatio); QUALITY[k].msaa = false; QUALITY[k].shadows = true; QUALITY[k].shadowSize = QUALITY[k].shadowSize || 1024; }
 function pickQuality() {
   const q = params.get('q');
   if (q && QUALITY[q]) return { ...QUALITY[q] };
@@ -306,6 +307,7 @@ async function main() {
   await game.init(progress);
   betaTitle(game);
   { const actors = new Actors(game, scene); post.beforeDraw = (dt, cam) => actors.update(dt, cam); }
+  game.gfx = new Graphics(game, { gpu: GPU, post }); game.gfx.install();
   cityUp();
   if (game.audio && game.voiceRemote) game.audio.remote = game.voiceRemote;
   // warm the chunks around the start before the first frame
@@ -458,6 +460,7 @@ async function main() {
     if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = !game.shadowsOff && ((frames & 1) === 0 || Math.abs(player.onFoot ? (player.foot.v || 0) : (player.v || 0)) > 1.2);
     if (compiled && game.state !== 'map' && !(game.state === 'pause' && !game.livePause && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2) && !(game.menuFreeze && game.state === 'shop' && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);
     const t2 = performance.now();
+    if (game.gfxTick) game.gfxTick(dt, t2 - t0);
     perf.n++; perf.upd += t1 - t0; perf.rnd += t2 - t1; perf.worst = Math.max(perf.worst, t1 - t0);
     if (!perfBox.hidden) {
       const ft = dt * 1000;
