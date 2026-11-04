@@ -2,5 +2,8 @@
 #gl { background: #efe9dc; }
 .pz .seg.g-tabs { margin: 0 0 18px; justify-content: flex-start; gap: 18px !important; }
 .pz .g-tabs button { display: block !important; color: var(--tx3) !important; }
-.pz .g-tabs button.on { color: var(--acc) !important; }
+.pz .g-tabs button.on { color: #08100e !important; }
+.pz-r .pane[data-pane="set"] { padding-bottom: 130px; }
 .g-sec[hidden] { display: none !important; }
+.g-head { margin: 16px 0 4px; font: 700 12px var(--font-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--tx3); }
+#fps-counter { position: fixed; top: 58px; right: 18px; z-index: 40; padding: 5px 9px; border-radius: 8px; background: rgba(0, 0, 0, .55); color: #9dffb0; font: 600 12px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre; pointer-events: none; text-align: right; }

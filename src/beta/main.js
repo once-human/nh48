@@ -20,6 +20,7 @@ import { U } from '@orig/gfx/materials.js';
 import { installAtmosphere } from '@orig/gfx/atmos.js';
 import { vehicleMaterials } from './vehicles/vehmat.js';
 import * as VM from './vehicles/models.js';
+import { PU } from './gfx/paint.js';
 import { PlayerAuto } from '@orig/vehicles/player.js';
 import { Traffic } from '@orig/traffic/traffic.js';
 import { CameraRig } from '@orig/game/camera.js';
@@ -125,7 +126,7 @@ function gpuClass() {
 }
 const GPU = gpuClass();
 // the stress test's rule: one pass a pixel at screen resolution, no MSAA
-for (const k in QUALITY) { QUALITY[k].pixelRatio = Math.min(1, QUALITY[k].pixelRatio); QUALITY[k].msaa = false; QUALITY[k].shadows = true; QUALITY[k].shadowSize = QUALITY[k].shadowSize || 1024; QUALITY[k].grassRange = 64; QUALITY[k].grassCap = 9000; QUALITY[k].treeNearCap = 300; QUALITY[k].treeMidCap = 1500; QUALITY[k].impostorCell = 128; }
+for (const k in QUALITY) { QUALITY[k].pixelRatio = Math.min(1, QUALITY[k].pixelRatio); QUALITY[k].msaa = false; QUALITY[k].shadows = true; QUALITY[k].shadowSize = QUALITY[k].shadowSize || 1024; QUALITY[k].grassRange = 64; QUALITY[k].grassCap = 40000; QUALITY[k].treeNearCap = 1600; QUALITY[k].treeMidCap = 7000; QUALITY[k].traffic = 220; QUALITY[k].impostorCell = 128; }
 function pickQuality() {
   const q = params.get('q');
   if (q && QUALITY[q]) return { ...QUALITY[q] };
@@ -313,8 +314,10 @@ async function main() {
   }
   await game.init(progress);
   betaTitle(game);
-  { const actors = new Actors(game, scene); const lamps = new Lamps(game); post.beforeDraw = (dt, cam) => { actors.update(dt, cam); lamps.update(); inside.value = game.interiors && game.interiors.inside ? 1 : 0; }; post.shadows = new Shadows(renderer, scene, sky, 2048); post.shadowFocus = () => (game.player.onFoot ? game.player.foot : game.player); game.swapShadows = (on, size) => post.shadows.set(on, size); game.shadowsOn = () => post.shadows.on; }
-  game.gfx = new Graphics(game, { gpu: GPU, post }); game.gfx.install();
+  { const actors = new Actors(game, scene); const lamps = new Lamps(game); post.beforeDraw = (dt, cam) => { actors.update(dt, cam); lamps.update(); inside.value = game.interiors && game.interiors.inside ? 1 : 0; }; post.shadows = new Shadows(renderer, scene, sky, 2048); post.focusAt = () => { const f = post.shadowFocus(); return Math.max(2, camera.position.distanceTo(f.position || (f.root && f.root.position) || f)); }; post.indoors = () => inside.value > .5; post.shadowFocus = () => (game.player.onFoot ? game.player.foot : game.player); game.swapShadows = (on, size) => post.shadows.set(on, size); game.shadowsOn = () => post.shadows.on; }
+  game.setAniso = (v) => { const a = Math.min(v, renderer.capabilities.getMaxAnisotropy()); THREE.Texture.DEFAULT_ANISOTROPY = a; const seen = new Set(), one = (t) => { if (t && t.isTexture && !seen.has(t) && t !== PU.tNoise.value && !t.isDepthTexture) { seen.add(t); if (t.anisotropy !== a) { t.anisotropy = a; t.needsUpdate = true; } } }; scene.traverse(o => { const m = o.material; if (!m) return; for (const q of Array.isArray(m) ? m : [m]) { one(q.map); if (q.uniforms && q.uniforms.tMap) one(q.uniforms.tMap.value); } }); };
+  game.setVehicleDetail = (d) => { traffic.lodDist = d; const P = W.parked; if (P) for (const s of P.sets) { if (s.minRange > 0) { s.minRange = d; } else s.range = d; } updateProps(W, camera.position.x, camera.position.z); };
+  game.gfx = new Graphics(game, { gpu: GPU, post, PU, Vector2: THREE.Vector2 }); game.gfx.install();
   cityUp();
   if (game.audio && game.voiceRemote) game.audio.remote = game.voiceRemote;
   // warm the chunks around the start before the first frame
@@ -388,7 +391,9 @@ async function main() {
   // watchdog: a frame that throws must not stop the game (the screen would freeze or go black). A run of
   // failures, or a camera/player gone to NaN, or a city that never comes back: reload where you were
   let bad = 0, lastGood = null, emptyT = 0;
+  let capT = 0;
   function frame(now) {
+    if (game.fpsCap > 0) { const need = 1000/game.fpsCap; if (now - capT < need - 1.5) { requestAnimationFrame(frame); return; } capT = now - ((now - capT)%need > 4 ? 0 : (now - capT)%need); }
     try { frame1(now); bad = 0; } catch (err) {
       console.warn('frame', err);
       if (++bad < 90) requestAnimationFrame(frame);

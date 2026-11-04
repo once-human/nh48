@@ -5,15 +5,16 @@
 import * as THREE from 'three';
 import { TreeField as GameTrees } from '@orig/world/trees.js';
 import { U } from '@orig/gfx/materials.js';
-import { PU, LAMP } from '../gfx/paint.js';
+import { PU, LAMP, PCF } from '../gfx/paint.js';
 
 const CHUNK = `precision highp float; precision highp sampler2DShadow;
 varying vec3 vN, vW, vC; varying vec2 vU; varying float vZ, vH;
 uniform sampler2D tMap, tNoise; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, fogCol, uTint; uniform float shadowTexel, shadowOn, fogDensity, dayK;
 ${LAMP}
 float nz(vec2 p){ return texture2D(tNoise, p/16.).r; }
+${PCF}
 float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.15 + .003*vZ), 1.); if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.;
-  float z = s.z - .0009; return .5*(texture(shadowTex, vec3(s.xy + vec2(-.8, .4)*shadowTexel, z)) + texture(shadowTex, vec3(s.xy + vec2(.8, -.4)*shadowTexel, z))); }
+  return shadowPCF(vec3(s.xy, s.z - .0009)); }
 `;
 const VS = `uniform float uTime, uWind; varying vec3 vN, vW, vC; varying vec2 vU; varying float vZ, vH;
 void main(){ mat4 M = modelMatrix*instanceMatrix; vec3 p = position; vec3 o = (M*vec4(0., 0., 0., 1.)).xyz; float ph = o.x*.31 + o.z*.23, sw = (sin(uTime*1.1 + ph + p.y*.4) + .5*sin(uTime*2.3 + ph*1.7 + p.x))*uWind*.012*p.y*(LEAFY);
@@ -22,18 +23,18 @@ const LEAF_FS = CHUNK + `void main(){
   vec4 t = texture2D(tMap, vU); if (t.a < .45) discard;
   vec3 n = normalize(vN); if (!gl_FrontFacing) n = -n;
   vec3 b = t.rgb*vC*1.15;
-  float e = nz(vW.xz*.9 + vW.y*.7) - .5, ndl = dot(n, sunDir), lit = smoothstep(-.05, .22, ndl + e*.5);
-  float sh = (shadowOn > .5 && lit > 0.) ? smoothstep(.25, .7, shadowAt(vW, n) + e*.35) : 1., L = lit*sh*dayK;
+  float e = nz(vW.xz*.9 + vW.y*.7) - .5, ndl = dot(n, sunDir), lit = mix(smoothstep(-.05, .22, ndl + e*.5), smoothstep(-.35, .75, ndl + e*.25), uReal);
+  float sh = (shadowOn > .5 && lit > 0.) ? mix(smoothstep(.25, .7, shadowAt(vW, n) + e*.35), shadowAt(vW, n), uReal) : 1., L = lit*sh*dayK;
   // dabs of paint: a dark hollow under the crown, warm top, each clump a little its own colour
   b *= .78 + .5*nz(vW.xz*.23 + vW.y*.17);
   vec3 c = mix(b*shadeCol*vec3(.7, .85, .8)*(.75 + .25*smoothstep(0., 8., vH)) + vec3(.008, .016, .01)*dayK, b*sunCol*vec3(1.1, 1.04, .84), L) + b*lampAt(vW, n)*.8;
   float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1.); }`;
 const BARK_FS = CHUNK + `void main(){
-  vec3 n = normalize(vN), b = texture2D(tMap, vU*vec2(1., 1.)).rgb*uTint*1.25; float e = nz(gl_FragCoord.xy*.1) - .5, ndl = dot(n, sunDir), lit = smoothstep(.0, .14, ndl + e*.14);
-  float sh = (shadowOn > .5 && lit > 0.) ? smoothstep(.3, .7, shadowAt(vW, n) + e*.3) : 1., L = lit*sh*dayK;
+  vec3 n = normalize(vN), b = texture2D(tMap, vU*vec2(1., 1.)).rgb*uTint*1.25; float e = (nz(gl_FragCoord.xy*.1) - .5)*(1. - uReal), ndl = dot(n, sunDir), lit = sunOn(ndl, e*.14, .0, .14);
+  float sh = (shadowOn > .5 && lit > 0.) ? shadeOf(shadowAt(vW, n), e*.3) : 1., L = lit*sh*dayK;
   b *= .84 + .32*nz(vec2(vU.x*18., vU.y*2.));          // long furrows
   vec3 c = mix(b*shadeCol + vec3(.015)*dayK, b*sunCol, L) + b*lampAt(vW, n);
-  float h = smoothstep(.5, .72, fract((gl_FragCoord.x + gl_FragCoord.y)*.17 + e*.9))*(1. - L)*(1. - smoothstep(12., 45., vZ)); c = mix(c, c*.68, h*.65);
+  float h = smoothstep(.5, .72, fract((gl_FragCoord.x + gl_FragCoord.y)*.17 + e*.9))*(1. - L)*(1. - smoothstep(12., 45., vZ)); c = mix(c, c*.68, h*.65*(1. - uReal));
   float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1.); }`;
 const LEAF_SHADOW_VS = `varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix*viewMatrix*modelMatrix*instanceMatrix*vec4(position, 1.); }`;
 const LEAF_SHADOW_FS = `varying vec2 vU; uniform sampler2D tMap; void main(){ if (texture2D(tMap, vU).a < .45) discard; }`;

@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { PU } from './paint.js';
 
-const STILL = 6, MOVES = 7, HALF = 95, FAR = 500, STEP = 24;
+const STILL = 6, MOVES = 7, FAR = 700, STEP = 24;
 const STILL_ROOT = /^(chunk|landmark|hills)/;
 const VS = `#include <common>
 #include <skinning_pars_vertex>
@@ -31,10 +31,11 @@ export class Shadows {
     this.R = renderer; this.scene = scene; this.sky = sky; this.on = true; this.size = size; this.dirty = true; this.still = []; this.moving = []; this.mats = new Map(); this.frame = 0; this.seen = 0;
     this.stage = new THREE.Scene(); this.stage.children = scene.children; this.stage.matrixWorldAutoUpdate = false;   // (the same things, without the lights)
     scene.matrixWorldAutoUpdate = false;                  // (render() brings them up to date, once a frame)
-    this.cam = new THREE.OrthographicCamera(-HALF, HALF, HALF, -HALF, 1, FAR);
+    this.half = 95; this.cam = new THREE.OrthographicCamera(-95, 95, 95, -95, 1, FAR);
     this.c = new THREE.Vector3(1e9, 0, 1e9); this.sd = new THREE.Vector3(0, 1, 0); this.M = new THREE.Matrix4();
   }
   set(on, size) { this.on = on; if (size !== this.size) { this.size = size; this.free(); } this.dirty = true; }
+  reach(h) { if (h === this.half) return; this.half = h; const C = this.cam; C.left = C.bottom = -h; C.right = C.top = h; C.updateProjectionMatrix(); this.dirty = true; }
   free() { if (this.a) { for (const t of [this.a, this.b]) { t.depthTexture.dispose(); t.dispose(); } this.a = this.b = null; } }
   depth(m) {
     if (m.customDepthMaterial) return m.customDepthMaterial;
@@ -46,7 +47,7 @@ export class Shadows {
     if (!o.visible) return;
     if (o.isMesh && o.castShadow && (o.shadowOnly || (o.layers.isEnabled(0) && !o.layers.isEnabled(5))) && o.material && (Array.isArray(o.material) || o.material.visible)) {
       // (one thing somewhere: left out when it's nowhere near the map. Instances and people hold their own places)
-      const e = o.matrixWorld.elements; if (o.isInstancedMesh || o.customDepthMaterial || (Math.abs(e[12] - this.c.x) < HALF + 15 && Math.abs(e[14] - this.c.z) < HALF + 15)) list.push(o);
+      const e = o.matrixWorld.elements; if (o.isInstancedMesh || o.customDepthMaterial || (Math.abs(e[12] - this.c.x) < this.half + 15 && Math.abs(e[14] - this.c.z) < this.half + 15)) list.push(o);
     }
     const c = o.children; for (let i = 0; i < c.length; i++) this.walk(c[i], list);
   }
@@ -74,7 +75,7 @@ export class Shadows {
       this.dirty = false; this.sd.copy(ld); this.c.set(fx, focus.y || 0, fz);
       const C = this.cam; C.position.copy(this.c).addScaledVector(this.sd, 220); C.lookAt(this.c); C.updateMatrixWorld();
       // onto the map's own grid, so its pixels never slide under the shadows from one drawing to the next
-      const e = C.matrixWorld.elements, tx = 2*HALF/this.size; r.set(e[0], e[1], e[2]); u.set(e[4], e[5], e[6]);
+      const e = C.matrixWorld.elements, tx = 2*this.half/this.size; r.set(e[0], e[1], e[2]); u.set(e[4], e[5], e[6]);
       const a = C.position.dot(r), b = C.position.dot(u); C.position.addScaledVector(r, Math.round(a/tx)*tx - a).addScaledVector(u, Math.round(b/tx)*tx - b); C.updateMatrixWorld(); C.matrixWorldInverse.copy(C.matrixWorld).invert();
       this.M.copy(BIAS).multiply(C.projectionMatrix).multiply(C.matrixWorldInverse);
       const still = this.still; still.length = 0;

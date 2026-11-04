@@ -40,6 +40,7 @@ export const PU = {
   uStyle: { value: STYLE_PARAMS.map(p => new THREE.Vector4(p[0], p[1], p[2], p[3])) },
   uStyle2: { value: STYLE_PARAMS.map(p => new THREE.Vector4(p[4], p[5], p[7], p[8])) },
   uTime: GU.uTime, uNight: GU.uNight, uWindowLit: GU.uWindowLit, uShopsOpen: GU.uShopsOpen, uWet: GU.uWet,
+  uReal: { value: 0 }, uMarks: { value: 1 }, uTaps: { value: 2 }, uSoft: { value: 1 },
   tLamp: { value: null }, lampC: { value: new THREE.Vector4(0, 0, 1/256, 0) }, lampY: { value: 0 }, headP: { value: new THREE.Vector4() }, headD: { value: new THREE.Vector4(1, 0, 0, .85) },
 };
 // the light of lamps and your own headlight or torch on a surface (gfx/lamps.js keeps it up to date)
@@ -48,6 +49,15 @@ vec3 lampAt(vec3 w, vec3 n){ vec3 c = vec3(0.); if (lampC.w > 0.) { vec2 q = (w.
     c = vec3(1., .72, .44)*.95*texture(tLamp, q).r*(.5 + .5*max(n.y, 0.))*(1. - smoothstep(8., 13., w.y - lampY))*lampC.w; }
   if (headP.w > 0.) { vec3 d = w - headP.xyz; float r = length(d); d /= r; c += vec3(1., .93, .78)*headP.w*3.*smoothstep(headD.w, headD.w + .1, dot(d, headD.xyz))*max(dot(n, -d), .2)/(1. + r*r*.035); }
   return c; }
+`;
+
+// how the sun's shadow is read: a couple of filtered looks (the painted hard edge), or a disc of them, softer with every setting
+export const PCF = `uniform int uTaps; uniform float uSoft, uReal;
+float shadowPCF(vec3 s){ if (uTaps <= 2) return .5*(texture(shadowTex, vec3(s.xy + vec2(-.6, .3)*shadowTexel, s.z)) + texture(shadowTex, vec3(s.xy + vec2(.6, -.3)*shadowTexel, s.z)));
+  float a = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715))))*6.2832, r = 0.; for (int i = 0; i < uTaps; i++) { float q = sqrt((float(i) + .5)/float(uTaps)), th = a + float(i)*2.39996; r += texture(shadowTex, vec3(s.xy + vec2(cos(th), sin(th))*q*uSoft*shadowTexel, s.z)); } return r/float(uTaps); }
+// the sun on a surface: two tones with a brushed edge when painted, the plain cosine when it isn't
+float sunOn(float ndl, float e, float a, float b){ return mix(smoothstep(a, b, ndl + e), clamp(ndl*1.2, 0., 1.), uReal); }
+float shadeOf(float sh, float e){ return mix(smoothstep(.3, .7, sh + e), sh, uReal); }
 `;
 
 const NOISE = `
@@ -224,6 +234,7 @@ vec3 surface(int k, vec3 c, vec3 w, vec2 u, vec3 n, float wear, float seed, floa
     c = mix(c, vec3(.72, .68, .62), m*.75);
     c *= mix(.75, 1., smoothstep(.1, 1., u.y));
   } else if (k == 2 || k == 28) {                            // road: tar patches, wheel polish, an old patch job
+    c = mix(vec3(lum(c)), c, .3);                            // (tar is grey: the dust on it shouldn't read as an orange glow along the kerb)
     c *= .9 + .2*smoothstep(.4, .6, nR(w.xz*vec2(.35, .08)));
     c *= .93 + .12*nG(w.xz*vec2(3., .25));
     if (k == 28) { float pt = smoothstep(.55, .6, nR(w.xz*.21 + 4.)); c = mix(c, c*vec3(.82,.8,.78), pt); c *= 1. - .25*smoothstep(.72, .78, nR(w.xz*.6))*near; }
@@ -352,13 +363,14 @@ vec3 surface(int k, vec3 c, vec3 w, vec2 u, vec3 n, float wear, float seed, floa
   return c;
 }
 
-// the sun's shadow: two filtered reads, nudged by a brushed wobble
+${PCF}
+uniform float uMarks;
+// the sun's shadow: filtered reads, nudged by a brushed wobble
 float shadowAt(vec3 w, vec3 n, float e){
   vec4 s = shadowMat * vec4(w + n*(.05 + .002*vZ), 1.);
   if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.;
-  vec2 j = vec2(e, -e)*2.6*shadowTexel;
-  float z = s.z - .0006;
-  return .5*(texture(shadowTex, vec3(s.xy + j + vec2(-.6, .3)*shadowTexel, z)) + texture(shadowTex, vec3(s.xy + j + vec2(.6, -.3)*shadowTexel, z)));
+  vec2 j = vec2(e, -e)*2.6*shadowTexel*(1. - uReal);
+  return shadowPCF(vec3(s.xy + j, s.z - .0006));
 }
 
 void main(){
@@ -399,11 +411,11 @@ void main(){
   float e = nR(u*1.7 + w.y*.6)*.6 + nG(u*6.3 - w.y*2.)*.4 - .5;
   // the light, in two tones with a brushed edge
   float ndl = dot(n, sunDir);
-  float lit = smoothstep(.0, .1, ndl + e*.14);
-  float sh = (shadowOn > .5 && lit > 0.) ? smoothstep(.3, .7, shadowAt(w, n, e) + e*.3) : 1.;
+  float paintE = e*(1. - uReal), lit = sunOn(ndl, paintE*.14, .0, .1);
+  float sh = (shadowOn > .5 && lit > 0.) ? shadeOf(shadowAt(w, n, e), paintE*.3) : 1.;
   float L = lit*sh*dayK;
   vec3 cl = base*sunCol;
-  vec3 cs = base*shadeCol*(.92 + .16*max(n.y, 0.)) + vec3(.025, .03, .045)*dayK;
+  vec3 cs = base*shadeCol*mix(.92 + .16*max(n.y, 0.), .74 + .42*max(n.y, 0.) + .12*max(-n.y, 0.), uReal) + vec3(.025, .03, .045)*dayK;
   vec3 c = mix(cs, cl, L);
   c += base*lampAt(w, n);
   // glass takes the sky by day
@@ -417,8 +429,8 @@ void main(){
   // the marks, sized for the screen: far surfaces get the same strokes drawn bigger (two sizes blended)
   float lv = max(log2(max(vZ/pScale*3.*dpr/.016, 1e-3)), 0.), i0 = floor(lv), fr = fract(lv), k0 = exp2(i0), k1 = k0*2.;
   float T = mix(streak(u, k0), streak(u, k1), fr);
-  c *= 1. + (mix(.5, T, 1. - smoothstep(150., 380., vZ)) - .5)*.22*(1. - gEmit);
-  if (vZ < 230. && gEmit < .5) {
+  c *= 1. + (mix(.5, T, 1. - smoothstep(150., 380., vZ)) - .5)*.22*(1. - gEmit)*uMarks*(1. - uReal*.8);
+  if (vZ < 230. && gEmit < .5 && uMarks > .5 && uReal < .99) {
     // grey pencil in the shade: one way where it's shaded, crossed where it's darkest
     float shade = 1. - L, h = 0.;
     if (shade > .35) {
@@ -429,11 +441,11 @@ void main(){
       h *= 1. - smoothstep(90., 230., vZ);
     }
     vec3 pencil = vec3(.36, .37, .41)*mix(.35, 1., dayK);
-    c = mix(c, c*.55 + pencil*.25, h*.55*(1. - gEmit));
+    c = mix(c, c*.55 + pencil*.25, h*.55*(1. - gEmit)*(1. - uReal));
     if (L > .5 && an.y < .5 && vZ < 70.) {
       vec2 fq = vec2(u.x, u.y*.02);
       float hf = mix(hatch(fq, .03*k0), hatch(fq, .03*k1), fr)*L*.35*(1. - smoothstep(25., 70., vZ));
-      c = mix(c, c*.82, hf*.5);
+      c = mix(c, c*.82, hf*.5*(1. - uReal));
     }
   }
   // out the way three's materials write (tone-mapped, linear), then the game's haze over it
@@ -449,7 +461,9 @@ void main(){
   float lm = max(max(sunLc.r, sunLc.g), max(sunLc.b, 1e-3));
   float sa = max(dot(rw, sunDir), 0.);
   fc = mix(fc, sqrt(sunLc/lm), pow(sa, 6.)*.32*clamp(lm*.25, 0., 1.));
-  fragColor = vec4(mix(o, fc, ff), 1.);
+  // how much this surface mirrors, for the reflections pass: glass, standing water, a little from a road
+  float mir = gGlass*.34 + (an.y > .6 && (k == 2 || k == 28) ? .012 + .75*uWet : (an.y > .6 ? .55*uWet : 0.));
+  fragColor = vec4(mix(o, fc, ff), 1. - clamp(mir*(1. - ff), 0., .95));
 }`;
 
 // one 256² tile of everything the brush and the pencil need
