@@ -100,8 +100,9 @@ const PATCHES = {
      "      const look2 = R1 ? R1.look : kit.randomLook(this.rng, { female: o.type === 'scooterP' ? this.rng.chance(0.75) : this.rng.chance(0.2), avoid: P.look });"],
   ],
   [S('game/game.js')]: [
+    ["player.useHook = () => this.shops.tryUse();", "player.useHook = () => this.shops.tryUse() || !!this.people.ask?.(player, this);"],
     ["if (this.state === 'play' && !this.player.onFoot && this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);", "if (this.state === 'play' && this.input.took('KeyC')) this.rig.toggleView(this.player.onFoot);"],
-    ["      if (P.offer && P.onFoot) this.hud.prompt(P.offer.key, P.offer.label, 0.3);\n      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);", "      if (P.offer && P.onFoot) { this.hud.prompt(P.offer.key, P.offer.label, 0.3); if (sl && this.state === 'play') this.hud.prompt2('V', sl, 0.3); }\n      else if (sl && this.state === 'play') this.hud.prompt('V', sl, 0.3);"],
+    ["      if (P.offer && P.onFoot) this.hud.prompt(P.offer.key, P.offer.label, 0.3);\n      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);", "      const sv = sl || (this.state === 'play' && this.people.askLabel?.(P, this));\n      if (P.offer && P.onFoot) { this.hud.prompt(P.offer.key, P.offer.label, 0.3); if (sv && this.state === 'play') this.hud.prompt2('V', sv, 0.3); }\n      else if (sv && this.state === 'play') this.hud.prompt('V', sv, 0.3);"],
   ],
   // the cabin inside /beta's bodies (they're not main's shapes): seats scaled under each roof, the rear bench under the
   // roof's back (none in the two-seaters), pillars and mirror under the roof's front edge

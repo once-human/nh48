@@ -24,6 +24,7 @@ import * as VM from './vehicles/models.js';
 import './vehicles/physics.js';
 import './traffic/rates.js';
 import './game/prompt2.js';
+import './game/ask.js';           // stop someone and ask the way
 import './world/flyovers.js';
 import './world/hills.js';
 import './game/seat.js';
