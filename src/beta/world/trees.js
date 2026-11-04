@@ -1,67 +1,87 @@
-// /beta's trees: the game's TreeField keeps its data and its trunks in the collision (logic), and never draws. What's
-// drawn is this: one instanced painted tree, a detailed one close by and a cheap one further out, one draw each.
+// /beta's trees: the game's species, grown as it grows them (rain tree, gulmohar, peepal, neem...), with their real
+// branches and leaves, and its trunks in the collision. Drawn through painted shaders of their own: leaves dabbed on in
+// light and shade with the light falling across each crown, bark in pencil, a breeze. Past the mid range, one cheap
+// painted crown per tree instead of the game's pictures of trees.
 import * as THREE from 'three';
 import { TreeField as GameTrees } from '@orig/world/trees.js';
+import { U } from '@orig/gfx/materials.js';
 import { PU } from '../gfx/paint.js';
 
-const VS = `in vec3 position, normal, color; in vec4 iPos; in vec3 iTint; uniform mat4 viewMatrix, projectionMatrix; out vec3 vN, vC; out float vZ;
+const CHUNK = `precision highp float; precision highp sampler2DShadow;
+varying vec3 vN, vW, vC; varying vec2 vU; varying float vZ, vH;
+uniform sampler2D tMap, tNoise; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, fogCol, uTint; uniform float shadowTexel, shadowOn, fogDensity, dayK;
+float nz(vec2 p){ return texture2D(tNoise, p/16.).r; }
+float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.15 + .003*vZ), 1.); if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.;
+  float z = s.z - .0009; return .5*(texture(shadowTex, vec3(s.xy + vec2(-.8, .4)*shadowTexel, z)) + texture(shadowTex, vec3(s.xy + vec2(.8, -.4)*shadowTexel, z))); }
+`;
+const VS = `uniform float uTime, uWind; varying vec3 vN, vW, vC; varying vec2 vU; varying float vZ, vH;
+void main(){ mat4 M = modelMatrix*instanceMatrix; vec3 p = position; vec3 o = (M*vec4(0., 0., 0., 1.)).xyz; float ph = o.x*.31 + o.z*.23, sw = (sin(uTime*1.1 + ph + p.y*.4) + .5*sin(uTime*2.3 + ph*1.7 + p.x))*uWind*.012*p.y*(LEAFY);
+  p.x += sw; p.z += sw*.6; vec4 w = M*vec4(p, 1.); vW = w.xyz; vN = mat3(M)*normal; vC = COL; vU = uv; vH = position.y; vec4 v = viewMatrix*w; vZ = -v.z; gl_Position = projectionMatrix*v; }`;
+const LEAF_FS = CHUNK + `void main(){
+  vec4 t = texture2D(tMap, vU); if (t.a < .45) discard;
+  vec3 n = normalize(vN); if (!gl_FrontFacing) n = -n;
+  vec3 b = t.rgb*vC*1.15;
+  float e = nz(vW.xz*.9 + vW.y*.7) - .5, ndl = dot(n, sunDir), lit = smoothstep(-.05, .22, ndl + e*.5);
+  float sh = (shadowOn > .5 && lit > 0.) ? smoothstep(.25, .7, shadowAt(vW, n) + e*.35) : 1., L = lit*sh*dayK;
+  // dabs of paint: a dark hollow under the crown, warm top, each clump a little its own colour
+  b *= .78 + .5*nz(vW.xz*.23 + vW.y*.17);
+  vec3 c = mix(b*shadeCol*vec3(.7, .85, .8)*(.75 + .25*smoothstep(0., 8., vH)) + vec3(.008, .016, .01)*dayK, b*sunCol*vec3(1.1, 1.04, .84), L);
+  float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1.); }`;
+const BARK_FS = CHUNK + `void main(){
+  vec3 n = normalize(vN), b = texture2D(tMap, vU*vec2(1., 1.)).rgb*uTint*1.25; float e = nz(gl_FragCoord.xy*.1) - .5, ndl = dot(n, sunDir), lit = smoothstep(.0, .14, ndl + e*.14);
+  float sh = (shadowOn > .5 && lit > 0.) ? smoothstep(.3, .7, shadowAt(vW, n) + e*.3) : 1., L = lit*sh*dayK;
+  b *= .84 + .32*nz(vec2(vU.x*18., vU.y*2.));          // long furrows
+  vec3 c = mix(b*shadeCol + vec3(.015)*dayK, b*sunCol, L);
+  float h = smoothstep(.5, .72, fract((gl_FragCoord.x + gl_FragCoord.y)*.17 + e*.9))*(1. - L)*(1. - smoothstep(12., 45., vZ)); c = mix(c, c*.68, h*.65);
+  float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1.); }`;
+const FAR_VS = `attribute vec4 iPos; attribute vec3 iTint; varying vec3 vN, vC; varying float vZ;
 void main(){ float a = fract(iPos.x*.37 + iPos.z*.71)*6.283, c = cos(a), s = sin(a); vec3 p = position*iPos.w; p = vec3(c*p.x + s*p.z, p.y, -s*p.x + c*p.z);
-  vN = vec3(c*normal.x + s*normal.z, normal.y, -s*normal.x + c*normal.z); vC = color.g > color.r ? color*iTint : color;
-  vec4 v = viewMatrix*vec4(p + iPos.xyz, 1.); vZ = -v.z; gl_Position = projectionMatrix*v; }`;
-const FS = `precision highp float; in vec3 vN, vC; in float vZ; out vec4 o; uniform vec3 sunDir, sunCol, shadeCol, fogCol; uniform float fogDensity;
-void main(){ float n = dot(normalize(vN), sunDir); vec3 c = vC*(shadeCol*.8 + sunCol*smoothstep(.02, .38, n)*.85); float f = fogDensity*vZ; o = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1.); }`;
+  vN = vec3(c*normal.x + s*normal.z, normal.y, -s*normal.x + c*normal.z); vC = color.g > color.r ? color*iTint : color; vec4 v = viewMatrix*vec4(p + iPos.xyz, 1.); vZ = -v.z; gl_Position = projectionMatrix*v; }`;
+const FAR_FS = `precision highp float; varying vec3 vN, vC; varying float vZ; uniform vec3 sunDir, sunCol, shadeCol, fogCol; uniform float fogDensity, dayK;
+void main(){ float n = dot(normalize(vN), sunDir); vec3 c = mix(vC*shadeCol*.8, vC*sunCol, smoothstep(.02, .38, n)*dayK); float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1.); }`;
 
-function part(g, col, m) {
-  g = g.index ? g.toNonIndexed() : g; g.applyMatrix4(m); g.computeVertexNormals();
-  const p = g.attributes.position, n = g.attributes.normal, c = new Float32Array(p.count*3);
-  for (let i = 0; i < p.count; i++) { const k = col === 'leaf' ? .75 + .25*Math.sin(p.getY(i)*2.1 + p.getX(i)*3.3) : 1; if (col === 'leaf') { c[i*3] = .16*k; c[i*3 + 1] = .3*k; c[i*3 + 2] = .09*k; } else { c[i*3] = .21; c[i*3 + 1] = .14; c[i*3 + 2] = .09; } }
-  return { p: p.array, n: n.array, c };
+function farCrown() {
+  const parts = [[new THREE.CylinderGeometry(.09, .16, 2.8, 4), .21, .14, .09, new THREE.Matrix4().makeTranslation(0, 1.4, 0)],
+    [new THREE.IcosahedronGeometry(1, 1), .17, .31, .1, new THREE.Matrix4().compose(new THREE.Vector3(0, 4, 0), new THREE.Quaternion(), new THREE.Vector3(2.4, 1.9, 2.4))]];
+  const P = [], N = [], C = [];
+  for (const [g0, r, gg, b, m] of parts) { const g = g0.index ? g0.toNonIndexed() : g0; g.applyMatrix4(m); g.computeVertexNormals(); const p = g.attributes.position, n = g.attributes.normal; for (let i = 0; i < p.count; i++) { P.push(p.getX(i), p.getY(i), p.getZ(i)); N.push(n.getX(i), n.getY(i), n.getZ(i)); C.push(r, gg, b); } }
+  const g = new THREE.InstancedBufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); return g;
 }
-function merge(parts) {
-  const len = parts.reduce((a, q) => a + q.p.length, 0), P = new Float32Array(len), N = new Float32Array(len), C = new Float32Array(len); let o = 0;
-  for (const q of parts) { P.set(q.p, o); N.set(q.n, o); C.set(q.c, o); o += q.p.length; }
-  const g = new THREE.InstancedBufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3)); return g;
-}
-const at = (x, y, z, sx, sy = sx, sz = sx) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion(), new THREE.Vector3(sx, sy, sz));
-const nearTree = () => merge([part(new THREE.CylinderGeometry(.09, .17, 3.4, 6), 'trunk', at(0, 1.7, 0, 1)),
-  ...[[0, 4.3, 0, 1.9], [1.1, 3.7, .3, 1.25], [-1, 3.8, -.5, 1.35], [.2, 3.6, 1.1, 1.15], [-.3, 5.3, -.2, 1.2]].map(([x, y, z, s]) => part(new THREE.IcosahedronGeometry(1, 1), 'leaf', at(x, y, z, s, s*.82, s)))]);
-const farTree = () => merge([part(new THREE.CylinderGeometry(.1, .17, 3, 3), 'trunk', at(0, 1.5, 0, 1)), part(new THREE.IcosahedronGeometry(1, 0), 'leaf', at(0, 4.2, 0, 2.3, 2, 2.3))]);
-
-function field(geo, cap, scene) {
-  geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(new Float32Array(cap*4), 4).setUsage(THREE.DynamicDrawUsage));
-  geo.setAttribute('iTint', new THREE.InstancedBufferAttribute(new Float32Array(cap*3), 3).setUsage(THREE.DynamicDrawUsage));
-  geo.instanceCount = 0;
-  const mat = new THREE.RawShaderMaterial({ vertexShader: VS, fragmentShader: FS, uniforms: PU, glslVersion: THREE.GLSL3 });
-  const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.cap = cap; scene.add(m); return m;
-}
-const TINT = [[1, 1.05, .9], [.82, 1.1, .85], [1.2, 1.05, .7], [.9, .9, 1], [1.1, 1.2, .8], [.72, .95, .75]];
+const TINT = [[1, 1.05, .9], [.82, 1.1, .85], [1.2, 1.05, .7], [.9, .9, 1], [1.1, 1.2, .8], [.72, .95, .75], [1, 1, 1], [.9, 1.1, .9]];
 
 export class TreeField extends GameTrees {
   constructor(W, scene, renderer, quality, tex) {
-    const n0 = scene.children.length;
     super(W, scene, renderer, quality, tex);
-    for (let i = n0; i < scene.children.length; i++) scene.children[i].visible = false;     // the game's own trees: data only
-    this.near = field(nearTree(), 500, scene); this.far = field(farTree(), 3000, scene);
-    this.R = Math.min(quality.treeFarRange || 600, 520); this.nearD = 85;
-    this.drawX = 1e9; this.drawZ = 1e9;
+    const un = (extra) => Object.assign({}, PU, { uTime: U.uTime, uWind: U.uWind, tNoise: PU.tNoise }, extra);
+    this.paintLeaf = new THREE.ShaderMaterial({ vertexShader: VS.replace('LEAFY', '1.').replace('COL', 'color'), fragmentShader: LEAF_FS, uniforms: un({ tMap: { value: this.leafMat.map } }), vertexColors: true, side: THREE.DoubleSide });
+    this.arch.forEach((A, k) => {
+      const S = this.sets[k], m = this.barkMats[k];
+      const bark = new THREE.ShaderMaterial({ vertexShader: VS.replace('LEAFY', '.25').replace('COL', 'vec3(1.)'), fragmentShader: BARK_FS, uniforms: un({ tMap: { value: m.map }, uTint: { value: m.color.clone() } }) });
+      S.nb.material = S.mb.material = bark; S.nl.material = S.ml.material = this.paintLeaf;
+    });
+    this.bb.visible = false;
+    const G = farCrown(), cap = 4000;
+    G.setAttribute('iPos', new THREE.InstancedBufferAttribute(new Float32Array(cap*4), 4).setUsage(THREE.DynamicDrawUsage)); G.setAttribute('iTint', new THREE.InstancedBufferAttribute(new Float32Array(cap*3), 3).setUsage(THREE.DynamicDrawUsage)); G.instanceCount = 0;
+    this.farMesh = new THREE.Mesh(G, new THREE.ShaderMaterial({ vertexShader: FAR_VS, fragmentShader: FAR_FS, uniforms: PU, vertexColors: true })); this.farMesh.frustumCulled = false; this.farMesh.cap = cap; scene.add(this.farMesh);
+    this.R = 700; this.fx = 1e9; this.fz = 1e9;
   }
-  sharpenLeaves() {}
+  sharpenLeaves() { super.sharpenLeaves(); this.paintLeaf.uniforms.tMap.value = this.leafMat.map; }
   update(cx, cz, force = false) {
-    if (this.lastX === 1e9) force = true;
-    if (!force && Math.hypot(cx - this.drawX, cz - this.drawZ) < 8) return;
-    this.lastX = this.drawX = cx; this.lastZ = this.drawZ = cz;
-    const c = this.cell, r = Math.ceil(this.R/c), gx = Math.floor(cx/c), gz = Math.floor(cz/c), N = this.near, F = this.far;
-    const nP = N.geometry.attributes.iPos, nT = N.geometry.attributes.iTint, fP = F.geometry.attributes.iPos, fT = F.geometry.attributes.iTint;
-    let a = 0, b = 0;
+    if (this.lastX === 1e9) this.fx = 1e9;
+    this.farR = 0;                                        // (the game's far pictures: never filled)
+    super.update(cx, cz, force);
+    if (!force && Math.hypot(cx - this.fx, cz - this.fz) < 30) return;
+    this.fx = cx; this.fz = cz;
+    const c = this.cell, r = Math.ceil(this.R/c), gx = Math.floor(cx/c), gz = Math.floor(cz/c), M = this.farMesh, A = M.geometry.attributes.iPos, T = M.geometry.attributes.iTint, m0 = this.midR - 20, R = this.R; let n = 0;
     for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) {
       const l = this.grid.get((gx + i) + ',' + (gz + j)); if (!l) continue;
       for (const t of l) {
-        const x = this.x[t], z = this.z[t], d = Math.hypot(x - cx, z - cz); if (d > this.R) continue;
-        const near = d < this.nearD; if (near ? a >= N.cap : b >= F.cap) continue;
-        const A = near ? nP.array : fP.array, T = near ? nT.array : fT.array, o = near ? a++ : b++, K = TINT[(this.k[t] + t)%TINT.length];
-        A[o*4] = x; A[o*4 + 1] = this.y[t] || 0; A[o*4 + 2] = z; A[o*4 + 3] = Math.max(.7, this.s[t]*1.35); T[o*3] = K[0]; T[o*3 + 1] = K[1]; T[o*3 + 2] = K[2];
+        const d = Math.hypot(this.x[t] - cx, this.z[t] - cz); if (d > R || d < m0 || n >= M.cap) continue;
+        const K = TINT[this.k[t]%TINT.length], ar = this.arch[this.k[t]];
+        A.array[n*4] = this.x[t]; A.array[n*4 + 1] = this.y[t] || 0; A.array[n*4 + 2] = this.z[t]; A.array[n*4 + 3] = this.s[t]*(ar.H || 10)/6;
+        T.array[n*3] = K[0]; T.array[n*3 + 1] = K[1]; T.array[n*3 + 2] = K[2]; n++;
       }
     }
-    N.geometry.instanceCount = a; F.geometry.instanceCount = b; nP.needsUpdate = nT.needsUpdate = fP.needsUpdate = fT.needsUpdate = true;
+    M.geometry.instanceCount = n; A.needsUpdate = T.needsUpdate = true;
   }
 }

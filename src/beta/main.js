@@ -119,7 +119,7 @@ function gpuClass() {
 }
 const GPU = gpuClass();
 // the stress test's rule: one pass a pixel at screen resolution, no MSAA
-for (const k in QUALITY) { QUALITY[k].pixelRatio = Math.min(1, QUALITY[k].pixelRatio); QUALITY[k].msaa = false; QUALITY[k].shadows = true; QUALITY[k].shadowSize = QUALITY[k].shadowSize || 1024; }
+for (const k in QUALITY) { QUALITY[k].pixelRatio = Math.min(1, QUALITY[k].pixelRatio); QUALITY[k].msaa = false; QUALITY[k].shadows = true; QUALITY[k].shadowSize = QUALITY[k].shadowSize || 1024; QUALITY[k].grassRange = 64; QUALITY[k].grassCap = 9000; QUALITY[k].treeNearCap = 300; QUALITY[k].treeMidCap = 1500; QUALITY[k].impostorCell = 128; }
 function pickQuality() {
   const q = params.get('q');
   if (q && QUALITY[q]) return { ...QUALITY[q] };
