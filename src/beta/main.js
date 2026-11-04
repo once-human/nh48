@@ -33,6 +33,7 @@ import { fixPins } from '@orig/world/venues.js';
 import { Streamer } from '@orig/world/index.js';
 import { Actors } from './draw/actors.js';
 import { Shadows } from './gfx/shadows.js';
+import { paintSky } from './gfx/paintsky.js';
 import { Lamps } from './gfx/lamps.js';
 import { trackBodies } from './draw/skin.js';
 import { Graphics } from './game/graphics.js';
@@ -246,6 +247,7 @@ async function main() {
   const W = await buildWorld(M, T, renderer, scene, quality, (t, f) => progress(t, 0.62 + f * 0.2));
   const sky = new Sky(renderer, scene);
   W.sky = sky;
+  paintSky(sky);
   const post = new Post(renderer, scene, camera, quality, paint, sky);
   // with the after-frame smoothing the city is drawn into the pass's picture, whose shaders differ from the screen's:
   // every precompile (loading screen, police, ambulance, people) builds those, so none compile mid-game
