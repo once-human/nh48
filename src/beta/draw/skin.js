@@ -37,10 +37,12 @@ const SHADOW_RIGID = `precision highp float; in vec3 position; in vec4 iM0, iM1,
 const SHADOW_FS = `precision highp float; out vec4 o; void main(){ o = vec4(0.); }`;
 const COMMON = `precision highp float; precision highp sampler2D; precision highp sampler2DShadow;
 in vec3 vN, vW, vB, vC; in vec2 vU; in float vZ; flat in int vS; out vec4 o;
-uniform sampler2D tSkin, tMap, tNoise; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, fogCol; uniform float shadowTexel, shadowOn, fogDensity, dayK;
+uniform sampler2D tSkin, tMap, tNoise; uniform vec3 cameraPosition; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, fogCol; uniform float shadowTexel, shadowOn, fogDensity, dayK;
 ${LAMP}
 vec4 LK(int i){ return texelFetch(tSkin, ivec2(${LOOK} + i, vS), 0); }
 float nz(vec2 p){ return texture(tNoise, p/16.).r; }
+// a little height on the surface, seen as light: folds, weave, pores
+vec3 bump(vec3 n, vec3 w, float h){ vec3 sx = dFdx(w), sy = dFdy(w), r1 = cross(sy, n), r2 = cross(n, sx); float det = dot(sx, r1); return normalize(abs(det)*n - sign(det)*(dFdx(h)*r1 + dFdy(h)*r2)); }
 float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.05 + .002*vZ), 1.); if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.;
   float z = s.z - .0006; return .5*(texture(shadowTex, vec3(s.xy + vec2(-.6, .3)*shadowTexel, z)) + texture(shadowTex, vec3(s.xy + vec2(.6, -.3)*shadowTexel, z))); }
 // two tones with a brushed edge, a warm glow where the light turns on skin, grey pencil in the shade, the rim the sky leaves
@@ -48,7 +50,7 @@ vec3 paint(vec3 b, vec3 n, vec3 w, float sss){
   float e = nz(gl_FragCoord.xy*.11) - .5, ndl = dot(n, sunDir), lit = smoothstep(.0, .14, ndl + e*.12);
   float sh = (shadowOn > .5 && lit > 0.) ? smoothstep(.3, .7, shadowAt(w, n) + e*.3) : 1., L = lit*sh*dayK;
   vec3 cl = b*sunCol, cs = b*shadeCol*(.92 + .16*max(n.y, 0.)) + vec3(.02)*dayK;
-  cs += b*vec3(.3, .08, .03)*sss*smoothstep(-.35, .05, ndl);
+  cs += b*vec3(.2, .075, .04)*sss*smoothstep(-.35, .05, ndl);
   vec3 c = mix(cs, cl, L) + b*lampAt(w, n);
   float h = smoothstep(.5, .72, fract((gl_FragCoord.x + gl_FragCoord.y)*.17 + e*.9))*(1. - L)*(1. - smoothstep(10., 34., vZ));
   c = mix(c, c*.7, h*.6);
@@ -61,7 +63,7 @@ const BODY = COMMON + `void main(){
   vec3 tex = texture(tMap, vU).rgb, p = vB, top = LK(0).rgb, bot = LK(1).rgb, uSkin = LK(2).rgb, shoe = LK(3).rgb; vec4 cut = LK(4), sty = LK(5), fit = LK(7), arms = LK(8), bd = LK(9);
   float ax = abs(p.x), hip = bd.x, neck = bd.y; const vec3 REF = vec3(.40, .18, .085);
   float l = dot(tex, vec3(.3, .55, .15))/dot(REF, vec3(.3, .55, .15));
-  vec3 skin = uSkin*mix(vec3(l), tex/REF, .2); skin = mix(vec3(dot(skin, vec3(.3, .55, .15))), skin, .82);
+  vec3 skin = uSkin*mix(vec3(l), tex/REF, .42); skin = mix(vec3(dot(skin, vec3(.3, .55, .15))), skin, .74);
   vec3 col = skin; float cloth = 0.; bool arm = ax > arms.x && p.y > bd.z; float t = (ax - arms.x)/(arms.y - arms.x);
   if (arm) { if (t < arms.w) { col = top; cloth = 1.; } }
   else if (p.y > neck) col = skin;
@@ -76,8 +78,15 @@ const BODY = COMMON + `void main(){
   if (p.y > neck - .11 && ax > .07 && t < .22) torsoIn = false;
   bool armIn = arm && t < arms.w - .07 && t > .22, legIn = p.y < hip - .03 && p.y > bd.w + .03 && (cut.w < 2.5 || p.y > sty.y*hip + .03), footIn = p.y < bd.w - .015;
   if (torsoIn || armIn || legIn || footIn) discard;
+  vec3 n = N(); float near = 1. - smoothstep(1.5, 7., vZ);
   if (cloth > .5) col *= .92;
-  o = vec4(paint(col, N(), vW, 1. - cloth), 1.); }`;
+  else {
+    float pore = nz(p.xy*vec2(95., 110.) + p.z*80.)*.6 + nz(p.yz*vec2(40., 52.))*.4;
+    col *= 1. + (pore - .5)*.12*near; n = bump(n, vW, pore*.0016*near);
+    vec3 V = normalize(cameraPosition - vW); float sp = pow(max(dot(n, normalize(V + sunDir)), 0.), 22.);
+    o = vec4(paint(col, n, vW, 1.) + sunCol*col*sp*.28*dayK*(1. - smoothstep(0., 22., vZ)), 1.); return;
+  }
+  o = vec4(paint(col, n, vW, 1. - cloth), 1.); }`;
 // the clothes: cut and patterned by where they sit on the body; a weave and soft folds up close
 const CLOTH = COMMON + `uniform float uWhich; void main(){
   vec3 p = vB, col = vC, pc = LK(6).rgb; vec4 sty = LK(5), fit = LK(7), arm = LK(8); float pt = sty.x;
@@ -95,12 +104,29 @@ const CLOTH = COMMON + `uniform float uWhich; void main(){
     float n = fract(sin(dot(floor(vec2(p.x*260. + p.y*260., p.y*90.)), vec2(127.1, 311.7)))*43758.5453);
     col *= .9 + n*.16; col = mix(col, col*1.35, smoothstep(.03, .12, p.z)*smoothstep(.45, .75, p.y)*.5);
   }
-  float near = 1. - smoothstep(3., 11., vZ);
-  col *= .93 + .14*nz(vec2(p.x + p.z*.7, p.y*.45)*7.);                                 // soft folds, long down the body
+  float near = 1. - smoothstep(3., 11., vZ), close = 1. - smoothstep(1.5, 6., vZ), ax = abs(p.x), f = nz(vec2(p.x + p.z*.7, p.y*.4)*5.)*.65 + nz(vec2(p.x - p.z*.5, p.y*.9)*13.)*.35, s = 0.;
+  // long soft folds down the body, and where it bends the cloth bunches across: at the waist, under the arms, the elbows, the knees
+  if (uWhich > .5 && uWhich < 1.5) {
+    f += .6*(smoothstep(.09, .0, abs(p.y - .5)) + smoothstep(.1, .0, abs(p.y - fit.y + .14)))*nz(vec2(ax*8., p.y*30.));
+    s = max(step(abs(p.z), .0035)*step(.5, fract(p.y*130.)), smoothstep(.004, .0, abs(p.y - fit.y + .045))*step(.4, fract((p.x + p.z)*150.)));
+    s = max(s, smoothstep(.004, .0, abs(p.x))*step(.0, p.z)*step(p.y, fit.y - .05)*step(fit.y - .22, p.y));       // the fly
+  } else if (uWhich < .5 || uWhich > 2.5) {
+    bool sl = ax > arm.x && p.y > arm.z; float t = (ax - arm.x)/(arm.y - arm.x);
+    if (sl) { f += .7*smoothstep(.1, .0, abs(t - .5))*nz(vec2(t*6., p.y*38.)); s = smoothstep(.012, .0, abs(t - arm.w + .03))*step(.4, fract((p.y + p.z)*150.)); }
+    else {
+      f += .6*smoothstep(.17, .0, p.y - fit.x)*nz(vec2(ax*7., p.y*34.));                                         // bunched at the waist
+      f += .5*smoothstep(.09, .0, ax - arm.x + .02)*smoothstep(.2, .0, abs(p.y - arm.z + .1))*nz(vec2(p.y*30., p.z*25.)); // under the arm
+      if (uWhich < .5) { float hem = fit.x - (fit.z > .5 && fit.z < 2.5 ? .06 : .015); s = smoothstep(.0035, .0, abs(p.y - hem - .014))*step(.4, fract((p.x + p.z)*150.)); }
+    }
+  }
+  col *= .9 + .2*f;
   col *= 1. + near*.05*(sin(p.y*1100.) + sin((p.x + p.z)*1100.));                       // the weave
-  o = vec4(paint(col, normalize(vN), vW, 0.), 1.); }`;
-const SHOE = COMMON + `void main(){ vec3 c = vC; if (vB.y < .028) c *= .3; c *= .94 + .1*nz(vB.xz*30.); o = vec4(paint(c, N(), vW, 0.), 1.); }`;
-const HAIR = COMMON + `void main(){ vec3 c = texture(tMap, vU).rgb*vC*1.2, n = N(); c *= .86 + .28*smoothstep(.3, .7, fract(vU.x*90. + nz(vU*40.)*.8));
+  col *= 1. - .32*s*close;
+  o = vec4(paint(col, bump(normalize(vN), vW, f*.009*near), vW, 0.), 1.); }`;
+const SHOE = COMMON + `void main(){ vec3 c = vC, n = N(); float near = 1. - smoothstep(1.5, 7., vZ); if (vB.y < .028) c *= .3; c *= .94 + .1*nz(vB.xz*30.);
+  if (vB.y > .05 && vB.z > .02 && abs(vB.x) < .4) c = mix(c, min(c*1.5 + .08, vec3(1.)), smoothstep(.02, .0, abs(fract(vB.z*38.) - .5))*near*.55);   // the laces
+  float l = smoothstep(.034, .03, abs(vB.y - .034)); c *= 1. - .25*l*near; o = vec4(paint(c, bump(n, vW, nz(vB.xz*60.)*.001*near), vW, 0.), 1.); }`;
+const HAIR = COMMON + `void main(){ vec3 c = texture(tMap, vU).rgb*vC*1.2, n = N(); float st = fract(vU.x*90. + nz(vU*40.)*.8); c *= .82 + .36*smoothstep(.3, .7, st); n = bump(n, vW, st*.004*(1. - smoothstep(1.5, 8., vZ)));
   float sh = pow(max(dot(n, normalize(sunDir + vec3(0., .4, 0.))), 0.), 14.)*.2; o = vec4(paint(c + sh*vec3(.75, .68, .6), n, vW, 0.), 1.); }`;
 const EYES = COMMON + `void main(){ o = vec4(paint(texture(tMap, vU).rgb, N(), vW, 0.) + .04, 1.); }`;
 const PLAIN = COMMON + `void main(){ o = vec4(paint(vC, N(), vW, 0.), 1.); }`;
