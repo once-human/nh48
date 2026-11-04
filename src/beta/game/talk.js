@@ -34,7 +34,9 @@ const LABEL = {
   college: 'Which college are you in?', exams: 'Exams going on?', hangout: 'Where do people hang out around here?', tonight: 'Anything happening tonight?', match: 'Did you watch the match?',
   cafe: 'Know a good café near here?', work: 'What do you do?', outfit: 'Nice outfit', busy: 'Busy day?', from: 'Where are you from?', cheapfood: 'Where can I eat cheap?',
   boss: 'Who runs this area?', respect: 'Just saying namaskar', market: 'Where\'s the market?', prices: 'Everything\'s so expensive, no?', trouble: 'Any trouble around here?',
-  area: 'What\'s this area like?', weather: 'Talk about the weather', compliment: 'Pay them a compliment', money: 'Ask for ₹20 for a chai', jab: 'Make a Puneri jab',
+  area: 'What\'s this area like?', traffic: 'This traffic, man...', weekend: 'Any plans for the weekend?', favfood: 'What\'s the best thing to eat in Pune?', morning: 'Early start today?', evening: 'Heading home?', rainy: 'Got caught in the rain?',
+  live: 'Do you live around here?', hobby: 'What do you do for fun?', music: 'What music are you into?', movie: 'Seen any good film lately?', festival: 'Big on Ganpati?', joke: 'Tell them a joke', dream: 'If you could do anything, what would it be?', pune: 'Born and brought up in Pune?',
+  number: 'Ask for their number', headed: 'Where are you headed?', shortcut: 'Take the lanes? It\'s quicker', music2: 'Music okay?', liftoffer: 'Need a lift?', askout2: 'Ask them out', weather: 'Talk about the weather', compliment: 'Pay them a compliment', money: 'Ask for ₹20 for a chai', jab: 'Make a Puneri jab',
   // inside, the staff
   biz: 'How\'s business?', sells: 'What sells the most?', since: 'How long have you had this place?', good: 'What\'s good here?', discount: 'Any discount?',
   wait: 'How long\'s the wait?', cut: 'What cut would suit me?', gossip: 'Any news around here?', recommend: 'What would you recommend?', night: 'Busy night?',
@@ -74,6 +76,23 @@ const LINES = {
   compliment: L([['हं. काय हवंय?', 'Hm. What do you want?']], [['धन्यवाद.', 'Thank you.']], [['अरे वा! धन्यवाद, तुमचाही दिवस छान जावो.', 'Oh wow! Thank you, have a nice day yourself.']]),
   money: L([['काम करा जरा!', 'Go do some work!']], [['सुट्टे नाहीत.', 'No change on me.']], [['घ्या, चहा प्या.', 'Here, have a chai.']]),
   jab: L([['काय म्हणालात? परत बोलून दाखवा!', 'What did you say? Say that again!']], [['तोंड सांभाळून बोला.', 'Mind your mouth.']], [['हाहा, पुणेरी आहात खरे!', 'Haha, you really are Puneri!']]),
+  traffic: L([['हं.', 'Hm.']], [['रोजचंच आहे. सिग्नलला कोणी थांबतच नाही.', 'Every day. Nobody stops at signals.']], [['अहो, पुण्यात ट्रॅफिक नाही तर काय मजा! पण खरं सांगू, मेट्रोने जरा बरं झालंय.', 'What\'s Pune without traffic! But honestly, the metro has made it a bit better.']]),
+  weekend: L([['काही नाही.', 'Nothing.']], [['सिंहगडला जायचंय, बघू.', 'Want to go up to Sinhagad, let\'s see.']], [['मित्रांबरोबर सिंहगडला! पिठलं-भाकरी आणि कांदा भजी. येताय?', 'Sinhagad with friends! Pithla-bhakri and kanda bhaji. Coming?']]),
+  favfood: L([['जे मिळेल ते.', 'Whatever you get.']], [['मिसळ, दुसरं काय?', 'Misal, what else?']], [['मिसळ, बाकरवडी, आणि पावसात भजी! पण मिसळीवरून पुणेकरांशी भांडू नका, प्रत्येकाची आपली आवडती जागा असते.', 'Misal, bakarwadi, and bhaji in the rain! But don\'t fight Punekars over misal, everyone has their own favourite place.']]),
+  morning: L([['हो.', 'Yes.']], [['हो, कामाला जायचंय.', 'Yes, off to work.']], [['हो! सकाळचा चहा झाल्याशिवाय मी माणूस नसतो.', 'Yes! I\'m not human until my morning chai.']]),
+  evening: L([['हो.', 'Yes.']], [['हो, दिवस संपला एकदाचा.', 'Yes, the day\'s finally over.']], [['हो, आधी जरा कट्ट्यावर, मग घरी. आज मूड छान आहे!', 'Yes, the katta first, then home. Good mood today!']]),
+  rainy: L([['दिसतंय ना.', 'Can\'t you see.']], [['हो, छत्री विसरलो.', 'Yes, forgot my umbrella.']], [['हो! पण पुण्याचा पाऊस, भिजायचंच असतं. चला भजी खाऊ!', 'Yes! But Pune rain, you\'re meant to get wet. Let\'s get bhaji!']]),
+  live: L([['जवळच.', 'Close by.']], [['हो, दोन गल्ल्या पुढे.', 'Yes, two lanes ahead.']], [['हो, लहानपणापासून इथेच! अख्खी गल्ली ओळखते मला.', 'Yes, since I was a kid! The whole lane knows me.']]),
+  hobby: L([['काही नाही.', 'Nothing.']], [['क्रिकेट, कधीकधी.', 'Cricket, sometimes.']], [['ट्रेकिंग! सह्याद्रीत दर पावसाळ्यात. एकदा राजगडला या, वेड लागेल.', 'Trekking! In the Sahyadris every monsoon. Do Rajgad once, you\'ll be hooked.']]),
+  music: L([['सगळंच.', 'Everything.']], [['मराठी गाणी, आणि थोडं बॉलिवूड.', 'Marathi songs, and a bit of Bollywood.']], [['ढोल-ताशा! गणपतीत पथकात वाजवतो. अंगात येतं अगदी!', 'Dhol-tasha! I play in a pathak at Ganpati. It takes over you!']]),
+  movie: L([['नाही.', 'No.']], [['हो, एक मराठी पिक्चर पाहिला, बरा होता.', 'Yes, saw a Marathi film, it was okay.']], [['हो! थिएटरमध्ये सगळे टाळ्या वाजवत होते. नक्की बघा.', 'Yes! The whole theatre was clapping. You must see it.']]),
+  festival: L([['हं.', 'Hm.']], [['हो, दरवर्षी मानाचे गणपती बघतो.', 'Yes, I see the Manache Ganpati every year.']], [['अर्थात! विसर्जनाला रात्रभर रस्त्यावर. अख्खं पुणे जागं असतं!', 'Of course! Out all night for the visarjan. All of Pune is awake!']]),
+  joke: L([['हसू येत नाहीये.', 'I\'m not laughing.']], [['हाहा, बरा होता.', 'Haha, not bad.']], [['हाहाहा! पुणेरी आहात तुम्ही! आता माझा ऐका...', 'Hahaha! You\'re a true Puneri! Now hear mine...']]),
+  dream: L([['झोपणं.', 'Sleep.']], [['स्वतःचं छोटंसं दुकान.', 'A little shop of my own.']], [['कोकणात एक घर, समोर समुद्र, आणि फोन बंद! तुमचं?', 'A house in the Konkan, the sea in front, and my phone off! Yours?']]),
+  pune: L([['हो.', 'Yes.']], [['हो, पेठेत वाढलो.', 'Yes, grew up in the peths.']], [['जन्मापासून! पुणेरी पाट्यांपासून बाकरवडीपर्यंत, सगळं रक्तात आहे.', 'From birth! From Puneri patya to bakarwadi, it\'s all in the blood.']]),
+  shortcut: L([['मीटरवरच चला, शॉर्टकट नको.', 'Just go by the meter, no shortcuts.']], [['तुम्हाला माहित असेल तर चला.', 'If you know the way, go ahead.']], [['हो चला! पण खड्डे सांभाळून.', 'Yes, go! But mind the potholes.']]),
+  music2: L([['बंद करा.', 'Turn it off.']], [['चालेल.', 'It\'s fine.']], [['अरे वा, लावा जोरात!', 'Oh nice, turn it up!']]),
+  liftoffer: L([['नको. तुमच्यासोबत? नाही.', 'No. With you? No.']], [['नको, जवळच जायचंय. धन्यवाद.', 'No, I\'m going close by. Thanks.']], [['खरंच? किती छान! पण नको, बस येईलच. धन्यवाद हं!', 'Really? How nice! But no, the bus will come. Thank you!']]),
   // staff
   biz: L([['चालू आहे.', 'It\'s going.']], [['ठीक आहे. ऑनलाईनमुळे थोडं कमी झालं.', 'Okay. A bit less since online shopping.']], [['देवाच्या कृपेने छान! सणासुदीला तर उभं राहायला जागा नसते.', 'Good, by God\'s grace! At festival time there\'s no room to stand.']]),
   sells: L([['सगळंच.', 'Everything.']], [['रोजचं सामान जास्त जातं.', 'The everyday stuff goes most.']], [['हे बघा, हे सगळ्यात जास्त जातं. घेऊन बघा, परत याल.', 'Look, this sells the most. Try it, you\'ll be back.']]),
@@ -114,6 +133,25 @@ const WEATHER = {
   fine: [['हं.', 'Hm.'], ['आज हवा छान आहे.', 'Nice weather today.'], ['अशी हवा असली की फिरायला मजा येते.', 'Weather like this, it\'s fun to just roam.']],
 };
 
+// how someone is today: it colours everything they say and how far a chat with them goes
+const VIBE = {
+  chatty: { w: 0.5, tag: 'chatty', hi: ['अरे, बोला बोला! काय म्हणताय?', 'Oh, go on, go on! What\'s up?'] },
+  shy: { w: -0.3, tag: 'shy', hi: ['ह... हो? बोला.', 'Y... yes? Go on.'] },
+  grumpy: { w: -0.6, tag: 'in a mood', hi: ['काय आहे? लवकर बोला.', 'What is it? Be quick.'] },
+  funny: { w: 0.2, tag: 'a joker', hi: ['बोला, पण फुकट सल्ला नाही हं!', 'Go on, but no free advice, okay!'] },
+  hurried: { w: -0.4, tag: 'in a hurry', hi: ['घाईत आहे, पटकन बोला.', 'I\'m in a hurry, say it quick.'] },
+  flirty: { w: 0.3, tag: 'smiling at you', hi: ['हाय... बोला ना.', 'Hi... go on.'] },
+};
+const VIBES_YOUNG = ['chatty', 'chatty', 'shy', 'grumpy', 'funny', 'hurried', 'flirty', 'flirty'], VIBES_OLD = ['chatty', 'chatty', 'grumpy', 'funny', 'hurried', 'shy'];
+// things anyone can be asked, by the moment: the hour, the weather, the week
+const GENERAL = (G) => {
+  const h = G.hour ?? 12, o = ['traffic', 'weekend', 'favfood'];
+  if (h < 11) o.push('morning'); else if (h >= 19) o.push('evening');
+  if (/rain|storm/.test(G.weather?.kind || '')) o.push('rainy');
+  return o;
+};
+// once they've warmed to you, the chat goes further: these come up after a warm answer
+const FOLLOW = ['live', 'hobby', 'music', 'movie', 'festival', 'joke', 'dream', 'pune', 'favfood', 'weekend'];
 // a few topics each, picked once per person, so no two people give you the same list
 function pickTopics(rng, pool, n) { const a = pool.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng.next()*(i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a.slice(0, n); }
 
@@ -136,7 +174,7 @@ class Talk {
     }, true);
     // T: talk to whoever is in front of you, out on the street or inside
     addEventListener('keydown', (e) => {
-      if (e.code !== 'KeyT' || e.repeat || this.cur || G.state !== 'play' || !G.player.onFoot) return;
+      if (e.code !== 'KeyT' || e.repeat || this.cur || G.state !== 'play') return;
       if (/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || '')) return;
       if (this.tryTalk()) e.preventDefault();
     });
@@ -146,6 +184,15 @@ class Talk {
     const G = this.g, P = G.player, I = G.interiors;
     if ((this._t || 0) > performance.now()) return false;
     this._t = performance.now() + 600;
+    // in a vehicle: your passenger, else whoever is at your window
+    if (!P.onFoot) {
+      const f = G.rides && G.rides.current;
+      if (f && f.state === 'onboard') return this.open(f.p || { persona: f.persona, female: f.fem, name: f.name, id: 0 }, null, 'fare', f);
+      const v = P.cur; if (!v || Math.abs(P.v || 0) > 4) return false;
+      let best = null, bd = 4;
+      for (const p of G.people.list) { if (p.hidden || p.pax || p.fallen > 0 || p.mode === 'fight' || p.mode === 'flee') continue; const d = Math.hypot(p.x - v.x, p.z - v.z); if (d < bd) { bd = d; best = p; } }
+      return best ? this.open(best, null, 'window') : false;
+    }
     if (I && I.inside) {
       const C = I.cur, x = P.x, z = P.z, fx = Math.cos(P.th), fz = Math.sin(P.th);
       let best = null, bd = 2.4;
@@ -175,15 +222,17 @@ class Talk {
     if (/^sit/.test(p.anim || p.idle || '')) return 'seated';
     return 'customer';
   }
-  open(p, room) {
+  open(p, room, role, fare) {
     const G = this.g, ppl = G.people, P = G.player, name = this.nameOf(p, room);
     const sub = (mr, en, t = 4) => G.hud.say(name, mr, en, t);
-    const att = ppl.gate ? ppl.gate(p, P, G, sub) : 'normal';
+    const att = role === 'fare' ? one(ppl.rng, ['normal', 'eager', 'curt']) : ppl.gate ? ppl.gate(p, P, G, sub) : 'normal';
     if (!att) return true;                          // that was all they had for you
-    this.cur = { p, room, att, used: {}, role: this.roleOf(p, room) };
+    if (!p._vibe) p._vibe = one(ppl.rng, OLD.has(p.persona) || p.cop ? VIBES_OLD : VIBES_YOUNG.filter(v => v !== 'flirty' || !!p.female !== !!P.look.female));
+    if (p._open === undefined) p._open = ppl.rng.next() < (/^(college|kp)/.test(p.persona || '') ? 0.6 : 0.3) + (p._vibe === 'flirty' ? 0.3 : 0);
+    this.cur = { p, room, att, used: {}, role: role || this.roleOf(p, room), extra: [], fare };
     G.state = 'shop';
     const ph = (p.anim || p.idle) === 'phone';
-    const hi = ph ? ['एक मिनिट, फोनवर आहे... हां, बोला.', 'One minute, I\'m on the phone... yes, go on.']
+    const hi = !ph && this.cur.role !== 'keeper' && ppl.rng.next() < 0.6 ? VIBE[p._vibe].hi : ph ? ['एक मिनिट, फोनवर आहे... हां, बोला.', 'One minute, I\'m on the phone... yes, go on.']
       : this.cur.role === 'keeper' ? ['बोला, काय देऊ?', 'Tell me, what can I get you?']
       : WARM[att] >= 2 ? one(ppl.rng, [['हां, बोला?', 'Yes, tell me?'], ['नमस्कार! काय म्हणताय?', 'Namaskar! What\'s up?']]) : att === 'curt' ? ['काय?', 'What?'] : ['हां?', 'Yes?'];
     this.say(...hi);
@@ -207,8 +256,9 @@ class Talk {
         o.push({ id: 'food', label: 'Where can I get something to eat?' }, { id: 'where', label: 'Where am I?' });
         if (G.waypoint && !p.cop) o.push({ id: 'lift', label: `Going towards ${G.waypoint.name || 'there'}? Could you drop me?` });
         const g = group(p);
-        if (!p._topics) p._topics = pickTopics(G.people.rng, STREET[g] || STREET.any, g === 'cop' ? 3 : 4);
-        p._topics.forEach(add);
+        // theirs (a new few each time you stop them) and one for the moment
+        if (!c.topics) c.topics = pickTopics(G.people.rng, STREET[g] || STREET.any, g === 'cop' ? 2 : 3).concat(g === 'cop' ? [] : pickTopics(G.people.rng, GENERAL(G), 1));
+        c.topics.forEach(add);
         break;
       }
       case 'keeper': {
@@ -218,6 +268,12 @@ class Talk {
         if (/club|pub/.test(tpl)) { add('recommend'); add('night'); break; }
         if (tpl === 'bank') { add('account'); add('server'); break; }
         add('good'); add('sells'); add('biz'); add('since'); add('discount');
+        break;
+      }
+      case 'fare': add('headed'); add('shortcut'); add('music2'); add('day'); break;
+      case 'window': {
+        if (G.waypoint) o.push({ id: 'way', label: `Ask the way to ${G.waypoint.name || 'your waypoint'}` });
+        o.push({ id: 'where', label: 'Where am I?' }, { id: 'food', label: 'Where can I get something to eat?' }); add('liftoffer'); add('jab');
         break;
       }
       case 'teller': add('account'); add('server'); break;
@@ -232,7 +288,11 @@ class Talk {
       case 'patient': add('waitlong'); add('day'); break;
       default: add('anygood'); add('found'); add('often'); add('cheaper');
     }
-    if (dateable && !['keeper', 'teller', 'cop', 'barber', 'bartender', 'helper'].includes(c.role)) o.push({ id: 'askout', label: c.room ? 'Chat them up' : 'Ask them out' });
+    // what came up as you talked
+    for (const id of c.extra || []) if (!o.some(q => q.id === id)) add(id);
+    // their number first (someone you like the look of, of the other gender); asking them out is for someone in your phone
+    const known = p.name && D && (D.contacts || []).some(x => x.name === p.name);
+    if (dateable && !['keeper', 'teller', 'cop', 'barber', 'bartender', 'helper', 'fare'].includes(c.role)) o.push(known ? { id: 'askout', label: 'Ask them out' } : { id: 'number', label: LABEL.number });
     o.push({ id: 'bye', label: 'Leave it' });
     return o;
   }
@@ -240,7 +300,7 @@ class Talk {
     const c = this.cur, p = c.p;
     this.el.querySelector('.tk-k').textContent = c.role === 'street' ? 'Stopped someone' : 'Talking';
     this.el.querySelector('.tk-name').textContent = this.nameOf(p, c.room);
-    this.el.querySelector('.tk-job').textContent = MOOD[c.att] || '';
+    this.el.querySelector('.tk-job').textContent = [MOOD[c.att], VIBE[p._vibe] && VIBE[p._vibe].tag].filter(Boolean).join(' · ');
     this.opts = this.options();
     const list = this.el.querySelector('.tk-opts'); list.innerHTML = '';
     this.opts.forEach((q, i) => {
@@ -254,7 +314,7 @@ class Talk {
   // how warm they are to this, 0 cold to 2 warm: their way, your karma and charm, how it's gone so far
   warmth(extra = 0) {
     const c = this.cur, G = this.g, k = G.life?.s?.karma || 0, ch = G.life?.charm ?? 0.5;
-    const w = WARM[c.att] - 0.4 + k/60 + (ch - 0.5) + extra + (c.warm || 0) + (G.people.rng.next() - 0.5)*0.8;
+    const v = VIBE[c.p._vibe], w = WARM[c.att] - 0.4 + k/60 + (ch - 0.5) + extra + (c.warm || 0) + (v ? v.w : 0) + (G.people.rng.next() - 0.5)*0.8;
     return w < 0.6 ? 0 : w < 1.8 ? 1 : 2;
   }
   pick(i) {
@@ -265,10 +325,13 @@ class Talk {
     c.used[q.id] = true;
     const G = this.g, ppl = G.people, p = c.p, P = G.player, rng = ppl.rng, Lf = G.life;
     let said = false, last = null; const say = (mr, en) => { said = true; last = [mr, en]; this.say(mr, en); };
-    const line = (id, extra = 0) => one(rng, (LINES[id] || LINES.day)[this.warmth(extra)]);
+    const grp = group(p), en = (x) => grp === 'kp' && x[1] ? [x[1], ''] : x;
+    let lastW = 1;
+    const line = (id, extra = 0) => { lastW = this.warmth(extra); return en(one(rng, (LINES[id] || LINES.day)[lastW])); };
     p.act = { clip: 'talk', t: 0, dur: 2.4 };
     switch (q.id) {
       case 'way': case 'food': case 'where': case 'lift': ppl.answer(p, P, G, q.id, c.att, say); if (ppl.lift && ppl.lift.p === p) { this.close(); if (last) G.hud.say(this.nameOf(p), last[0], last[1], 5); return; } break;
+      case 'headed': { const d = c.fare && c.fare.dest ? c.fare.dest.name : 'पुढे'; const w = this.warmth(); say(...en(w === 0 ? [`${d}. चला लवकर.`, `${d}. Hurry up.`] : w === 1 ? [`${d}. तिथे काम आहे.`, `${d}. I\'ve got work there.`] : [`${d}! मित्राचं लग्न आहे, उशीर झालाय. जरा पळवा!`, `${d}! A friend\'s wedding, I\'m late. Step on it!`])); break; }
       case 'weather': {
         const k = G.weather?.kind || '', h = G.hour ?? 12, W = /rain|storm/.test(k) ? 'rain' : h >= 21 || h < 5 ? 'night' : h > 11 && h < 16 && !/cloud|fog|haze/.test(k) ? 'hot' : 'fine';
         say(...WEATHER[W][this.warmth()]); break;
@@ -291,16 +354,28 @@ class Talk {
         if (w === 2) Lf?.change?.('respect', 1);
         break;
       }
-      case 'askout': {
-        const D = G.date;
-        if (c.room && p.name) { const room = c.room; this.close(); D.talk(p, room); return; }
-        const ok = rng.next() < 0.08 + (Lf?.charm ?? 0.5)*0.3 + (WARM[c.att] - 1)*0.08 + (G.life?.s?.karma || 0)/300 + (c.warm || 0)*0.15;
-        if (!ok) { const w = this.warmth(-0.6); say(...ASKOUT.no[w]); if (w === 0) { this.close(); ppl.flee(p, P.x, P.z, 8); return; } break; }
-        say(...one(rng, ASKOUT.yes));
+      case 'number': {
+        // how it's gone so far counts most: ask cold and it's a no
+        const ok = p._open && rng.next() < 0.1 + (Lf?.charm ?? 0.5)*0.3 + (WARM[c.att] - 1)*0.08 + (G.life?.s?.karma || 0)/300 + (c.warm || 0)*0.25 + (VIBE[p._vibe]?.w || 0)*0.2;
+        if (!ok) { const w = this.warmth(-0.6); say(...en(ASKOUT.no[w])); p._open = p._open && w > 0; if (w === 0) { this.close(); ppl.flee(p, P.x, P.z, 8); return; } break; }
+        say(...en(one(rng, ASKOUT.yes)));
         this.addContact(p);
         break;
       }
+      case 'askout': {
+        // in a café or a club: there and then (that's a date, game/date.js); on the street: plan it by text
+        const D = G.date;
+        if (c.room && p.name) { const room = c.room; this.close(); D.talk(p, room); return; }
+        say(...en(['हो, चालेल! मेसेज करा, ठरवू.', 'Yes, sure! Text me, we\'ll fix it.']));
+        this.el.querySelector('.tk-how').textContent = 'Plan it from Jhola → People';
+        break;
+      }
       default: say(...line(q.id));
+    }
+    // a warm answer opens the chat up: something else comes up to talk about
+    if (said && (lastW === 2 || (c.warm || 0) > 0.5) && c.role !== 'keeper' && c.role !== 'cop' && c.extra.length < 4) {
+      const n = pickTopics(rng, FOLLOW.filter(id => !c.used[id] && !c.extra.includes(id)), 1)[0]; if (n) c.extra.push(n);
+      c.warm = (c.warm || 0) + 0.15;
     }
     if (!said) this.say('', '');
     this.render();
