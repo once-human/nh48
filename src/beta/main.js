@@ -22,6 +22,7 @@ import { installAtmosphere } from '@orig/gfx/atmos.js';
 import { vehicleMaterials } from './vehicles/vehmat.js';
 import * as VM from './vehicles/models.js';
 import './vehicles/physics.js';
+import './traffic/rates.js';
 import './game/view.js';           // first or third person, on foot and driving     // vehicles as boxes on four wheels
 import { PU } from './gfx/paint.js';
 import { PlayerAuto } from '@orig/vehicles/player.js';
