@@ -4,12 +4,24 @@ import * as THREE from 'three';
 import { PU } from './paint.js';
 import { U as GU } from '@orig/gfx/materials.js';
 
-const N = 256, SIZE = 256, R = 15, STEP = 30;
+const N = 256, SIZE = 256, R = 15, STEP = 30, SPILL = 5.5;
+
+// an open shop lights the pavement in front of it: bright at the door, gone in a few metres, nothing behind the wall.
+// A lifted shutter is the one the game scaled to nothing (it decides who's open, this only reads it)
+const isUp = (a, i) => a[i*16] === 0 && a[i*16 + 2] === 0;
+export function shopSpill(d, x0, z0, k, r) {
+  const nx = Math.sin(r.ry), nz = Math.cos(r.ry), tx = nz, tz = -nx, hw = r.w/2 + 1.4, cu = (r.x - x0)*k, cv = (r.z - z0)*k, m = (hw + SPILL)*k;
+  if (cu < -m || cv < -m || cu > N + m || cv > N + m) return;
+  for (let j = Math.max(1, Math.ceil(cv - m)), je = Math.min(N - 2, Math.floor(cv + m)); j <= je; j++) for (let i = Math.max(1, Math.ceil(cu - m)), ie = Math.min(N - 2, Math.floor(cu + m)); i <= ie; i++) {
+    const dx = (i - cu)/k, dz = (j - cv)/k, out = dx*nx + dz*nz, al = Math.abs(dx*tx + dz*tz); if (out < .05 || out > SPILL || al > hw) continue;
+    const q = 1 - out/SPILL, e = Math.min(1, (hw - al)/1.4), o = j*N + i, n = d[o] + 150*q*q*e; d[o] = n > 255 ? 255 : n;
+  }
+}
 const p = new THREE.Vector3(), t = new THREE.Vector3();
 
 export class Lamps {
   constructor(G) {
-    this.G = G; this.d = new Uint8Array(N*N); this.x = 1e9; this.z = 1e9; this.count = -1;
+    this.G = G; this.d = new Uint8Array(N*N); this.x = 1e9; this.z = 1e9; this.count = -1; this.shops = -1; this.shopT = 0;
     const T = this.tex = new THREE.DataTexture(this.d, N, N, THREE.RedFormat, THREE.UnsignedByteType); T.minFilter = T.magFilter = THREE.LinearFilter; T.unpackAlignment = 1; T.needsUpdate = true;
     PU.tLamp.value = T;
   }
@@ -25,13 +37,24 @@ export class Lamps {
         const o = j*N + i, n = d[o] + a*q*q; d[o] = n > 255 ? 255 : n;
       }
     }
+    this.shops = this.eachShop((r) => shopSpill(d, x0, z0, k, r));
     this.tex.needsUpdate = true;
     PU.lampC.value.set(cx, cz, 1/SIZE, 0);
+  }
+  eachShop(fn) {
+    const built = this.G.W.streamer?.built; let n = 0; if (!built) return n;
+    for (const c of built) { const S = c.shutters; if (!S) continue; const a = S.im.instanceMatrix.array; S.list.forEach((r, i) => { if (isUp(a, i)) { n++; if (fn) fn(r); } }); }
+    return n;
+  }
+  // shops open and shut with the clock, and new streets load in: look every couple of seconds
+  shopsMoved(night) {
+    const t = performance.now(); if (night <= .01 || t < this.shopT) return false;
+    this.shopT = t + 2000; return this.eachShop() !== this.shops;
   }
   update() {
     const G = this.G, P = G.player, night = GU.uNight.value; if (!P) return;
     const F = P.onFoot ? P.foot : P, cx = F.x, cz = F.z, C = PU.lampC.value;
-    if (night > .01 && (Math.hypot(cx - this.x, cz - this.z) > STEP || (G.W.lampPositions || []).length !== this.count)) this.draw(Math.round(cx/4)*4, Math.round(cz/4)*4);
+    if (night > .01 && (Math.hypot(cx - this.x, cz - this.z) > STEP || (G.W.lampPositions || []).length !== this.count || this.shopsMoved(night))) this.draw(Math.round(cx/4)*4, Math.round(cz/4)*4);
     C.w = (G.interiors && G.interiors.inside) ? 0 : night;
     PU.lampY.value = F.y || 0;
     // your own light: whichever of the two is on, as the game aims it
