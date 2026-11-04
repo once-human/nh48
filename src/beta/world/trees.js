@@ -34,6 +34,8 @@ const BARK_FS = CHUNK + `void main(){
   vec3 c = mix(b*shadeCol + vec3(.015)*dayK, b*sunCol, L);
   float h = smoothstep(.5, .72, fract((gl_FragCoord.x + gl_FragCoord.y)*.17 + e*.9))*(1. - L)*(1. - smoothstep(12., 45., vZ)); c = mix(c, c*.68, h*.65);
   float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1.); }`;
+const LEAF_SHADOW_VS = `varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix*viewMatrix*modelMatrix*instanceMatrix*vec4(position, 1.); }`;
+const LEAF_SHADOW_FS = `varying vec2 vU; uniform sampler2D tMap; void main(){ if (texture2D(tMap, vU).a < .45) discard; }`;
 const FAR_VS = `attribute vec4 iPos; attribute vec3 iTint; varying vec3 vN, vC; varying float vZ;
 void main(){ float a = fract(iPos.x*.37 + iPos.z*.71)*6.283, c = cos(a), s = sin(a); vec3 p = position*iPos.w; p = vec3(c*p.x + s*p.z, p.y, -s*p.x + c*p.z);
   vN = vec3(c*normal.x + s*normal.z, normal.y, -s*normal.x + c*normal.z); vC = color.g > color.r ? color*iTint : color; vec4 v = viewMatrix*vec4(p + iPos.xyz, 1.); vZ = -v.z; gl_Position = projectionMatrix*v; }`;
@@ -54,10 +56,13 @@ export class TreeField extends GameTrees {
     super(W, scene, renderer, quality, tex);
     const un = (extra) => Object.assign({}, PU, { uTime: U.uTime, uWind: U.uWind, tNoise: PU.tNoise }, extra);
     this.paintLeaf = new THREE.ShaderMaterial({ vertexShader: VS.replace('LEAFY', '1.').replace('COL', 'color'), fragmentShader: LEAF_FS, uniforms: un({ tMap: { value: this.leafMat.map } }), vertexColors: true, side: THREE.DoubleSide });
+    this.leafShadow = new THREE.ShaderMaterial({ vertexShader: LEAF_SHADOW_VS, fragmentShader: LEAF_SHADOW_FS, uniforms: { tMap: this.paintLeaf.uniforms.tMap }, side: THREE.DoubleSide, colorWrite: false });
     this.arch.forEach((A, k) => {
       const S = this.sets[k], m = this.barkMats[k];
       const bark = new THREE.ShaderMaterial({ vertexShader: VS.replace('LEAFY', '.25').replace('COL', 'vec3(1.)'), fragmentShader: BARK_FS, uniforms: un({ tMap: { value: m.map }, uTint: { value: m.color.clone() } }) });
       S.nb.material = S.mb.material = bark; S.nl.material = S.ml.material = this.paintLeaf;
+      S.nl.customDepthMaterial = S.ml.customDepthMaterial = this.leafShadow;
+      for (const m of [S.nb, S.nl, S.mb, S.ml]) m.shadowStill = true;
     });
     this.bb.visible = false;
     const G = farCrown(), cap = 4000;

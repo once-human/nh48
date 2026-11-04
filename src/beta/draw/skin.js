@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { PU } from '../gfx/paint.js';
 import { RNG } from '@orig/core/util.js';
 
-const TEX_W = 256, LOOK = 200, SLOTS = 96;
+const TEX_W = 256, LOOK = 200, SLOTS = 96, CAST2 = 45*45;
 
 // (called right after the kit is made: it must see every body from the first one)
 export function trackBodies(kit) {
@@ -29,6 +29,12 @@ const RIGID_VS = `precision highp float; in vec3 position, normal; in vec4 iM0, 
 out vec3 vN, vW, vB, vC; out vec2 vU; out float vZ; flat out int vS;
 void main(){ mat4 M = mat4(iM0, iM1, iM2, iM3); vec4 w = M*vec4(position, 1.); vW = w.xyz; vN = mat3(M)*normal; vB = position; vC = iCol; vU = vec2(0.); vS = 0; vec4 v = viewMatrix*w; vZ = -v.z; gl_Position = projectionMatrix*v; }`;
 
+const SHADOW_VS = `precision highp float; precision highp sampler2D; in vec3 position; in vec4 skinIndex, skinWeight; in float iSlot; uniform sampler2D tSkin; uniform mat4 viewMatrix, projectionMatrix;
+mat4 bone(int s, float f){ int x = int(f)*3; vec4 a = texelFetch(tSkin, ivec2(x, s), 0), b = texelFetch(tSkin, ivec2(x + 1, s), 0), c = texelFetch(tSkin, ivec2(x + 2, s), 0);
+  return mat4(a.x, b.x, c.x, 0., a.y, b.y, c.y, 0., a.z, b.z, c.z, 0., a.w, b.w, c.w, 1.); }
+void main(){ int s = int(iSlot + .5); mat4 M = bone(s, skinIndex.x)*skinWeight.x + bone(s, skinIndex.y)*skinWeight.y + bone(s, skinIndex.z)*skinWeight.z + bone(s, skinIndex.w)*skinWeight.w; gl_Position = projectionMatrix*viewMatrix*M*vec4(position, 1.); }`;
+const SHADOW_RIGID = `precision highp float; in vec3 position; in vec4 iM0, iM1, iM2, iM3; uniform mat4 viewMatrix, projectionMatrix; void main(){ gl_Position = projectionMatrix*viewMatrix*mat4(iM0, iM1, iM2, iM3)*vec4(position, 1.); }`;
+const SHADOW_FS = `precision highp float; out vec4 o; void main(){ o = vec4(0.); }`;
 const COMMON = `precision highp float; precision highp sampler2D; precision highp sampler2DShadow;
 in vec3 vN, vW, vB, vC; in vec2 vU; in float vZ; flat in int vS; out vec4 o;
 uniform sampler2D tSkin, tMap, tNoise; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, fogCol; uniform float shadowTexel, shadowOn, fogDensity, dayK;
@@ -164,6 +170,7 @@ export class Skin {
       if (!o.isSkinnedMesh) return;
       const type = this.typeOf(o.name), map = type === 'body' ? K.maps[k] : type === 'hair' ? K.hairMat[k] : type === 'eyes' ? o.material.map : null;
       const A = arrays(o, K, k), rec = { lo: this.mesh(A, type, map) };
+      if (/^(body|cloth|hair)/.test(type)) rec.sh = this.shadowOf(rec.lo);
       if (['body', 'cloth0', 'cloth1', 'cloth2', 'cloth3', 'shoe', 'hair'].includes(type)) rec.hi = this.mesh(subdivide(A), type, map);
       this.parts[k].set(o.name, rec);
     });
@@ -175,7 +182,16 @@ export class Skin {
     g.setAttribute('iSlot', new THREE.InstancedBufferAttribute(new Float32Array(SLOTS), 1).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('iCol', new THREE.InstancedBufferAttribute(new Float32Array(SLOTS*3), 3).setUsage(THREE.DynamicDrawUsage));
     g.instanceCount = 0;
-    const m = new THREE.Mesh(g, this.material(type, map)); m.frustumCulled = false; m.visible = false; m.renderOrder = -2; m.fill = 0; this.scene.add(m); return m;
+    const m = new THREE.Mesh(g, this.material(type, map)); m.frustumCulled = false; m.visible = false; m.renderOrder = -2; m.fill = 0; this.scene.add(m);
+    return m;
+  }
+  // who's close enough to cast does it with the plain body, in a mesh only the shadow pass draws
+  shadowOf(lo) {
+    const g = new THREE.InstancedBufferGeometry(), L = lo.geometry; for (const n of ['position', 'skinIndex', 'skinWeight']) g.setAttribute(n, L.attributes[n]); g.setIndex(L.index);
+    g.setAttribute('iSlot', new THREE.InstancedBufferAttribute(new Float32Array(SLOTS), 1).setUsage(THREE.DynamicDrawUsage)); g.instanceCount = 0;
+    const m = new THREE.Mesh(g, lo.material); m.frustumCulled = false; m.visible = false; m.fill = 0; m.castShadow = true; m.shadowOnly = true; m.layers.set(8);
+    m.customDepthMaterial = this.shadowMat || (this.shadowMat = new THREE.RawShaderMaterial({ vertexShader: SHADOW_VS, fragmentShader: SHADOW_FS, uniforms: { tSkin: { value: this.tex } }, glslVersion: THREE.GLSL3, side: THREE.DoubleSide, colorWrite: false }));
+    this.scene.add(m); return m;
   }
   rigidOf(geo) {
     let r = this.rigid.get(geo.uuid); if (r) return r;
@@ -184,6 +200,7 @@ export class Skin {
     g.setAttribute('iCol', new THREE.InstancedBufferAttribute(new Float32Array(cap*3), 3).setUsage(THREE.DynamicDrawUsage)); g.instanceCount = 0;
     if (!this.rigidMat) { const un = Object.assign({}, PU, { tSkin: { value: this.tex }, tMap: { value: null } }); this.rigidMat = new THREE.RawShaderMaterial({ vertexShader: RIGID_VS, fragmentShader: PLAIN, uniforms: un, glslVersion: THREE.GLSL3, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -8 }); }
     const m = new THREE.Mesh(g, this.rigidMat); m.frustumCulled = false; m.visible = false; m.renderOrder = -2; m.cap = cap; m.fill = 0; this.scene.add(m);
+    m.castShadow = true; m.customDepthMaterial = this.rigidShadow || (this.rigidShadow = new THREE.RawShaderMaterial({ vertexShader: SHADOW_RIGID, fragmentShader: SHADOW_FS, glslVersion: THREE.GLSL3, side: THREE.DoubleSide, colorWrite: false }));
     this.rigid.set(geo.uuid, m); return m;
   }
   // what a body is made of: the game's meshes go on a layer no camera looks at
@@ -204,7 +221,7 @@ export class Skin {
       H._d2 = H === playerH ? -1 : d2; near.push(H);
     }
     near.sort((a, b) => a._d2 - b._d2);
-    for (const M of this.parts.m.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; } for (const M of this.parts.f.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; } for (const r of this.rigid.values()) r.fill = 0;
+    for (const M of this.parts.m.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; if (M.sh) M.sh.fill = 0; } for (const M of this.parts.f.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; if (M.sh) M.sh.fill = 0; } for (const r of this.rigid.values()) r.fill = 0;
     const D = this.data, n = Math.min(near.length, this.max, SLOTS), hi2 = this.hiR*this.hiR;
     for (let s = 0; s < n; s++) {
       const H = near[s], k = H.look && H.look.female ? 'f' : 'm', row = s*TEX_W*4;
@@ -218,6 +235,7 @@ export class Skin {
         const R = this.parts[k].get(o.name); if (!R) continue;
         const P = (H._d2 < hi2 && R.hi) ? R.hi : R.lo, c = o.material.color, A = P.geometry.attributes, j = P.fill++; if (j >= SLOTS) continue;
         A.iSlot.array[j] = s; A.iCol.array[j*3] = c.r; A.iCol.array[j*3 + 1] = c.g; A.iCol.array[j*3 + 2] = c.b;
+        if (R.sh && H._d2 < CAST2) R.sh.geometry.attributes.iSlot.array[R.sh.fill++] = s;
       }
       for (const o of H._rg) {
         let on = o.visible, q = o.parent; while (on && q && q !== H.holder) { on = q.visible; q = q.parent; } if (!on) continue;
@@ -228,8 +246,8 @@ export class Skin {
       }
     }
     this.n = n; this.tex.needsUpdate = n > 0;
-    const done = (P) => { const c = Math.min(P.fill, P.cap || SLOTS); P.visible = c > 0; if (!c) return; P.geometry.instanceCount = c; const A = P.geometry.attributes; A.iCol.needsUpdate = true; if (A.iSlot) A.iSlot.needsUpdate = true; else for (let i = 0; i < 4; i++) A['iM' + i].needsUpdate = true; };
-    for (const M of [this.parts.m, this.parts.f]) for (const R of M.values()) { done(R.lo); if (R.hi) done(R.hi); }
+    const done = (P) => { const c = Math.min(P.fill, P.cap || SLOTS); P.visible = c > 0; if (!c) return; P.geometry.instanceCount = c; const A = P.geometry.attributes; if (A.iCol) A.iCol.needsUpdate = true; if (A.iSlot) A.iSlot.needsUpdate = true; else for (let i = 0; i < 4; i++) A['iM' + i].needsUpdate = true; };
+    for (const M of [this.parts.m, this.parts.f]) for (const R of M.values()) { done(R.lo); if (R.hi) done(R.hi); if (R.sh) done(R.sh); }
     for (const r of this.rigid.values()) done(r);
     return near.slice(0, n);
   }

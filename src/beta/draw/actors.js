@@ -21,7 +21,8 @@ export class Actors {
     this.crowd.look(0, { shirt: 0xeeeeea, lower: 0x161a2a, skin: 0xa06a48, hair: 0x1a1512, acc: 0xeeeeea, acc2: 0xeeeeea, mask: B.CURLY, h: 1, girth: .55 });
     this.crowd.tex.needsUpdate = true; this.crowd.n = CAP;
     this.all = [...this.crowd.meshes];
-    for (const m of this.all) { m.renderOrder = -1; scene.add(m); }
+    const cast = new THREE.RawShaderMaterial({ vertexShader: pm.vertexShader, fragmentShader: 'precision highp float; out vec4 o; void main(){ o = vec4(0.); }', uniforms: pm.uniforms, defines: pm.defines, glslVersion: pm.glslVersion, side: THREE.DoubleSide, colorWrite: false });
+    for (const m of this.all) { m.renderOrder = -1; m.castShadow = true; m.customDepthMaterial = cast; scene.add(m); }
     this.next = 1; this.t = 0; this.hidOld = false;
     this.skin = new Skin(G.W.kit, scene); G.skin = this.skin;
   }

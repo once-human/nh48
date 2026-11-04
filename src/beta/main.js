@@ -31,6 +31,7 @@ import * as Save from '@orig/game/save.js';
 import { fixPins } from '@orig/world/venues.js';
 import { Streamer } from '@orig/world/index.js';
 import { Actors } from './draw/actors.js';
+import { Shadows } from './gfx/shadows.js';
 import { trackBodies } from './draw/skin.js';
 import { Graphics } from './game/graphics.js';
 
@@ -159,7 +160,7 @@ async function main() {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: params.has('msaa') ? params.get('msaa') === '1' : !!quality.msaa, powerPreference: 'high-performance', stencil: false, depth: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatio));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
-  renderer.shadowMap.enabled = quality.shadows;
+  renderer.shadowMap.enabled = false;                 // (gfx/shadows.js draws the sun's own)
   renderer.shadowMap.type = THREE.PCFShadowMap;
   // the shadow map is redrawn every other frame (the sun moves slowly; people and cars at 30 updates a second look
   // the same), which takes a big share of the GPU's work off half the frames
@@ -242,7 +243,6 @@ async function main() {
   hookStreamer(paint);
   const W = await buildWorld(M, T, renderer, scene, quality, (t, f) => progress(t, 0.62 + f * 0.2));
   const sky = new Sky(renderer, scene);
-  sky.setShadows(quality.shadows, quality.shadowSize);
   W.sky = sky;
   const post = new Post(renderer, scene, camera, quality, paint, sky);
   // with the after-frame smoothing the city is drawn into the pass's picture, whose shaders differ from the screen's:
@@ -307,7 +307,7 @@ async function main() {
   }
   await game.init(progress);
   betaTitle(game);
-  { const actors = new Actors(game, scene); post.beforeDraw = (dt, cam) => actors.update(dt, cam); }
+  { const actors = new Actors(game, scene); post.beforeDraw = (dt, cam) => actors.update(dt, cam); post.shadows = new Shadows(renderer, scene, sky, 2048); post.shadowFocus = () => (game.player.onFoot ? game.player.foot : game.player); game.swapShadows = (on, size) => post.shadows.set(on, size); game.shadowsOn = () => post.shadows.on; }
   game.gfx = new Graphics(game, { gpu: GPU, post }); game.gfx.install();
   cityUp();
   if (game.audio && game.voiceRemote) game.audio.remote = game.voiceRemote;
@@ -457,8 +457,6 @@ async function main() {
     if (propT <= 0) { updateProps(W, camera.position.x, camera.position.z); W.fly?.update?.(camera.position.x, camera.position.z); propT = 0.2; }
     const t1 = performance.now();
     // the map covers the screen, and while paused the last frame just sits there (blurred by CSS): no rendering at all
-    // shadows every other frame when you're still; every frame when you're moving (a stale shadow judders against you)
-    if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = !game.shadowsOff && ((frames & 1) === 0 || Math.abs(player.onFoot ? (player.foot.v || 0) : (player.v || 0)) > 1.2);
     if (compiled && game.state !== 'map' && !(game.state === 'pause' && !game.livePause && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2) && !(game.menuFreeze && game.state === 'shop' && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);
     const t2 = performance.now();
     if (game.gfxTick) game.gfxTick(dt, t2 - t0);

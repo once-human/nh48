@@ -8,7 +8,7 @@ const pct = (v) => Math.round(v*100) + '%';
 export const SETTINGS = [
   { id: 'res', label: 'Resolution', sub: 'Of your screen', side: 'gpu', w: 3, val: [.6, .75, 1, 1.5], fmt: pct, apply: (G, v) => { G.perf.pr = v; G.applyPixelRatio(v); } },
   { id: 'msaa', label: 'Edge smoothing (MSAA)', sub: 'Auto goes by your PC, not your frame rate', fixed: true, val: [0, 0, 2, 4], fmt: (v) => (v ? v + 'x' : 'Off'), apply: (G, v, C) => { if (C.post.q.samples !== v) { C.post.q.samples = v; C.post.setSize(window.innerWidth, window.innerHeight); } } },
-  { id: 'shadows', label: 'Shadows', sub: 'Their sharpness', side: 'gpu', w: 4, val: [0, 1024, 1536, 2048], fmt: (v) => (v ? v + ' px' : 'Off'), apply: (G, v) => G.swapShadows(v > 0, v || 1024) },
+  { id: 'shadows', label: 'Shadows', sub: 'Their sharpness', side: 'gpu', w: 4, val: [0, 1024, 2048, 3072], fmt: (v) => (v ? v + ' px' : 'Off'), apply: (G, v) => G.swapShadows(v > 0, v || 1024) },
   { id: 'ink', label: 'Ink lines', sub: 'How much of the sketch is drawn', side: 'gpu', w: 1, val: [0, 1, 2, 3], fmt: (v) => ['Outlines', 'And colour edges', 'Drawn twice', 'Drawn twice, further'][v], apply: (G, v, C) => { C.post.U.inkQ.value = v; } },
   { id: 'trees', label: 'Trees', sub: 'How far the full trees and then any trees go', side: 'gpu', w: 3, val: [[14, 60, 300], [26, 100, 450], [50, 180, 700], [90, 320, 1100]], fmt: (v) => v[1] + ' m, then ' + v[2] + ' m', apply: (G, v) => { const T = G.W.trees; if (T) { T.nearR = v[0]; T.midR = v[1]; T.R = v[2]; T.lastX = 1e9; } } },
   { id: 'grass', label: 'Grass', sub: 'How much of it', side: 'gpu', w: 2, val: [0, .35, .7, 1], fmt: (v) => (v ? pct(v) : 'Off'), apply: (G, v) => { if (G.W.grass) G.W.grass.level = v; } },

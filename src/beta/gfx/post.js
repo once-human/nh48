@@ -100,6 +100,7 @@ export class Post {
     const R = this.renderer, cam = this.camera, U = this.U;
     if (this.beforeDraw) this.beforeDraw(dt || 0.016, cam);
     this.paintLook.update(this.sky, cam, this.scene);
+    if (this.shadows) this.shadows.render(this.shadowFocus(), cam.getWorldDirection(this._f || (this._f = new THREE.Vector3())));
     const rt = this.target();
     R.setRenderTarget(rt); R.render(this.scene, cam);
     this.t += dt || 0.016;
