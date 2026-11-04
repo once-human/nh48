@@ -63,6 +63,15 @@ const PATCHES = {
     ["this.onFootpath = this.deck < 0 && !W.surf.isRoad(this.x, this.z);", "this.onFootpath = this.deck < 0 && gr.off > 0.5;"],
     ["-clamp(this.latAcc * 0.01, -0.06, 0.06);", "-clamp(this.latAcc * 0.01, -0.06, 0.06) + gr.roll;"],
   ],
+  // C switches first and third person (on foot too, V still does); rolling moves to Q
+  [S('game/keys.js')]: [
+    ["{ id: 'roll', label: 'Roll; camera when driving', group: 'Do', def: 'KeyC' }", "{ id: 'roll', label: 'Roll', group: 'Do', def: 'KeyQ' }"],
+    ["{ id: 'cam', label: 'Change camera', group: 'Vehicle', def: 'KeyV' }", "{ id: 'cam', label: 'First or third person', group: 'Move', def: 'KeyC' }"],
+  ],
+  [S('people/fight.js')]: [["if (input.took('KeyC') && !busyDown", "if (input.took('KeyQ') && !busyDown"]],
+  [S('game/game.js')]: [
+    ["if (this.state === 'play' && !this.player.onFoot && this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);", "if (this.state === 'play' && (this.input.took('KeyC') || this.input.took('KeyV'))) this.rig.toggleView(this.player.onFoot);"],
+  ],
   [S('traffic/traffic.js')]: [["bullet: buildBike({ helmet: true }), superbike: buildBike({ helmet: true }),", "bullet: buildBike({ helmet: true, kind: 'bullet' }), superbike: buildBike({ helmet: true, kind: 'superbike' }),"]],
 };
 const swapPlugin = {

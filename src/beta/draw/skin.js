@@ -290,6 +290,7 @@ export class Skin {
       let o = H.holder, on = true; while (o.parent) { o = o.parent; if (!o.visible) { on = false; break; } } if (!on || !o.isScene) continue;
       const p = H.holder.position, dx = p.x - cx, dz = p.z - cz, d2 = dx*dx + dz*dz;
       if (d2 > 25 && dx*fx + dz*fz < -3) continue;       // behind you
+      if (H === playerH && H._fp) continue;              // first person: your own body isn't drawn
       H._d2 = H === playerH ? -1 : d2; near.push(H);
     }
     near.sort((a, b) => a._d2 - b._d2);
