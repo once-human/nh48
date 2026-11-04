@@ -3,22 +3,31 @@
 import { Shell, Terminal, plain } from './console.js';
 import { Vehicle, SPECS, specOf, defaultPaint } from '@orig/vehicles/vehicle.js';
 import { TYPES } from '@orig/traffic/traffic.js';
-import { VARIANTS } from '../vehicles/models.js';
 import { WEATHERS } from '@orig/gfx/weather.js';
 import { ITEMS } from '@orig/game/life.js';
 import { lin } from '@orig/world/geo.js';
 import { SETTINGS } from './graphics.js';
 
-// what you'd call them, to what the game calls them. The game's own names stay "911-style" and so on: no badges on anything
-const NICK = {
-  porsche: 'sports', '911': 'sports', carrera: 'sports', lamborghini: 'super', lambo: 'super', huracan: 'super', mercedes: 'lux', merc: 'lux', eclass: 'lux', benz: 'lux',
-  thar: 'jeep', creta: 'suv', swift: 'hatch', dzire: 'sedan', activa: 'scooter', hero: 'cycle', splendor: 'bike', ninja: 'superbike', zx10r: 'superbike', re: 'bullet', enfield: 'bullet',
-  rickshaw: 'auto', pmpml: 'bus', ace: 'tempo', cab: 'taxi',
-  wagonr: 'wagonr', alto: 'alto', city: 'city', honda: 'city', nexon: 'nexon', tata: 'nexon', xuv700: 'xuv', xuv: 'xuv', mahindra: 'xuv', scorpio: 'scorpio', scorpion: 'scorpio',
-  fortuner: 'fortuner', toyota: 'fortuner', bolero: 'bolero', innova: 'innova', crysta: 'innova', ertiga: 'ertiga', mpv: 'innova',
+// every model by the name you'd call it, to the game's type for it: "spawn creta" is that car and nothing else.
+// The game's own names stay "911-style" and so on: no badges on anything
+const MODEL = {
+  swift: 'hatch', wagonr: 'wagonr', alto: 'alto', dzire: 'sedan', city: 'city', eclass: 'lux', creta: 'suv', nexon: 'nexon', xuv700: 'xuv',
+  scorpio: 'scorpio', fortuner: 'fortuner', bolero: 'bolero', thar: 'jeep', innova: 'innova', ertiga: 'ertiga', '911': 'sports', huracan: 'super',
+  cab: 'taxi', activa: 'scooter', commuter: 'bike', classic350: 'bullet', zx10r: 'superbike', roadster: 'cycle', rickshaw: 'auto', ace: 'tempo', pmpml: 'bus',
 };
-// names that mean one model, not its family
-const NICK_EXACT = new Set(['creta', 'swift', 'dzire']);
+// other words for the same models
+const ALSO = { porsche: '911', carrera: '911', lamborghini: 'huracan', lambo: 'huracan', mercedes: 'eclass', merc: 'eclass', benz: 'eclass', xuv: 'xuv700', mahindra: 'xuv700', honda: 'city', tata: 'nexon', toyota: 'fortuner', crysta: 'innova', ninja: 'zx10r', enfield: 'classic350', re: 'classic350', hero: 'roadster', tuktuk: 'rickshaw', taxi: 'cab' };
+// the types: "spawn type suv" is any one of these, as often as traffic has each
+const KIND = {
+  hatch: ['hatch', 'wagonr', 'alto'], sedan: ['sedan', 'city', 'lux'], suv: ['suv', 'nexon', 'xuv', 'scorpio', 'fortuner', 'bolero', 'jeep'], mpv: ['innova', 'ertiga'],
+  luxury: ['lux'], sports: ['sports', 'super'], offroad: ['jeep', 'bolero', 'scorpio', 'fortuner'],
+  scooter: ['scooter'], bike: ['bike', 'bullet', 'superbike'], cycle: ['cycle'], twowheeler: ['scooter', 'bike', 'bullet', 'superbike', 'cycle'],
+  auto: ['auto'], taxi: ['taxi'], tempo: ['tempo'], bus: ['bus'], commercial: ['auto', 'taxi', 'tempo', 'bus'],
+};
+KIND.car = [...new Set([...KIND.hatch, ...KIND.sedan, ...KIND.suv, ...KIND.mpv, ...KIND.sports])];
+KIND.any = [...new Set(Object.values(KIND).flat())];
+const NICK = { ...MODEL }; for (const k in ALSO) NICK[k] = MODEL[ALSO[k]];
+const modelOf = (t) => Object.keys(MODEL).find(k => MODEL[k] === t) || t;
 const COLOURS = { red: '#c8181a', white: '#eeeeea', black: '#101216', silver: '#a9acb0', grey: '#60646a', blue: '#1c3f9e', navy: '#0e1c44', green: '#14613a', yellow: '#f0c414', orange: '#e8650e', lime: '#8fd11c', purple: '#4c2178', pink: '#d84f8c', gt: '#b7bcc2', verde: '#7bbf1a', arancio: '#ef6a10', rosso: '#b30e12', teal: '#0f7f80' };
 const paintOf = (s) => {
   const h = COLOURS[String(s).toLowerCase()] || String(s), m = /^#?([0-9a-f]{6})$/i.exec(h);
@@ -76,9 +85,8 @@ export function freeTerminal(G) {
     return [...a.sort((m, n) => d(m) - d(n)), ...b.sort((m, n) => d(m) - d(n))].slice(0, max);
   };
   const vehType = (s) => { const k = String(s).toLowerCase(), t = NICK[k] || k; if (!SPECS[t]) throw new Error(`no vehicle "${s}". See: roster`); return t; };
-  // "spawn suv" is any SUV: the family or one of its models, as often as traffic has them; "spawn xuv700" is that one
-  const family = (t) => [t, ...Object.keys(VARIANTS).filter(k => VARIANTS[k].base === t)];
-  const anyOf = (t) => { if (VARIANTS[t] || NICK_EXACT.has(t)) return t; const f = family(t); if (f.length < 2) return t; let tot = 0; for (const k of f) tot += TYPES[k]?.w || 1; let r = Math.random()*tot; for (const k of f) { r -= TYPES[k]?.w || 1; if (r <= 0) return k; } return t; };
+  // one of a type, as often as traffic has each
+  const anyOf = (kind) => { const f = KIND[kind].filter(k => SPECS[k]); let tot = 0; for (const k of f) tot += TYPES[k]?.w || 0.5; let r = Math.random()*tot; for (const k of f) { r -= TYPES[k]?.w || 0.5; if (r <= 0) return k; } return f[0]; };
   const nearest = (type) => { let best = null, bd = 1e18; for (const o of T().list) { if (type && o.type !== type) continue; const d = (o.x - P().x)**2 + (o.z - P().z)**2; if (d < bd) { bd = d; best = o; } } return best; };
   // a point from words: x z, ~dx ~dz (from you), ^right ^forward (the way you face), @type (the nearest of them), @wp, or a name
   let found = [];
@@ -167,6 +175,8 @@ export function freeTerminal(G) {
   const lit = (s) => { if (s === 'true') return true; if (s === 'false') return false; if (s === 'null') return null; if (s !== '' && Number.isFinite(+s)) return +s; return s; };
 
   // ------------------------------------------------------------ what completes what
+  sh.type('model', () => Object.keys(MODEL).filter(k => SPECS[MODEL[k]]).map(v => ({ v, note: `${SPECS[MODEL[v]].model} · ${Math.round(SPECS[MODEL[v]].vTop*3.6)} km/h` })).concat(Object.keys(ALSO).map(v => ({ v, note: '→ ' + ALSO[v] }))));
+  sh.type('kind', () => Object.keys(KIND).map(v => ({ v, note: KIND[v].filter(k => SPECS[k]).map(modelOf).join(', ') })));
   sh.type('vehicle', () => [...Object.keys(SPECS).filter(k => !SPECS[k].alias).map(v => ({ v, note: `${SPECS[v].model} · ${Math.round(SPECS[v].vTop*3.6)} km/h` })), ...Object.keys(NICK).map(v => ({ v, note: '→ ' + NICK[v] }))]);
   sh.type('rate', () => ['*', ...Object.keys(TYPES)].map(v => ({ v, note: v === '*' ? 'everything' : `now ${(St.rates[v] ?? 1)}×` })).concat(Object.keys(NICK).map(v => ({ v, note: '→ ' + NICK[v] }))));
   const placeT = (cur) => /^[~^@#\d-]/.test(cur) ? [] : (cur ? search(cur, 400) : allPlaces().filter(p => p.c === 'area').sort((a, b) => a.l < b.l ? -1 : 1)).map(p => ({ v: p.n, note: p.c + ' · ' + Math.round(Math.hypot(p.x - P().x, p.z - P().z)) + ' m' }));
@@ -190,7 +200,8 @@ export function freeTerminal(G) {
   const tail = (raw, skip) => raw.trim().split(/\s+/).slice(skip).join(' ').replace(/^(["'])(.*)\1$/, '$2');   // (what's left of a line, as a command)
 
   // ------------------------------------------------------------ commands: finding your way
-  sh.reg('help [command:cmd]', 'every command, or one in detail', ([c]) => {
+  sh.reg('help [command:cmd...]', 'every command, or one in detail', (a) => {
+    const c = a.join(' ');
     if (c) { const k = sh.find(c); if (!k) throw new Error('no such command'); say(plain(k.sig), 'ok'); say(k.about); if (k.more) for (const l of k.more) say('  ' + l, 'dim'); return; }
     const grp = {}; for (const k of sh.cmds.values()) (grp[k.group || 'other'] = grp[k.group || 'other'] || []).push(k);
     for (const g in grp) { say(g, 'head'); sh.table(grp[g].map(k => [k.name, k.about])); }
@@ -246,13 +257,23 @@ export function freeTerminal(G) {
     sh.table(rows, ['type', 'name', 'model', 'top', 'spawn', 'rate', 'live', 'also']);
     say('spawn is the base chance on an ordinary road: neighbourhoods and the hour change it too.', 'dim');
   }, { group: 'vehicles' });
-  sh.reg('spawn <vehicle:vehicle> [count:int] [--paint:paint] [--drive]', 'put a vehicle in front of you', ([t, n], f) => {
-    const fam = vehType(t), exact = NICK_EXACT.has(String(t).toLowerCase()), count = Math.min(Math.max(1, +n || 1), 24), paint = f.paint ? paintOf(f.paint) : null; let v; const got = {};
-    for (let i = 0; i < count; i++) { const type = exact ? fam : anyOf(fam); got[type] = (got[type] || 0) + 1; v = make(type, paint, 7 + Math.floor(i/4)*7, (i % 4 - 1.5)*(count > 1 ? 3.2 : 0)); }
-    say(Object.entries(got).map(([k, c]) => `${c} × ${SPECS[k].name} (${SPECS[k].model})`).join(', '), 'ok');
+  // pick(i) gives the type of the i-th one
+  function put(pick, n, f) {
+    const count = Math.min(Math.max(1, +n || 1), 24), paint = f.paint ? paintOf(f.paint) : null; let v; const got = {};
+    for (let i = 0; i < count; i++) { const type = pick(i); got[type] = (got[type] || 0) + 1; v = make(type, paint, 7 + Math.floor(i/4)*7, (i % 4 - 1.5)*(count > 1 ? 3.2 : 0)); }
+    say(Object.entries(got).map(([k, c]) => `${c} × ${modelOf(k)}: ${SPECS[k].model}`).join(', '), 'ok');
     if (f.drive) { const d = P().dropped.find(q => q.veh === v); if (!P().onFoot) P().exit(T(), true); P().enter({ kind: 'dropped', d, now: true }, T()); if (G.rig) G.rig.inited = false; }
-  }, { group: 'vehicles', more: ['spawn lambo --paint=verde --drive', 'spawn porsche 4 --paint=#b7bcc2'] });
-  sh.reg('drive <vehicle:vehicle> [--paint:paint]', 'spawn one and get in', ([t], f) => sh.exec(`spawn ${t}${f.paint ? ' --paint=' + f.paint : ''} --drive`, true), { group: 'vehicles' });
+  }
+  const kindOf = (k) => { k = String(k).toLowerCase().replace(/[-_ ]/g, ''); if (k === 'twowheelers' || k === '2w') k = 'twowheeler'; if (!KIND[k]) throw new Error(`no type "${k}". Types: ${Object.keys(KIND).join(', ')}`); return k; };
+  sh.reg('spawn <model:model> [count:int] [--paint:paint] [--drive]', 'that one model in front of you: creta, xuv700, 911…', ([t, n], f) => {
+    const k = String(t).toLowerCase(), m = ALSO[k] || k;
+    if (MODEL[m]) return put(() => MODEL[m], n, f);
+    if (KIND[k]) { say(`${k} is a type, so any of them. For one model: spawn ${modelOf(KIND[k][0])}`, 'dim'); return put(() => anyOf(k), n, f); }
+    const g = vehType(k); put(() => g, n, f);
+  }, { group: 'vehicles', more: ['spawn creta', 'spawn lambo --paint=verde --drive', 'spawn 911 4 --paint=#b7bcc2'] });
+  sh.reg('spawn type <type:kind> [count:int] [--paint:paint] [--drive]', 'any model of a type: suv, hatch, sedan, mpv, bike…', ([t, n], f) => { const k = kindOf(t); put(() => anyOf(k), n, f); }, { group: 'vehicles', more: ['spawn type suv 4', 'spawn type twowheeler 8'] });
+  sh.reg('drive <model:model> [--paint:paint]', 'spawn that model and get in', ([t], f) => sh.exec(`spawn ${t}${f.paint ? ' --paint=' + f.paint : ''} --drive`, true), { group: 'vehicles' });
+  sh.reg('drive type <type:kind> [--paint:paint]', 'any model of a type, and get in', ([t], f) => sh.exec(`spawn type ${t}${f.paint ? ' --paint=' + f.paint : ''} --drive`, true), { group: 'vehicles' });
   sh.reg('despawn', 'take away everything you spawned', () => say(`${removeSpawned()} removed`), { group: 'vehicles' });
   sh.reg('exit', 'get out', () => { if (!P().onFoot) P().exit(T(), true); }, { group: 'vehicles' });
   sh.reg('fix', 'repair and refuel what you are driving', () => { const v = P().cur; if (P().onFoot) throw new Error('on foot'); v.dmg = 0; v.fuel = 1; say('good as new', 'ok'); }, { group: 'vehicles' });
@@ -293,9 +314,11 @@ export function freeTerminal(G) {
     try { navigator.clipboard?.writeText(`${q.lat.toFixed(6)}, ${q.lon.toFixed(6)}`); say('copied: paste it into Google Maps', 'dim'); } catch (e) { /* no clipboard */ }
     const z = T().zoneAt?.(Pl.x, Pl.z); say(`${name || 'off-road'} · traffic zone: ${z || 'ordinary'}`, 'dim');
   }, { group: 'world' });
+  const WORDS = { dawn: '5:45', sunrise: '6:20', morning: '8:30', noon: '12:00', afternoon: '15:30', golden: '17:50', sunset: '18:25', dusk: '19:00', night: '21:30', midnight: '0:00', late: '2:30' };
   sh.reg('time [when:str]', 'set the hour: 21:30 or 21.5. "time lock" holds it, "time unlock" lets it go', ([w]) => {
     if (w === undefined) { const h = G.hour; say(`${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor(h%1*60)).padStart(2, '0')}${St.hourLock !== null ? ' (locked)' : ''}`); return; }
     if (w === 'lock') { St.hourLock = G.hour; say('held', 'ok'); return; } if (w === 'unlock') { St.hourLock = null; say('running', 'ok'); return; }
+    if (WORDS[w]) w = WORDS[w];
     const m = /^(\d{1,2}):(\d{2})$/.exec(w), h = m ? +m[1] + +m[2]/60 : +w;
     if (!Number.isFinite(h) || h < 0 || h >= 24) throw new Error('21:30 or 21.5');
     G.setHour(h); if (St.hourLock !== null) St.hourLock = h; say(`it is ${w}`, 'ok');
@@ -360,64 +383,71 @@ export function freeTerminal(G) {
   }, { group: 'shell' });
 
   // ------------------------------------------------------------ the long list: one command for each thing you'd reach for
-  const slug = (t) => String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const one = (name, about, run, group) => { if (!name || sh.cmds.has(name)) return; sh.reg(name, about, run, { group }); };
-  const x = (c) => () => sh.exec(c, true);
+  const one = (v, about, group) => sh.line(v, about, group);
+  // command, sub-command, then the values: what used to be one word each is grouped under what it works on
+  function regroup() {
+    for (const [a, b] of [['roster', 'spawn list'], ['despawn', 'spawn clear'], ['exit', 'vehicle exit'], ['fix', 'vehicle fix'], ['paint', 'vehicle paint'], ['tune', 'vehicle tune'],
+      ['rate', 'traffic rate'], ['only', 'traffic only'], ['find', 'map find'], ['where', 'map where'], ['gmaps', 'map open'], ['timescale', 'time scale'],
+      ['god', 'player god'], ['noclip', 'player noclip'], ['run', 'player run'], ['money', 'player money'], ['give', 'player give'], ['stat', 'player stat'], ['wanted', 'player wanted'],
+      ['preset', 'gfx preset'], ['stats', 'gfx stats'], ['readout', 'gfx readout']]) sh.move(a, b);
+    sh.aliases.ts = 'time scale'; sh.aliases.hud = 'gfx readout';
+    sh.reg('fly speed <x:num>', 'flight speed, 1 is 15 m/s cruising and 48 with Shift', ([m]) => { St.flySpeed = Math.max(0.1, Math.min(20, +m)); say(`flight ${St.flySpeed}×`, 'ok'); }, { group: 'you' });
+    sh.reg('fly up [metres:num]', 'straight up, 100 m unless you say', ([m]) => { if (!St.flight) setFlight(true); P().foot.y += +m || 100; }, { group: 'you' });
+    sh.reg('fly high', 'up to 400 m, over the whole city', () => { if (!St.flight) setFlight(true); P().foot.y = Math.max(P().foot.y, 400); }, { group: 'you' });
+    sh.reg('cam view', 'first or third person (C)', () => G.rig.toggleView(P().onFoot), { group: 'picture' });
+    sh.reg('cam fov [degrees:str]', 'field of view, 40 to 120. "reset" gives it back to the camera', ([f]) => {
+      if (f === undefined) { say(St.fov ? `${St.fov}°` : 'as the camera likes it'); return; }
+      if (f === 'reset') { St.fov = 0; say('fov as the camera likes it', 'ok'); return; }
+      St.fov = Math.max(20, Math.min(140, +f || 0)); say(`fov ${St.fov}`, 'ok');
+    }, { group: 'picture' });
+  }
   function families() {
-    const types = Object.keys(SPECS).filter(k => !SPECS[k].alias);
-    one('fly.on', 'take off', () => setFlight(true), 'flight'); one('fly.off', 'come down and land', () => setFlight(false), 'flight');
-    for (const m of [0.5, 1, 2, 4, 8]) one(`fly.speed.${m}x`, `flight speed ${m}× (15 m/s cruising, 48 with Shift, at 1×)`, () => { St.flySpeed = m; say(`flight ${m}×`, 'ok'); }, 'flight');
-    one('fly.up', 'straight up 100 m', () => { if (!St.flight) setFlight(true); P().foot.y += 100; }, 'flight');
-    one('fly.high', 'up to 400 m, over the whole city', () => { if (!St.flight) setFlight(true); P().foot.y = Math.max(P().foot.y, 400); }, 'flight');
-    one('freecam.on', 'detached camera', () => setFly(true), 'flight'); one('freecam.off', 'back to you', () => setFly(false), 'flight');
-    one('cam.toggle', 'first or third person (C)', () => G.rig.toggleView(P().onFoot), 'camera');
-    for (let f = 40; f <= 120; f += 5) one(`cam.fov.${f}`, `field of view ${f}°`, () => { St.fov = f; say(`fov ${f}`, 'ok'); }, 'camera');
-    one('cam.fov.reset', 'the camera\'s own field of view', () => { St.fov = 0; say('fov as the camera likes it', 'ok'); }, 'camera');
-    for (const t of types) {
-      const S = SPECS[t], nm = `${S.name} (${S.model})`;
-      one(`spawn.${t}`, `spawn a ${nm}`, x(`spawn ${t}`), 'spawn');
-      one(`spawn.${t}.x4`, `four ${S.name}s in a row`, x(`spawn ${t} 4`), 'spawn');
-      one(`drive.${t}`, `spawn a ${nm} and get in`, x(`drive ${t}`), 'drive');
-      for (const c of Object.keys(COLOURS)) one(`spawn.${t}.${c}`, `a ${c} ${S.name}, and get in`, x(`spawn ${t} --paint=${c} --drive`), 'paint jobs');
+    for (const w of ['on', 'off']) { one(`fly ${w}`, w === 'on' ? 'take off' : 'come down and land', 'flight'); one(`freecam ${w}`, w === 'on' ? 'detached camera' : 'back to you', 'flight'); }
+    for (const m of [0.5, 1, 2, 4, 8]) one(`fly speed ${m}`, `flight speed ${m}×`, 'flight');
+    one('fly up', 'straight up 100 m', 'flight'); one('fly up 500', 'straight up 500 m', 'flight'); one('fly high', 'up to 400 m, over the whole city', 'flight');
+    one('cam view', 'first or third person (C)', 'camera');
+    for (let f = 40; f <= 120; f += 5) one(`cam fov ${f}`, `field of view ${f}°`, 'camera');
+    one('cam fov reset', 'the camera\'s own field of view', 'camera');
+    for (const k of Object.keys(KIND)) { one(`spawn type ${k}`, `any ${k}: ${KIND[k].filter(t => SPECS[t]).map(modelOf).join(', ')}`, 'spawn'); one(`spawn type ${k} 4`, `four of them, mixed`, 'spawn'); one(`drive type ${k}`, `any ${k}, and get in`, 'drive'); }
+    for (const m of Object.keys(MODEL)) {
+      const t = MODEL[m], S = SPECS[t]; if (!S) continue;
+      one(`spawn ${m}`, `a ${S.model}`, 'spawn'); one(`spawn ${m} 4`, `four of them in a row`, 'spawn'); one(`drive ${m}`, `a ${S.model}, and get in`, 'drive');
+      for (const c of Object.keys(COLOURS)) one(`drive ${m} --paint=${c}`, `a ${c} ${m}, and get in`, 'paint jobs');
       if (!TYPES[t]) continue;
-      one(`only.${t}`, `nothing but ${S.name}s on the road`, x(`only ${t}`), 'traffic');
-      for (const [m, w] of [[0, 'never'], [0.5, 'half as often'], [1.5, '1.5× as often'], [2, 'twice as often'], [5, '5× as often'], [10, '10× as often'], [100, 'everywhere']]) one(`rate.${t}.${m}x`, `${S.name}: ${w}`, x(`rate ${t} ${m}`), 'traffic');
-      one(`rate.${t}.reset`, `${S.name}: as the game has it`, x(`rate ${t}`), 'traffic');
+      one(`traffic only ${m}`, `nothing but ${m}s on the road`, 'traffic');
+      for (const [x, w] of [[0, 'never'], [0.5, 'half as often'], [1.5, '1.5× as often'], [2, 'twice as often'], [5, '5× as often'], [10, '10× as often'], [100, 'everywhere']]) one(`traffic rate ${m} ${x}`, `${m}: ${w}`, 'traffic');
+      one(`traffic rate ${m}`, `${m}: as the game has it`, 'traffic');
     }
-    for (const c of Object.keys(COLOURS)) one(`paint.${c}`, `respray what you drive ${c}`, x(`paint ${c}`), 'paint jobs');
-    for (const [w, a] of [['flush', 'clear the road and fill it again'], ['stop', 'everyone stands'], ['go', 'and off again'], ['census', 'what is out there now']]) one(`traffic.${w}`, a, x(`traffic ${w}`), 'traffic');
-    for (const n of [0, 10, 25, 50, 75, 100, 150, 200, 300]) one(`traffic.density.${n}`, `up to ${n} vehicles at once`, x(`traffic density ${n}`), 'traffic');
-    one('traffic.density.reset', 'as many as the game likes', x('traffic density'), 'traffic');
-    for (let h = 0; h < 24; h++) for (const m of ['00', '30']) one(`time.${String(h).padStart(2, '0')}${m}`, `${String(h).padStart(2, '0')}:${m}`, x(`time ${h}:${m}`), 'clock');
-    for (const [w, h] of [['dawn', '5:45'], ['sunrise', '6:20'], ['morning', '8:30'], ['noon', '12:00'], ['afternoon', '15:30'], ['golden', '17:50'], ['sunset', '18:25'], ['dusk', '19:00'], ['night', '21:30'], ['midnight', '0:00'], ['late', '2:30']]) one(`time.${w}`, `go to ${h}`, x(`time ${h}`), 'clock');
-    one('time.lock', 'hold the hour', x('time lock'), 'clock'); one('time.unlock', 'let it run', x('time unlock'), 'clock');
-    for (const v of [0, 0.1, 0.25, 0.5, 1, 2, 4, 8, 16]) one(`ts.${v}`, v === 1 ? 'normal speed' : v < 1 ? `slow motion, ${v}×` : `fast forward, ${v}×`, x(`timescale ${v}`), 'clock');
-    for (const k of Object.keys(WEATHERS)) one(`weather.${k}`, `the sky: ${k}`, x(`weather ${k}`), 'sky');
-    for (const n of [0, 1, 2, 3, 4, 5]) one(`wanted.${n}`, n ? `police heat ${n}` : 'nobody is after you', x(`wanted ${n}`), 'body');
-    for (const n of [0, 1000, 10000, 100000, 1000000, 10000000]) one(`money.${n}`, `₹${n.toLocaleString('en-IN')} in your pocket`, x(`money ${n}`), 'body');
-    for (const m of [0.5, 1, 1.5, 2, 3, 5, 10]) one(`run.${m}x`, `run ${m}× as fast`, x(`run ${m}`), 'body');
-    for (const w of ['on', 'off']) { one(`god.${w}`, `god mode ${w}`, x(`god ${w}`), 'body'); one(`noclip.${w}`, `through walls ${w}`, x(`noclip ${w}`), 'body'); one(`readout.${w}`, `numbers top left ${w}`, x(`readout ${w}`), 'picture'); }
-    for (const k of Object.keys(ITEMS)) { one(`give.${k}`, `a ${ITEMS[k].name}`, x(`give ${k}`), 'jhola'); one(`give.${k}.x10`, `ten of ${ITEMS[k].name}`, x(`give ${k} 10`), 'jhola'); }
-    for (const p of ['auto', 'lite', 'low', 'medium', 'high', 'veryhigh', 'ultra']) one(`preset.${p}`, `graphics preset: ${p}`, x(`preset ${p}`), 'graphics');
+    for (const c of Object.keys(COLOURS)) one(`vehicle paint ${c}`, `respray what you drive ${c}`, 'paint jobs');
+    for (const [w, a] of [['flush', 'clear the road and fill it again'], ['stop', 'everyone stands'], ['go', 'and off again'], ['census', 'what is out there now']]) one(`traffic ${w}`, a, 'traffic');
+    for (const n of [0, 10, 25, 50, 75, 100, 150, 200, 300]) one(`traffic density ${n}`, `up to ${n} vehicles at once`, 'traffic');
+    one('traffic density', 'as many as the game likes', 'traffic');
+    for (const w of Object.keys(WORDS)) one(`time ${w}`, `go to ${WORDS[w]}`, 'clock');
+    for (let h = 0; h < 24; h++) for (const m of ['00', '30']) one(`time ${h}:${m}`, `${String(h).padStart(2, '0')}:${m}`, 'clock');
+    one('time lock', 'hold the hour', 'clock'); one('time unlock', 'let it run', 'clock');
+    for (const v of [0, 0.1, 0.25, 0.5, 1, 2, 4, 8, 16]) one(`time scale ${v}`, v === 1 ? 'normal speed' : v < 1 ? `slow motion, ${v}×` : `fast forward, ${v}×`, 'clock');
+    for (const k of Object.keys(WEATHERS)) one(`weather ${k}`, `the sky: ${k}`, 'sky');
+    for (const n of [0, 1, 2, 3, 4, 5]) one(`player wanted ${n}`, n ? `police heat ${n}` : 'nobody is after you', 'body');
+    for (const n of [0, 1000, 10000, 100000, 1000000, 10000000]) one(`player money ${n}`, `₹${n.toLocaleString('en-IN')} in your pocket`, 'body');
+    for (const m of [0.5, 1, 1.5, 2, 3, 5, 10]) one(`player run ${m}`, `run ${m}× as fast`, 'body');
+    for (const w of ['on', 'off']) { one(`player god ${w}`, `god mode ${w}`, 'body'); one(`player noclip ${w}`, `through walls ${w}`, 'body'); one(`gfx readout ${w}`, `numbers top left ${w}`, 'picture'); }
+    for (const k of Object.keys(ITEMS)) { one(`player give ${k}`, `a ${ITEMS[k].name}`, 'jhola'); one(`player give ${k} 10`, `ten of ${ITEMS[k].name}`, 'jhola'); }
+    for (const p of ['auto', 'lite', 'low', 'medium', 'high', 'veryhigh', 'ultra']) one(`gfx preset ${p}`, `graphics preset: ${p}`, 'graphics');
     for (const S of SETTINGS) {
       if (!S.id) continue;
       const nv = Math.min(6, (S.val && S.val.length) || 6);
-      for (let i = 0; i < nv; i++) { let t = ''; try { t = S.fmt ? S.fmt(S.val[i]) : fmt(S.val[i]); } catch (e) { t = ''; } one(`gfx.${S.id}.${i}`, `${S.label}: level ${i}${t ? ' (' + t + ')' : ''}`, x(`gfx ${S.id} ${i}`), 'graphics'); }
-      one(`gfx.${S.id}.auto`, `${S.label}: let Auto choose`, x(`gfx ${S.id}`), 'graphics');
+      for (let i = 0; i < nv; i++) { let t = ''; try { t = S.fmt ? S.fmt(S.val[i]) : fmt(S.val[i]); } catch (e) { t = ''; } one(`gfx ${S.id} ${i}`, `${S.label}: level ${i}${t ? ' (' + t + ')' : ''}`, 'graphics'); }
+      one(`gfx ${S.id}`, `${S.label}: let Auto choose`, 'graphics');
     }
-    one('gfx.reset', 'every setting back to the preset', x('gfx reset'), 'graphics');
+    one('gfx reset', 'every setting back to the preset', 'graphics');
   }
-  // what needs the city loaded: a command for every area of Pune and every landmark, and your stats
+  // what needs the city loaded: a line for every area of Pune and every landmark, and your stats
   let placed = false;
   function placeFamilies() {
     if (placed) return; placed = true;
-    for (const p of allPlaces()) {
-      if (p.c !== 'area' && p.c !== 'landmark') continue;
-      const s0 = slug(p.n); if (!s0) continue;
-      one(`${p.c === 'area' ? 'tp' : 'go'}.${s0}`, `${p.c === 'area' ? 'teleport to' : 'go to'} ${p.n}`, async () => { const r = await go({ x: p.x, z: p.z, name: p.n, safe: true }); say(`${p.n} (${r.x.toFixed(0)}, ${r.z.toFixed(0)})`, 'ok'); }, p.c === 'area' ? 'areas' : 'landmarks');
-    }
+    for (const p of allPlaces()) if (p.c === 'area' || p.c === 'landmark') one(`tp ${p.n}`, `${p.c === 'area' ? 'teleport to' : 'go to'} ${p.n} · ${ll(p.x, p.z, 4)}`, p.c === 'area' ? 'areas' : 'landmarks');
     const L = G.life?.s || {};
-    for (const k of Object.keys(L)) if (typeof L[k] === 'number' && L[k] >= 0 && L[k] <= 1) for (const [w, v] of [['full', 1], ['half', 0.5], ['empty', 0]]) one(`stat.${k}.${w}`, `${k}: ${w}`, x(`stat ${k} ${v}`), 'body');
+    for (const k of Object.keys(L)) if (typeof L[k] === 'number' && L[k] >= 0 && L[k] <= 1) for (const [w, v] of [['full', 1], ['half', 0.5], ['empty', 0]]) one(`player stat ${k} ${v}`, `${k}: ${w}`, 'body');
   }
 
   // ------------------------------------------------------------ the terminal and its readout
@@ -427,7 +457,7 @@ export function freeTerminal(G) {
     onClose: () => { G.input?.keys?.clear(); G.input?.pressed?.clear(); G.lockMouse?.(); },
   });
   sh.order = ['vehicles', 'world', 'you', 'picture', 'live', 'shell', 'flight', 'camera', 'spawn', 'drive', 'paint jobs', 'traffic', 'areas', 'landmarks', 'clock', 'sky', 'body', 'jhola', 'graphics', 'yours'];
-  families();
+  regroup(); families();
   // the "click to take the mouse" hint has no business showing while you're typing
   const lockHint = G.hud?.setLockHint?.bind(G.hud);
   if (lockHint) G.hud.setLockHint = (on) => lockHint(on && !term.open);
@@ -575,7 +605,7 @@ export function freeTerminal(G) {
     tel.hidden = !St.hud; readout();
     term.clear();
     say('Free roam terminal. Nothing here reaches your own game.', 'head');
-    say(`${sh.cmds.size} commands, every one in the list. Type to narrow it, Tab or a click to take one. Double-tap Space to fly.`, 'dim');
+    say(`${sh.cmds.size} commands and ${sh.lines.length} ready lines, every one in the list. Type to narrow it, Tab or a click to take one. Double-tap Space to fly.`, 'dim');
     say('Try: spawn lambo --paint=verde --drive   ·   rate super 500; traffic flush   ·   tp fc road', 'dim');
     for (const l of autoexec) St.timers.push({ t: 0.5, c: l });
   }

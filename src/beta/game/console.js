@@ -38,9 +38,12 @@ export function statements(line) {
   if (cur.trim()) out.push(cur.trim());
   return out;
 }
-// `spawn <vehicle:vehicle> [count:int] [--paint:paint] [--drive]` into its parts
+// `spawn type <kind:kind> [count:int] [--paint:paint] [--drive]` into its parts. A name can be several words, a command and
+// its sub-commands, the way a real shell has `git remote add`: everything before the first <argument> or [option]
 export function signature(sig) {
-  const parts = sig.split(/\s+/), name = parts.shift(), args = [], flags = {};
+  const parts = sig.split(/\s+/), words = [], args = [], flags = {};
+  while (parts.length && !/^[<\[]/.test(parts[0])) words.push(parts.shift());
+  const name = words.join(' ');
   for (const p of parts) {
     const m = /^([<\[])(--)?([\w-]+)(?::([\w|-]+))?(\.\.\.)?[>\]]$/.exec(p);
     if (!m) continue;
@@ -51,7 +54,31 @@ export function signature(sig) {
 }
 
 export class Shell {
-  constructor() { this.cmds = new Map(); this.types = {}; this.aliases = {}; this.printer = () => {}; this.vars = {}; }
+  constructor() { this.cmds = new Map(); this.types = {}; this.aliases = {}; this.printer = () => {}; this.vars = {}; this.lines = []; this.seen = new Set(); }
+  // a whole line ready to run, listed with the commands: "spawn type suv 4"
+  line(v, note, group) { if (this.seen.has(v)) return; this.seen.add(v); this.lines.push({ v, note, group }); }
+  // move a command under another name, the old one kept as an alias: "fix" is now "vehicle fix"
+  move(from, to) {
+    const c = this.cmds.get(from); if (!c) return;
+    this.cmds.delete(from); c.sig = to + c.sig.slice(from.length); c.name = to; this.cmds.set(to, c); this.aliases[from] = to;
+  }
+  // the command a line starts with: the longest name its first words make. Returns { c, n } with n words used
+  match(t) {
+    for (let n = Math.min(3, t.length); n > 0; n--) { const c = this.cmds.get(t.slice(0, n).map(x => x.v).join(' ')); if (c) return { c, n }; }
+    const a = t.length && this.aliases[t[0].v];
+    return a ? { c: this.cmds.get(a), n: 1 } : null;
+  }
+  // the words that can come next after these: "spawn" gives "type", "list", "clear"
+  subs(words) {
+    const pre = words.length ? words.join(' ') + ' ' : '', out = new Map();
+    for (const c of this.cmds.values()) {
+      if (!c.name.startsWith(pre)) continue;
+      const rest = c.name.slice(pre.length).split(' '), w = rest[0];
+      if (!w || out.has(w)) continue;
+      out.set(w, { v: w, note: rest.length > 1 ? 'more: ' + [...this.cmds.keys()].filter(k => k.startsWith(pre + w + ' ')).map(k => k.slice(pre.length + w.length + 1).split(' ')[0]).filter((q, i, a) => a.indexOf(q) === i).join(', ') : c.about, args: rest.length > 1 ? '…' : plain(c.sig.slice(c.name.length).trim()), sub: true });
+    }
+    return [...out.values()];
+  }
   reg(sig, about, run, opts = {}) {
     const s = signature(sig), c = { ...s, sig, about, run, ...opts };
     this.cmds.set(s.name, c);
@@ -68,7 +95,7 @@ export class Shell {
     if (head) this.print(fmt(head), 'dim');
     for (const r of rows) this.print(fmt(r));
   }
-  find(name) { return this.cmds.get(this.aliases[name] || name); }
+  find(name) { return this.cmds.get(this.aliases[name] || name) || this.match(tokenize(String(name)))?.c; }
   // run a line. A command's error is printed, it never reaches the game's frame
   async exec(line, quiet = false) {
     for (const st of statements(line)) {
@@ -78,10 +105,16 @@ export class Shell {
       const head = t[0].v;
       if (head.startsWith('#')) continue;
       if (this.userAlias && this.userAlias[head]) { await this.exec(this.userAlias[head] + ' ' + st.slice(t[0].end), true); continue; }
-      const c = this.find(head);
-      if (!c) { this.print(`${head}: no such command. Try: help`, 'err'); continue; }
+      const m = this.match(t);
+      if (!m) {
+        const sub = this.subs([head]);
+        if (sub.length) { this.print(`${head}: needs one of: ${sub.map(s => s.v).join(', ')}`, 'err'); continue; }
+        this.print(`${head}: no such command. Try: help`, 'err'); continue;
+      }
+      const { c } = m;
+      if (m.n === 1 && t.length > 1 && !c.args.length) { const sub = this.subs([head]); if (sub.length) { this.print(`${head}: no "${t[1].v}". One of: ${sub.map(s => s.v).join(', ')}`, 'err'); continue; } }
       const args = [], flags = {};
-      for (const a of t.slice(1)) {
+      for (const a of t.slice(m.n)) {
         const m = !a.quoted && /^--([\w-]+)(?:=(.*))?$/.exec(a.v);
         if (m) flags[m[1]] = m[2] === undefined ? true : m[2]; else args.push(a.v);
       }
@@ -89,13 +122,14 @@ export class Shell {
       if (args.length < need) { this.print('usage: ' + plain(c.sig), 'err'); continue; }
       for (const f in flags) if (!(f in c.flags)) this.print(`${head}: unknown flag --${f}`, 'warn');
       try { await c.run(args, flags, st); }
-      catch (e) { this.print(`${head}: ${e && e.message || e}`, 'err'); console.warn('console', st, e); }
+      catch (e) { this.print(`${c.name}: ${e && e.message || e}`, 'err'); console.warn('console', st, e); }
     }
   }
   // every command, in the order they were registered, grouped
   listing() {
     const pretty = (a) => a.replace(/:[\w|-]+/, '');
-    return [...this.cmds.values()].map(c => ({ v: c.name, note: c.about, group: c.group || 'other', args: c.sig.split(/\s+/).slice(1).map(pretty).join(' ') }))
+    return [...this.cmds.values()].map(c => ({ v: c.name, note: c.about, group: c.group || 'other', args: c.sig.slice(c.name.length).trim().split(/\s+/).map(pretty).join(' ') }))
+      .concat(this.lines)
       .concat(Object.keys(this.userAlias || {}).map(v => ({ v, note: 'your alias: ' + this.userAlias[v], group: 'yours' })))
       .map((c, i) => [(this.order || []).indexOf(c.group), i, c]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]);
   }
@@ -112,11 +146,15 @@ export class Shell {
     if (toks.length === 1 && !endsSpace) {
       // by name first, then anything whose description mentions it ("teleport" finds tp)
       const all = this.listing(), named = pick(all), q = cur.toLowerCase(), said = all.filter(o => !named.includes(o) && String(o.note).toLowerCase().includes(q));
-      return { from, items: [...named, ...said], sig: null, all: true };
+      return { from, items: [...named, ...said], sig: null, all: true, noQuote: true };
     }
-    const c = this.find(toks[0].v);
-    if (!c) return { from, items: [], sig: null };
-    const used = toks.slice(1, endsSpace ? undefined : -1), pos = used.filter(a => !a.v.startsWith('--')).length;
+    // the command so far, and what sub-commands could still follow it
+    const done = toks.slice(0, endsSpace ? undefined : -1), m = this.match(done), words = done.map(x => x.v);
+    const subs = m && m.n < done.length ? [] : pick(this.subs(words));
+    if (!m) return { from, items: subs, sig: null, noQuote: true };
+    const { c, n } = m;
+    if (subs.length && done.length === n && !c.args.length) return { from, items: subs, sig: c, noQuote: true };
+    const used = toks.slice(n, endsSpace ? undefined : -1), pos = used.filter(a => !a.v.startsWith('--')).length;
     if (cur.startsWith('--')) {
       const m = /^--([\w-]+)=(.*)$/.exec(cur);
       if (m && c.flags[m[1]]) { const fn = this.types[c.flags[m[1]]]; return { from: from + m[1].length + 3, items: pick(fn ? fn(m[2], c, used) : [], m[2]), sig: c, argIndex: -1, noQuote: true }; }
@@ -124,13 +162,13 @@ export class Shell {
     }
     // a name of several words: everything after the command is the one thing being searched for
     const first = c.args[0] && c.args[0].t.split('|').map(t => this.types[t]).find(f => f && f.span);
-    if (first && toks.length > 1 && !/^[~^@#\d-]/.test(toks[1].v)) {
-      const q = st.slice(toks[1].start).replace(/^["']/, '');
-      return { from: st0 + toks[1].start, items: first(q.trim()).slice(0, MAX), sig: c, argIndex: 0 };
+    if (first && toks.length > n && !/^[~^@#\d-]/.test(toks[n].v) && !(subs.length && toks.length === n + 1)) {
+      const q = st.slice(toks[n].start).replace(/^["']/, '');
+      return { from: st0 + toks[n].start, items: first(q.trim()).slice(0, MAX), sig: c, argIndex: 0 };
     }
     const arg = c.args[Math.min(pos, c.args.length - 1)], use = arg && (pos < c.args.length || arg.rest) ? arg : null;
-    if (!use) return { from, items: [], sig: c, argIndex: -1 };
-    let items = [];
+    if (!use) return { from, items: subs, sig: c, argIndex: -1, noQuote: true };
+    let items = pos === 0 && done.length === n ? subs : [];
     for (const t of use.t.split('|')) { const fn = this.types[t]; if (fn) items = items.concat(fn.own ? fn(cur, c, used) : pick(fn(cur, c, used))); }
     return { from, items: items.slice(0, MAX), sig: c, argIndex: Math.min(pos, c.args.length - 1), argName: use.n };
   }
