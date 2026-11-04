@@ -16,7 +16,7 @@ void main(){
   if (paint > .5 && paint < 1.5) base *= instanceColor;
 #endif
 #ifdef USE_INSTANCING
-  if (paint > 1.5 && paint < 2.5) base *= aColB; else if (paint > 2.5) base *= aColC;
+  if (paint > 1.5 && paint < 2.5) base *= aColB; else if (paint > 2.5 && paint < 3.5) base *= aColC;
   mat4 M = modelMatrix*instanceMatrix;
 #else
   mat4 M = modelMatrix;
@@ -42,7 +42,7 @@ float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.05 + .002*vZ), 1
 `;
 const FS = CHUNK + `void main(){
   vec3 n = normalize(vN), V = normalize(cameraPosition - vW), b = vC; float matte = vG < -.5 ? 1. : 0., painted = abs(vP - 1.) < .5 ? 1. : 0.;
-  float e = nz(gl_FragCoord.xy*.11) - .5, ndl = dot(n, sunDir), lit = smoothstep(.0, .13, ndl + e*.1), sh = (shadowOn > .5 && lit > 0.) ? smoothstep(.3, .7, shadowAt(vW, n) + e*.3) : 1., L = lit*sh*dayK;
+  float glassy = step(3.5, vP), e = nz(gl_FragCoord.xy*.11) - .5, ndl = dot(n, sunDir), lit = smoothstep(.0, .13, ndl + e*.1), sh = (shadowOn > .5 && lit > 0.) ? smoothstep(.3, .7, shadowAt(vW, n) + e*.3) : 1., L = lit*sh*dayK;
   // grime low down on the body, a little wear
   float grime = (1. - smoothstep(.15, .7, vW.y))*(.6 + .6*nz(vL.xz*9.))*(1. - matte);
   b = mix(b, b*vec3(.62, .56, .48), grime*.4);
@@ -52,7 +52,7 @@ const FS = CHUNK + `void main(){
     // the world along the body: sky above a hard horizon, the road below, brushed on
     vec3 R = reflect(-V, n); float hz = smoothstep(-.02, .06, R.y + e*.08), fres = pow(1. - max(dot(n, V), 0.), 3.);
     vec3 env = mix(vec3(.13, .12, .115)*(.4 + dayK*.6), skyCol*(.3 + .7*dayK)*(1.1 - R.y*.4), hz);
-    float gloss = (1. - uRough)*(.5 + .5*painted), amt = gloss*(.1 + .55*fres) + uMetal*.35;
+    float gloss = (1. - uRough)*(.5 + .5*painted), amt = gloss*(.1 + .55*fres) + uMetal*.35 + glassy*(.06 + .75*fres);
     c = mix(c, env, clamp(amt, 0., .85));
     float s = pow(max(dot(R, sunDir), 0.), 40.*(1.2 - uRough) + 8.)*gloss*1.6*sh*dayK; c += sunCol*smoothstep(.25, .6, s);
   }

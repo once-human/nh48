@@ -24,7 +24,7 @@ vec3 enc(vec3 c){ c = max(c, vec3(0.)); return mix(c*12.92, 1.055*pow(c, vec3(1.
 vec3 col(vec2 uv){ return enc(texture(tCol, uv).rgb); }
 // how much the surface bends at uv: the second difference of 1/z (flat on flat things, whatever the angle)
 float crease(vec2 uv, float r){ vec2 px = r/res; float z = lz(uv), l = lz(uv - vec2(px.x, 0.)), rr = lz(uv + vec2(px.x, 0.)), u = lz(uv + vec2(0., px.y)), d = lz(uv - vec2(0., px.y));
-  float iz = 1./z; float e = (abs(1./l + 1./rr - 2.*iz) + abs(1./u + 1./d - 2.*iz))*z; return smoothstep(.012, .03, e); }
+  float iz = 1./z; float e = (abs(1./l + 1./rr - 2.*iz) + abs(1./u + 1./d - 2.*iz))*z; return smoothstep(.012 + .0016*z, .03 + .0032*z, e); }
 void main(){
   vec2 uv = vUv, px = 1./res, fp = gl_FragCoord.xy/dpr;
   vec2 wob = (vec2(nR(fp*.09), nR(fp*.09 + 9.)) - .5)*px*2.4*dpr;

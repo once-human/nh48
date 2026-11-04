@@ -3,6 +3,7 @@
 // /beta keeps its own saves, starts you on foot with no auto of your own, and has no story.
 import * as THREE from 'three';
 import { inside } from './gfx/repaint.js';
+import './world/fixes.js';
 import './core/storage.js';         // /beta's saves and settings live apart from the game's (first, before anything reads them)
 import './gfx/legacy.js';           // the look for everything still drawn with three's materials (before any is made)
 import '@orig/gfx/painted.js';
@@ -18,6 +19,7 @@ import { betaGame, betaTitle } from './game/beta.js';
 import { U } from '@orig/gfx/materials.js';
 import { installAtmosphere } from '@orig/gfx/atmos.js';
 import { vehicleMaterials } from './vehicles/vehmat.js';
+import * as VM from './vehicles/models.js';
 import { PlayerAuto } from '@orig/vehicles/player.js';
 import { Traffic } from '@orig/traffic/traffic.js';
 import { CameraRig } from '@orig/game/camera.js';
@@ -255,7 +257,7 @@ async function main() {
     const compile = renderer.compile.bind(renderer);
     renderer.compile = (s, c, t) => { const prev = renderer.getRenderTarget(); renderer.setRenderTarget(post.target()); try { return compile(s, c, t); } finally { renderer.setRenderTarget(prev); } };
   }
-  window.__W = W; window.__updateProps = updateProps; window.__U = U; window.__post = post;
+  window.__THREE = THREE; window.__VM = VM; window.__W = W; window.__updateProps = updateProps; window.__U = U; window.__post = post;
 
   if (PUNE) {
     // the tiles around where you'll start: your saved spot, or Shaniwar Wada for a new game (FC Road with ?spawn)
