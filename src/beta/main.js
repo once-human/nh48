@@ -36,7 +36,7 @@ import { Game } from '@orig/game/game.js';
 import { Pilot } from '@orig/game/pilot.js';
 import { HumanKit } from '@orig/people/humans.js';
 import { AnimalKit } from '@orig/people/animals.js';
-import { MetroTrains } from '@orig/world/metroTrains.js';
+import { MetroTrains } from './world/metroTrains.js';
 import { TileManager, cityFromBase } from '@orig/world/tiles.js';
 import * as Save from '@orig/game/save.js';
 import { fixPins } from '@orig/world/venues.js';
