@@ -3,7 +3,7 @@
 // under the roof
 import * as THREE from 'three';
 import { Pilot } from '@orig/game/pilot.js';
-import { carSpec } from '../vehicles/models.js';
+import { carSpec, baseOf } from '../vehicles/models.js';
 
 const CARS = new Set(['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super']), V = new THREE.Vector3();
 const pr = Pilot.prototype.placeRider;
@@ -11,7 +11,7 @@ Pilot.prototype.placeRider = function () {
   pr.call(this);
   const v = this.riderShown, H = this.human;
   if (!H) return;
-  if (!v || v === this.auto || !CARS.has(v.type)) { H._clipY = undefined; return; }
+  if (!v || v === this.auto || !CARS.has(baseOf(v.type))) { H._clipY = undefined; return; }
   const S = carSpec(v.type);
   if (S.H < 1.4) {
     const k = (1.4 - S.H) / 0.25;                       // the Huracán-style lies back further than the 911-style

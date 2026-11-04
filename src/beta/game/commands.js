@@ -3,6 +3,7 @@
 import { Shell, Terminal, plain } from './console.js';
 import { Vehicle, SPECS, specOf, defaultPaint } from '@orig/vehicles/vehicle.js';
 import { TYPES } from '@orig/traffic/traffic.js';
+import { VARIANTS } from '../vehicles/models.js';
 import { WEATHERS } from '@orig/gfx/weather.js';
 import { ITEMS } from '@orig/game/life.js';
 import { lin } from '@orig/world/geo.js';
@@ -13,7 +14,11 @@ const NICK = {
   porsche: 'sports', '911': 'sports', carrera: 'sports', lamborghini: 'super', lambo: 'super', huracan: 'super', mercedes: 'lux', merc: 'lux', eclass: 'lux', benz: 'lux',
   thar: 'jeep', creta: 'suv', swift: 'hatch', dzire: 'sedan', activa: 'scooter', hero: 'cycle', splendor: 'bike', ninja: 'superbike', zx10r: 'superbike', re: 'bullet', enfield: 'bullet',
   rickshaw: 'auto', pmpml: 'bus', ace: 'tempo', cab: 'taxi',
+  wagonr: 'wagonr', alto: 'alto', city: 'city', honda: 'city', nexon: 'nexon', tata: 'nexon', xuv700: 'xuv', xuv: 'xuv', mahindra: 'xuv', scorpio: 'scorpio', scorpion: 'scorpio',
+  fortuner: 'fortuner', toyota: 'fortuner', bolero: 'bolero', innova: 'innova', crysta: 'innova', ertiga: 'ertiga', mpv: 'innova',
 };
+// names that mean one model, not its family
+const NICK_EXACT = new Set(['creta', 'swift', 'dzire']);
 const COLOURS = { red: '#c8181a', white: '#eeeeea', black: '#101216', silver: '#a9acb0', grey: '#60646a', blue: '#1c3f9e', navy: '#0e1c44', green: '#14613a', yellow: '#f0c414', orange: '#e8650e', lime: '#8fd11c', purple: '#4c2178', pink: '#d84f8c', gt: '#b7bcc2', verde: '#7bbf1a', arancio: '#ef6a10', rosso: '#b30e12', teal: '#0f7f80' };
 const paintOf = (s) => {
   const h = COLOURS[String(s).toLowerCase()] || String(s), m = /^#?([0-9a-f]{6})$/i.exec(h);
@@ -71,6 +76,9 @@ export function freeTerminal(G) {
     return [...a.sort((m, n) => d(m) - d(n)), ...b.sort((m, n) => d(m) - d(n))].slice(0, max);
   };
   const vehType = (s) => { const k = String(s).toLowerCase(), t = NICK[k] || k; if (!SPECS[t]) throw new Error(`no vehicle "${s}". See: roster`); return t; };
+  // "spawn suv" is any SUV: the family or one of its models, as often as traffic has them; "spawn xuv700" is that one
+  const family = (t) => [t, ...Object.keys(VARIANTS).filter(k => VARIANTS[k].base === t)];
+  const anyOf = (t) => { if (VARIANTS[t] || NICK_EXACT.has(t)) return t; const f = family(t); if (f.length < 2) return t; let tot = 0; for (const k of f) tot += TYPES[k]?.w || 1; let r = Math.random()*tot; for (const k of f) { r -= TYPES[k]?.w || 1; if (r <= 0) return k; } return t; };
   const nearest = (type) => { let best = null, bd = 1e18; for (const o of T().list) { if (type && o.type !== type) continue; const d = (o.x - P().x)**2 + (o.z - P().z)**2; if (d < bd) { bd = d; best = o; } } return best; };
   // a point from words: x z, ~dx ~dz (from you), ^right ^forward (the way you face), @type (the nearest of them), @wp, or a name
   let found = [];
@@ -239,9 +247,9 @@ export function freeTerminal(G) {
     say('spawn is the base chance on an ordinary road: neighbourhoods and the hour change it too.', 'dim');
   }, { group: 'vehicles' });
   sh.reg('spawn <vehicle:vehicle> [count:int] [--paint:paint] [--drive]', 'put a vehicle in front of you', ([t, n], f) => {
-    const type = vehType(t), count = Math.min(Math.max(1, +n || 1), 24), paint = f.paint ? paintOf(f.paint) : null; let v;
-    for (let i = 0; i < count; i++) v = make(type, paint, 7 + Math.floor(i/4)*7, (i % 4 - 1.5)*(count > 1 ? 3.2 : 0));
-    say(`${count} × ${SPECS[type].name} (${SPECS[type].model})`, 'ok');
+    const fam = vehType(t), exact = NICK_EXACT.has(String(t).toLowerCase()), count = Math.min(Math.max(1, +n || 1), 24), paint = f.paint ? paintOf(f.paint) : null; let v; const got = {};
+    for (let i = 0; i < count; i++) { const type = exact ? fam : anyOf(fam); got[type] = (got[type] || 0) + 1; v = make(type, paint, 7 + Math.floor(i/4)*7, (i % 4 - 1.5)*(count > 1 ? 3.2 : 0)); }
+    say(Object.entries(got).map(([k, c]) => `${c} × ${SPECS[k].name} (${SPECS[k].model})`).join(', '), 'ok');
     if (f.drive) { const d = P().dropped.find(q => q.veh === v); if (!P().onFoot) P().exit(T(), true); P().enter({ kind: 'dropped', d, now: true }, T()); if (G.rig) G.rig.inited = false; }
   }, { group: 'vehicles', more: ['spawn lambo --paint=verde --drive', 'spawn porsche 4 --paint=#b7bcc2'] });
   sh.reg('drive <vehicle:vehicle> [--paint:paint]', 'spawn one and get in', ([t], f) => sh.exec(`spawn ${t}${f.paint ? ' --paint=' + f.paint : ''} --drive`, true), { group: 'vehicles' });

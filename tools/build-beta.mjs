@@ -73,6 +73,8 @@ const PATCHES = {
     ["{ id: 'use', label: 'Talk, walk in, get in or out', group: 'Do', def: 'KeyF' },", "{ id: 'use', label: 'Get in or out of a vehicle', group: 'Do', def: 'KeyF' }, { id: 'visit', label: 'Walk in, talk, pet, fuel up', group: 'Do', def: 'KeyV' },"],
   ],
   [S('game/pilot.js')]: [
+    ["import { carSpec } from '../vehicles/models.js';", "import { carSpec, VARIANTS } from '../vehicles/models.js';"],
+    ["const CAR_DOOR = new Set(['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super']);", "const CAR_DOOR = new Set(['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super', ...Object.keys(VARIANTS)]);"],
     ["      if (!(this.onFoot && this.offer) && this.useHook && this.useHook()) { /* walked in */ }\n      else if (this.onFoot && this.offer) this.enter(this.offer, traffic);", "      if (this.onFoot && this.offer && this.offer.kind !== 'pet') this.enter(this.offer, traffic);"],
     ["    if (input.took('KeyF') && this.busy <= 0) {", "    if (input.took('KeyV') && this.busy <= 0) { if (this.onFoot && this.offer && this.offer.kind === 'pet') this.enter(this.offer, traffic); else if (this.useHook) this.useHook(); }\n    if (input.took('KeyF') && this.busy <= 0) {"],
     ["'Pet the dog', key: 'F' });", "'Pet the dog', key: 'V' });"],
@@ -93,7 +95,21 @@ const PATCHES = {
     ["b2 = new THREE.Vector3(Math.min(xf0 - 0.6, xf0 - (H - belt) * 0.9), H - 0.08,", "b2 = new THREE.Vector3(Math.min(xf0 - 0.3, S.roofF - 0.04), H - 0.1,"],
     ["const mx = xf0 - 0.42;", "const mx = Math.min(xf0 - 0.42, S.roofF - 0.12);"],
   ],
-  [S('traffic/traffic.js')]: [["bullet: buildBike({ helmet: true }), superbike: buildBike({ helmet: true }),", "bullet: buildBike({ helmet: true, kind: 'bullet' }), superbike: buildBike({ helmet: true, kind: 'superbike' }),"]],
+  [S('traffic/traffic.js')]: [
+    ["bullet: buildBike({ helmet: true }), superbike: buildBike({ helmet: true }),", "bullet: buildBike({ helmet: true, kind: 'bullet' }), superbike: buildBike({ helmet: true, kind: 'superbike' }),"],
+    // the models inside the types (beta/vehicles/models.js VARIANTS): their own spawn share, bodies and time-of-day mix
+    ["import { buildAuto, buildScooter, buildBike, buildCar, buildBus, buildTempo, buildCycle, buildLow, PAINTS } from '../vehicles/models.js';", "import { buildAuto, buildScooter, buildBike, buildCar, buildBus, buildTempo, buildCycle, buildLow, PAINTS, VARIANTS, addVariantTypes, baseOf } from '../vehicles/models.js';"],
+    ["const TYPE_NAMES = Object.keys(TYPES);", "addVariantTypes(TYPES); const TYPE_NAMES = Object.keys(TYPES);"],
+    ["tempo: buildTempo(), bus: buildBus(),", "tempo: buildTempo(), bus: buildBus(), ...Object.fromEntries(Object.keys(VARIANTS).map(k => [k, buildCar(k)])),"],
+    ["tot += t.w * (mix[k] ?? 1);", "tot += t.w * (mix[k] ?? mix[baseOf(k)] ?? 1);"],
+    ["x -= t.w * (mix[k] ?? 1);", "x -= t.w * (mix[k] ?? mix[baseOf(k)] ?? 1);"],
+  ],
+  [S('vehicles/vehicle.js')]: [
+    ["import { buildScooter, buildBike, buildCycle, buildCar, buildBus, buildTempo, buildAuto, PAINTS, wheelsOf } from './models.js';", "import { buildScooter, buildBike, buildCycle, buildCar, buildBus, buildTempo, buildAuto, PAINTS, wheelsOf, VARIANTS, baseOf } from './models.js';"],
+    ["default: return buildCar('hatch');", "default: return VARIANTS[type] ? buildCar(type, { interior: true }) : buildCar('hatch');"],
+    ["if (['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super'].includes(type)) {", "if (['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super'].includes(baseOf(type))) {"],
+    ["export function defaultPaint(type, rng) {", "export function defaultPaint(type, rng) {\n  type = baseOf(type);"],
+  ],
 };
 const swapPlugin = {
   name: 'beta-swap',
