@@ -15,7 +15,8 @@ const STEPS = [
 ];
 // first-time hints: when it applies, and what to say
 const HINTS = [
-  { id: 'shop', keys: ['V'], main: 'Go in', sub: 'Shops, cafés and clubs open with V at the door (F is for vehicles). 1 to 9 picks in any menu', when: (G) => G.player.onFoot && /enter|go in|shop|café|cafe/i.test(G.hud.$('h-prompt-t')?.textContent || '') },
+  { id: 'shop', keys: ['F'], main: 'Go in', sub: 'F at the door: shops, cafés, clubs. Near a vehicle too, F takes whichever is closer. 1 to 9 picks in any menu', when: (G) => G.player.onFoot && /enter|go in|shop|café|cafe/i.test(G.hud.$('h-prompt-t')?.textContent || '') },
+  { id: 'ask', keys: ['Z'], main: 'Lost?', sub: 'Walk up to someone and press Z to ask the way. Not everyone will help', when: (G) => G.player.onFoot && !!G.waypoint && Math.hypot(G.waypoint.x - G.player.x, G.waypoint.z - G.player.z) > 300 },
   { id: 'night', keys: ['L'], main: 'Torch', sub: 'It’s dark: L for your torch on foot, your headlights in a vehicle', when: (G) => G.hour > 19.3 || G.hour < 5.5 },
   { id: 'hungry', keys: ['E'], main: 'You’re hungry', sub: 'Eat from your jhola (E), or any tapri, misal place or hawker', when: (G) => G.life && G.life.s && (G.life.s.hunger ?? 1) < 0.3 },
   { id: 'thirsty', keys: ['E'], main: 'You’re thirsty', sub: 'A bottle from your jhola, or a juice centre', when: (G) => G.life && G.life.s && (G.life.s.thirst ?? 1) < 0.3 },
@@ -24,7 +25,7 @@ const HINTS = [
   { id: 'sms', keys: ['T'], main: 'A new text', sub: 'T to read it', when: (G) => G.phone && G.phone.unread && G.phone.unread() > 0 },
   { id: 'fare', keys: ['W'], main: 'Someone wants an auto', sub: 'People waving show up green on the map. Stop right next to them and they get in', when: (G) => G.rides && G.rides.enabled && !G.player.onFoot },
   { id: 'damage', keys: ['M'], main: 'Your vehicle is hurt', sub: 'Garages fix it (on the map). Past 80% it smokes, past 90% it burns', when: (G) => !G.player.onFoot && (G.player.cur.dmg || 0) > 0.4 },
-  { id: 'pet', keys: ['V'], main: 'An animal', sub: 'V to pet a dog or a cat. Mind them when you drive', when: (G) => G.player.onFoot && /pet the|cow for luck/i.test(G.hud.$('h-prompt-t')?.textContent || '') },
+  { id: 'pet', keys: ['F'], main: 'An animal', sub: 'F to pet a dog or a cat. Mind them when you drive', when: (G) => G.player.onFoot && /pet the|cow for luck/i.test(G.hud.$('h-prompt-t')?.textContent || '') },
 ];
 const KEY = 'nh48_tut', HKEY = 'nh48_hints';
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* fine */ } } };

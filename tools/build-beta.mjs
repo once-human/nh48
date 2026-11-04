@@ -70,7 +70,7 @@ const PATCHES = {
     ["{ id: 'roll', label: 'Roll; camera when driving', group: 'Do', def: 'KeyC' }", "{ id: 'roll', label: 'Roll', group: 'Do', def: 'KeyQ' }"],
     ["{ id: 'cam', label: 'Change camera', group: 'Vehicle', def: 'KeyV' }", "{ id: 'cam', label: 'First or third person', group: 'Move', def: 'KeyC' }"],
     // F is for vehicles only; V walks in, talks, pets, fuels: a car parked by a shop no longer hides the shop
-    ["{ id: 'use', label: 'Talk, walk in, get in or out', group: 'Do', def: 'KeyF' },", "{ id: 'use', label: 'Get in or out of a vehicle', group: 'Do', def: 'KeyF' }, { id: 'visit', label: 'Walk in, talk, pet, fuel up', group: 'Do', def: 'KeyV' },"],
+    ["{ id: 'use', label: 'Talk, walk in, get in or out', group: 'Do', def: 'KeyF' },", "{ id: 'use', label: 'Get in or out, walk in, pet, fuel up: whatever is closest', group: 'Do', def: 'KeyF' }, { id: 'ask', label: 'Ask someone nearby the way', group: 'Do', def: 'KeyZ' },"],
   ],
   [S('game/pilot.js')]: [
     // you never vanish: from the driver's seat too your body stays, only the head is cut (beta/draw/skin.js)
@@ -79,12 +79,10 @@ const PATCHES = {
     ["this.human.holder.visible = !this.cockpitOn;", "this.human.holder.visible = true;"],
     ["import { carSpec } from '../vehicles/models.js';", "import { carSpec, VARIANTS } from '../vehicles/models.js';"],
     ["const CAR_DOOR = new Set(['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super']);", "const CAR_DOOR = new Set(['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super', ...Object.keys(VARIANTS)]);"],
-    ["      if (!(this.onFoot && this.offer) && this.useHook && this.useHook()) { /* walked in */ }\n      else if (this.onFoot && this.offer) this.enter(this.offer, traffic);", "      if (this.onFoot && this.offer && this.offer.kind !== 'pet') this.enter(this.offer, traffic);"],
-    ["    if (input.took('KeyF') && this.busy <= 0) {", "    if (input.took('KeyV') && this.busy <= 0) { if (this.onFoot && this.offer && this.offer.kind === 'pet') this.enter(this.offer, traffic); else if (this.useHook) this.useHook(); }\n    if (input.took('KeyF') && this.busy <= 0) {"],
-    ["'Pet the dog', key: 'F' });", "'Pet the dog', key: 'V' });"],
+    ["      if (!(this.onFoot && this.offer) && this.useHook && this.useHook()) { /* walked in */ }\n      else if (this.onFoot && this.offer) this.enter(this.offer, traffic);", "      if (this.fPick(this.shopNear && this.shopNear()) !== 'offer' && this.useHook && this.useHook()) { /* walked in */ }\n      else if (this.onFoot && this.offer) this.enter(this.offer, traffic);"],
+    ["const consider = (d, o) => { if (d < bd) { bd = d; best = o; } };", "const consider = (d, o) => { if (d < bd) { bd = d; best = o; o.dist = d; } };"],
   ],
   [S('game/shops.js')]: [
-    ["if (e.code === 'Escape' || e.code === 'KeyF' || e.code === 'KeyE') {", "if (e.code === 'Escape' || e.code === 'KeyF' || e.code === 'KeyV' || e.code === 'KeyE') {"],
     // eat here or parcel: only where there's food (a chowki has a bench, not a kitchen)
     ["const dineIn = !!(ctx.inside && ctx.spot === 'counter'", "const dineIn = !!(MENUS[k] && ctx.inside && ctx.spot === 'counter'"],
   ],
@@ -104,9 +102,9 @@ const PATCHES = {
      "      const look2 = R1 ? R1.look : kit.randomLook(this.rng, { female: o.type === 'scooterP' ? this.rng.chance(0.75) : this.rng.chance(0.2), avoid: P.look });"],
   ],
   [S('game/game.js')]: [
-    ["player.useHook = () => this.shops.tryUse();", "player.useHook = () => this.shops.tryUse() || !!this.people.ask?.(player, this);"],
+    ["player.useHook = () => this.shops.tryUse();", "player.useHook = () => this.shops.tryUse(); player.shopNear = () => this.shops.near; this.people._G = window.__nhAskG = this;"],
     ["if (this.state === 'play' && !this.player.onFoot && this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);", "if (this.state === 'play' && this.input.took('KeyC')) this.rig.toggleView(this.player.onFoot);"],
-    ["      if (P.offer && P.onFoot) this.hud.prompt(P.offer.key, P.offer.label, 0.3);\n      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);", "      const sv = sl || (this.state === 'play' && this.people.askLabel?.(P, this));\n      if (P.offer && P.onFoot) { this.hud.prompt(P.offer.key, P.offer.label, 0.3); if (sv && this.state === 'play') this.hud.prompt2('V', sv, 0.3); }\n      else if (sv && this.state === 'play') this.hud.prompt('V', sv, 0.3);"],
+    ["      if (P.offer && P.onFoot) this.hud.prompt(P.offer.key, P.offer.label, 0.3);\n      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);", "      if (P.offer && P.onFoot && P.fPick(this.shops.near) === 'offer') this.hud.prompt(P.offer.key, P.offer.label, 0.3);\n      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);"],
   ],
   // the cabin inside /beta's bodies (they're not main's shapes): seats scaled under each roof, the rear bench under the
   // roof's back (none in the two-seaters), pillars and mirror under the roof's front edge
