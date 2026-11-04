@@ -65,14 +65,15 @@ const PATCHES = {
     ["this.onFootpath = this.deck < 0 && !W.surf.isRoad(this.x, this.z);", "this.onFootpath = this.deck < 0 && gr.off > 0.5;"],
     ["-clamp(this.latAcc * 0.01, -0.06, 0.06);", "-clamp(this.latAcc * 0.01, -0.06, 0.06) + gr.roll;"],
   ],
-  // C switches first and third person (on foot too, V still does); rolling moves to Q
+  // C switches first and third person; rolling is Ctrl; the jhola is Q; vehicles are E
   [S('game/keys.js')]: [
-    ["{ id: 'roll', label: 'Roll; camera when driving', group: 'Do', def: 'KeyC' }", "{ id: 'roll', label: 'Roll', group: 'Do', def: 'KeyQ' }"],
+    ["{ id: 'bag', label: 'Jhola', group: 'Menus', def: 'KeyE' },", "{ id: 'bag', label: 'Jhola', group: 'Menus', def: 'KeyQ' },"],
+    ["{ id: 'roll', label: 'Roll; camera when driving', group: 'Do', def: 'KeyC' }", "{ id: 'roll', label: 'Roll', group: 'Do', def: 'ControlLeft' }"],
     ["{ id: 'punch', label: 'Punch (click works too)',", "{ id: 'punch', label: 'Punch (click works too; hold right-click to block)',"],
     ["{ id: 'cam', label: 'Change camera', group: 'Vehicle', def: 'KeyV' }", "{ id: 'cam', label: 'First or third person', group: 'Move', def: 'KeyC' }"],
-    // F for what's in front of you (shops, doors, counters, pumps, animals), V for vehicles (in, out, take one),
+    // F for what's in front of you (shops, doors, counters, pumps, animals), E for vehicles (in, out, take one),
     // T to talk to anyone (beta/game/talk.js); the phone moves to I
-    ["{ id: 'use', label: 'Talk, walk in, get in or out', group: 'Do', def: 'KeyF' },", "{ id: 'use', label: 'Walk in, counters, pet, fuel up', group: 'Do', def: 'KeyF' }, { id: 'vehicle', label: 'Get in or out of a vehicle', group: 'Do', def: 'KeyV' }, { id: 'talk', label: 'Talk to someone (ask them out too)', group: 'Do', def: 'KeyT' },"],
+    ["{ id: 'use', label: 'Talk, walk in, get in or out', group: 'Do', def: 'KeyF' },", "{ id: 'use', label: 'Walk in, counters, pet, fuel up', group: 'Do', def: 'KeyF' }, { id: 'vehicle', label: 'Get in or out of a vehicle', group: 'Do', def: 'KeyE' }, { id: 'talk', label: 'Talk to someone (ask them out too)', group: 'Do', def: 'KeyT' },"],
     ["{ id: 'phone', label: 'Phone', group: 'Menus', def: 'KeyT' },", "{ id: 'phone', label: 'Phone', group: 'Menus', def: 'KeyI' },"],
   ],
   [S('game/phone.js')]: [
@@ -80,7 +81,7 @@ const PATCHES = {
     ["if (c === 'KeyT' || c === 'Escape')", "if (c === 'KeyI' || c === 'Escape')"],
     ['this.badge.innerHTML = `<span class="kbd">T</span>', 'this.badge.innerHTML = `<span class="kbd">I</span>'],
   ],
-  [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'],", "['F', 'Walk in, counters, pet'], ['V', 'Get in or out of a vehicle'], ['T', 'Talk to someone'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
+  [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'], ['E', 'Jhola'],", "['F', 'Walk in, counters, pet'], ['E', 'Get in or out of a vehicle'], ['T', 'Talk to someone'], ['Q', 'Jhola'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
   [S('game/pilot.js')]: [
     // you never vanish: from the driver's seat too your body stays, only the head is cut (beta/draw/skin.js)
     ["this.human.holder.visible = !!this.riderShown && !on;", "this.human.holder.visible = !!this.riderShown; this.human._fp = on;"],
@@ -89,7 +90,7 @@ const PATCHES = {
     ["import { carSpec } from '../vehicles/models.js';", "import { carSpec, VARIANTS } from '../vehicles/models.js';"],
     ["const CAR_DOOR = new Set(['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super']);", "const CAR_DOOR = new Set(['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super', ...Object.keys(VARIANTS)]);"],
     ["      if (!(this.onFoot && this.offer) && this.useHook && this.useHook()) { /* walked in */ }\n      else if (this.onFoot && this.offer) this.enter(this.offer, traffic);\n      else if (!this.onFoot) this.exit(traffic);", "      if (this.onFoot && this.offer && this.offer.kind === 'pet') this.enter(this.offer, traffic);\n      else if (this.useHook) this.useHook();"],
-    ["    if (input.took('KeyF') && this.busy <= 0) {", "    if (input.took('KeyV') && this.busy <= 0) { if (this.onFoot && this.offer && this.offer.kind !== 'pet') this.enter(this.offer, traffic); else if (!this.onFoot) this.exit(traffic); }\n    if (input.took('KeyF') && this.busy <= 0) {"],
+    ["    if (input.took('KeyF') && this.busy <= 0) {", "    if (input.took('KeyE') && this.busy <= 0) { if (this.onFoot && this.offer && this.offer.kind !== 'pet') this.enter(this.offer, traffic); else if (!this.onFoot) this.exit(traffic); }\n    if (input.took('KeyF') && this.busy <= 0) {"],
     ["const consider = (d, o) => { if (d < bd) { bd = d; best = o; } };", "const consider = (d, o) => { if (d < bd) { bd = d; best = o; o.dist = d; } };"],
   ],
   // talk to anyone: no hearts over strangers any more (yours keep theirs: blue in your phone, black your partner), and
@@ -114,7 +115,7 @@ const PATCHES = {
      "      const q = m._lx === undefined ? 0 : Math.hypot(a.x - m._lx, a.z - m._lz); m._lx = a.x; m._lz = a.z;\n      if (q < 3 && dt > 0) m._v = (m._v || 0) + (q / dt - (m._v || 0)) * Math.min(1, dt * 6);\n      const mv = m._v || 0, walking = mv > 0.12, cowS = a.cow || a.kind === 'cow', slow = cowS && mv < 0.9;\n      if (walking && mv > 2.4) { m._ph = (m._ph || 0) + dt * mv * 2.2; m.holder.position.y += Math.abs(Math.sin(m._ph)) * Math.min(0.07, (mv - 2.4) * 0.02); }\n      const lie = !walking && a.kind !== 'cow' && !a.cow;\n      m.play(walking ? (slow ? 'WalkSlow' : 'Walk') : 'Idle', walking ? Math.max(0.45, mv / (cowS ? (slow ? 0.7 : 1.1) : a.kind === 'cat' ? 0.6 : 0.95)) : 1);"],
   ],
   [S('people/fight.js')]: [
-    ["if (input.took('KeyC') && !busyDown", "if (input.took('KeyQ') && !busyDown"],
+    ["if (input.took('KeyC') && !busyDown", "if ((input.took('ControlLeft') || input.took('ControlRight')) && !busyDown"],
     // whoever rode it comes off as themselves, not someone new: the riders the crowd had seated on it (crowd.js riders)
     ["    const look = kit.randomLook(this.rng, { female: this.rng.chance(o.T.two ? 0.15 : 0.25), helmet: o.T.two && o.type !== 'cycle', avoid: P.look });\n    if (o.colB) look.top = look.top.setRGB(o.colB[0], o.colB[1], o.colB[2]);",
      "    const R0 = o._riders && o._riders[0], R1 = o._riders && o._riders[1];\n    const look = R0 ? R0.look : kit.randomLook(this.rng, { female: this.rng.chance(o.T.two ? 0.15 : 0.25), helmet: o.T.two && o.type !== 'cycle', avoid: P.look });\n    if (!R0 && o.colB) look.top = look.top.setRGB(o.colB[0], o.colB[1], o.colB[2]);"],
@@ -127,9 +128,12 @@ const PATCHES = {
     ["  S.list.forEach((r, i) => {\n    if (r.door && open(r.door)) { S.im.setMatrixAt(i, ZERO); return; }", "  S.seen = (S.seen || 0) + 1;\n  S.list.forEach((r, i) => {\n    r.t = r.door && open(r.door) ? 1 : 0;\n    if (S.seen > 2 && r.k !== undefined) { if (r.k !== r.t) S.moving = true; return; }\n    r.k = r.t;\n    if (r.t) { S.im.setMatrixAt(i, ZERO); return; }"],
   ],
   [S('game/game.js')]: [
+    // the jhola on Q (E is vehicles now)
+    ["if (e.code === 'KeyE' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.jhola.open(); }", "if (e.code === 'KeyQ' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.jhola.open(); }"],
+    ["['Escape', 'KeyE', 'KeyJ', 'Tab', 'KeyF', 'KeyM', 'KeyP', 'KeyK'].includes(e.code)", "['Escape', 'KeyE', 'KeyQ', 'KeyJ', 'Tab', 'KeyF', 'KeyM', 'KeyP', 'KeyK'].includes(e.code)"],
     ["player.useHook = () => this.shops.tryUse();", "player.useHook = () => this.shops.tryUse(); player.shopNear = () => this.shops.near; this.people._G = window.__nhAskG = this;"],
     ["if (this.state === 'play' && !this.player.onFoot && this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);", "if (this.state === 'play' && this.input.took('KeyC')) this.rig.toggleView(this.player.onFoot);"],
-    ["      if (P.offer && P.onFoot) this.hud.prompt(P.offer.key, P.offer.label, 0.3);\n      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);\n      else if (!P.onFoot && Math.abs(P.v) < 1 && this.state === 'play') this.hud.prompt('F',", "      if (P.offer && P.onFoot) { const pet = P.offer.kind === 'pet'; this.hud.prompt(pet ? 'F' : 'V', P.offer.label, 0.3); if (sl && !pet && this.state === 'play') this.hud.prompt2('F', sl, 0.3); }\n      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);\n      else if (!P.onFoot && Math.abs(P.v) < 1 && this.state === 'play') this.hud.prompt('V',"],
+    ["      if (P.offer && P.onFoot) this.hud.prompt(P.offer.key, P.offer.label, 0.3);\n      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);\n      else if (!P.onFoot && Math.abs(P.v) < 1 && this.state === 'play') this.hud.prompt('F',", "      if (P.offer && P.onFoot) { const pet = P.offer.kind === 'pet'; this.hud.prompt(pet ? 'F' : 'E', P.offer.label, 0.3); if (sl && !pet && this.state === 'play') this.hud.prompt2('F', sl, 0.3); }\n      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);\n      else if (!P.onFoot && Math.abs(P.v) < 1 && this.state === 'play') this.hud.prompt('E',"],
   ],
   // the cabin inside /beta's bodies (they're not main's shapes): seats scaled under each roof, the rear bench under the
   // roof's back (none in the two-seaters), pillars and mirror under the roof's front edge

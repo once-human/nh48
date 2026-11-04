@@ -519,7 +519,7 @@ export function freeTerminal(G) {
     const Pl = P(), F = Pl.foot, H = Pl.human, f = St.flight, k = (...c) => input.key(...c);
     f.t += dt;
     const fw = (k('KeyW', 'ArrowUp') ? 1 : 0) - (k('KeyS', 'ArrowDown') ? 1 : 0), sd = (k('KeyD', 'ArrowRight') ? 1 : 0) - (k('KeyA', 'ArrowLeft') ? 1 : 0);
-    let up = (k('Space') ? 1 : 0) - (k('KeyQ', 'ControlLeft', 'ControlRight') ? 1 : 0);
+    let up = (k('Space') ? 1 : 0) - (k('ControlLeft', 'ControlRight') ? 1 : 0);
     const fast = k('ShiftLeft', 'ShiftRight'), top = (fast ? 48 : 15)*St.flySpeed;
     const c = Math.cos(camYaw), n = Math.sin(camYaw), len = Math.hypot(fw, sd) || 1;
     let tx = (c*fw - n*sd)/len*top, tz = (n*fw + c*sd)/len*top;

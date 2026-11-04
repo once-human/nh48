@@ -258,10 +258,11 @@ function pose(G, H, dt) {
   const A = P.act, F = P.foot;
   const clip = A && A.kind === 'atk' && !A.proc && !A.leg;
   let want = 0;
-  if (!(P.ko || P.downT > 0) && !(A && (A.kind === 'roll' || A.kind === 'hurt'))) want = B.guarding ? 1 : A && (A.proc || A.leg) ? 1 : B.active > 0 && !clip ? 0.6 : 0;
+  if (!(P.ko || P.downT > 0) && !(A && (A.kind === 'roll' || A.kind === 'hurt'))) want = B.guarding ? 1 : 0;
   if (clip) want = 0;
   B._gw = (B._gw || 0) + (want - (B._gw || 0))*Math.min(1, dt*(want > (B._gw || 0) ? 12 : 8));
   if (B._gw < 0.01 && !(A && (A.proc || A.leg))) return;
+  if (B._gw < 0.01 && A && A.leg && !A.proc) { /* kicks only: arms stay with the clip */ }
   _f.set(Math.cos(F.yaw), 0, Math.sin(F.yaw)); _r.set(-_f.z, 0, _f.x);
   const torch = rightBusy(G) === 'torch', fp = !!H._fp;
   const u = A && A.kind === 'atk' ? A.t/A.dur : 0, hk = A ? A.hit/A.dur : 0.4;
@@ -284,6 +285,8 @@ function pose(G, H, dt) {
     const sh = bone(H, 'upperarm_' + side); if (!sh) continue;
     if (A && A.proc && A.side === side) {
       sh.getWorldPosition(_s);
+      // from where the hand is: your guard if it's up, else where the clip has it hanging
+      if (B._gw < 0.5) { const hb = bone(H, 'hand_' + side); if (hb) hb.getWorldPosition(_G2); }
       const q = A.target && !A.target.veh ? A.target : null;
       if (A.name === 'jab' || A.name === 'body') {
         // straight out at their face, or at their middle
@@ -304,10 +307,11 @@ function pose(G, H, dt) {
       }
       const back = u >= hk;
       if (back) _t.copy(_S2).lerp(_G2, 1 - e); else bez(_t, _G2, _M2, _S2, e);
-      ikArm(H, side, _t, _pole, 1);
+      ikArm(H, side, _t, _pole, Math.min(1, u*7, (1 - u)*5 + B._gw));
     } else {
       _pole.copy(_r).multiplyScalar(sx*0.5).addScaledVector(_f, -0.1).setY(-1);
-      ikArm(H, side, _G2, _pole, B._gw);
+      // the other hand comes up to cover the face while one punches
+      ikArm(H, side, _G2, _pole, Math.max(B._gw, A && A.proc ? 0.7*e : 0));
     }
   }
   if (A && A.leg) {

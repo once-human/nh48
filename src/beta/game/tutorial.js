@@ -11,17 +11,17 @@ const STEPS = [
   { keys: ['Mouse'], main: 'Look around', sub: 'The camera follows the mouse', done: (G, s) => s.turned > 1.2 || s.t > 7 },
   { keys: ['M'], main: 'Open the map', sub: 'Find places, set a waypoint, or take a rickshaw across the city', done: (G) => G.state === 'map' },
   { keys: ['I'], main: 'Your phone', sub: 'Texts, contacts, and everything you’ll need', done: (G) => G.phone && G.phone.on },
-  { keys: ['E'], main: 'Your jhola', sub: 'Food, water and whatever you buy', done: (G) => !!(G.jhola && G.jhola.on) },
+  { keys: ['Q'], main: 'Your jhola', sub: 'Food, water and whatever you buy', done: (G) => !!(G.jhola && G.jhola.on) },
 ];
 // first-time hints: when it applies, and what to say
 const HINTS = [
-  { id: 'shop', keys: ['F'], main: 'Go in', sub: 'F at the door: shops, cafés, clubs. V is for vehicles. 1 to 9 picks in any menu', when: (G) => G.player.onFoot && /enter|go in|shop|café|cafe/i.test(G.hud.$('h-prompt-t')?.textContent || '') },
+  { id: 'shop', keys: ['F'], main: 'Go in', sub: 'F at the door: shops, cafés, clubs. E is for vehicles. 1 to 9 picks in any menu', when: (G) => G.player.onFoot && /enter|go in|shop|café|cafe/i.test(G.hud.$('h-prompt-t')?.textContent || '') },
   { id: 'ask', keys: ['T'], main: 'Lost?', sub: 'Walk up to anyone and press T to talk: the way, food, a lift. Not everyone will help', when: (G) => G.player.onFoot && !!G.waypoint && Math.hypot(G.waypoint.x - G.player.x, G.waypoint.z - G.player.z) > 300 },
   { id: 'night', keys: ['L'], main: 'Torch', sub: 'It’s dark: L for your torch on foot, your headlights in a vehicle', when: (G) => G.hour > 19.3 || G.hour < 5.5 },
-  { id: 'hungry', keys: ['E'], main: 'You’re hungry', sub: 'Eat from your jhola (E), or any tapri, misal place or hawker', when: (G) => G.life && G.life.s && (G.life.s.hunger ?? 1) < 0.3 },
-  { id: 'thirsty', keys: ['E'], main: 'You’re thirsty', sub: 'A bottle from your jhola, or a juice centre', when: (G) => G.life && G.life.s && (G.life.s.thirst ?? 1) < 0.3 },
+  { id: 'hungry', keys: ['Q'], main: 'You’re hungry', sub: 'Eat from your jhola (Q), or any tapri, misal place or hawker', when: (G) => G.life && G.life.s && (G.life.s.hunger ?? 1) < 0.3 },
+  { id: 'thirsty', keys: ['Q'], main: 'You’re thirsty', sub: 'A bottle from your jhola, or a juice centre', when: (G) => G.life && G.life.s && (G.life.s.thirst ?? 1) < 0.3 },
   { id: 'cops', keys: ['Esc'], main: 'The police want you', sub: 'Lose them: break their line of sight and keep moving. Or pay your challans at a chowki (E-challans in the menu)', when: (G) => G.police && G.police.heat > 0 },
-  { id: 'fight', keys: ['Click', 'Right-click', 'Q'], main: 'A fight', sub: 'Click to punch. Hold right-click to block (just as it comes and they stagger); both together to shove or kick. Q rolls. Or just walk off', when: (G) => G.brawl && G.brawl.active > 0 },
+  { id: 'fight', keys: ['Click', 'Right-click', 'Ctrl'], main: 'A fight', sub: 'Click to punch. Hold right-click to block (just as it comes and they stagger); both together to shove or kick. Ctrl rolls. Or just walk off', when: (G) => G.brawl && G.brawl.active > 0 },
   { id: 'sms', keys: ['I'], main: 'A new text', sub: 'I for your phone', when: (G) => G.phone && G.phone.unread && G.phone.unread() > 0 },
   { id: 'fare', keys: ['W'], main: 'Someone wants an auto', sub: 'People waving show up green on the map. Stop right next to them and they get in', when: (G) => G.rides && G.rides.enabled && !G.player.onFoot },
   { id: 'damage', keys: ['M'], main: 'Your vehicle is hurt', sub: 'Garages fix it (on the map). Past 80% it smokes, past 90% it burns', when: (G) => !G.player.onFoot && (G.player.cur.dmg || 0) > 0.4 },
