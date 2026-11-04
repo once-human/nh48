@@ -83,6 +83,16 @@ const PATCHES = {
     ["if (this.state === 'play' && !this.player.onFoot && this.input.took('KeyC')) this.rig.setMode(this.rig.mode + 1);", "if (this.state === 'play' && this.input.took('KeyC')) this.rig.toggleView(this.player.onFoot);"],
     ["      if (P.offer && P.onFoot) this.hud.prompt(P.offer.key, P.offer.label, 0.3);\n      else if (sl && this.state === 'play') this.hud.prompt('F', sl, 0.3);", "      if (P.offer && P.onFoot) { this.hud.prompt(P.offer.key, P.offer.label, 0.3); if (sl && this.state === 'play') this.hud.prompt2('V', sl, 0.3); }\n      else if (sl && this.state === 'play') this.hud.prompt('V', sl, 0.3);"],
   ],
+  // the cabin inside /beta's bodies (they're not main's shapes): seats scaled under each roof, the rear bench under the
+  // roof's back (none in the two-seaters), pillars and mirror under the roof's front edge
+  [S('vehicles/cockpit.js')]: [
+    ["const fl = S.sill + 0.06, xb = -hl + 0.55, xd = xf0 - 0.55;", "const fl = S.sill + 0.06, xb = -hl + 0.55, xd = xf0 - 0.55, kS = Math.min(1, (S.H - (kind === 'sports' || kind === 'super' ? 0.24 : 0.15) - fl) / 1.2);"],
+    ["const back = new THREE.BoxGeometry(0.12, 0.62, 0.46); back.rotateZ(0.2); back.translate(xs - 0.36, fl + 0.68, zs);", "const back = new THREE.BoxGeometry(0.12, 0.62 * kS, 0.46); back.rotateZ(0.2); back.translate(xs - 0.36, fl + 0.36 + 0.32 * kS, zs);"],
+    ["bx(xs - 0.5, fl + 1.02, zs - 0.13, xs - 0.4, fl + 1.2, zs + 0.13, CLOTH);", "bx(xs - 0.5, fl + 0.36 + 0.66 * kS, zs - 0.13, xs - 0.4, fl + 0.36 + 0.84 * kS, zs + 0.13, CLOTH);"],
+    ["if (S.L > 3.8) { bx(xb + 0.05, fl + 0.2, -hw + 0.15, xb + 0.55, fl + 0.36, hw - 0.15, CLOTH); bx(xb - 0.02, fl + 0.36, -hw + 0.15, xb + 0.1, fl + 0.95, hw - 0.15, CLOTH); }", "if (S.L > 3.8 && kind !== 'sports' && kind !== 'super') { const xr = Math.max(xb, S.roofR - 0.45), yt = Math.min(fl + 0.95, S.H - 0.32); bx(xr + 0.05, fl + 0.2, -hw + 0.15, xr + 0.55, fl + 0.36, hw - 0.15, CLOTH); bx(xr - 0.02, fl + 0.36, -hw + 0.15, xr + 0.1, yt, hw - 0.15, CLOTH); }"],
+    ["b2 = new THREE.Vector3(Math.min(xf0 - 0.6, xf0 - (H - belt) * 0.9), H - 0.08,", "b2 = new THREE.Vector3(Math.min(xf0 - 0.3, S.roofF - 0.04), H - 0.1,"],
+    ["const mx = xf0 - 0.42;", "const mx = Math.min(xf0 - 0.42, S.roofF - 0.12);"],
+  ],
   [S('traffic/traffic.js')]: [["bullet: buildBike({ helmet: true }), superbike: buildBike({ helmet: true }),", "bullet: buildBike({ helmet: true, kind: 'bullet' }), superbike: buildBike({ helmet: true, kind: 'superbike' }),"]],
 };
 const swapPlugin = {
