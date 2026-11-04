@@ -48,6 +48,7 @@ const SWAPS = [
   ['*', S('vehicles/models.js'), S('beta/vehicles/models.js')],
   ['*', S('game/story.js'), S('beta/game/story.js')],
   ['*', S('game/tutorial.js'), S('beta/game/tutorial.js')],
+  ['*', S('game/home.js'), S('beta/game/home.js')],
 ];
 // a line in a game file swapped as it's bundled: only for what a module swap can't reach. Fails the build if the line has moved
 const PATCHES = {
