@@ -43,6 +43,7 @@ const SWAPS = [
   [S('world/world.js'), S('gfx/pbr.js'), S('beta/gfx/pbr.js')],
   [S('world/world.js'), S('gfx/materials.js'), S('beta/gfx/materials.js')],
   [S('world/world.js'), S('world/trees.js'), S('beta/world/trees.js')],
+  [S('world/world.js'), S('world/farCity.js'), S('beta/world/farCity.js')],
   [S('world/world.js'), S('world/grass.js'), S('beta/world/grass.js')],
   ['*', S('vehicles/vehmat.js'), S('beta/vehicles/vehmat.js')],
   ['*', S('vehicles/models.js'), S('beta/vehicles/models.js')],
