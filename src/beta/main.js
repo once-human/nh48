@@ -25,6 +25,7 @@ import './vehicles/physics.js';
 import './traffic/rates.js';
 import './game/prompt2.js';
 import './game/ask.js';           // stop someone and ask the way
+import './game/hands.js';         // what you hold, in your hand: the torch aimed by the arm, the body turning
 import './world/flyovers.js';
 import './world/hills.js';
 import './game/seat.js';

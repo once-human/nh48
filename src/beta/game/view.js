@@ -39,7 +39,14 @@ R.updateFoot = function (dt, p) {
   // a walk's gentle rise and fall, none standing still
   this._bob = (this._bob || 0) + dt*Math.min(9, Math.abs(p.v)*1.9);
   const bob = Math.sin(this._bob*2)*Math.min(0.035, Math.abs(p.v)*0.006);
-  const ex = p.x + cy*0.16, ez = p.z + sy*0.16, ey = (p.y || 0) + (p.crouch ? 1.05 : 1.62) + bob;
+  // a neck turns so far: past that, your body comes round with your look
+  const F = p.foot;
+  if (F && !this.lookBack) { const d = Math.atan2(Math.sin(this.footYaw - F.yaw), Math.cos(this.footYaw - F.yaw)); if (Math.abs(d) > 0.85) F.yaw += d - Math.sign(d)*0.85; }
+  // your eyes are in your head, wherever the walk or the run has it (skin.js finds it each frame), just ahead of the face
+  const o = H && H._headOff, hy = H ? H.holder.position.y : (p.y || 0);
+  if (o) { const s = this._eo || (this._eo = { x: o.x, y: o.y, z: o.z }), k = Math.min(1, dt*14); s.x += (o.x - s.x)*k; s.y += (o.y - s.y)*k; s.z += (o.z - s.z)*k; }
+  const e = this._eo, fw = 0.11;
+  const ex = e ? p.x + e.x + cy*fw : p.x + cy*0.16, ez = e ? p.z + e.z + sy*fw : p.z + sy*0.16, ey = e ? hy + e.y + 0.08 : (p.y || 0) + (p.crouch ? 1.05 : 1.62) + bob;
   this.pos.set(ex, ey, ez); cam.position.copy(this.pos); cam.up.set(0, 1, 0);
   const cp = Math.cos(pitch);
   this.look.set(ex + cy*cp, ey - Math.sin(pitch), ez + sy*cp); cam.lookAt(this.look);

@@ -44,7 +44,7 @@ ${LAMP}
 vec4 LK(int i){ return texelFetch(tSkin, ivec2(${LOOK} + i, vS), 0); }
 // seated in a car: nothing of you below the car's floor (the legs would show under the body). First person: your head
 // and hair only, above the neck, so the eyes see out; the rest of you, hands and what they hold, stays
-bool seatClip(){ if (vS < 0) return false; vec4 c = LK(10); if (c.w > .5 && vW.y < c.x) return true; vec4 h = LK(11); return h.w > .5 && vW.y > h.y && length(vW.xz - h.xz) < .2; }
+bool seatClip(){ if (vS < 0) return false; vec4 c = LK(10); if (c.w > .5 && vW.y < c.x) return true; vec4 h = LK(11); return h.w > .5 && ((vW.y > h.y && length(vW.xz - h.xz) < .2) || distance(vW, cameraPosition) < .17); }
 float nz(vec2 p){ return texture(tNoise, p/16.).r; }
 // a little height on the surface, seen as light: folds, weave, pores
 vec3 bump(vec3 n, vec3 w, float h){ vec3 sx = dFdx(w), sy = dFdy(w), r1 = cross(sy, n), r2 = cross(n, sx); float det = dot(sx, r1); return normalize(abs(det)*n - sign(det)*(dFdx(h)*r1 + dFdy(h)*r2)); }
@@ -309,7 +309,7 @@ export class Skin {
       for (let b = 0; b < nb; b++) { const i = b*16, o = row + b*12; D[o] = m[i]; D[o + 1] = m[i + 4]; D[o + 2] = m[i + 8]; D[o + 3] = m[i + 12]; D[o + 4] = m[i + 1]; D[o + 5] = m[i + 5]; D[o + 6] = m[i + 9]; D[o + 7] = m[i + 13]; D[o + 8] = m[i + 2]; D[o + 9] = m[i + 6]; D[o + 10] = m[i + 10]; D[o + 11] = m[i + 14]; }
       const u = H.mat.userData, O = row + LOOK*4, col = (i, c) => { D[O + i*4] = c.r; D[O + i*4 + 1] = c.g; D[O + i*4 + 2] = c.b; }, vec = (i, q) => { D[O + i*4] = q.x; D[O + i*4 + 1] = q.y; D[O + i*4 + 2] = q.z; D[O + i*4 + 3] = q.w; };
       col(0, u.top); col(1, u.bottom); col(2, u.skin); col(3, u.shoe); vec(4, u.cut); vec(5, H.style); col(6, H.pat); vec(7, H.fit); vec(8, H.arm); vec(9, u.body); D[O + 40] = H._clipY ?? 0; D[O + 43] = H._clipY === undefined ? 0 : 1; D[O + 47] = 0;
-      if (H === playerH && H._fp) { const hb = H._hb || (H._hb = H.body.skeleton.getBoneByName('Head') || H.body.skeleton.bones.find(q => /head/i.test(q.name))); if (hb) { hb.getWorldPosition(_hp); D[O + 44] = _hp.x; D[O + 45] = _hp.y - 0.03; D[O + 46] = _hp.z; D[O + 47] = 1; } }
+      if (H === playerH && H._fp) { const hb = H._hb || (H._hb = H.body.skeleton.getBoneByName('Head') || H.body.skeleton.bones.find(q => /head/i.test(q.name))); if (hb) { hb.getWorldPosition(_hp); const hm = H.holder.matrixWorld.elements; H._headOff = { x: _hp.x - hm[12], y: _hp.y - hm[13], z: _hp.z - hm[14] }; D[O + 44] = _hp.x; D[O + 45] = _hp.y - 0.03; D[O + 46] = _hp.z; D[O + 47] = 1; } }
       if (D_ && D_.clothK) { D[O + 23] = D_.clothK; col(6, D_.pat); }
       const helmeted = H.xtra && H.xtra.helm && H.xtra.helm.visible, topC = u.top;
       for (const o of H._sk) {
