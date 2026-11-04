@@ -16,6 +16,8 @@ R.toggleView = function (onFoot) {
   else this.setMode(this.mode + 1);
 };
 R.update = function (dt, p) {
+  // in a vehicle you're drawn in both views; from the seat only your head is cut away (skin.js)
+  if (p && p.human && !p.onFoot) p.human._fp = this.mode === 2;
   if (!this._pl) { this._pl = true; const v = load(); this.mode = v.drive === 2 ? 2 : 0; this.footFP = !!v.foot; }
   return upd.call(this, dt, p);
 };
@@ -23,7 +25,7 @@ R.drag = function (dx, dy) {
   if (this.footMode && this.footFP) { this.footYaw += dx*0.006; this.footPitch = clamp(this.footPitch + dy*0.004, -1.25, 1.3); this.orbitT = 1.2; return; }
   return drag.call(this, dx, dy);
 };
-// first person on foot: your own eyes, a little in front of the face so nothing of you is in the way; your body isn't drawn
+// first person on foot: your own eyes, a little in front of the face. You're still there: only your head isn't drawn
 R.updateFoot = function (dt, p) {
   const H = p.human, fp = this.footFP && !this.preview && !p.seated;
   if (H) H._fp = fp;

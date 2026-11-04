@@ -3,6 +3,7 @@
 // the game's meshes are never drawn. Each frame the bones of whoever's close go into one texture, and each part of a
 // person (body, shirt, trousers, hair...) is one instanced draw that reads them. Those closest get a smoother body.
 import * as THREE from 'three';
+const _hp = new THREE.Vector3();
 import { PU, LAMP, PCF } from '../gfx/paint.js';
 import { RNG } from '@orig/core/util.js';
 import { Wardrobe, buildCloth, dress } from './wardrobe.js';
@@ -41,8 +42,9 @@ in vec3 vN, vW, vB, vC; in vec2 vU; in float vZ; flat in int vS; out vec4 o;
 uniform sampler2D tSkin, tMap, tNoise; uniform vec3 cameraPosition; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, fogCol; uniform float shadowTexel, shadowOn, fogDensity, dayK;
 ${LAMP}
 vec4 LK(int i){ return texelFetch(tSkin, ivec2(${LOOK} + i, vS), 0); }
-// seated in a car: nothing of you below the car's floor (the legs would show under the body)
-bool seatClip(){ if (vS < 0) return false; vec4 c = LK(10); return c.w > .5 && vW.y < c.x; }
+// seated in a car: nothing of you below the car's floor (the legs would show under the body). First person: your head
+// and hair only, above the neck, so the eyes see out; the rest of you, hands and what they hold, stays
+bool seatClip(){ if (vS < 0) return false; vec4 c = LK(10); if (c.w > .5 && vW.y < c.x) return true; vec4 h = LK(11); return h.w > .5 && vW.y > h.y && length(vW.xz - h.xz) < .2; }
 float nz(vec2 p){ return texture(tNoise, p/16.).r; }
 // a little height on the surface, seen as light: folds, weave, pores
 vec3 bump(vec3 n, vec3 w, float h){ vec3 sx = dFdx(w), sy = dFdy(w), r1 = cross(sy, n), r2 = cross(n, sx); float det = dot(sx, r1); return normalize(abs(det)*n - sign(det)*(dFdx(h)*r1 + dFdy(h)*r2)); }
@@ -292,7 +294,6 @@ export class Skin {
       let o = H.holder, on = true; while (o.parent) { o = o.parent; if (!o.visible) { on = false; break; } } if (!on || !o.isScene) continue;
       const p = H.holder.position, dx = p.x - cx, dz = p.z - cz, d2 = dx*dx + dz*dz;
       if (d2 > 25 && dx*fx + dz*fz < -3) continue;       // behind you
-      if (H === playerH && H._fp) continue;              // first person: your own body isn't drawn
       H._d2 = H === playerH ? -1 : d2; near.push(H);
     }
     near.sort((a, b) => a._d2 - b._d2);
@@ -307,7 +308,8 @@ export class Skin {
       if (W_ && H !== playerH && !(H.look && H.look.player)) { if (H._wl !== H.look) { H._wl = H.look; H._w = dress(H, W_); } D_ = H._w; for (const [i, S] of W_.builds[D_.build]) { _m1.fromArray(m, i*16).multiply(S); _m1.toArray(m, i*16); } }
       for (let b = 0; b < nb; b++) { const i = b*16, o = row + b*12; D[o] = m[i]; D[o + 1] = m[i + 4]; D[o + 2] = m[i + 8]; D[o + 3] = m[i + 12]; D[o + 4] = m[i + 1]; D[o + 5] = m[i + 5]; D[o + 6] = m[i + 9]; D[o + 7] = m[i + 13]; D[o + 8] = m[i + 2]; D[o + 9] = m[i + 6]; D[o + 10] = m[i + 10]; D[o + 11] = m[i + 14]; }
       const u = H.mat.userData, O = row + LOOK*4, col = (i, c) => { D[O + i*4] = c.r; D[O + i*4 + 1] = c.g; D[O + i*4 + 2] = c.b; }, vec = (i, q) => { D[O + i*4] = q.x; D[O + i*4 + 1] = q.y; D[O + i*4 + 2] = q.z; D[O + i*4 + 3] = q.w; };
-      col(0, u.top); col(1, u.bottom); col(2, u.skin); col(3, u.shoe); vec(4, u.cut); vec(5, H.style); col(6, H.pat); vec(7, H.fit); vec(8, H.arm); vec(9, u.body); D[O + 40] = H._clipY ?? 0; D[O + 43] = H._clipY === undefined ? 0 : 1;
+      col(0, u.top); col(1, u.bottom); col(2, u.skin); col(3, u.shoe); vec(4, u.cut); vec(5, H.style); col(6, H.pat); vec(7, H.fit); vec(8, H.arm); vec(9, u.body); D[O + 40] = H._clipY ?? 0; D[O + 43] = H._clipY === undefined ? 0 : 1; D[O + 47] = 0;
+      if (H === playerH && H._fp) { const hb = H._hb || (H._hb = H.body.skeleton.getBoneByName('Head') || H.body.skeleton.bones.find(q => /head/i.test(q.name))); if (hb) { hb.getWorldPosition(_hp); D[O + 44] = _hp.x; D[O + 45] = _hp.y - 0.03; D[O + 46] = _hp.z; D[O + 47] = 1; } }
       if (D_ && D_.clothK) { D[O + 23] = D_.clothK; col(6, D_.pat); }
       const helmeted = H.xtra && H.xtra.helm && H.xtra.helm.visible, topC = u.top;
       for (const o of H._sk) {

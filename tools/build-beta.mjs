@@ -73,6 +73,10 @@ const PATCHES = {
     ["{ id: 'use', label: 'Talk, walk in, get in or out', group: 'Do', def: 'KeyF' },", "{ id: 'use', label: 'Get in or out of a vehicle', group: 'Do', def: 'KeyF' }, { id: 'visit', label: 'Walk in, talk, pet, fuel up', group: 'Do', def: 'KeyV' },"],
   ],
   [S('game/pilot.js')]: [
+    // you never vanish: from the driver's seat too your body stays, only the head is cut (beta/draw/skin.js)
+    ["this.human.holder.visible = !!this.riderShown && !on;", "this.human.holder.visible = !!this.riderShown; this.human._fp = on;"],
+    ["if (this.human && !this.cockpitOn && !this.human.holder.visible)", "if (this.human && !this.human.holder.visible)"],
+    ["this.human.holder.visible = !this.cockpitOn;", "this.human.holder.visible = true;"],
     ["import { carSpec } from '../vehicles/models.js';", "import { carSpec, VARIANTS } from '../vehicles/models.js';"],
     ["const CAR_DOOR = new Set(['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super']);", "const CAR_DOOR = new Set(['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super', ...Object.keys(VARIANTS)]);"],
     ["      if (!(this.onFoot && this.offer) && this.useHook && this.useHook()) { /* walked in */ }\n      else if (this.onFoot && this.offer) this.enter(this.offer, traffic);", "      if (this.onFoot && this.offer && this.offer.kind !== 'pet') this.enter(this.offer, traffic);"],
