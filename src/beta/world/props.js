@@ -1,8 +1,7 @@
 // world/props.js for /beta: the game's street furniture and stalls at the same sizes, footprints and facing, modelled for real.
 // Where the game places them, what collides and where the signal bulbs and sign quads go are all untouched.
-// The game's chunk builder paints these one colour (cb.addGeo(P.stall, m, [1,1,1])), so every stall and shelter came out white:
-// a proto built here is marked and keeps its own colours and glow. Stalls run to thousands of triangles and a busy
-// square kilometre has over a hundred of them, so they aren't merged into the chunks: see stallSets at the bottom.
+// Stalls run to thousands of triangles and a busy square kilometre has over a hundred of them, so they aren't merged into
+// the chunks: see stallSets at the bottom. (Merged props keep their colours through fixes.js.)
 export * from '@orig/world/props.js';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -10,18 +9,7 @@ import { ColorBuilder } from '@orig/world/geo.js';
 import { buildProto as gameProto, compose, InstancedSet } from '@orig/world/props.js';
 
 const add0 = ColorBuilder.prototype.addGeo;
-ColorBuilder.prototype.addGeo = function (geo, m, color, glow = 0, paint = 0) {
-  if (geo.userData?.lod) return geo.userData.lod(m);
-  if (!geo.userData?.ownColours) return add0.call(this, geo, m, color, glow, paint);
-  const base = this.c;
-  add0.call(this, geo, m, color, 0, paint);
-  const col = geo.attributes.color, gl = geo.attributes.glow;
-  for (let k = 0; k < col.count; k++) {
-    const i = (base + k)*3;
-    this.col[i] = col.getX(k); this.col[i + 1] = col.getY(k); this.col[i + 2] = col.getZ(k);
-    this.g[base + k] = gl.getX(k);
-  }
-};
+ColorBuilder.prototype.addGeo = function (geo, m, ...rest) { return geo.userData?.lod ? geo.userData.lod(m) : add0.call(this, geo, m, ...rest); };
 
 // ---------------------------------------------------------------- the kit
 let b = null, seed = 1;
@@ -103,7 +91,7 @@ function wheel(x, y, z, R, c = [0.09, 0.09, 0.09], spokes = 8) {
     rod([x, y, z], [x + ex, y + ey, z], 0.004, [0.55, 0.55, 0.57], 3);
   }
 }
-const finish = () => { const g = b.build(); g.userData.ownColours = true; return g; };
+const finish = () => b.build();
 const start = (s) => { b = new ColorBuilder(); seed = s; };
 
 const STEEL = [0.62, 0.63, 0.66], DARKST = [0.22, 0.22, 0.24], RUST = [0.4, 0.26, 0.17], ROPE = [0.62, 0.52, 0.35], BLACK = [0.06, 0.06, 0.07], WOOD = [0.5, 0.34, 0.2];
