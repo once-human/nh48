@@ -10,6 +10,7 @@ import { ikLeg } from '../game/fists.js';
 import { free, frameOf, seg, bez, torso } from './mount.js';
 import { ikArm } from '@orig/people/humans.js';
 import { reachLean, grip as close } from './fit.js';
+import { frameOf as carFrame, stoop, put, originFor, feetDown } from './cardoor.js';
 
 const CAR = new Set(['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super']);
 const BIG = new Set(['bus', 'tempo', 'truck']);
@@ -32,10 +33,10 @@ Pilot.prototype.exit = function (traffic, force = false) {
   // where you start: on the seat (two-wheelers), in the doorway, under the roof, up on the step
   const inn = st === 'two' ? od : st === 'car' ? 0.5 : st === 'auto' ? 0.55 : 0.35;
   const sx = ex - ox/od*inn - (st === 'two' ? hx*0.15 : 0), sz = ez - oz/od*inn - (st === 'two' ? hz*0.15 : 0);
-  this._out = { veh, kind: kindOfVeh(this, veh), st, t: 0, T: st === 'two' ? 1.15 : st === 'car' ? 0.7 : st === 'auto' ? 0.55 : 0.45, sx, sz, ex, ez, y0: F.y, hx, hz, seatY: (veh.y || 0) + 0.8, leg: null };
+  this._out = { veh, kind: kindOfVeh(this, veh), st, t: 0, T: st === 'two' ? 1.15 : st === 'auto' ? 1.9 : 0.45, sx, sz, ex, ez, y0: F.y, hx, hz, seatY: (veh.y || 0) + 0.8, leg: null };
   F.x = sx; F.z = sz;
   this.frozen = true; this.act = { kind: 'getout', t: 0 };
-  if (st === 'two' && this.human) this.human.play('drive', { fade: 0 });
+  if ((st === 'two' || st === 'auto') && this.human) this.human.play('drive', { fade: 0 });
   return out;
 };
 
@@ -48,7 +49,7 @@ Pilot.prototype.enter = function (offer, traffic) {
   if (!offer || offer.now || this._in || this.entering || this._mount || !this.onFoot || (st !== 'auto' && st !== 'step')) return enter.call(this, offer, traffic);
   const src = srcOf(offer), F = this.foot, S = specOf(k) || {};
   const hx = src.hx ?? Math.cos(src.th), hz = src.hz ?? Math.sin(src.th), W = (S.W || 1.4)/2 + 0.45;
-  const fwd = st === 'step' ? (S.L || 4)/2 - 1.2 : 0;           // a bus or tempo: by the front
+  const fwd = st === 'step' ? (S.L || 4)/2 - 1.2 : st === 'auto' ? AUTO_SEAT[0] - 0.35 : 0;           // a bus or tempo: by the front; an auto: by its seat
   const bus = k === 'bus', fw = bus ? 11.4/2 - 0.71 : fwd;
   const sides = (bus ? [-1] : [1, -1]).map(s => ({ s, x: src.x + hx*fw - hz*W*s, z: src.z + hz*fw + hx*W*s }));     // (a bus: its front door, on the left)
   sides.sort((a, b) => Math.hypot(a.x - F.x, a.z - F.z) - Math.hypot(b.x - F.x, b.z - F.z));
@@ -58,6 +59,96 @@ Pilot.prototype.enter = function (offer, traffic) {
   this._in = { offer, traffic, src, st, side, t: 0, phase: 'walk', max: Math.hypot(side.x - F.x, side.z - F.z)/1.5 + 0.6, y0: F.y };
   this.frozen = true; this.puppet = { x: side.x, z: side.z }; this.busy = 3;
 };
+
+// An auto: no door, a low roof. In: your back to the seat at the side opening, a duck under the roof's edge and down
+// onto the seat, then round to face the handlebar with the legs coming in over the floor's edge. Out the same way
+// back: round to the side, the feet out onto the road, up off the seat under the roof and a step clear.
+const AUTO_SEAT = [0.36, 0.8, 0], HIP_FWD = 0.33;
+const _h = new THREE.Vector3(), _o = new THREE.Vector3(), _w = new THREE.Vector3();
+function autoIn(P, I) {
+  const F = P.foot, H = P.human, src = I.src, Fr = carFrame(src), s = I.side.s, t = I.t, ground = I.y0;
+  const fwd = Math.atan2(Fr.hz, Fr.hx), out = Math.atan2(s*Fr.hx, -s*Fr.hz);
+  const hipSeat = Fr.at(AUTO_SEAT[0] - 0.05 - HIP_FWD + 0.02, AUTO_SEAT[1] - 0.04, 0, new THREE.Vector3());
+  const hipSide = Fr.at(AUTO_SEAT[0] - 0.05 - HIP_FWD + 0.02, AUTO_SEAT[1] - 0.04, s*0.22, new THREE.Vector3());
+  if (I.phase === 'turn') {
+    // your back to the opening by the seat, a half step in
+    const k = sm(t/0.35), to = Fr.at(AUTO_SEAT[0] - 0.35, 0, s*0.95, _o);
+    F.x = I.sx + (to.x - I.sx)*k; F.z = I.sz + (to.z - I.sz)*k;
+    F.yaw = I.yaw0 + Math.atan2(Math.sin(out - I.yaw0), Math.cos(out - I.yaw0))*k;
+    put(H, _w.set(F.x, ground, F.z), F.yaw);
+    if (t >= 0.35) { I.phase = 'sit'; I.t = 0; I.p0 = new THREE.Vector3(F.x, ground, F.z); H.play('sit_enter', { once: true, restart: true, fade: 0.15, speed: 1.35 }); }
+    return;
+  }
+  if (I.phase === 'sit') {
+    // down and back onto the seat, ducked under the roof
+    const k = sm((t - 0.12)/0.62), end = originFor(hipSide, out, _o);
+    _w.set(I.p0.x + (end.x - I.p0.x)*k, I.p0.y + (end.y - I.p0.y)*k, I.p0.z + (end.z - I.p0.z)*k);
+    put(H, _w, out);
+    stoop(H, -Math.sin(out), Math.cos(out), 0.5*Math.sin(Math.PI*Math.min(1, Math.max(0, t/0.95))));
+    feetDown(H, out, ground, k);
+    if (t >= 0.95) { I.phase = 'legs'; I.t = 0; H.play('drive', { fade: 0.45 }); I.feet = null; }
+    return;
+  }
+  if (I.phase === 'legs') {
+    // round to the handlebar, the feet up over the floor's edge and in
+    const T = 0.6, k = sm(t/T), yaw = out + Math.atan2(Math.sin(fwd - out), Math.cos(fwd - out))*k;
+    if (!I.feet) { I.feet = {}; for (const f of ['l', 'r']) { const b = H.root.getObjectByName('foot_' + f); if (b) I.feet[f] = b.getWorldPosition(new THREE.Vector3()); } }
+    _h.lerpVectors(hipSide, hipSeat, k);
+    put(H, originFor(_h, yaw, _o), yaw);
+    for (const f of ['l', 'r']) {
+      if (!I.feet[f]) continue;
+      const well = Fr.at(AUTO_SEAT[0] + 0.32, 0.36, f === 'l' ? -0.13 : 0.13, _w);
+      _t.lerpVectors(I.feet[f], well, k); _t.y += Math.sin(Math.PI*k)*0.32;
+      ikLeg(H, f, _t, _pole.set(Math.cos(yaw), 0.4, Math.sin(yaw)), 1 - sm((t - 0.35)/(T - 0.35)));
+    }
+    if (t >= T) {
+      const keep = H.holder.position.clone(), o = I.offer;
+      P._in = null; P.frozen = false; P.puppet = null;
+      if (P.act && P.act.kind === 'getin') P.act = null;
+      F.y = I.y0; o.now = true; P.enter(o, I.traffic);
+      if (!P.onFoot) P._settle = { from: keep, t0: performance.now() };
+    }
+  }
+}
+function autoOut(P, O) {
+  const F = P.foot, H = P.human, V = O.veh, Fr = carFrame(V), t = O.t, ground = O.y0;
+  if (!O.s) O.s = Math.sign((O.ex - V.x)*-Fr.hz + (O.ez - V.z)*Fr.hx) || 1;
+  const s = O.s, fwd = Math.atan2(Fr.hz, Fr.hx), out = Math.atan2(s*Fr.hx, -s*Fr.hz);
+  const hipSeat = Fr.at(AUTO_SEAT[0] - 0.05 - HIP_FWD + 0.02, AUTO_SEAT[1] - 0.04, 0, new THREE.Vector3());
+  const hipSide = Fr.at(AUTO_SEAT[0] - 0.05 - HIP_FWD + 0.02, AUTO_SEAT[1] - 0.04, s*0.22, new THREE.Vector3());
+  const stand = Fr.at(AUTO_SEAT[0] - 0.35, 0, s*0.98, new THREE.Vector3()); stand.y = ground;
+  F.x = stand.x; F.z = stand.z;
+  if (t < 0.6) {
+    // round on the seat, the feet out over the edge to the road
+    const k = sm(t/0.6), yaw = fwd + Math.atan2(Math.sin(out - fwd), Math.cos(out - fwd))*k;
+    if (!O.sat) { O.sat = true; H.play('sit', { fade: 0.4 }); }
+    _h.lerpVectors(hipSeat, hipSide, k);
+    put(H, originFor(_h, yaw, _o), yaw);
+    for (const f of ['l', 'r']) {
+      const well = Fr.at(AUTO_SEAT[0] + 0.32, 0.36, f === 'l' ? -0.13 : 0.13, _w).clone();
+      const road = Fr.at(AUTO_SEAT[0] - 0.37 + (f === 'l' ? 0.12 : -0.12)*s, 0.085, s*0.62, _o);
+      _t.lerpVectors(well, road, k); _t.y += Math.sin(Math.PI*k)*0.3;
+      ikLeg(H, f, _t, _pole.set(Math.cos(yaw), 0.4, Math.sin(yaw)), Math.min(1, k*3));
+    }
+    return;
+  }
+  if (t < 1.5) {
+    // up off the seat, ducked under the roof, out from under it
+    if (!O.rose) { O.rose = true; H.play('sit_exit', { once: true, restart: true, fade: 0.2, speed: 1.15 }); O.o0 = originFor(hipSide, out, new THREE.Vector3()); }
+    const u = t - 0.6, k = sm((u - 0.05)/0.7);
+    _w.set(O.o0.x + (stand.x - O.o0.x)*k, O.o0.y + (ground - O.o0.y)*k, O.o0.z + (stand.z - O.o0.z)*k);
+    put(H, _w, out);
+    stoop(H, -Math.sin(out), Math.cos(out), 0.5*Math.sin(Math.PI*Math.min(1, u/0.85)));
+    feetDown(H, out, ground, 1 - k);
+    return;
+  }
+  // a step clear
+  if (!O.walked) { O.walked = true; H.play('walk', { speed: 0.75, fade: 0.25 }); }
+  const k = sm((t - 1.5)/0.4);
+  F.x = stand.x + (O.ex - stand.x)*k; F.z = stand.z + (O.ez - stand.z)*k; F.y = ground;
+  put(H, _w.set(F.x, ground, F.z), out);
+  if (t >= O.T - 0.02) H.play('idle', { fade: 0.25 });
+}
 
 function bent(H, rx, rz, a) {
   if (!H || Math.abs(a) < 0.01) return;
@@ -85,8 +176,7 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
     if (O.st === 'step') y = O.y0 + 0.38*(1 - e) + Math.sin(Math.PI*k)*0.06;
     H.holder.position.set(F.x, y, F.z); H.holder.rotation.set(0, -F.yaw, 0);
     const rx = -Math.sin(F.yaw), rz = Math.cos(F.yaw);        // (right of where you face: the bend is about it)
-    if (O.st === 'car') bent(H, rx, rz, 0.75*(1 - sm(k*1.4)));
-    else if (O.st === 'auto') bent(H, rx, rz, 0.55*(1 - sm(k*1.3)));
+    if (O.st === 'auto') autoOut(this, O);
     else if (O.st === 'two') {
       // from the seat: the left foot down to the road, up off the seat onto it, the right leg back over behind you,
       // and you stand beside it (the reverse of getting on, mount.js)
@@ -145,11 +235,12 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
     const src = I.src;
     if (I.phase === 'walk') {
       if (Math.hypot(F.x - I.side.x, F.z - I.side.z) < 0.35 || I.t > I.max) {
-        I.phase = 'in'; I.t = 0; this.puppet = null; this.act = { kind: 'getin', t: 0 };
-        I.sx = F.x; I.sz = F.z; F.yaw = Math.atan2(src.z - F.z, src.x - F.x);
+        I.phase = I.st === 'auto' ? 'turn' : 'in'; I.t = 0; this.puppet = null; this.act = { kind: 'getin', t: 0 };
+        I.sx = F.x; I.sz = F.z; I.yaw0 = F.yaw; if (I.st !== 'auto') F.yaw = Math.atan2(src.z - F.z, src.x - F.x);
         H.play('idle', { fade: 0.12 });
       }
-    } else {
+    } else if (I.st === 'auto') autoIn(this, I);
+    else {
       const T = I.st === 'step' ? 0.55 : 0.5, k = Math.min(1, I.t/T), e = sm(k);
       const tx = I.sx + (src.x - I.sx)*0.45, tz = I.sz + (src.z - I.sz)*0.45;
       F.x = I.sx + (tx - I.sx)*e; F.z = I.sz + (tz - I.sz)*e;

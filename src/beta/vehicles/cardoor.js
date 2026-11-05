@@ -137,7 +137,7 @@ function shut(R) { if (!R.slam) { R.slam = true; R.vel = Math.min(R.vel, -1.6); 
 const MAX = 1.18;
 
 // the car's frame: a point given along it, up, and out to its right (+) / left (-)
-function frameOf(src) {
+export function frameOf(src) {
   const hx = src.hx ?? Math.cos(src.th), hz = src.hz ?? Math.sin(src.th), y = src.y || 0;
   return { hx, hz, y, x: src.x, z: src.z, at: (a, u, r, o) => o.set(src.x + hx*a - hz*r, y + u, src.z + hz*a + hx*r) };
 }
@@ -269,7 +269,7 @@ Pilot.prototype.tickDoors = function (dt) {
 // a hand to a point (the hand toward the car's front is the one that takes the handle), fingers closed on it
 function hand(H, sd, target, pole, w) { if (w <= 0.01) return; ikArm(H, sd, target, pole, w); grip(H, sd, w); }
 // bent at the waist (under the roof, into the cabin), the head kept up
-function stoop(H, rx, rz, a) {
+export function stoop(H, rx, rz, a) {
   if (!H || Math.abs(a) < 0.01) return;
   _r.set(rx, 0, rz);
   H.root.updateMatrixWorld(true);
@@ -280,11 +280,11 @@ function stoop(H, rx, rz, a) {
   H.root.updateMatrixWorld(true);
 }
 // place the body: its origin, facing
-function put(H, p, yaw) { H.holder.position.copy(p); H.holder.rotation.set(0, -yaw, 0); H.holder.updateMatrixWorld(true); }
+export function put(H, p, yaw) { H.holder.position.copy(p); H.holder.rotation.set(0, -yaw, 0); H.holder.updateMatrixWorld(true); }
 // the origin that puts the hips (as the seated clips carry them) on a point, facing yaw
-function originFor(hip, yaw, out) { return out.set(hip.x + Math.cos(yaw)*HIP_BACK, hip.y - HIP_UP, hip.z + Math.sin(yaw)*HIP_BACK); }
+export function originFor(hip, yaw, out) { return out.set(hip.x + Math.cos(yaw)*HIP_BACK, hip.y - HIP_UP, hip.z + Math.sin(yaw)*HIP_BACK); }
 // feet down to the ground when the body sits higher than the clip has them (an SUV's seat)
-function feetDown(H, yaw, ground, w) {
+export function feetDown(H, yaw, ground, w) {
   if (w <= 0.01) return;
   const fx = Math.cos(yaw), fz = Math.sin(yaw);
   for (const sd of ['l', 'r']) {
