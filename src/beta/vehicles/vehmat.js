@@ -7,10 +7,16 @@ import { PU, LAMP, PCF } from '../gfx/paint.js';
 
 const VS = `attribute float glow; attribute float paint;
 #ifdef USE_INSTANCING
-attribute vec3 aColB, aColC;
+attribute vec3 aColB, aColC; attribute vec2 aLamp;
 #endif
+uniform vec2 uLamp; varying vec2 vLp;
 varying vec3 vN, vW, vC, vL; varying float vG, vP, vZ;
 void main(){
+#ifdef USE_INSTANCING
+  vLp = aLamp + uLamp;
+#else
+  vLp = uLamp;
+#endif
   vec3 base = color;
 #ifdef USE_INSTANCING_COLOR
   if (paint > .5 && paint < 1.5) base *= instanceColor;
@@ -41,7 +47,8 @@ ${PCF}
 float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.05 + .002*vZ), 1.); if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.;
   return shadowPCF(vec3(s.xy, s.z - .0006)); }
 `;
-const FS = CHUNK + `void main(){
+const FS = CHUNK + `varying vec2 vLp;
+void main(){
   vec3 n = normalize(vN), V = normalize(cameraPosition - vW), b = vC; float matte = vG < -.5 ? 1. : 0., painted = abs(vP - 1.) < .5 ? 1. : 0.;
   float glassy = step(3.5, vP), e = (nz(gl_FragCoord.xy*.11) - .5)*(1. - uReal), ndl = dot(n, sunDir), lit = sunOn(ndl, e*.1, .0, .13), sh = (shadowOn > .5 && lit > 0.) ? shadeOf(shadowAt(vW, n), e*.3) : 1., L = lit*sh*dayK;
   // grime low down on the body, a little wear
@@ -58,7 +65,15 @@ const FS = CHUNK + `void main(){
     float s = pow(max(dot(R, sunDir), 0.), 40.*(1.2 - uRough) + 8.)*gloss*1.6*sh*dayK; c += sunCol*smoothstep(.25, .6, s);
   }
   float h = smoothstep(.5, .72, fract((gl_FragCoord.x + gl_FragCoord.y)*.17 + e*.9))*(1. - L)*(1. - smoothstep(10., 40., vZ)); c = mix(c, c*.7, h*.55*(1. - uReal));
-  if (vG > 0.) c += vC*vG*(.25 + uNight*3.);
+  // lamps. At the back (behind the middle): the red ones a dim tail lamp after dark and bright on the brakes (vLp.x:
+  // 1 braking, 0 driving, -1 nobody in it, so dark), the white one only in reverse (vLp.y); the amber ones as they were
+  if (vG > 0.) {
+    float k = .25 + uNight*3.;
+    bool rear = vL.x < 0.;
+    if (rear && vG > .45 && vC.r > .5 && vC.g < .3 && vC.b < .3) k = vLp.x < -.5 ? 0. : uNight*1.1 + max(vLp.x, 0.)*(1.7 + uNight*1.6);
+    else if (rear && vG > .1 && vG < .2 && vC.r > .8 && vC.g > .8 && vC.b > .75) k = max(vLp.y, 0.)*(9. + uNight*12.);
+    c += vC*vG*k;
+  }
   float f = fogDensity*vZ, mir = matte > .5 ? 0. : (glassy*.72 + painted*(.3 - .22*grime) + (1. - painted)*(1. - glassy)*.18); gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1. - clamp(mir, 0., .95)); }`;
 // glass: dark with the sky across it, a brushed streak, someone's shape behind it left to the imagination
 const GLASS_FS = CHUNK + `void main(){
@@ -70,7 +85,15 @@ const GLASS_FS = CHUNK + `void main(){
 
 function mat(fs, vs, opts = {}) {
   const uniforms = Object.assign({}, PU, { uTint: { value: new THREE.Color(opts.tint ?? 0x15191d).convertSRGBToLinear() }, uRough: { value: opts.rough ?? .38 }, uMetal: { value: opts.metal ?? .1 } });
+  uniforms.uLamp = { value: new THREE.Vector2() };
   const m = new THREE.ShaderMaterial({ vertexShader: vs, fragmentShader: fs, uniforms, vertexColors: !opts.glass, side: opts.glass ? THREE.DoubleSide : THREE.FrontSide });
+  // every instanced body drawn with this needs its lamps' per-instance state: a model that came without (a parked
+  // row, a door cut out of a body, a copy) gets one that's all zero (its tail lamps as any car's at night)
+  if (!opts.glass) m.onBeforeRender = (r, sc, cam, geo, obj) => {
+    if (!obj.isInstancedMesh) return;
+    const A = geo.attributes.aLamp, n = Math.max(1, obj.instanceMatrix.count);
+    if (!A || (A._zero && A.count < n)) { const Z = new THREE.InstancedBufferAttribute(new Float32Array(n*2), 2); Z._zero = true; geo.setAttribute('aLamp', Z); }
+  };
   m.color = new THREE.Color(opts.tint ?? 0xffffff); m.roughness = opts.rough ?? .38; m.metalness = opts.metal ?? .1;
   return m;
 }

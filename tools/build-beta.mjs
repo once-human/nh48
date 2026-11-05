@@ -325,6 +325,11 @@ const PATCHES = {
     ["if (o.signals && !o.emergency && G.traffic.signals) {", "if (o.careful && !o.signals && G.traffic.signals) { const n = W.graph.nearest(v.x + hx * 14, v.z + hz * 14, 10), node = n && W.graph.nodes[n.s < n.e.len / 2 ? n.e.a : n.e.b]; if (node && node.signal && Math.hypot(node.x - v.x, node.z - v.z) < 24 && G.traffic.signals.stateForAngle(node.i, v.th) === 'r') target = Math.min(target, 6); }\n    if (o.signals && G.traffic.signals) {"],
   ],
   [S('traffic/traffic.js')]: [
+    // brake and reverse lamps per car (beta/vehicles/lamps.js, beta/vehicles/vehmat.js)
+    ["      body.geometry.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));", "      body.geometry.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));\n      body.geometry.setAttribute('aLamp', new THREE.InstancedBufferAttribute(new Float32Array(c * 2), 2));"],
+    ["      lowGeo.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));", "      lowGeo.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));\n      lowGeo.setAttribute('aLamp', new THREE.InstancedBufferAttribute(new Float32Array(c * 2), 2));"],
+    ["      mesh.geometry.attributes.aColC.setXYZ(i, v.colC[0] * dk, v.colC[1] * dk, v.colC[2] * dk);", "      mesh.geometry.attributes.aColC.setXYZ(i, v.colC[0] * dk, v.colC[1] * dk, v.colC[2] * dk);\n      if (mesh.geometry.attributes.aLamp) mesh.geometry.attributes.aLamp.setXY(i, v._brk || 0, 0);"],
+    ["        mesh.geometry.attributes.aColC.needsUpdate = true;", "        mesh.geometry.attributes.aColC.needsUpdate = true;\n        if (mesh.geometry.attributes.aLamp) mesh.geometry.attributes.aLamp.needsUpdate = true;"],
     // cyclists close by are real people too (beta/people/cyclists.js): an empty cycle to seat them on, and the cycle in
     // the list of what gets real riders up close
     ["scooterE: buildScooter({ helmet: true, noRider: true }), bikeE: buildBike({ helmet: true, noRider: true }),", "scooterE: buildScooter({ helmet: true, noRider: true }), bikeE: buildBike({ helmet: true, noRider: true }), cycleE: buildCycle({ noRider: true }),"],
