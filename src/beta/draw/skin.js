@@ -213,6 +213,18 @@ function arrays(o, kit, k) {
   return { pos, nor, uv, bp, si, sw, idx };
 }
 
+// a preview's light: a soft key from the front and above, the game's own sun and shade colours, no shadow map, fog,
+// street lamps or headlight (those belong to the street); uEnc: colours encoded for the page (sRGB) when drawn straight to it
+function studioLight() {
+  return { sunDir: { value: new THREE.Vector3(0.45, 0.7, 0.55).normalize() }, sunCol: { value: new THREE.Vector3(1.07, 1.02, 0.93) }, shadeCol: { value: new THREE.Vector3(0.5, 0.53, 0.62) },
+    fogDensity: { value: 0 }, shadowOn: { value: 0 }, dayK: { value: 1 }, uNight: { value: 0 }, uWet: { value: 0 },
+    lampC: { value: new THREE.Vector4(0, 0, 1/256, 0) }, headP: { value: new THREE.Vector4() }, tLamp: { value: null }, uEnc: { value: 0 } };
+}
+const ENC = `
+uniform float uEnc;
+vec3 encS(vec3 c){ c = max(c, vec3(0.)); return mix(c*12.92, 1.055*pow(c, vec3(1./2.4)) - .055, step(.0031308, c)); }
+void main(){ main0(); if (uEnc > .5) o.rgb = encS(o.rgb); }`;
+
 export class Skin {
   constructor(kit, scene) {
     this.kit = kit; this.scene = scene; this.max = 64; this.hiR = 12; this.n = 0; this.frame = 0;
@@ -220,16 +232,59 @@ export class Skin {
     this.tex = new THREE.DataTexture(this.data, TEX_W, SLOTS, THREE.RGBAFormat, THREE.FloatType); this.tex.minFilter = this.tex.magFilter = THREE.NearestFilter; this.tex.generateMipmaps = false; this.tex.needsUpdate = true;
     this.parts = { m: new Map(), f: new Map() }; this.rigid = new Map(); this.prog = new Map();
     for (const k of ['m', 'f']) this.buildBody(k);
+    // every other scene, as it starts to draw, gets its bodies drawn by a view of this (drawFor)
+    const me = this; THREE.Scene.prototype.onBeforeRender = function (r, s, cam) { me.drawFor(this, r, cam); };
   }
   material(type, map) {
     const key = type + (map ? map.uuid : '');
     let m = this.prog.get(key); if (m) return m;
     const fs = { body: BODY, cloth0: CLOTH, cloth1: CLOTH, cloth2: CLOTH, cloth3: CLOTH, shoe: SHOE, hair: HAIR, eyes: EYES, plain: PLAIN }[type];
-    const un = Object.assign({}, PU, { tSkin: { value: this.tex }, tMap: { value: map || null }, uHead: HEAD }); if (type.startsWith('cloth')) un.uWhich = { value: +type[5] };
-    m = new THREE.RawShaderMaterial({ vertexShader: VS, fragmentShader: fs, uniforms: un, glslVersion: THREE.GLSL3, side: /cloth/.test(type) ? THREE.DoubleSide : THREE.FrontSide });
+    const un = Object.assign({}, PU, this.uOver, { tSkin: { value: this.tex }, tMap: { value: map || null }, uHead: HEAD }); if (type.startsWith('cloth')) un.uWhich = { value: +type[5] };
+    m = new THREE.RawShaderMaterial({ vertexShader: VS, fragmentShader: this.fsOf(fs), uniforms: un, glslVersion: THREE.GLSL3, side: /cloth/.test(type) ? THREE.DoubleSide : THREE.FrontSide });
     if (type === 'cloth0' || type === 'hair') { m.polygonOffset = true; m.polygonOffsetFactor = type === 'hair' ? -2 : -1; m.polygonOffsetUnits = type === 'hair' ? -6 : -2; }
     if (type === 'plain') { m.polygonOffset = true; m.polygonOffsetFactor = -3; m.polygonOffsetUnits = -8; }
     this.prog.set(key, m); return m;
+  }
+  fsOf(fs) { return fs; }
+  // ---- the same bodies anywhere else: the character preview, the outfit studio, the phone's camera
+  // Any other scene with a body in it gets a view of this renderer: the same fitted clothes, the same cut and shading,
+  // the same hair and dress, drawn into that scene, from that scene's camera (and with a light of its own, not the
+  // street's: no shadow map or fog or lamps from wherever you happen to be standing). Before, those screens showed
+  // the game's raw body meshes, cloth poking through and coloured differently, so you didn't look like yourself.
+  view(scene) {
+    const V = Object.create(this);
+    Object.assign(V, { scene, only: scene, fsOf: (fs) => fs.replace('void main(){', 'void main0(){') + ENC, n: 0, frame: 0, prog: new Map(), rigid: new Map(), rigidMats: null, rigidMat: null, shadowMat: null, uOver: studioLight() });
+    V.data = new Float32Array(TEX_W*SLOTS*4);
+    V.tex = new THREE.DataTexture(V.data, TEX_W, SLOTS, THREE.RGBAFormat, THREE.FloatType); V.tex.minFilter = V.tex.magFilter = THREE.NearestFilter; V.tex.generateMipmaps = false; V.tex.needsUpdate = true;
+    V.parts = { m: new Map(), f: new Map() };
+    for (const k of ['m', 'f']) for (const [name, R] of this.parts[k]) V.parts[k].set(name, { lo: V.twin(R.lo), hi: R.hi ? V.twin(R.hi) : null });
+    return V;
+  }
+  // a part's mesh for a view: the same geometry (shared, uploaded once per renderer), its own slots and material
+  twin(M) {
+    const S = M.geometry, g = new THREE.InstancedBufferGeometry();
+    for (const n in S.attributes) if (n !== 'iSlot' && n !== 'iCol') g.setAttribute(n, S.attributes[n]);
+    g.setIndex(S.index);
+    g.setAttribute('iSlot', new THREE.InstancedBufferAttribute(new Float32Array(SLOTS), 1).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('iCol', new THREE.InstancedBufferAttribute(new Float32Array(SLOTS*3), 3).setUsage(THREE.DynamicDrawUsage));
+    g.instanceCount = 0;
+    const m = new THREE.Mesh(g, this.material(M.userData.type, M.userData.map)); m.frustumCulled = false; m.visible = false; m.renderOrder = -2; m.fill = 0; this.scene.add(m);
+    return m;
+  }
+  // called as any scene but the game's starts to draw: if it has bodies, its view draws them
+  drawFor(sc, renderer, camera) {
+    if (sc === this.scene) return;
+    const views = this.views || (this.views = new Map());
+    let V = views.get(sc);
+    if (!V) {
+      let any = false;
+      for (const H of this.kit.bodies) { let o = H.holder; while (o.parent) o = o.parent; if (o === sc) { any = true; break; } }
+      if (!any) return;
+      V = this.view(sc); views.set(sc, V);
+    }
+    // straight onto the page the colours are encoded as the game's last pass encodes them; into a picture, left linear
+    V.uOver.uEnc.value = renderer.getRenderTarget() ? 0 : 1;
+    V.update(camera, null);
   }
   typeOf(n) { return n.startsWith('body') ? 'body' : n.startsWith('eyes') ? 'eyes' : n.startsWith('hair') || n.startsWith('face') ? 'hair' : n === 'cloth_pants' ? 'cloth1' : n === 'cloth_shoes' ? 'shoe' : n === 'cloth_saree' ? 'cloth2' : n === 'cloth_kurta' ? 'cloth3' : n.startsWith('cloth') ? 'cloth0' : 'plain'; }
   buildBody(k) {
@@ -263,6 +318,7 @@ export class Skin {
     g.setAttribute('iCol', new THREE.InstancedBufferAttribute(new Float32Array(SLOTS*3), 3).setUsage(THREE.DynamicDrawUsage));
     g.instanceCount = 0;
     const m = new THREE.Mesh(g, this.material(type, map)); m.frustumCulled = false; m.visible = false; m.renderOrder = -2; m.fill = 0; this.scene.add(m);
+    m.userData.type = type; m.userData.map = map;
     return m;
   }
   // who's close enough to cast does it with the plain body, in a mesh only the shadow pass draws
@@ -278,7 +334,7 @@ export class Skin {
     const g = new THREE.InstancedBufferGeometry(); g.setAttribute('position', geo.attributes.position); g.setAttribute('normal', geo.attributes.normal); if (geo.index) g.setIndex(geo.index);
     const cap = SLOTS; for (let i = 0; i < 4; i++) g.setAttribute('iM' + i, new THREE.InstancedBufferAttribute(new Float32Array(cap*4), 4).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('iCol', new THREE.InstancedBufferAttribute(new Float32Array(cap*3), 3).setUsage(THREE.DynamicDrawUsage)); g.instanceCount = 0;
-    if (!this.rigidMats) { this.rigidMats = {}; for (const [kn, fs] of [['plain', PLAIN], ['hair', HAIR2], ['cloth', SOFT]]) { const un = Object.assign({}, PU, { tSkin: { value: this.tex }, tMap: { value: null }, uHead: HEAD }); this.rigidMats[kn] = new THREE.RawShaderMaterial({ vertexShader: RIGID_VS, fragmentShader: fs, uniforms: un, glslVersion: THREE.GLSL3, side: THREE.DoubleSide }); } this.rigidMat = this.rigidMats.plain; }
+    if (!this.rigidMats) { this.rigidMats = {}; for (const [kn, fs] of [['plain', PLAIN], ['hair', HAIR2], ['cloth', SOFT]]) { const un = Object.assign({}, PU, this.uOver, { tSkin: { value: this.tex }, tMap: { value: null }, uHead: HEAD }); this.rigidMats[kn] = new THREE.RawShaderMaterial({ vertexShader: RIGID_VS, fragmentShader: this.fsOf(fs), uniforms: un, glslVersion: THREE.GLSL3, side: THREE.DoubleSide }); } this.rigidMat = this.rigidMats.plain; }
     if (false) { const un = {}; this.rigidMat = new THREE.RawShaderMaterial({ vertexShader: RIGID_VS, fragmentShader: PLAIN, uniforms: un, glslVersion: THREE.GLSL3, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -8 }); }
     if (geo.attributes.sway) g.setAttribute('sway', geo.attributes.sway);
     const m = new THREE.Mesh(g, this.rigidMats[geo.userData.kind] || this.rigidMat); m.frustumCulled = false; m.visible = false; m.renderOrder = -2; m.cap = cap; m.fill = 0; this.scene.add(m);
@@ -293,13 +349,14 @@ export class Skin {
   }
   update(camera, playerH) {
     const K = this.kit, cx = camera.position.x, cz = camera.position.z, near = [];
-    HEAD.value.w = 0;
+    if (!this.only) HEAD.value.w = 0;
     camera.getWorldDirection(v3); const fx = v3.x, fz = v3.z;
     this.frame++;
     for (const H of K.bodies) {
       if (!H._sk || this.frame%45 === 0) this.scan(H);
       if (!H.holder.visible) continue;
       let o = H.holder, on = true; while (o.parent) { o = o.parent; if (!o.visible) { on = false; break; } } if (!on || !o.isScene) continue;
+      if (o !== (this.only || this.scene)) continue;          // (a body in another scene, a preview's, is drawn by that scene's view)
       const p = H.holder.position, dx = p.x - cx, dz = p.z - cz, d2 = dx*dx + dz*dz;
       if (d2 > 25 && dx*fx + dz*fz < -3) continue;       // behind you
       H._d2 = H === playerH ? -1 : d2; near.push(H);

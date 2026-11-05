@@ -120,11 +120,8 @@ const PATCHES = {
     ['this.badge.innerHTML = `<span class="kbd">T</span>', 'this.badge.innerHTML = `<span class="kbd">I</span>'],
   ],
   // the strip of keys along the bottom: the jhola is Q now (E is vehicles), I the phone
-  [S('ui/hud.js')]: [["this.nerd = el('div', 'h nerd', 'E jhola · J diary · F3 stats');", "this.nerd = el('div', 'h nerd', 'Q jhola · I phone · J diary · F3 stats');"],
-    // the character preview: /beta's people renderer keeps every body's own meshes on layer 5 (beta/draw/skin.js) and
-    // draws them itself in the game; this little renderer has to look at that layer or the preview stays empty
-    ["const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 20);", "const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 20); cam.layers.enable(5);"]],
-  [S('game/studio.js')]: [["this.cam = new THREE.PerspectiveCamera(opts.fov ?? 24, w / h, 0.1, 30);", "this.cam = new THREE.PerspectiveCamera(opts.fov ?? 24, w / h, 0.1, 30); this.cam.layers.enable(5);      // (bodies' meshes: beta/draw/skin.js)"]],
+  // (the character preview and the outfit studio draw bodies through beta/draw/skin.js's views, as the game does)
+  [S('ui/hud.js')]: [["this.nerd = el('div', 'h nerd', 'E jhola · J diary · F3 stats');", "this.nerd = el('div', 'h nerd', 'Q jhola · I phone · J diary · F3 stats');"]],
   [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'], ['E', 'Jhola'],", "['F', 'Walk in, counters, pet'], ['E', 'Get in or out of a vehicle'], ['T', 'Talk to someone'], ['Q', 'Jhola'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
   [S('game/pilot.js')]: [
     // slowed on foot (dazed after Vetal: beta/game/powers.js sets slowMul)
