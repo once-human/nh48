@@ -44,6 +44,7 @@ import './vehicles/getout.js';
 import './vehicles/busdoors.js';
 import './vehicles/cabinfit.js';    // the cabin kept inside each car's own shell
 import './vehicles/footdown.js';    // a foot down on the road when a two-wheeler stops
+import './vehicles/wrecks.js';      // a vehicle you got out of goes on smoking and burning
 import './world/shutters.js';      // shutters that roll, with the rattle, and board lights that go with them
 import './world/flyovers.js';
 import './world/hills.js';
