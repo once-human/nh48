@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { People } from '@orig/people/peds.js';
 import { NearBoards } from '@orig/gfx/boards.js';
+import { glowSafe } from './buildings.js';
 
 const SECS = 3.5, HEAR = 40;
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Euler(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -62,7 +63,7 @@ People.prototype.update = function (dt, player, ...a) {
 const nbUpd = NearBoards.prototype.update;
 NearBoards.prototype.update = function (...a) {
   const out = nbUpd.apply(this, a), g = this.geo;
-  if (!this._glow) { this._glow = true; this.mat.userData.glow = true; this.mat.customProgramCacheKey = () => 'glow'; this.mat.needsUpdate = true; }
+  if (!this._glow) { this._glow = true; this.mat.userData.glow = true; this.mat.customProgramCacheKey = () => 'glow'; glowSafe(this.mat); this.mat.needsUpdate = true; }
   let A = g.attributes.aGlow;
   if (!A) { A = new THREE.BufferAttribute(new Float32Array(this.pos.length/3).fill(1), 1).setUsage(THREE.DynamicDrawUsage); g.setAttribute('aGlow', A); }
   let q = 0, ch = false;

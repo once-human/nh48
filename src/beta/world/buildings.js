@@ -19,7 +19,12 @@ import { paint, packGeo } from '../gfx/paint.js';
 
 export { setShutters, BASE };
 // a sign material whose boards each carry their own light (aGlow): its own program, not a plain sign's
-export const litMat = (m) => { m.userData.glow = true; m.customProgramCacheKey = () => 'glow'; return m; };
+// (the material's shared: the game's own boards, a street's name board, draw with it too and carry no light of their
+// own; without one the shader read whatever was left over, and they went black. They get a full one, always on)
+export const glowSafe = (m) => { if (m._glowSafe) return m; m._glowSafe = true; const b0 = m.onBeforeRender;
+  m.onBeforeRender = function (r, sc, cam, geo, obj, grp) { if (b0) b0.call(this, r, sc, cam, geo, obj, grp); if (geo && !geo.attributes.aGlow && geo.attributes.position) geo.setAttribute('aGlow', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count).fill(1), 1)); };
+  return m; };
+export const litMat = (m) => { m.userData.glow = true; m.customProgramCacheKey = () => 'glow'; return glowSafe(m); };
 
 // ---------------------------------------------------------------- the workers
 // A chunk's drawings are made on a few workers from the map alone, while the game works out its own part of the
