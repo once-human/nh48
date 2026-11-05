@@ -6,6 +6,7 @@
 // bench) as the few rectangles that cover it, and those go into the collision as walls round them.
 import * as THREE from 'three';
 import { signedArea, offsetRing } from './geom.js';
+import { Collision } from '@orig/world/mapdata.js';
 
 const CELL = 0.06, Y0 = 0.05, Y1 = 1.7;
 const cache = new Map();
@@ -106,7 +107,7 @@ export function makeSolids(W) {
 // A building's collision: its outline as a wall, except a petrol pump's canopy (style 7), a roof on columns you drive
 // in under: only its columns and the two pumps are solid, where world/builder.js's canopy() stands them.
 export function buildingSolid(B, ring, C) {
-  if (B[3] !== 7) { C.addRing(ring, 0); return; }
+  if (B[3] !== 7) { C.addRing(ring, 0); C.addPoly(ring); return; }
   const p = ring, n = p.length / 2; if (n < 3) return;
   const sgn = signedArea(p) > 0 ? 1 : -1, normals = new Float64Array(p.length);
   let cx = 0, cz = 0;
@@ -120,3 +121,58 @@ export function buildingSolid(B, ring, C) {
   for (let i = 0; i < n; i += Math.max(1, Math.floor(n / 4))) sq(inner[2 * i], inner[2 * i + 1], 0.5, 0.5);
   for (const k of [-1, 1]) sq(cx + k * 2.5, cz, 0.8, 0.5);
 }
+
+// A building is solid all through, not a line round it. Its outline was only walls: whatever got past one in a frame (a
+// shove, a car at speed, a dodge, someone thrown, someone set down on its edge) was inside, and the same walls kept it
+// there. Now each outline is also kept as the shape it is, and anything standing inside one is put out through the
+// nearest wall, the way it would have been stopped at it.
+function inPoly(p, x, z) {
+  let c = false;
+  for (let i = 0, n = p.length/2, j = n - 1; i < n; j = i++) {
+    const xi = p[2*i], zi = p[2*i + 1], xj = p[2*j], zj = p[2*j + 1];
+    if ((zi > z) !== (zj > z) && x < (xj - xi)*(z - zi)/(zj - zi) + xi) c = !c;
+  }
+  return c;
+}
+Collision.prototype.addPoly = function (pts) {
+  const n = pts.length/2; if (n < 3) return;
+  let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+  for (let i = 0; i < n; i++) { const x = pts[2*i], z = pts[2*i + 1]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+  const q = { p: pts, x0, z0, x1, z1, tag: this.tag }, c = this.cell, M = this.polys || (this.polys = new Map());
+  for (let i = Math.floor(x0/c); i <= Math.floor(x1/c); i++) for (let j = Math.floor(z0/c); j <= Math.floor(z1/c); j++) {
+    const k = this.key(i, j); let l = M.get(k); if (!l) M.set(k, l = []); l.push(q);
+  }
+};
+const res0 = Collision.prototype.resolve;
+Collision.prototype.resolve = function (x, z, r, out) {
+  const best = res0.call(this, x, z, r, out), M = this.polys;
+  if (!M) return best;
+  const l = M.get(this.key(Math.floor(x/this.cell), Math.floor(z/this.cell)));
+  if (!l) return best;
+  for (const q of l) {
+    if (x < q.x0 || x > q.x1 || z < q.z0 || z > q.z1 || !inPoly(q.p, x, z)) continue;
+    // inside: out through the nearest wall, just clear of it
+    const p = q.p, n = p.length/2;
+    let bd = 1e18, bx = x, bz = z;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const ax = p[2*j], az = p[2*j + 1], dx = p[2*i] - ax, dz = p[2*i + 1] - az, L2 = dx*dx + dz*dz || 1e-9;
+      let t = ((x - ax)*dx + (z - az)*dz)/L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const px = ax + dx*t, pz = az + dz*t, d2 = (x - px)**2 + (z - pz)**2;
+      if (d2 < bd) { bd = d2; bx = px; bz = pz; }
+    }
+    const d = Math.sqrt(bd) || 1e-6;
+    return { nx: (bx - x)/d, nz: (bz - z)/d, depth: d + r, kind: 0 };
+  }
+  return best;
+};
+const rm0 = Collision.prototype.removeTag;
+Collision.prototype.removeTag = function (tag, rect) {
+  rm0.call(this, tag, rect);
+  const M = this.polys; if (!M) return;
+  if (rect) {
+    const c = this.cell, i0 = Math.floor((rect[0] - 60)/c), i1 = Math.floor((rect[2] + 60)/c), j0 = Math.floor((rect[1] - 60)/c), j1 = Math.floor((rect[3] + 60)/c);
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const k = this.key(i, j), l = M.get(k); if (!l) continue; const kept = l.filter(q => q.tag !== tag); if (!kept.length) M.delete(k); else if (kept.length !== l.length) M.set(k, kept); }
+    return;
+  }
+  for (const [k, l] of M) { const kept = l.filter(q => q.tag !== tag); if (!kept.length) M.delete(k); else if (kept.length !== l.length) M.set(k, kept); }
+};
