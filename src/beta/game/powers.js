@@ -779,6 +779,8 @@ export function powers(G) {
     else if (!AC.busy) { const p = downed(); if (p) AC.grab(p); }
   }
 
+  // where your own body lies, on the minimap and the big map, while you're away in someone (game/hud.js, patched)
+  G.extraMarks = () => home ? [{ kind: 'body', x: home.body ? home.body.x : home.x, z: home.body ? home.body.z : home.z, label: 'Your body' }] : [];
   // ---------------------------------------------------------------- every frame
   const frame = G.frame.bind(G);
   let last = performance.now();

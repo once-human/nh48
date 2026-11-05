@@ -75,6 +75,15 @@ const PATCHES = {
     ["index.chunks[ci].extras.push({ kind: 'banner', x, z, fx, fz, s: rng.int(0, W.signs.banners.length - 1) });", "index.chunks[ci].extras.push({ kind: 'banner', x, z, fx, fz, s: rng.int(0, W.signs.banners.length - 1) }); (W.solid || (W.solid = makeSolids(W))).board('banner', x, z, fx, fz, collision);"]],
   [S('world/props.js')]: [["for (const w of M.walls) {", "for (const w of []) {"]],
   // the four-wheel ground of beta/vehicles/physics.js
+  // your own body on the minimap and the big map while you're away in someone (beta/game/powers.js: G.extraMarks)
+  [S('game/hud.js')]: [
+    ["const marks = g.rides ? g.rides.markers() : [];", "const marks = (g.rides ? g.rides.markers() : []).concat(g.extraMarks ? g.extraMarks() : []);"],
+    ["      if (m.kind === 'pax') {", "      if (m.kind === 'body') {\n        x.fillStyle = '#b26bff'; x.strokeStyle = '#fff'; x.lineWidth = 2;\n        x.beginPath(); x.arc(0, 0, 7, 0, Math.PI * 2); x.fill(); x.stroke();\n        x.fillStyle = '#fff'; x.beginPath(); x.arc(0, -2.5, 2, 0, Math.PI * 2); x.fill(); x.fillRect(-2.5, 0.5, 5, 4);\n      } else if (m.kind === 'pax') {"],
+    ["x.fillStyle = m.kind === 'pax' ? '#3ddc84' : '#ff3d24';", "x.fillStyle = m.kind === 'body' ? '#b26bff' : m.kind === 'pax' ? '#3ddc84' : '#ff3d24';"],
+    ["for (const m of (g.rides ? g.rides.markers() : [])) {", "for (const m of (g.rides ? g.rides.markers() : []).concat(g.extraMarks ? g.extraMarks() : [])) {"],
+    ["x.fillStyle = m.kind === 'pax' ? '#3ddc84' : '#ff3d24';", "x.fillStyle = m.kind === 'body' ? '#b26bff' : m.kind === 'pax' ? '#3ddc84' : '#ff3d24';"],
+    ["      x.beginPath(); x.arc(X, Y, 6, 0, Math.PI * 2); x.fill();", "      x.beginPath(); x.arc(X, Y, m.kind === 'body' ? 8 : 6, 0, Math.PI * 2); x.fill();\n      if (m.kind === 'body') { x.strokeStyle = '#fff'; x.lineWidth = 2; x.stroke(); x.font = '700 12px \"Baloo 2\"'; x.textAlign = 'left'; const t = 'Your body'; x.fillStyle = 'rgba(15,14,12,0.75)'; x.fillRect(X + 11, Y - 9, x.measureText(t).width + 8, 17); x.fillStyle = '#e6d2ff'; x.fillText(t, X + 15, Y + 4); }"],
+  ],
   [S('vehicles/vehicle.js')]: [
     ["case 'bike': case 'bikeP': case 'bullet': case 'superbike': return buildBike({ parked: true });", "case 'bike': case 'bikeP': return buildBike({ parked: true }); case 'bullet': case 'superbike': return buildBike({ parked: true, kind: type });"],
     ["    const hF = this.heightAt(this.x + hx * half, this.z + hz * half), hR = this.heightAt(this.x - hx * half, this.z - hz * half);\n    const jolt = Math.max(Math.abs(hF - this.prevH[0]), Math.abs(hR - this.prevH[1]));", "    const gr = this.ground(hx, hz, sp), hF = gr.f, hR = gr.r, jolt = gr.jolt;"],
