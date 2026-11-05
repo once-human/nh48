@@ -675,19 +675,40 @@ const PAINTED = [1, 1, 1, 1], WINDOW = [...GLASS, 4], BLACKOUT = [...TRIM, 0, MA
 const LOW_ROWS = [[0, 0], [.45, 0], [.8, 0], [.92, .012], [.965, .05], [.985, .11], [.99, .16], [.995, .28], [1, .42], [1.005, .56], [1.008, .68], [1.014, .775], [1, .8], [.985, .875], [.965, .945], [.93, .985], [.86, 1], [.6, 1.012], [.3, 1.02], [0, 1.024]];
 const SIDE_ROWS = [0, .05, .1, .3, .5, .7, .86, .93, 1], ROOF_ROWS = [.97, .9, .76, .55, .28, 0];
 const CHROMED = { lux: 1, sedan: 1, taxi: 1 };
+// The lines a model is drawn on beyond its numbers (carBody and the door cut share them): how its belt kicks up behind
+// the front door (Fortuner, Nexon), how its roof falls to the back (Nexon), how curved its windscreen is (flat on a
+// Bolero, swept on an Innova), and the rear deck that comes with all that.
+function shapeOf(spec, kind) {
+  const { L, H, hood, roofF, roofR, beltY, tail } = spec, lk = spec.look || {}, hl = L/2, sedan = tail > .3, xf0 = hl - hood, xr0 = -hl + tail, xb = (roofF + roofR)/2;
+  const low = kind === 'super' || kind === 'sports', kick = lk.kick || 0, slope = lk.slope || 0, xKs = xb - .05, xKe = xb - .5;
+  const beltAt = (x) => beltY + kick*sm((xKs - x)/(xKs - xKe));
+  const deck = (sedan ? beltY - .03 : beltY - .06) + kick, Hr = H - slope;
+  const roofAt = (x) => H - slope*Math.pow(Math.max(0, Math.min(1, (roofF - x)/(roofF - roofR))), 1.6);
+  const topAt = (x) => {
+    if (x > roofF) return H - (H - beltY - .015)*Math.pow((x - roofF)/(xf0 - roofF), lk.screen ?? (sedan || !low ? 1.2 : 1.05));
+    if (x < roofR) return Hr - (Hr - deck)*Math.pow((roofR - x)/(roofR - xr0), sedan ? 1.35 : 1.1);
+    return roofAt(x); };
+  const baseAt = (x) => x < roofR ? lerp(deck - .02, beltAt(roofR) - .04, sm((x - xr0)/(roofR - xr0))) : beltAt(x) - .04;
+  return { beltAt, deck, topAt, baseAt, roofAt, Hr, xKs, xKe, kick };
+}
 function carBody(b, gl, spec, kind = 'sedan') {
   const { L, W, H, hood, roofF, roofR, beltY, sill, R, tail } = spec;
   const hl = L/2, hw = W/2, sedan = tail > 0.3, xr0 = -hl + tail, xf0 = hl - hood, xb = (roofF + roofR)/2, xw = hl - spec.overhang, Ra = R + .055;
   const lk = spec.look || {}, GB = [.025, .025, .03, 0], dark = lk.pillars || lk.roof;   // gloss black: a floating roof, a contrast roof
-  const deck = sedan ? beltY - 0.03 : beltY - 0.06, jeep = kind === 'jeep', suv = kind === 'suv' || jeep, low = kind === 'super' || kind === 'sports', twoDoor = low || jeep, chrome = !!CHROMED[kind];
+  const SH = shapeOf(spec, kind), deck = SH.deck, bx = lk.box || 0, nose = lk.nose ?? 1, jeep = kind === 'jeep', suv = kind === 'suv' || jeep, low = kind === 'super' || kind === 'sports', twoDoor = low || jeep, chrome = !!CHROMED[kind];
+  // (boxy: the corners in plan squarer; nose: how far the bonnet falls to the front, 1 as the family has it)
+  const pw = (f) => hw*lerp(f, 1 - (1 - f)*.45, bx), xm0 = -hl + Math.max(.5, tail + .02);
+  const mid = [...new Set([xm0, SH.xKe, SH.xKs, 0, xf0 + .05].map(x => Math.round(x*1000)/1000))].filter(x => x >= xm0 && x <= xf0 + .05).sort((a, e) => a - e);
   const T = [
-    [-hl, hw*.8, sill + .17, deck - .17], [-hl + .015, hw*.86, sill + .12, deck - .11], [-hl + .05, hw*.91, sill + .075, deck - .06], [-hl + .14, hw*.96, sill + .03, deck - .02],
-    [-hl + .32, hw*.99, sill, deck], [-hl + Math.max(.5, tail + .02), hw, sill, beltY], [0, hw, sill, beltY], [xf0 + .05, hw, sill, beltY],
-    [hl - hood*.45, hw*.985, sill, beltY - .07], [hl - .22, hw*.96, sill + .01, beltY - .13], [hl - .09, hw*.91, sill + .035, beltY - .18], [hl - .03, hw*.86, sill + .08, beltY - .22], [hl, hw*.79, sill + .14, beltY - .27],
+    [-hl, pw(.8), sill + .17, deck - .17], [-hl + .015, pw(.86), sill + .12, deck - .11], [-hl + .05, pw(.91), sill + .075, deck - .06], [-hl + .14, pw(.96), sill + .03, deck - .02],
+    [-hl + .32, pw(.99), sill, deck], ...mid.map(x => [x, hw, sill, SH.beltAt(x)]),
+    [hl - hood*.45, pw(.985), sill, beltY - .07*nose], [hl - .22, pw(.96), sill + .01, beltY - .13*nose], [hl - .09, pw(.91), sill + .035, beltY - .18*nose], [hl - .03, pw(.86), sill + .08, beltY - .22*nose], [hl, pw(.79), sill + .14, beltY - .27*nose],
   ];
+  // the section: a boxy one stands its sides up and squares its shoulders
+  const ROWS = bx ? LOW_ROWS.map(([fz, fy], i) => [i >= 3 && i <= 16 && fz < 1 ? lerp(fz, 1 - (1 - fz)*.3, bx) : fz, fy]) : LOW_ROWS;
   const ringCache = new Map();
   const ringAt = (x) => { const key = Math.round(x*400); let r = ringCache.get(key); if (r) return r; const xq = key/400, w = tableAt(T, xq, 1), yb = tableAt(T, xq, 2), yt = tableAt(T, xq, 3);
-    r = LOW_ROWS.map(([fz, fy]) => [fz*w, yb + fy*(yt - yb)]); ringCache.set(key, r); return r; };
+    r = ROWS.map(([fz, fy]) => [fz*w, yb + fy*(yt - yb)]); ringCache.set(key, r); return r; };
   // where the body's skin is, at a height (side) / across (top)
   const zSide = (x, y) => { const r = ringAt(x); for (let i = 0; i < r.length - 1; i++) if (y <= r[i + 1][1]) { const k = (y - r[i][1])/Math.max(1e-5, r[i + 1][1] - r[i][1]); return lerp(r[i][0], r[i + 1][0], Math.max(0, k)); } return 0; };
   const yTop = (x, z) => { const r = ringAt(x); z = Math.abs(z); for (let i = 12; i < r.length - 1; i++) if (z >= r[i + 1][0]) { const k = (r[i][0] - z)/Math.max(1e-5, r[i][0] - r[i + 1][0]); return lerp(r[i][1], r[i + 1][1], k); } return r[r.length - 1][1]; };
@@ -725,11 +746,7 @@ function carBody(b, gl, spec, kind = 'sedan') {
   }
   // the greenhouse: one surface from the belt, up over the roof and down. Where the top line falls, the across-rows
   // are the windscreen and the rear glass; where it runs flat they're the roof; the side-rows are the door glass
-  const gwB = hw - .05, topAt = (x) => {
-    if (x > roofF) return H - (H - beltY - .015)*Math.pow((x - roofF)/(xf0 - roofF), sedan || !low ? 1.2 : 1.05);
-    if (x < roofR) return H - (H - deck)*Math.pow((roofR - x)/(roofR - xr0), sedan ? 1.35 : 1.1);
-    return H; };
-  const baseAt = (x) => x < roofR ? lerp(deck - .02, beltY - .04, sm((x - xr0)/(roofR - xr0))) : beltY - .04;
+  const gwB = hw - .05, topAt = SH.topAt, baseAt = SH.baseAt, roofAt = SH.roofAt;
   const xC = sedan ? roofR + .02 : (suv ? roofR + .06 : roofR + .16), xQ = kind === 'suv' || kind === 'lux' ? roofR + .62 : 1e9;
   const gs = [xr0, xf0, roofR, roofF, xb - .045, xb + .045, xC, xC + .05, roofF - .08, roofR + .05]; if (xQ < 1e8) gs.push(xQ - .04, xQ + .04);
   const gX = (a, e, n) => { for (let i = 0; i <= n; i++) gs.push(lerp(a, e, i/n)); };
@@ -738,7 +755,7 @@ function carBody(b, gl, spec, kind = 'sedan') {
   const GX = stationsOf(gs), side = SIDE_ROWS.length, RF = ROOF_ROWS.length, halfG = side + RF, fullG = halfG*2 - 1;
   const gP = GX.map((x) => {
     const top = topAt(x), base = baseAt(x), h = Math.max(.004, top - base), k = Math.min(1, h/.32), edgeY = top - .045*k, tall = Math.min(1, (edgeY - base)/Math.max(.05, H - base));
-    const ez = lerp(gwB*.965, gwB*.8, sm(tall)), half = [];
+    const ez = lerp(gwB*.965, gwB*lerp(.8, .9, bx), sm(tall)), half = [];
     for (const t of SIDE_ROWS) half.push([x, lerp(base, edgeY, t), lerp(gwB, ez, Math.pow(t, 1.1)) + Math.sin(t*Math.PI)*.012*k]);
     for (const u of ROOF_ROWS) half.push([x, edgeY + (top - edgeY)*(1 - u*u), ez*u]);
     const row = half.slice(); for (let i = half.length - 2; i >= 0; i--) row.push([x, half[i][1], -half[i][2]]);
@@ -814,7 +831,7 @@ function carBody(b, gl, spec, kind = 'sedan') {
     b.addGeo(G.sph2, M(mx - .03, my, s*mz, .022, .05, .082), [.38, .44, .5], 0, 4);
     b.addGeo(G.sphLo, M(mx + .03, my - .005, s*(mz + .06), .018, .012, .032), AMBER, .6);
     // window trim at the door tops is in the greenhouse; a rain gutter runs above it
-    tube(b, [[roofF + .06, H - .043, s*(gwB*.81 + .006)], [xb, H - .04, s*(gwB*.81 + .007)], [roofR - .02, H - .043, s*(gwB*.81 + .006)]], .005, TRIM, 6, 4);
+    tube(b, [[roofF + .06, roofAt(roofF + .06) - .043, s*(gwB*.81 + .006)], [xb, roofAt(xb) - .04, s*(gwB*.81 + .007)], [roofR - .02, roofAt(roofR) - .043, s*(gwB*.81 + .006)]], .005, TRIM, 6, 4);
   }
   // ------------------------------------- the hood and boot: shut lines, creases
   const seamT = (x0, x1, z0, z1, n = 6) => onTop(x0, x1, z0, z1, SEAM, { nu: n, nv: 1, off: .002 });
@@ -826,13 +843,13 @@ function carBody(b, gl, spec, kind = 'sedan') {
   // wipers lying at the foot of the windscreen
   for (const zz of [-.12, .42]) tube(b, [[xf0 - .03, beltY + .035, zz], [xf0 - .09, beltY + .058, zz - .25], [xf0 - .12, beltY + .08, zz - .5]], .0055, TRIM, 4, 4);
   // an aerial on the roof, a roof seam
-  tube(b, [[roofR + .1, H, 0], [roofR + .02, H + .05, 0], [roofR - .1, H + .15, 0]], .004, TRIM, 4, 4);
-  rbox(b, roofR + .06, H - .01, -.022, roofR + .2, H + .035, .022, TRIM, 0, MATTE);
+  { const Ha = roofAt(roofR + .1); tube(b, [[roofR + .1, Ha, 0], [roofR + .02, Ha + .05, 0], [roofR - .1, Ha + .15, 0]], .004, TRIM, 4, 4);
+    rbox(b, roofR + .06, Ha - .01, -.022, roofR + .2, Ha + .035, .022, TRIM, 0, MATTE); }
   if (kind === 'lux' || kind === 'sedan') for (const s of [-1, 1]) patch(b, 6, 1, (u, v) => [lerp(roofR + .12, roofF - .1, u), H - .004 - (s*(.42 + v*.012))**2*.09, s*(.42 + v*.012)], SEAM, [0, 1, 0]);
   if (kind === 'lux') patch(b, 8, 4, (u, v) => { const z = lerp(-.42, .42, v); return [lerp(roofF - .85, roofF - .22, u), H + .002 - z*z*.09, z]; }, WINDOW, [0, 1, 0]);
 
   // ------------------------------------- the nose
-  const yb0 = sill + .14, yt0 = beltY - .27, yM = (yb0 + yt0)/2, nW = tableAt(T, hl - .06, 1);
+  const yb0 = sill + .14, yt0 = beltY - .27*nose, yM = (yb0 + yt0)/2, nW = tableAt(T, hl - .06, 1);
   const lampY0 = jeep ? yt0 - .03 : Math.min(yt0 + .02, beltY - .22), lampY1 = beltY - .13;
   if (jeep) {
     // a jeep's face: slatted grille between round lamps, a steel bumper
@@ -899,7 +916,7 @@ function carBody(b, gl, spec, kind = 'sedan') {
   // a lit bar right across (Creta, Nexon); lamps standing up the D pillar (WagonR, Scorpio, Innova)
   if (lk.tailBar) onEnd(-1, -nR*.52, nR*.52, tY0 + (rH - tY0)*.6, tY0 + (rH - tY0)*.8, [...TAIL, 0, .85], { off: .013, nu: 10, nv: 1 });
   if (lk.tailV && !sedan) for (const s of [-1, 1]) for (const [c, o, w] of [[[.1, .02, .02], .008, 1], [[...TAIL, 0, .9], .014, .8]]) patch(b, 2, 8, (u, v) => {
-    const y = lerp(deck - .03, lerp(deck, H, lk.tailV), v), x = roofR - (roofR - xr0)*Math.pow(Math.max(0, (H - y)/(H - deck)), 1/1.1) - o, z = s*lerp(gwB*lerp(.97, .82, w), gwB*.985, u);
+    const Hr = SH.Hr, y = lerp(deck - .03, lerp(deck, Hr, lk.tailV), v), x = roofR - (roofR - xr0)*Math.pow(Math.max(0, (Hr - y)/(Hr - deck)), 1/1.1) - o, z = s*lerp(gwB*lerp(.97, .82, w), gwB*.985, u);
     return [x, y, z]; }, c, [-1, 0, 0]);
   else if (kind === 'lux' || kind === 'sedan') onEnd(-1, -nR*.5, nR*.5, tY0 + (rH - tY0)*.62, tY0 + (rH - tY0)*.78, chrome ? [...CHROME, 0] : [...TAIL, 0, .4], { off: .009, nu: 6, nv: 1 });
   // the boot lid's shut line, the bumper's seam and swell, a black valance, the plate in a recess
@@ -909,7 +926,7 @@ function carBody(b, gl, spec, kind = 'sedan') {
   onEnd(-1, -.27, .27, rY0 + .08, rY0 + .205, [.03, .03, .03, 0, MATTE], { off: .03, nu: 4, nv: 1 });
   onEnd(-1, -.25, .25, rY0 + .09, rY0 + .195, plate, { off: .036, nu: 4, nv: 1 });
   // a rear wiper and a stop lamp in the glass on a hatch; a lip on a boot; a wing on the fast ones
-  if (!sedan) { const ry = lerp(deck, H, .25); tube(b, [[xr0 + .02, ry, 0], [xr0 + .05, ry + .1, .15], [xr0 + .06, ry + .2, .3]], .005, TRIM, 4, 4); rbox(b, roofR - .05, H - .05, -.25, roofR + .03, H - .015, .25, [...TAIL], 0, .7); }
+  if (!sedan) { const H = SH.Hr, ry = lerp(deck, H, .25); tube(b, [[xr0 + .02, ry, 0], [xr0 + .05, ry + .1, .15], [xr0 + .06, ry + .2, .3]], .005, TRIM, 4, 4); rbox(b, roofR - .05, H - .05, -.25, roofR + .03, H - .015, .25, [...TAIL], 0, .7); }
   else patch(b, 10, 2, (u, v) => { const z = lerp(-hw*.84, hw*.84, u), x = lerp(-hl + .05, -hl + .12, v); return [x, yTop(x, z) + .004 + (1 - v)*.018*(1 - z*z), z]; }, PAINTED, [0, 1, 0]);
   if (low) { for (const s of [-1, 1]) rbox(b, -hl + .12, deck, s*hw*.72, -hl + .22, deck + .14, s*hw*.66, TRIM, 0, MATTE); rbox(b, -hl - .01, deck + .13, -hw*.86, -hl + .24, deck + .165, hw*.86, [1, 1, 1], 1); for (const s of [-1, 1]) for (let i = 0; i < 3; i++) rbox(b, xf0 - .02 - i*.03 + hood*.5, yTop(hl - hood*.5, s*.36) - .005, s*.2, xf0 + .005 - i*.03 + hood*.5, yTop(hl - hood*.5, s*.36) + .007, s*.5, SEAM.slice(0, 3), 0, MATTE); }
   // the exhaust: a pipe with its tip showing
@@ -921,7 +938,7 @@ function carBody(b, gl, spec, kind = 'sedan') {
   rbox(b, -hl + .5, sill - .1, hw*.2, -hl + 1.1, sill - .01, hw*.7, UNDER, 0, MATTE);
   // an SUV's rails and skid plates; a jeep's spare wheel on its back, hinges and a step
   if (suv) {
-    for (const s of [-1, 1]) { const z = s*gwB*.76; tube(b, [[roofF - .1, H - .01, z], [roofF - .16, H + .05, z], [xb, H + .055, z], [roofR + .14, H + .05, z], [roofR + .08, H - .01, z]], .012, kind === 'suv' ? CHROME : TRIM, 12, 5);
+    for (const s of [-1, 1]) { const z = s*gwB*.76; tube(b, [[roofF - .1, roofAt(roofF - .1) - .01, z], [roofF - .16, roofAt(roofF - .16) + .05, z], [xb, roofAt(xb) + .055, z], [roofR + .14, roofAt(roofR + .14) + .05, z], [roofR + .08, roofAt(roofR + .08) - .01, z]], .012, kind === 'suv' ? CHROME : TRIM, 12, 5);
       onSide(s, -xw + Ra + .02, xw - Ra - .02, sill + .05, sill + .1, [.2, .2, .22], { nu: 4, nv: 1, off: .03 }); }
     onEnd(1, -nW*.45, nW*.45, yb0 - .06, yb0 + .03, [.6, .6, .62], { off: .018, nu: 6, nv: 1 });
   }
@@ -962,10 +979,8 @@ export function doorOf(kind0) {
       top: (x) => { const b = at(x, 4); return b + (at(x, 5) - b)*.9 - .003; }, zIn: (x) => at(x, 1)*.45, hw: (x) => at(x, 1),
       hinge: [x1, at(x1, 1) + .004], handle: [x0 + .2, at(x0 + .2, 3) - .062], pull: [x0 + .32, at(x0 + .32, 3) - .1], len: x1 - x0, low: true };
   }
-  const { H, hood, roofF, roofR, beltY, sill, R, tail } = sp, sedan = tail > .3, xf0 = hl - hood, xb = (roofF + roofR)/2, xr0 = -hl + tail;
-  const deck = sedan ? beltY - .03 : beltY - .06, twoDoor = kind === 'jeep', suv = kind === 'suv' || twoDoor, x1 = xf0 + .04, x0 = twoDoor ? xb - .28 : xb;
-  const topAt = (x) => x > roofF ? H - (H - beltY - .015)*Math.pow((x - roofF)/(xf0 - roofF), 1.2) : x < roofR ? H - (H - deck)*Math.pow((roofR - x)/(roofR - xr0), sedan ? 1.35 : 1.1) : H;
-  const baseAt = (x) => x < roofR ? lerp(deck - .02, beltY - .04, sm((x - xr0)/(roofR - xr0))) : beltY - .04;
+  const { hood, roofF, roofR, beltY, sill, R } = sp, xf0 = hl - hood, xb = (roofF + roofR)/2;
+  const twoDoor = kind === 'jeep', suv = kind === 'suv' || twoDoor, x1 = xf0 + .04, x0 = twoDoor ? xb - .28 : xb, { topAt, baseAt } = shapeOf(sp, kind);
   const edge = (x) => { x = Math.min(x, xf0); const t = topAt(x), h = Math.max(.004, t - baseAt(x)); return t - .045*Math.min(1, h/.32); };
   return { x0, x0g: twoDoor ? x0 : xb + .045, x1, y0: sill + .075, belt: beltY, hood: xf0 - .02, wheel: [xw, R, R + .055 + (suv ? .065 : .04)],
     top: (x) => edge(x) - .004, zIn: (x, y) => (y < beltY + .015 ? .8 : .6)*hw, hw: () => hw,
@@ -989,8 +1004,14 @@ export function addVariantSpecs(SPECS) {
 // (City), tail lamps up the D pillar (tailV: how far up), flush handles (XUV700), a spare on the back (Bolero)
 const LOOK = {
   hatch: { pillars: true }, sedan: { grille: 'wide' }, taxi: { grille: 'wide' }, suv: { grille: 'big', drlBar: true, tailBar: true }, lux: { grille: 'wide', chrome: true },
-  wagonr: { tailV: .85 }, alto: {}, city: { wing: true, chrome: true }, nexon: { split: true, roof: true, tailBar: true }, xuv: { flush: true, grille: 'big' },
-  scorpio: { grille: 'slats', tailV: .8 }, fortuner: { grille: 'big', chrome: true }, bolero: { grille: 'slats', spare: true }, innova: { grille: 'big', chrome: true, tailV: .55 }, ertiga: { wing: true, chrome: true },
+  // and their own lines: box (0 round, 1 a brick), nose (how far the bonnet falls, 1 the family's), screen (the
+  // windscreen's curve: under 1 flat and upright, over 1 swept), kick (the belt rising behind the front door, m),
+  // slope (the roof falling to the back, m)
+  wagonr: { tailV: .85, box: .75, nose: .7, screen: .95 }, alto: { box: .05, nose: 1.15, screen: 1.3 }, city: { wing: true, chrome: true, screen: 1.45, slope: .03 },
+  nexon: { split: true, roof: true, tailBar: true, slope: .1, kick: .05, box: .25 }, xuv: { flush: true, grille: 'big', kick: .04, box: .35, screen: 1.3 },
+  scorpio: { grille: 'slats', tailV: .8, box: .85, nose: .5, screen: 1.0 }, fortuner: { grille: 'big', chrome: true, kick: .07, box: .45, nose: .65, screen: 1.25 },
+  bolero: { grille: 'slats', spare: true, box: 1, nose: .4, screen: .85 }, innova: { grille: 'big', chrome: true, tailV: .55, nose: 1.25, screen: 1.5, slope: .02, box: .3 },
+  ertiga: { wing: true, chrome: true, pillars: true, nose: 1.15, screen: 1.4, slope: .02 },
 };
 export function carSpec(kind) {
   if (VARIANTS[kind]) { const V = VARIANTS[kind], b = carSpec(V.base); return { ...b, ...V.spec, yellowPlate: b.yellowPlate, look: LOOK[kind] || {} }; }
