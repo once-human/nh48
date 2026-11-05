@@ -1,10 +1,12 @@
 import { freeTerminal } from './commands.js';
+import { liveMode } from './live.js';
 
 // What /beta changes about the game once it's made, from the outside (no game file is edited):
 //  - there's no auto of your own: you start on foot, and the auto the game keeps for you never shows up on the
 //    street, on the map or in a prompt (any other vehicle, autos in traffic included, is yours to take as always)
 //  - the title says Play instead of Story (there's no story here) and has no Experimental graphics: /beta is the new look
 //  - free roam has a terminal on / (commands.js)
+//  - Live Pune on the title: Pune's real clock and real weather (live.js)
 export function betaGame(G) {
   const P = G.player;
   const hideAuto = () => {
@@ -26,6 +28,7 @@ export function betaGame(G) {
   const start = G.startPlay.bind(G);
   G.startPlay = (shift) => { const r = start(shift); hideAuto(); return r; };
   freeTerminal(G);
+  liveMode(G);
 }
 
 // the title screen (the HUD exists once the game's init has run)
