@@ -1,6 +1,6 @@
 // The powers' light on a person's own body: a second skin on the same skeleton, a few millimetres out, lit at its
 // edges (where you see past them) so they glow round their outline and it moves as they move. It's strongest round
-// the head and only a breath on the rest of them, and it comes up slowly and goes down the same way. It belongs to
+// the head and only a breath on the rest of them, and it comes up slowly and goes out at once. It belongs to
 // the person, not the body the crowd happens to draw them on: when the crowd hands them another (they walked out of
 // range and back), the glow goes over with them at the strength it had.
 import * as THREE from 'three';
@@ -53,8 +53,9 @@ export function auras(G) {
     clock += dt;
     for (const [p, A] of on) {
       if (A.seen !== n) A.want = 0;
-      // it comes up as fast as the hold builds it; goes down slowly
-      A.k += (A.want - A.k)*Math.min(1, dt*(A.want > A.k ? 4 : 1.8));
+      // it comes up as fast as the hold builds it; the moment it's let go (or you look off them) it's gone, so you
+      // know it's stopped
+      A.k = A.want > A.k ? A.k + (A.want - A.k)*Math.min(1, dt*4) : A.want;
       const H = bodyOf(p);
       if (H !== A.H) dress(A, H);
       const U = A.mat.userData;

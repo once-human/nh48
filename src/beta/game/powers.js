@@ -36,6 +36,7 @@ import { auras } from './aura.js';
 import { people } from './wake.js';
 import { acts } from './acts.js';
 import { hostBody } from './host.js';
+import { Vehicle } from '@orig/vehicles/vehicle.js';
 
 const STORE = 'puneri_powers', DAILY = 3;
 // how strong your powers are: level 1 is half of what they'll be once they've grown (levelling up raises LV toward 1).
@@ -244,6 +245,25 @@ export function powers(G) {
   }
   let stick = null;                  // who the aim's on (Vetal's link or Brahmarakshas' read)
   const candidates = () => ppl() ? ppl().list.filter(p => !p.hidden && !p.corpse && !(p.fallen > 0) && !p.pax && !p._vetalBody && !p._wake && p.look) : [];
+  // and whoever's in the traffic round you: a rider close up is a real body on the seat (people/crowd.js riders); in a
+  // car, a bus, a far two-wheeler there's nobody drawn, so they're someone at the wheel made once for that vehicle
+  const DRV = ['kaka', 'dada', 'bhaiya', 'kpguy', 'collegeboy'];
+  const vehOf = (q) => q && (q._drv ? q.veh : q.rideOf) || null;
+  function drv(o) {
+    const r = o._riders && o._riders[0];
+    if (r && r.body) return r;
+    let d = o._drv;
+    if (!d) {
+      const kit = G.W?.kit; if (!kit) return null;
+      const female = Math.random() < 0.15, rng = { next: Math.random, chance: (q) => Math.random() < q, range: (a, b) => a + Math.random()*(b - a), pick: (a) => a[Math.floor(Math.random()*a.length)], int: (a, b) => a + Math.floor(Math.random()*(b - a + 1)) };
+      d = o._drv = { _drv: true, veh: o, id: (o.id || 0)*4 + 1e7 + 3, female, look: kit.randomLook(rng, { female, helmet: !!o.T?.two && o.type !== 'cycle' }), persona: female ? (Math.random() < 0.5 ? 'tai' : 'aunty') : DRV[Math.floor(Math.random()*DRV.length)], hp0: 100, mode: 'drive' };
+    }
+    d.x = o.rx ?? o.x; d.z = o.rz ?? o.z; d.yaw = Math.atan2(o.hz ?? 0, o.hx ?? 1);
+    return d;
+  }
+  const inVeh = (range) => { const out = [], F = R(); for (const o of G.traffic?.list || []) { if (!o.alive || o.wreck || o.fallen > 0 || !o.T || o.parked) continue; if (Math.abs(o.x - F.x) > range || Math.abs(o.z - F.z) > range) continue; const d = drv(o); if (d) out.push(d); } return out; };
+  const vCands = () => candidates().concat(inVeh(V_RANGE));
+  const stillThere = (q) => { const o = vehOf(q); return o ? !!G.traffic?.list.includes(o) && o.alive && !o.wreck : ppl().list.includes(q); };
   const bodyOf = (p) => p && p.body && p.body.H;
 
   // ---------------------------------------------------------------- Vetal
@@ -285,10 +305,20 @@ export function powers(G) {
     host = { look: q.look, persona: q.persona, cop: q.cop || q.police, name: q.name, female: !!(q.female || q.look?.female), id: q.id, kind: persona(q), hp0: q.hp0 || 100 };
     const hpR = clamp01((q.hp ?? q.hp0 ?? 100)/(q.hp0 || 100));
     HB.enter(q, Pl);
-    const x = q.x, z = q.z, th = q.yaw || 0;
-    ppl().remove(q);
-    raw(host.look);
-    Pl.teleportFoot(x, z, th, G.traffic);
+    const x = q.x, z = q.z, th = q.yaw || 0, o = vehOf(q);
+    if (!o) { ppl().remove(q); raw(host.look); Pl.teleportFoot(x, z, th, G.traffic); }
+    else {
+      // at their wheel, as it was going: the same vehicle, the same speed, you driving it now
+      raw(host.look);
+      if (!Pl.onFoot) Pl.exit(G.traffic, true);
+      Pl.teleportFoot(o.x, o.z, th, G.traffic);
+      const veh = new Vehicle(Pl.W, Pl.scene, Pl.vmats, o.type, o.col);
+      veh.reset(o.x, o.z, Math.atan2(o.hz ?? 0, o.hx ?? 1)); veh.v = Math.max(0, o.v || 0);
+      if ((o.y || 0) > 0.5 && Pl.W.fly) { const qd = Pl.W.fly.probe(o.x, o.z); if (qd) { veh.deck = qd.s.f; veh.y = qd.h; } }
+      veh.helmet = false; veh.plate = Pl.randomPlate ? Pl.randomPlate() : veh.plate; veh.vetal = true;
+      const idx = G.traffic.list.indexOf(o); if (idx >= 0) G.traffic.despawn(idx);
+      Pl.switchTo(veh);
+    }
     Pl.hp = hpMax()*(hpR || 1); hp0 = Pl.hp; heat0 = G.police?.heat || 0; strain = 0; strainShow = 0; punches = 0; calm = 0;
     hops++;
     AC.shudder();
@@ -305,12 +335,13 @@ export function powers(G) {
     humOn(1);
     blackout(() => {
       humOn(0);
-      if (!ppl().list.includes(q)) return;
+      if (!stillThere(q)) return;
       if (Math.random() < pr) {
         spend(3 + 2*sit(q));
         const who = nameOf(q);
-        // they felt you at the door: startled, and wary of you (a dada squares up)
-        q.angry = 3; if (persona(q) === 'dada') { q.grudge = 30; ppl().watch(q, R().x, R().z, 3); } else ppl().flee?.(q, R().x, R().z, 10);
+        // they felt you at the door: startled, and wary of you (a dada squares up; one at the wheel leans on the horn)
+        if (vehOf(q)) { const o = vehOf(q); o.angry = 6; if (G.traffic && !(o.honkT > 0)) { o.honkT = 2.5; G.traffic.honks.push({ x: o.x, z: o.z, kind: o.T?.honk, n: 3 }); } }
+        else if ((q.angry = 3) && persona(q) === 'dada') { q.grudge = 30; ppl().watch(q, R().x, R().z, 3); } else ppl().flee?.(q, R().x, R().z, 10);
         if (host) throwOut(`${who} threw you off`);
         else { dazeT = 14; coolT = 10; AC.foughtOff(); toast('Vetal', `${who} fought you off`, 'warn', 3); }
       } else { take(q); justIn = !!G.input?.key('KeyV'); }          // (still holding V: that letting go isn't a tap)
@@ -333,7 +364,9 @@ export function powers(G) {
   // how: soft (tapped V, or it ran out), thrown (they threw you out), ko (knocked out in them)
   function goHome(why, how = 'soft', D) {
     if (!home) return;
-    const Pl = P(), F = R(), b = home.body;
+    const Pl = P();
+    if (!Pl.onFoot) Pl.exit(G.traffic, true);                 // (they come to beside the vehicle you had them in)
+    const F = R(), b = home.body;
     if (AC.dragging) AC.stopDrag();
     if (host) release(host, F.x, F.z, how, D);
     HB.home(Pl);
@@ -378,7 +411,7 @@ export function powers(G) {
     if (down) held += dt;
     if (coolT > 0) coolT -= dt;
     if (down && !link && held > 0.35 && !justIn && coolT <= 0 && !black && P().onFoot) {
-      const p = aimAt(candidates(), V_RANGE);
+      const p = aimAt(vCands(), V_RANGE);
       if (p) { if (!S.free && S.vu < hopRange(hops)[0]/LV) { toast('Vetal', 'Not enough left in you for that', 'warn', 2); held = -1e9; } else link = { p, t: 0, need: holdFor(p) }; }
     }
     if (rel) {
@@ -389,15 +422,15 @@ export function powers(G) {
       held = 0;
     }
     if (link) {
-      const p = aimAt(candidates(), V_RANGE);
+      const p = aimAt(vCands(), V_RANGE);
       // look across to someone else and the link moves to them, from nothing again; look at nobody and it breaks
       if (p && p !== link.p) link = { p, t: 0, need: holdFor(p) };
-      else if (!p) { link.lost = (link.lost || 0) + dt; if (link.lost > 0.35) { earlyCost(link); link = null; humOn(0); toast('Vetal', 'The link broke: keep them in the middle', 'warn', 1.6); } }
+      else if (!p) { link.lost = (link.lost || 0) + dt; if (link.lost > 0.2) { earlyCost(link); link = null; humOn(0); toast('Vetal', 'The link broke: keep them in the middle', 'warn', 1.6); } }
       else link.lost = 0;
       if (link) {
         link.t += dt;
         // they feel it: they stop and look round, uneasy
-        if (link.t > 1.2 && link.p.mode !== 'watch' && link.p.mode !== 'fight' && !link.p._startle) ppl().watch(link.p, link.p.x + Math.cos(link.p.yaw || 0)*4, link.p.z + Math.sin(link.p.yaw || 0)*4, 2.5);
+        if (link.t > 1.2 && !vehOf(link.p) && link.p.mode !== 'watch' && link.p.mode !== 'fight' && !link.p._startle) ppl().watch(link.p, link.p.x + Math.cos(link.p.yaw || 0)*4, link.p.z + Math.sin(link.p.yaw || 0)*4, 2.5);
         humOn(link.t/link.need);
         if (link.t >= link.need) { const q = link.p; link = null; attempt(q); }
       }
@@ -451,7 +484,7 @@ export function powers(G) {
 
   // ---------------------------------------------------------------- Brahmarakshas (B, on foot): hold on someone
   let bl = null, bDone = false, readP = null, readT = 0;
-  const readable = () => (ppl()?.list || []).filter(p => !p.hidden && !p._vetalBody && p.look);
+  const readable = () => (ppl()?.list || []).filter(p => !p.hidden && !p._vetalBody && p.look).concat(inVeh(B_RANGE));
   function reading(p) {
     const k = persona(p), id = p.id || 0, mem = ppl().mem?.get(p.id) || {}, rep = ppl().rep?.at?.(p.x, p.z) || { good: 0, bad: 0 }, h = G.hour ?? 12;
     const [a0, a1] = AGE[k] || [30, 50], age = Math.round(a0 + (a1 - a0)*rnd(id, 1));
@@ -519,44 +552,49 @@ export function powers(G) {
 
   // ---------------------------------------------------------------- Munja (N, on foot): everyone near, through walls
   let nk = 0, nForce = 0, nSaid = false;
+  // the colours: the police blue, anyone with it in for you red, the people in your phone a cooler white, and
+  // everyone else the plain warm white (your own body violet, the dead grey)
+  const known = () => { const out = new Set(); for (const c of G.date?.contacts || []) out.add(c.name); for (const c of G.phone?.s?.contacts || []) out.add(c.name); return out; };
+  let knownSet = new Set(), knownT = 0;
   const intent = (p) => {
     const m = ppl().mem?.get(p.id) || {};
     if (p._vetalBody) return '#c79bff';
     if (p.corpse) return '#777777';
     if (p.cop || p.police) return '#4aa3ff';
     if (p.mode === 'fight' || p.angry > 0 || p.grudge > 0 || (m.hit && /dada|bhaiya|tai/.test(p.persona || ''))) return '#ff4d4d';
-    if (p.mode === 'flee' || m.saw || m.hit || m.shoved) return '#ffb020';
-    if (p.act && p.act.clip === 'wave') return '#3ddc84';
-    return '#e9e2d0';
+    if (p.name && knownSet.has(p.name)) return '#cfe4ff';
+    return '#efe6d2';
   };
   const near = () => { const F = R(), out = []; for (const p of ppl()?.list || []) { if (p.hidden) continue; const d = Math.hypot(p.x - F.x, p.z - F.z); if (d <= N_R) out.push([p, d]); } return out.sort((x, y) => x[1] - y[1]); };
   function munja(dt) {
     const want = (nForce > 0 || (!!G.input?.key('KeyN') && P().onFoot && !AC.busy)) && (S.mu > 0 || S.free);
     if (nForce > 0) nForce -= dt;
-    nk = want ? Math.min(1, nk + dt/N_UP) : Math.max(0, nk - dt/0.6);
+    nk = want ? Math.min(1, nk + dt/N_UP) : 0;                    // (let go and it's gone at once)
+    if (want && (knownT -= dt) <= 0) { knownT = 1; knownSet = known(); }
     if (want && nForce <= 0) spend2(N_DRAIN*dt);
     if (want && S.mu <= 0 && !S.free) toast('Munja', 'Spent. It comes back in time', 'warn', 2);
     if (!want) nSaid = false;
     if (!want && nk <= 0) S.mu = Math.min(100, S.mu + dt*(R_DAY + (R_NIGHT - R_DAY)*nightK())*N_REFILL);
     if (nk >= 1 && !nSaid) {
       nSaid = true;
-      let hos = 0, wary = 0, cop = 0, calm2 = 0;
-      for (const [p] of near()) { const c = intent(p); if (c === '#ff4d4d') hos++; else if (c === '#ffb020') wary++; else if (c === '#4aa3ff') cop++; else if (!p._vetalBody && !p.corpse) calm2++; }
-      toast('Munja', [hos && `${hos} hostile`, wary && `${wary} wary`, cop && `${cop} police`, `${calm2} calm`].filter(Boolean).join(', '), 'info', 2.5);
+      let hos = 0, kn = 0, cop = 0, calm2 = 0;
+      for (const [p] of near()) { const c = intent(p); if (c === '#ff4d4d') hos++; else if (c === '#cfe4ff') kn++; else if (c === '#4aa3ff') cop++; else if (!p._vetalBody && !p.corpse) calm2++; }
+      toast('Munja', [hos && `${hos} hostile`, cop && `${cop} police`, kn && `${kn} you know`, `${calm2} others`].filter(Boolean).join(', '), 'info', 2.5);
     }
   }
   const spend2 = (u) => { if (!S.free) S.mu = Math.max(0, S.mu - u/LV); };
   // where each of them is about to walk, lit on the ground ahead of them
-  const TR_N = 44, TR_M = 12;
-  let trail = null, trT = 0;
+  const TR_N = 44, TR_M = 12, TR_Q = TR_N*40;
+  let trail = null, trT = 0, trPh = 0;
   const TMP = [0, 0, 0, 0];
   function trailMesh() {
-    const g = new THREE.BufferGeometry(), nv = TR_N*TR_M*4;
+    const g = new THREE.BufferGeometry(), nv = TR_Q*4;
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nv*3), 3));
-    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(nv*3), 3));
-    const idx = new Uint32Array(TR_N*TR_M*6); for (let i = 0; i < TR_N*TR_M; i++) { const v = i*4; idx.set([v, v + 1, v + 2, v + 1, v + 3, v + 2], i*6); }
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(nv*4), 4));
+    const idx = new Uint32Array(TR_Q*6); for (let i = 0; i < TR_Q; i++) { const v = i*4; idx.set([v, v + 1, v + 2, v + 1, v + 3, v + 2], i*6); }
     g.setIndex(new THREE.BufferAttribute(idx, 1)); g.setDrawRange(0, 0);
-    const m = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, opacity: 0 });
+    // solid paint in their colour (light added on a bright road barely showed), seen through walls like the auras
+    const m = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, depthTest: false, toneMapped: false, side: THREE.DoubleSide, opacity: 0 });
     const mesh = new THREE.Mesh(g, m); mesh.frustumCulled = false; mesh.renderOrder = 19;
     G.scene.add(mesh); return mesh;
   }
@@ -574,7 +612,7 @@ export function powers(G) {
   }
   // the traffic too: everyone on a two-wheeler, in an auto, a car, a bus near you, and where they're headed down the road
   const vehNear = () => { const F = R(), T = G.traffic, out = []; if (!T) return out; for (const v of T.list) { if (!v.alive || v.wreck) continue; const d = Math.hypot(v.x - F.x, v.z - F.z); if (d <= N_R) out.push([v, d]); } return out.sort((a, b) => a[1] - b[1]); };
-  const vIntent = (v) => v.angry > 0 ? '#ff4d4d' : v.fallen > 0 ? '#ffb020' : '#e9e2d0';
+  const vIntent = (v) => v.angry > 0 ? '#ff4d4d' : '#efe6d2';
   function pathOfVeh(v) {
     const pts = [v.x, v.z], gr = ppl().g;
     if (!gr?.at || !v.l || v.jc) return pts;
@@ -611,25 +649,45 @@ export function powers(G) {
   const col = new THREE.Color();
   function trails(dt) {
     vGlow(smooth(nk));
-    if (nk <= 0.01) { if (trail) trail.material.opacity = 0; return; }
+    if (nk <= 0.01) { if (trail) { trail.material.opacity = 0; trail.geometry.setDrawRange(0, 0); } return; }
     if (!trail) trail = trailMesh();
-    trail.material.opacity = 0.75*smooth(nk);
-    if ((trT -= dt) > 0) return; trT = 0.12;
+    trail.material.opacity = smooth(nk);
+    trPh += dt;
+    if ((trT -= dt) > 0) return; trT = 1/30;
     const pos = trail.geometry.attributes.position.array, cl = trail.geometry.attributes.color.array, surf = G.W?.surf;
     let q = 0;
     const list = [];
     for (const [p] of near().slice(0, 28)) { if (!(p.fallen > 0 || p._vetalBody || p.corpse)) list.push([pathOf(p), intent(p)]); }
     for (const [v] of vehNear().slice(0, 16)) list.push([pathOfVeh(v), vIntent(v)]);
+    // each path as dashes 1 m long, 0.6 m apart, flowing the way they're going; a ribbon 30 cm wide, fading out ahead
+    const DASH = 1.0, GAP = 0.6, PER = DASH + GAP, HW = 0.15, flow = (trPh*2.2) % PER;
+    const quad = (ax, az, bx, bz, ya, yb, aa, ab) => {
+      if (q >= TR_Q) return;
+      const dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz) || 1, nx = -dz/l*HW, nz = dx/l*HW, v = q*12, c = q*16;
+      pos.set([ax + nx, ya, az + nz, ax - nx, ya, az - nz, bx + nx, yb, bz + nz, bx - nx, yb, bz - nz], v);
+      for (let j = 0; j < 4; j++) { const al = j < 2 ? aa : ab; cl[c + j*4] = col.r; cl[c + j*4 + 1] = col.g; cl[c + j*4 + 2] = col.b; cl[c + j*4 + 3] = al; }
+      q++;
+    };
+    const hAt = (x, z) => (surf ? surf.height(x, z) : 0) + 0.06;
     for (const [pts, c] of list) {
       if (pts.length < 4) continue;
       col.set(c);
-      const nseg = pts.length/2 - 1;
-      for (let i = 0; i < nseg && q < TR_N*TR_M; i++, q++) {
-        const ax = pts[i*2], az = pts[i*2 + 1], bx = pts[i*2 + 2], bz = pts[i*2 + 3], dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz) || 1, nx = -dz/l*0.08, nz = dx/l*0.08;
-        const ay = (surf ? surf.height(ax, az) : 0) + 0.05, by = (surf ? surf.height(bx, bz) : 0) + 0.05;
-        const fa = 1 - i/nseg, fb = 1 - (i + 1)/nseg, v = q*12;
-        pos.set([ax + nx, ay, az + nz, ax - nx, ay, az - nz, bx + nx, by, bz + nz, bx - nx, by, bz - nz], v);
-        for (let j = 0; j < 4; j++) { const fk = (j < 2 ? fa : fb)*0.9; cl[v + j*3] = col.r*fk; cl[v + j*3 + 1] = col.g*fk; cl[v + j*3 + 2] = col.b*fk; }
+      let tot = 0; for (let i = 0; i + 3 < pts.length; i += 2) tot += Math.hypot(pts[i + 2] - pts[i], pts[i + 3] - pts[i + 1]);
+      if (tot < 0.5) continue;
+      let d0 = 0;
+      for (let i = 0; i + 3 < pts.length && q < TR_Q; i += 2) {
+        const ax = pts[i], az = pts[i + 1], bx = pts[i + 2], bz = pts[i + 3], L = Math.hypot(bx - ax, bz - az);
+        if (L < 1e-3) continue;
+        // the dashes on this piece: [k*PER + flow, k*PER + flow + DASH] along the whole path
+        for (let k = Math.floor((d0 - flow)/PER) - 1; ; k++) {
+          const s0 = k*PER + flow, s1 = s0 + DASH;
+          if (s0 >= d0 + L) break;
+          const u0 = Math.max(s0, d0), u1 = Math.min(s1, d0 + L);
+          if (u1 <= u0) continue;
+          const t0 = (u0 - d0)/L, t1 = (u1 - d0)/L, x0 = ax + (bx - ax)*t0, z0 = az + (bz - az)*t0, x1 = ax + (bx - ax)*t1, z1 = az + (bz - az)*t1;
+          quad(x0, z0, x1, z1, hAt(x0, z0), hAt(x1, z1), 0.85*(1 - u0/tot), 0.85*(1 - u1/tot));
+        }
+        d0 += L;
       }
     }
     trail.geometry.setDrawRange(0, q*6);
@@ -673,10 +731,34 @@ export function powers(G) {
 
   // the lights on people this frame: Vetal's on whoever you're going into (only while you hold V), Brahmarakshas' on
   // whoever you're reading and have read, Munja's on everyone near (through walls); all building over the whole hold
+  // someone at the wheel with no body drawn (a car's driver behind the glass): the glow where they sit, head and
+  // shoulders, through the car
+  let sg = null;
+  function seatGlow(list) {
+    if (!sg) {
+      const g = new THREE.SphereGeometry(0.5, 16, 12), m = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, opacity: 0.55 });
+      sg = new THREE.InstancedMesh(g, m, 4); sg.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(12), 3); sg.frustumCulled = false; sg.renderOrder = 20; G.scene.add(sg);
+    }
+    let n = 0;
+    for (const [q, c, k] of list) {
+      const o = q.veh; if (!o || n >= 4 || k <= 0) continue;
+      const T = o.T || {}, L = T.L || 4, Wd = T.W || 1.7, bus = L > 6, two = !!T.two, hx = o.hx ?? 1, hz = o.hz ?? 0;
+      // where the driver sits: a two-wheeler's saddle; a car's right front seat; a bus's cab
+      const fwd = two ? 0 : bus ? L/2 - 1.3 : L*0.04, side = two ? 0 : Wd*0.22, y = (o.y || 0) + (two ? 1.25 : bus ? 2.1 : 1.0);
+      vm.compose(vp.set((o.rx ?? o.x) + hx*fwd - hz*side, y, (o.rz ?? o.z) + hz*fwd + hx*side), vq.identity(), vs.set(0.55, 0.85, 0.5));
+      sg.setMatrixAt(n, vm); col.set(c).multiplyScalar(k); sg.instanceColor.setXYZ(n, col.r, col.g, col.b); n++;
+    }
+    sg.count = n; sg.instanceMatrix.needsUpdate = true; sg.instanceColor.needsUpdate = true;
+  }
   function lights(dt) {
     stick = link ? link.p : bl ? bl.p : null;
-    if (link && G.state === 'play') AU.light(link.p, '#b26bff', 0.12 + 0.88*clamp01(link.t/link.need));
-    if (bl) AU.light(bl.p, '#ffb020', 0.12 + 0.88*clamp01(bl.t/B_HOLD));
+    const sl = [];
+    if (link && !(link.lost > 0) && link.p._drv && G.state === 'play') sl.push([link.p, '#b26bff', 0.12 + 0.88*clamp01(link.t/link.need)]);
+    if (bl && !(bl.lost > 0) && bl.p._drv) sl.push([bl.p, '#ffb020', 0.12 + 0.88*clamp01(bl.t/B_HOLD)]);
+    seatGlow(sl);
+    // (off the moment they're out of the middle of your view: you see it's let go)
+    if (link && !(link.lost > 0) && G.state === 'play') AU.light(link.p, '#b26bff', 0.12 + 0.88*clamp01(link.t/link.need));
+    if (bl && !(bl.lost > 0)) AU.light(bl.p, '#ffb020', 0.12 + 0.88*clamp01(bl.t/B_HOLD));
     if (readP && readT > 0) { readT -= dt; AU.light(readP, '#ffb020', Math.min(0.9, readT*0.35)); }
     if (nk > 0) { const k = 0.9*smooth(nk); for (const [p] of near().slice(0, 28)) AU.light(p, intent(p), k, true); }
     AU.tick(dt);
@@ -709,7 +791,7 @@ export function powers(G) {
       aimDot(P().onFoot && (!!G.input?.key('KeyV') || !!G.input?.key('KeyB')), link || bl);
       // say so: someone out cold at your feet can be dragged (and let go of), as the F offers are shown
       if (P().onFoot && !P().offer && G.hud?.prompt) { if (AC.dragging) G.hud.prompt('Z', 'Let go of them', 0.3); else if (!AC.busy && downed()) G.hud.prompt('Z', 'Drag them', 0.3); }
-    } else { wasV = false; held = 0; if (link) { link = null; humOn(0); } bl = null; nk = Math.max(0, nk - el/0.6); aimDot(false); }
+    } else { wasV = false; held = 0; if (link) { link = null; humOn(0); } bl = null; nk = 0; aimDot(false); }
     if (G.state === 'play') { PE.tick(el); AC.dragTick(el); }
     // a heavy head after you were thrown out: blurred, slow, clearing over the next minute
     // a heavy head: the picture swims (a slow lean and drift), soft and washed out, clearing over the minute
