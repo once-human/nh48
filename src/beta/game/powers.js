@@ -17,6 +17,7 @@
 // return body, read @look, sense, set mastery, toggle powerfree, and the power.* variables.
 import * as THREE from 'three';
 import { ikArm } from '@orig/people/humans.js';
+import { dizzyPose } from './dizzy.js';
 
 const STORE = 'puneri_powers', DAILY = 3, SENSE = 8, SENSE_R = 60;
 // how hard each kind of person holds on to themselves
@@ -115,7 +116,7 @@ export function powers(G) {
   };
 
   // ---------------------------------------------------------------- Vetal
-  let leaving = false, justIn = false, target = null, calm = 0, drag = null, dazeT = 0, link = null, host = null, home = null, strain = 0, held = 0, wasV = false, heat0 = 0, hp0 = 100, punches = 0;
+  let dz = null, leaving = false, justIn = false, target = null, calm = 0, drag = null, dazeT = 0, link = null, host = null, home = null, strain = 0, held = 0, wasV = false, heat0 = 0, hp0 = 100, punches = 0;
   const RANGE = 30;
   const candidates = () => ppl() ? ppl().list.filter(p => !p.hidden && !p.corpse && !(p.fallen > 0) && !p.pax && !p._vetalBody && p.look) : [];
   function aimed() {
@@ -163,7 +164,7 @@ export function powers(G) {
     const p = ppl().spawnAt(h.look, x, z, h.persona);
     if (!p) return;
     if (h.cop) p.cop = true; if (h.name) p.name = h.name;
-    p.mode = 'watch'; p.watch = { x: x + 1, z }; p.wait = 4; p.anim = 'no'; p.id = h.id;
+    p.mode = 'watch'; p.watch = { x: x + 1, z }; p.wait = 4; p.anim = null; p.id = h.id; p.dizzy = { t: 0, dur: 2.6, ph: Math.random()*6 };
     setTimeout(() => G.hud?.say?.(h.name || WHO[h.kind] || 'Someone', '', h.female ? 'How… how did I get here?' : 'How did I get here?', 3), 600);
   }
   function goHome(why, hard = false, quiet = false) {
@@ -197,10 +198,11 @@ export function powers(G) {
   function leaveSoft() {
     if (!home || leaving) return;
     const Pl = P(); leaving = true; Pl.frozen = true;
-    const H = Pl.human; H?.play?.(H.actions?.no ? 'no' : 'idle', { fade: 0.15, speed: 0.6 });
+    dz = { t: 0, dur: 0.5, ph: Math.random()*6 };
     veil.style.opacity = 1;
     setTimeout(() => {
       try {
+        dz = null;
         goHome(null, false, true);
         const H2 = P().human, g = H2?.actions?.getup;
         if (g) { H2.play('getup', { once: true, fade: 0.05 }); g.timeScale = 0; }
@@ -332,10 +334,18 @@ export function powers(G) {
   // ---------------------------------------------------------------- dragging someone who's down (your own body too)
   const downed = () => { if (!P().onFoot) return null; const F = R(), th = yaw(); let best = null, bs = 1e9; for (const p of (ppl()?.list || [])) { if (p.hidden || !(p.fallen > 0)) continue; const dx = p.x - F.x, dz = p.z - F.z, d = Math.hypot(dx, dz); if (d > 1.9) continue; const a = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - th), Math.cos(Math.atan2(dz, dx) - th))); if (a > 1.2) continue; if (d + a < bs) { bs = d + a; best = p; } } return best; };
   const grab = new THREE.Vector3();
+  let zPress = false;
+  addEventListener('keydown', (e) => {
+    if (e.code !== 'KeyZ' || e.repeat || G.state !== 'play' || !G.player?.onFoot) return;
+    if (!drag && !downed()) return;               // nobody down at your feet: Z is the weapons wheel as ever
+    e.preventDefault(); e.stopImmediatePropagation(); zPress = true;
+  }, true);
+  addEventListener('keyup', (e) => { if (e.code === 'KeyZ' && zPress) e.stopImmediatePropagation(); }, true);
   function dragStep(dt) {
-    if (took('KeyF')) {
+    if (zPress) {
+      zPress = false;
       if (drag) { drag = null; toast('Drag', 'Let go', 'info', 1); }
-      else { const p = downed(); if (p) { drag = { p, ease: 0 }; toast('Drag', `Dragging ${p._vetalBody ? 'your own body' : nameOf(p)}. F to let go`, 'info', 2.5); } }
+      else { const p = downed(); if (p) { drag = { p, ease: 0 }; toast('Drag', `Dragging ${p._vetalBody ? 'your own body' : nameOf(p)}. Z to let go`, 'info', 2.5); } }
     }
     if (!drag) return;
     const p = drag.p, Pl = P(), F = Pl.foot;
@@ -366,6 +376,7 @@ export function powers(G) {
       if (took('KeyO')) read(faced());
       if (took('Period')) senseOn();
       dragStep(el);
+      if (dz && !dizzyPose(P().human, dz, el, P().foot.yaw)) dz = null;
     } else { wasV = false; held = 0; target = null; if (link) { link = null; humOn(0); } }
     // a heavy head after you were thrown out: blurred, slow, clearing over the next minute
     if (dazeT > 0) { dazeT -= el; P().limpT = Math.max(P().limpT || 0, 0.3); const cv = G.renderer?.domElement; if (cv) cv.style.filter = dazeT > 0 ? `blur(${Math.min(3, dazeT/12).toFixed(2)}px) saturate(${(1 - Math.min(0.4, dazeT/100)).toFixed(2)})` : ''; }
