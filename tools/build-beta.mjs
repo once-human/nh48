@@ -97,6 +97,11 @@ const PATCHES = {
     ["      if (!(this.onFoot && this.offer) && this.useHook && this.useHook()) { /* walked in */ }\n      else if (this.onFoot && this.offer) this.enter(this.offer, traffic);\n      else if (!this.onFoot) this.exit(traffic);", "      if (this.onFoot && this.offer && this.offer.kind === 'pet') this.enter(this.offer, traffic);\n      else if (this.useHook) this.useHook();"],
     ["    if (input.took('KeyF') && this.busy <= 0) {", "    if (input.took('KeyE') && this.busy <= 0) { if (this.onFoot && this.offer && this.offer.kind !== 'pet') this.enter(this.offer, traffic); else if (!this.onFoot) this.exit(traffic); }\n    if (input.took('KeyF') && this.busy <= 0) {"],
     ["const consider = (d, o) => { if (d < bd) { bd = d; best = o; } };", "const consider = (d, o) => { if (d < bd) { bd = d; best = o; o.dist = d; } };"],
+    // the car you walked up to and opened is the one you drive (beta/vehicles/cardoor.js built it as the door opened),
+    // and whoever was at its wheel you've already hauled out
+    ["      veh = new Vehicle(this.W, this.scene, this.vmats, r.kind, r.col);", "      veh = offer.pre || new Vehicle(this.W, this.scene, this.vmats, r.kind, r.col);"],
+    ["      veh = new Vehicle(this.W, this.scene, this.vmats, o.type, o.col);", "      veh = offer.pre || new Vehicle(this.W, this.scene, this.vmats, o.type, o.col);"],
+    ["      const dr = this.spawnAngryDriver(o);", "      const dr = offer.drv !== undefined ? offer.drv : this.spawnAngryDriver(o);"],
   ],
   // talk to anyone: no hearts over strangers any more (yours keep theirs: blue in your phone, black your partner), and
   // anyone with a name in a room can be talked to; it opens the talk (beta/game/talk.js), chatting them up leads to dating
@@ -197,6 +202,8 @@ const PATCHES = {
     ["import { buildAuto, buildScooter, buildBike, buildCar, buildBus, buildTempo, buildCycle, buildLow, PAINTS } from '../vehicles/models.js';", "import { buildAuto, buildScooter, buildBike, buildCar, buildBus, buildTempo, buildCycle, buildLow, PAINTS, VARIANTS, addVariantTypes, baseOf } from '../vehicles/models.js';"],
     ["const TYPE_NAMES = Object.keys(TYPES);", "addVariantTypes(TYPES); const TYPE_NAMES = Object.keys(TYPES);"],
     ["tempo: buildTempo(), bus: buildBus(),", "tempo: buildTempo(), bus: buildBus(), ...Object.fromEntries(Object.keys(VARIANTS).map(k => [k, buildCar(k)])),"],
+    // a car you're getting into: the one built for you stands in its place (beta/vehicles/cardoor.js)
+    ["const seated = v.wreck || (v.rich", "if (v.hideBody) continue; const seated = v.wreck || (v.rich"],
     ["tot += t.w * (mix[k] ?? 1);", "tot += t.w * (mix[k] ?? mix[baseOf(k)] ?? 1);"],
     ["x -= t.w * (mix[k] ?? 1);", "x -= t.w * (mix[k] ?? mix[baseOf(k)] ?? 1);"],
   ],

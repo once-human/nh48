@@ -16,7 +16,8 @@ const BIG = new Set(['bus', 'tempo', 'truck']);
 const _t = new THREE.Vector3(), _a = new THREE.Vector3(), _c = new THREE.Vector3(), _f = new THREE.Vector3(), _pole = new THREE.Vector3(), _r = new THREE.Vector3();
 const sm = (k) => { k = Math.max(0, Math.min(1, k)); return k*k*(3 - 2*k); };
 const kindOfVeh = (P, v) => v === P.auto ? 'auto' : v.type;
-const styleOf = (k) => { const S = specOf(k); return S && S.two ? 'two' : k === 'auto' ? 'auto' : CAR.has(k) ? 'car' : BIG.has(k) ? 'step' : null; };
+// (cars: out through their own door, vehicles/cardoor.js)
+const styleOf = (k) => { const S = specOf(k); return S && S.two ? 'two' : k === 'auto' ? 'auto' : CAR.has(k) ? null : BIG.has(k) ? 'step' : null; };
 
 const exit = Pilot.prototype.exit;
 Pilot.prototype.exit = function (traffic, force = false) {

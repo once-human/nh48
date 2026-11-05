@@ -814,7 +814,7 @@ function carBody(b, gl, spec, kind = 'sedan') {
     b.addGeo(G.sph2, M(mx - .03, my, s*mz, .022, .05, .082), [.38, .44, .5], 0, 4);
     b.addGeo(G.sphLo, M(mx + .03, my - .005, s*(mz + .06), .018, .012, .032), AMBER, .6);
     // window trim at the door tops is in the greenhouse; a rain gutter runs above it
-    tube(b, [[roofF + .06, H - .05, s*(gwB*.81 + .006)], [xb, H - .046, s*(gwB*.81 + .007)], [roofR - .02, H - .05, s*(gwB*.81 + .006)]], .005, TRIM, 6, 4);
+    tube(b, [[roofF + .06, H - .043, s*(gwB*.81 + .006)], [xb, H - .04, s*(gwB*.81 + .007)], [roofR - .02, H - .043, s*(gwB*.81 + .006)]], .005, TRIM, 6, 4);
   }
   // ------------------------------------- the hood and boot: shut lines, creases
   const seamT = (x0, x1, z0, z1, n = 6) => onTop(x0, x1, z0, z1, SEAM, { nu: n, nv: 1, off: .002 });
@@ -949,6 +949,28 @@ export const VARIANTS = {
   ertiga: { base: 'suv', w: 0.9, spec: { L: 4.4, W: 1.74, H: 1.69, hood: 0.95, roofF: 1.0, roofR: -2.0, beltY: 0.98, sill: 0.3, R: 0.31, tail: 0.08, overhang: 0.75 }, phys: { name: 'MPV', model: 'Ertiga-style 1.5 CNG, seven seats', vTop: 44, acc: 2.8, mass: 1250 } },
 };
 export const baseOf = (k) => (VARIANTS[k] ? VARIANTS[k].base : k);
+
+// A front door as the body draws its shut lines (carBody, exotic), so the real panel can be cut out of the body and
+// hung on its hinge (vehicles/cardoor.js): its back edge (the B-pillar seam; the window's back edge just ahead of the
+// pillar), its front edge, the sill line under it, the top of its window, the hinge, the handle. Taken from the same
+// numbers the body is built from.
+export function doorOf(kind0) {
+  const kind = baseOf(kind0), sp = carSpec(kind0), hl = sp.L/2, hw = sp.W/2, xw = hl - sp.overhang;
+  if (kind === 'sports' || kind === 'super') {
+    const T = LINES[kind], por = kind === 'sports', at = (x, c) => tableAt(T, x, c), x0 = por ? -.92 : -.46, x1 = por ? .42 : .72;
+    return { x0, x0g: x0, x1, y0: sp.sill + .12, belt: at((x0 + x1)/2, 3), hood: 1e9, wheel: [xw, sp.R, sp.R + .09],
+      top: (x) => { const b = at(x, 4); return b + (at(x, 5) - b)*.9 - .003; }, zIn: (x) => at(x, 1)*.45, hw: (x) => at(x, 1),
+      hinge: [x1, at(x1, 1) + .004], handle: [x0 + .2, at(x0 + .2, 3) - .062], pull: [x0 + .32, at(x0 + .32, 3) - .1], len: x1 - x0, low: true };
+  }
+  const { H, hood, roofF, roofR, beltY, sill, R, tail } = sp, sedan = tail > .3, xf0 = hl - hood, xb = (roofF + roofR)/2, xr0 = -hl + tail;
+  const deck = sedan ? beltY - .03 : beltY - .06, twoDoor = kind === 'jeep', suv = kind === 'suv' || twoDoor, x1 = xf0 + .04, x0 = twoDoor ? xb - .28 : xb;
+  const topAt = (x) => x > roofF ? H - (H - beltY - .015)*Math.pow((x - roofF)/(xf0 - roofF), 1.2) : x < roofR ? H - (H - deck)*Math.pow((roofR - x)/(roofR - xr0), sedan ? 1.35 : 1.1) : H;
+  const baseAt = (x) => x < roofR ? lerp(deck - .02, beltY - .04, sm((x - xr0)/(roofR - xr0))) : beltY - .04;
+  const edge = (x) => { x = Math.min(x, xf0); const t = topAt(x), h = Math.max(.004, t - baseAt(x)); return t - .045*Math.min(1, h/.32); };
+  return { x0, x0g: twoDoor ? x0 : xb + .045, x1, y0: sill + .075, belt: beltY, hood: xf0 - .02, wheel: [xw, R, R + .055 + (suv ? .065 : .04)],
+    top: (x) => edge(x) - .004, zIn: (x, y) => (y < beltY + .015 ? .8 : .6)*hw, hw: () => hw,
+    hinge: [x1, hw + .004], handle: [twoDoor ? x0 + .14 : xb + .1, beltY - .118], pull: [x0 + .3, beltY - .06], len: x1 - x0, low: false };
+}
 // what the family keeps of its share once its models take theirs (hatch 10, sedan 7, suv 4 in main)
 const FAMILY_W = { hatch: 5.8, sedan: 5.2, suv: 1.6 };
 export function addVariantTypes(TYPES) {
