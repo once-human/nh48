@@ -93,10 +93,12 @@ export function soundscape(G) {
     for (const h of T.honks) {
       const d = Math.hypot(h.x - Pl.x, h.z - Pl.z); if (d > 70) continue;
       // a jam is a lot of vehicles close together, barely moving
-      let slow = 0; for (const o of T.list) if (Math.abs(o.x - h.x) < 16 && Math.abs(o.z - h.z) < 16 && Math.abs(o.v || 0) < 2.5) slow++;
-      const jam = slow >= 6, gap = jam ? 1400 : 9000;
-      if (now - (G._hornT || 0) < gap) continue;
-      if (!jam && Math.random() > 0.15) continue;
+      // (a red light isn't a jam: it takes a lot of vehicles, packed and crawling)
+      let slow = 0; for (const o of T.list) if (Math.abs(o.x - h.x) < 20 && Math.abs(o.z - h.z) < 20 && Math.abs(o.v || 0) < 2) slow++;
+      const jam = slow >= 9;
+      // in a jam, a horn every few seconds somewhere near; on a moving road, now and then (about one a minute)
+      if (now - (G._hornT || 0) < (jam ? 3500 : 25000)) continue;
+      if (Math.random() > (jam ? 0.5 : 0.25)) continue;
       G._hornT = now;
       A_.at(h.x, h.z, () => A_.horn(h.kind, jam ? 0.5 : 0.4, 0, Math.min(h.n || 1, jam ? 2 : 1)));
       break;
