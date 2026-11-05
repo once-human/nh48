@@ -115,7 +115,7 @@ export function powers(G) {
   };
 
   // ---------------------------------------------------------------- Vetal
-  let target = null, calm = 0, drag = null, dazeT = 0, link = null, host = null, home = null, strain = 0, held = 0, wasV = false, heat0 = 0, hp0 = 100, punches = 0;
+  let leaving = false, justIn = false, target = null, calm = 0, drag = null, dazeT = 0, link = null, host = null, home = null, strain = 0, held = 0, wasV = false, heat0 = 0, hp0 = 100, punches = 0;
   const RANGE = 30;
   const candidates = () => ppl() ? ppl().list.filter(p => !p.hidden && !p.corpse && !(p.fallen > 0) && !p.pax && !p._vetalBody && p.look) : [];
   function aimed() {
@@ -166,7 +166,7 @@ export function powers(G) {
     p.mode = 'watch'; p.watch = { x: x + 1, z }; p.wait = 4; p.anim = 'no'; p.id = h.id;
     setTimeout(() => G.hud?.say?.(h.name || WHO[h.kind] || 'Someone', '', h.female ? 'How… how did I get here?' : 'How did I get here?', 3), 600);
   }
-  function goHome(why, hard = false) {
+  function goHome(why, hard = false, quiet = false) {
     if (!home) return;
     const Pl = P(), F = R(), b = home.body;
     if (drag && drag.p === b) drag = null;
@@ -188,22 +188,42 @@ export function powers(G) {
       setTimeout(() => { H?.play?.('getup', { once: true, fade: 0.35, speed: 0.6 }); }, 2600);
       setTimeout(() => { Pl.frozen = false; }, 5200);
       if (why) toast('Vetal', why + '. You come round two minutes later, head pounding', 'warn', 4);
-    } else {
+    } else if (!quiet) {
       Pl.frozen = true; H?.play?.('getup', { once: true, fade: 0.25, speed: 0.85 });
       setTimeout(() => { Pl.frozen = false; }, 1700);
       if (why) toast('Vetal', why, 'warn', 3);
     }
+  }
+  function leaveSoft() {
+    if (!home || leaving) return;
+    const Pl = P(); leaving = true; Pl.frozen = true;
+    const H = Pl.human; H?.play?.(H.actions?.no ? 'no' : 'idle', { fade: 0.15, speed: 0.6 });
+    veil.style.opacity = 1;
+    setTimeout(() => {
+      try {
+        goHome(null, false, true);
+        const H2 = P().human, g = H2?.actions?.getup;
+        if (g) { H2.play('getup', { once: true, fade: 0.05 }); g.timeScale = 0; }
+        setTimeout(() => { if (g) g.timeScale = 0.9; setTimeout(() => { P().frozen = false; leaving = false; }, 1300); }, 500);
+        if (!g) { P().frozen = false; leaving = false; }
+      } catch (e) { P().frozen = false; leaving = false; }
+    }, 500);
   }
   // the punch key and the mouse, counted while you're in someone (a gentle body fighting strains the hold)
   addEventListener('keydown', (e) => { if (host && e.code === 'KeyX' && !e.repeat) punches++; }, true);
   addEventListener('mousedown', (e) => { if (host && e.button === 0 && document.pointerLockElement) punches++; }, true);
 
   function vetal(dt) {
-    const down = !!G.input?.key('KeyV') && !G.talkUI?.cur, press = down && !wasV;
+    // hold V on someone until you're in them (then let go: you stay); hold it on someone else to hop; a tap goes home
+    const down = !!G.input?.key('KeyV') && !G.talkUI?.cur && !leaving, rel = !down && wasV;
     wasV = down;
-    if (press) {
-      if (link) { link = null; humOn(0); toast('Vetal', 'Let them go', 'info', 1.2); }
-      else { const p = aimed(); if (p) link = { p, t: 0, need: timeIn(p) }; else if (host) goHome(); else toast('Vetal', 'Look at someone and press V', 'info', 2); }
+    if (down) held += dt;
+    if (down && !link && held > 0.12) { const p = aimed(); if (p) link = { p, t: 0, need: timeIn(p) }; }
+    if (rel) {
+      if (justIn) justIn = false;
+      else if (link) { link = null; humOn(0); toast('Vetal', 'Hold V until you\'re in', 'info', 1.6); }
+      else if (held < 0.35) { if (host) leaveSoft(); else toast('Vetal', 'Look at someone and hold V', 'info', 2); }
+      held = 0;
     }
     target = link ? link.p : aimed();
     if (link) {
@@ -215,7 +235,7 @@ export function powers(G) {
         // they feel it: they stop and look round
         if (link.t > 0.4 && link.p.mode !== 'watch' && link.p.mode !== 'fight') ppl().watch(link.p, R().x, R().z, 2);
         humOn(link.t/link.need);
-        if (link.t >= link.need) { const q = link.p; link = null; take(q); }
+        if (link.t >= link.need) { const q = link.p; link = null; justIn = true; take(q); }
       }
     }
     if (host) {
@@ -384,7 +404,7 @@ export function powers(G) {
     sh.reg('refill power [which:power]', 'fill them up: vetal, brahma, munja or all (default)', ([w = 'all']) => { if (w === 'all' || w === 'vetal') S.bar = 1; if (w === 'all' || w === 'brahma') S.brahma = 0; if (w === 'all' || w === 'munja') S.munja = 0; save(); say('refilled ' + w, 'ok'); }, { group: 'powers' });
     sh.reg('retake power', 'today\'s uses back, the bar full, and the strain gone', () => { S.bar = 1; S.brahma = 0; S.munja = 0; strain = 0; save(); say('all yours again', 'ok'); }, { group: 'powers' });
     sh.reg('take <who:sel>', 'Vetal: into them, now (no link)', ([s]) => { const [p] = persons(s); take(p, true); say('in', 'ok'); }, { group: 'powers' });
-    sh.reg('return body', 'Vetal: back to your own body', () => { if (!home) throw new Error('you are yourself'); goHome(); say('home', 'ok'); }, { group: 'powers' });
+    sh.reg('return body', 'Vetal: back to your own body', () => { if (!home) throw new Error('you are yourself'); leaveSoft(); say('home', 'ok'); }, { group: 'powers' });
     sh.reg('read <who:sel>', 'Brahmarakshas on anyone (uses one)', ([s]) => { const [p] = persons(s); read(p); }, { group: 'powers' });
     sh.reg('sense [seconds:num]', 'Munja (uses one)', ([t]) => { senseOn(+t || SENSE); }, { group: 'powers' });
     sh.reg('toggle powerfree [on:onoff]', 'powers cost nothing (testing)', ([a]) => { S.free = a === undefined ? !S.free : a === 'on'; save(); say(`free ${S.free ? 'on' : 'off'}`, 'ok'); }, { group: 'powers' });
