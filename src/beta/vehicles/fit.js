@@ -66,8 +66,9 @@ function hand(H, side) {
   }
   return (c[side] = f);
 }
+// (k below 0 opens the hand out of the clip's loose curl: flat to stroke or offer something)
 export function grip(H, side, k = 1) {
-  if (!H || k <= 0) return;
+  if (!H || !k) return;
   const f = hand(H, side); if (!f) return;
   H.root.updateMatrixWorld(true);
   f.f[0][0].getWorldPosition(_a); f.f[3][0].getWorldPosition(_b); _ax.subVectors(_b, _a).normalize();

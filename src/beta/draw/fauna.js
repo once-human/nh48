@@ -25,7 +25,8 @@ function bend(b, a1, t1, a2, t2) {
   if (a2 && t2) b.quaternion.premultiply(_rq.setFromAxisAngle(_ax.copy(a2).applyQuaternion(_pq), t2));
   (u.fq || (u.fq = new THREE.Quaternion())).copy(b.quaternion);
 }
-const bone = (m, n) => (m._fb || (m._fb = {}))[n] !== undefined ? m._fb[n] : (m._fb[n] = m.root.getObjectByName(n) || null);
+// (the loader drops the dots from the dog's and cat's bone names: Bone.003 comes in as Bone003)
+const bone = (m, n) => (m._fb || (m._fb = {}))[n] !== undefined ? m._fb[n] : (m._fb[n] = m.root.getObjectByName(n) || m.root.getObjectByName(n.replace(/\./g, '')) || null);
 
 const update = Fauna.prototype.update;
 Fauna.prototype.update = function (dt, cx, cz) {

@@ -50,6 +50,7 @@ import './world/hills.js';
 import './game/seat.js';
 import './game/view.js';           // first or third person, on foot and driving     // vehicles as boxes on four wheels
 import './game/stride.js';        // lean into turns and starts, feet on the ground under them, knees on landing
+import './game/pet.js';           // down by a dog to stroke it or feed it, a banana up to a cow, namaskar to her
 import { PU } from './gfx/paint.js';
 import { PlayerAuto } from '@orig/vehicles/player.js';
 import { Traffic } from '@orig/traffic/traffic.js';
