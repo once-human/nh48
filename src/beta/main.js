@@ -65,6 +65,7 @@ import './vehicles/getout.js';
 import './vehicles/haul.js';          // an auto's, a tempo's, a bus's driver hauled out before you take it
 import './vehicles/busdoors.js';
 import './vehicles/busboards.js';     // PMPML route boards: a real route's number and destination
+import './world/fade.js';             // street furniture fades in and out at the edge of its range
 import './world/stopnames.js';        // each bus shelter's own stop name on its board
 import './game/medics.js';            // paramedics wait while you're dragging the one they came for
 import './game/engines.js';           // every vehicle its own engine (a bicycle its freewheel), yours and the street's

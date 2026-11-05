@@ -2,7 +2,7 @@
 // own colours, animals, the metro, the far city, rooms...) compiles to this instead of three's lighting. The material
 // itself stays what the game made, so its colour, opacity, glow and textures go on working as the game sets them.
 import * as THREE from 'three';
-import { PU, LAMP, PCF } from './paint.js';
+import { PU, LAMP, PCF, DITHER } from './paint.js';
 
 export const inside = { value: 0 };           // (in a room: the sun has no say)
 
@@ -17,7 +17,13 @@ varying vec2 vMaskUV;
 #ifdef GLOW
 attribute float aGlow; varying float vGlow;
 #endif
+#ifdef FADE
+varying float vFd;
+#endif
 void main(){
+#if defined(FADE) && defined(USE_INSTANCING)
+  vFd = length((modelMatrix*instanceMatrix*vec4(0., 0., 0., 1.)).xz - cameraPosition.xz);
+#endif
 #ifdef GLOW
   vGlow = aGlow;
 #endif
@@ -63,7 +69,14 @@ ${PCF}
 float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.05 + .002*vZ), 1.); if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.;
   return shadowPCF(vec3(s.xy, s.z - .0006)); }
 #endif
+#ifdef FADE
+uniform vec4 uFade; varying float vFd;
+${DITHER}
+#endif
 void main(){
+#ifdef FADE
+  { float h = ditherH(), i = uFade.x > 0. ? clamp((vFd - uFade.x + uFade.y)/uFade.y, 0., 1.) : 1., o = clamp((vFd - uFade.z + uFade.w)/uFade.w, 0., 1.); if (h >= i || h < o) discard; }
+#endif
 #ifdef MASK
   if (texture2D(tMask, vMaskUV).r > .5) discard;
 #endif
@@ -112,9 +125,10 @@ void main(){
 }`;
 
 function paint(m, sh) {
-  const lit = m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial, head = (lit ? '#define PAINT_LIT\n' : '') + (sh.uniforms.tMask ? '#define MASK\n' : '') + (m.userData.glow ? '#define GLOW\n' : '');
+  const lit = m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial, head = (lit ? '#define PAINT_LIT\n' : '') + (sh.uniforms.tMask ? '#define MASK\n' : '') + (m.userData.glow ? '#define GLOW\n' : '') + (m._fadeU ? '#define FADE\n' : '');
   sh.vertexShader = head + VS; sh.fragmentShader = head + FS;
   Object.assign(sh.uniforms, { uReal: PU.uReal, uTaps: PU.uTaps, uSoft: PU.uSoft, sunDir: PU.sunDir, sunCol: PU.sunCol, shadeCol: PU.shadeCol, fogCol: PU.fogCol, fogDensity: PU.fogDensity, tNoise: PU.tNoise, shadowTex: PU.shadowTex, shadowMat: PU.shadowMat, shadowTexel: PU.shadowTexel, shadowOn: PU.shadowOn, dayK: PU.dayK, uInside: inside, tLamp: PU.tLamp, lampC: PU.lampC, lampY: PU.lampY, headP: PU.headP, headD: PU.headD });
+  if (m._fadeU) sh.uniforms.uFade = m._fadeU;
 }
 const stock = (m) => m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial || m.isMeshBasicMaterial || m.isLineBasicMaterial;
 

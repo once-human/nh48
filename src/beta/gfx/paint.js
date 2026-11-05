@@ -578,3 +578,8 @@ export class Paint {
 const _v2 = new THREE.Vector2();
 // the one Paint (made by main.js before the world is built; the builders and the material swaps reach it here)
 export let paint = null;
+
+// the same few pixels for everyone, in a fine even scatter: a near model fading out over a band at the edge of its range
+// leaves exactly the pixels the far one fading in takes (keep h above the fade on one side, below it on the other), so
+// nothing's ever drawn twice or missing while one swaps for the other
+export const DITHER = `float ditherH(){ return fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715)))); }`;

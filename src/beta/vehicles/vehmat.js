@@ -3,13 +3,16 @@
 // painted shader instead of the game's: poster colour in two tones, pencil in the shade, the sky and street along the
 // body as brushed bands, a sun glint on paint and chrome, lit glass, tyres matte, lamps that burn at night.
 import * as THREE from 'three';
-import { PU, LAMP, PCF } from '../gfx/paint.js';
+import { PU, LAMP, PCF, DITHER } from '../gfx/paint.js';
 
 const VS = `attribute float glow; attribute float paint;
 #ifdef USE_INSTANCING
 attribute vec3 aColB, aColC; attribute vec2 aLamp;
 #endif
 uniform vec2 uLamp; varying vec2 vLp;
+#ifdef FADE
+varying float vFd;
+#endif
 varying vec3 vN, vW, vC, vL; varying float vG, vP, vZ;
 void main(){
 #ifdef USE_INSTANCING
@@ -24,6 +27,9 @@ void main(){
 #ifdef USE_INSTANCING
   if (paint > 1.5 && paint < 2.5) base *= aColB; else if (paint > 2.5 && paint < 3.5) base *= aColC;
   mat4 M = modelMatrix*instanceMatrix;
+#ifdef FADE
+  vFd = length((M*vec4(0., 0., 0., 1.)).xz - cameraPosition.xz);
+#endif
 #else
   mat4 M = modelMatrix;
 #endif
@@ -31,9 +37,15 @@ void main(){
   vec4 w = M*vec4(position, 1.); vW = w.xyz; vN = mat3(M)*normal;
   vec4 v = viewMatrix*w; vZ = -v.z; gl_Position = projectionMatrix*v; }`;
 const GLASS_VS = `varying vec3 vN, vW, vC, vL; varying float vG, vP, vZ;
+#ifdef FADE
+varying float vFd;
+#endif
 void main(){
 #ifdef USE_INSTANCING
   mat4 M = modelMatrix*instanceMatrix;
+#ifdef FADE
+  vFd = length((M*vec4(0., 0., 0., 1.)).xz - cameraPosition.xz);
+#endif
 #else
   mat4 M = modelMatrix;
 #endif
@@ -42,6 +54,13 @@ const CHUNK = `precision highp float; precision highp sampler2DShadow;
 varying vec3 vN, vW, vC, vL; varying float vG, vP, vZ;
 uniform sampler2D tNoise; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, skyCol, fogCol, uTint; uniform float shadowTexel, shadowOn, fogDensity, dayK, uNight, uRough, uMetal;
 float nz(vec2 p){ return texture2D(tNoise, p/16.).r; }
+#ifdef FADE
+uniform vec4 uFade; varying float vFd;
+${DITHER}
+#define FADE_OUT { float h = ditherH(), i = uFade.x > 0. ? clamp((vFd - uFade.x + uFade.y)/uFade.y, 0., 1.) : 1., o = clamp((vFd - uFade.z + uFade.w)/uFade.w, 0., 1.); if (h >= i || h < o) discard; }
+#else
+#define FADE_OUT
+#endif
 ${LAMP}
 ${PCF}
 float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.05 + .002*vZ), 1.); if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.;
@@ -49,6 +68,7 @@ float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.05 + .002*vZ), 1
 `;
 const FS = CHUNK + `varying vec2 vLp;
 void main(){
+  FADE_OUT
   vec3 n = normalize(vN), V = normalize(cameraPosition - vW), b = vC; float matte = vG < -.5 ? 1. : 0., painted = abs(vP - 1.) < .5 ? 1. : 0.;
   float glassy = step(3.5, vP), e = (nz(gl_FragCoord.xy*.11) - .5)*(1. - uReal), ndl = dot(n, sunDir), lit = sunOn(ndl, e*.1, .0, .13), sh = (shadowOn > .5 && lit > 0.) ? shadeOf(shadowAt(vW, n), e*.3) : 1., L = lit*sh*dayK;
   // grime low down on the body, a little wear
@@ -77,6 +97,7 @@ void main(){
   float f = fogDensity*vZ, mir = matte > .5 ? 0. : (glassy*.72 + painted*(.3 - .22*grime) + (1. - painted)*(1. - glassy)*.18); gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1. - clamp(mir, 0., .95)); }`;
 // glass: dark with the sky across it, a brushed streak, someone's shape behind it left to the imagination
 const GLASS_FS = CHUNK + `void main(){
+  FADE_OUT
   vec3 n = normalize(vN), V = normalize(cameraPosition - vW); if (!gl_FrontFacing) n = -n;
   vec3 R = reflect(-V, n); float e = nz(gl_FragCoord.xy*.09) - .5, hz = smoothstep(-.05, .12, R.y + e*.1), fres = .25 + .75*pow(1. - max(dot(n, V), 0.), 2.5);
   vec3 env = mix(vec3(.1, .1, .1)*(.3 + .7*dayK), skyCol*(.25 + .75*dayK)*1.1, hz), c = mix(uTint, env, clamp(fres*(.75 + .25*step(.2, fract(vW.x*1.3 + vW.z*1.1 + vW.y*2.1 + e))), 0., .9));
