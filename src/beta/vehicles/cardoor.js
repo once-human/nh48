@@ -169,6 +169,8 @@ function showStandIn(P, E) {
   v.reset(src.x, src.z, src.th ?? Math.atan2(src.hz, src.hx));
   v.y = E.offer.kind === 'parked' ? P.W.surf.height(src.x, src.z) : (src.y || 0);
   v.v = 0; v.sync(0); v.root.visible = true;
+  // its cabin in from the start (seats, wheel, dash): the door opens on the inside of a car, not an empty shell
+  if (v.cockpit) v.cockpit.group.visible = true;
   // (the parked rows only re-cull once the camera's moved 6 m: made to now, or the parked car stays drawn round this one)
   if (E.offer.kind === 'parked') { for (const it of src.items) it.off = true; P.W._propX = undefined; }
   else if (E.offer.kind === 'traffic') src.hideBody = true;
