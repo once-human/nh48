@@ -94,7 +94,11 @@ const PATCHES = {
     ["if (['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super'].includes(type)) {", "if (['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super'].includes(baseOf(type))) {"],
     ["export function defaultPaint(type, rng) {", "export function defaultPaint(type, rng) {\n  type = baseOf(type);"],
     // a car corners on its tyres (beta/vehicles/tyres.js); two-wheelers keep the leaning model below
-    ["    // ---- steering (bicycle model, less lock at speed)\n", "    if (!S.two && this.tyres) this.tyres(dt, inp, thr); else {\n    // ---- steering (bicycle model, less lock at speed)\n"],
+    ["    // ---- steering (bicycle model, less lock at speed)\n", "    if (!S.two && this.tyres) this.tyres(dt, inp, thr); else if (S.two && this.twoWheel) this.twoWheel(dt, inp, thr); else {\n    // ---- steering (bicycle model, less lock at speed)\n"],
+    // a two-wheeler leans as beta/vehicles/twowheel.js works out (its own limits), and a superbike's front can come up
+    ["const leanT = S.two ? clamp(Math.atan(this.latAcc / 9.81), -0.6, 0.6)", "const leanT = S.two ? (this.bikeLean !== undefined ? this.bikeLean : clamp(Math.atan(this.latAcc / 9.81), -0.6, 0.6))"],
+    ["this.lean += (leanT - this.lean) * Math.min(1, dt * 6);", "this.lean += (leanT - this.lean) * Math.min(1, dt * (S.two && this.bikeLean !== undefined ? 30 : 6));"],
+    ["this.tilt.position.set(0, this.y + idle - (this.lower || 0), 0);\n    this.tilt.rotation.set(this.lean, 0, this.pitch, 'YXZ');", "this.tilt.position.set(0, this.y + idle - (this.lower || 0) + (this.wheelie ? Math.sin(this.wheelie) * this.spec.wb * 0.5 : 0), 0);\n    this.tilt.rotation.set(this.lean, 0, this.pitch + (this.wheelie || 0), 'YXZ');"],
     ["    this.latAcc = this.v * this.w;\n", "    }\n    this.latAcc = this.v * this.w;\n"],
     // (a car's handbrake is the locked back wheels in tyres.js, not a flat drag on top)
     ["if (inp.handbrake) a -= Math.sign(v) * (S.two ? 3.5 : 4.5);", "if (inp.handbrake && (S.two || !this.tyres)) a -= Math.sign(v) * (S.two ? 3.5 : 4.5);"],

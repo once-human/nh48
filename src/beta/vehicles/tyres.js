@@ -8,7 +8,7 @@
 // wheels so they slide wherever the car's going. A drift is what's left: the back steps out, opposite lock and the
 // throttle hold it, and it comes back when you let it. Each car has its own weight, balance, drive and centre of
 // gravity, so a rear-engined coupé, a front-drive hatch, a 4x4 and a bus all handle like themselves.
-// (Two-wheelers keep the game's own leaning model; longitudinal: engine, brakes, gears, drag are the game's.)
+// (Two-wheelers lean to turn instead: beta/vehicles/twowheel.js. Longitudinal: engine, brakes, gears, drag are the game's.)
 import { Vehicle } from '@orig/vehicles/vehicle.js';
 import { clamp, lerp } from '@orig/core/util.js';
 import { baseOf } from './models.js';
