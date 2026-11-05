@@ -25,8 +25,6 @@ Interiors.prototype.use = function (s) {
   let k; do k = Math.floor(Math.random()*POSES.length); while (k === last); last = k;
   // the glass is on the wall a metre on from where you stand (world/interiors.js: the boutique's mirror on its +x wall)
   P._mir = { pose: POSES[k], t: 0, yaw: Math.atan2(0, 1), side: Math.random() < 0.5 ? 1 : -1 };
-  // in first person your own head isn't drawn (it's your eyes): the camera steps back for the look, and in after
-  const rig = this.g.rig; if (rig && rig.footFP) { rig.footFP = false; P._mir.fp = rig; }
   P.act = { kind: 'hurt', t: 0, dur: D };
   P.human.play(CLIP[POSES[k]] || 'idle', { fade: 0.3, restart: true });
 };
@@ -36,13 +34,13 @@ Pilot.prototype.updateFoot = function (dt, ...rest) {
   const M = this._mir;
   if (!M) return upd.call(this, dt, ...rest);
   const F = this.foot, H = this.human;
-  if (!this.onFoot || !H || !this.act || this.act.kind !== 'hurt' || this.downT > 0) { if (M.fp) M.fp.footFP = true; this._mir = null; return upd.call(this, dt, ...rest); }
+  if (!this.onFoot || !H || !this.act || this.act.kind !== 'hurt' || this.downT > 0) { this._mir = null; return upd.call(this, dt, ...rest); }
   M.t += dt;
   // to the glass (side-on: turned most of the way off it)
   const want = M.yaw + (M.pose === 'side' ? M.side*1.0*smooth(M.t/0.7) : 0);
   F.yaw += wrap(want - F.yaw)*Math.min(1, dt*6);
   const out = upd.call(this, dt, ...rest);
-  if (M.t >= D) { if (M.fp) M.fp.footFP = true; this._mir = null; H.play('idle', { fade: 0.4 }); return out; }
+  if (M.t >= D) { this._mir = null; H.play('idle', { fade: 0.4 }); return out; }
   pose(H, F, M);
   return out;
 };

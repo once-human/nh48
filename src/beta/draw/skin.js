@@ -4,6 +4,8 @@
 // person (body, shirt, trousers, hair...) is one instanced draw that reads them. Those closest get a smoother body.
 import * as THREE from 'three';
 const _hp = new THREE.Vector3();
+// where your head is (w 1 once it's found): any camera inside it, your own eyes, doesn't draw it; every other one does
+const HEAD = { value: new THREE.Vector4() };
 import { PU, LAMP, PCF } from '../gfx/paint.js';
 import { RNG } from '@orig/core/util.js';
 import { Wardrobe, buildCloth, dress } from './wardrobe.js';
@@ -40,11 +42,15 @@ const SHADOW_FS = `precision highp float; out vec4 o; void main(){ o = vec4(0.);
 const COMMON = `precision highp float; precision highp sampler2D; precision highp sampler2DShadow;
 in vec3 vN, vW, vB, vC; in vec2 vU; in float vZ; flat in int vS; out vec4 o;
 uniform sampler2D tSkin, tMap, tNoise; uniform vec3 cameraPosition; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, fogCol; uniform float shadowTexel, shadowOn, fogDensity, dayK;
+uniform vec4 uHead;
 ${LAMP}
 vec4 LK(int i){ return texelFetch(tSkin, ivec2(${LOOK} + i, vS), 0); }
-// seated in a car: nothing of you below the car's floor (the legs would show under the body). First person: your head
-// and hair only, above the neck, so the eyes see out; the rest of you, hands and what they hold, stays
-bool seatClip(){ if (vS < 0) return false; vec4 c = LK(10); if (c.w > .5 && vW.y < c.x) return true; vec4 h = LK(11); return h.w > .5 && ((vW.y > h.y && length(vW.xz - h.xz) < .2) || distance(vW, cameraPosition) < .17); }
+// seated in a car: nothing of you below the car's floor (the legs would show under the body). And a camera looking out
+// from inside your head (your own eyes, first person) sees out past it: for that camera alone the head, hair, helmet and
+// glasses above the neck aren't drawn. Every other view of you (a mirror, a cutscene, someone else) has the whole head.
+bool inHead(vec4 h){ return h.w > .5 && distance(cameraPosition, h.xyz) < .45; }
+bool seatClip(){ if (vS < 0) return inHead(uHead) && vW.y > uHead.y && length(vW.xz - uHead.xz) < .22;
+  vec4 c = LK(10); if (c.w > .5 && vW.y < c.x) return true; vec4 h = LK(11); return inHead(h) && ((vW.y > h.y && length(vW.xz - h.xz) < .2) || distance(vW, cameraPosition) < .17); }
 float nz(vec2 p){ return texture(tNoise, p/16.).r; }
 // a little height on the surface, seen as light: folds, weave, pores
 vec3 bump(vec3 n, vec3 w, float h){ vec3 sx = dFdx(w), sy = dFdy(w), r1 = cross(sy, n), r2 = cross(n, sx); float det = dot(sx, r1); return normalize(abs(det)*n - sign(det)*(dFdx(h)*r1 + dFdy(h)*r2)); }
@@ -219,7 +225,7 @@ export class Skin {
     const key = type + (map ? map.uuid : '');
     let m = this.prog.get(key); if (m) return m;
     const fs = { body: BODY, cloth0: CLOTH, cloth1: CLOTH, cloth2: CLOTH, cloth3: CLOTH, shoe: SHOE, hair: HAIR, eyes: EYES, plain: PLAIN }[type];
-    const un = Object.assign({}, PU, { tSkin: { value: this.tex }, tMap: { value: map || null } }); if (type.startsWith('cloth')) un.uWhich = { value: +type[5] };
+    const un = Object.assign({}, PU, { tSkin: { value: this.tex }, tMap: { value: map || null }, uHead: HEAD }); if (type.startsWith('cloth')) un.uWhich = { value: +type[5] };
     m = new THREE.RawShaderMaterial({ vertexShader: VS, fragmentShader: fs, uniforms: un, glslVersion: THREE.GLSL3, side: /cloth/.test(type) ? THREE.DoubleSide : THREE.FrontSide });
     if (type === 'cloth0' || type === 'hair') { m.polygonOffset = true; m.polygonOffsetFactor = type === 'hair' ? -2 : -1; m.polygonOffsetUnits = type === 'hair' ? -6 : -2; }
     if (type === 'plain') { m.polygonOffset = true; m.polygonOffsetFactor = -3; m.polygonOffsetUnits = -8; }
@@ -272,7 +278,7 @@ export class Skin {
     const g = new THREE.InstancedBufferGeometry(); g.setAttribute('position', geo.attributes.position); g.setAttribute('normal', geo.attributes.normal); if (geo.index) g.setIndex(geo.index);
     const cap = SLOTS; for (let i = 0; i < 4; i++) g.setAttribute('iM' + i, new THREE.InstancedBufferAttribute(new Float32Array(cap*4), 4).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('iCol', new THREE.InstancedBufferAttribute(new Float32Array(cap*3), 3).setUsage(THREE.DynamicDrawUsage)); g.instanceCount = 0;
-    if (!this.rigidMats) { this.rigidMats = {}; for (const [kn, fs] of [['plain', PLAIN], ['hair', HAIR2], ['cloth', SOFT]]) { const un = Object.assign({}, PU, { tSkin: { value: this.tex }, tMap: { value: null } }); this.rigidMats[kn] = new THREE.RawShaderMaterial({ vertexShader: RIGID_VS, fragmentShader: fs, uniforms: un, glslVersion: THREE.GLSL3, side: THREE.DoubleSide }); } this.rigidMat = this.rigidMats.plain; }
+    if (!this.rigidMats) { this.rigidMats = {}; for (const [kn, fs] of [['plain', PLAIN], ['hair', HAIR2], ['cloth', SOFT]]) { const un = Object.assign({}, PU, { tSkin: { value: this.tex }, tMap: { value: null }, uHead: HEAD }); this.rigidMats[kn] = new THREE.RawShaderMaterial({ vertexShader: RIGID_VS, fragmentShader: fs, uniforms: un, glslVersion: THREE.GLSL3, side: THREE.DoubleSide }); } this.rigidMat = this.rigidMats.plain; }
     if (false) { const un = {}; this.rigidMat = new THREE.RawShaderMaterial({ vertexShader: RIGID_VS, fragmentShader: PLAIN, uniforms: un, glslVersion: THREE.GLSL3, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -8 }); }
     if (geo.attributes.sway) g.setAttribute('sway', geo.attributes.sway);
     const m = new THREE.Mesh(g, this.rigidMats[geo.userData.kind] || this.rigidMat); m.frustumCulled = false; m.visible = false; m.renderOrder = -2; m.cap = cap; m.fill = 0; this.scene.add(m);
@@ -287,6 +293,7 @@ export class Skin {
   }
   update(camera, playerH) {
     const K = this.kit, cx = camera.position.x, cz = camera.position.z, near = [];
+    HEAD.value.w = 0;
     camera.getWorldDirection(v3); const fx = v3.x, fz = v3.z;
     this.frame++;
     for (const H of K.bodies) {
@@ -310,7 +317,7 @@ export class Skin {
       for (let b = 0; b < nb; b++) { const i = b*16, o = row + b*12; D[o] = m[i]; D[o + 1] = m[i + 4]; D[o + 2] = m[i + 8]; D[o + 3] = m[i + 12]; D[o + 4] = m[i + 1]; D[o + 5] = m[i + 5]; D[o + 6] = m[i + 9]; D[o + 7] = m[i + 13]; D[o + 8] = m[i + 2]; D[o + 9] = m[i + 6]; D[o + 10] = m[i + 10]; D[o + 11] = m[i + 14]; }
       const u = H.mat.userData, O = row + LOOK*4, col = (i, c) => { D[O + i*4] = c.r; D[O + i*4 + 1] = c.g; D[O + i*4 + 2] = c.b; }, vec = (i, q) => { D[O + i*4] = q.x; D[O + i*4 + 1] = q.y; D[O + i*4 + 2] = q.z; D[O + i*4 + 3] = q.w; };
       col(0, u.top); col(1, u.bottom); col(2, u.skin); col(3, u.shoe); vec(4, u.cut); vec(5, H.style); col(6, H.pat); vec(7, H.fit); vec(8, H.arm); vec(9, u.body); D[O + 40] = H._clipY ?? 0; D[O + 43] = H._clipY === undefined ? 0 : 1; D[O + 47] = 0;
-      if (H === playerH && H._fp) { const hb = H._hb || (H._hb = H.body.skeleton.getBoneByName('Head') || H.body.skeleton.bones.find(q => /head/i.test(q.name))); if (hb) { hb.getWorldPosition(_hp); const hm = H.holder.matrixWorld.elements; H._headOff = { x: _hp.x - hm[12], y: _hp.y - hm[13], z: _hp.z - hm[14] }; D[O + 44] = _hp.x; D[O + 45] = _hp.y - 0.03; D[O + 46] = _hp.z; D[O + 47] = 1; } }
+      if (H === playerH) { const hb = H._hb || (H._hb = H.body.skeleton.getBoneByName('Head') || H.body.skeleton.bones.find(q => /head/i.test(q.name))); if (hb) { hb.getWorldPosition(_hp); const hm = H.holder.matrixWorld.elements; H._headOff = { x: _hp.x - hm[12], y: _hp.y - hm[13], z: _hp.z - hm[14] }; D[O + 44] = _hp.x; D[O + 45] = _hp.y - 0.03; D[O + 46] = _hp.z; D[O + 47] = 1; HEAD.value.set(_hp.x, _hp.y - 0.03, _hp.z, 1); } }
       if (D_ && D_.clothK) { D[O + 23] = D_.clothK; col(6, D_.pat); }
       const helmeted = H.xtra && H.xtra.helm && H.xtra.helm.visible, topC = u.top;
       for (const o of H._sk) {
@@ -325,9 +332,8 @@ export class Skin {
       if (D_) {
         for (const X of D_.cloth) { const R = this.parts[k].get(X.n); if (!R) continue; const P = (H._d2 < hi2 && R.hi) ? R.hi : R.lo, A = P.geometry.attributes, j = P.fill++; if (j >= SLOTS) continue; const c = X.c || topC; A.iSlot.array[j] = s; A.iCol.array[j*3] = c.r; A.iCol.array[j*3 + 1] = c.g; A.iCol.array[j*3 + 2] = c.b; if (R.sh && H._d2 < CAST2) R.sh.geometry.attributes.iSlot.array[R.sh.fill++] = s; }
         const put = (g, b, c) => { const r = this.rigidOf(g), j = r.fill++; if (j >= r.cap) return; const A = r.geometry.attributes, o = b*16; for (let i = 0; i < 4; i++) { const a = A['iM' + i].array; a[j*4] = m[o + i*4]; a[j*4 + 1] = m[o + i*4 + 1]; a[j*4 + 2] = m[o + i*4 + 2]; a[j*4 + 3] = m[o + i*4 + 3]; } A.iCol.array[j*3] = c.r; A.iCol.array[j*3 + 1] = c.g; A.iCol.array[j*3 + 2] = c.b; };
-        const eyes = H === playerH && H._fp;          // (their hair and hat aren't drawn over your eyes)
-        if (!helmeted && !eyes && D_.hair && W_.hair[D_.hair]) put(W_.hair[D_.hair], W_.headB, D_.hairCol);
-        for (const it of D_.items) { if (eyes && it.b === W_.headB) continue; if (helmeted && it.b === W_.headB && it.g.userData.kind !== 'hair' && it.g.index && it.g.index.count > 3000) continue; put(it.g, it.b, it.c); }
+        if (!helmeted && D_.hair && W_.hair[D_.hair]) put(W_.hair[D_.hair], W_.headB, D_.hairCol);
+        for (const it of D_.items) { if (helmeted && it.b === W_.headB && it.g.userData.kind !== 'hair' && it.g.index && it.g.index.count > 3000) continue; put(it.g, it.b, it.c); }
       }
       for (const o of H._rg) {
         if (D_ && H.xtra && (o === H.xtra.pony || o === H.xtra.braid || o === H.xtra.cap || o === H.xtra.glasses || o === H.xtra.lens)) continue;      // (theirs are drawn above)
