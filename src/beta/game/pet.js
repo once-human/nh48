@@ -15,6 +15,7 @@ const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const bone = (H, n) => (H._pb || (H._pb = {}))[n] || (H._pb[n] = H.root.getObjectByName(n));
 const HEAD = { dog: 'Bone003', cat: 'Bone003', cow: 'Head' };     // (the loader drops the dots: Bone.003 in the file)
 const _ua = new THREE.Vector3(), _ub = new THREE.Vector3(), _st = new THREE.Vector3(), _vi = new THREE.Vector3(), _hd = new THREE.Vector3(), _t = new THREE.Vector3(), _p = new THREE.Vector3(), _r = new THREE.Vector3(), _k = new THREE.Vector3();
+const _ns = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
 const _ft = [new THREE.Vector3(), new THREE.Vector3()], _fq = [new THREE.Quaternion(), new THREE.Quaternion()], _pq = new THREE.Quaternion(), _q = new THREE.Quaternion();
 function turn(b, axis, ang) {
   if (!b || !b.parent || !ang) return;
@@ -178,16 +179,28 @@ Pilot.prototype.updateFoot = function (dt, ...rest) {
     const h = sm(t/0.4)*(1 - sm((t - (D - 0.45))/0.4));
     turn(bone(H, 'spine_03'), _r, -0.16*h); turn(bone(H, 'neck_01'), _r, -0.28*h);
     H.root.updateMatrixWorld(true);
-    const s3 = bone(H, 'spine_03');
-    if (s3) {
-      // the wrists together a hand's width in front of the breastbone, the heels of the hands touching; the hands
-      // turned so the palms meet flat, fingers up and a little forward, thumbs toward the chest
-      s3.getWorldPosition(_k).add(_p.set(fx*0.2, -0.13, fz*0.2));
-      const up = _ua.set(fx*0.25, 1, fz*0.25).normalize(), fw = _ub.set(fx, 0, fz);
-      for (const [sd, o] of [['l', -0.028], ['r', 0.028]]) {
-        ikArm(H, sd, _t.copy(_k).addScaledVector(_r, o), _p.set(-fx*0.2, -1, -fz*0.2).addScaledVector(_r, sd === 'l' ? -1.2 : 1.2), h);
-        setHand(H, sd, up, fw, h);
-        grip(H, sd, -1.0*h);
+    // Which way is your right is taken from your own shoulders, not worked out from the way you face: from the
+    // heading it came out the other way round to the bones, so each hand was sent to the far side of the other and
+    // the arms crossed. Right = left shoulder to right shoulder (square to the way you face): each hand on its own side.
+    const sl = bone(H, 'upperarm_l'), sr = bone(H, 'upperarm_r');
+    if (sl && sr) {
+      sl.getWorldPosition(_ns[0]); sr.getWorldPosition(_ns[1]);
+      const fw = _ub.set(fx, 0, fz), rt = _ns[2].subVectors(_ns[1], _ns[0]); rt.y = 0; rt.addScaledVector(fw, -rt.dot(fw));
+      if (rt.lengthSq() > 1e-6) {
+        rt.normalize();
+        // the meeting point: in front of the breastbone, a hand's width out, a little under the shoulders' height
+        _k.addVectors(_ns[0], _ns[1]).multiplyScalar(0.5).addScaledVector(fw, 0.24); _k.y -= 0.24;
+        // fingers up and a little forward; thumbs to the chest, the little fingers out front (index to little finger
+        // runs forward on both hands, which with fingers up turns each palm in to the other)
+        const up = _ua.set(fw.x*0.25, 1, fw.z*0.25).normalize();
+        for (const [sd, sg] of [['l', -1], ['r', 1]]) {
+          // the wrist just to its own side of the middle; the elbow out to its own side, down and a touch back
+          _t.copy(_k).addScaledVector(rt, sg*0.03);
+          _p.copy(rt).multiplyScalar(sg*1.2).addScaledVector(fw, -0.2); _p.y -= 1;
+          ikArm(H, sd, _t, _p, h);
+          setHand(H, sd, up, fw, h);
+          grip(H, sd, -1.0*h);
+        }
       }
     }
   }
