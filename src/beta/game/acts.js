@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { Pilot } from '@orig/game/pilot.js';
 import { ikArm } from '@orig/people/humans.js';
 import { ikLeg } from './fists.js';
-import { UP, bone, smooth, bell, turn, shiftPelvis, worldOf, axes, safe, dizzyPose } from './dizzy.js';
+import { UP, bone, smooth, bell, turn, turnHeld, shiftPelvis, worldOf, axes, safe, dizzyPose } from './dizzy.js';
 
 const f = new THREE.Vector3(), r = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), tg = new THREE.Vector3(), pole = new THREE.Vector3(), cd = new THREE.Vector3();
 const wrap = (x) => Math.atan2(Math.sin(x), Math.cos(x));
@@ -256,7 +256,7 @@ export function acts(G) {
       const feet = {}; for (const s of ['l', 'r']) { const x = worldOf(H, 'foot_' + s, new THREE.Vector3()); if (x) feet[s] = x; }
       shiftPelvis(H, tg.set(0, -0.36*k, 0).addScaledVector(f, -0.1*k));
       turn(bone(H, 'spine_01'), r, -0.28*k); turn(bone(H, 'spine_02'), r, -0.22*k); turn(bone(H, 'spine_03'), r, -0.12*k);
-      turn(bone(H, 'neck_01'), r, 0.18*k); turn(bone(H, 'Head'), r, -0.2*k);       // (the head stays up, the eyes on them)
+      turnHeld(bone(H, 'neck_01'), r, 0.18*k); turnHeld(bone(H, 'Head'), r, -0.2*k);       // (the head stays up, the eyes on them)
       for (const s of ['l', 'r']) if (feet[s]) { pole.copy(f).addScaledVector(UP, 0.1).addScaledVector(r, s === 'r' ? 0.25 : -0.25); safe(() => ikLeg(H, s, feet[s], pole, 1)); }
     }
     // hands under their arms

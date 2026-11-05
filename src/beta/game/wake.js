@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { Crowd } from '@orig/people/crowd.js';
 import { ikArm } from '@orig/people/humans.js';
 import { ikLeg } from './fists.js';
-import { UP, bone, smooth, bell, turn, shiftPelvis, worldOf, axes, safe, dizzyPose } from './dizzy.js';
+import { UP, bone, smooth, bell, turn, turnHeld, shiftPelvis, worldOf, axes, safe, dizzyPose } from './dizzy.js';
 
 const OLD = new Set(['ajoba', 'aaji']);
 const LINES = {
@@ -152,16 +152,22 @@ export function people(G) {
     const L = D.loc, ly = p.yaw ?? 0, lx = L.arm.x - L.feet.x, lz = L.arm.z - L.feet.z;
     const dir = new THREE.Vector3(lx*Math.cos(ly) - lz*Math.sin(ly), 0, lx*Math.sin(ly) + lz*Math.cos(ly)).normalize(), ax = new THREE.Vector3().crossVectors(dir, UP).normalize();
     const th = D.theta || 0;
+    // (lifted from where the crowd stood them this frame; if nothing has stood them again since last frame's lift, from
+    // where they were before it, so the lift never adds up)
+    const hs = Hd.userData._lift;
+    if (hs && Hd.quaternion.equals(hs.q) && Hd.position.equals(hs.p)) { Hd.quaternion.copy(hs.q0); Hd.position.copy(hs.p0); Hd.updateMatrixWorld(true); ft.copy(hs.ft); }
+    const q0 = Hd.quaternion.clone(), p0 = Hd.position.clone(), ft0 = ft.clone();
     if (th > 0.001) {
       q.setFromAxisAngle(ax, th);
       Hd.position.sub(ft).applyQuaternion(q).add(ft);
       Hd.quaternion.premultiply(q);
       Hd.updateMatrixWorld(true);
     }
+    Hd.userData._lift = { q: Hd.quaternion.clone(), p: Hd.position.clone(), q0, p0, ft: ft0 };
     // the head falls back, swaying with the steps
     const ph = D.ph || 0;
-    turn(bone(H, 'neck_01'), ax, -0.55*th - 0.05*Math.sin(ph)*w);
-    turn(bone(H, 'Head'), ax, -0.35*th + 0.04*Math.sin(ph + 0.8)*w);
+    turnHeld(bone(H, 'neck_01'), ax, -0.55*th - 0.05*Math.sin(ph)*w);
+    turnHeld(bone(H, 'Head'), ax, -0.35*th + 0.04*Math.sin(ph + 0.8)*w);
     // the arms hang, trailing a little
     const gy = G.W?.surf ? G.W.surf.height(p.x, p.z) : 0, mid2 = mid(H, 'upperarm_l', 'upperarm_r', c);
     for (const sd of ['l', 'r']) {

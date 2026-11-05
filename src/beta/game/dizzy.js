@@ -24,6 +24,16 @@ export function turn(b, axis, ang) {
   b.quaternion.premultiply(_dq.setFromAxisAngle(_ax, ang));
   b.updateMatrixWorld(true);
 }
+// the same, but for a bone the clip may not set every frame (someone lying still, their clip held on its last frame):
+// it starts from where it was before last frame's turn, so the turn doesn't pile up frame on frame and spin it round
+export function turnHeld(b, axis, ang) {
+  if (!b || !b.parent) return;
+  const S = b.userData._th;
+  if (S && b.quaternion.equals(S.out)) b.quaternion.copy(S.base);
+  const base = b.quaternion.clone();
+  turn(b, axis, ang);
+  b.userData._th = { base, out: b.quaternion.clone() };
+}
 // move the hips by a world offset (the clip set them this frame; this goes on top)
 export function shiftPelvis(H, d) {
   const pel = bone(H, 'pelvis'); if (!pel || !pel.parent) return;
