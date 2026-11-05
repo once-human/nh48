@@ -8,15 +8,16 @@
 import { People } from '@orig/people/peds.js';
 import { KbNav } from '@orig/ui/kbnav.js';
 import { CAST } from '@orig/people/cast.js';
-import { who, facing } from './ask.js';
+import { who, facing, memOf } from './ask.js';
 import { outing } from './outing.js';
 
 const one = (rng, a) => a[Math.floor(rng.next()*a.length)];
+const TOUGHISH = (p) => p.cop ? 1 : { dada: 0.8, bhaiya: 0.7, collegeboy: 0.6, kpguy: 0.35, kaka: 0.3, tai: 0.25 }[p.persona] || 0.1;
 const WHO = { kaka: 'Kaka', ajoba: 'Ajoba', dada: 'Dada', kaku: 'Kaku', aaji: 'Aaji', tai: 'Tai', bhaiya: 'Bhaiya', collegeboy: 'A college guy', collegegirl: 'A college girl', aunty: 'Aunty', kpguy: 'A KP guy', kpgirl: 'A KP girl' };
 const ROLE = { keeper: 'The shopkeeper', bartender: 'The bartender', barber: 'The barber', teller: 'At the counter', helper: 'Works here', aai: 'Aai' };
 const OLD = new Set(['kaka', 'ajoba', 'kaku', 'aaji', 'aunty']);
-const MOOD = { curt: 'short with you', normal: 'polite', eager: 'chatty', kind: 'warm' };
-const WARM = { curt: 0, normal: 1, eager: 2, kind: 3 };
+const MOOD = { curt: 'short with you', normal: 'polite', eager: 'chatty', kind: 'warm', sore: 'angry with you' };
+const WARM = { curt: 0, normal: 1, eager: 2, kind: 3, sore: -1 };
 const group = (p) => p.cop ? 'cop' : OLD.has(p.persona) ? 'old' : /^college/.test(p.persona || '') ? 'college' : /^kp/.test(p.persona || '') ? 'kp' : p.persona === 'bhaiya' ? 'bhaiya' : p.persona === 'dada' ? 'dada' : p.persona === 'tai' ? 'tai' : 'any';
 
 // what each kind of person on the street can be asked (a few of these each, picked once per person)
@@ -231,15 +232,20 @@ class Talk {
   }
   open(p, room, role, fare) {
     const G = this.g, ppl = G.people, P = G.player, name = this.nameOf(p, room);
-    const sub = (mr, en, t = 4) => G.hud.say(name, mr, en, t);
+    let heard = null; const sub = (mr, en, t = 4) => { heard = [mr, en]; G.hud.say(name, mr, en, t); };
     const att = role === 'fare' ? one(ppl.rng, ['normal', 'eager', 'curt']) : ppl.gate ? ppl.gate(p, P, G, sub) : 'normal';
     if (!att) return true;                          // that was all they had for you
     if (!p._vibe) p._vibe = one(ppl.rng, OLD.has(p.persona) || p.cop ? VIBES_OLD : VIBES_YOUNG.filter(v => v !== 'flirty' || !!p.female !== !!P.look.female));
     if (p._open === undefined) p._open = ppl.rng.next() < (/^(college|kp)/.test(p.persona || '') ? 0.6 : 0.3) + (p._vibe === 'flirty' ? 0.3 : 0);
-    this.cur = { p, room, att, used: {}, role: role || this.roleOf(p, room), extra: [], fare };
+    const R = p.id !== undefined ? memOf(ppl, p) : {};
+    this.cur = { p, room, att, used: {}, role: att === 'sore' ? 'sore' : role || this.roleOf(p, room), extra: [], fare, R, cold: 0, warm: R.insult ? -0.5 : R.liked ? 0.3 : 0 };
     G.state = 'shop';
     const ph = (p.anim || p.idle) === 'phone';
-    const hi = !ph && this.cur.role !== 'keeper' && ppl.rng.next() < 0.6 ? VIBE[p._vibe].hi : ph ? ['एक मिनिट, फोनवर आहे... हां, बोला.', 'One minute, I\'m on the phone... yes, go on.']
+    // someone who knows you: you hit them (they've said so), you were rude, you got on well
+    const hi = att === 'sore' && heard ? heard : R.insult && att === 'curt' ? one(ppl.rng, [['परत तुम्ही? या वेळी तोंड सांभाळून.', 'You again? Mind your mouth this time.'], ['हं. आता काय?', 'Hm. What now?']])
+      : R.liked && R.lastEnd ? one(ppl.rng, [['अरे, तुम्ही परत! बोला.', 'Oh, you again! Go on.'], ['परत भेटलो! काय म्हणताय?', 'We meet again! What\'s up?']])
+      : R.talks && R.lastEnd > performance.now() - 45000 ? ['परत? आता काय?', 'Again? What now?']
+      : !ph && this.cur.role !== 'keeper' && ppl.rng.next() < 0.6 ? VIBE[p._vibe].hi : ph ? ['एक मिनिट, फोनवर आहे... हां, बोला.', 'One minute, I\'m on the phone... yes, go on.']
       : this.cur.role === 'keeper' ? ['बोला, काय देऊ?', 'Tell me, what can I get you?']
       : WARM[att] >= 2 ? one(ppl.rng, [['हां, बोला?', 'Yes, tell me?'], ['नमस्कार! काय म्हणताय?', 'Namaskar! What\'s up?']]) : att === 'curt' ? ['काय?', 'What?'] : ['हां?', 'Yes?'];
     this.say(...hi);
@@ -277,6 +283,7 @@ class Talk {
         add('good'); add('sells'); add('biz'); add('since'); add('discount');
         break;
       }
+      case 'sore': o.push({ id: 'sorry', label: 'I\'m sorry about earlier. I lost my temper' }, { id: 'bye', label: 'Leave it' }); return o;
       case 'fare': add('headed'); add('shortcut'); add('music2'); add('day'); break;
       case 'window': {
         if (G.waypoint) o.push({ id: 'way', label: `Ask the way to ${G.waypoint.name || 'your waypoint'}` });
@@ -338,6 +345,22 @@ class Talk {
     p.act = { clip: 'talk', t: 0, dur: 2.4 };
     switch (q.id) {
       case 'way': case 'food': case 'where': case 'lift': ppl.answer(p, P, G, q.id, c.att, say); if (ppl.lift && ppl.lift.p === p) { this.close(); if (last) G.hud.say(this.nameOf(p), last[0], last[1], 5); return; } break;
+      case 'sorry': {
+        // one chance: they hear you out. How badly you hurt them, your karma and your charm; the old forgive easier
+        const R = c.R, n = R.hit || 1;
+        R.sorry = (R.sorry || 0) + 1;
+        const ok = rng.next() < 0.2 + (Lf?.charm ?? 0.5)*0.3 + (Lf?.s?.karma || 0)/200 - (n - 1)*0.15 + (OLD.has(p.persona) ? 0.15 : 0) - (p.grudge > 0 ? 0.1 : 0);
+        if (ok) {
+          R.forgiven = true; p.angry = 0; p.grudge = 0;
+          say(...en(one(rng, [['ठीक आहे. पण परत असं करू नका.', 'Fine. But don\'t ever do that again.'], ['बरं, जाऊ दे. रागात होतात, कळलं.', 'Alright, let it go. You were angry, I get it.']])));
+          c.role = 'street'; c.att = 'curt'; c.warm = -0.4; Lf?.change?.('karma', 0.5);
+          break;
+        }
+        say(...en(one(rng, [['माफी? मारताना आठवलं नाही का?', 'Sorry? Didn\'t think of that when you hit me?'], ['सॉरी बोलून झालं? आता जा.', 'Said your sorry? Now go.']])));
+        const t = TOUGHISH(p); this.close();
+        setTimeout(() => { if (G.brawl && rng.next() < t*0.5) ppl.startFight?.(p, P); else ppl.flee(p, P.x, P.z, 12); }, 1200);
+        return;
+      }
       case 'headed': { const d = c.fare && c.fare.dest ? c.fare.dest.name : 'पुढे'; const w = this.warmth(); say(...en(w === 0 ? [`${d}. चला लवकर.`, `${d}. Hurry up.`] : w === 1 ? [`${d}. तिथे काम आहे.`, `${d}. I\'ve got work there.`] : [`${d}! मित्राचं लग्न आहे, उशीर झालाय. जरा पळवा!`, `${d}! A friend\'s wedding, I\'m late. Step on it!`])); break; }
       case 'weather': {
         const k = G.weather?.kind || '', h = G.hour ?? 12, W = /rain|storm/.test(k) ? 'rain' : h >= 21 || h < 5 ? 'night' : h > 11 && h < 16 && !/cloud|fog|haze/.test(k) ? 'hot' : 'fine';
@@ -355,7 +378,7 @@ class Talk {
       case 'jab': case 'boss': {
         const w = this.warmth(q.id === 'jab' ? -0.5 : -0.2); say(...one(rng, LINES[q.id][w]));
         if (q.id === 'jab' && w === 0) {
-          p.angry = 5; p.grudge = 15; Lf?.change?.('karma', -1);
+          p.angry = 5; p.grudge = 15; Lf?.change?.('karma', -1); c.R.insult = (c.R.insult || 0) + 1;
           if (G.brawl && !p.cop && (group(p) === 'dada' || rng.next() < 0.3)) { this.close(); ppl.startFight?.(p, P); return; }
         }
         if (w === 2) Lf?.change?.('respect', 1);
@@ -364,7 +387,9 @@ class Talk {
       case 'number': {
         // how it's gone so far counts most: ask cold and it's a no
         const ok = p._open && rng.next() < 0.1 + (Lf?.charm ?? 0.5)*0.3 + (WARM[c.att] - 1)*0.08 + (G.life?.s?.karma || 0)/300 + (c.warm || 0)*0.25 + (VIBE[p._vibe]?.w || 0)*0.2;
-        if (!ok) { const w = this.warmth(-0.6); say(...en(ASKOUT.no[w])); p._open = p._open && w > 0; if (w === 0) { this.close(); ppl.flee(p, P.x, P.z, 8); return; } break; }
+        // they've told you no before: asking again only annoys them
+        if (c.R.noNumber) { say(...en(one(rng, [['आधीच नाही म्हणाले ना?', 'I already said no, didn\'t I?'], ['परत तेच? नाही.', 'That again? No.']]))); c.warm = (c.warm || 0) - 0.6; lastW = 0; break; }
+        if (!ok) { const w = this.warmth(-0.6); say(...en(ASKOUT.no[w])); p._open = p._open && w > 0; c.R.noNumber = true; if (w === 0) { this.close(); ppl.flee(p, P.x, P.z, 8); return; } break; }
         say(...en(one(rng, ASKOUT.yes)));
         this.addContact(p);
         break;
@@ -378,6 +403,14 @@ class Talk {
         break;
       }
       default: say(...line(q.id));
+    }
+    // it's going nowhere: two cold answers running and they've had enough (and remember it next time)
+    if (said && this.cur === c) {
+      c.cold = lastW === 0 ? c.cold + 1 : 0;
+      if (c.cold >= 2 && !['keeper', 'teller', 'bartender', 'barber', 'helper', 'fare'].includes(c.role)) {
+        c.R.cut = true; c.warm = -1;
+        setTimeout(() => { if (this.cur === c) { this.close(); G.hud.say(this.nameOf(p, c.room), ...en(one(rng, [['बरं, मला निघायला हवं.', 'Right, I need to get going.'], ['चला, येतो मी.', 'Okay, I\'m off.']])), 3); if (!c.room) ppl.flee(p, P.x, P.z, 5); } }, 1800);
+      }
     }
     // a warm answer opens the chat up: something else comes up to talk about
     if (said && (lastW === 2 || (c.warm || 0) > 0.5) && c.role !== 'keeper' && c.role !== 'cop' && c.extra.length < 4) {
@@ -403,6 +436,8 @@ class Talk {
   close() {
     const c = this.cur; if (!c) return;
     this.cur = null; this.el.hidden = true; this.el.querySelector('.tk-how').textContent = '';
+    // what they'll remember of this one: that you talked, and whether it went well
+    const R = c.R; if (R) { R.talks = (R.talks || 0) + 1; R.lastEnd = performance.now(); if ((c.warm || 0) > 0.5 && !R.insult) R.liked = (R.liked || 0) + 1; }
     if (c.p.mode === 'watch') c.p.wait = 1.2;
     if (this.g.state === 'shop') this.g.state = 'play';
     this._t = performance.now() + 400;

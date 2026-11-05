@@ -10,6 +10,9 @@ import { People } from '@orig/people/peds.js';
 import { MENUS } from '@orig/game/shops.js';
 import { specOf } from '@orig/vehicles/vehicle.js';
 import { Pilot } from '@orig/game/pilot.js';
+import { TOUGH } from '@orig/people/fight.js';
+
+const OLDP = new Set(['kaka', 'ajoba', 'kaku', 'aaji', 'aunty']);
 
 // F is the one key for what's in front of you: a vehicle, a shop, a door, a pump, an animal. With two at once, the
 // closer one (a vehicle needs you right at it, a shop's door is a few steps off)
@@ -57,12 +60,13 @@ export function attitude(ppl, p, G) {
     const r = ppl.rng.next();
     p._att0 = r < 0.1 ? 'ignore' : r < 0.2 ? 'walkaway' : r < 0.42 ? 'curt' : r < 0.74 ? 'normal' : r < 0.9 ? 'eager' : 'kind';
   }
+  if (p._att) return p._att;                        // (decided once: the same person is the same with you every time)
   const k = G.life?.s?.karma || 0, h = G.hour ?? 12, late = h >= 22 || h < 5, R = ppl.rng.next();
   let a = p._att0;
   if (k < -20 && R < Math.min(0.7, -k/80)) a = R < 0.3 ? 'ignore' : 'walkaway';
   else if (k > 20 && (a === 'curt' || a === 'normal') && R < Math.min(0.5, k/100)) a = R < 0.2 ? 'kind' : 'eager';
   if (late && R < 0.35) a = p.female ? 'walkaway' : a === 'kind' ? 'eager' : a === 'normal' ? 'curt' : a;
-  return a;
+  return (p._att = a);
 }
 
 // the way from here to (x, z), as you'd say it
@@ -93,33 +97,80 @@ export function rideNear(G, p) {
   return best;
 }
 
-// before anything: what they know of you, and whether they'll talk to a stranger at all. Returns their attitude, or
-// null when that was the end of it (they've said their piece, run, or not even looked at you)
+// what this person remembers of you, kept for as long as they're around (the game's own memory, keyed by them)
+export function memOf(ppl, p) { const m = ppl.mem || (ppl.mem = new Map()); let r = m.get(p.id); if (!r) { r = {}; m.set(p.id, r); } return r; }
+const tough = (p) => p.cop ? 1 : TOUGH[p.persona] || 0.05;
+// a punch (or a kick, a swing, a shot) from you: they remember it, and it stays with them. Angry for a good while, and
+// a grudge after the fight's over: come near them again and the tough ones come for you
+const hurt0 = People.prototype.hurt;
+People.prototype.hurt = function (p, dmg, sx, sz, M, byPlayer) {
+  const dead0 = p && p.corpse, r = hurt0.call(this, p, dmg, sx, sz, M, byPlayer);
+  if (!byPlayer || !p || dead0) return r;
+  const R = memOf(this, p), now = performance.now();
+  if (!(R.hitAt > now - 3000)) this.remember(p, 'hit');            // (a flurry of blows is one beating, not ten)
+  R.hitAt = now; R.forgiven = false; R.sorry = 0;
+  if (!p.corpse) { p.angry = Math.max(p.angry || 0, 10); if (!p.beaten && !p.fleeing) p.grudge = Math.max(p.grudge || 0, 60); }
+  return r;
+};
+
+// before anything: what they know of you, and whether they'll talk to a stranger at all. Returns their attitude
+// ('sore' for someone you hit who'll hear you out), or null when that was the end of it (they've said their piece,
+// run, or not even looked at you). Whatever they decide about you they keep deciding: someone who wouldn't talk to
+// you won't the next time either, and gets less patient each time you try
 People.prototype.gate = function (p, P, G, say) {
   const rng = this.rng;
   const look = (x, z, t) => { this.watch(p, x, z, t); p.yaw = Math.atan2(z - p.z, x - p.x); };
-  const mem = (this.mem && this.mem.get(p.id)) || {}, now = performance.now(), heat = G.police?.heat || 0, karma = G.life?.s?.karma || 0;
-  const rep = this.rep ? this.rep.at(p.x, p.z) : { bad: 0, good: 0 }, h = G.hour ?? 12, late = h >= 22.5 || h < 5;
-  // what they know of you first
-  if (mem.hit) {
-    look(P.x, P.z, 2);
-    if (rng.next() < 0.5) { this.flee(p, P.x, P.z, 20); say(one(rng, ['तू? लांब राहा माझ्यापासून!', 'परत तूच? जा!']), 'You? Keep away from me!'); }
-    else { p.angry = 4; p.grudge = 12; say('आधी मारलं, आता पत्ता विचारतोय?', 'First you hit me, now you want directions?'); }
-    return null;
+  const R = memOf(this, p), now = performance.now(), heat = G.police?.heat || 0, karma = G.life?.s?.karma || 0;
+  const rep = this.rep ? this.rep.at(p.x, p.z) : { bad: 0, good: 0 }, T = tough(p);
+  const fight = (mr, en) => { say(mr, en, 3); if (G.brawl) this.startFight(p, P); else { p.angry = 6; look(P.x, P.z, 3); } return null; };
+  const run = (mr, en, d = 20) => { say(mr, en, 3); this.flee(p, P.x, P.z, d); return null; };
+  // pestering someone who's already said no: each time worse
+  const refuse = (first) => {
+    R.no = (R.no || 0) + 1; R.noAt = now;
+    if (first) { first(); return null; }
+    const n = R.no;
+    if (n === 2) { look(P.x, P.z, 1); p.anim = 'no'; say(...one(rng, [['सांगितलं ना, नाही.', 'I told you, no.'], ['मला बोलायचं नाही.', 'I don\'t want to talk.']]), 3); setTimeout(() => { if (p.mode === 'watch') this.flee(p, P.x, P.z, 8); }, 900); return null; }
+    if (n === 3) { look(P.x, P.z, 1.5); p.angry = 6; if (T > 0.5) p.grudge = Math.max(p.grudge || 0, 30); say(...one(rng, [['माझ्या मागे का लागलाय? सोडा मला!', 'Why are you following me? Leave me alone!'], ['परत? जा ना!', 'Again? Just go!']]), 3); setTimeout(() => { if (p.mode === 'watch') this.flee(p, P.x, P.z, 12); }, 1100); return null; }
+    if (rng.next() < T*0.8) return fight(...one(rng, [['ऐकू येत नाही का? थांब, दाखवतो!', 'Can\'t you hear? Wait, I\'ll show you!'], ['लय झालं आता!', 'That\'s enough now!']]));
+    G.life?.change?.('karma', -1);
+    return run(...one(rng, [['अहो, हा माणूस पिच्छा सोडत नाहीये!', 'Hey, this one won\'t stop following me!'], ['कोणीतरी बघा याला!', 'Somebody look at this one!']]), 24);
+  };
+
+  // you hit them
+  if (R.hit && !R.forgiven) {
+    const fresh = now - (R.hitAt || R.t || 0) < 60000 || p.angry > 0;
+    if (p.beaten || (OLDP.has(p.persona) && !fresh) || T < 0.2) return run(...one(rng, [['तू? लांब राहा माझ्यापासून!', 'You? Keep away from me!'], ['परत तूच? नको, जा!', 'You again? No, go away!']]), 24);
+    if (fresh) return rng.next() < T ? fight(...one(rng, [['परत आलास? आता बघ!', 'Came back, did you? Now watch!'], ['अजून हवंय का?', 'Want some more?']])) : run('मारून परत बोलायला येतोय? जा!', 'You hit me and now you want to talk? Go!');
+    // cooled off: they'll hear you out once (an apology's your one chance); turned down, never again
+    if ((R.sorry || 0) > 0) { R.pest = (R.pest || 0) + 1; return R.pest > 1 && rng.next() < T ? fight('माफी झाली ना? आता जा नाहीतर...', 'You\'ve had your say. Go now, or else...') : run('तुझ्याशी काही बोलायचं नाही.', 'I\'ve nothing to say to you.', 14); }
+    look(P.x, P.z, 30); p.angry = 4;
+    say(...one(rng, [['आधी मारलं, आता बोलायचंय?', 'First you hit me, now you want to talk?'], ['तुझा चेहरा विसरलो नाही मी.', 'I haven\'t forgotten your face.']]));
+    return 'sore';
   }
   if (heat >= 2 && !p.cop) { look(P.x, P.z, 1.5); say(one(rng, ['पोलीस तुम्हालाच शोधतायत ना? जा इथून.', 'माझं नाव घेऊ नका. जा.']), 'Aren\'t the police after you? Go, leave me out of it.'); this.flee(p, P.x, P.z, 10); return null; }
   if (p.cop && heat >= 1) { look(P.x, P.z, 4); say('पत्ता नंतर. आधी इकडे या.', 'Directions later. Come here first.'); return null; }
-  if ((rep.bad > 3 || karma < -40) && rng.next() < 0.6) { look(P.x, P.z, 1.5); say('तुमच्याबद्दल ऐकलंय मी. काही सांगायचं नाही.', 'I\'ve heard about you. I\'ve nothing to tell you.'); p.anim = 'no'; return null; }
+  // they've already said no to you: the same answer, and less patience
+  if (R.no) return refuse();
+  // saw what you did to someone: they keep their distance (the tough ones stand their ground, but they're short with you)
+  if (R.saw && R.sawKeep === undefined) R.sawKeep = !p.cop && rng.next() < T*0.6;
+  if (R.saw && !p.cop && !R.sawKeep) return refuse(() => { look(P.x, P.z, 0.8); say(...one(rng, [['तुम्हीच होतात ना मारामारीत? नको, नको.', 'You were the one fighting, weren\'t you? No, no.'], ['मी काही पाहिलं नाही. जाऊ द्या.', 'I didn\'t see anything. Let me go.']]), 3); this.flee(p, P.x, P.z, 10); });
+  // what this street has heard of you: they decide that once
+  if (R.repNo === undefined) R.repNo = (rep.bad > 3 || karma < -40) && rng.next() < 0.6;
+  if (R.repNo) return refuse(() => { look(P.x, P.z, 1.5); say('तुमच्याबद्दल ऐकलंय मी. काही सांगायचं नाही.', 'I\'ve heard about you. I\'ve nothing to tell you.'); p.anim = 'no'; });
+  // stopped them a minute ago, and again, and again: they've their own day to get on with
+  if (R.lastEnd > now - 45000 && (R.talks || 0) >= 2) return refuse(() => { look(P.x, P.z, 1); say(...one(rng, [['बस झालं, मला कामं आहेत.', 'That\'s enough, I\'ve things to do.'], ['परत? नंतर बोलू.', 'Again? Later.']]), 3); setTimeout(() => { if (p.mode === 'watch') this.flee(p, P.x, P.z, 6); }, 900); });
 
-  const att = attitude(this, p, G);
+  let att = attitude(this, p, G);
   // the ones who won't: no look at all, or a shake of the head and off
-  if (att === 'ignore') return null;
-  if (att === 'walkaway') {
+  if (att === 'ignore') return refuse(() => { say('', '(walks past without a look at you)', 2.5); });
+  if (att === 'walkaway') return refuse(() => {
     look(P.x, P.z, 0.8); p.anim = 'no';
-    if (rng.next() < 0.6) say(one(rng, ['नको, नको.', 'मला वेळ नाही.', 'घाईत आहे.']), one(rng, ['No, no.', 'I don\'t have time.', 'I\'m in a hurry.']), 3);
+    say(one(rng, ['नको, नको.', 'मला वेळ नाही.', 'घाईत आहे.']), one(rng, ['No, no.', 'I don\'t have time.', 'I\'m in a hurry.']), 3);
     setTimeout(() => { if (p.mode === 'watch') this.flee(p, P.x, P.z, 6); }, 900);
-    return null;
-  }
+  });
+  // you were rude to them last time, or it went nowhere: short with you. You were good company: glad to see you
+  if (R.insult || R.sawKeep || R.cut || (R.hit && R.forgiven)) att = 'curt';
+  else if (R.liked && att !== 'kind') att = att === 'curt' ? 'normal' : att === 'normal' ? 'eager' : 'kind';
   look(P.x, P.z, 30);
   return att;
 };
