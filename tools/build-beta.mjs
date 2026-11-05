@@ -224,6 +224,10 @@ const PATCHES = {
     ["      const lie = !a.moving && a.kind !== 'cow' && !a.cow;\n      m.play(a.moving ? (a.cow ? 'WalkSlow' : 'Walk') : 'Idle', a.moving ? (a.cow ? 0.9 : Math.min(2.6, Math.max(1, a.v / 1.1))) : 1);",
      "      const q = m._lx === undefined ? 0 : Math.hypot(a.x - m._lx, a.z - m._lz); m._lx = a.x; m._lz = a.z;\n      if (q < 3 && dt > 0) m._v = (m._v || 0) + (q / dt - (m._v || 0)) * Math.min(1, dt * 6);\n      const mv = m._v || 0, walking = mv > 0.12, cowS = a.cow || a.kind === 'cow', slow = cowS && mv < 0.9;\n      if (walking && mv > 2.4) { m._ph = (m._ph || 0) + dt * mv * 2.2; m.holder.position.y += Math.abs(Math.sin(m._ph)) * Math.min(0.07, (mv - 2.4) * 0.02); }\n      const lie = !walking && a.kind !== 'cow' && !a.cow;\n      m.play(walking ? (slow ? 'WalkSlow' : 'Walk') : 'Idle', walking ? Math.max(0.45, mv / (cowS ? (slow ? 0.7 : 1.1) : a.kind === 'cat' ? 0.6 : 0.95)) : 1);"],
   ],
+  // a cow goes at a cow's pace, shooed off or following you (beta/people/cows.js)
+  [S('people/strays.js')]: [
+    ["      if (sp > 0) {", "      if (a.kind === 'cow' || a.cow) sp = Math.min(sp, 2.2);\n      if (sp > 0) {"],
+  ],
   [S('people/fight.js')]: [
     ["if (input.took('KeyC') && !busyDown", "if ((input.took('ControlLeft') || input.took('ControlRight')) && !busyDown && !(P.act && P.act.move)"],
     // Ctrl standing still crouches (beta/game/crouch.js); moving, it's the roll the way you're going
