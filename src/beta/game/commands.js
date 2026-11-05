@@ -555,7 +555,8 @@ export function freeTerminal(G) {
     // the shut saves: nothing written during free roam, whatever the terminal did to you
     const Lf = G.life, ls = Lf.save.bind(Lf); Lf.save = () => { if (!armed) ls(); };
     const ss = G.saveStats.bind(G); G.saveStats = (...a) => armed ? undefined : ss(...a);
-    const S = G.debugSave?.Save; if (S && S.save) { const o = S.save; S.save = function (...a) { return armed ? undefined : o.apply(this, a); }; }
+    // (a module's own exports can't be written over: that threw here and took free roam and Live down with it)
+    const S = G.debugSave?.Save; if (S && S.save && Object.getOwnPropertyDescriptor(S, 'save')?.writable) { const o = S.save; S.save = function (...a) { return armed ? undefined : o.apply(this, a); }; }
   }
 
   // ------------------------------------------------------------ keys
