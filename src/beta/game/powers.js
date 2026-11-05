@@ -112,6 +112,7 @@ export function powers(G) {
   const hpMax = () => G.life?.hpMax || 100;
 
   const AU = auras(G), PE = people(G), AC = acts(G), HB = hostBody(G);
+  G.acts = AC;                 // (the paramedics need to know who you've got hold of: beta/game/medics.js)
 
   // ---------------------------------------------------------------- on the game's own HUD: two more rings in the vitals
   const veil = document.createElement('div'); veil.id = 'nh-veil';
@@ -813,7 +814,7 @@ export function powers(G) {
   }
 
   // ---------------------------------------------------------------- dragging (Z, with someone out cold at your feet)
-  const downed = () => { if (!P().onFoot) return null; const F = R(), th = yaw(); let best = null, bs = 1e9; for (const p of (ppl()?.list || [])) { if (p.hidden || !(p.fallen > 1.6) || !(p.ko || p.corpse || p._vetalBody)) continue; const dx = p.x - F.x, dz = p.z - F.z, d = Math.hypot(dx, dz); if (d > 2.6) continue; const a = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - th), Math.cos(Math.atan2(dz, dx) - th))); if (a > 1.4) continue; if (d + a < bs) { bs = d + a; best = p; } } return best; };
+  const downed = () => { if (!P().onFoot) return null; const F = R(), th = yaw(); let best = null, bs = 1e9; for (const p of (ppl()?.list || [])) { if (p.hidden || !(p.fallen > 1.6) || !(p.ko || p.corpse || p._vetalBody) || p._medic || p.liftY > 0) continue; const dx = p.x - F.x, dz = p.z - F.z, d = Math.hypot(dx, dz); if (d > 2.6) continue; const a = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - th), Math.cos(Math.atan2(dz, dx) - th))); if (a > 1.4) continue; if (d + a < bs) { bs = d + a; best = p; } } return best; };
   let zPress = false;
   addEventListener('keydown', (e) => {
     if (e.code !== 'KeyZ' || e.repeat || G.state !== 'play' || !G.player?.onFoot) return;
