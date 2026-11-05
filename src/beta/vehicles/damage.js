@@ -73,6 +73,15 @@ V.flatWheel = function (w) {
   this.flatSide = (this.flatSide || 0) + Math.sign(w.z)*(w.x > 0 ? 1.4 : 1);
   this.flatN = (this.flatN || 0) + 1;
 };
+// a tyre takes a knock or a round and holds, up to a point: two good hits on a wheel, or two rounds in the tyre, and
+// it's gone (returns true when this one finished it)
+V.hurtTyre = function (w, k) {
+  if (!w || this.noFlat || (this._flats && this._flats.has(w))) return false;
+  const hp = (this._thp || (this._thp = new Map())), left = (hp.has(w) ? hp.get(w) : 1) - k;
+  hp.set(w, left);
+  if (left > 0) return false;
+  this.flatWheel(w); return true;
+};
 // a flat drags, and pulls to its side; the speed goes (the rim on the road)
 const upd = V.update;
 V.update = function (dt, inp, traffic) {
@@ -81,8 +90,78 @@ V.update = function (dt, inp, traffic) {
     this.th += (this.flatSide || 0)*0.045*Math.min(1, sp/6)*Math.sign(v)*dt;
     this.v -= Math.sign(v)*Math.min(sp, this.flatN*(0.5 + 0.004*v*v)*dt);
   }
-  return upd.call(this, dt, inp, traffic);
+  const r = upd.call(this, dt, inp, traffic);
+  if (this.flatN && dt > 0) rims(this, dt); else if (this._grind) grind(this, 0);
+  return r;
 };
+// ---------------------------------------------------------------- on the rims: sparks and the grind of steel on tar
+// sparks: little hot streaks thrown back off the rim where it meets the road, falling, gone in a third of a second
+const SPK = 160;
+let spk = null;
+function sparks() {
+  if (spk) return spk;
+  const G = window.__nhAskG; if (!G || !G.scene) return null;
+  const g = new THREE.BoxGeometry(0.012, 0.012, 0.09);
+  const m = new THREE.MeshBasicMaterial({ color: 0xffc36a, toneMapped: false, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  const mesh = new THREE.InstancedMesh(g, m, SPK); mesh.frustumCulled = false; mesh.count = 0; G.scene.add(mesh);
+  spk = { mesh, p: [], k: 0, m4: new THREE.Matrix4(), q: new THREE.Quaternion(), v: new THREE.Vector3(), s: new THREE.Vector3(), z: new THREE.Vector3(0, 0, 1), t: 0 };
+  return spk;
+}
+function emitSpark(x, y, z, vx, vy, vz) {
+  const S = sparks(); if (!S) return;
+  const p = S.p[S.k] || (S.p[S.k] = {}); S.k = (S.k + 1) % SPK;
+  Object.assign(p, { x, y, z, vx, vy, vz, life: 0, max: 0.18 + Math.random()*0.2 });
+}
+function tickSparks(dt) {
+  const S = spk; if (!S) return;
+  let n = 0;
+  for (const p of S.p) {
+    if (!p || p.life >= p.max) continue;
+    p.life += dt; p.vy -= 9.8*dt; p.x += p.vx*dt; p.y += p.vy*dt; p.z += p.vz*dt;
+    if (p.life >= p.max) continue;
+    S.v.set(p.vx, p.vy, p.vz); const sp = S.v.length() || 1;
+    S.q.setFromUnitVectors(S.z, S.v.multiplyScalar(1/sp));
+    const k = 1 - p.life/p.max; S.s.set(1, 1, 0.5 + Math.min(2.5, sp*0.12)*k);
+    S.m4.compose(S.v.set(p.x, p.y, p.z), S.q, S.s); S.mesh.setMatrixAt(n++, S.m4);
+  }
+  S.mesh.count = n; S.mesh.instanceMatrix.needsUpdate = true;
+}
+function rims(v, dt) {
+  const G = window.__nhAskG, sp = Math.abs(v.v || 0);
+  if (G && G.player && G.player.cur === v && !G.player.onFoot) grind(v, sp); else if (v._grind) grind(v, 0);
+  if (sp > 2.5 && v._flats) {
+    const hx = Math.cos(v.th), hz = Math.sin(v.th), y0 = v.y || 0, dir = Math.sign(v.v);
+    for (const w of v._flats) {
+      v._sa = (v._sa || 0) + dt*Math.min(60, sp*3);
+      while (v._sa >= 1) {
+        v._sa -= 1;
+        const x = v.x + hx*w.x - hz*w.z, z = v.z + hz*w.x + hx*w.z, R = Math.random;
+        emitSpark(x, y0 + 0.04, z, -hx*dir*sp*(0.3 + R()*0.4) + (R() - 0.5)*2, 1 + R()*2.5, -hz*dir*sp*(0.3 + R()*0.4) + (R() - 0.5)*2);
+      }
+    }
+  }
+  tickSparks(dt);
+}
+// the grind: steel on tar, a harsh rasp that rises with the speed and screams under it, louder the more rims are down
+function grind(v, sp) {
+  const G = window.__nhAskG, A = G && G.audio, ctx = A && A.ctx; if (!ctx) return;
+  let N = v._grind;
+  if (!N && sp > 0.5) {
+    const len = ctx.sampleRate*2, b = ctx.createBuffer(1, len, ctx.sampleRate), d = b.getChannelData(0);
+    let last = 0; for (let i = 0; i < len; i++) { const w = Math.random()*2 - 1; last = last*0.6 + w*0.4; d[i] = (Math.random() < 0.002 ? w*3 : 0) + w*0.6 + last*0.4; }
+    const src = ctx.createBufferSource(); src.buffer = b; src.loop = true;
+    const hi = ctx.createBiquadFilter(); hi.type = 'bandpass'; hi.frequency.value = 3400; hi.Q.value = 2.2;
+    const lo = ctx.createBiquadFilter(); lo.type = 'bandpass'; lo.frequency.value = 900; lo.Q.value = 4;
+    const g = ctx.createGain(); g.gain.value = 0;
+    src.connect(hi); src.connect(lo); hi.connect(g); lo.connect(g); g.connect(A.bus ? A.bus('fx') : ctx.destination); src.start();
+    N = v._grind = { src, g, hi, lo };
+  }
+  if (!N) return;
+  const t = ctx.currentTime, lv = sp > 0.5 ? Math.min(0.35, 0.05 + sp*0.012)*Math.min(2, v.flatN || 1)/1.4 : 0;
+  N.g.gain.setTargetAtTime(lv, t, 0.08);
+  N.hi.frequency.setTargetAtTime(2600 + sp*70, t, 0.1);
+  if (!lv && sp <= 0.5 && !(v.flatN > 0)) { N.g.gain.setTargetAtTime(0, t, 0.05); setTimeout(() => { try { N.src.stop(); } catch (e) { /* gone */ } }, 300); v._grind = null; }
+}
 // all of it put right (the garage: damage back to nothing)
 V.mend = function () {
   const D = this._dg;
@@ -90,7 +169,8 @@ V.mend = function () {
     D.body.attributes.position.array.set(D.b0); D.body.attributes.position.needsUpdate = true; D.body.computeVertexNormals();
     if (D.glass) { D.glass.attributes.position.array.set(D.g0); D.glass.attributes.position.needsUpdate = true; D.glass.computeVertexNormals(); }
   }
-  this._flats = null; this.sag = null; this.flatN = 0; this.flatSide = 0;
+  if (this._grind) grind(this, 0);
+  this._flats = null; this._thp = null; this.sag = null; this.flatN = 0; this.flatSide = 0;
   if (this._holes) { for (const h of this._holes) h.parent && h.parent.remove(h); this._holes = null; }
 };
 
@@ -105,7 +185,7 @@ P.bounce = function (res, ox, oz) {
     const r = clamp(0.35 + imp*0.035, 0.35, 0.95), depth = Math.min(0.28, (imp - 3)*0.022);
     try { this.dent(res.lx, ly, res.lz, nlx, -0.12, nlz, r, depth); } catch (e) { /* drawn as it was */ }
     // a big one on a wheel bends it
-    if (imp > 9 && this.wheels) { const w = this.wheels.find(q => Math.hypot(q.x - res.lx, q.z - res.lz) < q.r + 0.45); if (w) this.flatWheel(w); }
+    if (imp > 7 && this.wheels) { const w = this.wheels.find(q => Math.hypot(q.x - res.lx, q.z - res.lz) < q.r + 0.45); if (w) this.hurtTyre(w, (imp - 6)*0.08); }
   }
   return imp;
 };
@@ -171,7 +251,7 @@ function shotAt(G, best, o3, d3) {
   m.worldToLocal(_l.copy(h.point));
   _n.copy(h.face ? h.face.normal : new THREE.Vector3(0, 1, 0));
   const glass = m === v.glassMesh, wheel = !glass && v.wheels && inWheel(v.wheels, _l.x, _l.y, _l.z, 0.04);
-  if (wheel) { v.flatWheel(wheel); G.hud && G.hud.toast && G.player.cur === v && G.hud.toast('Tyre', 'One of your tyres is gone', 'bad', 2); }
+  if (wheel) { if (v.hurtTyre(wheel, 0.55) && G.hud && G.hud.toast && G.player.cur === v) G.hud.toast('Tyre', 'One of your tyres is gone', 'bad', 2); }
   else v.dent(_l.x, _l.y, _l.z, -_n.x, -_n.y, -_n.z, 0.1, 0.025);
   // the hole (a star in glass)
   const dm = new THREE.Mesh(glass ? hole.star : hole.g, glass ? starM : holeM);
