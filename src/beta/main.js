@@ -36,7 +36,8 @@ import './game/hands.js';
 import './game/fists.js';
 import './game/climb.js';          // up and over: hands planted on the ledge, the feet up the face, a knee onto the top
 import './game/crouch.js';
-import './game/mirror.js';          // a pose in a shop's mirror, a different one each time          // Ctrl standing still: crouch (on the move it's still the roll)
+import './game/mirror.js';
+import './world/mirrors.js';         // the shops' mirrors reflect          // a pose in a shop's mirror, a different one each time          // Ctrl standing still: crouch (on the move it's still the roll)
 import './game/pursuit.js';         // a cop who saw you go into a shop comes in after you
 import './world/staff.js';
 import './world/walkin.js';

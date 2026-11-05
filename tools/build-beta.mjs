@@ -158,6 +158,13 @@ const PATCHES = {
     ["  inBuilding(x, z) { return this.test(this.bld, x, z); }", "  inBuilding(x, z) { return this.test(this.bld, x, z); }\n  bldTop(x, z) { const l = this.bld.get(this.chunkOf(x, z)); let t = -1; if (l) for (const p of l) { if (x < p.bb[0] || x > p.bb[2] || z < p.bb[1] || z > p.bb[3]) continue; if (p.top > t && pointInRings(x, z, p.rings)) t = p.top; } return t; }"],
   ],
   [S('world/interiors.js')]: [
+    // the mirrors are real (beta/world/mirrors.js): each one's glass, where it is, which way it faces
+    ["const solid = (cx, cz, sx, sz, kind = 0) =>", "const mir = (cx, cy, cz, w, h, ry) => (R.mirrors || (R.mirrors = [])).push({ x: O.x + cx, y: cy + FLOOR, z: O.z + cz, w, h, ry });\n    const solid = (cx, cz, sx, sz, kind = 0) =>"],
+    ["box(B, W / 2 - 0.05, 1.4, D - 2, 0.04, 2.2, 1.2, 0xbcd0dc);", "box(B, W / 2 - 0.05, 1.4, D - 2, 0.04, 2.2, 1.2, 0xbcd0dc); mir(W / 2 - 0.075, 1.4, D - 2, 1.2, 2.2, -Math.PI / 2);"],
+    ["box(B, x, 1.75, D - 0.05, 1.2, 1.5, 0.04, 0xcfe0ea);", "box(B, x, 1.75, D - 0.05, 1.2, 1.5, 0.04, 0xcfe0ea); mir(x, 1.75, D - 0.075, 1.2, 1.5, Math.PI);"],
+    ["box(B, x, 1.7, D - 0.05, 1.0, 1.25, 0.04, 0xbcd0dc);", "box(B, x, 1.7, D - 0.05, 1.0, 1.25, 0.04, 0xbcd0dc); mir(x, 1.7, D - 0.075, 1.0, 1.25, Math.PI);"],
+    ["box(B, 0, 1.65, D - 0.05, W - 2, 1.0, 0.04, 0xbcd0dc);", "box(B, 0, 1.65, D - 0.05, W - 2, 1.0, 0.04, 0xbcd0dc); mir(0, 1.65, D - 0.075, W - 2, 1.0, Math.PI);"],
+    ["box(B, -W / 2 + 0.03, 1.5, D / 2, 0.03, 2.2, D * 0.7, 0xbcd0dc);", "box(B, -W / 2 + 0.03, 1.5, D / 2, 0.03, 2.2, D * 0.7, 0xbcd0dc); mir(-W / 2 + 0.05, 1.5, D / 2, D * 0.7, 2.2, Math.PI / 2);"],
     // everything in a room you'd walk into is solid in its own footprint: counters, cases, racks, shelves, tables,
     // machines, the bar (only some had a solid() of their own). What's under your shins (rugs, floor) or over your
     // head (lights, boards, the ceiling) isn't, nor a chair or stool (you're sat in those)
