@@ -124,6 +124,8 @@ const PATCHES = {
   [S('ui/hud.js')]: [["this.nerd = el('div', 'h nerd', 'E jhola · J diary · F3 stats');", "this.nerd = el('div', 'h nerd', 'Q jhola · I phone · J diary · F3 stats');"]],
   [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'], ['E', 'Jhola'],", "['F', 'Walk in, counters, pet'], ['E', 'Get in or out of a vehicle'], ['T', 'Talk to someone'], ['Q', 'Jhola'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
   [S('game/pilot.js')]: [
+    // a parked ride taken: off the parked rows now, not once the camera's gone 6 m (two of it drawn till then)
+    ["      for (const it of r.items) it.off = true;\n", "      for (const it of r.items) it.off = true;\n      this.W._propX = undefined;\n"],
     // slowed on foot (dazed after Vetal: beta/game/powers.js sets slowMul)
     ["const target = (fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0;", "const target = ((fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0) * (this.slowMul ? this.slowMul() : 1) * (this.crouchMul ? this.crouchMul() : 1);"],
     // knocked down by a vehicle only if it's coming at you: walking into the back of a scooter riding away from you
