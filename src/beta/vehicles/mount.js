@@ -80,6 +80,21 @@ Pilot.prototype.enter = function (offer, traffic) {
   this.busy = 4;
 };
 
+// the body on the seat of a close, slow two-wheeler (people/crowd.js gives them one)
+function riderOf(o) { const R = o && o._riders && o._riders[0]; return R && R.body && R.body.H && R.body.H.root ? R.body.H : null; }
+// shoved off: the one who was riding it (their look, not a stranger's), down where they sat
+const sad = Pilot.prototype.spawnAngryDriver;
+Pilot.prototype.spawnAngryDriver = function (o, mode) {
+  const J = this._jab;
+  if (!J || J.o !== o || !this.kit) return sad.call(this, o, mode);
+  const kit = this.kit, rl = kit.randomLook;
+  if (J.look) kit.randomLook = () => J.look;
+  let p;
+  try { p = sad.call(this, o, mode); } finally { kit.randomLook = rl; }
+  if (p) { p.x = J.x; p.z = J.z; }
+  return p;
+};
+
 function finish(P) {
   const M = P._mount; P._mount = null; P.frozen = false; P.puppet = null;
   if (P.act && P.act.kind === 'mount') P.act = null;
@@ -120,11 +135,14 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
     const sh = H.root.getObjectByName('upperarm_r');
     if (sh) {
       H.root.updateMatrixWorld(true); sh.getWorldPosition(_a);
-      Fr.at(Fr.sx*0.3, Fr.seatY + 0.42, 0, _c);                              // their chest
-      _c.x -= fx*0.12; _c.z -= fz*0.12;
+      // their chest: the rider's own (the close riders are real bodies), or where it'd be; the palm lands on its front
+      const rb = riderOf(M.src), ch = rb && (rb.root.getObjectByName('spine_03') || rb.root.getObjectByName('spine_02'));
+      if (ch) { rb.root.updateMatrixWorld(true); ch.getWorldPosition(_c); }
+      else Fr.at(Fr.sx*0.3, Fr.seatY + 0.42, 0, _c);
+      _c.x -= fx*0.11; _c.z -= fz*0.11;
       _f.set(_a.x - fx*0.12 + rx*0.08, _a.y - 0.12, _a.z - fz*0.12 + rz*0.08);   // cocked by your shoulder
       if (t < 0.2) _t.copy(_f);
-      else if (t < 0.36) _t.lerpVectors(_f, _c, Math.min(1, k2*1.15)).addScaledVector(_a.set(fx, 0, fz), 0.22*k2);
+      else if (t < 0.36) _t.lerpVectors(_f, _c, Math.min(1, k2*1.1));
       else _t.lerpVectors(_c, _f, k3);
       _pole.set(rx*0.6, -1, rz*0.6);
       ikArm(H, 'r', _t, _pole, Math.min(1, t/0.1)*(1 - k3));
@@ -133,8 +151,11 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
     if (t > 0.3 && !M.hit) {
       M.hit = true; this.audio?.punch?.(0.7); this.audio?.thud?.(0.45);
       const o = M.offer, keep = { x: F.x, z: F.z, yaw: F.yaw, y: F.y };
+      // the same person goes over, from where they sat, away from you (pilot.spawnAngryDriver, below)
+      const R = M.src._riders && M.src._riders[0];
+      this._jab = { o: M.src, x: (R ? R.x : M.src.x) + fx*0.15, z: (R ? R.z : M.src.z) + fz*0.15, look: R && R.look };
       o.now = true; o.dragged = true;
-      enter.call(this, o, M.traffic);
+      try { enter.call(this, o, M.traffic); } finally { this._jab = null; }
       const veh = this.cur;
       if (veh && !this.onFoot) {
         this.exit(M.traffic, true);
