@@ -654,6 +654,8 @@ export function powers(G) {
   }
   const vm = new THREE.Matrix4(), vp = new THREE.Vector3(), vq = new THREE.Quaternion(), vs = new THREE.Vector3(), vy = new THREE.Vector3(0, 1, 0);
   const col = new THREE.Color();
+  // how far someone (or a vehicle) has come, for where their next step or tyre mark falls
+  const odo = (o) => { const d = Math.hypot(o.x - (o._mx ?? o.x), o.z - (o._mz ?? o.z)); o._mx = o.x; o._mz = o.z; if (d < 4) o._modo = (o._modo || 0) + d; return o._modo || 0; };
   function trails(dt) {
     vGlow(smooth(nk));
     if (nk <= 0.01) { if (trail) { trail.material.opacity = 0; trail.geometry.setDrawRange(0, 0); } return; }
@@ -664,10 +666,10 @@ export function powers(G) {
     const pos = trail.geometry.attributes.position.array, cl = trail.geometry.attributes.color.array, surf = G.W?.surf;
     let q = 0;
     const list = [];
-    for (const [p] of near().slice(0, 28)) { if (!(p.fallen > 0 || p._vetalBody || p.corpse)) list.push([pathOf(p), intent(p), null]); }
+    for (const [p] of near().slice(0, 28)) { if (!(p.fallen > 0 || p._vetalBody || p.corpse)) list.push([pathOf(p), intent(p), null, odo(p)]); }
     // a vehicle's wheels: one line for a two-wheeler or an auto (its back wheels run in the front one's track... near
     // enough: the auto's single front wheel leads), two for anything on four wheels, its track apart
-    for (const [v] of vehNear().slice(0, 16)) { const T = v.T || {}, one = T.two || v.type === 'auto'; list.push([pathOfVeh(v), vIntent(v), one ? [0] : [-(T.W || 1.7)*0.41, (T.W || 1.7)*0.41]]); }
+    for (const [v] of vehNear().slice(0, 16)) { const T = v.T || {}, one = T.two || v.type === 'auto'; list.push([pathOfVeh(v), vIntent(v), one ? [0] : [-(T.W || 1.7)*0.41, (T.W || 1.7)*0.41], odo(v)]); }
     // a rectangle on the ground: centre (cx, cz), along (fx, fz) half a long and b wide, at alpha al
     const rect = (cx, cz, fx, fz, a, b, al) => {
       if (q >= TR_Q) return;
@@ -677,16 +679,18 @@ export function powers(G) {
       q++;
     };
     const hAt = (x, z) => (surf ? surf.height(x, z) : 0) + 0.06;
-    // wheels: dashes 1 m long, 0.6 m apart, a hand wide, flowing the way it's going, fading out ahead
-    const DASH = 1.0, GAP = 0.6, PER = DASH + GAP, HW = 0.09, flow = (trPh*2.2) % PER;
-    // feet: a footprint (the sole, a gap, the heel) left and right in turn, a step apart, creeping ahead the way they walk
-    const STEP = 0.68, flowF = (trPh*1.3) % (2*STEP);
+    // wheels: dashes 1 m long, 0.6 m apart, a hand wide; feet: a footprint (the sole, a gap, the heel) left and right in
+    // turn, a step apart. Both are laid on the ground where they'll be, counted from how far each one has come, so they
+    // stay put as the person or the vehicle moves on to them (nothing slides along)
+    const DASH = 1.0, GAP = 0.6, PER = DASH + GAP, HW = 0.09, STEP = 0.68;
+    const mod = (a, m) => ((a % m) + m) % m;
     const foot = (x, z, fx, fz, side, al) => {
       const ox = -fz*0.1*side, oz = fx*0.1*side;
       rect(x + ox + fx*0.045, z + oz + fz*0.045, fx, fz, 0.085, 0.048, al);         // the sole and toes
       rect(x + ox - fx*0.1, z + oz - fz*0.1, fx, fz, 0.042, 0.038, al);              // the heel
     };
-    for (const [pts, c, wheels] of list) {
+    for (const [pts, c, wheels, od] of list) {
+      const flow = mod(-od, PER), flowF = mod(-od, STEP);
       if (pts.length < 4) continue;
       col.set(c);
       let tot = 0; for (let i = 0; i + 3 < pts.length; i += 2) tot += Math.hypot(pts[i + 2] - pts[i], pts[i + 3] - pts[i + 1]);
@@ -703,7 +707,7 @@ export function powers(G) {
             if (sd >= d0 + L) break;
             if (sd < d0 || sd < 0.3) continue;
             const t = (sd - d0)/L;
-            foot(ax + (bx - ax)*t, az + (bz - az)*t, fx, fz, (k & 1) ? 1 : -1, 0.9*(1 - sd/tot));
+            foot(ax + (bx - ax)*t, az + (bz - az)*t, fx, fz, (Math.round((od + sd)/STEP) & 1) ? 1 : -1, 0.9*(1 - sd/tot));
           }
         } else {
           for (let k = Math.floor((d0 - flow)/PER) - 1; ; k++) {
