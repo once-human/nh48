@@ -89,7 +89,7 @@ void main(){
   vec3 L = texture(tCol, uv + wob*.6).rgb;
   // the lens: things out of focus open up into discs; the camera's own movement smears the frame
   if (dofN > 0) { float coc = clamp((z0 - focus - 25.)/380., 0., 1.)*dofR; if (coc > .6) { vec3 a = L; float W = 1., a0 = ign(gl_FragCoord.xy)*6.28; for (int i = 0; i < dofN; i++) { float t = sqrt((float(i) + .5)/float(dofN)), th = a0 + float(i)*2.39996; vec2 q = uv + vec2(cos(th), sin(th))*t*coc*px; float zq = lz(q), w = zq > focus - 1. ? 1. : .12; a += texture(tCol, q).rgb*w; W += w; } L = a/W; } }
-  if (mbN > 0 && z0 > focus + 1.5) { vec4 pw = invVP*vec4(uv*2. - 1., (sky ? 1. : d0)*2. - 1., 1.); pw /= pw.w; vec4 pr = reproj*pw; vec2 vel = uv - pr.xy/pr.w*.5 - .5; float vl = length(vel); if (vl > .001) { vel *= min(1., .05/vl); vec3 a = L; float jit = ign(gl_FragCoord.xy); for (int i = 0; i < mbN; i++) a += texture(tCol, uv - vel*(float(i) + jit)/float(mbN)).rgb; L = a/float(mbN + 1); } }
+  if (mbN > 0 && z0 > focus + 1.5) { vec4 pw = invVP*vec4(uv*2. - 1., (sky ? 1. : d0)*2. - 1., 1.); pw /= pw.w; vec4 pr = reproj*pw; vec2 vel = uv - pr.xy/pr.w*.5 - .5; float vl = length(vel); if (vl > .001) { vel *= .35; vl *= .35; vel *= min(1., .012/max(vl, 1e-5)); if (vl < .0008) vel *= 0.; vec3 a = L; float jit = ign(gl_FragCoord.xy); for (int i = 0; i < mbN; i++) a += texture(tCol, uv - vel*(float(i) + jit)/float(mbN)).rgb; L = a/float(mbN + 1); } }
   if (!sky) {
     if (useSSR > 0) { vec4 r = texture(tSSR, uv); L = mix(L, r.rgb, r.a); }
     if (useAO > 0) { vec4 a = texture(tAO, uv); float k = a.a; L = L*mix(1., k, 1. - min(1., lum(L)*.2)) + a.rgb*(.15 + L)*.35*dayK; }
@@ -232,7 +232,16 @@ export class Post {
     }
     U.dofN.value = F.dof; U.mbN.value = F.mb;
     if (F.dof > 0 && this.focusAt) { const f = this.focusAt(); U.focus.value += (f - U.focus.value)*Math.min(1, (dt || .016)*5); U.dofR.value = 5*U.dpr.value; }
-    if (F.mb > 0) { this.vp.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); U.invVP.value.copy(this.vp).invert(); U.reproj.value.copy(this.prevVP); this.prevVP.copy(this.vp); }
+    // motion blur from how you're moving through the world, not from turning the view: last frame's camera is taken
+    // where it was but looking where it looks now, so flicking the camera round smears nothing; going fast does
+    if (F.mb > 0) {
+      this.vp.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); U.invVP.value.copy(this.vp).invert();
+      cam.getWorldPosition(this._mbP = this._mbP || new THREE.Vector3()); cam.getWorldQuaternion(this._mbQ = this._mbQ || new THREE.Quaternion());
+      if (!this._mbL) this._mbL = this._mbP.clone();
+      if (this._mbL.distanceTo(this._mbP) > 6) this._mbL.copy(this._mbP);          // (a cut or a teleport: no smear)
+      this.prevVP.compose(this._mbL, this._mbQ, this._mbS || (this._mbS = new THREE.Vector3(1, 1, 1))).invert().premultiply(cam.projectionMatrix);
+      U.reproj.value.copy(this.prevVP); this._mbL.copy(this._mbP);
+    }
     this.pass(this.mat, null);
   }
 }
