@@ -306,6 +306,8 @@ Pilot.prototype.tickEnter = function (dt) {
   const E = this.entering, F = this.foot, H = this.human;
   if (!E.cd || !H) return tick.call(this, dt);
   E.real += dt; this.busy = Math.max(this.busy, 0.5);
+  // the car stays where it is the whole time you're at its door (pilot.js stops it for 3 s, and this takes longer)
+  if (E.offer.kind === 'traffic' && E.offer.o) { E.offer.o.v = 0; E.offer.o.argue = Math.max(E.offer.o.argue || 0, 0.5); }
   // knocked about on the way: it's off
   if (this.downT > 0 || this.ko || (this.act && this.act.kind === 'hurt')) return abortIn(this, E);
   const src = E.src, D = E.D, s = E.s, sd = s > 0 ? 'r' : 'l', od = s > 0 ? 'l' : 'r';
@@ -465,11 +467,34 @@ Pilot.prototype.tickEnter = function (dt) {
 };
 function abortIn(P, E, quiet) {
   if (E.R) { E.R.held = false; shut(E.R); }
+  // its driver's already out on the road: the car doesn't drive on without them. It stays standing there, empty, its
+  // door swinging shut, a car you (or they) can get into
+  if (E.offer.kind === 'traffic' && E.pulled && emptied(P, E)) {
+    P.entering = null; P.frozen = false; P.puppet = null;
+    if (P.act && P.act.kind === 'getin') P.act = null;
+    if (!quiet) P.human?.play('idle', { fade: 0.2 });
+    return;
+  }
   if (!E.R || !E.pre || !E.pre.root.visible) dropStandIn(P, E);
   else { const v = E.pre; setTimeout(() => dropStandIn(P, { ...E, pre: v }), 900); }
   P.entering = null; P.frozen = false; P.puppet = null;
   if (P.act && P.act.kind === 'getin') P.act = null;
   if (!quiet) P.human?.play('idle', { fade: 0.2 });
+}
+
+function emptied(P, E) {
+  const o = E.offer.o, TR = E.traffic;
+  let v = E.pre;
+  try {
+    if (!v) { v = new Vehicle(P.W, P.scene, P.vmats, E.kind, o.col || [0.6, 0.6, 0.6]); }
+    v.reset(o.x, o.z, o.th ?? Math.atan2(o.hz, o.hx)); v.y = o.y || 0; v.v = 0; v.sync(0); v.root.visible = true;
+    v.helmet = false; v.plate = P.randomPlate ? P.randomPlate() : v.plate;
+  } catch (e) { return false; }
+  E.pre = null; E.offer.pre = null;
+  const i = TR && TR.list ? TR.list.indexOf(o) : -1;
+  if (i >= 0) TR.despawn(i);
+  P.addDropped(v, TR);
+  return true;
 }
 
 // bent in at the open door: the body forward into the cabin, the hands down under the dash (wiring) or on the seat
