@@ -99,7 +99,7 @@ const PATCHES = {
   [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'], ['E', 'Jhola'],", "['F', 'Walk in, counters, pet'], ['E', 'Get in or out of a vehicle'], ['T', 'Talk to someone'], ['Q', 'Jhola'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
   [S('game/pilot.js')]: [
     // slowed on foot (dazed after Vetal: beta/game/powers.js sets slowMul)
-    ["const target = (fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0;", "const target = ((fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0) * (this.slowMul ? this.slowMul() : 1);"],
+    ["const target = (fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0;", "const target = ((fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0) * (this.slowMul ? this.slowMul() : 1) * (this.crouchMul ? this.crouchMul() : 1);"],
     // knocked down by a vehicle only if it's coming at you: walking into the back of a scooter riding away from you
     // (or alongside one) is a bump, not being run over (it counted its speed, not which way it was going)
     ["if ((o.v || 0) > 3.5 && !this.downT) {", "if (!this.downT && ((o.hx * (o.v || 0) - F.vx) * rx + (o.hz * (o.v || 0) - F.vz) * rz) / (Math.hypot(rx, rz) || 1) > 3.5) {"],
@@ -187,6 +187,8 @@ const PATCHES = {
   ],
   [S('people/fight.js')]: [
     ["if (input.took('KeyC') && !busyDown", "if ((input.took('ControlLeft') || input.took('ControlRight')) && !busyDown && !(P.act && P.act.move)"],
+    // Ctrl standing still crouches (beta/game/crouch.js); moving, it's the roll the way you're going
+    ["&& !(P.act && P.act.kind === 'roll')) this.roll(input);", "&& !(P.act && P.act.kind === 'roll')) { if (F.v < 0.5 && !P.act && P.crouchKey) P.crouchKey(); else { if (P.crouchOff) P.crouchOff(); this.roll(input); } }"],
     // whoever rode it comes off as themselves, not someone new: the riders the crowd had seated on it (crowd.js riders)
     ["    const look = kit.randomLook(this.rng, { female: this.rng.chance(o.T.two ? 0.15 : 0.25), helmet: o.T.two && o.type !== 'cycle', avoid: P.look });\n    if (o.colB) look.top = look.top.setRGB(o.colB[0], o.colB[1], o.colB[2]);",
      "    const R0 = o._riders && o._riders[0], R1 = o._riders && o._riders[1];\n    const look = R0 ? R0.look : kit.randomLook(this.rng, { female: this.rng.chance(o.T.two ? 0.15 : 0.25), helmet: o.T.two && o.type !== 'cycle', avoid: P.look });\n    if (!R0 && o.colB) look.top = look.top.setRGB(o.colB[0], o.colB[1], o.colB[2]);"],
