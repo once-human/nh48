@@ -18,6 +18,9 @@ R.toggleView = function (onFoot) {
 R.update = function (dt, p) {
   // in a vehicle you're drawn in both views; from the seat only your head is cut away (skin.js)
   if (p && p.human && !p.onFoot) p.human._fp = this.mode === 2;
+  // a helmet is its own piece over the head: from inside it, it's the whole view, so it isn't drawn while it's your eyes
+  const X = p && p.human && p.human.xtra, hm = X && X.helm;
+  if (hm) { const fp = !!p.human._fp; if (fp && hm.visible) { hm.visible = false; hm.userData.fpHid = true; } else if (!fp && hm.userData.fpHid) { hm.visible = true; hm.userData.fpHid = false; } }
   if (!this._pl) { this._pl = true; const v = load(); this.mode = v.drive === 2 ? 2 : 0; this.footFP = !!v.foot; }
   return upd.call(this, dt, p);
 };
