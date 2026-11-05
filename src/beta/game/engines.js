@@ -27,6 +27,68 @@ const CLS = {
   v8: { cyl: 8, idle: 850, red: 7200, h: 0.8, sub: 0.45, nz: 0.12, nf: 2200, f1: [160, 2, 8], f2: [600, 2, 5], lp: [400, 3200], drive: 2.0, vol: 0.05 },
   v10: { cyl: 10, idle: 1000, red: 8500, h: 0.85, sub: 0.25, nz: 0.1, nf: 3000, f1: [260, 2, 7], f2: [900, 2, 6], lp: [550, 4500], drive: 1.9, vol: 0.05 },
 };
+// the firing itself (beta: an AudioWorklet, below): ev, where in the two turns of the crank each cylinder fires (0..1);
+// amp, how hard each one (a V8's two banks into their pipes give the lope); dec, how fast a pulse dies (s); nz, how
+// much of it is roar rather than thump; pipe, the exhaust's length as its echo (s: its note is 1/pipe); fb and damp, how
+// much it rings and how dull; irr, how uneven it runs at idle (cycle to cycle); knock, a diesel's clatter
+const even = (n) => [...Array(n).keys()].map(i => i/n);
+const PULSE = {
+  scooter: { ev: [0], amp: [1], dec: 0.0025, nz: 0.22, pipe: 0.0021, fb: 0.55, damp: 0.5, irr: 0.06, knock: 0, g: 1 },
+  commuter: { ev: [0], amp: [1], dec: 0.003, nz: 0.2, pipe: 0.0028, fb: 0.6, damp: 0.45, irr: 0.08, knock: 0, g: 1 },
+  thumper: { ev: [0], amp: [1], dec: 0.0065, nz: 0.1, pipe: 0.0058, fb: 0.7, damp: 0.33, irr: 0.13, knock: 0, g: 1.15 },
+  i4bike: { ev: even(4), amp: [1, 0.97, 1.02, 0.99], dec: 0.0016, nz: 0.14, pipe: 0.0016, fb: 0.5, damp: 0.6, irr: 0.02, knock: 0, g: 0.95 },
+  auto: { ev: [0], amp: [1], dec: 0.0035, nz: 0.34, pipe: 0.0033, fb: 0.55, damp: 0.55, irr: 0.1, knock: 0, g: 1 },
+  i3: { ev: even(3), amp: [1, 0.94, 1.05], dec: 0.003, nz: 0.1, pipe: 0.0045, fb: 0.6, damp: 0.4, irr: 0.05, knock: 0, g: 1 },
+  i4: { ev: even(4), amp: [1, 0.98, 1.02, 0.99], dec: 0.0028, nz: 0.08, pipe: 0.005, fb: 0.55, damp: 0.4, irr: 0.03, knock: 0, g: 1 },
+  i4t: { ev: even(4), amp: [1, 0.98, 1.02, 0.99], dec: 0.0024, nz: 0.12, pipe: 0.0047, fb: 0.5, damp: 0.45, irr: 0.03, knock: 0, g: 0.95 },
+  diesel4: { ev: even(4), amp: [1, 0.96, 1.03, 0.98], dec: 0.0022, nz: 0.24, pipe: 0.006, fb: 0.55, damp: 0.35, irr: 0.05, knock: 0.5, g: 1 },
+  diesel6: { ev: even(6), amp: [1, 0.97, 1.02, 0.99, 1.03, 0.98], dec: 0.0025, nz: 0.26, pipe: 0.0075, fb: 0.6, damp: 0.3, irr: 0.04, knock: 0.45, g: 1.05 },
+  v8: { ev: even(8), amp: [1, 0.78, 1.12, 0.74, 0.96, 1.08, 0.8, 1.02], dec: 0.0034, nz: 0.1, pipe: 0.0052, fb: 0.65, damp: 0.35, irr: 0.05, knock: 0, g: 1 },
+  v10: { ev: even(10), amp: [1, 0.92, 1.06, 0.95, 1.02, 0.97, 1.05, 0.93, 1.01, 0.99], dec: 0.002, nz: 0.1, pipe: 0.0034, fb: 0.55, damp: 0.5, irr: 0.02, knock: 0, g: 0.95 },
+};
+// the engine as it runs, sample by sample: each cylinder's firing a pressure pulse into the pipe, never two cycles quite
+// alike (lumpier at idle, steadier as it revs), the pipe ringing with it, a diesel's knock on each firing; revs and
+// load glide (the parameters are smoothed per sample here, so nothing steps or zips)
+const PROC = `class NhEngine extends AudioWorkletProcessor {
+  static get parameterDescriptors() { return [{ name: 'rpm', defaultValue: 800, minValue: 0, maxValue: 20000 }, { name: 'load', defaultValue: 0, minValue: 0, maxValue: 1 }]; }
+  constructor() { super(); this.c = null; this.ph = 0; this.k = 0; this.nx = 0; this.env = 0; this.kn = 0; this.buf = new Float32Array(4096); this.w = 0; this.lp = 0; this.dc = 0; this.dx = 0; this.s = 22222; this.r = 0; this.l = 0;
+    this.port.onmessage = (e) => { this.c = e.data; this.k = 0; this.nx = this.ph + 0.01; }; }
+  rnd() { this.s = (Math.imul(this.s, 1664525) + 1013904223) >>> 0; return this.s/4294967296; }
+  process(_, outs, P) {
+    const o = outs[0] && outs[0][0]; if (!o) return true; const c = this.c; if (!c) { o.fill(0); return true; }
+    const sr = sampleRate, R = P.rpm, L = P.load, ev = c.ev, n = ev.length, D = Math.max(2, Math.min(4000, Math.round(c.pipe*sr))), dE = Math.exp(-1/(c.dec*sr)), dK = Math.exp(-1/(0.0007*sr));
+    for (let i = 0; i < o.length; i++) {
+      this.r += ((R.length > 1 ? R[i] : R[0]) - this.r)*0.0015; this.l += ((L.length > 1 ? L[i] : L[0]) - this.l)*0.0008;
+      const rpm = Math.max(1, this.r), load = this.l;
+      this.ph += rpm/120/sr;
+      while (this.ph >= this.nx) {
+        const idle = Math.max(0, 1 - (rpm - c.idle)/(c.idle*1.5)), irr = c.irr*(0.35 + 0.65*idle) + 0.012;
+        const a = c.amp[this.k % c.amp.length]*(1 + (this.rnd() - 0.5)*2*irr)*(0.55 + 0.45*load + 0.2*rpm/c.red);
+        this.env += a; this.kn += c.knock*a*(0.5 + 0.5*load);
+        this.k++; if (this.k >= n) { this.k = 0; this.ph -= 1; this.nx -= 1; }
+        this.nx = Math.floor(this.nx) + ev[this.k] + (this.k === 0 ? 1 : 0) + (this.rnd() - 0.5)*irr*0.02;
+        if (this.nx <= this.ph) this.nx = this.ph + 1e-6;
+      }
+      const nz = this.rnd()*2 - 1, x = this.env*((1 - c.nz) + c.nz*nz*(0.6 + 0.6*load)) + this.kn*(this.rnd()*2 - 1);
+      this.env *= dE; this.kn *= dK;
+      const d = this.buf[(this.w - D) & 4095]; this.lp += (d - this.lp)*c.damp;
+      const y = x + c.fb*this.lp; this.buf[this.w & 4095] = y; this.w++;
+      const out = y - this.dx + 0.996*this.dc; this.dx = y; this.dc = out;
+      o[i] = out*c.g/(0.4 + rpm/120*n*c.dec*1.6);
+    }
+    return true;
+  }
+}
+registerProcessor('nh-engine', NhEngine);`;
+let wk = null;
+// (loaded once, in the background; until it is, the older synth below plays)
+function worklet(A) {
+  if (wk || !A.ctx || !A.ctx.audioWorklet) return wk && wk.ok;
+  wk = { ok: false };
+  const url = URL.createObjectURL(new Blob([PROC], { type: 'application/javascript' }));
+  A.ctx.audioWorklet.addModule(url).then(() => { wk.ok = true; if (A._pe) silence(A, A._pe, 0.05); if (A._pc) cycleSilence(A, A._pc); A._pe = null; A._pc = null; if (A._te) { for (const T of A._te) { try { T.V.out.disconnect(); } catch (e) { /* gone */ } } A._te = null; } }).catch(() => { /* the older synth stays */ });
+  return false;
+}
 // what engine a vehicle has, from its type and the spec's own description
 const memo = new Map();
 export function engineOf(type) {
@@ -75,11 +137,22 @@ function voice(A, dest) {
   osc.start(); sub.start(); nz.start(); pulse.start(); lope.start();
   return { osc, sub, oG, sG, nbp, nAM, pulse, pG, lope, lG, shaper, lp, f1, f2, out, cls: null, f: 0 };
 }
+// a voice on the worklet: the firing, then the muffler and the pipe's and the intake's colour as before
+function wvoice(A, dest) {
+  const ctx = A.ctx, eng = new AudioWorkletNode(ctx, 'nh-engine', { numberOfInputs: 0, outputChannelCount: [1] });
+  const pre = ctx.createGain(); pre.gain.value = 0.7;
+  const shaper = ctx.createWaveShaper(), lp = ctx.createBiquadFilter(), f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter(), out = ctx.createGain();
+  lp.type = 'lowpass'; lp.Q.value = 0.6; f1.type = 'peaking'; f2.type = 'peaking'; out.gain.value = 0;
+  eng.connect(pre).connect(shaper).connect(lp).connect(f1).connect(f2).connect(out).connect(dest);
+  return { w: true, eng, rpm: eng.parameters.get('rpm'), load: eng.parameters.get('load'), shaper, lp, f1, f2, out, cls: null };
+}
 function tune(A, V, k) {
   if (V.cls === k) return;
   V.cls = k; const C = CLS[k], t = A.ctx.currentTime;
-  V.osc.setPeriodicWave(waveFor(A.ctx, C));
-  const c = new Float32Array(512); for (let i = 0; i < 512; i++) { const x = i/256 - 1; c[i] = Math.tanh(x*C.drive)/Math.tanh(C.drive); }
+  if (V.w) V.eng.port.postMessage({ ...PULSE[k], idle: C.idle, red: C.red });
+  else V.osc.setPeriodicWave(waveFor(A.ctx, C));
+  const dr = V.w ? 1 + (C.drive - 1)*0.5 : C.drive;
+  const c = new Float32Array(512); for (let i = 0; i < 512; i++) { const x = i/256 - 1; c[i] = Math.tanh(x*dr)/Math.tanh(dr); }
   V.shaper.curve = c;
   V.nbp.frequency.setValueAtTime(C.nf, t);
   V.f1.frequency.setValueAtTime(C.f1[0], t); V.f1.Q.setValueAtTime(C.f1[1], t); V.f1.gain.setValueAtTime(C.f1[2], t);
@@ -90,8 +163,15 @@ function drive(A, V, k, r, load, gain) {
   const C = CLS[k], t = A.ctx.currentTime, rate = A.rateMul || 1, loud = A.engLoud || 1;
   tune(A, V, k);
   const rpm = C.idle + (C.red - C.idle)*Math.max(0, Math.min(1.08, r));
+  if (V.w) {
+    // (the worklet smooths both itself; here only where they're headed)
+    V.rpm.setTargetAtTime(rpm*rate, t, 0.04); V.load.setTargetAtTime(load, t, 0.08);
+    V.lp.frequency.setTargetAtTime((C.lp[0] + C.lp[1]*(0.35*r + 0.65*load*(0.4 + r)))*(loud > 1 ? 0.8 : 1), t, 0.12);
+    V.out.gain.setTargetAtTime(gain*C.vol*1.5*(0.6 + 0.25*r + 0.3*load)*loud, t, 0.12);
+    return;
+  }
   // four-stroke: each cylinder fires once every two turns; a touch of wander, an engine's never metronomic
-  const f = rpm/120*C.cyl*rate*(1 + (Math.random() - 0.5)*0.006);
+  const f = rpm/120*C.cyl*rate;
   if (Math.abs(f - V.f) > 0.15) {
     V.f = f;
     V.osc.frequency.setTargetAtTime(f, t, 0.03); V.sub.frequency.setTargetAtTime(f/2, t, 0.03);
@@ -105,7 +185,7 @@ function drive(A, V, k, r, load, gain) {
   V.out.gain.setTargetAtTime(gain*C.vol*(0.55 + 0.25*r + 0.35*load)*loud, t, 0.08);
 }
 function silence(A, V, tc = 0.2) { if (V) V.out.gain.setTargetAtTime(0, A.ctx.currentTime, tc); }
-const mkVoice = voice;
+const mkVoice = (A, dest) => worklet(A) ? wvoice(A, dest) : voice(A, dest);
 
 // ---------------------------------------------------------------- a bicycle: freewheel and chain
 function cycleVoice(A, dest) {
@@ -175,14 +255,22 @@ Audio.prototype.engines = function (list, lx, lz) {
     const q = (v.x - lx)**2 + (v.z - lz)**2; if (q > 3600) continue;
     near.push([q, v, k]);
   }
-  near.sort((a, b) => a[0] - b[0]);
-  const t = this.ctx.currentTime;
-  this._te.forEach((T, i) => {
-    const n = near[i];
-    if (!n) { if (T.v) { T.v = null; silence(this, T.V, 0.3); } return; }
-    const [, v, k] = n, sp = Math.abs(v.v || 0), acc = T.v === v ? Math.max(0, sp - T.sp0)/0.12 : 0;
-    T.v = v; T.sp0 = sp;
-    drive(this, T.V, k, revsAt(k, sp), Math.min(1, acc*0.6 + (sp > 0.5 ? 0.15 : 0)), 1);
+  near.sort((a, b) => a[0] - b[0]); near.length = Math.min(near.length, NV);
+  const t = this.ctx.currentTime, want = new Map(near.map(n => [n[1], n]));
+  // each voice keeps to its vehicle while it's still among the nearest (handing a voice from one to another mid-note
+  // was a jump in the sound); a free one takes a newcomer, faded in rather than switched
+  for (const T of this._te) if (T.v && !want.has(T.v)) { T.v = null; silence(this, T.V, 0.25); T.quiet = t + 0.35; }
+  for (const n of near) {
+    if (this._te.some(T => T.v === n[1])) continue;
+    const T = this._te.find(q => !q.v && !(q.quiet > t)); if (!T) continue;
+    T.v = n[1]; T.sp0 = Math.abs(n[1].v || 0); T.ld = 0.15;
+  }
+  this._te.forEach((T) => {
+    const n = T.v && want.get(T.v);
+    if (!n) return;
+    const [, v, k] = n, sp = Math.abs(v.v || 0), acc = Math.max(0, sp - T.sp0)/0.12;
+    T.sp0 = sp; T.ld += (Math.min(1, acc*0.6 + (sp > 0.5 ? 0.15 : 0)) - T.ld)*0.15;
+    drive(this, T.V, k, revsAt(k, sp), T.ld, 1);
     if (T.pn.positionX) { T.pn.positionX.setTargetAtTime(v.rx ?? v.x, t, 0.08); T.pn.positionZ.setTargetAtTime(v.rz ?? v.z, t, 0.08); } else T.pn.setPosition(v.x, 0.8, v.z);
   });
 };
