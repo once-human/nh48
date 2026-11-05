@@ -6,7 +6,7 @@ import { liveMode } from './live.js';
 //    street, on the map or in a prompt (any other vehicle, autos in traffic included, is yours to take as always)
 //  - the title says Play instead of Story (there's no story here) and has no Experimental graphics: /beta is the new look
 //  - free roam has a terminal on / (commands.js)
-//  - Live Pune on the title: Pune's real clock and real weather (live.js)
+//  - Live on the title: the real clock and the real weather, and it never pauses (live.js)
 export function betaGame(G) {
   const P = G.player;
   const hideAuto = () => {
