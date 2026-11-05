@@ -6,7 +6,8 @@ import { Vehicle } from '@orig/vehicles/vehicle.js';
 import { clamp } from '@orig/core/util.js';
 import { baseOf } from './models.js';
 
-const LIFT = 4.6, TIP = 8.2;
+// (a real auto takes a hard, fast corner to get a wheel up, and a lot more held for a good while to go over)
+const LIFT = 7.2, TIP = 10.5;
 const isAuto = (v) => baseOf(v.type) === 'auto';
 
 const upd = Vehicle.prototype.update;
@@ -28,10 +29,10 @@ Vehicle.prototype.update = function (dt, inp, traffic) {
     return;
   }
   const out = upd.call(this, dt, inp, traffic);
-  const la = Math.abs(this.latAcc || 0), tgt = la > LIFT ? clamp((la - LIFT)*0.11, 0, 0.36) : 0;
+  const la = Math.abs(this.latAcc || 0), tgt = la > LIFT ? clamp((la - LIFT)*0.08, 0, 0.3) : 0;
   this.lift = (this.lift || 0) + (tgt - (this.lift || 0))*Math.min(1, dt*(tgt > (this.lift || 0) ? 7 : 4));
   this._liftSide = Math.sign(this.latAcc || 0) || this._liftSide || 1;
-  if (la > TIP) { this._liftT = (this._liftT || 0) + dt; if (this._liftT > 0.45) { this._tip3 = { t: 3.2, side: this._liftSide, ang: 0 }; this.events.push({ type: 'tip', speed: Math.abs(this.v) }); } }
+  if (la > TIP) { this._liftT = (this._liftT || 0) + dt; if (this._liftT > 0.9) { this._tip3 = { t: 3.2, side: this._liftSide, ang: 0 }; this.events.push({ type: 'tip', speed: Math.abs(this.v) }); } }
   else this._liftT = Math.max(0, (this._liftT || 0) - dt*2);
   if (tgt > 0.05 && !this._liftWarned) { this.events.push({ type: 'lift' }); this._liftWarned = true; }
   if (tgt === 0) this._liftWarned = false;

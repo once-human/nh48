@@ -22,7 +22,8 @@ const CHASSIS = {
 // how readily the back lets go: [the rear tyres' grip against the front's, how soon they slide and how long they keep
 // sliding]. An ordinary car is set up to push on, not slide (more grip at the back, a handbrake turn that dies out
 // fast); a sports car's back is lighter and its tyres let go progressively, so it drifts and holds one
-const DRIFT = { sports: [0.85, 1.4], super: [0.9, 1.25], lux: [0.97, 1.05] }, ORDINARY = [1.45, 0.6];
+// (all of it held back a notch: he found every car too ready to slide)
+const DRIFT = { sports: [0.93, 1.2], super: [0.97, 1.1], lux: [1.05, 0.9] }, ORDINARY = [1.6, 0.5];
 // An auto rickshaw doesn't slide: one wheel in front and a high seat, so it runs out of footprint before it runs out
 // of grip: the inside wheel comes up first (on two wheels), and pushed further it goes over (beta/vehicles/auto3w.js)
 const THREE_WHEEL = new Set(['auto']);
