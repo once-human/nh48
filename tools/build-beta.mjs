@@ -167,6 +167,8 @@ const PATCHES = {
     ["  inBuilding(x, z) { return this.test(this.bld, x, z); }", "  inBuilding(x, z) { return this.test(this.bld, x, z); }\n  bldTop(x, z) { const l = this.bld.get(this.chunkOf(x, z)); let t = -1; if (l) for (const p of l) { if (x < p.bb[0] || x > p.bb[2] || z < p.bb[1] || z > p.bb[3]) continue; if (p.top > t && pointInRings(x, z, p.rings)) t = p.top; } return t; }"],
   ],
   [S('world/interiors.js')]: [
+    // a bank's counter has real glass over it: clear panes in a steel frame, the tellers seen through them
+    ["      box(B, 0, 1.75, D - 2, W * 0.7, 1.4, 0.04, 0xcfe2ec);   // glass partition", "      { const np = Math.max(3, Math.floor(W * 0.7 / 2.4)); for (let i = 0; i <= np; i++) box(B, (i - np / 2) * (W * 0.7 / np), 1.75, D - 2, 0.05, 1.4, 0.05, 0x9aa0a6); box(B, 0, 2.47, D - 2, W * 0.7, 0.05, 0.06, 0x9aa0a6);\n        const gm = new THREE.Mesh(new THREE.BoxGeometry(W * 0.7, 1.36, 0.012), new THREE.MeshStandardMaterial({ color: 0xe4f1f6, transparent: true, opacity: 0.16, roughness: 0.04, metalness: 0, depthWrite: false })); gm.position.set(O.x, 1.75 + FLOOR, O.z + D - 2); gm.renderOrder = 2; R.dyn.push(gm); }"],
     // the mirrors are real (beta/world/mirrors.js): each one's glass, where it is, which way it faces
     ["const solid = (cx, cz, sx, sz, kind = 0) =>", "const mir = (cx, cy, cz, w, h, ry) => (R.mirrors || (R.mirrors = [])).push({ x: O.x + cx, y: cy + FLOOR, z: O.z + cz, w, h, ry });\n    const solid = (cx, cz, sx, sz, kind = 0) =>"],
     ["box(B, W / 2 - 0.05, 1.4, D - 2, 0.04, 2.2, 1.2, 0xbcd0dc);", "box(B, W / 2 - 0.05, 1.4, D - 2, 0.04, 2.2, 1.2, 0xbcd0dc); mir(W / 2 - 0.075, 1.4, D - 2, 1.2, 2.2, -Math.PI / 2);"],
