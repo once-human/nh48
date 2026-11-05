@@ -265,6 +265,9 @@ const PATCHES = {
     ["edge(3, 'KeyV');", "edge(3, 'KeyC');"],
   ],
   [S('game/game.js')]: [
+    // a driver who got out to have words goes back to their own door and gets in; one who can't get there in time
+    // tries again, and is only gone (in, and away) when you're not looking, never in front of you
+    ["this.people.goTo(p, o.x, o.z, (q) => { this.people.remove(q); o.argue = 0; o.angry = 4; });\n        this.later(12, () => { if (o.argue > 0) { if (this.people.list.includes(p)) this.people.remove(p); o.argue = 0; } });", "const back = (n) => { const hx = o.hx ?? Math.cos(o.th || 0), hz = o.hz ?? Math.sin(o.th || 0), sw = (o.spec && o.spec.W ? o.spec.W / 2 : 0.85) + 0.45; o.argue = Math.max(o.argue || 0, 13);\n        this.people.goTo(p, o.x - hz * sw, o.z + hx * sw, (q) => { this.people.remove(q); o.argue = 0; o.angry = 4; });\n        this.later(12, () => { if (!this.people.list.includes(p)) { o.argue = 0; return; } if (!(o.argue > 0) && n > 0) return; const C = this.crowd, d = Math.hypot(p.x - this.player.x, p.z - this.player.z), unseen = d > 75 || (C && C.inView && !C.inView(p.x, p.z) && d > 10); if (unseen || n >= 8) { if (unseen) this.people.remove(p); else { p.busy = 0; p.anim = null; this.people.backToPath && this.people.backToPath(p); } o.argue = 0; } else back(n + 1); }); };\n        back(0);"],
     // the weapons wheel open: the mouse picks on the wheel, the view stays where it was
     ["document.addEventListener('mousemove', (e) => { if (locked() && this.state === 'play') {", "document.addEventListener('mousemove', (e) => { if (locked() && this.state === 'play' && !(this.arms && this.arms.wheelOn)) {"],
     // V is Vetal now (C is the camera)
@@ -294,8 +297,15 @@ const PATCHES = {
   ],
   // your vehicle hits an animal when its box meets the animal's body (beta/people/bodies.js), not anywhere within 1.9 m
   // of a cow's middle (a bike stopped a metre short of her counted as running her over)
+  // a shopkeeper shuts up and goes when you're not looking, not in a blink while you're stood at the counter
+  [S('people/brain.js')]: [
+    ["if (far || (k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21)) {", "const seen = !far && G.crowd && G.crowd.inView && Math.hypot(k.p.x - P.x, k.p.z - P.z) < 60 && (G.crowd.inView(k.p.x, k.p.z) || Math.hypot(k.p.x - P.x, k.p.z - P.z) < 10);\n      if (far || !seen && ((k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21))) {"],
+  ],
   [S('people/peds.js')]: [
     ["if (d < r && pv > 2) {", "if (pv > 2 && (this.vehTouches ? this.vehTouches(a, player) : d < r)) {"],
+    // into a shop and out again through its door (beta/people/doors.js), not gone at the step and back out of nowhere
+    ["this.goTo(p, d.x, d.z, (q) => { q.mode = 'inside'; q.hidden = true; q.door = d; q.wait = this.rng.range(6, 35); });", "this.goTo(p, d.x, d.z, (q) => { q.mode = 'inside'; q.door = d; q.wait = this.rng.range(6, 35); if (this.thruDoor) this.thruDoor(q, d, true); else q.hidden = true; });"],
+    ["const d = p.door; p.hidden = false; p.door = null; if (d) d.n--;", "const d = p.door; p.hidden = false; p.door = null; if (d) d.n--;\n        if (d && this.thruDoor) { this.thruDoor(p, d, false); return; }"],
   ],
   // parked vehicles solid over their real length and width: a chain of circles as wide as the vehicle from bumper to
   // bumper (a parked scooter was one 0.45 m circle in its middle: you walked through its nose and its tail)
