@@ -14,12 +14,26 @@ const sm = (k) => { k = Math.max(0, Math.min(1, k)); return k*k*(3 - 2*k); };
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const bone = (H, n) => (H._pb || (H._pb = {}))[n] || (H._pb[n] = H.root.getObjectByName(n));
 const HEAD = { dog: 'Bone003', cat: 'Bone003', cow: 'Head' };     // (the loader drops the dots: Bone.003 in the file)
-const _hd = new THREE.Vector3(), _t = new THREE.Vector3(), _p = new THREE.Vector3(), _r = new THREE.Vector3(), _k = new THREE.Vector3();
+const _ua = new THREE.Vector3(), _ub = new THREE.Vector3(), _st = new THREE.Vector3(), _vi = new THREE.Vector3(), _hd = new THREE.Vector3(), _t = new THREE.Vector3(), _p = new THREE.Vector3(), _r = new THREE.Vector3(), _k = new THREE.Vector3();
 const _ft = [new THREE.Vector3(), new THREE.Vector3()], _fq = [new THREE.Quaternion(), new THREE.Quaternion()], _pq = new THREE.Quaternion(), _q = new THREE.Quaternion();
 function turn(b, axis, ang) {
   if (!b || !b.parent || !ang) return;
   b.parent.getWorldQuaternion(_pq).invert();
   b.quaternion.premultiply(_q.setFromAxisAngle(_t.copy(axis).applyQuaternion(_pq), ang));
+}
+// turn a hand about its wrist so its fingers point along `up` and its knuckle line (index to little finger) along
+// `across`: palms together for namaskar is fingers up, index toward the chest on both hands
+const _ha = new THREE.Vector3(), _hb = new THREE.Vector3(), _hc = new THREE.Vector3(), _hq = new THREE.Quaternion(), _wq = new THREE.Quaternion();
+function setHand(H, sd, up, across, w) {
+  const h = bone(H, 'hand_' + sd), m = bone(H, 'middle_01_' + sd), i = bone(H, 'index_01_' + sd), p = bone(H, 'pinky_01_' + sd);
+  if (!h || !m || !i || !p || w <= 0) return;
+  const rot = (q) => { if (w < 1) q.slerp(_wq.identity(), 1 - w); h.parent.getWorldQuaternion(_pq); h.getWorldQuaternion(_q).premultiply(q); h.quaternion.copy(_pq.invert().multiply(_q)); H.root.updateMatrixWorld(true); };
+  h.getWorldPosition(_ha); m.getWorldPosition(_hb);
+  rot(_hq.setFromUnitVectors(_hb.sub(_ha).normalize(), up));
+  i.getWorldPosition(_ha); p.getWorldPosition(_hb); _hb.sub(_ha);
+  _hb.addScaledVector(up, -_hb.dot(up)).normalize(); _hc.copy(across).addScaledVector(up, -across.dot(up)).normalize();
+  // (about the fingers' line only; turned right round when they're opposite)
+  rot(_hb.dot(_hc) < -0.999 ? _hq.setFromAxisAngle(up, Math.PI) : _hq.setFromUnitVectors(_hb, _hc));
 }
 // where the animal's head is now (its model's head bone when it's drawn, else from where it stands)
 function headOf(G, a, out) {
@@ -53,8 +67,9 @@ Game.prototype.petAnimal = function (a) {
   if (!P.onFoot || !H) return;
   if (this.rep) this.rep.good(a.x, a.z, 0.35);          // the lane notices who's kind to its dogs
   F.vx = F.vz = 0;
-  a.petT = 3.2; a.petPh = 0; a.petX = F.x; a.petZ = F.z;
   const cow = a.cow || a.kind === 'cow';
+  // (its wag and bounce; not the instant swing round to face you and back after: animals.js turned the whole body)
+  a.petT = 3.2; a.petPh = 0; a.petX = undefined; a.petZ = undefined;
   start(P, a, cow ? 'cow' : a.kind === 'cat' ? 'cat' : 'dog', cow ? 'touch' : 'pet');
   if (a.kind === 'cat') this.later(0.9, () => this.audio && this.audio.purr && this.audio.purr());
   else if (!cow) this.later(0.9, () => this.audio && this.audio.bark && this.audio.bark(0.25));
@@ -67,18 +82,29 @@ Pilot.prototype.updateFoot = function (dt, ...rest) {
   if (!this.onFoot || this.downT || !this.act || this.act.kind !== 'hurt' || F.air || F.swim) { this._pet = null; return upd.call(this, dt, ...rest); }
   const a = S.a, H = this.human, cow = S.kind === 'cow';
   headOf(G, a, _hd);
-  // up to it first: a few steps until you're close enough to reach (squatting by a dog, an arm's length from a cow)
-  const want = cow ? 0.85 : S.kind === 'cat' ? 0.45 : 0.5, dx = _hd.x - F.x, dz = _hd.z - F.z, d = Math.hypot(dx, dz), face = Math.atan2(dz, dx);
+  // where to stand: in front of a cow's face; beside a dog's or cat's shoulder, on the side you came from. Walk
+  // there round its body (by its flank first if you're behind it), never through it
+  const ax = Math.cos(a.yaw || 0), az = Math.sin(a.yaw || 0), qx = F.x - a.x, qz = F.z - a.z;
+  if (S.side === undefined) S.side = (-az*qx + ax*qz) >= 0 ? 1 : -1;          // which flank you're on
+  const sx = -az*S.side, sz = ax*S.side;
+  const stand = _st.set(cow ? _hd.x + ax*0.72 : a.x + ax*0.2 + sx*0.48, 0, cow ? _hd.z + az*0.72 : a.z + az*0.2 + sz*0.48);
+  // (behind it when you start: by its flank first, once)
+  if (S.round === undefined) S.round = qx*ax + qz*az < (cow ? 0.3 : 0.05) && Math.hypot(qx, qz) < (cow ? 2.6 : 1.3);
+  const behind = S.round;
+  const via = behind ? _vi.set(a.x + sx*(cow ? 0.95 : 0.55) + ax*(cow ? 0.2 : 0), 0, a.z + sz*(cow ? 0.95 : 0.55) + az*(cow ? 0.2 : 0)) : stand;
   if (S.go) {
     S.goT += dt;
-    if (d > want + 0.04 && S.goT < 2.5) {
+    const gx = via.x - F.x, gz = via.z - F.z, gd = Math.hypot(gx, gz);
+    if (S.round && gd < 0.15) S.round = false;
+    if (Math.hypot(stand.x - F.x, stand.z - F.z) > 0.06 && S.goT < 6) {
       // an unhurried walk, the clip's own pace (feet don't slide)
-      const s = Math.min(1.0*dt, d - want);
-      F.x += dx/d*s; F.z += dz/d*s;
+      const s = Math.min(1.0*dt, gd);
+      if (gd > 1e-3) { F.x += gx/gd*s; F.z += gz/gd*s; }
       H.play('walk', { fade: 0.2, speed: 0.8 });
     } else { S.go = false; H.play('idle', { fade: 0.3 }); }
     this.act.t = 0;
   }
+  const dx = _hd.x - F.x, dz = _hd.z - F.z, face = S.go ? Math.atan2(via.z - F.z, via.x - F.x) : Math.atan2(dz, dx);
   F.yaw += wrap(face - F.yaw)*Math.min(1, dt*(S.go ? 10 : 6));
   upd.call(this, dt, ...rest);
   if (S.go) return;
@@ -146,8 +172,15 @@ Pilot.prototype.updateFoot = function (dt, ...rest) {
     H.root.updateMatrixWorld(true);
     const s3 = bone(H, 'spine_03');
     if (s3) {
-      s3.getWorldPosition(_k).add(_p.set(fx*0.24, 0.1, fz*0.24));
-      for (const [sd, o] of [['l', -0.03], ['r', 0.03]]) { ikArm(H, sd, _t.copy(_k).addScaledVector(_r, o), _p.set(-fx*0.3, -1, -fz*0.3).addScaledVector(_r, sd === 'l' ? -0.9 : 0.9), h); grip(H, sd, -0.95*h); }
+      // the wrists together a hand's width in front of the breastbone, the heels of the hands touching; the hands
+      // turned so the palms meet flat, fingers up and a little forward, thumbs toward the chest
+      s3.getWorldPosition(_k).add(_p.set(fx*0.2, -0.13, fz*0.2));
+      const up = _ua.set(fx*0.25, 1, fz*0.25).normalize(), fw = _ub.set(fx, 0, fz);
+      for (const [sd, o] of [['l', -0.028], ['r', 0.028]]) {
+        ikArm(H, sd, _t.copy(_k).addScaledVector(_r, o), _p.set(-fx*0.2, -1, -fz*0.2).addScaledVector(_r, sd === 'l' ? -1.2 : 1.2), h);
+        setHand(H, sd, up, fw, h);
+        grip(H, sd, -1.0*h);
+      }
     }
   }
   H.root.updateMatrixWorld(true);
