@@ -1,6 +1,7 @@
 // Puneri /beta, entry point: the game's own boot (src/main.js), wired to the new look. Everything that decides what
 // happens is the game's own code; what's different here is how it's drawn (src/beta/gfx, src/beta/world) and that
 // /beta keeps its own saves, starts you on foot with no auto of your own, and has no story.
+import './people/clippose.js';       // every pose built on a body starts from the clip's, every frame (no spinning)
 import './game/guard.js';         // the terminal's hold on the keyboard: before every other key listener
 import * as THREE from 'three';
 import { inside } from './gfx/repaint.js';

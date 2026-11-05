@@ -203,6 +203,9 @@ const PATCHES = {
   ],
   // a one-off gesture (a wave as they pass) is upper body too: the legs keep walking under it
   [S('people/crowd.js')]: [
+    // smooth up to 45 m, half rate to 100 m; a frame someone isn't animated, their bones go back to the clip's pose
+    // (beta/people/clippose.js), so whatever's built on it (hands on the grips, a lean) is rebuilt on that, never on itself
+    ["if (p.rideOf && upd && (seen || dd < 12) && dd < 70) {", "if (p.rideOf && (seen || dd < 12) && dd < 70) {"],
     // a cyclist: on the saddle, no helmet, hands on the flat bar, sitting up more than on a motorbike (beta/people/cyclists.js pedals)
     ["const GRIPS = { auto: [0.72, 1.07, 0.33], scooter: [0.62, 1.0, 0.3], bike: [0.6, 1.08, 0.34] };", "const GRIPS = { auto: [0.72, 1.07, 0.33], scooter: [0.62, 1.0, 0.3], bike: [0.6, 1.08, 0.34], cycle: [0.44, 1.0, 0.28] };"],
     ["const LEAN = { bike: 0.5, scooter: 0.36, auto: 0.24, pillion: 0.14 };", "const LEAN = { bike: 0.5, scooter: 0.36, auto: 0.24, pillion: 0.14, cycle: 0.3 };"],
@@ -217,8 +220,8 @@ const PATCHES = {
     // after each person's clip: where they look (beta/draw/alive.js)
     // someone being dragged or waking up is posed every frame, seen or not (behind you, they were posed every few
     // frames and your hands, holding them, jumped between where they were and where they'd been)
-    ["if (seen ? (dd < 30 ||", "if (p._drag || p._wake ? true : seen ? (dd < 30 ||"],
-    ["H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; }", "H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; if (this.postPed && dd < 40) this.postPed(p, H, dt); }"]],
+    ["if (seen ? (dd < 30 || (dd < 70 ?", "if (p._drag || p._wake ? true : seen ? (dd < 45 || (dd < 100 ?"],
+    ["H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; }", "H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; } else H.mixer.rest && H.mixer.rest();\n    if (this.postPed && dd < 40) this.postPed(p, H, dt);"]],
   // animals: the walk follows how far they really move (no gliding when the game moves them, no 2.6x cap when they run)
   [S('people/animals.js')]: [
     ["      const lie = !a.moving && a.kind !== 'cow' && !a.cow;\n      m.play(a.moving ? (a.cow ? 'WalkSlow' : 'Walk') : 'Idle', a.moving ? (a.cow ? 0.9 : Math.min(2.6, Math.max(1, a.v / 1.1))) : 1);",
