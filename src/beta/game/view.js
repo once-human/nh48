@@ -44,7 +44,8 @@ R.updateFoot = function (dt, p) {
   const bob = Math.sin(this._bob*2)*Math.min(0.035, Math.abs(p.v)*0.006);
   // a neck turns so far: past that, your body comes round with your look
   const F = p.foot;
-  if (F && !this.lookBack) { const d = Math.atan2(Math.sin(this.footYaw - F.yaw), Math.cos(this.footYaw - F.yaw)); if (Math.abs(d) > 0.85) F.yaw += d - Math.sign(d)*0.85; }
+  // (not while you're dragging someone: you keep facing them, and look round)
+  if (F && !this.lookBack && !(p.act && p.act.kind === 'drag')) { const d = Math.atan2(Math.sin(this.footYaw - F.yaw), Math.cos(this.footYaw - F.yaw)); if (Math.abs(d) > 0.85) F.yaw += d - Math.sign(d)*0.85; }
   // your eyes are in your head, wherever the walk or the run has it (skin.js finds it each frame), just ahead of the face
   const o = H && H._headOff, hy = H ? H.holder.position.y : (p.y || 0);
   if (o) { const s = this._eo || (this._eo = { x: o.x, y: o.y, z: o.z }), k = Math.min(1, dt*14); s.x += (o.x - s.x)*k; s.y += (o.y - s.y)*k; s.z += (o.z - s.z)*k; }

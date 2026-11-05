@@ -147,7 +147,10 @@ export function people(G) {
     // up off the ground from the heels, the shoulders to where the hands are
     const ft = mid(H, 'foot_l', 'foot_r', new THREE.Vector3()), am = mid(H, 'upperarm_l', 'upperarm_r', new THREE.Vector3());
     if (!ft || !am) return;
-    const dir = new THREE.Vector3(am.x - ft.x, 0, am.z - ft.z).normalize(), ax = new THREE.Vector3().crossVectors(dir, UP).normalize();
+    // the line from their heels to their shoulders from the shape measured once, turned to where they lie (from the
+    // live bones it swung about whenever the clip shifted them, and the lift went round with it)
+    const L = D.loc, ly = p.yaw ?? 0, lx = L.arm.x - L.feet.x, lz = L.arm.z - L.feet.z;
+    const dir = new THREE.Vector3(lx*Math.cos(ly) - lz*Math.sin(ly), 0, lx*Math.sin(ly) + lz*Math.cos(ly)).normalize(), ax = new THREE.Vector3().crossVectors(dir, UP).normalize();
     const th = D.theta || 0;
     if (th > 0.001) {
       q.setFromAxisAngle(ax, th);

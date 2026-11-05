@@ -38,7 +38,7 @@ import { acts } from './acts.js';
 import { hostBody } from './host.js';
 
 const STORE = 'puneri_powers', DAILY = 3;
-const V_HOLD = 5, V_RANGE = 135, B_HOLD = 3, B_RANGE = 40, N_R = 60, N_UP = 1.0;
+const V_HOLD = 5, V_RANGE = 135, B_HOLD = 2, B_RANGE = 40, N_R = 60, N_UP = 1.0;
 const STAY = 100/180;                           // units a second, being someone ordinary close to your own body
 const N_DRAIN = 8*STAY;
 const R_DAY = 0.075, R_NIGHT = 0.405, N_REFILL = 3;    // units a second
@@ -267,7 +267,13 @@ export function powers(G) {
     if (AC.dragging) AC.stopDrag();
     if (!home) {
       // your own body stays where it fell: one of the street's people now, out cold, for as long as you're away
-      const body = ppl().spawnAt(Pl.look, F.x, F.z, 'kaka');
+      // (indoors there's no street within reach to make someone from, and none was made: you left no body in the
+      // room. Made where you stand, whatever's round you, like the room's own people)
+      let body = G.interiors?.inside ? null : ppl().spawnAt(Pl.look, F.x, F.z, 'kaka');
+      if (!body && G.W?.graph?.edges?.[0]) {
+        const L = Pl.look; body = ppl().make(G.W.graph.edges[0], 1, 1, { female: !!L.female, mode: 'fixed', adult: true });
+        Object.assign(body, { look: L, female: !!L.female, x: F.x, z: F.z, onRoad: false, fixed: true, interior: !!G.interiors?.inside, shirt: [L.top.r, L.top.g, L.top.b], lower: [L.bottom.r, L.bottom.g, L.bottom.b], skin: [L.skin.r, L.skin.g, L.skin.b] });
+      }
       if (body) { Object.assign(body, { fallen: 1e6, ko: true, unconscious: true, mode: 'stand', wait: 1e9, v: 0, anim: null, yaw: yaw(), _vetalBody: true, persona: null, _downAt: performance.now() }); body.anchor = { x: body.x, z: body.z }; }
       home = { look: Pl.look, x: F.x, z: F.z, yaw: yaw(), hp: Pl.hp ?? 100, body, t: 0, crowd: false };
     } else if (host) release(host, F.x, F.z, 'soft');
@@ -485,7 +491,7 @@ export function powers(G) {
   }
   function read(p, free = false) {
     if (!p) return false;
-    if (!free && !S.free) { if (left() <= 0) { toast('Brahmarakshas', 'Spent for today. Back tomorrow', 'warn', 2.5); return false; } S.brahma++; save(); }
+    // as many reads as you like: no daily count any more
     const r = reading(p);
     toast(r.title, r.lines.join('\n'), 'info', 11);
     const T = G.hud?.toasts; if (T && T.length) T[T.length - 1].el.classList.add('nh-read');
@@ -499,7 +505,6 @@ export function powers(G) {
     const p = aimAt(readable(), B_RANGE);
     if (!bl) {
       if (!p) return;
-      if (!S.free && left() <= 0) { toast('Brahmarakshas', 'Spent for today. Back tomorrow', 'warn', 2.5); bDone = true; return; }
       bl = { p, t: 0 };
     } else if (p && p !== bl.p) bl = { p, t: 0 };       // the aim's moved to someone else: it goes with it
     else if (!p) { bl.lost = (bl.lost || 0) + dt; if (bl.lost > 0.25) { bl = null; return; } } else bl.lost = 0;
@@ -742,7 +747,7 @@ export function powers(G) {
     const persons = (s) => G.registry.select(s).filter(e => e.k === 'person').map(e => e.o);
     const one = (s) => { const [p] = persons(s); if (!p) throw new Error('nobody there'); return p; };
     const status = () => [
-      `Vetal ${Math.round(S.vu)}/100   Munja ${Math.round(S.mu)}/100   Brahmarakshas ${left()}/${DAILY} today${S.free ? '   (free)' : ''}`,
+      `Vetal ${Math.round(S.vu)}/100   Munja ${Math.round(S.mu)}/100   Brahmarakshas unlimited${S.free ? '   (free)' : ''}`,
       host ? `in ${host.name || WHO[host.kind]} · hop ${hops} · strain ${Math.round(strain*100)}% · ${Math.round(fromBody())} m from your body` : `yourself · next way in costs ${hopRange(0).join('–')}`,
     ];
     const G_ = 'powers';

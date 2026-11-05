@@ -176,6 +176,9 @@ const PATCHES = {
     ["if (d < r) cand.push([d - (p.cop || p.ctl ? 12 : 0) + (seen ? 0 : 15), p]);", "if (d < r) cand.push([d - (p.cop || p.ctl ? 12 : 0) - (lit ? 1e5 : 0) + (seen ? 0 : 15), p]);"],
     ["if (mv > 0.3 && !once && !LOCO.has(name)) {", "if (mv > 0.3 && (!once || UPPER.has(name)) && !LOCO.has(name)) {"],
     // after each person's clip: where they look (beta/draw/alive.js)
+    // someone being dragged or waking up is posed every frame, seen or not (behind you, they were posed every few
+    // frames and your hands, holding them, jumped between where they were and where they'd been)
+    ["if (seen ? (dd < 30 ||", "if (p._drag || p._wake ? true : seen ? (dd < 30 ||"],
     ["H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; }", "H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; if (this.postPed && dd < 40) this.postPed(p, H, dt); }"]],
   // animals: the walk follows how far they really move (no gliding when the game moves them, no 2.6x cap when they run)
   [S('people/animals.js')]: [
