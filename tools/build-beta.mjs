@@ -94,6 +94,8 @@ const PATCHES = {
   [S('ui/hud.js')]: [["this.nerd = el('div', 'h nerd', 'E jhola · J diary · F3 stats');", "this.nerd = el('div', 'h nerd', 'Q jhola · I phone · J diary · F3 stats');"]],
   [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'], ['E', 'Jhola'],", "['F', 'Walk in, counters, pet'], ['E', 'Get in or out of a vehicle'], ['T', 'Talk to someone'], ['Q', 'Jhola'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
   [S('game/pilot.js')]: [
+    // sat in a chair you're not pushed out of it (a salon chair, the jhula: solid now, beta interiors)
+    ["if (res && !(F.air && res.kind === 2 && F.y - groundY() > 0.55) && !(F.swim && res.kind === 4)) {", "if (res && !this.seated && !(F.air && res.kind === 2 && F.y - groundY() > 0.55) && !(F.swim && res.kind === 4)) {"],
     // a scene that moves you itself (beta/game/acts.js: dragging someone, walking up to them) sets the pace, as a roll does
     ["    if (A && A.kind === 'roll') { F.vx = A.vx; F.vz = A.vz; }", "    if (A && (A.kind === 'roll' || A.move)) { F.vx = A.vx || 0; F.vz = A.vz || 0; }"],
     // standing about a while: arms folded, the phone out (beta/draw/alive.js picks it)
@@ -122,6 +124,10 @@ const PATCHES = {
     ["  inBuilding(x, z) { return this.test(this.bld, x, z); }", "  inBuilding(x, z) { return this.test(this.bld, x, z); }\n  bldTop(x, z) { const l = this.bld.get(this.chunkOf(x, z)); let t = -1; if (l) for (const p of l) { if (x < p.bb[0] || x > p.bb[2] || z < p.bb[1] || z > p.bb[3]) continue; if (p.top > t && pointInRings(x, z, p.rings)) t = p.top; } return t; }"],
   ],
   [S('world/interiors.js')]: [
+    // everything in a room you'd walk into is solid in its own footprint: counters, cases, racks, shelves, tables,
+    // machines, the bar (only some had a solid() of their own). What's under your shins (rugs, floor) or over your
+    // head (lights, boards, the ceiling) isn't, nor a chair or stool (you're sat in those)
+    ["      b.addGeo(UNIT, m, hex(col));\n    };", "      b.addGeo(UNIT, m, hex(col));\n      const y0 = cy - sy / 2, y1 = cy + sy / 2;\n      if (y1 > 0.15 && y0 < 1.2 && Math.max(sx, sz) >= 0.2 && Math.min(sx, sz) >= 0.03 && !(sx <= 0.62 && sz <= 0.62 && y1 <= 1.15)) {\n        const cs = Math.cos(ry), sn = Math.sin(ry), q = (a, c) => [O.x + cx + a * cs + c * sn, O.z + cz - a * sn + c * cs];\n        C.addRing([...q(-sx / 2, -sz / 2), ...q(sx / 2, -sz / 2), ...q(sx / 2, sz / 2), ...q(-sx / 2, sz / 2)], 2);\n      }\n    };"],
     // a Pune bakery, not a café with a counter: glass cases down both sides (khari, toast, nankatai, puffs, cream
     // rolls), jars of biscuits on top, the bread on the shelves behind the till, a lit cake fridge, two tables
     ["else if (k === 'bakery') { aes = pick(['bakery', 'pastel', 'heritage']); layout = 'counter'; }", "else if (k === 'bakery') { aes = pick(['bakery', 'heritage', 'local']); layout = 'bakery'; scale = 0.8; }"],
@@ -211,6 +217,14 @@ const PATCHES = {
   // of a cow's middle (a bike stopped a metre short of her counted as running her over)
   [S('people/peds.js')]: [
     ["if (d < r && pv > 2) {", "if (pv > 2 && (this.vehTouches ? this.vehTouches(a, player) : d < r)) {"],
+  ],
+  // parked vehicles solid over their real length and width: a chain of circles as wide as the vehicle from bumper to
+  // bumper (a parked scooter was one 0.45 m circle in its middle: you walked through its nose and its tail)
+  [S('traffic/parked.js')]: [
+    ["const pick = (a) => rng.pick(a).map(lin);", "const pick = (a) => rng.pick(a).map(lin);\n  const chain = (x, z, hx, hz, L, Wd) => { const r = Wd / 2, n = Math.max(1, Math.ceil((L - Wd) / (r * 0.8)) + 1), out = []; for (let i = 0; i < n; i++) { const o = n === 1 ? 0 : -(L / 2 - r) + (L - 2 * r) * i / (n - 1); out.push(W.collision.addCircle(x + hx * o, z + hz * o, r, 2)); } return out; };"],
+    ["rec.circles.push(W.collision.addCircle(x + tx * 1.1, z + tz * 1.1, 0.85, 2), W.collision.addCircle(x - tx * 1.1, z - tz * 1.1, 0.85, 2));", "rec.circles.push(...chain(x, z, tx, tz, { hatch: 3.65, sedan: 4.0, suv: 4.5 }[k], { hatch: 1.62, sedan: 1.72, suv: 1.82 }[k]));"],
+    ["rec.circles.push(W.collision.addCircle(px, pz, 0.45, 2));", "rec.circles.push(...chain(px, pz, hx, hz, k === 'bike' ? 2.0 : 1.85, 0.62));"],
+    ["rec.circles.push(W.collision.addCircle(px, pz, 0.8, 2), W.collision.addCircle(px - tx * 0.9, pz - tz * 0.9, 0.7, 2));", "rec.circles.push(...chain(px, pz, -tx, -tz, 2.7, 1.38));"],
   ],
   [S('traffic/traffic.js')]: [
     ["bullet: buildBike({ helmet: true }), superbike: buildBike({ helmet: true }),", "bullet: buildBike({ helmet: true, kind: 'bullet' }), superbike: buildBike({ helmet: true, kind: 'superbike' }),"],
