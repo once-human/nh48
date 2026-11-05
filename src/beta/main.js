@@ -59,6 +59,7 @@ import './vehicles/mount.js';
 import './vehicles/cardoor.js';
 import './vehicles/getout.js';
 import './vehicles/busdoors.js';
+import './vehicles/busboards.js';     // PMPML route boards: a real route's number and destination
 import './vehicles/cabinfit.js';    // the cabin kept inside each car's own shell
 import './vehicles/footdown.js';    // a foot down on the road when a two-wheeler stops
 import './people/cyclists.js';        // cyclists close by: real people, pedalling
