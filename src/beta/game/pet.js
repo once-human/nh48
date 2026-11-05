@@ -52,6 +52,14 @@ Strays.prototype.interact = function (a) {
   if (!P.onFoot || !P.human) return;
   start(P, a, dog ? 'dog' : 'cow', dog ? (feed ? 'feed' : 'pet') : (feed ? 'feed' : 'namaskar'));
 };
+// a cow in front of the punch button (fight.js calls this straight, not through interact): the real namaskar, palms
+// together, not the old 'yes' clip (whose arms crossed through each other)
+const nam = Strays.prototype.namaskar;
+Strays.prototype.namaskar = function (a) {
+  nam.call(this, a);
+  const P = this.g.player;
+  if (a && P.onFoot && P.human && !(P._pet && P._pet.a === a)) start(P, a, 'cow', 'namaskar');
+};
 function start(P, a, kind, how) {
   const D = { pet: 2.6, feed: 2.4, namaskar: 1.9, touch: 2.5 }[how];
   P._pet = { a, kind, how, t: 0, D, go: true, goT: 0 };

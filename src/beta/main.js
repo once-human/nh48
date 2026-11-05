@@ -23,6 +23,7 @@ import { vehicleMaterials } from './vehicles/vehmat.js';
 import * as VM from './vehicles/models.js';
 import './vehicles/physics.js';
 import './traffic/rates.js';
+import './traffic/spacing.js';
 import './game/prompt2.js';
 import './game/ask.js';           // what people tell you: the way, food, where you are, a lift
 import './game/outing.js';

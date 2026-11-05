@@ -6,8 +6,8 @@ import { People } from '@orig/people/peds.js';
 
 const R_PED = 0.26;                         // a person, shoulder to shoulder
 const TMP = [0, 0, 0, 0];
-// an animal as one or two circles along its length: [offset along it, radius]
-const SHAPE = { cow: [[0.55, 0.42], [-0.45, 0.42]], dog: [[0.12, 0.26]], cat: [[0, 0.16]] };
+// an animal as circles along its length: [offset along it, radius] (a cow ~2.1 m nose to tail, ~0.65 m across the belly)
+const SHAPE = { cow: [[0.72, 0.3], [0.12, 0.33], [-0.5, 0.31]], dog: [[0.12, 0.26]], cat: [[0, 0.16]] };
 const shapeOf = (a) => SHAPE[a.cow ? 'cow' : a.kind || 'dog'] || SHAPE.dog;
 
 // move an animal by (dx, dz): along its path and across it if it's on one, straight if it's loose (following you)
@@ -26,6 +26,29 @@ function nudge(p, dx, dz) {
   else { p.x += dx; p.z += dz; }
 }
 const still = (p) => p.hidden || p.fixed || p.pax || p.ctl || p.dead || p.corpse || p.seated || p.mode === 'inside' || p.rideOf || p.lift || p.duty;
+
+// how far a circle at (cx, cz) radius r is into your vehicle's box: [depth, nx, nz] (normal out of the box), or null
+function intoBox(V, L, W, cx, cz, r) {
+  const hx = Math.cos(V.th), hz = Math.sin(V.th), rx = cx - V.x, rz = cz - V.z;
+  const al = rx*hx + rz*hz, ac = -rx*hz + rz*hx;
+  const qa = Math.max(-L/2, Math.min(L/2, al)), qc = Math.max(-W/2, Math.min(W/2, ac));
+  let da = al - qa, dc = ac - qc, d = Math.hypot(da, dc);
+  if (d >= r) return null;
+  if (d < 1e-4) {            // the middle inside the box: out through the nearest side
+    const pa = L/2 - Math.abs(al), pc = W/2 - Math.abs(ac);
+    if (pa < pc) { da = Math.sign(al) || 1; dc = 0; d = -pa; } else { da = 0; dc = Math.sign(ac) || 1; d = -pc; }
+    return [r - d, da*hx - dc*hz, da*hz + dc*hx];
+  }
+  da /= d; dc /= d;
+  return [r - d, da*hx - dc*hz, da*hz + dc*hx];
+}
+// your vehicle has hit this animal: its body (the circles above) touches the vehicle's box
+People.prototype.vehTouches = function (a, player) {
+  const V = player.cur, S = player.spec; if (!V || !S) return false;
+  const hx = Math.cos(a.yaw || 0), hz = Math.sin(a.yaw || 0);
+  for (const [o, r] of shapeOf(a)) if (intoBox(V, S.L || 4, S.W || 1.7, a.x + hx*o, a.z + hz*o, r + 0.04)) return true;
+  return false;
+};
 
 const upd = People.prototype.update;
 People.prototype.update = function (dt, player, avoidView) {
@@ -72,10 +95,22 @@ People.prototype.update = function (dt, player, avoidView) {
           nudge(p, dx/d*(m - d)*Math.min(1, dt*12), dz/d*(m - d)*Math.min(1, dt*12));
         }
       }
-      // you can't walk through it either
+      // you can't walk through it either (your body, 0.26 across the shoulders, against hers)
       if (P && P.foot) {
-        const F = P.foot, dx = F.x - cx, dz = F.z - cz, d = Math.hypot(dx, dz), m = r + 0.3;
+        const F = P.foot, dx = F.x - cx, dz = F.z - cz, d = Math.hypot(dx, dz), m = r + R_PED;
         if (d < m && d > 1e-4) { F.x += dx/d*(m - d); F.z += dz/d*(m - d); }
+      }
+      // nor ride through her: rolling slowly into a cow stops you against her body; a dog or a cat is nudged aside
+      if (!player.onFoot && player.cur && player.spec) {
+        const V = player.cur, S = player.spec, hit = intoBox(V, S.L || 4, S.W || 1.7, cx, cz, r);
+        if (hit) {
+          const [dep, nx, nz] = hit;
+          if (a.cow) {
+            V.x -= nx*dep; V.z -= nz*dep;
+            const into = (V.v || 0)*(Math.cos(V.th)*nx + Math.sin(V.th)*nz);
+            if (into > 0) V.v = 0;
+          } else shove(this, a, nx*dep, nz*dep);
+        }
       }
       // poles, walls, parked two-wheelers and cars: edged round
       const res = W.collision.resolve(cx, cz, r);

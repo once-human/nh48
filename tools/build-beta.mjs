@@ -55,8 +55,17 @@ const SWAPS = [
 const PATCHES = {
   // compound walls along the roads: not Pune, Onkar wants them gone. Neither drawn nor solid (the city's edge wall is separate)
   [S('world/index.js')]: [["for (const w of D.walls) put('walls', at(w[0] / 100, w[1] / 100), cmRing(w));", "/* /beta: no compound walls */"]],
-  [S('world/tiles.js')]: [["for (let j = 0; j < D.walls.length; j += 60) {", "for (let j = 0; j < 0; j += 60) {"]],
-  [S('world/propsChunk.js')]: [["for (const w of M.walls) {", "for (const w of []) {"]],
+  [S('world/tiles.js')]: [["for (let j = 0; j < D.walls.length; j += 60) {", "for (let j = 0; j < 0; j += 60) {"],
+    // stalls solid in their own shape, not a 0.9 m circle (beta/world/solids.js)
+    ["import { cmRing } from './geo.js';", "import { cmRing } from './geo.js';\nimport { makeSolids } from '../beta/world/solids.js';"],
+    ["for (const s of D.stalls) C.addCircle(s[0] / 100, s[1] / 100, 0.9, 2);", "{ const SO = W.solid || (W.solid = makeSolids(W)); for (const s of D.stalls) SO.stall(s, C); }"]],
+  [S('world/propsChunk.js')]: [["for (const w of M.walls) {", "for (const w of []) {"],
+    // stalls, bus shelters, street-name boards and banner frames solid in their own shapes (beta/world/solids.js)
+    ["import { RNG, hash1 } from '../core/util.js';", "import { RNG, hash1 } from '../core/util.js';\nimport { makeSolids } from '../beta/world/solids.js';"],
+    ["for (const b of M.buses) collision.addCircle(b[0] / 100, b[1] / 100, 0.9, 2);", "const SO = W.solid || (W.solid = makeSolids(W)); for (const b of M.buses) SO.bus(b, collision);"],
+    ["for (const s of M.stalls) collision.addCircle(s[0] / 100, s[1] / 100, 0.9, 2);", "for (const s of M.stalls) SO.stall(s, collision);"],
+    ["        collision.addCircle(x, z, 0.12, 2);", "        (W.solid || (W.solid = makeSolids(W))).board('street', x, z, fx, fz, collision);"],
+    ["index.chunks[ci].extras.push({ kind: 'banner', x, z, fx, fz, s: rng.int(0, W.signs.banners.length - 1) });", "index.chunks[ci].extras.push({ kind: 'banner', x, z, fx, fz, s: rng.int(0, W.signs.banners.length - 1) }); (W.solid || (W.solid = makeSolids(W))).board('banner', x, z, fx, fz, collision);"]],
   [S('world/props.js')]: [["for (const w of M.walls) {", "for (const w of []) {"]],
   // the four-wheel ground of beta/vehicles/physics.js
   [S('vehicles/vehicle.js')]: [
@@ -198,6 +207,11 @@ const PATCHES = {
     ["b2 = new THREE.Vector3(Math.min(xf0 - 0.6, xf0 - (H - belt) * 0.9), H - 0.08,", "b2 = new THREE.Vector3(Math.min(xf0 - 0.3, S.roofF - 0.04), H - 0.1,"],
     ["const mx = xf0 - 0.42;", "const mx = Math.min(xf0 - 0.42, S.roofF - 0.12);"],
   ],
+  // your vehicle hits an animal when its box meets the animal's body (beta/people/bodies.js), not anywhere within 1.9 m
+  // of a cow's middle (a bike stopped a metre short of her counted as running her over)
+  [S('people/peds.js')]: [
+    ["if (d < r && pv > 2) {", "if (pv > 2 && (this.vehTouches ? this.vehTouches(a, player) : d < r)) {"],
+  ],
   [S('traffic/traffic.js')]: [
     ["bullet: buildBike({ helmet: true }), superbike: buildBike({ helmet: true }),", "bullet: buildBike({ helmet: true, kind: 'bullet' }), superbike: buildBike({ helmet: true, kind: 'superbike' }),"],
     // the models inside the types (beta/vehicles/models.js VARIANTS): their own spawn share, bodies and time-of-day mix
@@ -207,6 +221,9 @@ const PATCHES = {
     // a car you're getting into: the one built for you stands in its place (beta/vehicles/cardoor.js)
     ["const seated = v.wreck || (v.rich", "if (v.hideBody) continue; const seated = v.wreck || (v.rich"],
     ["tot += t.w * (mix[k] ?? 1);", "tot += t.w * (mix[k] ?? mix[baseOf(k)] ?? 1);"],
+    // the far model of the empty two-wheeler / auto (real riders up close, a wreck) is that vehicle without its baked
+    // rider, not a car: buildLow('scooterE') fell through to the car box, so a scooter past the detail range drew as a car
+    ["const lowGeo = buildLow(k);", "const lowGeo = /E$/.test(k) ? buildLow(k.slice(0, -1), true) : buildLow(k);"],
     ["x -= t.w * (mix[k] ?? 1);", "x -= t.w * (mix[k] ?? mix[baseOf(k)] ?? 1);"],
   ],
   [S('vehicles/vehicle.js')]: [
