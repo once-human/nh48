@@ -30,6 +30,7 @@ import './vehicles/damage.js';        // dents where it's hit, holes where it's 
 import './vehicles/crawl.js';         // never stuck: a crawl either way whatever state it's in
 import './vehicles/auto3w.js';        // an auto corners on two wheels, and goes over, instead of sliding
 import './vehicles/lamps.js';         // brake and reverse lamps that answer the pedals, yours and everyone's
+import './vehicles/potholes.js';      // potholes jolt each kind of vehicle its own way
 import './people/stalls.js';          // stall keepers keep to their stalls
 import './people/walls.js';           // nobody walks through a building
 import './game/meow.js';              // a cat's meow

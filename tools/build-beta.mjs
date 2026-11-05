@@ -89,6 +89,8 @@ const PATCHES = {
     ["const pitch = (p.inAuto ? -0.17 : -0.035)", "const pitch = (p.inAnyAuto ? -0.17 : -0.035)"],
     ["this.setFov(dt, (p.inAuto ? 78 : 70) + speed * 0.3);", "this.setFov(dt, (p.inAnyAuto ? 78 : 70) + speed * 0.3);"]],
   [S('vehicles/vehicle.js')]: [
+    // the wheel's drop into a pothole is the hole's and the wheel's own (beta/vehicles/potholes.js)
+    ["for (const p of W.potholeNear || []) { const d = Math.hypot(x - p.x, z - p.z); if (d < p.r) h -= 0.07 * (1 - d / p.r); }", "if (this.potDip) h -= this.potDip(x, z); else for (const p of W.potholeNear || []) { const d = Math.hypot(x - p.x, z - p.z); if (d < p.r) h -= 0.07 * (1 - d / p.r); }"],
     // an auto off the street has the driver's seat view your own has (it had none: the inside view fell back to behind)
     ["    else if (type === 'tempo') this.cockpitEye = [1.05, 1.6, 0.32];", "    else if (type === 'tempo') this.cockpitEye = [1.05, 1.6, 0.32];\n    else if (type === 'auto') this.cockpitEye = [0.3, 1.49, 0];"],
     ["case 'bike': case 'bikeP': case 'bullet': case 'superbike': return buildBike({ parked: true });", "case 'bike': case 'bikeP': return buildBike({ parked: true }); case 'bullet': case 'superbike': return buildBike({ parked: true, kind: type });"],

@@ -12,6 +12,7 @@ import { DECAL } from '../gfx/textures.js';
 import { RNG } from '@orig/core/util.js';
 import { pointInRings } from '@orig/world/mapdata.js';
 import { scatterTufts } from '@orig/world/grass.js';
+import { buildPotholes, buildLitter } from './potholes.js';
 import { GB, KERB_H, WATER_Y } from '@orig/world/groundChunk.js';
 
 // a band along a polyline at a slant: from (off0, y0) to (off1, y1) across it, side the way GB.wall faces
@@ -229,7 +230,7 @@ export function* buildGroundChunk(W, C, group) {
   // potholes, oil stains, litter
   const rng = new RNG(1000 + C.ci);
   const potUV = cellUV(DECAL.pothole), oilUV = cellUV(DECAL.oil), garbUV = cellUV(DECAL.garbage);
-  for (const p of C.pot) db.ground(p.x, 0.018, p.z, p.ang, p.rr, p.rr * p.sq, potUV);
+  // (potholes and the rubbish by the stalls are real shapes now: ./potholes.js)
   const nOil = Math.round(C.ground.length * 0.3);
   for (let k = 0; k < nOil; k++) {
     const g = C.ground[rng.int(0, C.ground.length - 1)];
@@ -238,9 +239,7 @@ export function* buildGroundChunk(W, C, group) {
     const vi = rng.int(0, r0.length / 2 - 1) * 2;
     db.ground(r0[vi] * 0.9 + C.cx * 0.1, 0.013, r0[vi + 1] * 0.9 + C.cz * 0.1, rng.range(0, 6.28), rng.range(0.6, 1.4), rng.range(0.5, 1.0), oilUV);
   }
-  for (const s of C.stalls) {
-    if (rng.chance(0.5)) db.ground(s[0] / 100 + rng.range(-1.5, 1.5), KERB_H + 0.02, s[1] / 100 + rng.range(-1.5, 1.5), rng.range(0, 6.28), rng.range(0.6, 1.1), rng.range(0.5, 0.9), garbUV);
-  }
+  buildPotholes(W, C, group); buildLitter(W, C, group, KERB_H + 0.012);
   // emit (one heavy array conversion per step)
   yield;
   W.sliceLabel = 'gEmit';
