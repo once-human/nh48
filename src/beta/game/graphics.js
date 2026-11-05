@@ -1,10 +1,10 @@
-// /beta's graphics settings and its Auto. The whole picture takes Auto, Light, Low, Medium, High, Very High or Ultra; each
+// /beta's graphics settings and its Auto. The whole picture takes Auto, Lite, Low, Medium, High, Very High or Ultra; each
 // setting takes Auto or any of six real values.
 // Auto starts from what the PC is, and while you play, when frames drop, it works out whether the graphics card or the
 // processor is holding things up and takes one step off the setting that's costing the most there, checks that it
 // helped (puts it back and tries the next one if it didn't), and gives steps back when there's room. MSAA is the
 // exception: Auto sets it from how powerful the PC is, and frame drops never touch it.
-const NAMES = ['Light', 'Low', 'Medium', 'High', 'Very High', 'Ultra'];
+const NAMES = ['Lite', 'Low', 'Medium', 'High', 'Very High', 'Ultra'];
 const pct = (v) => Math.round(v*100) + '%';
 const onOff = (v, f) => (v ? f(v) : 'Off');
 const M = (v) => v + ' m';
@@ -54,7 +54,8 @@ const BASE = { discrete: 3, integrated: 2, weak: 1, soft: 0 };
 
 export class Graphics {
   constructor(G, C) {
-    this.G = G; this.C = C; this.base = BASE[C.gpu] ?? 2;
+    // Auto starts at Medium at the least, and only goes below it (to Low, never Lite) while frames stay under 40
+    this.G = G; this.C = C; this.base = Math.max(2, BASE[C.gpu] ?? 2);
     this.auto = {}; for (const s of ALL) this.auto[s.id] = this.base;
     this.auto.msaa = C.gpu === 'discrete' ? 3 : 0;       // set once, from the hardware
     this.preset = 'auto'; this.pin = {}; this.cap = 144; this.counter = 0;
@@ -97,7 +98,8 @@ export class Graphics {
     this.high = fps >= 58 ? this.high + 1 : 0;
     if (this.low >= 2) {
       const side = share > .6 ? 'cpu' : 'gpu', score = (s) => s.w*this.auto[s.id];
-      const pick = (f) => ALL.filter(s => this.free(s, now) && this.auto[s.id] > 0 && f(s)).sort((a, b) => score(b) - score(a))[0];
+      const floor = fps < 40 ? 1 : 2;
+      const pick = (f) => ALL.filter(s => this.free(s, now) && this.auto[s.id] > floor && f(s)).sort((a, b) => score(b) - score(a))[0];
       const s = pick(q => q.side === side || q.side === 'both') || pick(() => true);
       this.low = 0; if (!s) return;
       this.auto[s.id]--; this.applyOne(s); this.trial = { s, fps, dir: -1, left: 2 }; this.wait = 4; this.sync();

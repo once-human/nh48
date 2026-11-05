@@ -180,7 +180,7 @@ const ASSETS = {
   animals: { dog: 'assets/animals/dog.glb.gz', cat: 'assets/animals/cat.glb.gz', cow: 'assets/animals/cow.glb.gz', kite: 'assets/animals/kite.glb.gz' },
 };
 const SOUNDS = ['horn_car', 'horn_beep', 'horn_truck', 'horn_truck_short', 'dog_bark', 'dog_bark2', 'crow', 'cow_moo', 'temple_bells',
-  'auto_start', 'car_idle', 'diesel_idle', 'amb_auto_ride', 'amb_traffic'];
+  'auto_start', 'car_idle', 'diesel_idle', 'amb_auto_ride'];
 
 async function main() {
   // Start over asked for a clean slate on this load

@@ -117,7 +117,7 @@ export function soundscape(G) {
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -22; comp.ratio.value = 3; comp.knee.value = 18; comp.attack.value = 0.01; comp.release.value = 0.3;
     a.muf.connect(shelf).connect(mud).connect(comp).connect(ctx.destination);
     // each kind of sound a little back from the rest (the voices stay clearest)
-    const TRIM = { traffic: 0.55, world: 0.7, fx: 0.8, voice: 0.9, music: 0.85 };
+    const TRIM = { traffic: 0.4, world: 0.7, fx: 0.8, voice: 0.9, music: 0.85 };
     for (const k in a.buses) { const b = a.buses[k], g = ctx.createGain(); g.gain.value = TRIM[k] ?? 0.8; try { b.disconnect(); } catch (e) { /* */ } b.connect(g).connect(a.master); }
     // the engine: rounder, not a buzz
     const E = a.eng;
