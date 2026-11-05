@@ -203,6 +203,12 @@ const PATCHES = {
   ],
   // a one-off gesture (a wave as they pass) is upper body too: the legs keep walking under it
   [S('people/crowd.js')]: [
+    // a cyclist: on the saddle, no helmet, hands on the flat bar, sitting up more than on a motorbike (beta/people/cyclists.js pedals)
+    ["const GRIPS = { auto: [0.72, 1.07, 0.33], scooter: [0.62, 1.0, 0.3], bike: [0.6, 1.08, 0.34] };", "const GRIPS = { auto: [0.72, 1.07, 0.33], scooter: [0.62, 1.0, 0.3], bike: [0.6, 1.08, 0.34], cycle: [0.44, 1.0, 0.28] };"],
+    ["const LEAN = { bike: 0.5, scooter: 0.36, auto: 0.24, pillion: 0.14 };", "const LEAN = { bike: 0.5, scooter: 0.36, auto: 0.24, pillion: 0.14, cycle: 0.3 };"],
+    ["base = /^bike/.test(o.type) ? 'bike' : /^auto/.test(o.type) ? 'auto' : 'scooter';", "base = /^bike/.test(o.type) ? 'bike' : /^auto/.test(o.type) ? 'auto' : /^cycle/.test(o.type) ? 'cycle' : 'scooter';"],
+    ["const seats = two ? [[bike ? 0.0 : 0.04, 0, false, bike ? 0.95 : 0.8]]", "const cyc = /^cycle/.test(o.type), seats = two ? [[bike ? 0.0 : cyc ? 0.1 : 0.04, 0, false, bike ? 0.95 : cyc ? 0.92 : 0.8]]"],
+    ["helmet: two && i === 0 && o.type !== 'scooterP' });", "helmet: two && i === 0 && o.type !== 'scooterP' && !cyc });"],
     // someone a power is lit on (Vetal going into them, Brahmarakshas reading them) keeps a real body however far off:
     // the glow is on the body, and the crowd used to hand a far one's body to someone nearer a moment later
     ["const R0 = this.range || RANGE, r = p.cop || p.ctl || p.story ? R0 + 14 : R0;", "const lit = p._lit > performance.now() - 600, R0 = this.range || RANGE, r = lit ? 1e9 : p.cop || p.ctl || p.story ? R0 + 14 : R0;"],
@@ -308,6 +314,11 @@ const PATCHES = {
     ["if (o.signals && !o.emergency && G.traffic.signals) {", "if (o.careful && !o.signals && G.traffic.signals) { const n = W.graph.nearest(v.x + hx * 14, v.z + hz * 14, 10), node = n && W.graph.nodes[n.s < n.e.len / 2 ? n.e.a : n.e.b]; if (node && node.signal && Math.hypot(node.x - v.x, node.z - v.z) < 24 && G.traffic.signals.stateForAngle(node.i, v.th) === 'r') target = Math.min(target, 6); }\n    if (o.signals && G.traffic.signals) {"],
   ],
   [S('traffic/traffic.js')]: [
+    // cyclists close by are real people too (beta/people/cyclists.js): an empty cycle to seat them on, and the cycle in
+    // the list of what gets real riders up close
+    ["scooterE: buildScooter({ helmet: true, noRider: true }), bikeE: buildBike({ helmet: true, noRider: true }),", "scooterE: buildScooter({ helmet: true, noRider: true }), bikeE: buildBike({ helmet: true, noRider: true }), cycleE: buildCycle({ noRider: true }),"],
+    ["for (const k of [...TYPE_NAMES, 'scooterE', 'bikeE', 'autoE'])", "for (const k of [...TYPE_NAMES, 'scooterE', 'bikeE', 'autoE', 'cycleE'])"],
+    ["/^(scooter|bike|auto)/.test(v.type) && !(v.fallen > 0);", "/^(scooter|bike|auto|cycle)/.test(v.type) && !(v.fallen > 0);"],
     ["bullet: buildBike({ helmet: true }), superbike: buildBike({ helmet: true }),", "bullet: buildBike({ helmet: true, kind: 'bullet' }), superbike: buildBike({ helmet: true, kind: 'superbike' }),"],
     // the models inside the types (beta/vehicles/models.js VARIANTS): their own spawn share, bodies and time-of-day mix
     ["import { buildAuto, buildScooter, buildBike, buildCar, buildBus, buildTempo, buildCycle, buildLow, PAINTS } from '../vehicles/models.js';", "import { buildAuto, buildScooter, buildBike, buildCar, buildBus, buildTempo, buildCycle, buildLow, PAINTS, VARIANTS, addVariantTypes, baseOf } from '../vehicles/models.js';"],

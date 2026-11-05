@@ -621,7 +621,7 @@ export function buildCycle(opts = {}) {
   for (const s of [-1, 1]) { const ped = [pedal[0] + s*.12, pedal[1] + s*.08, s*.11]; rod(b, [pedal[0], pedal[1], s*.05], ped, .006, STEEL, HUB_G); rbox(b, ped[0] - .04, ped[1] - .01, s*.1, ped[0] + .04, ped[1] + .01, s*.18, BLACK); }
   rod(b, [-.5, R, .05], pedal.slice(0, 2).concat(.05), .006, [.2, .2, .2], HUB_G);
   guard(b, -.5, R + .03, 0, R + .035, .05, c, 1); front(b, () => guard(b, .5, R + .03, 0, R + .035, .05, c, 1));
-  if (!opts.parked) addRider(b, -0.28, 0.92, 0, { lean: 0.22, inst: true, handX: 0.44, handY: 1.0, handW: 0.28, footX: 0.05, footY: 0.32 });
+  if (!opts.parked && !opts.noRider) addRider(b, -0.28, 0.92, 0, { lean: 0.22, inst: true, handX: 0.44, handY: 1.0, handW: 0.28, footX: 0.05, footY: 0.32 });
   front(b, () => wheel2(b, 0.5, R, 0, R, .05)); wheel2(b, -0.5, R, 0, R, .05);
   return withFront({ body: b.build(), glass: gl.build(), dims: { L: 1.75, W: 0.6, H: 1.75, wb: 1.0 } }, b, [.385, .72, .5, R]);
 }
