@@ -1,6 +1,7 @@
 import { freeTerminal } from './commands.js';
 import { liveMode } from './live.js';
 import { powers } from './powers.js';
+import { soundscape } from './soundscape.js';
 
 // What /beta changes about the game once it's made, from the outside (no game file is edited):
 //  - there's no auto of your own: you start on foot, and the auto the game keeps for you never shows up on the
@@ -31,6 +32,7 @@ export function betaGame(G) {
   freeTerminal(G);
   liveMode(G);
   powers(G);
+  soundscape(G);
 }
 
 // the title screen (the HUD exists once the game's init has run)

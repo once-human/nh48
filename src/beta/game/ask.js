@@ -130,8 +130,13 @@ People.prototype.answer = function (p, P, G, what, att, say) {
   const mem = (this.mem && this.mem.get(p.id)) || {};
   if (mem['t_' + what] && now - mem['t_' + what] < 60000) { say(one(rng, ['आत्ताच सांगितलं ना! लक्ष कुठे असतं?', 'किती वेळा सांगू?']), 'I just told you! Where is your mind?'); return true; }
   if (what === 'way' && rng.next() < (late ? 0.15 : 0.05) && att !== 'kind' && att !== 'eager') { say('पाटी वाचता येत नाही का?', 'Can\'t you read the signboard?'); return true; }
+  const asked0 = !!mem.asked;
   this.remember(p, 'asked'); this.mem.get(p.id)['t_' + what] = now;
-  const pre = late && att !== 'curt' ? ['एवढ्या रात्री? जपून जा. ', 'At this hour? Go carefully. '] : att === 'eager' || att === 'kind' ? one(rng, [['हां, सांगतो. ', 'Yes, I\'ll tell you. '], ['अरे, सोपं आहे. ', 'Oh, that\'s easy. '], ['बघा, ', 'Look, ']]) : ['', ''];
+  // "at this hour?" is a thing one person says, once, at the start: not every answer, not everyone you ask. The old ones
+  // more than the young, and after someone's said it, nobody else does for a good while
+  const R = this.mem.get(p.id), lateOk = late && att !== 'curt' && !R.lateSaid && !asked0 && now - (this._lateT || -1e9) > 240000 && rng.next() < (/ajoba|aaji|kaka|kaku|aunty/.test(p.persona || '') ? 0.45 : 0.2);
+  if (lateOk) { R.lateSaid = true; this._lateT = now; }
+  const pre = lateOk ? ['एवढ्या रात्री? जपून जा. ', 'At this hour? Go carefully. '] : att === 'eager' || att === 'kind' ? one(rng, [['हां, सांगतो. ', 'Yes, I\'ll tell you. '], ['अरे, सोपं आहे. ', 'Oh, that\'s easy. '], ['बघा, ', 'Look, ']]) : ['', ''];
   // where to: the waypoint, else food when you're hungry, else just where you are
   let x, z;
   const topic = what;
