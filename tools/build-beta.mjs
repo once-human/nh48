@@ -345,6 +345,8 @@ const PATCHES = {
     ["if (o.signals && !o.emergency && G.traffic.signals) {", "if (o.careful && !o.signals && G.traffic.signals) { const n = W.graph.nearest(v.x + hx * 14, v.z + hz * 14, 10), node = n && W.graph.nodes[n.s < n.e.len / 2 ? n.e.a : n.e.b]; if (node && node.signal && Math.hypot(node.x - v.x, node.z - v.z) < 24 && G.traffic.signals.stateForAngle(node.i, v.th) === 'r') target = Math.min(target, 6); }\n    if (o.signals && G.traffic.signals) {"],
   ],
   [S('traffic/traffic.js')]: [
+    // a bus or a tempo keeps its full model a good deal further out (it's big: its detail was missing until right up close)
+    ["const far = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) > L2;", "const far = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) > L2 * (v.type === 'bus' || v.type === 'tempo' ? 6.25 : 1);"],
     // brake and reverse lamps per car (beta/vehicles/lamps.js, beta/vehicles/vehmat.js)
     ["      body.geometry.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));", "      body.geometry.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));\n      body.geometry.setAttribute('aLamp', new THREE.InstancedBufferAttribute(new Float32Array(c * 2), 2));"],
     ["      lowGeo.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));", "      lowGeo.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));\n      lowGeo.setAttribute('aLamp', new THREE.InstancedBufferAttribute(new Float32Array(c * 2), 2));"],

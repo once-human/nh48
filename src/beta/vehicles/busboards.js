@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { Pilot } from '@orig/game/pilot.js';
 import T from '@orig/game/transit.json';
 
-const POOL = 6, NEAR = 70, FLIP = 4.5;
+const POOL = 8, NEAR = 140, FLIP = 4.5;
 // the boards on the model (beta/vehicles/models.js buildBus): the front one's face and the back one's, bus frame
 const FRONT = { x: 5.455, y: 2.795, w: 1.82, h: 0.27, dir: 1 }, BACK = { x: -5.66, y: 2.76, w: 1.38, h: 0.26, dir: -1 };
 
@@ -50,10 +50,12 @@ function paint(B, R, mr) {
 function makeBoard(spec) {
   const cv = document.createElement('canvas'); cv.width = 512; cv.height = Math.round(512*spec.h/spec.w);
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-  const m = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+  // (a hair proud of the housing's face, and pulled forward in depth: the lit plate in the model's board and this one
+  // were in the same plane and took turns showing, the neon one second and the number the next)
+  const m = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -6 });
   m.color.setScalar(1.35);                                  // (lit: a touch over white, so it glows at night)
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(spec.w, spec.h), m);
-  mesh.position.set(spec.x, spec.y, 0); mesh.rotation.y = spec.dir > 0 ? Math.PI/2 : -Math.PI/2;
+  mesh.position.set(spec.x + spec.dir*0.012, spec.y, 0); mesh.rotation.y = spec.dir > 0 ? Math.PI/2 : -Math.PI/2;
   return { mesh, tex, ctx: cv.getContext('2d') };
 }
 function makeSet(scene) {

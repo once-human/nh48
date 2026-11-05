@@ -95,7 +95,8 @@ export class TreeField extends GameTrees {
     const G = farCrown(), cap = 4000;
     G.setAttribute('iPos', new THREE.InstancedBufferAttribute(new Float32Array(cap*4), 4).setUsage(THREE.DynamicDrawUsage)); G.setAttribute('iTint', new THREE.InstancedBufferAttribute(new Float32Array(cap*3), 3).setUsage(THREE.DynamicDrawUsage)); G.instanceCount = 0;
     this.farMesh = new THREE.Mesh(G, new THREE.ShaderMaterial({ vertexShader: FAR_VS, fragmentShader: FAR_FS, uniforms: Object.assign({}, PU, { uLodF: this.uLodF }), defines: { LOD_FAR: '' }, vertexColors: true })); this.farMesh.frustumCulled = false; this.farMesh.cap = cap; scene.add(this.farMesh);
-    this.R = 700; this.fx = 1e9; this.fz = 1e9;
+    // (two kinds of tree only: the full one close, the lighter real one out to the distance; the blob crowns are off)
+    this.R = 0; this.farMesh.visible = false; this.fx = 1e9; this.fz = 1e9;
   }
   // near and mid sets, refilled every 3 m: each tree in the one its distance says, and in both through the band where
   // one fades into the other (with a little over the 3 m either way, so the shader always has what it needs)
@@ -129,6 +130,7 @@ export class TreeField extends GameTrees {
     const Bn = Math.min(8, Math.max(3, this.nearR*0.3)), Bm = Math.min(24, Math.max(8, this.midR*0.12));
     this.uLodF.value.set(this.nearR, Bn, this.midR, Bm);
     this.nearMid(cx, cz, force, Bn);
+    if (!this.R) return;
     if (!force && Math.hypot(cx - this.fx, cz - this.fz) < 30) return;
     this.fx = cx; this.fz = cz;
     const c = this.cell, r = Math.ceil(this.R/c), gx = Math.floor(cx/c), gz = Math.floor(cz/c), M = this.farMesh, A = M.geometry.attributes.iPos, T = M.geometry.attributes.iTint, m0 = this.midR - Bm - 32, R = this.R; let n = 0;

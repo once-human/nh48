@@ -70,6 +70,7 @@ import './world/fade.js';             // street furniture fades in and out at th
 import './world/stopnames.js';        // each bus shelter's own stop name on its board
 import './game/medics.js';            // paramedics wait while you're dragging the one they came for
 import './game/engines.js';           // every vehicle its own engine (a bicycle its freewheel), yours and the street's
+import './game/voices.js';            // overheard chatter and muttering quieter than talk aimed at you
 import './vehicles/cabinfit.js';    // the cabin kept inside each car's own shell
 import './vehicles/footdown.js';    // a foot down on the road when a two-wheeler stops
 import './people/cyclists.js';        // cyclists close by: real people, pedalling
@@ -156,13 +157,13 @@ function hookStreamer(paint) {
 export const QUALITY = {
   // for old laptops and office PCs: 75% resolution, no shadows or grass, a shorter view, thinner crowds
   lite: { name: 'lite', pixelRatio: 0.75, shadows: false, shadowSize: 0, msaa: false, texMax: 512, boardRes: 1, signScale: 1,
-    streamRadius: 260, streamBudget: 2, grassRange: 0, grassCap: 0, treeNearRange: 18, treeMidRange: 70, treeFarRange: 380, treeNearCap: 60, treeMidCap: 400, treeFarCap: 2500, leafCell: 256, impostorCell: 128, propRange: 80, far: 1000, traffic: 40, peds: 60 },
+    streamRadius: 260, streamBudget: 2, grassRange: 0, grassCap: 0, treeNearRange: 29, treeMidRange: 182, treeFarRange: 380, treeNearCap: 150, treeMidCap: 1600, treeFarCap: 2500, leafCell: 256, impostorCell: 128, propRange: 136, far: 1000, traffic: 40, peds: 60 },
   low: { name: 'low', pixelRatio: 1.0, shadows: false, shadowSize: 0, msaa: false, texMax: 512, boardRes: 1, signScale: 1,
-    streamRadius: 360, streamBudget: 2, grassRange: 22, grassCap: 2200, treeNearRange: 28, treeMidRange: 100, treeFarRange: 600, treeNearCap: 100, treeMidCap: 700, treeFarCap: 5000, leafCell: 256, impostorCell: 128, propRange: 110, far: 1400, traffic: 70, peds: 110 },
+    streamRadius: 360, streamBudget: 2, grassRange: 22, grassCap: 2200, treeNearRange: 45, treeMidRange: 260, treeFarRange: 600, treeNearCap: 250, treeMidCap: 2800, treeFarCap: 5000, leafCell: 256, impostorCell: 128, propRange: 187, far: 1400, traffic: 70, peds: 110 },
   med: { name: 'med', pixelRatio: 1.5, shadows: true, shadowSize: 2048, msaa: true, texMax: 1024, boardRes: 1, signScale: 1,
-    streamRadius: 520, streamBudget: 2.5, grassRange: 42, grassCap: 6500, treeNearRange: 60, treeMidRange: 210, treeFarRange: 1100, treeNearCap: 300, treeMidCap: 2000, treeFarCap: 11000, crowdRange: 60, leafCell: 512, impostorCell: 256, propRange: 170, far: 2200, traffic: 130, peds: 190 },
+    streamRadius: 520, streamBudget: 2.5, grassRange: 42, grassCap: 6500, treeNearRange: 96, treeMidRange: 546, treeFarRange: 1100, treeNearCap: 750, treeMidCap: 8000, treeFarCap: 11000, crowdRange: 60, leafCell: 512, impostorCell: 256, propRange: 289, far: 2200, traffic: 130, peds: 190 },
   high: { name: 'high', pixelRatio: 2, shadows: true, shadowSize: 2048, msaa: true, texMax: 1024, boardRes: 1, signScale: 1,
-    streamRadius: 720, streamBudget: 3, grassRange: 60, grassCap: 12000, treeNearRange: 110, treeMidRange: 320, treeFarRange: 1500, treeNearCap: 700, treeMidCap: 3800, treeFarCap: 16000, crowdRange: 75, leafCell: 512, impostorCell: 256, propRange: 240, far: 3000, traffic: 170, peds: 260 },
+    streamRadius: 720, streamBudget: 3, grassRange: 60, grassCap: 12000, treeNearRange: 176, treeMidRange: 832, treeFarRange: 1500, treeNearCap: 1750, treeMidCap: 15200, treeFarCap: 16000, crowdRange: 75, leafCell: 512, impostorCell: 256, propRange: 408, far: 3000, traffic: 170, peds: 260 },
 };
 
 const params = new URLSearchParams(location.search);
@@ -199,7 +200,7 @@ function pickQuality() {
   // laptop graphics (Intel UHD / Iris, Radeon Vega): Medium's look at the screen's own resolution with a
   // lighter shadow map, grass and crowd, so it holds a steady frame rate instead of swinging between 30 and 60
   // (and the edges smoothed after the frame rather than by 4x MSAA, which alone was a third of the frame there)
-  if (GPU === 'integrated') return { ...QUALITY.med, msaa: false, fxaa: true, pixelRatio: 1.0, shadowSize: 1024, grassRange: 32, grassCap: 3800, treeNearRange: 45, treeMidRange: 170,
+  if (GPU === 'integrated') return { ...QUALITY.med, msaa: false, fxaa: true, pixelRatio: 1.0, shadowSize: 1024, grassRange: 32, grassCap: 3800, treeNearRange: 72, treeMidRange: 442,
     treeNearCap: 200, treeMidCap: 1400, treeFarCap: 8000, streamRadius: 440, streamBudget: 2, propRange: 140, traffic: 100, peds: 150 };
   return { ...QUALITY.med };
 }
