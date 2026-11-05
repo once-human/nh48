@@ -59,22 +59,48 @@ V.dent = function (lx, ly, lz, nx, ny, nz, r, depth) {
     }
     if (hit) { g.attributes.position.needsUpdate = true; g.computeVertexNormals(); }
   }
+  // the damage you're shown is the damage you can see: how far the panels are from where they were made, all round
+  // the body (not the tyres), three times over (a fender pushed in a hand's width is about a tenth; a car stoved in
+  // down one side is most of the way to gone). Crashes no longer count on their own (knock() skips a body that dents)
+  const a = D.body.attributes.position.array, g0 = D.b0; let sum = 0, n = 0;
+  for (let i = 0; i < a.length; i += 3) { if (inWheel(wh, g0[i], g0[i + 1], g0[i + 2])) continue; n++; sum += Math.min(0.3, Math.hypot(a[i] - g0[i], a[i + 1] - g0[i + 1], a[i + 2] - g0[i + 2])); }
+  const M = n ? sum/n/0.3 : 0, dM = M - (this._dM || 0);
+  if (dM > 0) { this._dM = M; this.dmg = Math.min(0.97, (this.dmg || 0) + dM*3); }
+};
+V.dentDmg = true;
+// how a tyre looks let down: the rubber under the rim squashed down onto the road and bulging out at the sides (you
+// can see it across the street), and the longer it's driven on, the more of it torn away, a chunk at a time, till the
+// rim's running bare. (The rubber is the model's matte part of the wheel; worked from the shape it was made with.)
+const RIM_R = 0.64, SECT = 12;
+V.tyreLook = function (w) {
+  const D = this.own(), g = D.body, a = g.attributes.position.array, b0 = D.b0, gl = g.attributes.glow && g.attributes.glow.array;
+  if (!gl) return;
+  const sh = Math.min(1, w._shred || 0), R = w.r, rim = R*RIM_R;
+  if (!w._torn) { let h = Math.abs(Math.floor(w.x*97 + w.z*41)) + 7; w._torn = [...Array(SECT).keys()].sort(() => ((h = h*16807 % 2147483647)/2147483647) - 0.5); }
+  const nT = Math.round(sh*SECT);
+  for (let i = 0, k = 0; i < a.length; i += 3, k++) {
+    if (gl[k] > -0.5) continue;
+    const x = b0[i], y = b0[i + 1], z = b0[i + 2], dx = x - w.x, dy = y - w.y;
+    if (dx*dx + dy*dy > (R + 0.03)**2 || Math.abs(z - w.z) > w.w/2 + 0.04) continue;
+    const rr = Math.hypot(dx, dy) || 1e-4;
+    if (rr <= rim) continue;
+    const sec = Math.floor((Math.atan2(dy, dx) + Math.PI)/(2*Math.PI)*SECT) % SECT;
+    let r2, zz;
+    if (w._torn.indexOf(sec) < nT) { r2 = rim*0.96; zz = w.z + (z - w.z)*0.5; }          // rubber gone: the rim bare there
+    else { const low = Math.max(0, -dy/rr); r2 = rim + (rr - rim)*(1 - 0.72*Math.pow(low, 1.3)); zz = w.z + (z - w.z)*(1 + 0.34*low*low + 0.1*sh); }
+    a[i] = w.x + dx/rr*r2; a[i + 1] = w.y + dy/rr*r2; a[i + 2] = zz;
+  }
+  g.attributes.position.needsUpdate = true; g.computeVertexNormals();
 };
 // a tyre let down (or a wheel bent): its bottom flattened onto the rim, that corner of the car down on it
 V.flatWheel = function (w) {
   if (!w || this.noFlat || !this.wheels || !this.wheels.includes(w)) return;      // (bulletproof tyres from the garage)
   const D = this.own(), a = D.body.attributes.position.array;
   this._flats = this._flats || new Set(); if (this._flats.has(w)) return; this._flats.add(w);
-  for (let i = 0; i < a.length; i += 3) {
-    const x = a[i], y = a[i + 1], z = a[i + 2];
-    if (y >= w.y || !inWheel([w], x, y, z, 0.01)) continue;
-    const q = (w.y - y)/w.r; a[i + 1] = w.y - (w.y - y)*(1 - 0.3*q*q);          // the bottom squashed flat
-    a[i + 2] = w.z + (z - w.z)*(1 + 0.12*q*q);                                   // and bulging out
-  }
-  D.body.attributes.position.needsUpdate = true; D.body.computeVertexNormals();
+  void a; w._shred = w._shred || 0; this.tyreLook(w);
   // which corner it is to the wheels on the ground (beta/vehicles/physics.js ground(): front right, front left, back
   // right, back left; a two-wheeler front, back)
-  const S = this.spec, sag = w.r*0.3;
+  const S = this.spec, sag = w.r*0.32;
   this.sag = this.sag || (S.two ? [0, 0] : [0, 0, 0, 0]);
   if (S.two) this.sag[w.x > 0 ? 0 : 1] += sag;
   else { const f = w.x > 0 ? 0 : 2; if (Math.abs(w.z) < 0.15) { this.sag[f] += sag/2; this.sag[f + 1] += sag/2; } else this.sag[f + (w.z > 0 ? 0 : 1)] += sag; }
@@ -179,6 +205,7 @@ function rims(v, dt) {
   if (sp > 2.5 && v._flats) {
     const hx = Math.cos(v.th), hz = Math.sin(v.th), y0 = v.y || 0, dir = Math.sign(v.v);
     for (const w of v._flats) {
+      { const was = Math.round((w._shred || 0)*SECT); w._shred = Math.min(1, (w._shred || 0) + sp*dt/320); if (Math.round(w._shred*SECT) !== was) v.tyreLook(w); }
       v._sa = (v._sa || 0) + dt*Math.min(110, sp*5.5);
       v._fa = (v._fa || 0) + dt*Math.min(40, sp*2.2);
       const fx = v.x + hx*w.x - hz*w.z, fz = v.z + hz*w.x + hx*w.z;
@@ -220,7 +247,8 @@ V.mend = function () {
     if (D.glass) { D.glass.attributes.position.array.set(D.g0); D.glass.attributes.position.needsUpdate = true; D.glass.computeVertexNormals(); }
   }
   if (this._grind) grind(this, 0);
-  this._flats = null; this._thp = null; this.sag = null; this.flatN = 0; this.flatSide = 0;
+  if (this._flats) for (const w of this._flats) { w._shred = 0; }
+  this._flats = null; this._thp = null; this.sag = null; this.flatN = 0; this.flatSide = 0; this._dM = 0;
   if (this._holes) { for (const h of this._holes) h.parent && h.parent.remove(h); this._holes = null; }
 };
 

@@ -89,6 +89,8 @@ const PATCHES = {
     ["const pitch = (p.inAuto ? -0.17 : -0.035)", "const pitch = (p.inAnyAuto ? -0.17 : -0.035)"],
     ["this.setFov(dt, (p.inAuto ? 78 : 70) + speed * 0.3);", "this.setFov(dt, (p.inAnyAuto ? 78 : 70) + speed * 0.3);"]],
   [S('vehicles/vehicle.js')]: [
+    // a body that dents counts its damage by its dents (beta/vehicles/damage.js), not twice
+    ["if (imp < 4 || (v._kT || 0) > now) return;", "if (imp < 4 || (v._kT || 0) > now || v.dentDmg) return;"],
     // the wheel's drop into a pothole is the hole's and the wheel's own (beta/vehicles/potholes.js)
     ["for (const p of W.potholeNear || []) { const d = Math.hypot(x - p.x, z - p.z); if (d < p.r) h -= 0.07 * (1 - d / p.r); }", "if (this.potDip) h -= this.potDip(x, z); else for (const p of W.potholeNear || []) { const d = Math.hypot(x - p.x, z - p.z); if (d < p.r) h -= 0.07 * (1 - d / p.r); }"],
     // an auto off the street has the driver's seat view your own has (it had none: the inside view fell back to behind)
