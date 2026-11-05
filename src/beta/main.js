@@ -22,6 +22,7 @@ import { installAtmosphere } from '@orig/gfx/atmos.js';
 import { vehicleMaterials } from './vehicles/vehmat.js';
 import * as VM from './vehicles/models.js';
 import './vehicles/physics.js';
+import './vehicles/tyres.js';
 import './traffic/rates.js';
 import './traffic/spacing.js';
 import './traffic/steer.js';

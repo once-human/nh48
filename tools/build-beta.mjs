@@ -84,6 +84,11 @@ const PATCHES = {
     ["default: return buildCar('hatch');", "default: return VARIANTS[type] ? buildCar(type, { interior: true }) : buildCar('hatch');"],
     ["if (['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super'].includes(type)) {", "if (['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super'].includes(baseOf(type))) {"],
     ["export function defaultPaint(type, rng) {", "export function defaultPaint(type, rng) {\n  type = baseOf(type);"],
+    // a car corners on its tyres (beta/vehicles/tyres.js); two-wheelers keep the leaning model below
+    ["    // ---- steering (bicycle model, less lock at speed)\n", "    if (!S.two && this.tyres) this.tyres(dt, inp, thr); else {\n    // ---- steering (bicycle model, less lock at speed)\n"],
+    ["    this.latAcc = this.v * this.w;\n", "    }\n    this.latAcc = this.v * this.w;\n"],
+    // (a car's handbrake is the locked back wheels in tyres.js, not a flat drag on top)
+    ["if (inp.handbrake) a -= Math.sign(v) * (S.two ? 3.5 : 4.5);", "if (inp.handbrake && (S.two || !this.tyres)) a -= Math.sign(v) * (S.two ? 3.5 : 4.5);"],
   ],
   // C switches first and third person; rolling is Ctrl; the jhola is Q; vehicles are E
   [S('game/keys.js')]: [
