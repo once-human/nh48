@@ -16,6 +16,7 @@
 // The keys are in Pause → Controls like every other. In the terminal: list powers, refill power, retake power, take @look,
 // return body, read @look, sense, set mastery, toggle powerfree, and the power.* variables.
 import * as THREE from 'three';
+import { ikArm } from '@orig/people/humans.js';
 
 const STORE = 'puneri_powers', DAILY = 3, SENSE = 8, SENSE_R = 60;
 // how hard each kind of person holds on to themselves
@@ -60,7 +61,7 @@ export function powers(G) {
   // ---------------------------------------------------------------- the status bar
   const css = document.createElement('style');
   css.textContent = `
-  #nh-pw{position:fixed;left:18px;bottom:212px;display:flex;gap:8px;align-items:center;padding:7px 10px;border-radius:14px;background:rgba(14,14,18,.78);backdrop-filter:blur(6px);font:600 12px/1 system-ui,sans-serif;color:#f3ead8;z-index:5;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+  #nh-pw{position:fixed;left:498px;bottom:22px;display:flex;gap:8px;align-items:center;padding:7px 10px;border-radius:14px;background:rgba(14,14,18,.78);backdrop-filter:blur(6px);font:600 12px/1 system-ui,sans-serif;color:#f3ead8;z-index:5;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.35)}
   #nh-pw .pw{display:flex;align-items:center;gap:6px}
   #nh-pw .ic{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-size:13px;color:#fff}
   #nh-pw .v .ic{background:#7b2ff2}#nh-pw .b .ic{background:#e08a00}#nh-pw .m .ic{background:#1f9d6b}
@@ -73,6 +74,7 @@ export function powers(G) {
   #nh-pw.in .st{display:block}#nh-pw .st i{position:absolute;left:0;right:0;bottom:0;background:#ff4d4d}
   #nh-veil{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:0;transition:opacity .25s;background:radial-gradient(ellipse at center,transparent 45%,rgba(60,0,110,.55) 100%)}
   #nh-sense{position:fixed;inset:0;pointer-events:none;z-index:3}
+  body.nh-nohud #nh-pw,body.nh-nohud #nh-read{display:none!important}
   #nh-read{position:fixed;right:22px;top:40%;width:270px;padding:14px 16px;border-radius:16px;background:rgba(14,14,18,.86);color:#f3ead8;font:13px/1.45 system-ui,sans-serif;z-index:6;pointer-events:none;opacity:0;transform:translateX(12px);transition:.25s;border-left:4px solid #e08a00}
   #nh-read.on{opacity:1;transform:none}#nh-read h4{margin:0 0 6px;font-size:15px;color:#ffd38a}#nh-read p{margin:2px 0}#nh-read em{color:#ffd38a;font-style:normal}`;
   document.head.appendChild(css);
@@ -83,18 +85,19 @@ export function powers(G) {
   const veil = document.createElement('div'); veil.id = 'nh-veil';
   const sense = document.createElement('canvas'); sense.id = 'nh-sense';
   const card = document.createElement('div'); card.id = 'nh-read';
-  const mount = () => { const host = document.getElementById('ui'); if (!host) { setTimeout(mount, 400); return; } host.appendChild(ui); host.appendChild(card); document.body.appendChild(veil); document.body.appendChild(sense); };
+  const mount = () => { if (!document.body) { setTimeout(mount, 400); return; } document.body.appendChild(ui); document.body.appendChild(card); document.body.appendChild(veil); document.body.appendChild(sense); };
   mount();
   const bar = ui.querySelector('.bar i'), stb = ui.querySelector('.st i');
   const pips = (sel, n) => ui.querySelectorAll(sel + ' .pips b').forEach((b, i) => b.classList.toggle('on', i < n));
   const draw = () => {
-    const shown = G.state === 'play' || G.state === 'pause';
+    const shown = (G.state === 'play' || G.state === 'pause') && !!document.querySelector('#h-mode')?.offsetParent;
     ui.style.display = shown ? '' : 'none';
     bar.style.width = Math.round(S.bar*100) + '%';
     ui.classList.toggle('in', !!host);
     stb.style.height = Math.round(Math.min(1, strain)*100) + '%';
     pips('.b', left('brahma')); pips('.m', left('munja'));
-    veil.style.opacity = host ? 0.55 + Math.min(1, strain)*0.45 : link ? link.t/link.need*0.8 : 0;
+    veil.style.opacity = host ? 0.3 + Math.min(1, strain)*0.7 : link ? link.t/link.need*0.8 : 0;
+    veil.style.background = `radial-gradient(ellipse at center,transparent ${45 - Math.min(1, strain)*25}%,rgba(${60 + strain*50},0,${110 + strain*40},${0.55 + strain*0.35}) 100%)`;
   };
 
   // ---------------------------------------------------------------- a low sound for the link (made here, nothing loaded)
@@ -112,8 +115,8 @@ export function powers(G) {
   };
 
   // ---------------------------------------------------------------- Vetal
-  let link = null, host = null, home = null, strain = 0, held = 0, wasV = false, heat0 = 0, hp0 = 100, punches = 0;
-  const RANGE = 14;
+  let target = null, calm = 0, drag = null, dazeT = 0, link = null, host = null, home = null, strain = 0, held = 0, wasV = false, heat0 = 0, hp0 = 100, punches = 0;
+  const RANGE = 30;
   const candidates = () => ppl() ? ppl().list.filter(p => !p.hidden && !p.corpse && !(p.fallen > 0) && !p.pax && !p._vetalBody && p.look) : [];
   function aimed() {
     if (!P().onFoot) return null;
@@ -122,7 +125,7 @@ export function powers(G) {
     for (const p of candidates()) {
       const dx = p.x - F.x, dz = p.z - F.z, d = Math.hypot(dx, dz); if (d > RANGE || d < 0.4) continue;
       const a = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - th), Math.cos(Math.atan2(dz, dx) - th)));
-      if (a > (d < 3 ? 0.7 : 0.3)) continue;                // close you can be rough about it; far you have to mean it
+      if (a > (d < 3 ? 0.7 : d < 12 ? 0.3 : 0.2)) continue;                // close you can be rough about it; far you have to mean it
       const sc = a*6 + d*0.3; if (sc < bs) { bs = sc; best = p; }
     }
     return best;
@@ -130,7 +133,7 @@ export function powers(G) {
   const raw = (look) => Object.getPrototypeOf(P()).setLook.call(P(), look);
   const fromBody = () => home ? Math.hypot(R().x - home.x, R().z - home.z) : 0;
   const costIn = (p) => 0.14*(WILL[persona(p)] || 1)*(1 - 0.4*mastery())*(host ? 0.5 : 1);
-  const timeIn = (p) => 1.3*(WILL[persona(p)] || 1)*(1 - 0.4*mastery())*(host ? 0.5 : 1);
+  const timeIn = (p) => 2.0*(WILL[persona(p)] || 1)*(1 - 0.4*mastery())*(host ? 0.5 : 1);
 
   function take(p, instant = false) {
     if (!p) throw new Error('nobody to take');
@@ -163,62 +166,77 @@ export function powers(G) {
     p.mode = 'watch'; p.watch = { x: x + 1, z }; p.wait = 4; p.anim = 'no'; p.id = h.id;
     setTimeout(() => G.hud?.say?.(h.name || WHO[h.kind] || 'Someone', '', h.female ? 'How… how did I get here?' : 'How did I get here?', 3), 600);
   }
-  function goHome(why) {
+  function goHome(why, hard = false) {
     if (!home) return;
     const Pl = P(), F = R(), b = home.body;
+    if (drag && drag.p === b) drag = null;
     if (host) release(host, F.x, F.z);
     host = null;
     // whatever the street did to your body while you were out of it
     let hp = home.hp;
     if (b) { if (b.corpse) hp = 12; else if (b.over) hp = Math.max(8, hp - b.over*1.2); }
-    const bx = b ? b.x : home.x, bz = b ? b.z : home.z;
+    const bx = b ? b.x : home.x, bz = b ? b.z : home.z, by = b ? b.yaw ?? home.yaw : home.yaw;
     if (b) ppl().remove(b);
     raw(home.look);
-    Pl.teleportFoot(bx, bz, home.yaw, G.traffic);
-    Pl.hp = hp; home = null; strain = 0;
-    if (why) { Pl.human?.play?.('knockback', { once: true, fade: 0.1 }); toast('Vetal', why, 'warn', 3); }
-    humOn(0);
+    Pl.teleportFoot(bx, bz, by, G.traffic);
+    Pl.hp = hp; home = null; strain = 0; humOn(0);
+    // you come to on the ground and get up: slowly if they threw you out (and it's two minutes later)
+    const H = Pl.human;
+    if (hard) {
+      if (!G.live && G.setHour) G.setHour(((G.hour + 2/60) % 24 + 24) % 24);
+      dazeT = 45; Pl.frozen = true; H?.play?.('knockback', { once: true, fade: 0.15 });
+      setTimeout(() => { H?.play?.('getup', { once: true, fade: 0.35, speed: 0.6 }); }, 2600);
+      setTimeout(() => { Pl.frozen = false; }, 5200);
+      if (why) toast('Vetal', why + '. You come round two minutes later, head pounding', 'warn', 4);
+    } else {
+      Pl.frozen = true; H?.play?.('getup', { once: true, fade: 0.25, speed: 0.85 });
+      setTimeout(() => { Pl.frozen = false; }, 1700);
+      if (why) toast('Vetal', why, 'warn', 3);
+    }
   }
   // the punch key and the mouse, counted while you're in someone (a gentle body fighting strains the hold)
   addEventListener('keydown', (e) => { if (host && e.code === 'KeyX' && !e.repeat) punches++; }, true);
   addEventListener('mousedown', (e) => { if (host && e.button === 0 && document.pointerLockElement) punches++; }, true);
 
   function vetal(dt) {
-    const down = !!G.input?.key('KeyV') && !G.talkUI?.cur;
-    if (down) held += dt;
-    // a tap: home (in someone) or a word that there's nobody there
-    if (!down && wasV) { if (held < 0.3 && !(link && link.t > 0.15)) { if (host) goHome(); else if (!aimed()) toast('Vetal', 'Look at someone and hold V', 'info', 2); } held = 0; link = null; humOn(0); }
+    const down = !!G.input?.key('KeyV') && !G.talkUI?.cur, press = down && !wasV;
     wasV = down;
-    if (down && held > 0.12) {
+    if (press) {
+      if (link) { link = null; humOn(0); toast('Vetal', 'Let them go', 'info', 1.2); }
+      else { const p = aimed(); if (p) link = { p, t: 0, need: timeIn(p) }; else if (host) goHome(); else toast('Vetal', 'Look at someone and press V', 'info', 2); }
+    }
+    target = link ? link.p : aimed();
+    if (link) {
       const p = aimed();
-      if (!p || (link && link.p !== p)) { if (link) { link = null; humOn(0); if (p === null) toast('Vetal', 'The link broke: keep them in your eyes', 'warn', 1.6); } }
-      if (p) {
-        if (!link) link = { p, t: 0, need: timeIn(p) };
+      if (p !== link.p) { link.lost = (link.lost || 0) + dt; if (link.lost > 0.35) { link = null; humOn(0); toast('Vetal', 'The link broke: keep them in your eyes', 'warn', 1.6); } }
+      else link.lost = 0;
+      if (link) {
         link.t += dt;
         // they feel it: they stop and look round
-        if (link.t > 0.3 && p.mode !== 'watch' && p.mode !== 'fight') ppl().watch(p, R().x, R().z, 1.5);
+        if (link.t > 0.4 && link.p.mode !== 'watch' && link.p.mode !== 'fight') ppl().watch(link.p, R().x, R().z, 2);
         humOn(link.t/link.need);
-        if (link.t >= link.need) { const q = link.p; link = null; held = -1e9; take(q); }
+        if (link.t >= link.need) { const q = link.p; link = null; take(q); }
       }
     }
     if (host) {
       // the cost of being someone else
       S.xp += dt;
       const d = fromBody(), w = WILL[host.kind] || 1;
-      const drain = 0.011*w*(1 + d/120)*(1 - 0.45*mastery());
+      const drain = 0.008*w*(1 + d/220)*(1 - 0.45*mastery());
       if (!S.free) S.bar = Math.max(0, S.bar - drain*dt);
       // doing what they never would
       const Pl = P(), F = Pl.foot;
-      if (OLD.has(host.kind) && Pl.onFoot && Math.hypot(F.vx || 0, F.vz || 0) > 3.6) strain += dt*0.35;
-      if (punches) { strain += punches*(GENTLE.has(host.kind) ? 0.12 : host.kind === 'cop' ? 0.02 : 0.05); punches = 0; }
+      if (OLD.has(host.kind) && Pl.onFoot && Math.hypot(F.vx || 0, F.vz || 0) > 3.6) { strain += dt*0.2; calm = 0; }
+      if (punches) { strain += punches*(GENTLE.has(host.kind) ? 0.07 : host.kind === 'cop' ? 0.015 : 0.03); punches = 0; calm = 0; }
       const heat = G.police?.heat || 0;
-      if (heat > heat0) { strain += (heat - heat0)*(host.kind === 'cop' ? 0.45 : 0.15); heat0 = heat; } else heat0 = heat;
-      if ((Pl.hp ?? 100) < hp0) { strain += (hp0 - Pl.hp)*0.006; } hp0 = Pl.hp ?? 100;
-      strain = Math.max(0, strain - dt*0.06*(1 + mastery()));
+      if (heat > heat0) { strain += (heat - heat0)*(host.kind === 'cop' ? 0.35 : 0.1); heat0 = heat; calm = 0; } else heat0 = heat;
+      if ((Pl.hp ?? 100) < hp0) { strain += (hp0 - Pl.hp)*0.004; calm = 0; } hp0 = Pl.hp ?? 100;
+      calm += dt;
+      if (calm > 3) strain = Math.max(0, strain - dt*0.1*(1 + mastery()));
       if (S.free) strain = 0;
-      if (strain >= 1 + mastery()*0.5) goHome('They threw you out');
+      if (strain >= 1 + mastery()*0.5) goHome('They threw you out', true);
       else if (S.bar <= 0) goHome('Vetal ran out: pulled home');
-      else if (Pl.ko || (Pl.hp ?? 100) <= 0) goHome('Knocked out of them');
+      else if (Pl.ko || (Pl.hp ?? 100) <= 0) goHome('Knocked out of them', true);
       // the street finds your body after a while
       if (home && !home.crowd && (home.t += dt) > 18 && home.body) { home.crowd = true; try { ppl().gather?.(home.body.x, home.body.z, 3, 'foot'); } catch (e) { /* no crowd here */ } }
     } else if (!link) {
@@ -227,7 +245,7 @@ export function powers(G) {
   }
 
   // ---------------------------------------------------------------- Brahmarakshas
-  let cardT = 0;
+  let cardT = 0, readP = null, readT = 0;
   function read(p) {
     if (!p) { toast('Brahmarakshas', 'Face someone to read them', 'info', 2); return false; }
     if (!use('brahma')) { toast('Brahmarakshas', 'Spent for today. Back tomorrow', 'warn', 2.5); return false; }
@@ -236,7 +254,7 @@ export function powers(G) {
     const you = mem.hit ? 'You hit them. They haven\'t forgotten' : mem.shoved ? 'You shoved them. Still sore about it' : mem.saw ? 'They saw what you did. Wary of you' : rep.bad > 2 ? 'They\'ve heard about you round here, and not good things' : rep.good > 2 ? 'They\'ve heard good things about you' : 'They don\'t know you';
     const sec = SECRET[k] || SECRET.kaka, s = sec[Math.abs(p.id || 0) % sec.length];
     card.innerHTML = `<h4>${nameOf(p)}</h4><p>${WHO[k] || k}, ${DOING[p.mode] || 'about'}${p.anim ? ` (${p.anim.replace(/_/g, ' ')})` : ''}</p><p>Mood: <em>${mood}</em></p><p>${you}</p><p>Keeps to themselves: <em>${s}</em></p>${p.cash !== undefined ? `<p>Carrying ₹${Math.round(p.cash)}</p>` : ''}<p style="opacity:.55;font-size:11px">${left('brahma')} left today</p>`;
-    card.classList.add('on'); cardT = 7;
+    card.classList.add('on'); cardT = 7; readP = p; readT = 2;
     return true;
   }
   const faced = () => { const F = R(), th = yaw(); let best = null, bs = 1e9; for (const p of (ppl()?.list || [])) { if (p.hidden || p._vetalBody) continue; const dx = p.x - F.x, dz = p.z - F.z, d = Math.hypot(dx, dz); if (d > 9) continue; const a = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - th), Math.cos(Math.atan2(dz, dx) - th))); if (a > 0.6) continue; const sc = a*4 + d*0.3; if (sc < bs) { bs = sc; best = p; } } return best; };
@@ -255,11 +273,24 @@ export function powers(G) {
   };
   function drawSense(dt) {
     const c = sense, W = innerWidth, H = innerHeight;
-    if (senseT <= 0) { if (c.width) { c.width = 0; c.height = 0; } return; }
-    senseT -= dt;
-    if (c.width !== W) { c.width = W; c.height = H; }
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
     const g = c.getContext('2d'), cam = G.camera; g.clearRect(0, 0, W, H);
     if (!cam) return;
+    const pulse = 0.75 + 0.25*Math.sin(performance.now()/140);
+    // who Vetal is on: purple, brighter as the link builds; who Brahmarakshas just read: amber
+    const ring = (p, col, k, lw) => {
+      const y = (G.W?.surf ? G.W.surf.height(p.x, p.z) : 0);
+      v3.set(p.x, y + 0.95, p.z).project(cam); if (v3.z > 1 || v3.z < -1) return;
+      const d = Math.hypot(p.x - R().x, p.z - R().z), sx = (v3.x + 1)/2*W, sy = (1 - v3.y)/2*H, h = H*0.9/Math.max(1.5, d);
+      g.globalAlpha = k; g.strokeStyle = col; g.lineWidth = lw; g.shadowColor = col; g.shadowBlur = 18;
+      g.beginPath(); g.ellipse(sx, sy, h*0.24 + 3, h*0.55 + 4, 0, 0, Math.PI*2); g.stroke();
+      g.globalAlpha = k*0.18; g.fillStyle = col; g.fill(); g.shadowBlur = 0; g.globalAlpha = 1;
+    };
+    if (target && G.state === 'play' && !(host && !link && target === null)) ring(target, '#b26bff', link ? 0.5 + 0.5*Math.min(1, link.t/link.need)*pulse : 0.35, link ? 3 : 1.5);
+    if (readP && readT > 0) { readT -= dt; ring(readP, '#ffb020', Math.min(1, readT), 2.5); }
+    if (drag) ring(drag.p, '#f3ead8', 0.25, 1);
+    if (senseT <= 0) return;
+    senseT -= dt;
     const fade = Math.min(1, senseT/1.2, (SENSE - senseT + 0.3)/0.5);
     const F = R(), surf = G.W?.surf;
     const one = (x, z, col, r) => {
@@ -278,6 +309,29 @@ export function powers(G) {
     g.globalAlpha = 1;
   }
 
+  // ---------------------------------------------------------------- dragging someone who's down (your own body too)
+  const downed = () => { if (!P().onFoot) return null; const F = R(), th = yaw(); let best = null, bs = 1e9; for (const p of (ppl()?.list || [])) { if (p.hidden || !(p.fallen > 0)) continue; const dx = p.x - F.x, dz = p.z - F.z, d = Math.hypot(dx, dz); if (d > 1.9) continue; const a = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - th), Math.cos(Math.atan2(dz, dx) - th))); if (a > 1.2) continue; if (d + a < bs) { bs = d + a; best = p; } } return best; };
+  const grab = new THREE.Vector3();
+  function dragStep(dt) {
+    if (took('KeyF')) {
+      if (drag) { drag = null; toast('Drag', 'Let go', 'info', 1); }
+      else { const p = downed(); if (p) { drag = { p, ease: 0 }; toast('Drag', `Dragging ${p._vetalBody ? 'your own body' : nameOf(p)}. F to let go`, 'info', 2.5); } }
+    }
+    if (!drag) return;
+    const p = drag.p, Pl = P(), F = Pl.foot;
+    if (!Pl.onFoot || p.hidden || !ppl().list.includes(p)) { drag = null; return; }
+    // a heavy thing behind you: slow, and they come along a step behind, head first, pulled by the shoulders
+    Pl.limpT = Math.max(Pl.limpT || 0, 0.3);
+    const th = F.yaw, bx = F.x - Math.cos(th)*1.05, bz = F.z - Math.sin(th)*1.05;
+    drag.ease = Math.min(1, drag.ease + dt*2.5);
+    const k = 1 - Math.exp(-dt*6*drag.ease);
+    p.x += (bx - p.x)*k; p.z += (bz - p.z)*k; p.v = 0; p.yaw = Math.atan2(F.z - p.z, F.x - p.x);
+    p.fallen = Math.max(p.fallen, 4); if (p.anchor) { p.anchor.x = p.x; p.anchor.z = p.z; }
+    if (Math.hypot(p.x - F.x, p.z - F.z) > 3) { drag = null; return; }
+    // the near hand back on them
+    const H = Pl.human; if (H) { grab.set(p.x + Math.cos(p.yaw)*0.55, (G.W?.surf ? G.W.surf.height(p.x, p.z) : F.y) + 0.35, p.z + Math.sin(p.yaw)*0.55); try { ikArm(H, 'r', grab, null, drag.ease); } catch (e) { /* no arm here */ } }
+  }
+
   // ---------------------------------------------------------------- every frame
   const keyEdge = {};
   const took = (code) => { const d = !!G.input?.key(code); const e = d && !keyEdge[code]; keyEdge[code] = d; return e; };
@@ -291,7 +345,10 @@ export function powers(G) {
       vetal(el);
       if (took('KeyO')) read(faced());
       if (took('Period')) senseOn();
-    } else { wasV = false; held = 0; if (link) { link = null; humOn(0); } }
+      dragStep(el);
+    } else { wasV = false; held = 0; target = null; if (link) { link = null; humOn(0); } }
+    // a heavy head after you were thrown out: blurred, slow, clearing over the next minute
+    if (dazeT > 0) { dazeT -= el; P().limpT = Math.max(P().limpT || 0, 0.3); const cv = G.renderer?.domElement; if (cv) cv.style.filter = dazeT > 0 ? `blur(${Math.min(3, dazeT/12).toFixed(2)}px) saturate(${(1 - Math.min(0.4, dazeT/100)).toFixed(2)})` : ''; }
     if (cardT > 0 && (cardT -= el) <= 0) card.classList.remove('on');
     drawSense(el);
     draw();

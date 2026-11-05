@@ -178,6 +178,8 @@ const PATCHES = {
   // the cabin inside /beta's bodies (they're not main's shapes): seats scaled under each roof, the rear bench under the
   // roof's back (none in the two-seaters), pillars and mirror under the roof's front edge
   [S('vehicles/cockpit.js')]: [
+    // the wheel turns the way you steer, about three times the tyres, and eases there instead of snapping
+    ["spin.rotation.z = steer * 7.5;", "spin.userData.s = (spin.userData.s || 0) + (-steer * 3.2 - (spin.userData.s || 0)) * 0.14; spin.rotation.z = spin.userData.s;"],
     ["const fl = S.sill + 0.06, xb = -hl + 0.55, xd = xf0 - 0.55;", "const fl = S.sill + 0.06, xb = -hl + 0.55, xd = xf0 - 0.55, kS = Math.min(1, (S.H - (kind === 'sports' || kind === 'super' ? 0.24 : 0.15) - fl) / 1.2);"],
     ["const back = new THREE.BoxGeometry(0.12, 0.62, 0.46); back.rotateZ(0.2); back.translate(xs - 0.36, fl + 0.68, zs);", "const back = new THREE.BoxGeometry(0.12, 0.62 * kS, 0.46); back.rotateZ(0.2); back.translate(xs - 0.36, fl + 0.36 + 0.32 * kS, zs);"],
     ["bx(xs - 0.5, fl + 1.02, zs - 0.13, xs - 0.4, fl + 1.2, zs + 0.13, CLOTH);", "bx(xs - 0.5, fl + 0.36 + 0.66 * kS, zs - 0.13, xs - 0.4, fl + 0.36 + 0.84 * kS, zs + 0.13, CLOTH);"],

@@ -151,6 +151,8 @@ Pilot.prototype.placeRider = function () {
   pr.call(this);
   const v = this.riderShown, H = this.human;
   if (!v || !H) return;
+  // whoever was driving it is out on the road now: their figure doesn't stay in the seat with you
+  if (v.driver && v.driver.visible) { v.driver.visible = false; if (v.driverArms) v.driverArms.visible = false; }
   const two = v !== this.auto && v.spec && v.spec.two;
   if (!two && v.cockpit) { atWheel(H, v); return; }
   if (!two && v !== this.auto && v.type !== 'auto') return;
