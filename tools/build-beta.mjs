@@ -84,7 +84,13 @@ const PATCHES = {
     ["x.fillStyle = m.kind === 'pax' ? '#3ddc84' : '#ff3d24';", "x.fillStyle = m.kind === 'body' ? '#b26bff' : m.kind === 'pax' ? '#3ddc84' : '#ff3d24';"],
     ["      x.beginPath(); x.arc(X, Y, 6, 0, Math.PI * 2); x.fill();", "      x.beginPath(); x.arc(X, Y, m.kind === 'body' ? 8 : 6, 0, Math.PI * 2); x.fill();\n      if (m.kind === 'body') { x.strokeStyle = '#fff'; x.lineWidth = 2; x.stroke(); x.font = '700 12px \"Baloo 2\"'; x.textAlign = 'left'; const t = 'Your body'; x.fillStyle = 'rgba(15,14,12,0.75)'; x.fillRect(X + 11, Y - 9, x.measureText(t).width + 8, 17); x.fillStyle = '#e6d2ff'; x.fillText(t, X + 15, Y + 4); }"],
   ],
+  [S('game/camera.js')]: [
+    // any auto's seat looks down over the dash the same way (not just your own)
+    ["const pitch = (p.inAuto ? -0.17 : -0.035)", "const pitch = (p.inAnyAuto ? -0.17 : -0.035)"],
+    ["this.setFov(dt, (p.inAuto ? 78 : 70) + speed * 0.3);", "this.setFov(dt, (p.inAnyAuto ? 78 : 70) + speed * 0.3);"]],
   [S('vehicles/vehicle.js')]: [
+    // an auto off the street has the driver's seat view your own has (it had none: the inside view fell back to behind)
+    ["    else if (type === 'tempo') this.cockpitEye = [1.05, 1.6, 0.32];", "    else if (type === 'tempo') this.cockpitEye = [1.05, 1.6, 0.32];\n    else if (type === 'auto') this.cockpitEye = [0.3, 1.49, 0];"],
     ["case 'bike': case 'bikeP': case 'bullet': case 'superbike': return buildBike({ parked: true });", "case 'bike': case 'bikeP': return buildBike({ parked: true }); case 'bullet': case 'superbike': return buildBike({ parked: true, kind: type });"],
     ["    const hF = this.heightAt(this.x + hx * half, this.z + hz * half), hR = this.heightAt(this.x - hx * half, this.z - hz * half);\n    const jolt = Math.max(Math.abs(hF - this.prevH[0]), Math.abs(hR - this.prevH[1]));", "    const gr = this.ground(hx, hz, sp), hF = gr.f, hR = gr.r, jolt = gr.jolt;"],
     ["this.onFootpath = this.deck < 0 && !W.surf.isRoad(this.x, this.z);", "this.onFootpath = this.deck < 0 && gr.off > 0.5;"],
