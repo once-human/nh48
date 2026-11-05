@@ -5,6 +5,7 @@
 // close round the grips, and the feet sit on the floorboard or the pegs. The getting on and off (mount.js, getout.js)
 // work from the same numbers, so nothing jumps when they hand over.
 import * as THREE from 'three';
+import { turned } from './steerfront.js';
 import { Pilot } from '@orig/game/pilot.js';
 import { ikArm } from '@orig/people/humans.js';
 import { ikLeg } from '../game/fists.js';
@@ -164,7 +165,7 @@ Pilot.prototype.placeRider = function () {
     H.holder.updateMatrixWorld(true);
     // the hands on the grips: lean in as far as it takes
     const right = _r.set(0, 0, 1).transformDirection(m).clone();
-    for (const i of [0, 1]) _w[i].set(f.grip[0] + WRIST[0], f.grip[1] + WRIST[1], (i ? 1 : -1)*f.grip[2]).applyMatrix4(m);
+    for (const i of [0, 1]) turned(v, _w[i].set(f.grip[0] + WRIST[0], f.grip[1] + WRIST[1], (i ? 1 : -1)*f.grip[2])).applyMatrix4(m);       // (where the bars have turned them to)
     reachLean(H, right, _w);
     for (const i of [0, 1]) { const sd = i ? 1 : -1; _pole.set(-0.25, -0.7, sd*0.8).transformDirection(m); ikArm(H, i ? 'r' : 'l', _w[i], _pole, 1); }
     // the feet on the floorboard / the pegs, knees forward and a little out

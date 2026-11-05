@@ -24,6 +24,7 @@ import * as VM from './vehicles/models.js';
 import './vehicles/physics.js';
 import './vehicles/tyres.js';
 import './vehicles/twowheel.js';      // two-wheelers lean to turn, each its own way
+import './vehicles/steerfront.js';    // the bars, fork and front wheel turn with the steering
 import './vehicles/damage.js';        // dents where it's hit, holes where it's shot, flat tyres, fire from the engine
 import './vehicles/crawl.js';         // never stuck: a crawl either way whatever state it's in
 import './people/stalls.js';          // stall keepers keep to their stalls

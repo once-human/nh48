@@ -64,6 +64,11 @@ function guard(b, x, y, z, r, w, c, paint = 0) {
   b.addGeo(ARC, mi, c.map(v => v * 0.6), 0, paint);
 }
 function newB(paintable = true) { const b = new ColorBuilder(); if (paintable) b.paint = []; return b; }
+// a two-wheeler's front end, the part that turns with the bars (fork, wheel, guard, bars and what's on them): the
+// vertices fn adds are noted, and the built body carries them (and the steering axis, side view [x, y] top and
+// bottom) in userData.front for beta/vehicles/steerfront.js
+function front(b, fn) { const c0 = b.c; fn(); (b.front || (b.front = [])).push([c0, b.c]); }
+function withFront(m, b, ax) { if (b.front) m.body.userData.front = { r: b.front, ax }; return m; }
 
 // ---------------------------------------------------------------- people
 // seated rider: hips at (x, y), facing +x. lean forward (rad). colours via channels when `inst`
@@ -477,6 +482,7 @@ export function buildScooter(opts = {}) {
   box(b, .745, .56, -.018, .755, .82, .018, [.2, .2, .21]);
   for (const s of [-1, 1]) { rbox(b, .72, .7, s*.13, .75, .75, s*.18, AMBER, 0, .6); rbox(b, .71, .72, s*.11, .74, .78, s*.19, [.75, .76, .78], 0, 0); }
   // handlebar cowl, with the headlamp in it, the speedo on top
+  front(b, () => {
   loft(b, [
     { x: 0.53, w: 0.2, yb: 0.965, yt: 1.03, n: 3 }, { x: 0.58, w: 0.29, yb: 0.965, yt: 1.05, n: 3 }, { x: 0.64, w: 0.31, yb: 0.96, yt: 1.065, n: 3 }, { x: 0.69, w: 0.26, yb: 0.955, yt: 1.05, n: 2.8 }, { x: 0.73, w: 0.16, yb: 0.965, yt: 1.02, n: 2.5 },
   ], () => paint, { ring: 22 });
@@ -488,6 +494,7 @@ export function buildScooter(opts = {}) {
   rod(b, [.68, .56, -.05], [.66, .25, -.05], .017, CHROME, HUB_G); rod(b, [.68, .56, .05], [.66, .25, .05], .017, CHROME, HUB_G);
   rod(b, [.72, .78, 0], [.68, .5, 0], .025, [.12, .12, .13], HUB_G);
   guard(b, 0.66, R + 0.012, 0, R + 0.03, 0.115, [1, 1, 1], 1);
+  });
   // the engine and swing arm: rounded case on the left, fan cover, the silencer on the right, the shock
   rbox(b, -.66, .2, -.1, -.14, .37, -.02, [.32, .32, .34]);
   for (let i = 0; i < 5; i++) box(b, -.56 + i*.09, .21, -.106, -.53 + i*.09, .35, -.098, [.22, .22, .24]);
@@ -501,8 +508,8 @@ export function buildScooter(opts = {}) {
     addRider(b, -0.38, 0.8, 0, { lean: 0.05, inst: true, handX: 0.62, handY: 1.0, handW: 0.3, footX: 0.12, footY: 0.36, helmet: opts.helmet ? [0.2, 0.2, 0.2] : null });
     if (opts.pillion) addPillion(b, -0.72, 0.82, 0, opts.sideSaddle, true);
   } else if (opts.parked) { rod(b, [-.22, .28, -.13], [-.3, .02, -.26], .012, CHROME, HUB_G); rbox(b, -.34, .0, -.29, -.27, .02, -.23, BLACK); rod(b, [-.2, .24, -.08], [-.2, .03, -.09], .012, GREY, HUB_G); rod(b, [-.2, .24, .08], [-.2, .03, .09], .012, GREY, HUB_G); }
-  wheel2(b, 0.66, R, 0, R, 0.1, { cast: true, disc: true }); wheel2(b, -0.62, R, 0, R, 0.11, { cast: true });
-  return { body: b.build(), glass: gl.build(), dims: { L: 1.85, W: 0.72, H: 1.6, wb: 1.28 } };
+  front(b, () => wheel2(b, 0.66, R, 0, R, 0.1, { cast: true, disc: true })); wheel2(b, -0.62, R, 0, R, 0.11, { cast: true });
+  return withFront({ body: b.build(), glass: gl.build(), dims: { L: 1.85, W: 0.72, H: 1.6, wb: 1.28 } }, b, [.6, 1.02, .66, R]);
 }
 export function buildBike(opts = {}) {
   if (opts.kind === 'superbike') return buildSuperbike(opts);
@@ -530,7 +537,7 @@ export function buildBike(opts = {}) {
     rod(b, [.14, .54, -.07], [.27, .74, -.07], .014, CHROME, HUB_G);
     tube(b, [[-.6, .96, -.12], [-.8, .96, -.11], [-.84, .96, 0], [-.8, .96, .11], [-.6, .96, .12]], .009, BLACK, 10, 5);
     for (const x of [-.74, -.66]) rod(b, [x, .965, -.11], [x, .965, .11], .006, BLACK, TUBE6);
-    b.addGeo(G.sph2, M(.73, 1.1, 0, .09, .02, .1), [1, 1, 1], 0, 1);
+    front(b, () => b.addGeo(G.sph2, M(.73, 1.1, 0, .09, .02, .1), [1, 1, 1], 0, 1));
   } else loft(b, [
     { x: -0.72, w: 0.07, yb: 0.84, yt: 0.9, n: 2.4 }, { x: -0.66, w: 0.11, yb: 0.84, yt: 0.945, n: 2.8 }, { x: -0.5, w: 0.125, yb: 0.84, yt: 0.955, n: 3 }, { x: -0.36, w: 0.13, yb: 0.84, yt: 0.945, n: 3 },
     { x: -0.3, w: 0.135, yb: 0.84, yt: 0.925, n: 3 }, { x: -0.12, w: 0.135, yb: 0.84, yt: 0.935, n: 3 }, { x: -0.04, w: 0.11, yb: 0.85, yt: 0.925, n: 2.6 }, { x: 0.01, w: 0.075, yb: 0.86, yt: 0.905, n: 2.4 },
@@ -569,6 +576,7 @@ export function buildBike(opts = {}) {
   rbox(b, -.62, .25, -.14, -.05, .35, -.105, [.1, .1, .105]);                                                     // chain guard
   b.addGeo(HUB_G, M(-.6, R, -.1, .08, .008, .08, Math.PI/2), [.3, .3, .32]);
   // fork legs with their gaiters; handlebar, the round headlamp in a chrome shell, two dials, top clamp
+  front(b, () => {
   for (const s of [-1, 1]) {
     rod(b, [.57, .96, s*.075], [.77, .33, s*.075], .019, CHROME, HUB_G);
     rod(b, [.67, .64, s*.075], [.78, R + .01, s*.075], .027, [.5, .5, .52], HUB_G);
@@ -583,36 +591,39 @@ export function buildBike(opts = {}) {
   for (const s of [-1, 1]) { b.addGeo(HUB_G, M(.61, 1.09, s*.045, .037, .03, .037, 0, 0, .35), BLACK); b.addGeo(G.circle, M(.6, 1.106, s*.045, .03, .03, 1, -Math.PI/2 + .3), [.75, .78, .75], .1); }
   bars(b, .6, 1.07, .37, CHROME);
   rod(b, [.57, 1.05, -.02], [.6, 1.06, -.02], .012, BLACK, HUB_G); rod(b, [.57, 1.05, .02], [.6, 1.06, .02], .012, BLACK, HUB_G);
+  });
   // mudguards, tail lamp, plate, indicators
-  if (bullet) { guard(b, .78, R + .014, 0, R + .03, .068, [1, 1, 1], 1); guard(b, -.6, R + .04, 0, R + .05, .08, [1, 1, 1], 1); }
-  else { guard(b, 0.78, R + 0.012, 0, R + 0.03, 0.1, [.08, .08, .09]); guard(b, -0.6, R + 0.04, 0, R + 0.05, 0.12, [.08, .08, .09]); }
+  if (bullet) { front(b, () => guard(b, .78, R + .014, 0, R + .03, .068, [1, 1, 1], 1)); guard(b, -.6, R + .04, 0, R + .05, .08, [1, 1, 1], 1); }
+  else { front(b, () => guard(b, 0.78, R + 0.012, 0, R + 0.03, 0.1, [.08, .08, .09])); guard(b, -0.6, R + 0.04, 0, R + 0.05, 0.12, [.08, .08, .09]); }
   rbox(b, -.74, .78, -.075, -.68, .84, .075, [.55, .04, .04], 0, .9); rbox(b, -.755, .79, -.04, -.735, .83, .04, TAIL, 0, 1);
   box(b, -.78, .62, -.09, -.775, .74, .09, [.98, .98, .95]); rod(b, [-.72, .78, 0], [-.77, .68, 0], .012, BLACK, HUB_G);
   for (const s of [-1, 1]) winker(b, -.72, .76, s*.19);
-  box(b, .96, .5, -.05, .965, .58, .05, [.98, .98, .95]);
+  front(b, () => box(b, .96, .5, -.05, .965, .58, .05, [.98, .98, .95]));
   if (!opts.parked && !opts.noRider) {
     addRider(b, -0.32, 0.95, 0, { lean: 0.32, inst: true, handX: 0.6, handY: 1.08, handW: 0.34, footX: 0.05, footY: 0.42, helmet: opts.helmet ? [0.6, 0.6, 0.6] : null });
     if (opts.pillion) addPillion(b, -0.62, 0.97, 0, opts.sideSaddle, true);
   } else if (opts.parked) { rod(b, [-.12, .28, -.08], [-.2, .02, -.28], .012, FRAME, HUB_G); }
-  wheel2(b, 0.78, R, 0, R, 0.09, { disc: true }); wheel2(b, -0.6, R, 0, R, 0.11);
-  return { body: b.build(), glass: gl.build(), dims: { L: 2.0, W: 0.75, H: 1.75, wb: 1.3 } };
+  front(b, () => wheel2(b, 0.78, R, 0, R, 0.09, { disc: true })); wheel2(b, -0.6, R, 0, R, 0.11);
+  return withFront({ body: b.build(), glass: gl.build(), dims: { L: 2.0, W: 0.75, H: 1.75, wb: 1.3 } }, b, [.57, .96, .77, .33]);
 }
 export function buildCycle(opts = {}) {
   const b = newB(true), gl = newB(false);
   const R = 0.34, c = [1, 1, 1], STEEL = [.5, .5, .52];
   const hub = [.5, .28, 0], seat = [-.2, .84, 0], pedal = [-.05, .33, 0], head = [.36, .84, 0], down = [.34, .72, 0];
   for (const [a, e] of [[seat, pedal], [[-.18, .76, 0], head], [down, pedal]]) rod(b, a, e, .016, c, HUB_G, 1);
-  for (const s of [-1, 1]) { rod(b, [-.5, R, s*.05], pedal, .009, c, HUB_G, 1); rod(b, [-.5, R, s*.05], [-.19, .78, s*.01], .008, c, HUB_G, 1); rod(b, [.5, R, s*.05], [.385, .72, s*.02], .012, c, HUB_G, 1); }
+  for (const s of [-1, 1]) { rod(b, [-.5, R, s*.05], pedal, .009, c, HUB_G, 1); rod(b, [-.5, R, s*.05], [-.19, .78, s*.01], .008, c, HUB_G, 1); front(b, () => rod(b, [.5, R, s*.05], [.385, .72, s*.02], .012, c, HUB_G, 1)); }
+  front(b, () => {
   rod(b, [.385, .72, 0], [.42, 1.0, 0], .014, CHROME, HUB_G); tube(b, [[.45, 1.0, -.3], [.44, 1.02, -.15], [.42, 1.0, 0], [.44, 1.02, .15], [.45, 1.0, .3]], .009, CHROME, 8, 5);
   for (const s of [-1, 1]) rod(b, [.45, 1.0, s*.2], [.45, 1.0, s*.3], .014, BLACK, HUB_G);
+  });
   rod(b, [-.2, .8, 0], [-.21, .88, 0], .011, CHROME, HUB_G); rbox(b, -.36, .87, -.07, -.1, .92, .07, [.08, .07, .06], 0, MATTE);
   b.addGeo(HUB_G, M(pedal[0], pedal[1], .05, .08, .006, .08, Math.PI/2), STEEL);
   for (const s of [-1, 1]) { const ped = [pedal[0] + s*.12, pedal[1] + s*.08, s*.11]; rod(b, [pedal[0], pedal[1], s*.05], ped, .006, STEEL, HUB_G); rbox(b, ped[0] - .04, ped[1] - .01, s*.1, ped[0] + .04, ped[1] + .01, s*.18, BLACK); }
   rod(b, [-.5, R, .05], pedal.slice(0, 2).concat(.05), .006, [.2, .2, .2], HUB_G);
-  guard(b, -.5, R + .03, 0, R + .035, .05, c, 1); guard(b, .5, R + .03, 0, R + .035, .05, c, 1);
+  guard(b, -.5, R + .03, 0, R + .035, .05, c, 1); front(b, () => guard(b, .5, R + .03, 0, R + .035, .05, c, 1));
   if (!opts.parked) addRider(b, -0.28, 0.92, 0, { lean: 0.22, inst: true, handX: 0.44, handY: 1.0, handW: 0.28, footX: 0.05, footY: 0.32 });
-  for (const x of [0.5, -0.5]) wheel2(b, x, R, 0, R, .05);
-  return { body: b.build(), glass: gl.build(), dims: { L: 1.75, W: 0.6, H: 1.75, wb: 1.0 } };
+  front(b, () => wheel2(b, 0.5, R, 0, R, .05)); wheel2(b, -0.5, R, 0, R, .05);
+  return withFront({ body: b.build(), glass: gl.build(), dims: { L: 1.75, W: 0.6, H: 1.75, wb: 1.0 } }, b, [.385, .72, .5, R]);
 }
 
 // a litre sports bike: nothing in common with the commuter but two wheels. Full fairing, a tail in the air, the rider folded over it
@@ -632,15 +643,17 @@ function buildSuperbike(opts = {}) {
     winker(b, .68, .9, s*.13);
     rod(b, [-.2, .48, s*.1], [-.28, .47, s*.2], .012, ALU); rb(-.32, .46, s*.17, -.22, .48, s*.25, BLACK);
     // clip-on bars, low behind the fairing; the forks upside down, gold at the top; a disc each side
+    front(b, () => {
     rod(b, [.42, .985, s*.08], [.38, .975, s*.26], .012, BLACK, HUB_G); b.addGeo(HUB_G, M(.375, .974, s*.285, .018, .05, .018, Math.PI/2), MAT);
     rod(b, [.58, .96, s*.085], [.68, .62, s*.085], .028, GOLD, HUB_G); rod(b, [.68, .64, s*.085], [xf, R + .02, s*.085], .017, CHROME, HUB_G);
     b.addGeo(HUB_G, M(xf, R, s*.1, .16, .004, .16, Math.PI/2), [.6, .6, .63]); b.addGeo(RING_G, M(xf, R, s*.1, .16, .16, .04), [.4, .4, .42]);
     rb(xf - .19, R + .04, s*.082, xf - .1, R + .12, s*.118, GOLD);
+    });
     // the frame's twin spars, the swing arm's two braced sides
     tube(b, [[.52, .9, s*.05], [.28, .86, s*.13], [-.05, .72, s*.14], [-.2, .48, s*.09]], .032, ALU, 12, 6);
     rod(b, [-.2, .42, s*.09], [xr, R, s*.11], .024, ALU, TUBE6); rod(b, [-.2, .36, s*.09], [xr, R + .02, s*.11], .012, ALU, TUBE6);
   }
-  rbox(b, .5, .95, -.09, .6, .99, .09, ALU);
+  front(b, () => rbox(b, .5, .95, -.09, .6, .99, .09, ALU));
   rbox(b, .42, 1.0, -.06, .5, 1.04, .06, [.06, .08, .07, 0, MATTE]);
   // the tank's hump, the seat, the tail lifted high with its lamp and a hanger for the plate
   loft(b, [{ x: -.14, w: .1, yb: .82, yt: .92, n: 2.5 }, { x: 0, w: .155, yb: .78, yt: 1.0, n: 2.8 }, { x: .2, w: .165, yb: .78, yt: 1.05, n: 2.8 }, { x: .36, w: .14, yb: .82, yt: 1.03, n: 2.6 }, { x: .46, w: .07, yb: .88, yt: .99, n: 2.3 }], paint, { ring: 24 });
@@ -658,14 +671,14 @@ function buildSuperbike(opts = {}) {
   for (const z of [-.09, -.03, .03, .09]) tube(b, [[.3, .5, z], [.3, .3, z*1.2], [.1, .24, z*.9], [-.2, .28, .08]], .017, [.5, .46, .42], 10, 6);
   rod(b, [-.2, .3, .1], [-.46, .46, .18], .06, [.12, .12, .13], HUB_G); rod(b, [-.46, .46, .18], [-.62, .56, .2], .05, [.5, .5, .53], HUB_G); b.addGeo(G.circle, M(-.625, .563, .2, .04, .04, 1, 0, -Math.PI/2), [.02, .02, .02]);
   rod(b, [-.14, .55, 0], [-.3, .78, 0], .02, GOLD, HUB_G); for (let i = 0; i < 8; i++) b.addGeo(RING_G, M(lerp(-.16, -.29, i/8), lerp(.58, .76, i/8), 0, .032, .032, .05, Math.PI/2), [.75, .15, .1]);
-  guard(b, xf, R + .015, 0, R + .02, .052, [1, 1, 1], 1);
+  front(b, () => guard(b, xf, R + .015, 0, R + .02, .052, [1, 1, 1], 1));
   if (!opts.parked && !opts.noRider) {
     addRider(b, -.3, .98, 0, { lean: .78, inst: true, handX: .5, handY: .97, handW: .3, footX: -.26, footY: .54, helmet: opts.helmet ? [0.6, 0.6, 0.6] : null });
   } else if (opts.parked) rod(b, [-.1, .32, -.1], [-.2, .02, -.28], .012, MAT, HUB_G);
-  wheel2(b, xf, R, 0, R, .1, { cast: true }); wheel2(b, xr, R*1.02, 0, R*1.02, .15, { cast: true });
+  front(b, () => wheel2(b, xf, R, 0, R, .1, { cast: true })); wheel2(b, xr, R*1.02, 0, R*1.02, .15, { cast: true });
   rod(b, [xr, R, -.12], [xr, R, .12], .02, ALU, HUB_G);
   b.addGeo(HUB_G, M(xr, R, -.1, .11, .004, .11, Math.PI/2), [.6, .6, .63]);
-  return { body: b.build(), glass: gl.build(), dims: { L: 2.1, W: .75, H: 1.5, wb: 1.47 } };
+  return withFront({ body: b.build(), glass: gl.build(), dims: { L: 2.1, W: .75, H: 1.5, wb: 1.47 } }, b, [.58, .96, xf, R + .02]);
 }
 
 // ---------------------------------------------------------------- cars

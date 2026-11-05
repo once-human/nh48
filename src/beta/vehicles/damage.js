@@ -21,11 +21,19 @@ const now = () => performance.now()/1000;
 // ---------------------------------------------------------------- its own model, dented
 V.own = function () {
   const B = this.bodyMesh;
-  if (this._dg && B.geometry === this._dg.body) return this._dg;
-  const body = B.geometry.clone(); B.geometry = body; B.userData.ownGeo = true;
+  if (this._dg && B.geometry === this._dg.view) return this._dg;
+  // (a two-wheeler draws its body as two meshes over one set of vertices, the front end turning with the bars,
+  // beta/vehicles/steerfront.js: the copy is of all of it, and each mesh draws its own triangles of the copy)
+  const F = this._fr, body = (F ? F.full : B.geometry).clone();
+  let view = body;
+  if (F) {
+    const on = (src) => { const g = new THREE.BufferGeometry(); for (const k of Object.keys(body.attributes)) g.setAttribute(k, body.attributes[k]); g.setIndex(src.index); g.boundingSphere = body.boundingSphere; return g; };
+    view = on(B.geometry); F.mesh.geometry = on(F.mesh.geometry);
+  }
+  B.geometry = view; B.userData.ownGeo = true;
   let glass = null;
   if (this.glassMesh && this.glassMesh.geometry.attributes.position.count) { glass = this.glassMesh.geometry.clone(); this.glassMesh.geometry = glass; }
-  this._dg = { body, glass, b0: Float32Array.from(body.attributes.position.array), g0: glass ? Float32Array.from(glass.attributes.position.array) : null };
+  this._dg = { body, view, glass, b0: Float32Array.from(body.attributes.position.array), g0: glass ? Float32Array.from(glass.attributes.position.array) : null };
   return this._dg;
 };
 V.box = function () {
@@ -165,7 +173,7 @@ function grind(v, sp) {
 // all of it put right (the garage: damage back to nothing)
 V.mend = function () {
   const D = this._dg;
-  if (D && this.bodyMesh.geometry === D.body) {
+  if (D && this.bodyMesh.geometry === D.view) {
     D.body.attributes.position.array.set(D.b0); D.body.attributes.position.needsUpdate = true; D.body.computeVertexNormals();
     if (D.glass) { D.glass.attributes.position.array.set(D.g0); D.glass.attributes.position.needsUpdate = true; D.glass.computeVertexNormals(); }
   }
