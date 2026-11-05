@@ -38,7 +38,12 @@ import { acts } from './acts.js';
 import { hostBody } from './host.js';
 
 const STORE = 'puneri_powers', DAILY = 3;
-const V_HOLD = 5, V_RANGE = 135, B_HOLD = 2, B_RANGE = 40, N_R = 60, N_UP = 1.0;
+// how strong your powers are: level 1 is half of what they'll be once they've grown (levelling up raises LV toward 1).
+// It scales every reach (who you can take, read or sense, how far from your body you can go), the bars (each use costs
+// 1/LV as much, so a full bar lasts LV as long) and how hard a take is (the chance of being thrown off, 1/LV)
+const LV = 0.5;
+const V_HOLD = 5, V_RANGE = 135*LV, B_HOLD = 2, B_RANGE = 40*LV, N_R = 60*LV, N_UP = 1.0;
+const V_LEASH = 1000*LV;                        // as far from your own body as Vetal reaches (m)
 const STAY = 100/180;                           // units a second, being someone ordinary close to your own body
 const N_DRAIN = 8*STAY;
 const R_DAY = 0.075, R_NIGHT = 0.405, N_REFILL = 3;    // units a second
@@ -252,7 +257,7 @@ export function powers(G) {
   const hopRange = (k) => k < HOP.length ? HOP[k] : [10 + 3*(k - 4), 15 + 4*(k - 4)];
   const costIn = (p) => { const [lo, hi] = hopRange(hops); return lo + (hi - lo)*sit(p); };
   const holdFor = (p) => V_HOLD*(0.92 + 0.08*will(p));
-  const spend = (u) => { if (!S.free) S.vu = Math.max(0, S.vu - u); };
+  const spend = (u) => { if (!S.free) S.vu = Math.max(0, S.vu - u/LV); };
   function earlyCost(l) {
     if (l.t < 0.4) return;
     const p = l.p, d = Math.hypot(p.x - R().x, p.z - R().z);
@@ -296,7 +301,7 @@ export function powers(G) {
   // about one in a hundred)
   function attempt(q) {
     const w = will(q);
-    const pr = S.free ? 0 : Math.min(0.6, 0.009*w*w*(1 + 4*(1 - S.vu/100))*(1 + 0.9*hops));
+    const pr = S.free ? 0 : Math.min(0.6, 0.009*w*w*(1 + 4*(1 - S.vu/100))*(1 + 0.9*hops)/LV);
     humOn(1);
     blackout(() => {
       humOn(0);
@@ -374,7 +379,7 @@ export function powers(G) {
     if (coolT > 0) coolT -= dt;
     if (down && !link && held > 0.35 && !justIn && coolT <= 0 && !black && P().onFoot) {
       const p = aimAt(candidates(), V_RANGE);
-      if (p) { if (!S.free && S.vu < hopRange(hops)[0]) { toast('Vetal', 'Not enough left in you for that', 'warn', 2); held = -1e9; } else link = { p, t: 0, need: holdFor(p) }; }
+      if (p) { if (!S.free && S.vu < hopRange(hops)[0]/LV) { toast('Vetal', 'Not enough left in you for that', 'warn', 2); held = -1e9; } else link = { p, t: 0, need: holdFor(p) }; }
     }
     if (rel) {
       if (justIn) justIn = false;
@@ -400,7 +405,7 @@ export function powers(G) {
     if (host) {
       // the cost of being someone else
       const d = fromBody(), w = WILL[host.kind] || 1;
-      spend(STAY*(0.8 + 0.2*w)*(1 + d/500)*dt);
+      spend(STAY*(0.8 + 0.2*w)*(1 + d/(V_LEASH/2))*dt);
       // doing what they never would
       const Pl = P(), F = Pl.foot;
       if (OLD.has(host.kind) && Pl.onFoot && Math.hypot(F.vx || 0, F.vz || 0) > 3.6) { strain += dt*0.2; calm = 0; }
@@ -408,15 +413,15 @@ export function powers(G) {
       const heat = G.police?.heat || 0;
       if (heat > heat0) { strain += (heat - heat0)*(host.kind === 'cop' ? 0.35 : 0.1); heat0 = heat; calm = 0; } else heat0 = heat;
       if ((Pl.hp ?? 100) < hp0) { strain += (hp0 - Pl.hp)*0.012; calm = 0; } hp0 = Pl.hp ?? 100;     // their pain loosens the hold, fast
-      if (d > 800 && !farSaid) { farSaid = true; toast('Vetal', `${Math.round(d)} m from your body: it pulls. Past a kilometre you're gone`, 'warn', 2.5); } else if (d < 700) farSaid = false;
+      if (d > V_LEASH*0.8 && !farSaid) { farSaid = true; toast('Vetal', `${Math.round(d)} m from your body: it pulls. Past ${Math.round(V_LEASH)} m you're gone`, 'warn', 2.5); } else if (d < V_LEASH*0.7) farSaid = false;
       calm += dt;
       if (calm > 3) strain = Math.max(0, strain - dt*0.1);
       if (S.free) strain = 0;
       if (!leaving && !AC.busy) {
         if (strain >= 1) throwOut('They threw you out');
         else if ((Pl.hp ?? 100) < 30) throwOut('Their body is too hurt to hold');
-        // a kilometre from your own body is as far as it reaches: a pull from 800 m, home past 1 km
-        else if (d > 1000) leaveSoft('Too far from your body: pulled home');
+        // as far from your own body as it reaches (V_LEASH): a pull from 80 % of it, home past it
+        else if (d > V_LEASH) leaveSoft('Too far from your body: pulled home');
         else if (S.vu <= 0) leaveSoft('Vetal ran out: pulled home');
         else if (Pl.ko || (Pl.hp ?? 100) <= 0) { leaving = true; blackout(() => { leaving = false; goHome('Knocked out of them', 'ko'); }); }
       }
@@ -474,8 +479,8 @@ export function powers(G) {
     if (mem.hit || mem.shoved) mind.push('you');
     const sec = (SECRET[k] || SECRET.kaka)[Math.abs(id) % (SECRET[k] || SECRET.kaka).length];
     const w = will(p), wl = w <= 0.8 ? 'weak' : w <= 1.05 ? 'ordinary' : w <= 1.3 ? 'firm' : w <= 1.7 ? 'strong' : 'iron';
-    const [lo, hi] = hopRange(home ? hops : 0), est = Math.round(lo + (hi - lo)*sit(p));
-    const pr = Math.min(0.6, 0.009*w*w*(1 + 4*(1 - S.vu/100))*(1 + 0.9*(home ? hops : 0)));
+    const [lo, hi] = hopRange(home ? hops : 0).map((x) => x/LV), est = Math.round(lo + (hi - lo)*sit(p));
+    const pr = Math.min(0.6, 0.009*w*w*(1 + 4*(1 - S.vu/100))*(1 + 0.9*(home ? hops : 0))/LV);
     return {
       title: `${nameOf(p)}, ${age}`,
       lines: [
@@ -540,7 +545,7 @@ export function powers(G) {
       toast('Munja', [hos && `${hos} hostile`, wary && `${wary} wary`, cop && `${cop} police`, `${calm2} calm`].filter(Boolean).join(', '), 'info', 2.5);
     }
   }
-  const spend2 = (u) => { if (!S.free) S.mu = Math.max(0, S.mu - u); };
+  const spend2 = (u) => { if (!S.free) S.mu = Math.max(0, S.mu - u/LV); };
   // where each of them is about to walk, lit on the ground ahead of them
   const TR_N = 44, TR_M = 12;
   let trail = null, trT = 0;
@@ -748,7 +753,7 @@ export function powers(G) {
     const one = (s) => { const [p] = persons(s); if (!p) throw new Error('nobody there'); return p; };
     const status = () => [
       `Vetal ${Math.round(S.vu)}/100   Munja ${Math.round(S.mu)}/100   Brahmarakshas unlimited${S.free ? '   (free)' : ''}`,
-      host ? `in ${host.name || WHO[host.kind]} · hop ${hops} · strain ${Math.round(strain*100)}% · ${Math.round(fromBody())} m from your body` : `yourself · next way in costs ${hopRange(0).join('–')}`,
+      host ? `in ${host.name || WHO[host.kind]} · hop ${hops} · strain ${Math.round(strain*100)}% · ${Math.round(fromBody())} m from your body` : `yourself · next way in costs ${hopRange(0).map((x) => Math.round(x/LV)).join('–')}   (powers at ${Math.round(LV*100)}%)`,
     ];
     const G_ = 'powers';
     sh.reg('list powers', 'the three powers: what\'s left, who you are in, how far from your body', () => status().forEach(l => say(l)), { group: G_ });
