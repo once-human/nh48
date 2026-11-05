@@ -111,12 +111,48 @@ export function reachLean(H, right, targets, w = 1) {
   if (lean > 0) { const nk = R.getObjectByName('neck_01'); if (nk) { nk.parent.getWorldQuaternion(_pq).invert(); nk.quaternion.premultiply(_rq.setFromAxisAngle(_c.copy(right).applyQuaternion(_pq), lean*0.8)); R.updateMatrixWorld(true); } }
 }
 
+// at the wheel of a car: both hands on the rim at ten to two, turning with it, fingers round it. The cabin's wheel sits
+// further from the seat than an arm reaches, so you sit forward on the cushion as far as it takes (never more than 30 cm)
+const _g = [new THREE.Vector3(), new THREE.Vector3()], _sh = new THREE.Vector3(), _fw = new THREE.Vector3();
+function wheelOf(v) {
+  if (v._wheel !== undefined) return v._wheel;
+  const piv = v.cockpit.group.children.find(o => o.type === 'Group' && o.children.length === 1 && o.children[0].type === 'Group' && o.children[0].children.some(c => c.isMesh));
+  return (v._wheel = piv ? piv.children[0] : null);
+}
+function atWheel(H, v) {
+  const spin = wheelOf(v); if (!spin) return;
+  const m = v.tilt.matrixWorld, R = H.root;
+  // the wrists just behind the rim (toward you), at ten and two on the wheel as it's turned
+  spin.updateWorldMatrix(true, false);
+  for (const i of [0, 1]) _g[i].set((i ? 1 : -1)*0.2*Math.sin(1.0), 0.2*Math.cos(1.0), 0.055).applyMatrix4(spin.matrixWorld);
+  _r.set(0, 0, 1).transformDirection(m);
+  // (which is your right hand's: the one further to the car's right, the wheel turned or not)
+  const rIs1 = _g[1].dot(_r) >= _g[0].dot(_r), wr = rIs1 ? [_g[0], _g[1]] : [_g[1], _g[0]];
+  const u = R.getObjectByName('upperarm_l'), l = R.getObjectByName('lowerarm_l'), h = R.getObjectByName('hand_l'); if (!u || !l || !h) return;
+  H.holder.updateMatrixWorld(true);
+  const L = (u.getWorldPosition(_a).distanceTo(l.getWorldPosition(_b)) + _b.distanceTo(h.getWorldPosition(_c)))*0.96;
+  let over = 0;
+  for (const [i, sd] of [[0, 'l'], [1, 'r']]) { R.getObjectByName('upperarm_' + sd).getWorldPosition(_sh); over = Math.max(over, _sh.distanceTo(wr[i]) - L); }
+  if (over > 0) {
+    _fw.set(1, 0, 0).transformDirection(m);
+    H.holder.position.addScaledVector(_fw, Math.min(0.3, over*1.05));
+    H.holder.updateMatrixWorld(true);
+  }
+  for (const [i, sd] of [[0, 'l'], [1, 'r']]) {
+    const s = sd === 'r' ? 1 : -1;
+    _pole.set(-0.3, -1, s*0.6).transformDirection(m);
+    ikArm(H, sd, wr[i], _pole, 1);
+    grip(H, sd, 1);
+  }
+}
+
 const pr = Pilot.prototype.placeRider;
 Pilot.prototype.placeRider = function () {
   pr.call(this);
   const v = this.riderShown, H = this.human;
   if (!v || !H) return;
   const two = v !== this.auto && v.spec && v.spec.two;
+  if (!two && v.cockpit) { atWheel(H, v); return; }
   if (!two && v !== this.auto && v.type !== 'auto') return;
   const f = two && fitOf(v.type), m = v.tilt.matrixWorld;
   if (f) {
