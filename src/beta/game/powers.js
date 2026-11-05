@@ -804,7 +804,11 @@ export function powers(G) {
     if (link && !(link.lost > 0) && G.state === 'play') AU.light(link.p, '#b26bff', 0.12 + 0.88*clamp01(link.t/link.need));
     if (bl && !(bl.lost > 0)) AU.light(bl.p, '#ffb020', 0.12 + 0.88*clamp01(bl.t/B_HOLD));
     if (readP && readT > 0) { readT -= dt; AU.light(readP, '#ffb020', Math.min(0.9, readT*0.35)); }
-    if (nk > 0) { const k = 0.9*smooth(nk); for (const [p] of near().slice(0, 28)) AU.light(p, intent(p), k, true); }
+    if (nk > 0) {
+      const k = 0.9*smooth(nk); for (const [p] of near().slice(0, 28)) AU.light(p, intent(p), k, true);
+      // the riders and drivers close by who are drawn as people glow too, in their vehicle's colour (what it's up to)
+      for (const d of inVeh(N_R)) { const o = vehOf(d); if (d.body && o) AU.light(d, vIntent(o), k, true); }
+    }
     AU.tick(dt);
   }
 
