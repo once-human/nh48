@@ -1,38 +1,68 @@
-// The bus's doors open. Each doorway (front and middle, on the left) has two glazed leaves that fold in on their outer
-// hinges with a hiss of air when the bus has pulled in at a stop and is waiting, and fold shut again before it pulls
-// out; your own bus opens them when you stop it, and when you get on or off. The doorways in the body are open
-// (beta/vehicles/models.js), so with the leaves folded you see in: the step, the poles, the seats.
+// The bus's doors open. Each doorway (front and middle, on the left) has two leaves, and each leaf is two glazed
+// panels hinged together: the first on the doorway's post, the second on the first, its far edge running in a track
+// along the doorway, so they fold in on themselves against the post like a city bus's (a jackknife), with a hiss of
+// air when the bus has pulled in at a stop and is waiting, and fold shut again before it pulls out; your own bus opens
+// them when you stop it, and when you get on or off. The doorways in the body are open (beta/vehicles/models.js), so
+// with the leaves folded you see in: the step, the poles, the seats.
 import * as THREE from 'three';
 import { Pilot } from '@orig/game/pilot.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const L = 11.4, hl = L/2, hw = 2.55/2, DOORS = [[hl - 1.17, hl - 0.25], [-0.62, 0.42]];
-const OPEN = 1.42, SPEED = 1/0.7, POOL = 10, NEAR = 110;
+const OPEN = 1.36, SPEED = 1/0.8, POOL = 10, NEAR = 110;
+const Y0 = 0.5, Y1 = 2.38;              // the leaves from the step to the doorway's head
 let mats = null;
-function leaf(w) {
+const box = (g, m, w, h, d, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); return o; };
+// one panel, from its hinge (x = 0) along +x for w: an aluminium frame round two panes, a painted kick panel at the
+// foot, a rubber edge where it meets the next one, a grab bar on the inside (+z). Built once per width and shared:
+// a mesh per material
+const PANELS = new Map();
+function panelGeo(w, edge) {
+  const key = Math.round(w*1000) + (edge ? 'e' : ''); if (PANELS.has(key)) return PANELS.get(key);
+  const parts = { frame: [], glass: [], kick: [], rubber: [], bar: [] }, h = Y1 - Y0;
+  const bx = (k, w2, h2, d, x, y, z) => parts[k].push(new THREE.BoxGeometry(w2, h2, d).translate(x, y, z));
+  bx('frame', 0.045, h, 0.034, 0.0225, Y0 + h/2, 0); bx('frame', 0.045, h, 0.034, w - 0.0225, Y0 + h/2, 0);   // the stiles
+  bx('frame', w, 0.06, 0.034, w/2, Y1 - 0.03, 0);                       // top rail
+  bx('frame', w, 0.07, 0.034, w/2, 1.36, 0);                            // the rail between the panes
+  bx('frame', w, 0.03, 0.034, w/2, Y0 + 0.335, 0);
+  bx('kick', w - 0.02, 0.32, 0.03, w/2, Y0 + 0.16, 0);                  // kick panel
+  bx('glass', w - 0.09, 1.325 - Y0 - 0.35, 0.008, w/2, (Y0 + 0.35 + 1.325)/2, 0); bx('glass', w - 0.09, Y1 - 0.06 - 1.395, 0.008, w/2, (1.395 + Y1 - 0.06)/2, 0);
+  if (edge) parts.rubber.push(new THREE.CylinderGeometry(0.016, 0.016, h - 0.04, 6).translate(w + 0.006, Y0 + h/2, 0));
+  parts.bar.push(new THREE.CylinderGeometry(0.013, 0.013, 0.95, 8).translate(w*0.55, 1.42, 0.05));
+  for (const y of [0.97, 1.87]) bx('bar', 0.025, 0.025, 0.05, w*0.55, y, 0.027);
+  const out = {};
+  for (const k in parts) if (parts[k].length) { out[k] = mergeGeometries(parts[k].map(g => g.index ? g.toNonIndexed() : g)); parts[k].forEach(g => g.dispose()); }
+  PANELS.set(key, out); return out;
+}
+function panel(w, edge) {
   if (!mats) mats = {
-    frame: new THREE.MeshStandardMaterial({ color: 0xd2c8ae, roughness: 0.55, metalness: 0.1 }),
-    glass: new THREE.MeshStandardMaterial({ color: 0x1a2228, roughness: 0.08, metalness: 0.35, transparent: true, opacity: 0.55 }),
-    brass: new THREE.MeshStandardMaterial({ color: 0xd8b040, roughness: 0.3, metalness: 0.7 }),
-    rubber: new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.9 }),
+    frame: new THREE.MeshStandardMaterial({ color: 0x8e9398, roughness: 0.38, metalness: 0.65 }),
+    glass: new THREE.MeshStandardMaterial({ color: 0x1c262c, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.42, depthWrite: false }),
+    kick: new THREE.MeshStandardMaterial({ color: 0xa8241b, roughness: 0.45, metalness: 0.1 }),
+    rubber: new THREE.MeshStandardMaterial({ color: 0x121212, roughness: 0.95 }),
+    bar: new THREE.MeshStandardMaterial({ color: 0xc9cdd2, roughness: 0.22, metalness: 0.85 }),
   };
-  const g = new THREE.Group(), add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
-  // the leaf runs from its hinge (x = 0) along +x for w
-  add(new THREE.BoxGeometry(w, 1.86, 0.02), mats.frame, w/2, 1.43, 0);
-  add(new THREE.BoxGeometry(w - 0.1, 0.86, 0.01), mats.glass, w/2, 1.85, -0.012);
-  add(new THREE.BoxGeometry(w - 0.1, 0.68, 0.01), mats.glass, w/2, 0.96, -0.012);
-  add(new THREE.BoxGeometry(w, 0.04, 0.03), mats.rubber, w/2, 0.52, 0);
-  add(new THREE.CylinderGeometry(0.012, 0.012, 1.0, 6), mats.brass, w - 0.07, 1.45, -0.035);
-  add(new THREE.CylinderGeometry(0.012, 0.012, 1.0, 6), mats.brass, w - 0.07, 1.45, 0.03);
+  const g = new THREE.Group(), P = panelGeo(w, edge);
+  for (const k in P) { const o = new THREE.Mesh(P[k], mats[k]); if (k === 'glass') o.renderOrder = 2; g.add(o); }
   return g;
+}
+// a leaf: the first panel on the post, the second hung on its far edge. fold(a): a = 0 shut, 1 folded
+function leaf(w, flip) {
+  const pw = w/2 - 0.004, p1 = new THREE.Group(), p2 = new THREE.Group();
+  p1.add(panel(pw, false)); p2.position.set(pw + 0.004, 0, 0); p2.add(panel(pw, true)); p1.add(p2);
+  const top = new THREE.Group(); if (flip) top.rotation.y = Math.PI; top.add(p1);
+  return { g: top, fold: (a, dir) => { p1.rotation.y = dir*a; p2.rotation.y = -dir*2*a; } };
 }
 function makeSet(scene) {
   const root = new THREE.Group(); root.matrixAutoUpdate = false;
   const leaves = [];
   for (const [a, e] of DOORS) {
     const m = (a + e)/2, z = -(hw + 0.006);
-    // the leaf from the front edge folds in one way, the one from the back edge the other
-    const p0 = new THREE.Group(); p0.position.set(a + 0.015, 0, z); p0.add(leaf(m - a - 0.023)); root.add(p0); leaves.push([p0, -1]);
-    const p1 = new THREE.Group(); p1.position.set(e - 0.015, 0, z); const l1 = leaf(e - m - 0.023); l1.rotation.y = Math.PI; p1.add(l1); root.add(p1); leaves.push([p1, 1]);
+    // the leaf from one post folds in one way, the one from the other post the other way
+    const L0 = leaf(m - a - 0.012, false); L0.g.position.set(a + 0.01, 0, z); root.add(L0.g); leaves.push([L0, -1]);
+    const L1 = leaf(e - m - 0.012, true); L1.g.position.set(e - 0.01, 0, z); root.add(L1.g); leaves.push([L1, 1]);
+    // the track along the doorway's head the folding edges run in
+    box(root, mats.frame, e - a, 0.035, 0.05, m, Y1 + 0.02, z + 0.03);
   }
   scene.add(root);
   return { root, leaves, bus: null, k: 0, was: 0 };
@@ -67,8 +97,9 @@ function step(P, dt) {
     const was = S.k;
     S.k = Math.max(0, Math.min(1, S.k + (open ? SPEED : -SPEED)*dt));
     if ((was === 0 && S.k > 0) || (was === 1 && S.k < 1)) G.audio?.at?.(o.x, o.z, () => G.audio.noiseBurst?.(0.45, 700, 0.5, 0.18));
-    const e = S.k*S.k*(3 - 2*S.k);
-    for (const [pv, dir] of S.leaves) pv.rotation.y = dir*OPEN*e;
+    // the air rams: quick in the middle, eased at the ends, and the leaves settle against their stops
+    const e = S.k*S.k*(3 - 2*S.k), set = open && S.k > 0.85 ? Math.sin((S.k - 0.85)/0.15*Math.PI)*0.03 : 0;
+    for (const [lf, dir] of S.leaves) lf.fold(OPEN*e + set, dir);
     // on the bus as it's drawn
     if (n.traffic) {
       _e.set(o.fallen > 0 ? 1.3 : (o.roll || 0), -(o.ryaw ?? o.yaw), (o.pitch || 0) + (o.slope || 0), 'YXZ'); _q.setFromEuler(_e);
