@@ -566,13 +566,20 @@ export function powers(G) {
     return '#efe6d2';
   };
   const near = () => { const F = R(), out = []; for (const p of ppl()?.list || []) { if (p.hidden) continue; const d = Math.hypot(p.x - F.x, p.z - F.z); if (d <= N_R) out.push([p, d]); } return out.sort((x, y) => x[1] - y[1]); };
+  // it opens only with at least 5 left in it (under that, holding N does nothing at all: no glow, no paths), and once
+  // it runs dry it shuts, and stays shut until you let go of N and there's 5 again
+  let nOn = false, nPress = false;
   function munja(dt) {
-    const want = (nForce > 0 || (!!G.input?.key('KeyN') && P().onFoot && !AC.busy)) && (S.mu > 0 || S.free);
+    const press = nForce > 0 || (!!G.input?.key('KeyN') && P().onFoot && !AC.busy);
+    if (!press) nOn = false;
+    else if (!nOn && !nPress) { if (S.free || nForce > 0 || S.mu >= 5) nOn = true; else toast('Munja', 'Too little left. It comes back in time', 'warn', 1.6); }
+    nPress = press;
+    if (nOn && !S.free && nForce <= 0 && S.mu <= 0) { nOn = false; toast('Munja', 'Spent. It comes back in time', 'warn', 2); }
+    const want = press && nOn;
     if (nForce > 0) nForce -= dt;
     nk = want ? Math.min(1, nk + dt/N_UP) : 0;                    // (let go and it's gone at once)
     if (want && (knownT -= dt) <= 0) { knownT = 1; knownSet = known(); }
     if (want && nForce <= 0) spend2(N_DRAIN*dt);
-    if (want && S.mu <= 0 && !S.free) toast('Munja', 'Spent. It comes back in time', 'warn', 2);
     if (!want) nSaid = false;
     if (!want && nk <= 0) S.mu = Math.min(100, S.mu + dt*(R_DAY + (R_NIGHT - R_DAY)*nightK())*N_REFILL);
     if (nk >= 1 && !nSaid) {

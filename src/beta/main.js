@@ -24,6 +24,7 @@ import * as VM from './vehicles/models.js';
 import './vehicles/physics.js';
 import './vehicles/tyres.js';
 import './vehicles/twowheel.js';      // two-wheelers lean to turn, each its own way
+import './people/stalls.js';          // stall keepers keep to their stalls
 import './traffic/rates.js';
 import './traffic/spacing.js';
 import './traffic/steer.js';
