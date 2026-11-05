@@ -157,6 +157,10 @@ const PATCHES = {
   [S('world/buildingsChunk.js')]: [
     ["  S.list.forEach((r, i) => {\n    if (r.door && open(r.door)) { S.im.setMatrixAt(i, ZERO); return; }", "  S.seen = (S.seen || 0) + 1;\n  S.list.forEach((r, i) => {\n    r.t = r.door && open(r.door) ? 1 : 0;\n    if (S.seen > 2 && r.k !== undefined) { if (r.k !== r.t) S.moving = true; return; }\n    r.k = r.t;\n    if (r.t) { S.im.setMatrixAt(i, ZERO); return; }"],
   ],
+  [S('world/landmarks.js')]: [
+    // the Shaniwar Wada plaque's board clear of /beta's stone blocks (they stand up to 2.6 cm proud; it was 2 cm out)
+    ["B.board(pu, 1.25, pv - 0.27, 2.8, 1.5,", "B.board(pu, 1.25, pv - 0.3, 2.8, 1.5,"],
+  ],
   [S('game/input.js')]: [
     // the pad's Y is the camera, as C is (V is Vetal)
     ["edge(3, 'KeyV');", "edge(3, 'KeyC');"],
