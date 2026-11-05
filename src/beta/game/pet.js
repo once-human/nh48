@@ -80,7 +80,7 @@ Game.prototype.petAnimal = function (a) {
   // (its wag and bounce; not the instant swing round to face you and back after: animals.js turned the whole body)
   a.petT = 3.2; a.petPh = 0; a.petX = undefined; a.petZ = undefined;
   start(P, a, cow ? 'cow' : a.kind === 'cat' ? 'cat' : 'dog', cow ? 'touch' : 'pet');
-  if (a.kind === 'cat') this.later(0.9, () => this.audio && this.audio.purr && this.audio.purr());
+  if (a.kind === 'cat') { this.later(0.35, () => this.audio && this.audio.meow && this.audio.meow(a.x, a.z)); this.later(1.3, () => this.audio && this.audio.purr && this.audio.purr()); }
   else if (!cow) this.later(0.9, () => this.audio && this.audio.bark && this.audio.bark(0.25));
 };
 
@@ -193,13 +193,23 @@ Pilot.prototype.updateFoot = function (dt, ...rest) {
         // fingers up and a little forward; thumbs to the chest, the little fingers out front (index to little finger
         // runs forward on both hands, which with fingers up turns each palm in to the other)
         const up = _ua.set(fw.x*0.25, 1, fw.z*0.25).normalize();
-        for (const [sd, sg] of [['l', -1], ['r', 1]]) {
-          // the wrist just to its own side of the middle; the elbow out to its own side, down and a touch back
-          _t.copy(_k).addScaledVector(rt, sg*0.03);
-          _p.copy(rt).multiplyScalar(sg*1.2).addScaledVector(fw, -0.2); _p.y -= 1;
-          ikArm(H, sd, _t, _p, h);
-          setHand(H, sd, up, fw, h);
-          grip(H, sd, -1.0*h);
+        // twice: placed, then the gap actually left between the two palms (at the knuckles) measured and closed, so the
+        // palms press flat together whatever the arms' lengths and the hands' thickness (each stays on its own side)
+        let corr = 0;
+        for (let pass = 0; pass < 2; pass++) {
+          for (const [sd, sg] of [['l', -1], ['r', 1]]) {
+            // the wrist just to its own side of the middle; the elbow out to its own side, down and a touch back
+            _t.copy(_k).addScaledVector(rt, sg*Math.max(0.006, 0.016 - corr));
+            _p.copy(rt).multiplyScalar(sg*1.2).addScaledVector(fw, -0.2); _p.y -= 1;
+            ikArm(H, sd, _t, _p, h);
+            setHand(H, sd, up, fw, h);
+            grip(H, sd, -1.0*h);
+          }
+          const ml = bone(H, 'middle_01_l'), mr = bone(H, 'middle_01_r'); if (!ml || !mr) break;
+          H.root.updateMatrixWorld(true);
+          ml.getWorldPosition(_ns[0]); mr.getWorldPosition(_ns[1]);
+          const gap = _ns[1].sub(_ns[0]).dot(rt);                 // (right knuckles minus left, along your right)
+          corr += (gap - 0.032)/2;
         }
       }
     }

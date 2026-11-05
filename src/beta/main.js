@@ -27,6 +27,7 @@ import './vehicles/twowheel.js';      // two-wheelers lean to turn, each its own
 import './vehicles/damage.js';        // dents where it's hit, holes where it's shot, flat tyres, fire from the engine
 import './people/stalls.js';          // stall keepers keep to their stalls
 import './people/walls.js';           // nobody walks through a building
+import './game/meow.js';              // a cat's meow
 import './traffic/rates.js';
 import './traffic/spacing.js';
 import './traffic/steer.js';
