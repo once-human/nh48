@@ -70,7 +70,7 @@ const PATCHES = {
     ["{ id: 'bag', label: 'Jhola', group: 'Menus', def: 'KeyE' },", "{ id: 'bag', label: 'Jhola', group: 'Menus', def: 'KeyQ' },"],
     ["{ id: 'roll', label: 'Roll; camera when driving', group: 'Do', def: 'KeyC' }", "{ id: 'roll', label: 'Roll', group: 'Do', def: 'ControlLeft' }"],
     ["{ id: 'punch', label: 'Punch (click works too)',", "{ id: 'punch', label: 'Punch (click works too; hold right-click to block)',"],
-    ["{ id: 'cam', label: 'Change camera', group: 'Vehicle', def: 'KeyV' }", "{ id: 'cam', label: 'First or third person', group: 'Move', def: 'KeyC' }, { id: 'vetal', label: 'Vetal: hold on someone to take them over, tap to go home', group: 'Powers', def: 'KeyV' }, { id: 'brahma', label: 'Brahmarakshas: read the person you face', group: 'Powers', def: 'KeyO' }, { id: 'munja', label: 'Munja: everyone near, through walls', group: 'Powers', def: 'Period' }"],
+    ["{ id: 'cam', label: 'Change camera', group: 'Vehicle', def: 'KeyV' }", "{ id: 'cam', label: 'First or third person', group: 'Move', def: 'KeyC' }, { id: 'vetal', label: 'Vetal: hold on someone to take them over, tap to go home', group: 'Powers', def: 'KeyV' }"],
     // F for what's in front of you (shops, doors, counters, pumps, animals), E for vehicles (in, out, take one),
     // T to talk to anyone (beta/game/talk.js); the phone moves to I
     ["{ id: 'use', label: 'Talk, walk in, get in or out', group: 'Do', def: 'KeyF' },", "{ id: 'use', label: 'Walk in, counters, pet, fuel up', group: 'Do', def: 'KeyF' }, { id: 'vehicle', label: 'Get in or out of a vehicle', group: 'Do', def: 'KeyE' }, { id: 'talk', label: 'Talk to someone (ask them out too)', group: 'Do', def: 'KeyT' },"],
@@ -168,6 +168,8 @@ const PATCHES = {
   [S('game/game.js')]: [
     // V is Vetal now (C is the camera)
     ["if (this.input.took('KeyV')) this.rig.setMode(this.rig.mode + 1);", ""],
+    // B looks back from a vehicle; on foot it's Brahmarakshas
+    ["this.rig.lookBack = this.input.key('KeyB');", "this.rig.lookBack = !this.player.onFoot && this.input.key('KeyB');"],
     // the jhola on Q (E is vehicles now)
     ["if (e.code === 'KeyE' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.jhola.open(); }", "if (e.code === 'KeyQ' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.jhola.open(); }"],
     ["['Escape', 'KeyE', 'KeyJ', 'Tab', 'KeyF', 'KeyM', 'KeyP', 'KeyK'].includes(e.code)", "['Escape', 'KeyE', 'KeyQ', 'KeyJ', 'Tab', 'KeyF', 'KeyM', 'KeyP', 'KeyK'].includes(e.code)"],

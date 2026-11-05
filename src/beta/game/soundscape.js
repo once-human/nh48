@@ -153,7 +153,6 @@ export function soundscape(G) {
     const day = night > 0.6 ? 0 : h >= 5.3 && h < 8.5 ? 2.4 : h < 11 ? 1.2 : h < 16.3 ? 0.55 : h < 19.2 ? 1.3 : 0.2;
     const quiet = 1 - 0.6*road;
     if (!inside && day > 0) {
-      if (Math.random() < dt*0.12*day*(0.2 + 1.5*gr)*quiet) song(a, L);
       if (Math.random() < dt*0.03*day*(0.5 + 0.5*(1 - gr))) a.crow();
     }
     // crickets at night, where it's green (one or two even in the city)

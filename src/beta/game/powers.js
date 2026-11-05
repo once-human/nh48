@@ -8,9 +8,9 @@
 //                      Vetal, or thrown out, you're pulled home anyway, to whatever happened to your body meanwhile.
 //                      From inside someone, hold V on the next: a jump costs half. The bar refills while you're
 //                      yourself, faster at night. The more time you spend in others, the better you get at it.
-//   Brahmarakshas (O)  the learned one: read the person you face. Who they are, how they are, what they make of you,
+//   Brahmarakshas (B)  on foot, the learned one: read the person you look at. Who they are, how they are, what they make of you,
 //                      what they're keeping to themselves. Three times a game day.
-//   Munja (.)          the one in the peepal tree: for eight seconds you see everyone within 60 m through walls,
+//   Munja (N)          on foot, the one in the peepal tree: for eight seconds you see everyone within 60 m through walls,
 //                      by what they mean you: red to fight, amber wary of you, green kind, blue the police.
 //                      Three times a game day.
 // The keys are in Pause → Controls like every other. In the terminal: list powers, refill power, retake power, take @look,
@@ -59,46 +59,29 @@ export function powers(G) {
   const left = (k) => { if (S.day !== day()) { S.day = day(); S.brahma = 0; S.munja = 0; save(); } return S.free ? DAILY : DAILY - S[k]; };
   const use = (k) => { if (left(k) <= 0) return false; if (!S.free) { S[k]++; save(); } return true; };
 
-  // ---------------------------------------------------------------- the status bar
-  const css = document.createElement('style');
-  css.textContent = `
-  #nh-pw{position:fixed;left:498px;bottom:22px;display:flex;gap:8px;align-items:center;padding:7px 10px;border-radius:14px;background:rgba(14,14,18,.78);backdrop-filter:blur(6px);font:600 12px/1 system-ui,sans-serif;color:#f3ead8;z-index:5;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.35)}
-  #nh-pw .pw{display:flex;align-items:center;gap:6px}
-  #nh-pw .ic{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-size:13px;color:#fff}
-  #nh-pw .v .ic{background:#7b2ff2}#nh-pw .b .ic{background:#e08a00}#nh-pw .m .ic{background:#1f9d6b}
-  #nh-pw .bar{width:74px;height:7px;border-radius:4px;background:rgba(255,255,255,.14);overflow:hidden}
-  #nh-pw .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#a46bff,#e2c2ff);border-radius:4px;transition:width .2s}
-  #nh-pw .pips{display:flex;gap:3px}#nh-pw .pips b{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.18)}#nh-pw .pips b.on{background:#f3ead8}
-  #nh-pw .k{opacity:.6;font-size:10px}
-  #nh-pw.in .v .ic{box-shadow:0 0 0 2px #e2c2ff}
-  #nh-pw .st{width:5px;height:22px;border-radius:3px;background:rgba(255,255,255,.12);position:relative;overflow:hidden;display:none}
-  #nh-pw.in .st{display:block}#nh-pw .st i{position:absolute;left:0;right:0;bottom:0;background:#ff4d4d}
-  #nh-veil{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:0;transition:opacity .25s;background:radial-gradient(ellipse at center,transparent 45%,rgba(60,0,110,.55) 100%)}
-  #nh-sense{position:fixed;inset:0;pointer-events:none;z-index:3}
-  body.nh-nohud #nh-pw,body.nh-nohud #nh-read{display:none!important}
-  #nh-read{position:fixed;right:22px;top:40%;width:270px;padding:14px 16px;border-radius:16px;background:rgba(14,14,18,.86);color:#f3ead8;font:13px/1.45 system-ui,sans-serif;z-index:6;pointer-events:none;opacity:0;transform:translateX(12px);transition:.25s;border-left:4px solid #e08a00}
-  #nh-read.on{opacity:1;transform:none}#nh-read h4{margin:0 0 6px;font-size:15px;color:#ffd38a}#nh-read p{margin:2px 0}#nh-read em{color:#ffd38a;font-style:normal}`;
-  document.head.appendChild(css);
-  const ui = document.createElement('div'); ui.id = 'nh-pw';
-  ui.innerHTML = `<div class="pw v"><span class="ic">◉</span><span class="bar"><i></i></span><span class="st"><i></i></span><span class="k">V</span></div>
-    <div class="pw b"><span class="ic">✦</span><span class="pips"><b></b><b></b><b></b></span><span class="k">O</span></div>
-    <div class="pw m"><span class="ic">❂</span><span class="pips"><b></b><b></b><b></b></span><span class="k">.</span></div>`;
+  // ---------------------------------------------------------------- on the game's own HUD: Vetal is a sixth ring in the vitals
   const veil = document.createElement('div'); veil.id = 'nh-veil';
-  const sense = document.createElement('canvas'); sense.id = 'nh-sense';
-  const card = document.createElement('div'); card.id = 'nh-read';
-  const mount = () => { if (!document.body) { setTimeout(mount, 400); return; } document.body.appendChild(ui); document.body.appendChild(card); document.body.appendChild(veil); document.body.appendChild(sense); };
+  veil.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:3;opacity:0;transition:opacity .4s';
+  const css = document.createElement('style');
+  css.textContent = `.vit .v-vt { color: #b26bff; } .vit .v-vt.in svg.gl { animation: v2pulse 1.6s ease-in-out infinite; } body.nh-nohud #nh-veil { display: none; }`;
+  document.head.appendChild(css);
+  let ring = null, black = false;
+  const mount = () => {
+    const Hd = G.hud; if (!Hd || !Hd.vit || !Hd._vitEls || !document.body) { setTimeout(mount, 500); return; }
+    document.body.appendChild(veil);
+    const C = Hd.vitC || 2*Math.PI*15, sp = document.createElement('span');
+    sp.className = 'v-vt'; sp.title = 'Vetal';
+    sp.innerHTML = `<svg viewBox="0 0 36 36"><circle class="tr" cx="18" cy="18" r="15"/><circle class="fg" cx="18" cy="18" r="15" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="0"/></svg><svg class="gl" viewBox="0 0 24 24"><path d="M12 2.5c.6 3.1 4.6 5.2 4.6 10.1a4.6 4.6 0 0 1-9.2 0c0-2.3 1.2-3.9 2.3-4.9.1 1.6.8 2.7 1.9 3.2-.6-2.9.1-5.8.4-8.4Z"/><circle cx="12" cy="15.4" r="1.6" fill="rgba(0,0,0,.45)"/></svg>`;
+    Hd.vit.appendChild(sp); ring = { sp, fg: sp.querySelector('.fg'), C };
+  };
   mount();
-  const bar = ui.querySelector('.bar i'), stb = ui.querySelector('.st i');
-  const pips = (sel, n) => ui.querySelectorAll(sel + ' .pips b').forEach((b, i) => b.classList.toggle('on', i < n));
   const draw = () => {
-    const shown = (G.state === 'play' || G.state === 'pause') && !!document.querySelector('#h-mode')?.offsetParent;
-    ui.style.display = shown ? '' : 'none';
-    bar.style.width = Math.round(S.bar*100) + '%';
-    ui.classList.toggle('in', !!host);
-    stb.style.height = Math.round(Math.min(1, strain)*100) + '%';
-    pips('.b', left('brahma')); pips('.m', left('munja'));
-    veil.style.opacity = host ? 0.3 + Math.min(1, strain)*0.7 : link ? link.t/link.need*0.8 : 0;
-    veil.style.background = `radial-gradient(ellipse at center,transparent ${45 - Math.min(1, strain)*25}%,rgba(${60 + strain*50},0,${110 + strain*40},${0.55 + strain*0.35}) 100%)`;
+    if (ring) { ring.fg.setAttribute('stroke-dashoffset', (ring.C*(1 - Math.max(0, Math.min(1, S.bar)))).toFixed(1)); ring.sp.classList.toggle('in', !!host); ring.sp.classList.toggle('low', S.bar < 0.15); }
+    if (black) return;
+    // purple coming in from the edges: while the link builds, and while you're in someone (deeper as they fight you)
+    const k = host ? 0.35 + Math.min(1, strain)*0.65 : link ? Math.min(1, link.t/link.need) : 0;
+    veil.style.opacity = k.toFixed(3);
+    veil.style.background = `radial-gradient(ellipse at center,transparent ${52 - k*22}%,rgba(${70 + strain*60},${10},${120 + strain*30},${0.35 + k*0.4}) 100%)`;
   };
 
   // ---------------------------------------------------------------- a low sound for the link (made here, nothing loaded)
@@ -115,28 +98,73 @@ export function powers(G) {
     hum.g.gain.setTargetAtTime(0.22*k, t, 0.08); hum.o2.frequency.setTargetAtTime(78.5 + k*40, t, 0.1); hum.f.frequency.setTargetAtTime(420 + k*900, t, 0.1);
   };
 
+  // ---------------------------------------------------------------- the aura: light on the person's own body
+  // A second skin on the same skeleton, a few millimetres out, lit only at its edges (where you see past them), so
+  // they glow round their outline and moves as they move. Faded in slowly, out the same way.
+  function auraMat(col) {
+    const m = new THREE.MeshBasicMaterial({ color: col, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    const uK = { value: 0 }; m.userData.uK = uK;
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uK = uK;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vF;')
+        .replace('#include <project_vertex>', '#ifdef USE_SKINNING\n  transformed += normalize(objectNormal)*0.012;\n#endif\n#include <project_vertex>\n  { vec3 nV = normalize(normalMatrix*objectNormal); vF = pow(1.0 - abs(dot(nV, normalize(-mvPosition.xyz))), 2.4); }');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vF;\nuniform float uK;')
+        .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  gl_FragColor = vec4(diffuse*(0.35 + 1.8*vF), (0.05 + 0.95*vF)*uK);');
+    };
+    return m;
+  }
+  const auras = new Map(); let auraN = 0;
+  function aura(H, col, want, xray = false) {
+    if (!H || !H.root) return;
+    let A = auras.get(H);
+    if (!A) {
+      const mat = auraMat(col), shells = [];
+      H.root.traverse(o => { if (!o.isSkinnedMesh || o.userData.aura) return; const s = new THREE.SkinnedMesh(o.geometry, mat); s.userData.aura = true; s.bind(o.skeleton, o.bindMatrix); s.position.copy(o.position); s.quaternion.copy(o.quaternion); s.scale.copy(o.scale); s.frustumCulled = false; s.renderOrder = 20; s.castShadow = false; s.receiveShadow = false; shells.push([o.parent, s]); });
+      for (const [par, s] of shells) par.add(s);
+      A = { mat, shells, k: 0 }; auras.set(H, A);
+    }
+    A.want = want; A.seen = auraN; A.mat.color.set(col); A.mat.depthTest = !xray;
+  }
+  function auraTick(dt) {
+    for (const [H, A] of auras) {
+      if (A.seen !== auraN) A.want = 0;
+      A.k += (A.want - A.k)*Math.min(1, dt*2.2);
+      A.mat.userData.uK.value = A.k;
+      if (A.want === 0 && A.k < 0.01) { for (const [par, s] of A.shells) par.remove(s); A.mat.dispose(); auras.delete(H); }
+    }
+    auraN++;
+  }
+  const bodyOf = (p) => p && p.body && p.body.H;
+
   // ---------------------------------------------------------------- Vetal
   let dz = null, leaving = false, justIn = false, target = null, calm = 0, drag = null, dazeT = 0, link = null, host = null, home = null, strain = 0, held = 0, wasV = false, heat0 = 0, hp0 = 100, punches = 0;
-  const RANGE = 30;
+  const RANGE = 45;
+  let coolT = 0, hops = 0;
   const candidates = () => ppl() ? ppl().list.filter(p => !p.hidden && !p.corpse && !(p.fallen > 0) && !p.pax && !p._vetalBody && p.look) : [];
-  function aimed() {
-    if (!P().onFoot) return null;
-    const F = R(), th = yaw();
-    let best = null, bs = 1e9;
-    for (const p of candidates()) {
-      const dx = p.x - F.x, dz = p.z - F.z, d = Math.hypot(dx, dz); if (d > RANGE || d < 0.4) continue;
-      const a = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - th), Math.cos(Math.atan2(dz, dx) - th)));
-      if (a > (d < 3 ? 0.7 : d < 12 ? 0.3 : 0.2)) continue;                // close you can be rough about it; far you have to mean it
-      const sc = a*6 + d*0.3; if (sc < bs) { bs = sc; best = p; }
+  const cp = new THREE.Vector3(), cf = new THREE.Vector3(), tv = new THREE.Vector3();
+  const aimed = () => aimAt(candidates(), RANGE);
+  function aimAt(list, range) {
+    const cam = G.camera; if (!P().onFoot || !cam) return null;
+    cam.getWorldPosition(cp); cam.getWorldDirection(cf);
+    const F = R(); let best = null, bs = 1e9;
+    for (const p of list) {
+      const d = Math.hypot(p.x - F.x, p.z - F.z); if (d > range || d < 0.4) continue;
+      const y = G.W?.surf ? G.W.surf.height(p.x, p.z) : 0;
+      // the middle of the screen on them: the camera's line passes through their body (chest, head to hips)
+      tv.set(p.x, y + 1.15, p.z).sub(cp); const along = tv.dot(cf); if (along <= 0.5) continue;
+      const off = Math.sqrt(Math.max(0, tv.lengthSq() - along*along));
+      if (off > 0.42) continue;
+      const sc = off + along*0.004; if (sc < bs) { bs = sc; best = p; }
     }
     return best;
   }
   const raw = (look) => Object.getPrototypeOf(P()).setLook.call(P(), look);
   const fromBody = () => home ? Math.hypot(R().x - home.x, R().z - home.z) : 0;
   const costIn = (p) => 0.14*(WILL[persona(p)] || 1)*(1 - 0.4*mastery())*(host ? 0.5 : 1);
-  const timeIn = (p) => 2.0*(WILL[persona(p)] || 1)*(1 - 0.4*mastery())*(host ? 0.5 : 1);
+  const timeIn = (p) => 3.0*(0.75 + 0.25*(WILL[persona(p)] || 1))*(1 - 0.3*mastery())*(host ? 0.8 : 1);
 
   function take(p, instant = false) {
+    humOn(0);
     if (!p) throw new Error('nobody to take');
     const c = S.free ? 0 : costIn(p);
     if (S.bar < c) { toast('Vetal', 'Not enough left in you for that one', 'warn'); return false; }
@@ -156,9 +184,30 @@ export function powers(G) {
     Pl.hp = 100; hp0 = 100; heat0 = G.police?.heat || 0; strain = 0; punches = 0;
     G.hud?.flash?.();
     toast('Vetal', `You are ${host.name || WHO[host.kind] || 'someone else'} now. V to go back`, 'info', 3.5);
-    if (!instant) humOn(0);
+    coolT = 4;
     return true;
   }
+  // the moment of going in: the world goes dark, and either you wake up in them or they throw you off. How likely
+  // that is comes from them and from you: a strong will, a low bar, one hop too many, and less mastery all count
+  // (at full strength, first try, it's very rare: about one in a hundred with an ordinary person)
+  function attempt(q) {
+    const w = WILL[persona(q)] || 1, m = mastery();
+    const pr = S.free ? 0 : Math.min(0.6, 0.009*w*w*(1 + 4*(1 - S.bar))*(1 + 0.9*hops)*(1 - 0.6*m));
+    black = true; veil.style.transition = 'opacity .3s'; veil.style.background = '#000'; veil.style.opacity = '1';
+    humOn(1);
+    setTimeout(() => {
+      try {
+        if (Math.random() < pr && ppl().list.includes(q)) {
+          const who = nameOf(q);
+          ppl().flee?.(q, R().x, R().z, 10); q.angry = 3;
+          if (host) goHome(`${who} threw you out`, true);
+          else { S.bar = Math.max(0, S.bar - costIn(q)*0.5); dazeT = 14; const Pl = P(); Pl.frozen = true; Pl.human?.play?.('knockback', { once: true, fade: 0.12 }); setTimeout(() => { Pl.frozen = false; }, 1800); toast('Vetal', `${who} fought you off`, 'warn', 3); coolT = 10; }
+        } else if (ppl().list.includes(q)) { take(q); hops++; justIn = true; }
+      } catch (e) { console.warn('vetal', e); }
+      finally { humOn(0); black = false; veil.style.transition = 'opacity .6s'; }
+    }, 420);
+  }
+
   // the one you were in comes to, where you left them, with no idea how they got there
   function release(h, x, z) {
     const p = ppl().spawnAt(h.look, x, z, h.persona);
@@ -180,7 +229,7 @@ export function powers(G) {
     if (b) ppl().remove(b);
     raw(home.look);
     Pl.teleportFoot(bx, bz, by, G.traffic);
-    Pl.hp = hp; home = null; strain = 0; humOn(0);
+    Pl.hp = hp; home = null; strain = 0; humOn(0); hops = 0; coolT = 8;
     // you come to on the ground and get up: slowly if they threw you out (and it's two minutes later)
     const H = Pl.human;
     if (hard) {
@@ -220,9 +269,11 @@ export function powers(G) {
     const down = !!G.input?.key('KeyV') && !G.talkUI?.cur && !leaving, rel = !down && wasV;
     wasV = down;
     if (down) held += dt;
-    if (down && !link && held > 0.12) { const p = aimed(); if (p) link = { p, t: 0, need: timeIn(p) }; }
+    if (coolT > 0) coolT -= dt;
+    if (down && !link && held > 0.12 && !justIn && coolT <= 0 && !black) { const p = aimed(); if (p) link = { p, t: 0, need: timeIn(p) }; }
     if (rel) {
       if (justIn) justIn = false;
+      else if (black) { /* going in */ }
       else if (link) { link = null; humOn(0); toast('Vetal', 'Hold V until you\'re in', 'info', 1.6); }
       else if (held < 0.35) { if (host) leaveSoft(); else toast('Vetal', 'Look at someone and hold V', 'info', 2); }
       held = 0;
@@ -230,14 +281,16 @@ export function powers(G) {
     target = link ? link.p : aimed();
     if (link) {
       const p = aimed();
-      if (p !== link.p) { link.lost = (link.lost || 0) + dt; if (link.lost > 0.35) { link = null; humOn(0); toast('Vetal', 'The link broke: keep them in your eyes', 'warn', 1.6); } }
+      // look across to someone else and the link moves to them, from nothing again; look at nobody and it breaks
+      if (p && p !== link.p) link = { p, t: 0, need: timeIn(p) };
+      else if (!p) { link.lost = (link.lost || 0) + dt; if (link.lost > 0.35) { link = null; humOn(0); toast('Vetal', 'The link broke: keep them in your eyes', 'warn', 1.6); } }
       else link.lost = 0;
       if (link) {
         link.t += dt;
         // they feel it: they stop and look round
         if (link.t > 0.4 && link.p.mode !== 'watch' && link.p.mode !== 'fight') ppl().watch(link.p, R().x, R().z, 2);
         humOn(link.t/link.need);
-        if (link.t >= link.need) { const q = link.p; link = null; justIn = true; take(q); }
+        if (link.t >= link.need) { const q = link.p; link = null; attempt(q); }
       }
     }
     if (host) {
@@ -266,69 +319,44 @@ export function powers(G) {
     }
   }
 
-  // ---------------------------------------------------------------- Brahmarakshas
-  let cardT = 0, readP = null, readT = 0;
+  // ---------------------------------------------------------------- Brahmarakshas (B, on foot): the one you look at
+  let readP = null, readT = 0;
   function read(p) {
-    if (!p) { toast('Brahmarakshas', 'Face someone to read them', 'info', 2); return false; }
+    if (!p) { toast('Brahmarakshas', 'Look at someone, then B', 'info', 2); return false; }
     if (!use('brahma')) { toast('Brahmarakshas', 'Spent for today. Back tomorrow', 'warn', 2.5); return false; }
     const k = persona(p), mem = ppl().mem?.get(p.id) || {}, rep = ppl().rep?.at?.(p.x, p.z) || { good: 0, bad: 0 };
     const mood = p.mode === 'fight' ? 'ready to fight' : p.angry > 0 ? 'angry' : p.grudge > 0 ? 'holding a grudge' : p.mode === 'flee' ? 'frightened' : p.fallen > 0 ? 'hurt' : 'calm';
-    const you = mem.hit ? 'You hit them. They haven\'t forgotten' : mem.shoved ? 'You shoved them. Still sore about it' : mem.saw ? 'They saw what you did. Wary of you' : rep.bad > 2 ? 'They\'ve heard about you round here, and not good things' : rep.good > 2 ? 'They\'ve heard good things about you' : 'They don\'t know you';
-    const sec = SECRET[k] || SECRET.kaka, s = sec[Math.abs(p.id || 0) % sec.length];
-    card.innerHTML = `<h4>${nameOf(p)}</h4><p>${WHO[k] || k}, ${DOING[p.mode] || 'about'}${p.anim ? ` (${p.anim.replace(/_/g, ' ')})` : ''}</p><p>Mood: <em>${mood}</em></p><p>${you}</p><p>Keeps to themselves: <em>${s}</em></p>${p.cash !== undefined ? `<p>Carrying ₹${Math.round(p.cash)}</p>` : ''}<p style="opacity:.55;font-size:11px">${left('brahma')} left today</p>`;
-    card.classList.add('on'); cardT = 7; readP = p; readT = 2;
+    const you = mem.hit ? 'You hit them, and they haven\'t forgotten' : mem.shoved ? 'You shoved them; still sore about it' : mem.saw ? 'They saw what you did and are wary of you' : rep.bad > 2 ? 'They\'ve heard about you round here, and not good things' : rep.good > 2 ? 'They\'ve heard good things about you' : 'They don\'t know you';
+    const sec = SECRET[k] || SECRET.kaka, sc = sec[Math.abs(p.id || 0) % sec.length];
+    readP = p; readT = 7;
+    toast(nameOf(p), `${WHO[k] || k}, ${DOING[p.mode] || 'about'}. ${mood[0].toUpperCase() + mood.slice(1)}. ${you}. Keeps to themselves: ${sc}.${p.cash !== undefined ? ` Carrying ₹${Math.round(p.cash)}.` : ''}`, 'info', 7);
     return true;
   }
-  const faced = () => { const F = R(), th = yaw(); let best = null, bs = 1e9; for (const p of (ppl()?.list || [])) { if (p.hidden || p._vetalBody) continue; const dx = p.x - F.x, dz = p.z - F.z, d = Math.hypot(dx, dz); if (d > 9) continue; const a = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - th), Math.cos(Math.atan2(dz, dx) - th))); if (a > 0.6) continue; const sc = a*4 + d*0.3; if (sc < bs) { bs = sc; best = p; } } return best; };
+  const readable = () => aimAt((ppl()?.list || []).filter(p => !p.hidden && !p._vetalBody && p.look), 14);
 
-  // ---------------------------------------------------------------- Munja
+  // ---------------------------------------------------------------- Munja (N, on foot): everyone near, through walls
   let senseT = 0;
-  const v3 = new THREE.Vector3();
-  function senseOn(t = SENSE) { if (!use('munja')) { toast('Munja', 'Spent for today. Back tomorrow', 'warn', 2.5); return false; } senseT = t; toast('Munja', 'Everyone near you, through the walls', 'info', 2); return true; }
+  function senseOn(t = SENSE) { if (!use('munja')) { toast('Munja', 'Spent for today. Back tomorrow', 'warn', 2.5); return false; } senseT = t; toast('Munja', `Everyone within ${SENSE_R} m, through the walls: red to fight, amber wary, green kind, blue police`, 'info', 3); return true; }
   const intent = (p) => {
     const m = ppl().mem?.get(p.id) || {};
     if (p.cop || p.police) return '#4aa3ff';
     if (p.mode === 'fight' || p.angry > 0 || p.grudge > 0 || (m.hit && /dada|bhaiya|tai/.test(p.persona || ''))) return '#ff4d4d';
     if (p.mode === 'flee' || m.saw || m.hit || m.shoved) return '#ffb020';
     if (p.act && p.act.clip === 'wave') return '#3ddc84';
-    return '#f3ead8';
+    return '#e9e2d0';
   };
-  function drawSense(dt) {
-    const c = sense, W = innerWidth, H = innerHeight;
-    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
-    const g = c.getContext('2d'), cam = G.camera; g.clearRect(0, 0, W, H);
-    if (!cam) return;
-    const pulse = 0.75 + 0.25*Math.sin(performance.now()/140);
-    // who Vetal is on: purple, brighter as the link builds; who Brahmarakshas just read: amber
-    const ring = (p, col, k, lw) => {
-      const y = (G.W?.surf ? G.W.surf.height(p.x, p.z) : 0);
-      v3.set(p.x, y + 0.95, p.z).project(cam); if (v3.z > 1 || v3.z < -1) return;
-      const d = Math.hypot(p.x - R().x, p.z - R().z), sx = (v3.x + 1)/2*W, sy = (1 - v3.y)/2*H, h = H*0.9/Math.max(1.5, d);
-      g.globalAlpha = k; g.strokeStyle = col; g.lineWidth = lw; g.shadowColor = col; g.shadowBlur = 18;
-      g.beginPath(); g.ellipse(sx, sy, h*0.24 + 3, h*0.55 + 4, 0, 0, Math.PI*2); g.stroke();
-      g.globalAlpha = k*0.18; g.fillStyle = col; g.fill(); g.shadowBlur = 0; g.globalAlpha = 1;
-    };
-    if (target && G.state === 'play' && !(host && !link && target === null)) ring(target, '#b26bff', link ? 0.5 + 0.5*Math.min(1, link.t/link.need)*pulse : 0.35, link ? 3 : 1.5);
-    if (readP && readT > 0) { readT -= dt; ring(readP, '#ffb020', Math.min(1, readT), 2.5); }
-    if (drag) ring(drag.p, '#f3ead8', 0.25, 1);
-    if (senseT <= 0) return;
-    senseT -= dt;
-    const fade = Math.min(1, senseT/1.2, (SENSE - senseT + 0.3)/0.5);
-    const F = R(), surf = G.W?.surf;
-    const one = (x, z, col, r) => {
-      const d = Math.hypot(x - F.x, z - F.z); if (d > SENSE_R) return;
-      const y = surf ? surf.height(x, z) : 0;
-      v3.set(x, y + 1.0, z).project(cam); if (v3.z > 1 || v3.z < -1) return;
-      const sx = (v3.x + 1)/2*W, sy = (1 - v3.y)/2*H, k = Math.max(0.35, 1 - d/SENSE_R);
-      g.globalAlpha = fade*k; g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 2;
-      const h = 70*r/Math.max(2, d)*6;
-      g.beginPath(); g.ellipse(sx, sy, h*0.18 + 2, h*0.5 + 4, 0, 0, Math.PI*2); g.stroke();
-      g.globalAlpha = fade*k*0.25; g.fill();
-    };
-    for (const p of ppl().list) if (!p.hidden && !p._vetalBody) one(p.x, p.z, p.corpse ? '#777' : intent(p), 1);
-    for (const a of ppl().animals || []) one(a.x, a.z, '#9aa0a6', 0.6);
-    if (home && home.body) one(home.body.x, home.body.z, '#c79bff', 1.2);   // and your own body, wherever you left it
-    g.globalAlpha = 1;
+  // the auras this frame: Vetal's on whoever you're going into (only while you hold V), Brahmarakshas' on whoever you
+  // read, Munja's on everyone near (through walls), and your own body while you're out of it
+  function auraFrame(dt) {
+    if (link && G.state === 'play') aura(bodyOf(link.p), '#b26bff', 0.25 + 0.85*Math.min(1, link.t/link.need));
+    if (readP && readT > 0) { readT -= dt; aura(bodyOf(readP), '#ffb020', Math.min(0.8, readT*0.4)); }
+    if (senseT > 0) {
+      senseT -= dt;
+      const F = R(), k = Math.min(1, senseT/1.2, (SENSE - senseT + 0.2)/0.8);
+      let n = 0;
+      for (const p of ppl().list) { if (p.hidden || n > 40 || Math.hypot(p.x - F.x, p.z - F.z) > SENSE_R) continue; const H = bodyOf(p); if (!H) continue; aura(H, p._vetalBody ? '#c79bff' : p.corpse ? '#777777' : intent(p), 0.9*k, true); n++; }
+    }
+    auraTick(dt);
   }
 
   // ---------------------------------------------------------------- dragging someone who's down (your own body too)
@@ -373,15 +401,14 @@ export function powers(G) {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
     if (G.state === 'play' && !G.talkUI?.cur && !typing) {
       vetal(el);
-      if (took('KeyO')) read(faced());
-      if (took('Period')) senseOn();
+      if (P().onFoot && took('KeyB')) read(readable());
+      if (P().onFoot && took('KeyN')) senseOn();
       dragStep(el);
       if (dz && !dizzyPose(P().human, dz, el, P().foot.yaw)) dz = null;
     } else { wasV = false; held = 0; target = null; if (link) { link = null; humOn(0); } }
     // a heavy head after you were thrown out: blurred, slow, clearing over the next minute
     if (dazeT > 0) { dazeT -= el; P().limpT = Math.max(P().limpT || 0, 0.3); const cv = G.renderer?.domElement; if (cv) cv.style.filter = dazeT > 0 ? `blur(${Math.min(3, dazeT/12).toFixed(2)}px) saturate(${(1 - Math.min(0.4, dazeT/100)).toFixed(2)})` : ''; }
-    if (cardT > 0 && (cardT -= el) <= 0) card.classList.remove('on');
-    drawSense(el);
+    auraFrame(el);
     draw();
     return r;
   };
