@@ -123,9 +123,11 @@ export function hostBody(G) {
   function draw(dt) {
     if (!rings || (rt -= dt) > 0) return; rt = 0.25;
     const on = !!real, s = G.life?.s || {};
+    // their mood only in someone else; how much has been drunk for anyone, you too, whenever there's any in you
     for (const [k, v] of [['md', s.mood ?? 0.6], ['dk', Math.min(1, s.drunk || 0)]]) {
-      const R = rings[k]; if (R.sp.hidden === on) R.sp.hidden = !on;
-      if (on) { const o = (R.C*(1 - clamp01(v))).toFixed(1); if (R.fg._o !== o) { R.fg._o = o; R.fg.setAttribute('stroke-dashoffset', o); } }
+      const R = rings[k], show = on || (k === 'dk' && v > 0.02); if (R.sp.hidden === show) R.sp.hidden = !show;
+      if (k === 'dk') { const t = on ? 'How much they\'ve had to drink' : 'How much you\'ve had to drink'; if (R.sp.title !== t) R.sp.title = t; }
+      if (show) { const o = (R.C*(1 - clamp01(v))).toFixed(1); if (R.fg._o !== o) { R.fg._o = o; R.fg.setAttribute('stroke-dashoffset', o); } }
     }
     if (rings.md.sp.classList.contains('low') !== (on && (s.mood ?? 1) < 0.2)) rings.md.sp.classList.toggle('low');
   }
