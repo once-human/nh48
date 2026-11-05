@@ -25,10 +25,24 @@ function step(S, speed, dt) {
 // the other foot on its peg.
 const _h = [new THREE.Vector3(), new THREE.Vector3()], _hq = [new THREE.Quaternion(), new THREE.Quaternion()];
 const _rf = new THREE.Vector3(), _rq = new THREE.Quaternion(), _ax = new THREE.Vector3();
-function plant(H, w, gx, gy, gz, fx, fz, pose = true) {
-  const fb = bone(H, 'foot_l'), rb = bone(H, 'foot_r'); if (!fb || !rb || w <= 0.001) return;
-  // (a frame the clip hasn't posed: the bones still hold last frame's pose, made for the body slid over)
-  if (!pose) { H.holder.position.x += fz*0.055*w; H.holder.position.z -= fx*0.055*w; H.holder.position.y -= 0.03*w; return; }
+// The clip doesn't set every one of these bones every frame: whatever was put on them last frame is undone first, or
+// it would build on itself (the leg lifted a little more each frame till it stuck out sideways, the foot spun)
+const MINE = ['thigh_l', 'calf_l', 'foot_l', 'thigh_r', 'calf_r', 'foot_r', 'upperarm_l', 'lowerarm_l', 'hand_l', 'upperarm_r', 'lowerarm_r', 'hand_r'];
+function undo(H) {
+  for (const n of MINE) {
+    const b = bone(H, n); if (!b) continue;
+    const u = b.userData;
+    if (u.fdSet && b.quaternion.equals(u.fdSet)) b.quaternion.copy(u.fdBase);
+    (u.fdBase || (u.fdBase = new THREE.Quaternion())).copy(b.quaternion);
+  }
+}
+function mark(H) {
+  for (const n of MINE) { const b = bone(H, n); if (b) (b.userData.fdSet || (b.userData.fdSet = new THREE.Quaternion())).copy(b.quaternion); }
+}
+function plant(H, w, gx, gy, gz, fx, fz) {
+  const fb = bone(H, 'foot_l'), rb = bone(H, 'foot_r'); if (!fb || !rb) return;
+  undo(H);
+  if (w <= 0.001) return;
   const hs = [bone(H, 'hand_l'), bone(H, 'hand_r')];
   H.root.updateMatrixWorld(true);
   fb.getWorldPosition(_f); fb.getWorldQuaternion(_q);
@@ -56,6 +70,7 @@ function plant(H, w, gx, gy, gz, fx, fz, pose = true) {
   fb.updateMatrixWorld(true); fb.parent.getWorldQuaternion(_pq).invert();
   fb.quaternion.premultiply(_q.setFromAxisAngle(_ax.set(-fz, 0, fx).applyQuaternion(_pq), -0.5*w));
   H.root.updateMatrixWorld(true);
+  mark(H);
 }
 
 // you: on the player's machine, from the seat placeRider has already put you on
@@ -74,7 +89,7 @@ Pilot.prototype.placeRider = function () {
     v.tilt.updateMatrixWorld(true);
   }
   pr.call(this);
-  if (!(w > 0.001) || !this.human || this.riderShown !== v) return;
+  if (!f || !this.human || this.riderShown !== v) return;
   const fx = Math.cos(v.th), fz = Math.sin(v.th), ax = f.hip[0] + 0.14;
   _t.set(v.x + fx*ax + fz*OUT, 0, v.z + fz*ax - fx*OUT);
   const FL = this.W.fly, gy = v.deck >= 0 && FL ? FL.heightOn(v.deck, _t.x, _t.z) : this.W.surf.height(_t.x, _t.z);
@@ -89,12 +104,10 @@ Crowd.prototype.drive = function (s, dt, cx, cz) {
   const p = s.p, o = p && p.rideOf, H = s.H;
   if (!o || p.seatIdx !== 0 || p.sideSaddle || /^auto|^cycle/.test(o.type) || o.fallen > 0 || !H) return;
   const S = p._fd || (p._fd = { k: 0, want: 0 });
-  const w = step(S, Math.abs(o.v || 0), dt);
-  // the legs and arms only on a frame the clip has just posed (the lift would pile up on last frame's foot otherwise)
-  if (w <= 0.001 || Math.abs(p.x - cx) + Math.abs(p.z - cz) > 40) return;
-  const posed = H.mixer.time !== S.mt; S.mt = H.mixer.time;
+  // (far off, only last frame's pose undone)
+  const w = Math.abs(p.x - cx) + Math.abs(p.z - cz) > 40 ? (S.k = 0) : step(S, Math.abs(o.v || 0), dt);
   const yaw = o.ryaw ?? o.yaw ?? Math.atan2(o.hz, o.hx), fx = Math.cos(yaw), fz = Math.sin(yaw);
   const ax = (SEAT_X[/^bike/.test(o.type) ? 'bike' : 'scooter'] ?? 0) + 0.12, ox = o.rx ?? o.x, oz = o.rz ?? o.z;
   // (right of the way it faces is (-fz, fx): the left foot goes the other way)
-  plant(H, w, ox + fx*ax + fz*OUT, o.y || 0, oz + fz*ax - fx*OUT, fx, fz, posed);
+  plant(H, w, ox + fx*ax + fz*OUT, o.y || 0, oz + fz*ax - fx*OUT, fx, fz);
 };
