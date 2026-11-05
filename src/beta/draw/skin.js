@@ -279,10 +279,11 @@ export class Skin {
     m.castShadow = true; m.customDepthMaterial = this.rigidShadow || (this.rigidShadow = new THREE.RawShaderMaterial({ vertexShader: SHADOW_RIGID, fragmentShader: SHADOW_FS, glslVersion: THREE.GLSL3, side: THREE.DoubleSide, colorWrite: false }));
     this.rigid.set(geo.uuid, m); return m;
   }
-  // what a body is made of: the game's meshes go on a layer no camera looks at
+  // what a body is made of: the game's meshes go on a layer no camera looks at (not a power's glow on them: that's
+  // drawn as it is, game/aura.js; this rescan every 45 frames used to hide it half a second after it came on)
   scan(H) {
     H._sk = []; H._rg = [];
-    H.holder.traverse((o) => { if (o.isSkinnedMesh) { o.layers.set(5); H._sk.push(o); } else if (o.isMesh) { o.layers.set(5); if (o.geometry.attributes.normal) H._rg.push(o); } });
+    H.holder.traverse((o) => { if (o.userData.aura) return; if (o.isSkinnedMesh) { o.layers.set(5); H._sk.push(o); } else if (o.isMesh) { o.layers.set(5); if (o.geometry.attributes.normal) H._rg.push(o); } });
   }
   update(camera, playerH) {
     const K = this.kit, cx = camera.position.x, cz = camera.position.z, near = [];

@@ -216,19 +216,34 @@ export function powers(G) {
       const d = Math.hypot(p.x - F.x, p.z - F.z); if (d > range || d < 0.4) continue;
       const y = G.W?.surf ? G.W.surf.height(p.x, p.z) : 0;
       // the camera's line passes through their body (chest; more give the further off they are)
+      // snaps to whoever's nearest the middle of the screen within ~8 degrees of it (a metre's give close up), and
+      // stays on the one it's on unless someone else is clearly more in the middle
       tv.set(p.x, y + 1.15, p.z).sub(cp); const along = tv.dot(cf); if (along <= 0.5) continue;
       const off = Math.sqrt(Math.max(0, tv.lengthSq() - along*along));
-      if (off > 0.42 + along*0.006) continue;
-      const sc = off/along + along*0.0004; if (sc < bs) { bs = sc; best = p; }
+      if (off > Math.max(1.0, along*0.14)) continue;
+      let sc = Math.atan2(Math.max(0, off - 0.3), along) + along*0.0004;
+      if (p === stick) sc *= 0.7;
+      if (sc < bs) { bs = sc; best = p; }
     }
     return best;
   }
+  // a dot in the middle of the screen while you're aiming V or B (there's no crosshair on foot otherwise): pale while
+  // it's on nobody, the power's colour once it's snapped to someone
+  let dotEl = null;
+  function aimDot(on, onSomeone) {
+    if (!dotEl && on) { dotEl = document.createElement('div'); dotEl.style.cssText = 'position:fixed;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;pointer-events:none;z-index:30;transition:background .12s,box-shadow .12s'; document.body.appendChild(dotEl); }
+    if (!dotEl) return;
+    dotEl.style.display = on ? 'block' : 'none';
+    const c = link ? '#b26bff' : bl ? '#ffb020' : 'rgba(255,255,255,.55)';
+    dotEl.style.background = c; dotEl.style.boxShadow = onSomeone ? `0 0 10px ${c}` : 'none';
+  }
+  let stick = null;                  // who the aim's on (Vetal's link or Brahmarakshas' read)
   const candidates = () => ppl() ? ppl().list.filter(p => !p.hidden && !p.corpse && !(p.fallen > 0) && !p.pax && !p._vetalBody && !p._wake && p.look) : [];
   const bodyOf = (p) => p && p.body && p.body.H;
 
   // ---------------------------------------------------------------- Vetal
   let link = null, host = null, home = null, strain = 0, calm = 0, held = 0, wasV = false, justIn = false, leaving = false;
-  let heat0 = 0, hp0 = 100, punches = 0, coolT = 0, hops = 0, dazeT = 0, hauntT = 0;
+  let heat0 = 0, hp0 = 100, punches = 0, coolT = 0, hops = 0, dazeT = 0, dazeMax = 60, hauntT = 0;
   const raw = (look) => Object.getPrototypeOf(P()).setLook.call(P(), look);
   const fromBody = () => home ? Math.hypot(R().x - home.x, R().z - home.z) : 0;
   const will = (p) => WILL[persona(p)] || 1;
@@ -322,7 +337,9 @@ export function powers(G) {
     Pl.hp = hp; home = null; strain = 0; humOn(0); hops = 0; coolT = 8;
     const hard = how !== 'soft';
     if (how === 'thrown' && !G.live && G.setHour) G.setHour(((G.hour + 2/60) % 24 + 24) % 24);
-    if (hard) dazeT = 45;
+    // a minute of it whichever way you came back (worse thrown out): slow on your feet, the street swimming
+    dazeT = dazeMax = hard ? 60 : 50;
+    Pl.slowMul = () => dazeT > 0 ? 0.42 + 0.58*smooth(1 - dazeT/dazeMax) : 1;
     AC.wakeUp(hard);
     if (why) toast('Vetal', how === 'thrown' ? why + '. You come round two minutes later, head pounding' : why, 'warn', 4);
   }
@@ -342,6 +359,7 @@ export function powers(G) {
   addEventListener('keydown', (e) => { if (host && e.code === 'KeyX' && !e.repeat) punches++; }, true);
   addEventListener('mousedown', (e) => { if (host && e.button === 0 && document.pointerLockElement && !(nk > 0)) punches++; }, true);
 
+  let farSaid = false;
   function vetal(dt) {
     // hold V on someone until you're in them (then let go: you stay); hold it on someone else to hop; a tap goes home
     const down = !!G.input?.key('KeyV') && !leaving && !AC.busy, rel = !down && wasV;
@@ -383,12 +401,16 @@ export function powers(G) {
       if (punches) { strain += punches*(GENTLE.has(host.kind) ? 0.07 : host.kind === 'cop' ? 0.015 : 0.03); punches = 0; calm = 0; }
       const heat = G.police?.heat || 0;
       if (heat > heat0) { strain += (heat - heat0)*(host.kind === 'cop' ? 0.35 : 0.1); heat0 = heat; calm = 0; } else heat0 = heat;
-      if ((Pl.hp ?? 100) < hp0) { strain += (hp0 - Pl.hp)*0.004; calm = 0; } hp0 = Pl.hp ?? 100;
+      if ((Pl.hp ?? 100) < hp0) { strain += (hp0 - Pl.hp)*0.012; calm = 0; } hp0 = Pl.hp ?? 100;     // their pain loosens the hold, fast
+      if (d > 800 && !farSaid) { farSaid = true; toast('Vetal', `${Math.round(d)} m from your body: it pulls. Past a kilometre you're gone`, 'warn', 2.5); } else if (d < 700) farSaid = false;
       calm += dt;
       if (calm > 3) strain = Math.max(0, strain - dt*0.1);
       if (S.free) strain = 0;
       if (!leaving && !AC.busy) {
         if (strain >= 1) throwOut('They threw you out');
+        else if ((Pl.hp ?? 100) < 30) throwOut('Their body is too hurt to hold');
+        // a kilometre from your own body is as far as it reaches: a pull from 800 m, home past 1 km
+        else if (d > 1000) leaveSoft('Too far from your body: pulled home');
         else if (S.vu <= 0) leaveSoft('Vetal ran out: pulled home');
         else if (Pl.ko || (Pl.hp ?? 100) <= 0) { leaving = true; blackout(() => { leaving = false; goHome('Knocked out of them', 'ko'); }); }
       }
@@ -479,8 +501,8 @@ export function powers(G) {
       if (!p) return;
       if (!S.free && left() <= 0) { toast('Brahmarakshas', 'Spent for today. Back tomorrow', 'warn', 2.5); bDone = true; return; }
       bl = { p, t: 0 };
-    } else if (p && p !== bl.p) bl = { p, t: 0 };
-    else if (!p) { bl.lost = (bl.lost || 0) + dt; if (bl.lost > 0.35) { bl = null; return; } } else bl.lost = 0;
+    } else if (p && p !== bl.p) bl = { p, t: 0 };       // the aim's moved to someone else: it goes with it
+    else if (!p) { bl.lost = (bl.lost || 0) + dt; if (bl.lost > 0.25) { bl = null; return; } } else bl.lost = 0;
     bl.t += dt;
     if (bl.t >= B_HOLD) { read(bl.p); bl = null; bDone = true; }
   }
@@ -515,7 +537,7 @@ export function powers(G) {
   }
   const spend2 = (u) => { if (!S.free) S.mu = Math.max(0, S.mu - u); };
   // where each of them is about to walk, lit on the ground ahead of them
-  const TR_N = 28, TR_M = 12;
+  const TR_N = 44, TR_M = 12;
   let trail = null, trT = 0;
   const TMP = [0, 0, 0, 0];
   function trailMesh() {
@@ -540,18 +562,57 @@ export function powers(G) {
     } else if (p.mode === 'flee' && p.goal == null && p.fleeTo) push(p.fleeTo.x, p.fleeTo.z);
     return pts;
   }
+  // the traffic too: everyone on a two-wheeler, in an auto, a car, a bus near you, and where they're headed down the road
+  const vehNear = () => { const F = R(), T = G.traffic, out = []; if (!T) return out; for (const v of T.list) { if (!v.alive || v.wreck) continue; const d = Math.hypot(v.x - F.x, v.z - F.z); if (d <= N_R) out.push([v, d]); } return out.sort((a, b) => a[1] - b[1]); };
+  const vIntent = (v) => v.angry > 0 ? '#ff4d4d' : v.fallen > 0 ? '#ffb020' : '#e9e2d0';
+  function pathOfVeh(v) {
+    const pts = [v.x, v.z], gr = ppl().g;
+    if (!gr?.at || !v.l || v.jc) return pts;
+    // along its lane the way it's going (s counts that way), on into the road it turns onto next
+    for (let i = 1; i < TR_M; i++) {
+      let L = v.l, s = v.s + i*3.5;
+      if (s > L.e.len) { if (!v.next || !v.next.l) break; s -= L.e.len; L = v.next.l; if (s > L.e.len) break; }
+      gr.at(L.e, L.dir > 0 ? s : L.e.len - s, TMP);
+      const sg = L.dir > 0 ? 1 : -1, tx = TMP[2]*sg, tz = TMP[3]*sg;
+      pts.push(TMP[0] + tz*v.lat, TMP[1] - tx*v.lat);
+    }
+    return pts;
+  }
+  // a glow round the vehicles whose riders aren't real people up close (cars, the far two-wheelers): an ellipsoid of
+  // light their size, through walls like the rest
+  let vg = null;
+  function vGlow(k) {
+    if (!vg) {
+      const g = new THREE.SphereGeometry(0.5, 18, 12), m = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, opacity: 0 });
+      vg = new THREE.InstancedMesh(g, m, 24); vg.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(72), 3); vg.frustumCulled = false; vg.renderOrder = 19; G.scene.add(vg);
+    }
+    vg.material.opacity = 0.22*k;
+    let n = 0;
+    if (k > 0.01) for (const [v] of vehNear()) {
+      if (n >= 24) break;
+      if (v.rich && v._riders && v._riders.every(r => r.body)) { for (const r of v._riders) AU.light(r, vIntent(v), 0.9*k, true); continue; }
+      const T = v.T || {}, L = T.L || 2, W = T.W || 1, H = T.two ? 1.6 : T.L > 6 ? 3.2 : 1.6;
+      vm.compose(vp.set(v.rx ?? v.x, (v.y || 0) + H*0.5, v.rz ?? v.z), vq.setFromAxisAngle(vy, -(v.ryaw ?? v.yaw ?? 0)), vs.set(L*1.15, H*1.15, W*1.3));
+      vg.setMatrixAt(n, vm); col.set(vIntent(v)); vg.instanceColor.setXYZ(n, col.r, col.g, col.b); n++;
+    }
+    vg.count = n; vg.instanceMatrix.needsUpdate = true; vg.instanceColor.needsUpdate = true;
+  }
+  const vm = new THREE.Matrix4(), vp = new THREE.Vector3(), vq = new THREE.Quaternion(), vs = new THREE.Vector3(), vy = new THREE.Vector3(0, 1, 0);
   const col = new THREE.Color();
   function trails(dt) {
+    vGlow(smooth(nk));
     if (nk <= 0.01) { if (trail) trail.material.opacity = 0; return; }
     if (!trail) trail = trailMesh();
     trail.material.opacity = 0.75*smooth(nk);
     if ((trT -= dt) > 0) return; trT = 0.12;
     const pos = trail.geometry.attributes.position.array, cl = trail.geometry.attributes.color.array, surf = G.W?.surf;
     let q = 0;
-    for (const [p] of near().slice(0, TR_N)) {
-      if (p.fallen > 0 || p._vetalBody || p.corpse) continue;
-      const pts = pathOf(p); if (pts.length < 4) continue;
-      col.set(intent(p));
+    const list = [];
+    for (const [p] of near().slice(0, 28)) { if (!(p.fallen > 0 || p._vetalBody || p.corpse)) list.push([pathOf(p), intent(p)]); }
+    for (const [v] of vehNear().slice(0, 16)) list.push([pathOfVeh(v), vIntent(v)]);
+    for (const [pts, c] of list) {
+      if (pts.length < 4) continue;
+      col.set(c);
       const nseg = pts.length/2 - 1;
       for (let i = 0; i < nseg && q < TR_N*TR_M; i++, q++) {
         const ax = pts[i*2], az = pts[i*2 + 1], bx = pts[i*2 + 2], bz = pts[i*2 + 3], dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz) || 1, nx = -dz/l*0.08, nz = dx/l*0.08;
@@ -603,6 +664,7 @@ export function powers(G) {
   // the lights on people this frame: Vetal's on whoever you're going into (only while you hold V), Brahmarakshas' on
   // whoever you're reading and have read, Munja's on everyone near (through walls); all building over the whole hold
   function lights(dt) {
+    stick = link ? link.p : bl ? bl.p : null;
     if (link && G.state === 'play') AU.light(link.p, '#b26bff', 0.12 + 0.88*clamp01(link.t/link.need));
     if (bl) AU.light(bl.p, '#ffb020', 0.12 + 0.88*clamp01(bl.t/B_HOLD));
     if (readP && readT > 0) { readT -= dt; AU.light(readP, '#ffb020', Math.min(0.9, readT*0.35)); }
@@ -634,10 +696,23 @@ export function powers(G) {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
     if (G.state === 'play' && !G.talkUI?.cur && !typing) {
       vetal(el); brahma(el); munja(el); dragKeys();
-    } else { wasV = false; held = 0; if (link) { link = null; humOn(0); } bl = null; nk = Math.max(0, nk - el/0.6); }
+      aimDot(P().onFoot && (!!G.input?.key('KeyV') || !!G.input?.key('KeyB')), link || bl);
+      // say so: someone out cold at your feet can be dragged (and let go of), as the F offers are shown
+      if (P().onFoot && !P().offer && G.hud?.prompt) { if (AC.dragging) G.hud.prompt('Z', 'Let go of them', 0.3); else if (!AC.busy && downed()) G.hud.prompt('Z', 'Drag them', 0.3); }
+    } else { wasV = false; held = 0; if (link) { link = null; humOn(0); } bl = null; nk = Math.max(0, nk - el/0.6); aimDot(false); }
     if (G.state === 'play') { PE.tick(el); AC.dragTick(el); }
     // a heavy head after you were thrown out: blurred, slow, clearing over the next minute
-    if (dazeT > 0) { dazeT -= el; P().limpT = Math.max(P().limpT || 0, 0.3); const cv = G.renderer?.domElement; if (cv) cv.style.filter = dazeT > 0 ? `blur(${Math.min(3, dazeT/12).toFixed(2)}px) saturate(${(1 - Math.min(0.4, dazeT/100)).toFixed(2)})` : ''; }
+    // a heavy head: the picture swims (a slow lean and drift), soft and washed out, clearing over the minute
+    if (dazeT > 0) {
+      dazeT -= el; P().limpT = Math.max(P().limpT || 0, 0.3);
+      const cv = G.renderer?.domElement, k = smooth(Math.max(0, dazeT)/dazeMax), t = now/1000;
+      if (cv) {
+        if (dazeT > 0) {
+          cv.style.filter = `blur(${(0.4 + 2.4*k).toFixed(2)}px) saturate(${(1 - 0.45*k).toFixed(2)}) brightness(${(1 - 0.12*k).toFixed(2)})`;
+          cv.style.transform = `rotate(${(Math.sin(t*0.7)*1.6*k).toFixed(3)}deg) translate(${(Math.sin(t*0.43)*10*k).toFixed(1)}px, ${(Math.sin(t*0.61)*6*k).toFixed(1)}px) scale(${(1 + 0.05*k).toFixed(3)})`;
+        } else { cv.style.filter = ''; cv.style.transform = ''; }
+      }
+    }
     lights(el); trails(el);
     draw(el); HB.draw(el);
     return r;

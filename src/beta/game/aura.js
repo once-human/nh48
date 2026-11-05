@@ -47,6 +47,7 @@ export function auras(G) {
     let A = on.get(p);
     if (!A) { A = { mat: auraMat(col), H: null, shells: [], k: 0 }; on.set(p, A); }
     A.want = k; A.seen = n; A.mat.color.set(col); A.mat.depthTest = !xray;
+    if (!xray) p._lit = performance.now();          // (a close-up glow keeps its body: people/crowd.js, patched)
   }
   function tick(dt) {
     clock += dt;
