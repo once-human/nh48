@@ -81,6 +81,8 @@ const PATCHES = {
     ["if (c === 'KeyT' || c === 'Escape')", "if (c === 'KeyI' || c === 'Escape')"],
     ['this.badge.innerHTML = `<span class="kbd">T</span>', 'this.badge.innerHTML = `<span class="kbd">I</span>'],
   ],
+  // the strip of keys along the bottom: the jhola is Q now (E is vehicles), I the phone
+  [S('ui/hud.js')]: [["this.nerd = el('div', 'h nerd', 'E jhola · J diary · F3 stats');", "this.nerd = el('div', 'h nerd', 'Q jhola · I phone · J diary · F3 stats');"]],
   [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'], ['E', 'Jhola'],", "['F', 'Walk in, counters, pet'], ['E', 'Get in or out of a vehicle'], ['T', 'Talk to someone'], ['Q', 'Jhola'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
   [S('game/pilot.js')]: [
     // a scene that moves you itself (beta/game/acts.js: dragging someone, walking up to them) sets the pace, as a roll does

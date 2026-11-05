@@ -76,3 +76,8 @@
 
 /* the terminal's "hud off": a clean picture */
 body.nh-nohud #ui { display: none !important; }
+
+/* the key strip sits under the minimap, clear of the vitals; on a narrow screen the rings come down a size so they
+   don't run into the vehicle caption */
+.nerd { left: max(22px, env(safe-area-inset-left, 0px)); transform: none; bottom: calc(4px + env(safe-area-inset-bottom, 0px)); white-space: nowrap; }
+@media (max-width: 900px) { .vit > span { width: 34px; height: 34px; } .vit { gap: 4px !important; padding: 5px !important; } }
