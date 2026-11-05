@@ -19,6 +19,10 @@ const CHASSIS = {
   lux: [0.52, 'R', 0.5], jeep: [0.55, 'A', 0.78], sports: [0.39, 'R', 0.45], super: [0.43, 'A', 0.42],
   auto: [0.36, 'R', 0.62], tempo: [0.46, 'R', 0.8], bus: [0.34, 'R', 1.25],
 };
+// how readily the back lets go: [the rear tyres' grip against the front's, how soon they slide and how long they keep
+// sliding]. An ordinary car is set up to push on, not slide (more grip at the back, a handbrake turn that dies out
+// fast); a sports car's back is lighter and its tyres let go progressively, so it drifts and holds one
+const DRIFT = { sports: [0.85, 1.4], super: [0.9, 1.25], lux: [0.97, 1.05] }, ORDINARY = [1.3, 0.7];
 const G = 9.81;
 // rubber: lateral force (share of the most it can give) at slip angle al. Peak near 8 degrees, about 0.8 of it
 // sliding; C lower is a flatter, more forgiving curve past the peak (drift tyres)
@@ -32,8 +36,10 @@ Vehicle.prototype.tyres = function (dt, inp, thr) {
   const Iz = m*(S.L*S.L + S.W*S.W)/12*0.95;
   const W = this.W, wet = (W.wet || 0)*(this.rainTyre ? 0.3 : 1);
   const mu = S.mu/G*(this.gripMul || 1)*(1 - wet*0.28)*(this.onFootpath && !this.offroad ? 0.82 : 1);
-  const ease = (this.driftEase || 1)*(1 + wet*0.5);
-  const Bf = 12, Cf = 1.5, Br = 12/Math.sqrt(ease), Cr = 1.5 - 0.15*Math.min(1, ease - 1);
+  const dr = DRIFT[base] || DRIFT[this.type] || ORDINARY, muR = mu*dr[0];
+  const ease = (this.driftEase || 1)*dr[1]*(1 + wet*0.5);
+  // (a little softer than racing rubber: the grip builds over a few more degrees, so it's easier to feel)
+  const Bf = 10, Cf = 1.5, Br = 10/Math.sqrt(ease), Cr = 1.5 - 0.15*clamp(ease - 1, 0, 1);
   const hb = !!inp.handbrake;
   // ---- steering: the wheel turns at a hand's pace, less lock the faster you go; while the back's out the wheels
   // are helped round toward where the car's going (what your hands do: catch it), more the less you're asking for
@@ -42,7 +48,7 @@ Vehicle.prototype.tyres = function (dt, inp, thr) {
   const beta = Math.abs(u0) > 2 ? Math.atan2(this.vl || 0, Math.abs(u0)) : 0;
   const assist = hb ? 0.3 : 0.7 - 0.3*Math.abs(inp.steer || 0);
   const target = clamp(clamp(inp.steer || 0, -1, 1)*maxSteer + beta*assist*Math.sign(u0 || 1), -S.steerMax, S.steerMax);
-  const rate = Math.abs(beta) > 0.1 ? 6 : Math.abs(target) < Math.abs(this.steer) ? 4.2 : 3.0;      // (quick hands catching a slide)
+  const rate = Math.abs(beta) > 0.1 ? 6 : Math.abs(target) < Math.abs(this.steer) ? 5 : 3.8;        // (quick hands catching a slide)
   this.steer += clamp(target - this.steer, -rate*dt, rate*dt);
   const d = this.steer, cd = Math.cos(d), sd = Math.sin(d);
   // ---- the forces, in small steps (the tyres are stiff)
@@ -66,11 +72,12 @@ Vehicle.prototype.tyres = function (dt, inp, thr) {
     const vry = s - b*w;
     let Fxr = 0, Fyr;
     if (hb && Math.abs(u) > 1.5) {
-      const vr = Math.hypot(u, vry) || 1, k = mu*0.7*Fzr;
+      // (an ordinary car's locked back scrubs off its slide sooner: less of a pirouette)
+      const vr = Math.hypot(u, vry) || 1, k = muR*(dr[0] > 1 ? 0.8 : 0.7)*Fzr;
       Fxr = -k*u/vr; Fyr = -k*vry/vr; slideR = 1;
     } else {
       const alR = Math.atan2(vry, Math.max(0.5, Math.abs(u)));
-      const qR = Math.min(pR, 0.9*mu*Fzr), capR = Math.sqrt(Math.max((0.45*mu*Fzr)**2, (mu*Fzr)**2 - qR*qR));
+      const qR = Math.min(pR, 0.9*muR*Fzr), capR = Math.sqrt(Math.max((0.45*muR*Fzr)**2, (muR*Fzr)**2 - qR*qR));
       Fyr = -capR*MF(alR, Br, Cr);
       slipR = Math.max(slipR, Math.abs(alR));
     }
