@@ -303,7 +303,9 @@ export function powers(G) {
         const L = Pl.look; body = ppl().make(G.W.graph.edges[0], 1, 1, { female: !!L.female, mode: 'fixed', adult: true });
         Object.assign(body, { look: L, female: !!L.female, x: F.x, z: F.z, onRoad: false, fixed: true, interior: !!G.interiors?.inside, shirt: [L.top.r, L.top.g, L.top.b], lower: [L.bottom.r, L.bottom.g, L.bottom.b], skin: [L.skin.r, L.skin.g, L.skin.b] });
       }
-      if (body) { Object.assign(body, { fallen: 1e6, ko: true, unconscious: true, mode: 'stand', wait: 1e9, v: 0, anim: null, yaw: yaw(), _vetalBody: true, persona: null, _downAt: performance.now() }); body.anchor = { x: body.x, z: body.z }; }
+      // (fixed: the street's crowd lets its far people go, 150 m off, and new ones walk in near you. Your body isn't
+      // one of them: it lies where it fell however far you go)
+      if (body) { Object.assign(body, { fallen: 1e6, ko: true, unconscious: true, mode: 'stand', wait: 1e9, v: 0, anim: null, yaw: yaw(), _vetalBody: true, persona: null, fixed: true, _downAt: performance.now() }); body.anchor = { x: body.x, z: body.z }; }
       home = { look: Pl.look, x: F.x, z: F.z, yaw: yaw(), hp: Pl.hp ?? 100, body, t: 0, crowd: false };
     } else if (host) release(host, F.x, F.z, 'soft');
     host = { look: q.look, persona: q.persona, cop: q.cop || q.police, name: q.name, female: !!(q.female || q.look?.female), id: q.id, kind: persona(q), hp0: q.hp0 || 100 };
