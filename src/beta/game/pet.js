@@ -87,7 +87,7 @@ Pilot.prototype.updateFoot = function (dt, ...rest) {
   const ax = Math.cos(a.yaw || 0), az = Math.sin(a.yaw || 0), qx = F.x - a.x, qz = F.z - a.z;
   if (S.side === undefined) S.side = (-az*qx + ax*qz) >= 0 ? 1 : -1;          // which flank you're on
   const sx = -az*S.side, sz = ax*S.side;
-  const stand = _st.set(cow ? _hd.x + ax*0.72 : a.x + ax*0.2 + sx*0.48, 0, cow ? _hd.z + az*0.72 : a.z + az*0.2 + sz*0.48);
+  const stand = _st.set(cow ? _hd.x + ax*0.72 : a.x + ax*0.2 + sx*0.56, 0, cow ? _hd.z + az*0.72 : a.z + az*0.2 + sz*0.56);
   // (behind it when you start: by its flank first, once)
   if (S.round === undefined) S.round = qx*ax + qz*az < (cow ? 0.3 : 0.05) && Math.hypot(qx, qz) < (cow ? 2.6 : 1.3);
   const behind = S.round;

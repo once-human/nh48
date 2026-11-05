@@ -36,6 +36,7 @@ import './world/walkin.js';
 import './world/busy.js';
 import './world/pins.js';
 import './draw/alive.js';
+import './people/bodies.js';        // people, cows and dogs take up room: round each other, vehicles, poles, you
 import './draw/falls.js';
 import './draw/fauna.js';
 import './vehicles/mount.js';
