@@ -48,7 +48,7 @@ export function registry(C) {
     v('world.weather', 'the sky', () => G.weather?.kind, (k) => G.weather.set(k), { kind: 'str', opts: () => Object.keys(C.WEATHERS || {}) });
     v('traffic.density', 'vehicles at once', () => T().max, (n) => { if (!St.baseMax) St.baseMax = T().max; T().max = Math.round(n); }, { min: 0, max: 400 });
     v('traffic.stop', 'everyone stands', () => !!St.trafficStop, (x) => { St.trafficStop = x; }, { kind: 'bool' });
-    v('people.count', 'people out now (read only)', () => ppl().list.length, () => { throw new Error('read only: npc spawn / npc remove'); });
+    v('people.count', 'people out now (read only)', () => ppl().list.length, () => { throw new Error('read only: spawn npc / remove'); });
     v('police.heat', 'wanted level 0 to 5', () => G.police?.heat || 0, (x) => sh.exec(`player wanted ${Math.round(x)}`, true), { min: 0, max: 5 });
     v('police.pts', 'heat points', () => G.police?.pts || 0, (x) => { G.police.pts = x; });
     v('cam.fov', 'field of view °, 0 = the camera\'s own', () => St.fov, (x) => { St.fov = x; }, { min: 0, max: 140 });
@@ -57,6 +57,7 @@ export function registry(C) {
     const cur = !P().onFoot && P().cur;
     if (cur && cur.spec) for (const k of Object.keys(cur.spec)) if (typeof cur.spec[k] === 'number') v('vehicle.' + k, 'this vehicle', () => P().cur.spec[k], (x) => { P().cur.spec = { ...P().cur.spec, [k]: x }; });
     if (cur) { v('vehicle.fuel', 'tank 0 to 1', () => P().cur.fuel, (x) => { P().cur.fuel = x; }, { min: 0, max: 1 }); v('vehicle.damage', 'damage 0 to 1', () => P().cur.dmg || 0, (x) => { P().cur.dmg = x; }, { min: 0, max: 1 }); }
+    for (const f of G.varHooks || []) { try { f(v); } catch (err) { /* that system isn't up yet */ } }
     for (const e of V.values()) if (e.def === undefined) { try { e.def = e.get(); } catch (err) { /* not there yet */ } }
   }
   const DEF = new Map();          // what each was when free roam began, for reset
@@ -72,11 +73,11 @@ export function registry(C) {
   const ext = (name) => varOf(name);
   // get / set first try a variable, and fall back to a raw path into the code (G.player.foot.x)
   const raw = { get: sh.cmds.get('get'), set: sh.cmds.get('set') };
-  sh.reg('vars [prefix:var]', 'every variable and its value. vars player · vars gfx', ([pre = '']) => {
+  sh.reg('list vars [prefix:var]', 'every variable and its value. list vars player · list vars gfx', ([pre = '']) => {
     build();
     const rows = [...V.values()].filter(e => e.name.startsWith(pre)).map(e => [e.name, show(e), e.about]);
     if (!rows.length) throw new Error('nothing starts with that'); sh.table(rows, ['variable', 'now', 'what']);
-  }, { group: 'variables' });
+  }, { group: 'variables', also: ['vars'] });
   sh.reg('get <name:var|path>', 'a variable (player.karma) or anything in the code (P.foot.x)', (a, f, line) => {
     const e = ext(a[0]); if (!e) return raw.get.run(a, f, line);
     say(`${e.name} = ${show(e)}`);
@@ -153,15 +154,15 @@ export function registry(C) {
     p.mode = 'stand'; p.anchor = { x: p.x, z: p.z }; p.wait = 1e9; p.anim = null; p._spawned = true;
     return p;
   }
-  sh.reg('npc spawn [persona:persona] [count:int] [--female] [--male]', 'people in front of you, facing you: kaka, aaji, collegegirl, dada, cop…', ([per, n], f) => {
+  sh.reg('spawn npc [persona:persona] [count:int] [--female] [--male]', 'people in front of you, facing you: kaka, aaji, collegegirl, dada, cop…', ([per, n], f) => {
     const out = []; for (let i = 0; i < Math.min(30, Math.max(1, +n || 1)); i++) out.push(spawnPerson(per, i, f));
     last = out.map(o => ({ k: 'person', o })); say(`${out.length} × ${per || 'anyone'}: ${out.map(p => '#' + p.id).join(' ')}`, 'ok');
-  }, { group: 'people', also: ['summon'], more: ['npc spawn aaji', 'npc spawn dada 5', 'npc spawn cop 2', 'then: npc do @last dance'] });
-  sh.reg('npc list [radius:num]', 'who is around: id, who, what they are doing', ([rad]) => {
+  }, { group: 'people', also: ['summon'], more: ['spawn npc aaji', 'spawn npc dada 5', 'spawn npc cop 2', 'then: make @last dance'] });
+  sh.reg('list npc [radius:num]', 'who is around: id, who, what they are doing', ([rad]) => {
     const a = byDist(people().filter(p => dist(p) <= (+rad || 30))).slice(0, 40);
     sh.table(a.map(p => ['#' + p.id, nameOf(p), p.persona || '', p.mode, p.anim || p.idle || '', Math.round(dist(p)) + ' m', p.hp !== undefined ? Math.round(p.hp) : '']), ['id', 'who', 'persona', 'mode', 'anim', 'away', 'hp']);
   }, { group: 'people' });
-  sh.reg('npc info <who:sel>', 'everything about someone', ([s]) => {
+  sh.reg('info <who:sel>', 'everything about someone', ([s]) => {
     for (const p of persons(s)) { say(`#${p.id} ${nameOf(p)}`, 'head'); sh.table(Object.keys(p).filter(k => { const q = p[k]; return q !== null && (typeof q !== 'object' || Array.isArray(q) && q.length < 4) && typeof q !== 'function'; }).slice(0, 60).map(k => [k, fmt(p[k])])); }
   }, { group: 'people' });
   // what someone can be made to do. Each one is a body doing a thing, the way the game has them do it
@@ -172,7 +173,7 @@ export function registry(C) {
   };
   sh.type('action', () => Object.keys(DO).map(v => ({ v, note: DO[v] })));
   const hold = (p, anim) => { p.mode = 'stand'; p.anchor = { x: p.x, z: p.z }; p.wait = 1e9; p.anim = anim; p.v = 0; p.foe = null; p.goal = null; };
-  sh.reg('npc do <who:sel> <action:action>', 'make them do it: sit dance wave phone follow flee fight freeze…', ([s, a]) => {
+  sh.reg('make <who:sel> <action:action>', 'make them do it: sit dance wave phone follow flee fight freeze…', ([s, a]) => {
     if (!DO[a]) throw new Error(Object.keys(DO).join(' '));
     const ps = persons(s);
     for (const p of ps) {
@@ -187,20 +188,20 @@ export function registry(C) {
       if (a !== 'follow') p._follow = false;
     }
     say(`${ps.length} → ${a}`, 'ok');
-  }, { group: 'people', more: ['npc do @look sit', 'npc do @all:10 dance', 'npc do #42 follow'] });
-  sh.reg('npc kill <who:sel>', 'down for good', ([s]) => { const ps = persons(s); for (const p of ps) { p.fallen = 1e6; p.ko = true; p.corpse = true; p.hp = 0; p.v = 0; p.mode = 'stand'; } say(`${ps.length} down`, 'ok'); }, { group: 'people' });
-  sh.reg('npc ko <who:sel> [seconds:num]', 'knocked out, gets up after', ([s, t]) => { const ps = persons(s); for (const p of ps) { p.fallen = +t || 8; p.ko = true; p.unconscious = true; p.v = 0; } say(`${ps.length} out cold`, 'ok'); }, { group: 'people' });
-  sh.reg('npc heal <who:sel>', 'up again, whole', ([s]) => { const ps = persons(s); for (const p of ps) { p.fallen = 0; p.ko = false; p.corpse = false; p.unconscious = false; p.inj = null; p.limp = 0; if (p.hp0) p.hp = p.hp0; } say(`${ps.length} healed`, 'ok'); }, { group: 'people' });
-  sh.reg('npc remove <who:sel>', 'gone from the world', ([s]) => { const ps = persons(s); for (const p of ps) ppl().remove(p); say(`${ps.length} removed`, 'ok'); }, { group: 'people' });
-  sh.reg('npc bring <who:sel>', 'stand them in front of you', ([s]) => { const ps = persons(s); ps.forEach((p, i) => { const at = ahead(1.6 + Math.floor(i/4)*0.9, ((i % 4) - 1.5)*0.8); p.x = at.x; p.z = at.z; p.yaw = at.th + Math.PI; hold(p, null); }); say(`${ps.length} here`, 'ok'); }, { group: 'people' });
-  sh.reg('npc goto <who:sel>', 'you, next to them', async ([s]) => { const [e] = select(s); await go({ x: e.o.x, z: e.o.z, name: '' }); say('there', 'ok'); }, { group: 'people' });
-  sh.reg('npc say <who:sel> <text:str...>', 'words in their mouth, as subtitles', ([s, ...w]) => { for (const p of persons(s)) G.hud.say(nameOf(p), '', w.join(' '), 4); }, { group: 'people' });
-  sh.reg('npc talk <who:sel>', 'open a conversation with them, wherever they are', ([s]) => { const [p] = persons(s); G.talkUI?.open(p, G.interiors?.inside ? G.interiors.cur : null); }, { group: 'people' });
-  sh.reg('npc set <who:sel> <key:str> <value:str>', 'any field on them: npc set @look hp 10 · npc set #12 angry 5', ([s, k, x]) => { const ps = persons(s); for (const p of ps) p[k] = lit(x); say(`${ps.length} × ${k} = ${x}`, 'ok'); }, { group: 'people' });
+  }, { group: 'people', more: ['make @look sit', 'make @all:10 dance', 'make #42 follow'] });
+  sh.reg('kill <who:sel>', 'down for good', ([s]) => { const ps = persons(s); for (const p of ps) { p.fallen = 1e6; p.ko = true; p.corpse = true; p.hp = 0; p.v = 0; p.mode = 'stand'; } say(`${ps.length} down`, 'ok'); }, { group: 'people' });
+  sh.reg('ko <who:sel> [seconds:num]', 'knocked out, gets up after', ([s, t]) => { const ps = persons(s); for (const p of ps) { p.fallen = +t || 8; p.ko = true; p.unconscious = true; p.v = 0; } say(`${ps.length} out cold`, 'ok'); }, { group: 'people' });
+  sh.reg('heal <who:sel>', 'up again, whole', ([s]) => { const ps = persons(s); for (const p of ps) { p.fallen = 0; p.ko = false; p.corpse = false; p.unconscious = false; p.inj = null; p.limp = 0; if (p.hp0) p.hp = p.hp0; } say(`${ps.length} healed`, 'ok'); }, { group: 'people' });
+  sh.reg('remove <who:sel>', 'gone from the world: people or animals', ([s]) => { const es = select(s); let n = 0; for (const e of es) { if (e.k === 'person') { ppl().remove(e.o); n++; } else if (e.k === 'animal') { const i = ppl().animals.indexOf(e.o); if (i >= 0) { G.fauna?.release?.(e.o); ppl().animals.splice(i, 1); n++; } } } say(`${n} removed`, 'ok'); }, { group: 'people' });
+  sh.reg('bring <who:sel>', 'stand them in front of you', ([s]) => { const ps = persons(s); ps.forEach((p, i) => { const at = ahead(1.6 + Math.floor(i/4)*0.9, ((i % 4) - 1.5)*0.8); p.x = at.x; p.z = at.z; p.yaw = at.th + Math.PI; hold(p, null); }); say(`${ps.length} here`, 'ok'); }, { group: 'people' });
+  sh.reg('goto <who:sel>', 'you, next to them', async ([s]) => { const [e] = select(s); await go({ x: e.o.x, z: e.o.z, name: '' }); say('there', 'ok'); }, { group: 'people' });
+  sh.reg('say <who:sel> <text:str...>', 'words in their mouth, as subtitles', ([s, ...w]) => { for (const p of persons(s)) G.hud.say(nameOf(p), '', w.join(' '), 4); }, { group: 'people' });
+  sh.reg('talk <who:sel>', 'open a conversation with them, wherever they are', ([s]) => { const [p] = persons(s); G.talkUI?.open(p, G.interiors?.inside ? G.interiors.cur : null); }, { group: 'people' });
+  sh.reg('set npc <who:sel> <key:str> <value:str>', 'any field on them: npc set @look hp 10 · npc set #12 angry 5', ([s, k, x]) => { const ps = persons(s); for (const p of ps) p[k] = lit(x); say(`${ps.length} × ${k} = ${x}`, 'ok'); }, { group: 'people' });
 
   // ------------------------------------------------------------ animals
   sh.type('animal', () => [{ v: 'dog', note: 'street dog' }, { v: 'cow', note: 'cow' }, { v: 'cat', note: 'cat' }]);
-  sh.reg('animal spawn <kind:animal> [count:int]', 'a dog, a cow or a cat by you', ([k, n]) => {
+  sh.reg('spawn animal <kind:animal> [count:int]', 'a dog, a cow or a cat by you', ([k, n]) => {
     if (!/^(dog|cow|cat)$/.test(k)) throw new Error('dog, cow or cat');
     const out = [];
     for (let i = 0; i < Math.min(20, +n || 1); i++) {
@@ -212,24 +213,23 @@ export function registry(C) {
     }
     last = out.map(o => ({ k: 'animal', o })); say(`${out.length} × ${k}`, 'ok');
   }, { group: 'animals' });
-  sh.reg('animal list', 'the animals near you', () => sh.table(byDist(ppl().animals.slice()).slice(0, 30).map((a, i) => [i, a.kind, Math.round(dist(a)) + ' m', a.free ? 'following/chasing' : a.moving ? 'walking' : 'resting'])), { group: 'animals' });
-  sh.reg('animal remove <which:sel>', 'take them away', ([s]) => { const a = select(s).filter(e => e.k === 'animal'); for (const e of a) { const i = ppl().animals.indexOf(e.o); if (i >= 0) { G.fauna?.release?.(e.o); ppl().animals.splice(i, 1); } } say(`${a.length} removed`, 'ok'); }, { group: 'animals' });
-  sh.reg('animal follow <which:sel>', 'it follows you about', ([s]) => { for (const e of select(s)) if (e.k === 'animal') G.strays.free(e.o, { t: 120, follow: true }); say('following', 'ok'); }, { group: 'animals' });
+  sh.reg('list animal', 'the animals near you', () => sh.table(byDist(ppl().animals.slice()).slice(0, 30).map((a, i) => [i, a.kind, Math.round(dist(a)) + ' m', a.free ? 'following/chasing' : a.moving ? 'walking' : 'resting'])), { group: 'animals' });
+  sh.reg('tame <which:sel>', 'it follows you about', ([s]) => { for (const e of select(s)) if (e.k === 'animal') G.strays.free(e.o, { t: 120, follow: true }); say('following', 'ok'); }, { group: 'animals' });
 
   // ------------------------------------------------------------ animations
   const clips = () => Object.keys(P().human?.actions || {}).sort();
   sh.type('clip', () => clips().map(v => ({ v, note: 'clip' })));
-  sh.reg('anim list [filter:str]', 'every animation the bodies have', ([q = '']) => { const a = clips().filter(c => c.includes(q)); say(a.join('  ')); say(`${a.length} clips`, 'dim'); }, { group: 'animation' });
-  sh.reg('anim play <who:sel> <clip:clip> [--once] [--speed:num]', 'any clip on anyone: anim play @me dance · anim play @look sit', ([s, c], f) => {
-    if (!clips().includes(c)) throw new Error('no such clip: anim list');
+  sh.reg('list anim [filter:str]', 'every animation the bodies have', ([q = '']) => { const a = clips().filter(c => c.includes(q)); say(a.join('  ')); say(`${a.length} clips`, 'dim'); }, { group: 'animation' });
+  sh.reg('play anim <who:sel> <clip:clip> [--once] [--speed:num]', 'any clip on anyone: play anim @me dance · play anim @look sit', ([s, c], f) => {
+    if (!clips().includes(c)) throw new Error('no such clip: list anim');
     for (const e of select(s)) {
       if (e.k === 'player') { const H = P().human; P()._animHold = f.once ? null : c; H.play(c, { fade: 0.25, once: !!f.once, restart: true, speed: +f.speed || 1 }); }
       else if (e.k === 'person') hold(e.o, c);
     }
     say(`${c}`, 'ok');
   }, { group: 'animation', also: ['anim'] });
-  sh.reg('anim stop [who:sel]', 'back to what they would be doing', ([s = '@me']) => { for (const e of select(s)) { if (e.k === 'player') { P()._animHold = null; P().human.play('idle', { fade: 0.3 }); } else if (e.k === 'person') e.o.anim = null; } say('stopped', 'ok'); }, { group: 'animation' });
-  sh.reg('anim speed <x:num>', 'your body\'s playback speed (0.1 to look at a move frame by frame)', ([x]) => { const H = P().human; H.mixer.timeScale = Math.max(0, +x); say(`${x}×`, 'ok'); }, { group: 'animation' });
+  sh.reg('stop anim [who:sel]', 'back to what they would be doing', ([s = '@me']) => { for (const e of select(s)) { if (e.k === 'player') { P()._animHold = null; P().human.play('idle', { fade: 0.3 }); } else if (e.k === 'person') e.o.anim = null; } say('stopped', 'ok'); }, { group: 'animation' });
+  sh.reg('set animspeed <x:num>', 'your body\'s playback speed (0.1 to look at a move frame by frame)', ([x]) => { const H = P().human; H.mixer.timeScale = Math.max(0, +x); say(`${x}×`, 'ok'); }, { group: 'animation' });
 
   // ------------------------------------------------------------ tests: each animation set up and played, on its own
   const modelType = (m) => C.vehType(m);
@@ -251,19 +251,16 @@ export function registry(C) {
     walkin: ['walk into the nearest shop', async () => { const S = G.shops; if (!S.near) throw new Error('go near a shop door first (tp to one)'); S.tryUse(); }],
     sit: ['sit down', async () => { P().human.play('sit', { fade: 0.3 }); P()._animHold = 'sit'; }],
     fall: ['knocked down and up again', async () => { P().knock?.(6, 0, 0) ?? P().human.play('knockback', { once: true, fade: 0.1 }); }],
-    talk: ['talk to whoever you face', async () => { G.talkUI?.tryTalk?.() ?? sh.exec('npc talk @look', true); }],
+    talk: ['talk to whoever you face', async () => { G.talkUI?.tryTalk?.() ?? sh.exec('talk @look', true); }],
     fly: ['take off', async () => sh.exec('fly on', true)],
   };
   sh.type('test', () => Object.keys(TESTS).map(v => ({ v, note: TESTS[v][0] })));
-  sh.reg('test <what:test> [model:model]', 'play one animation, set up for you: mount dismount getin shove walkin sit fall…', async ([w, m]) => {
-    const t = TESTS[w]; if (!t) throw new Error(Object.keys(TESTS).join(' '));
-    await t[1](m); say(`test ${w}${m ? ' ' + m : ''}`, 'ok');
-  }, { group: 'animation', more: ['test mount activa', 'test mount classic350', 'test getin creta', 'test shove', 'anim speed 0.25 first to watch it slowly'] });
+  for (const [w, [about, fn]] of Object.entries(TESTS)) sh.reg(`test ${w}${fn.length || /= '/.test(String(fn)) ? ' [model:model]' : ''}`, about, async ([m]) => { await fn(m); say(`test ${w}${m ? ' ' + m : ''}`, 'ok'); }, { group: 'tests', more: w === 'mount' ? ['test mount activa', 'test mount classic350', 'set animspeed 0.25 first to watch it slowly'] : undefined });
 
   // ------------------------------------------------------------ snapshots: a moment to come back to
   const SNAP = {};
-  sh.reg('snapshot save [name:str]', 'where you are, the hour, the weather, every variable', ([n = 'a']) => { build(); const vals = {}; for (const e of V.values()) { try { vals[e.name] = e.get(); } catch (err) { /* skip */ } } SNAP[n] = { x: R().x, z: R().z, yaw: P().onFoot ? P().foot.yaw : P().th, vals }; say(`saved ${n}`, 'ok'); }, { group: 'variables' });
-  sh.reg('snapshot load [name:str]', 'back to it', async ([n = 'a']) => {
+  sh.reg('save snapshot [name:str]', 'where you are, the hour, the weather, every variable', ([n = 'a']) => { build(); const vals = {}; for (const e of V.values()) { try { vals[e.name] = e.get(); } catch (err) { /* skip */ } } SNAP[n] = { x: R().x, z: R().z, yaw: P().onFoot ? P().foot.yaw : P().th, vals }; say(`saved ${n}`, 'ok'); }, { group: 'variables' });
+  sh.reg('load snapshot [name:str]', 'back to it', async ([n = 'a']) => {
     const s = SNAP[n]; if (!s) throw new Error(`no snapshot ${n}: ${Object.keys(SNAP).join(' ') || 'none yet'}`);
     await go({ x: s.x, z: s.z, name: n });
     build(); for (const [k, x] of Object.entries(s.vals)) { const e = V.get(k); if (!e || /^player\.(x|z|fly)$|^people\./.test(k)) continue; try { if (e.get() !== x) e.set(x); } catch (err) { /* skip */ } }
@@ -273,14 +270,14 @@ export function registry(C) {
   // ------------------------------------------------------------ the systems
   const SYS = () => Object.keys(G).filter(k => { const o = G[k]; return o && typeof o === 'object' && !Array.isArray(o) && !o.isObject3D && o.constructor && o.constructor !== Object && !/^_/.test(k); }).sort();
   sh.type('system', () => SYS().map(v => ({ v, note: G[v].constructor.name })));
-  sh.reg('sys list', 'every part of the game, each a root for get / set / call / ls', () => sh.table(SYS().map(k => { const o = G[k], m = Object.getOwnPropertyNames(Object.getPrototypeOf(o)).filter(q => q !== 'constructor').length; return [k, o.constructor.name, m + ' methods']; })), { group: 'systems' });
-  sh.reg('sys show <name:system>', 'what one has: its values and what you can call', ([k]) => {
-    const o = G[k]; if (!o || typeof o !== 'object') throw new Error('sys list');
+  sh.reg('list systems', 'every part of the game, each a root for get / set / call / ls', () => sh.table(SYS().map(k => { const o = G[k], m = Object.getOwnPropertyNames(Object.getPrototypeOf(o)).filter(q => q !== 'constructor').length; return [k, o.constructor.name, m + ' methods']; })), { group: 'systems' });
+  sh.reg('info system <name:system>', 'what one has: its values and what you can call', ([k]) => {
+    const o = G[k]; if (!o || typeof o !== 'object') throw new Error('list systems');
     const vals = Object.keys(o).filter(q => typeof o[q] !== 'object' || o[q] === null).slice(0, 50).map(q => [q, fmt(o[q])]);
     if (vals.length) sh.table(vals, ['value', 'now']);
     say('call: ' + Object.getOwnPropertyNames(Object.getPrototypeOf(o)).filter(q => q !== 'constructor' && typeof o[q] === 'function').map(q => `${k}.${q}`).join('  '), 'dim');
-  }, { group: 'systems', more: ['sys show story', 'call story.<Tab>', 'get police.heat'] });
-  sh.reg('hud [on:onoff]', 'the whole HUD on or off (for clean pictures)', ([a]) => { const on = a === undefined ? document.body.classList.contains('nh-nohud') : a === 'on'; document.body.classList.toggle('nh-nohud', !on); say(`hud ${on ? 'on' : 'off'}`, 'ok'); }, { group: 'picture' });
+  }, { group: 'systems', more: ['info system story', 'call story.<Tab>', 'get police.heat'] });
+  sh.reg('toggle hud [on:onoff]', 'the whole HUD on or off (for clean pictures)', ([a]) => { const on = a === undefined ? document.body.classList.contains('nh-nohud') : a === 'on'; document.body.classList.toggle('nh-nohud', !on); say(`hud ${on ? 'on' : 'off'}`, 'ok'); }, { group: 'picture' });
 
   // (hooked in once the people and your body exist)
   const install = () => {
@@ -295,7 +292,7 @@ export function registry(C) {
       };
       f.__follow = true; ppl().constructor.prototype.update = f;
     }
-    // your own body held in a clip (anim play @me): the game's own pose waits until you move
+    // your own body held in a clip (play anim @me): the game's own pose waits until you move
     const pu = P().updateFoot;
     P().updateFoot = function (dt, ...a) {
       const out = pu.call(this, dt, ...a), h = this._animHold;

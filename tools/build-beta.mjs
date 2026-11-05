@@ -70,7 +70,7 @@ const PATCHES = {
     ["{ id: 'bag', label: 'Jhola', group: 'Menus', def: 'KeyE' },", "{ id: 'bag', label: 'Jhola', group: 'Menus', def: 'KeyQ' },"],
     ["{ id: 'roll', label: 'Roll; camera when driving', group: 'Do', def: 'KeyC' }", "{ id: 'roll', label: 'Roll', group: 'Do', def: 'ControlLeft' }"],
     ["{ id: 'punch', label: 'Punch (click works too)',", "{ id: 'punch', label: 'Punch (click works too; hold right-click to block)',"],
-    ["{ id: 'cam', label: 'Change camera', group: 'Vehicle', def: 'KeyV' }", "{ id: 'cam', label: 'First or third person', group: 'Move', def: 'KeyC' }"],
+    ["{ id: 'cam', label: 'Change camera', group: 'Vehicle', def: 'KeyV' }", "{ id: 'cam', label: 'First or third person', group: 'Move', def: 'KeyC' }, { id: 'vetal', label: 'Vetal: hold on someone to take them over, tap to go home', group: 'Powers', def: 'KeyV' }, { id: 'brahma', label: 'Brahmarakshas: read the person you face', group: 'Powers', def: 'KeyO' }, { id: 'munja', label: 'Munja: everyone near, through walls', group: 'Powers', def: 'Period' }"],
     // F for what's in front of you (shops, doors, counters, pumps, animals), E for vehicles (in, out, take one),
     // T to talk to anyone (beta/game/talk.js); the phone moves to I
     ["{ id: 'use', label: 'Talk, walk in, get in or out', group: 'Do', def: 'KeyF' },", "{ id: 'use', label: 'Walk in, counters, pet, fuel up', group: 'Do', def: 'KeyF' }, { id: 'vehicle', label: 'Get in or out of a vehicle', group: 'Do', def: 'KeyE' }, { id: 'talk', label: 'Talk to someone (ask them out too)', group: 'Do', def: 'KeyT' },"],
@@ -157,7 +157,13 @@ const PATCHES = {
   [S('world/buildingsChunk.js')]: [
     ["  S.list.forEach((r, i) => {\n    if (r.door && open(r.door)) { S.im.setMatrixAt(i, ZERO); return; }", "  S.seen = (S.seen || 0) + 1;\n  S.list.forEach((r, i) => {\n    r.t = r.door && open(r.door) ? 1 : 0;\n    if (S.seen > 2 && r.k !== undefined) { if (r.k !== r.t) S.moving = true; return; }\n    r.k = r.t;\n    if (r.t) { S.im.setMatrixAt(i, ZERO); return; }"],
   ],
+  [S('game/input.js')]: [
+    // the pad's Y is the camera, as C is (V is Vetal)
+    ["edge(3, 'KeyV');", "edge(3, 'KeyC');"],
+  ],
   [S('game/game.js')]: [
+    // V is Vetal now (C is the camera)
+    ["if (this.input.took('KeyV')) this.rig.setMode(this.rig.mode + 1);", ""],
     // the jhola on Q (E is vehicles now)
     ["if (e.code === 'KeyE' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.jhola.open(); }", "if (e.code === 'KeyQ' && this.state === 'play' && !e.repeat) { e.preventDefault(); this.jhola.open(); }"],
     ["['Escape', 'KeyE', 'KeyJ', 'Tab', 'KeyF', 'KeyM', 'KeyP', 'KeyK'].includes(e.code)", "['Escape', 'KeyE', 'KeyQ', 'KeyJ', 'Tab', 'KeyF', 'KeyM', 'KeyP', 'KeyK'].includes(e.code)"],

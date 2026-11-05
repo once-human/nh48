@@ -388,16 +388,26 @@ export function freeTerminal(G) {
   // ------------------------------------------------------------ names: each command under what it works on
   // command, sub-command, then the values: what used to be one word each is grouped under what it works on
   function regroup() {
-    for (const [a, b] of [['roster', 'spawn list'], ['despawn', 'spawn clear'], ['exit', 'vehicle exit'], ['fix', 'vehicle fix'], ['paint', 'vehicle paint'], ['tune', 'vehicle tune'],
-      ['rate', 'traffic rate'], ['only', 'traffic only'], ['find', 'map find'], ['where', 'map where'], ['gmaps', 'map open'], ['timescale', 'time scale'],
-      ['god', 'player god'], ['noclip', 'player noclip'], ['run', 'player run'], ['money', 'player money'], ['give', 'player give'], ['stat', 'player stat'], ['wanted', 'player wanted'],
-      ['preset', 'gfx preset'], ['stats', 'gfx stats'], ['readout', 'gfx readout']]) sh.move(a, b);
-    sh.aliases.ts = 'time scale'; sh.aliases.hud = 'gfx readout';
-    sh.reg('fly speed <x:num>', 'flight speed, 1 is 15 m/s cruising and 48 with Shift', ([m]) => { St.flySpeed = Math.max(0.1, Math.min(20, +m)); say(`flight ${St.flySpeed}×`, 'ok'); }, { group: 'you' });
+    // verb first, then what it acts on, then the values: spawn npc aaji 3 · set time 21:30 · toggle god · list vehicles
+    for (const [a, b] of [['spawn', 'spawn vehicle'], ['roster', 'list vehicles'], ['despawn', 'remove spawned'], ['exit', 'exit vehicle'], ['fix', 'fix vehicle'], ['paint', 'paint vehicle'], ['tune', 'tune vehicle'],
+      ['rate', 'set rate'], ['only', 'set only'], ['gmaps', 'open gmaps'], ['timescale', 'set timescale'], ['time', 'set time'], ['weather', 'set weather'],
+      ['god', 'toggle god'], ['noclip', 'toggle noclip'], ['freecam', 'toggle freecam'], ['run', 'set run'], ['money', 'set money'], ['give', 'give item'], ['stat', 'set stat'], ['wanted', 'set wanted'],
+      ['gfx', 'set gfx'], ['preset', 'set preset'], ['stats', 'show stats'], ['readout', 'toggle readout']]) sh.move(a, b);
+    // the old traffic <what>, as verbs
+    const tr = sh.cmds.get('traffic'); sh.cmds.delete('traffic');
+    sh.reg('flush traffic', 'clear the road and fill it again', () => tr.run(['flush']), { group: 'vehicles' });
+    sh.reg('stop traffic', 'everyone stands where they are', () => tr.run(['stop']), { group: 'vehicles' });
+    sh.reg('start traffic', 'and off again', () => tr.run(['go']), { group: 'vehicles' });
+    sh.reg('count traffic', 'what is out there now, by type', () => tr.run(['census']), { group: 'vehicles' });
+    sh.reg('lock time', 'hold the hour where it is', () => { St.hourLock = G.hour; say('held', 'ok'); }, { group: 'world' });
+    sh.reg('unlock time', 'let the hour run again', () => { St.hourLock = null; say('running', 'ok'); }, { group: 'world' });
+    sh.reg('get time', 'the hour now', () => sh.exec('set time', true), { group: 'world' });
+    sh.aliases.ts = 'set timescale'; sh.aliases.time = 'set time'; sh.aliases.weather = 'set weather';
+    sh.reg('set flyspeed <x:num>', 'flight speed, 1 is 15 m/s cruising and 48 with Shift', ([m]) => { St.flySpeed = Math.max(0.1, Math.min(20, +m)); say(`flight ${St.flySpeed}×`, 'ok'); }, { group: 'you' });
     sh.reg('fly up [metres:num]', 'straight up, 100 m unless you say', ([m]) => { if (!St.flight) setFlight(true); P().foot.y += +m || 100; }, { group: 'you' });
     sh.reg('fly high', 'up to 400 m, over the whole city', () => { if (!St.flight) setFlight(true); P().foot.y = Math.max(P().foot.y, 400); }, { group: 'you' });
-    sh.reg('cam view', 'first or third person (C)', () => G.rig.toggleView(P().onFoot), { group: 'picture' });
-    sh.reg('cam fov [degrees:str]', 'field of view, 40 to 120. "reset" gives it back to the camera', ([f]) => {
+    sh.reg('toggle view', 'first or third person (C)', () => G.rig.toggleView(P().onFoot), { group: 'picture' });
+    sh.reg('set fov [degrees:str]', 'field of view, 40 to 120. "reset" gives it back to the camera', ([f]) => {
       if (f === undefined) { say(St.fov ? `${St.fov}°` : 'as the camera likes it'); return; }
       if (f === 'reset') { St.fov = 0; say('fov as the camera likes it', 'ok'); return; }
       St.fov = Math.max(20, Math.min(140, +f || 0)); say(`fov ${St.fov}`, 'ok');
@@ -409,9 +419,9 @@ export function freeTerminal(G) {
     onOpen: () => { G.input?.keys?.clear(); G.input?.pressed?.clear(); G.releaseMouse?.(); },
     onClose: () => { G.input?.keys?.clear(); G.input?.pressed?.clear(); G.lockMouse?.(); },
   });
-  sh.order = ['variables', 'people', 'animals', 'animation', 'vehicles', 'world', 'you', 'systems', 'picture', 'live', 'shell', 'yours'];
+  sh.order = ['variables', 'people', 'animals', 'animation', 'tests', 'vehicles', 'world', 'you', 'powers', 'systems', 'picture', 'live', 'shell', 'yours'];
   regroup();
-  registry({ G, sh, say, St, make, go, target, fmt, lit, walk, vehType, SETTINGS, WEATHERS });
+  G.registry = registry({ G, sh, say, St, make, go, target, fmt, lit, walk, vehType, SETTINGS, WEATHERS });
   // the "click to take the mouse" hint has no business showing while you're typing
   const lockHint = G.hud?.setLockHint?.bind(G.hud);
   if (lockHint) G.hud.setLockHint = (on) => lockHint(on && !term.open);
@@ -565,7 +575,7 @@ export function freeTerminal(G) {
     term.clear();
     say('Free roam terminal. Nothing here reaches your own game.', 'head');
     say(`${sh.cmds.size} commands. Type to narrow the list, Tab or a click to take one. help <command> for detail. Double-tap Space to fly.`, 'dim');
-    say('vars player  ·  set player.karma 50  ·  npc spawn aaji; npc do @last dance  ·  anim play @me sit  ·  test mount classic350  ·  sys list', 'dim');
+    say('Verb first: spawn npc aaji 3  ·  spawn vehicle creta  ·  spawn animal dog  ·  make @last dance  ·  play anim @me sit  ·  test mount classic350  ·  set player.karma 50  ·  list vars  ·  take @look', 'dim');
     for (const l of autoexec) St.timers.push({ t: 0.5, c: l });
   }
   function disarm() {
