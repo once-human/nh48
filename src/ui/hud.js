@@ -160,7 +160,6 @@ export class HUD {
           <nav class="pz-menu">
             <button class="pz-i sel" id="t-roam">Story</button>
             <button class="pz-i" id="t-free">Free roam</button>
-            <button class="pz-i" id="t-paint">Experimental graphics</button>
             <button class="pz-i" id="t-who">New character</button>
             <button class="pz-i" id="t-wipe">Start over</button>
           </nav>
@@ -175,7 +174,6 @@ export class HUD {
     this.title = t;
     t.querySelector('#t-roam').onclick = () => this.game.begin();
     t.querySelector('#t-free').onclick = () => this.game.beginFree();
-    t.querySelector('#t-paint').onclick = () => this.game.beginPainted();
     t.querySelector('#t-who').onclick = () => this.showPicker(() => this.syncTitle());
     t.querySelector('#t-wipe').onclick = () => { t.querySelector('#t-wipe-c').hidden = false; };
     t.querySelector('#t-wipe-n').onclick = () => { t.querySelector('#t-wipe-c').hidden = true; };

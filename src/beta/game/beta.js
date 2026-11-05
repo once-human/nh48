@@ -6,7 +6,7 @@ import { soundscape } from './soundscape.js';
 // What /beta changes about the game once it's made, from the outside (no game file is edited):
 //  - there's no auto of your own: you start on foot, and the auto the game keeps for you never shows up on the
 //    street, on the map or in a prompt (any other vehicle, autos in traffic included, is yours to take as always)
-//  - the title says Play instead of Story (there's no story here) and has no Experimental graphics: /beta is the new look
+//  - the title says Play instead of Story (there's no story here)
 //  - free roam has a terminal on / (commands.js)
 //  - Live on the title: the real clock and the real weather, and it never pauses (live.js)
 export function betaGame(G) {
@@ -38,7 +38,6 @@ export function betaGame(G) {
 // the title screen (the HUD exists once the game's init has run)
 export function betaTitle(G) {
   const H = G.hud, title = () => {
-    const t = document.querySelector('#t-paint'); if (t) { t.hidden = true; t.style.display = 'none'; }
     const r = document.querySelector('#t-roam'); if (r && /^Story/.test(r.textContent)) r.textContent = r.textContent.replace(/^Story/, 'Play');
     for (const e of (H && H.title ? H.title.querySelectorAll('p, div') : [])) if (!e.children.length && /^Start at Shaniwar Wada\. Run an auto/.test(e.textContent)) e.textContent = 'Start at Shaniwar Wada, on foot. Misal on FC Road, a date in Baner.';
   };
