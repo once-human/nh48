@@ -226,6 +226,33 @@ const PATCHES = {
     ["rec.circles.push(W.collision.addCircle(px, pz, 0.45, 2));", "rec.circles.push(...chain(px, pz, hx, hz, k === 'bike' ? 2.0 : 1.85, 0.62));"],
     ["rec.circles.push(W.collision.addCircle(px, pz, 0.8, 2), W.collision.addCircle(px - tx * 0.9, pz - tz * 0.9, 0.7, 2));", "rec.circles.push(...chain(px, pz, -tx, -tz, 2.7, 1.38));"],
   ],
+  // the police (beta/game/pursuit.js has the rest): they actually chase. Faster the higher the heat; quicker to react;
+  // they go where you're going to be, not where you were a second ago; at three stars and up they ram you off the road
+  // instead of following politely; a vehicle counts as caught when you're slow beside one of them (or boxed in by two),
+  // not only at a crawl; on foot they run as fast as a fit constable does, and keep it up longer
+  [S('game/police.js')]: [
+    ["want = (pursuing ? (this.jeep ? 16 : 18) : 11) * this.skill.top;", "want = (pursuing ? (this.jeep ? [16, 18, 20, 23, 25, 26][police.heat] : [18, 21, 23, 25, 27, 28][police.heat]) : 11) * this.skill.top;"],
+    ["if (!this.skill) this.skill = { lag: 0.7 + police.rng.next() * 1.1, top: 0.82 + police.rng.next() * 0.2 };", "if (!this.skill) this.skill = { lag: 0.35 + police.rng.next() * 0.6, top: 0.9 + police.rng.next() * 0.12 };"],
+    ["      tx = ls.x; tz = ls.z;", "      tx = ls.x; tz = ls.z;\n      if (this.sees && !P.onFoot) { const ld = Math.min(2.5, d / 18), pv = P.v || 0; tx += Math.cos(P.th) * pv * ld; tz += Math.sin(P.th) * pv * ld; }"],
+    ["      if (this.sees && !P.onFoot && d < 18 && Math.abs(P.v) < 5) {", "      if (this.sees && !P.onFoot && police.heat >= 3 && d < 28 && Math.abs(P.v) >= 5) {\n        const S = P.spec || { L: 4, W: 1.8 }, fx = Math.cos(P.th), fz = Math.sin(P.th), sd = ((v.x - P.x) * -fz + (v.z - P.z) * fx) >= 0 ? 1 : -1; close = true;\n        tx = P.x - fx * (S.L || 4) * 0.3 - fz * sd * (S.W || 1.8) * 0.35; tz = P.z - fz * (S.L || 4) * 0.3 + fx * sd * (S.W || 1.8) * 0.35;\n        want = Math.abs(P.v) + 5;\n      } else if (this.sees && !P.onFoot && d < 18 && Math.abs(P.v) < 5) {"],
+    ["this.drv.o.emergency = !!pursuing; this.drv.o.signals = !pursuing;", "const hot = pursuing && (this.P.heat >= 3 || (this.sees && Math.hypot(G.player.x - v.x, G.player.z - v.z) < 70)); this.drv.o.emergency = !!pursuing; this.drv.o.signals = !hot; this.drv.o.careful = hot && this.P.heat <= 2;"],
+    ["const slow = P.onFoot ? d < 2.6 : (d < 6 && Math.abs(P.v) < 2.2);", "const slow = P.onFoot ? d < 2.6 : ((d < 7 && Math.abs(P.v) < 3) || (this.heat >= 2 && d < 9 && Math.abs(P.v) < 4.5 && this.marshals.filter(u => u.catchDist() < 12).length >= 2));"],
+    ["if (m.catchT > (P.onFoot ? 0.4 : 1.2)) this.caught(m);", "if (m.catchT > (P.onFoot ? 0.4 : 1.0)) this.caught(m);"],
+    ["p.runSp = 4.2 + police.rng.next() * 0.6; p.chaseT = 0;", "p.runSp = [5.2, 5.2, 5.5, 5.8, 6.1, 6.3][police.heat] + police.rng.next() * 0.5; p.chaseT = -14;"],
+    ["r = (this.heat <= 1 ? 55 : 85) + this.rng.next() * (this.heat <= 1 ? 45 : 70);", "r = (this.heat <= 1 ? 40 : 70) + this.rng.next() * (this.heat <= 1 ? 40 : 60);"],
+    ["this._spT = 4;", "this._spT = this.marshals.length ? 3.5 : 1.5;"],
+  ],
+  // anyone driving by vehicles/driver.js (the police, the ambulance): keeps up with what's in front instead of
+  // dropping back to a gap as if it were standing still; passes slow traffic (not only stopped) when on an emergency,
+  // a two-wheeler through the gaps between lanes; red lights obeyed unless chasing hard, crossed slowly at low heat
+  [S('vehicles/driver.js')]: [
+    ["let gap = 99, still = false, person = false;", "let gap = 99, still = false, person = false, ov = 0, isPlayer = false;"],
+    ["if (al > 0.5 && al < look && Math.abs(ac - lat) < wHalf + ow && al < gap) { gap = al; still = Math.abs(o.v || 0) < 0.6; }", "if (al > 0.5 && al < look && Math.abs(ac - lat) < wHalf + ow && al < gap) { gap = al; still = Math.abs(o.v || 0) < 0.6; ov = (o.v || 0) * ((o.hx ?? 1) * hx + (o.hz ?? 0) * hz); isPlayer = !!o.isPlayer; }"],
+    ["return { gap, still, person };", "return { gap, still, person, ov: person ? 0 : ov, isPlayer };"],
+    ["target = Math.min(target, Math.max(0, (H.gap - 3.2) * 0.9));", "target = Math.min(target, Math.max(0, Math.max(0, H.ov || 0) + (H.gap - 3.2) * 0.9));"],
+    ["if (H.still && !H.person && this.waitT > (o.emergency ? 0.8 : 2.5) && this.shiftT <= 0) for (const s of [2.6, -2.6]) {", "if (!H.person && !H.isPlayer && this.shiftT <= 0 && ((H.still && this.waitT > (o.emergency ? 0.3 : 2.5)) || (o.emergency && H.gap < 14 && (H.ov || 0) < want - 2))) for (const s of (v.spec.two ? [1.4, -1.4, 2.6, -2.6] : [2.6, -2.6])) {"],
+    ["if (o.signals && !o.emergency && G.traffic.signals) {", "if (o.careful && !o.signals && G.traffic.signals) { const n = W.graph.nearest(v.x + hx * 14, v.z + hz * 14, 10), node = n && W.graph.nodes[n.s < n.e.len / 2 ? n.e.a : n.e.b]; if (node && node.signal && Math.hypot(node.x - v.x, node.z - v.z) < 24 && G.traffic.signals.stateForAngle(node.i, v.th) === 'r') target = Math.min(target, 6); }\n    if (o.signals && G.traffic.signals) {"],
+  ],
   [S('traffic/traffic.js')]: [
     ["bullet: buildBike({ helmet: true }), superbike: buildBike({ helmet: true }),", "bullet: buildBike({ helmet: true, kind: 'bullet' }), superbike: buildBike({ helmet: true, kind: 'superbike' }),"],
     // the models inside the types (beta/vehicles/models.js VARIANTS): their own spawn share, bodies and time-of-day mix
