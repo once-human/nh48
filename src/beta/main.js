@@ -30,6 +30,7 @@ import './game/talk.js';          // T at anyone: talk
 import './game/attend.js';        // who you talk to stays sat / goes back to what they were doing
 import './game/hands.js';
 import './game/fists.js';
+import './game/climb.js';          // up and over: hands planted on the ledge, the feet up the face, a knee onto the top
 import './world/staff.js';
 import './world/walkin.js';
 import './world/busy.js';
