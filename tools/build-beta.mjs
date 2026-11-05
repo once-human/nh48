@@ -94,7 +94,7 @@ const PATCHES = {
     ["if (['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super'].includes(type)) {", "if (['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super'].includes(baseOf(type))) {"],
     ["export function defaultPaint(type, rng) {", "export function defaultPaint(type, rng) {\n  type = baseOf(type);"],
     // a car corners on its tyres (beta/vehicles/tyres.js); two-wheelers keep the leaning model below
-    ["    // ---- steering (bicycle model, less lock at speed)\n", "    if (!S.two && this.tyres) this.tyres(dt, inp, thr); else if (S.two && this.twoWheel) this.twoWheel(dt, inp, thr); else {\n    // ---- steering (bicycle model, less lock at speed)\n"],
+    ["    // ---- steering (bicycle model, less lock at speed)\n", "    const sp = Math.abs(this.v);          // (read below the steering too: the suspension's jolts)\n    if (!S.two && this.tyres) this.tyres(dt, inp, thr); else if (S.two && this.twoWheel) this.twoWheel(dt, inp, thr); else {\n    // ---- steering (bicycle model, less lock at speed)\n"],
     // a two-wheeler leans as beta/vehicles/twowheel.js works out (its own limits), and a superbike's front can come up
     ["const leanT = S.two ? clamp(Math.atan(this.latAcc / 9.81), -0.6, 0.6)", "const leanT = S.two ? (this.bikeLean !== undefined ? this.bikeLean : clamp(Math.atan(this.latAcc / 9.81), -0.6, 0.6))"],
     ["this.lean += (leanT - this.lean) * Math.min(1, dt * 6);", "this.lean += (leanT - this.lean) * Math.min(1, dt * (S.two && this.bikeLean !== undefined ? 30 : 6));"],
