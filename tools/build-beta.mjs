@@ -83,6 +83,8 @@ const PATCHES = {
   ],
   [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'], ['E', 'Jhola'],", "['F', 'Walk in, counters, pet'], ['E', 'Get in or out of a vehicle'], ['T', 'Talk to someone'], ['Q', 'Jhola'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
   [S('game/pilot.js')]: [
+    // a scene that moves you itself (beta/game/acts.js: dragging someone, walking up to them) sets the pace, as a roll does
+    ["    if (A && A.kind === 'roll') { F.vx = A.vx; F.vz = A.vz; }", "    if (A && (A.kind === 'roll' || A.move)) { F.vx = A.vx || 0; F.vz = A.vz || 0; }"],
     // standing about a while: arms folded, the phone out (beta/draw/alive.js picks it)
     ["      const a = F.v < 0.25 ? 'idle' : F.v < 2.2 ? 'walk' : F.v < 4.6 ? 'jog' : 'sprint';", "      const a = F.v < 0.25 ? (this._fid || 'idle') : F.v < 2.2 ? 'walk' : F.v < 4.6 ? 'jog' : 'sprint';"],
     ["      this.human.play(a, { speed: a === 'idle' ? 1 : clamp(F.v / nat, 0.6, 1.6) });", "      this.human.play(a, { speed: !nat || a === 'idle' ? 1 : clamp(F.v / nat, 0.6, 1.6) });"],
@@ -145,7 +147,7 @@ const PATCHES = {
      "      const q = m._lx === undefined ? 0 : Math.hypot(a.x - m._lx, a.z - m._lz); m._lx = a.x; m._lz = a.z;\n      if (q < 3 && dt > 0) m._v = (m._v || 0) + (q / dt - (m._v || 0)) * Math.min(1, dt * 6);\n      const mv = m._v || 0, walking = mv > 0.12, cowS = a.cow || a.kind === 'cow', slow = cowS && mv < 0.9;\n      if (walking && mv > 2.4) { m._ph = (m._ph || 0) + dt * mv * 2.2; m.holder.position.y += Math.abs(Math.sin(m._ph)) * Math.min(0.07, (mv - 2.4) * 0.02); }\n      const lie = !walking && a.kind !== 'cow' && !a.cow;\n      m.play(walking ? (slow ? 'WalkSlow' : 'Walk') : 'Idle', walking ? Math.max(0.45, mv / (cowS ? (slow ? 0.7 : 1.1) : a.kind === 'cat' ? 0.6 : 0.95)) : 1);"],
   ],
   [S('people/fight.js')]: [
-    ["if (input.took('KeyC') && !busyDown", "if ((input.took('ControlLeft') || input.took('ControlRight')) && !busyDown"],
+    ["if (input.took('KeyC') && !busyDown", "if ((input.took('ControlLeft') || input.took('ControlRight')) && !busyDown && !(P.act && P.act.move)"],
     // whoever rode it comes off as themselves, not someone new: the riders the crowd had seated on it (crowd.js riders)
     ["    const look = kit.randomLook(this.rng, { female: this.rng.chance(o.T.two ? 0.15 : 0.25), helmet: o.T.two && o.type !== 'cycle', avoid: P.look });\n    if (o.colB) look.top = look.top.setRGB(o.colB[0], o.colB[1], o.colB[2]);",
      "    const R0 = o._riders && o._riders[0], R1 = o._riders && o._riders[1];\n    const look = R0 ? R0.look : kit.randomLook(this.rng, { female: this.rng.chance(o.T.two ? 0.15 : 0.25), helmet: o.T.two && o.type !== 'cycle', avoid: P.look });\n    if (!R0 && o.colB) look.top = look.top.setRGB(o.colB[0], o.colB[1], o.colB[2]);"],

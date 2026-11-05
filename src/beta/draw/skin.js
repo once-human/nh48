@@ -303,9 +303,9 @@ export class Skin {
       const H = near[s], k = H.look && H.look.female ? 'f' : 'm', row = s*TEX_W*4;
       H.holder.updateWorldMatrix(true, true);
       const sk = H.body.skeleton; sk.update(); const m = sk.boneMatrices, nb = Math.min(sk.bones.length, Math.floor(LOOK/3));
-      // who they are (never the player: you chose your own look)
+      // who they are (never you as yourself: you chose your own look; in someone else (Vetal) you're dressed as they are)
       const W_ = this.ward[k]; let D_ = null;
-      if (W_ && H !== playerH && !(H.look && H.look.player)) { if (H._wl !== H.look) { H._wl = H.look; H._w = dress(H, W_); } D_ = H._w; for (const [i, S] of W_.builds[D_.build]) { _m1.fromArray(m, i*16).multiply(S); _m1.toArray(m, i*16); } }
+      if (W_ && !(H.look && H.look.player)) { if (H._wl !== H.look) { H._wl = H.look; H._w = dress(H, W_); } D_ = H._w; for (const [i, S] of W_.builds[D_.build]) { _m1.fromArray(m, i*16).multiply(S); _m1.toArray(m, i*16); } }
       for (let b = 0; b < nb; b++) { const i = b*16, o = row + b*12; D[o] = m[i]; D[o + 1] = m[i + 4]; D[o + 2] = m[i + 8]; D[o + 3] = m[i + 12]; D[o + 4] = m[i + 1]; D[o + 5] = m[i + 5]; D[o + 6] = m[i + 9]; D[o + 7] = m[i + 13]; D[o + 8] = m[i + 2]; D[o + 9] = m[i + 6]; D[o + 10] = m[i + 10]; D[o + 11] = m[i + 14]; }
       const u = H.mat.userData, O = row + LOOK*4, col = (i, c) => { D[O + i*4] = c.r; D[O + i*4 + 1] = c.g; D[O + i*4 + 2] = c.b; }, vec = (i, q) => { D[O + i*4] = q.x; D[O + i*4 + 1] = q.y; D[O + i*4 + 2] = q.z; D[O + i*4 + 3] = q.w; };
       col(0, u.top); col(1, u.bottom); col(2, u.skin); col(3, u.shoe); vec(4, u.cut); vec(5, H.style); col(6, H.pat); vec(7, H.fit); vec(8, H.arm); vec(9, u.body); D[O + 40] = H._clipY ?? 0; D[O + 43] = H._clipY === undefined ? 0 : 1; D[O + 47] = 0;
@@ -324,8 +324,9 @@ export class Skin {
       if (D_) {
         for (const X of D_.cloth) { const R = this.parts[k].get(X.n); if (!R) continue; const P = (H._d2 < hi2 && R.hi) ? R.hi : R.lo, A = P.geometry.attributes, j = P.fill++; if (j >= SLOTS) continue; const c = X.c || topC; A.iSlot.array[j] = s; A.iCol.array[j*3] = c.r; A.iCol.array[j*3 + 1] = c.g; A.iCol.array[j*3 + 2] = c.b; if (R.sh && H._d2 < CAST2) R.sh.geometry.attributes.iSlot.array[R.sh.fill++] = s; }
         const put = (g, b, c) => { const r = this.rigidOf(g), j = r.fill++; if (j >= r.cap) return; const A = r.geometry.attributes, o = b*16; for (let i = 0; i < 4; i++) { const a = A['iM' + i].array; a[j*4] = m[o + i*4]; a[j*4 + 1] = m[o + i*4 + 1]; a[j*4 + 2] = m[o + i*4 + 2]; a[j*4 + 3] = m[o + i*4 + 3]; } A.iCol.array[j*3] = c.r; A.iCol.array[j*3 + 1] = c.g; A.iCol.array[j*3 + 2] = c.b; };
-        if (!helmeted && D_.hair && W_.hair[D_.hair]) put(W_.hair[D_.hair], W_.headB, D_.hairCol);
-        for (const it of D_.items) { if (helmeted && it.b === W_.headB && it.g.userData.kind !== 'hair' && it.g.index && it.g.index.count > 3000) continue; put(it.g, it.b, it.c); }
+        const eyes = H === playerH && H._fp;          // (their hair and hat aren't drawn over your eyes)
+        if (!helmeted && !eyes && D_.hair && W_.hair[D_.hair]) put(W_.hair[D_.hair], W_.headB, D_.hairCol);
+        for (const it of D_.items) { if (eyes && it.b === W_.headB) continue; if (helmeted && it.b === W_.headB && it.g.userData.kind !== 'hair' && it.g.index && it.g.index.count > 3000) continue; put(it.g, it.b, it.c); }
       }
       for (const o of H._rg) {
         if (D_ && H.xtra && (o === H.xtra.pony || o === H.xtra.braid || o === H.xtra.cap || o === H.xtra.glasses || o === H.xtra.lens)) continue;      // (theirs are drawn above)

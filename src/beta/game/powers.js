@@ -1,30 +1,70 @@
 // The three powers, in every mode.
-//   Vetal (V)          the main one: take someone over. Hold V on a person in front of you and keep them in your eyes
-//                      while the link builds (look away and it breaks); you wake up in them, and your own body drops
-//                      where you stood, out cold, for the street to find. Walk, drive, talk as them. It costs: a
-//                      strong will (a cop, a dada) fights you harder, every metre from your body pulls harder, and
-//                      doing what they never would (an aaji sprinting, a gentle one throwing punches, a cop breaking
-//                      the law) strains the hold until they throw you out. Tap V to go home; knocked down, out of
-//                      Vetal, or thrown out, you're pulled home anyway, to whatever happened to your body meanwhile.
-//                      From inside someone, hold V on the next: a jump costs half. The bar refills while you're
-//                      yourself, faster at night. The more time you spend in others, the better you get at it.
-//   Brahmarakshas (B)  on foot, the learned one: read the person you look at. Who they are, how they are, what they make of you,
-//                      what they're keeping to themselves. Three times a game day.
-//   Munja (N)          on foot, the one in the peepal tree: for eight seconds you see everyone within 60 m through walls,
-//                      by what they mean you: red to fight, amber wary of you, green kind, blue the police.
-//                      Three times a game day.
-// The keys are in Pause → Controls like every other. In the terminal: list powers, refill power, retake power, take @look,
-// return body, read @look, sense, set mastery, toggle powerfree, and the power.* variables.
+//   Vetal (V)          take someone over. Hold V with them in the middle of the screen (up to 135 m off) and keep them
+//                      there for five seconds while the link builds: the glow comes up round their head, the purple in
+//                      from the edges of your eyes, the whole time. Look across to someone else and it moves to them,
+//                      from nothing again. Let go early and it costs a little (1 to 3, mostly 1). At the end it goes
+//                      dark: you wake up in them, or they throw you off (rare, fresh, at full strength; likelier
+//                      with a strong will, a low bar, and every hop). Then let go of V: you're them, their body,
+//                      their hunger, their jhola. Tap V to go home (they go dizzy, you're out, and a moment later your
+//                      own body gets up off the ground); hold V on someone else to hop. Doing what they never would (an
+//                      aaji sprinting, a gentle one throwing punches, a cop breaking the law) builds strain, and it
+//                      eases off once you stop; too much and they throw you out, and you come round two minutes later
+//                      with a heavy head.
+//                      100 units. Going in costs 5 to 8, each hop after more (6–9, 7–10, 8–12, 10–15, then up), the
+//                      low end mostly; thrown off at the door 3 to 5. Being someone else costs too: a full bar alone
+//                      lasts about three minutes. It comes back while you're yourself: slowly by day, faster at night,
+//                      and fastest near a cremation ground or a cemetery, or a Vetal temple (the real ones on the map).
+//   Brahmarakshas (B)  on foot, the learned one: hold B on someone for three seconds (up to 40 m) and you know them:
+//                      who they are, their age and work, where they live and where they're going, their mood and what
+//                      they make of you, what they carry, what's on their mind, what they keep to themselves, and
+//                      how hard they'd fight Vetal. Three a game day; let go early and it costs nothing.
+//   Munja (N)          on foot, the one in the peepal tree: hold N and everyone within 60 m glows through the walls
+//                      (red to fight, amber wary of you, green kind, blue the police, your own body violet), with
+//                      where each of them is about to walk lit on the ground ahead of them. While you hold it, click
+//                      someone to rustle the bushes behind them (they whip round, their back to you), or right-click
+//                      a spot to flick a stone there (everyone near turns to it; a constable walks over to look).
+//                      Its own bar: it goes eight times as fast as being in someone (about 22 s full), and comes back
+//                      three times as fast as Vetal.
+//   Z                  someone out cold at your feet (your own body too, while you're away in someone): drag them
+//                      by the shoulders; Z again to lay them down (beta/game/acts.js).
+// The keys are in Pause → Controls like every other. In the terminal: list powers, refill power, set power, take,
+// return body, read, sense, startle, throw stone, drag, toggle powerfree, the test commands, and the power.* variables.
 import * as THREE from 'three';
-import { ikArm } from '@orig/people/humans.js';
+import { ITEMS } from '@orig/game/life.js';
 import { dizzyPose } from './dizzy.js';
+import { auras } from './aura.js';
+import { people } from './wake.js';
+import { acts } from './acts.js';
+import { hostBody } from './host.js';
 
-const STORE = 'puneri_powers', DAILY = 3, SENSE = 8, SENSE_R = 60;
+const STORE = 'puneri_powers', DAILY = 3;
+const V_HOLD = 5, V_RANGE = 135, B_HOLD = 3, B_RANGE = 40, N_R = 60, N_UP = 1.0;
+const STAY = 100/180;                           // units a second, being someone ordinary close to your own body
+const N_DRAIN = 8*STAY;
+const R_DAY = 0.075, R_NIGHT = 0.405, N_REFILL = 3;    // units a second
+const HOP = [[5, 8], [6, 9], [7, 10], [8, 12], [10, 15]];
 // how hard each kind of person holds on to themselves
 const WILL = { kaka: 1, ajoba: 0.75, dada: 1.6, bhaiya: 1.25, collegeboy: 0.9, kpguy: 1, kaku: 1, aaji: 0.75, tai: 1.2, aunty: 1, collegegirl: 0.9, kpgirl: 1, cop: 2 };
 const OLD = new Set(['ajoba', 'aaji']);
 const GENTLE = new Set(['ajoba', 'aaji', 'kaku', 'aunty', 'collegegirl', 'collegeboy', 'kaka']);
 const WHO = { kaka: 'kaka, a man of the neighbourhood', ajoba: 'ajoba, an old man', dada: 'dada, the local tough', bhaiya: 'bhaiya, a working man', collegeboy: 'a college student', kpguy: 'a Koregaon Park regular', kaku: 'kaku, a woman of the neighbourhood', aaji: 'aaji, an old woman', tai: 'tai, sure of herself', aunty: 'an aunty', collegegirl: 'a college student', kpgirl: 'a Koregaon Park regular', cop: 'Pune police' };
+const AGE = { kaka: [45, 60], kaku: [42, 58], ajoba: [66, 84], aaji: [64, 82], dada: [24, 38], bhaiya: [21, 40], collegeboy: [18, 22], collegegirl: [18, 22], kpguy: [24, 33], kpgirl: [23, 31], tai: [30, 45], aunty: [38, 52], cop: [27, 52] };
+const WORK = {
+  kaka: ['runs a kirana shop', 'a clerk in a government office', 'an LIC agent', 'an electrician'],
+  kaku: ['keeps house, and the whole building', 'runs a mess from home', 'a schoolteacher', 'a tailor'],
+  ajoba: ['retired from the railways', 'a retired schoolteacher', 'retired from a factory job', 'a retired bank clerk'],
+  aaji: ['looks after the grandchildren', 'a retired teacher', 'makes papad and pickle to sell'],
+  dada: ['runs errands for a local politician', 'owns two autos and rents them out', 'a gym trainer', 'calls himself a property consultant'],
+  bhaiya: ['a construction worker', 'a delivery rider', 'a security guard', 'runs a pani puri cart'],
+  collegeboy: ['an engineering student', 'a commerce student', 'studying for the MPSC exams'],
+  collegegirl: ['an engineering student', 'studying law', 'studying for the MPSC exams'],
+  kpguy: ['a software engineer', 'works at a startup', 'a bartender', 'a designer'],
+  kpgirl: ['a software engineer', 'works at a startup', 'a designer', 'a photographer'],
+  tai: ['a nurse', 'a bank officer', 'runs a beauty parlour', 'a schoolteacher'],
+  aunty: ['keeps house', 'runs a boutique', 'a yoga teacher'],
+  cop: ['a constable at the local chowki', 'traffic police', 'a head constable'],
+};
+const CASH = { kaka: [200, 900], kaku: [150, 700], ajoba: [100, 600], aaji: [100, 500], dada: [1000, 5000], bhaiya: [100, 600], collegeboy: [50, 400], collegegirl: [80, 500], kpguy: [500, 3000], kpgirl: [400, 2500], tai: [300, 1500], aunty: [300, 1200], cop: [300, 1500] };
 // what people keep to themselves (picked by who they are, the same each time you read the same person)
 const SECRET = {
   kaka: ['owes the kirana shop more than he admits', 'has been skipping his walk and telling everyone he goes', 'still checks the old lottery tickets in his drawer', 'is saving up, quietly, for his daughter\'s wedding'],
@@ -41,50 +81,80 @@ const SECRET = {
   kpgirl: ['moved here alone and loves it', 'is quitting her job on Monday', 'is homesick tonight', 'is saving for a trip to the hills'],
   cop: ['hasn\'t had a day off in a month', 'lets the vada pav man park where he shouldn\'t', 'wanted to be a teacher', 'knows more about you than you think'],
 };
-const DOING = { walk: 'on their way somewhere', stand: 'waiting about', watch: 'watching something', fight: 'in a fight', flee: 'running from something', free: 'going their own way', fixed: 'at their place', inside: 'inside' };
+const DOING = { walk: 'on their way somewhere', stand: 'waiting about', watch: 'watching something', fight: 'in a fight', flee: 'running from something', free: 'going somewhere', fixed: 'at their place', inside: 'inside' };
+// where Vetal comes back fastest: the burning grounds and burial grounds, and his own temples
+const HAUNT = /cemetery|crematorium|shamshan|smashan|kabrastan|qabrastan|graveyard|burial/i;
 
 const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch (e) { return {}; } };
 const persona = (p) => p.cop || p.police ? 'cop' : p.persona || 'kaka';
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+const smooth = (x) => { x = clamp01(x); return x*x*(3 - 2*x); };
+const rnd = (id, k) => { let h = (Math.abs(id | 0) + 1)*2654435761 ^ k*40503; h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^ (h >>> 16)) >>> 0)/4294967296; };
 
 export function powers(G) {
-  const S = Object.assign({ bar: 1, xp: 0, free: false, day: -1, brahma: 0, munja: 0 }, load());
+  const L0 = load();
+  const S = Object.assign({ vu: L0.bar !== undefined ? L0.bar*100 : 100, mu: 100, free: false, day: -1, brahma: 0 }, L0);
+  delete S.bar; delete S.xp; delete S.munja;
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) { /* private mode */ } };
   const P = () => G.player, ppl = () => G.people, R = () => P().onFoot ? P().foot : P();
   const yaw = () => P().onFoot ? P().foot.yaw : P().th;
   const toast = (a, b, k = 'info', t = 3) => G.hud?.toast?.(a, b, k, t);
   const nameOf = (p) => p.name || G.talkUI?.nameOf?.(p) || WHO[persona(p)] || 'someone';
   const day = () => Math.floor((G.clock || 0)/24);
-  const night = () => { const h = G.hour ?? 12; return h >= 20 || h < 5; };
-  const mastery = () => Math.min(1, S.xp/1800);         // half an hour inside other people to master it
-  const left = (k) => { if (S.day !== day()) { S.day = day(); S.brahma = 0; S.munja = 0; save(); } return S.free ? DAILY : DAILY - S[k]; };
-  const use = (k) => { if (left(k) <= 0) return false; if (!S.free) { S[k]++; save(); } return true; };
+  const nightK = () => { const h = G.hour ?? 12; return h >= 20 || h < 5 ? 1 : h >= 18 ? (h - 18)/2 : h < 7 ? 1 - (h - 5)/2 : 0; };
+  const left = () => { if (S.day !== day()) { S.day = day(); S.brahma = 0; save(); } return S.free ? DAILY : DAILY - S.brahma; };
+  const hpMax = () => G.life?.hpMax || 100;
 
-  // ---------------------------------------------------------------- on the game's own HUD: Vetal is a sixth ring in the vitals
+  const AU = auras(G), PE = people(G), AC = acts(G), HB = hostBody(G);
+
+  // ---------------------------------------------------------------- on the game's own HUD: two more rings in the vitals
   const veil = document.createElement('div'); veil.id = 'nh-veil';
-  veil.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:3;opacity:0;transition:opacity .4s';
+  veil.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:3;opacity:0';
   const css = document.createElement('style');
-  css.textContent = `.vit .v-vt { color: #b26bff; } .vit .v-vt.in svg.gl { animation: v2pulse 1.6s ease-in-out infinite; } body.nh-nohud #nh-veil { display: none; }`;
+  css.textContent = `.vit .v-vt { color: #b26bff; } .vit .v-mj { color: #bcd4ff; } .vit .v-vt.in svg.gl, .vit .v-mj.in svg.gl { animation: v2pulse 1.6s ease-in-out infinite; }
+    body.nh-nohud #nh-veil { display: none; } .toast.nh-read { max-width: min(460px, 86vw); } .toast.nh-read .tt-sub { white-space: pre-line; line-height: 1.45; text-align: left; }`;
   document.head.appendChild(css);
-  let ring = null, black = false;
+  const rings = {};
+  const GLYPH = {
+    vt: '<path d="M12 2.5c.6 3.1 4.6 5.2 4.6 10.1a4.6 4.6 0 0 1-9.2 0c0-2.3 1.2-3.9 2.3-4.9.1 1.6.8 2.7 1.9 3.2-.6-2.9.1-5.8.4-8.4Z"/><circle cx="12" cy="15.4" r="1.6" fill="rgba(0,0,0,.45)"/>',
+    // a peepal leaf, its long tip up
+    mj: '<path d="M12 1.6c-.4 1.7-1.5 2.7-2.9 3.7C7 6.9 5.5 9.3 5.5 12.5a6.5 6.5 0 0 0 5.5 6.4V22h2v-3.1a6.5 6.5 0 0 0 5.5-6.4c0-3.2-1.5-5.6-3.6-7.2-1.4-1-2.5-2-2.9-3.7Z"/><path d="M12 6.5v12" stroke="rgba(0,0,0,.4)" stroke-width="1.1" fill="none"/>',
+  };
   const mount = () => {
     const Hd = G.hud; if (!Hd || !Hd.vit || !Hd._vitEls || !document.body) { setTimeout(mount, 500); return; }
     document.body.appendChild(veil);
-    const C = Hd.vitC || 2*Math.PI*15, sp = document.createElement('span');
-    sp.className = 'v-vt'; sp.title = 'Vetal';
-    sp.innerHTML = `<svg viewBox="0 0 36 36"><circle class="tr" cx="18" cy="18" r="15"/><circle class="fg" cx="18" cy="18" r="15" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="0"/></svg><svg class="gl" viewBox="0 0 24 24"><path d="M12 2.5c.6 3.1 4.6 5.2 4.6 10.1a4.6 4.6 0 0 1-9.2 0c0-2.3 1.2-3.9 2.3-4.9.1 1.6.8 2.7 1.9 3.2-.6-2.9.1-5.8.4-8.4Z"/><circle cx="12" cy="15.4" r="1.6" fill="rgba(0,0,0,.45)"/></svg>`;
-    Hd.vit.appendChild(sp); ring = { sp, fg: sp.querySelector('.fg'), C };
+    const C = Hd.vitC || 2*Math.PI*15;
+    for (const [k, n] of [['vt', 'Vetal'], ['mj', 'Munja']]) {
+      const sp = document.createElement('span'); sp.className = 'v-' + k; sp.title = n;
+      sp.innerHTML = `<svg viewBox="0 0 36 36"><circle class="tr" cx="18" cy="18" r="15"/><circle class="fg" cx="18" cy="18" r="15" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="0"/></svg><svg class="gl" viewBox="0 0 24 24">${GLYPH[k]}</svg>`;
+      Hd.vit.appendChild(sp); rings[k] = { sp, fg: sp.querySelector('.fg'), C };
+    }
   };
   mount();
-  const draw = () => {
-    if (ring) { ring.fg.setAttribute('stroke-dashoffset', (ring.C*(1 - Math.max(0, Math.min(1, S.bar)))).toFixed(1)); ring.sp.classList.toggle('in', !!host); ring.sp.classList.toggle('low', S.bar < 0.15); }
+  let black = false, strainShow = 0;
+  const ringSet = (R, v, on, low) => { if (!R) return; const o = (R.C*(1 - clamp01(v))).toFixed(1); if (R.fg._o !== o) { R.fg._o = o; R.fg.setAttribute('stroke-dashoffset', o); } R.sp.classList.toggle('in', on); R.sp.classList.toggle('low', low); };
+  const draw = (dt) => {
+    ringSet(rings.vt, S.vu/100, !!host || !!link, S.vu < 12);
+    ringSet(rings.mj, S.mu/100, nk > 0, S.mu < 12);
     if (black) return;
-    // purple coming in from the edges: while the link builds, and while you're in someone (deeper as they fight you)
-    const k = host ? 0.35 + Math.min(1, strain)*0.65 : link ? Math.min(1, link.t/link.need) : 0;
-    veil.style.opacity = k.toFixed(3);
-    veil.style.background = `radial-gradient(ellipse at center,transparent ${52 - k*22}%,rgba(${70 + strain*60},${10},${120 + strain*30},${0.35 + k*0.4}) 100%)`;
+    strainShow += (strain - strainShow)*Math.min(1, dt*0.6);        // (it spreads in slowly, as the strain builds)
+    // the edges of your eyes: purple while the link builds (from the first moment, evenly to the end) and while you're
+    // in someone (deeper as they fight you); amber while you read someone; pale while Munja's open
+    const kv = host ? 0.32 + 0.68*clamp01(strainShow) : link ? 0.12 + 0.88*clamp01(link.t/link.need) : 0;
+    const kb = bl ? 0.08 + 0.55*clamp01(bl.t/B_HOLD) : 0, kn = smooth(nk)*0.45;
+    const L = [];
+    if (kv > 0.005) L.push(`radial-gradient(ellipse at center,transparent ${54 - kv*24}%,rgba(${70 + strainShow*70},10,${120 + strainShow*20},${(0.3 + kv*0.45).toFixed(3)}) 100%)`);
+    if (kb > 0.005) L.push(`radial-gradient(ellipse at center,transparent ${60 - kb*20}%,rgba(255,170,30,${(0.15 + kb*0.4).toFixed(3)}) 100%)`);
+    if (kn > 0.005) L.push(`radial-gradient(ellipse at center,transparent ${62 - kn*18}%,rgba(170,200,255,${(0.1 + kn*0.35).toFixed(3)}) 100%)`);
+    veil.style.transition = ''; veil.style.background = L.join(',') || 'none'; veil.style.opacity = L.length ? '1' : '0';
   };
+  // the world goes dark a moment (going in, coming home)
+  function blackout(fn, hold = 260) {
+    black = true; veil.style.transition = 'opacity .25s'; veil.style.background = '#000'; veil.style.opacity = '1';
+    setTimeout(() => { try { fn(); } catch (e) { console.warn('vetal', e); } finally { setTimeout(() => { veil.style.transition = 'opacity .7s'; veil.style.opacity = '0'; setTimeout(() => { black = false; }, 700); }, 120); } }, hold);
+  }
 
-  // ---------------------------------------------------------------- a low sound for the link (made here, nothing loaded)
+  // ---------------------------------------------------------------- sounds (made here, nothing loaded)
   let hum = null;
   const humOn = (k) => {
     const a = G.audio; if (!a || !a.ctx || !a.master) return;
@@ -95,54 +165,49 @@ export function powers(G) {
       hum = { o, o2, g, f };
     }
     const t = a.ctx.currentTime;
-    hum.g.gain.setTargetAtTime(0.22*k, t, 0.08); hum.o2.frequency.setTargetAtTime(78.5 + k*40, t, 0.1); hum.f.frequency.setTargetAtTime(420 + k*900, t, 0.1);
+    hum.g.gain.setTargetAtTime(0.2*k, t, 0.08); hum.o2.frequency.setTargetAtTime(78.5 + k*40, t, 0.1); hum.f.frequency.setTargetAtTime(420 + k*900, t, 0.1);
   };
-
-  // ---------------------------------------------------------------- the aura: light on the person's own body
-  // A second skin on the same skeleton, a few millimetres out, lit only at its edges (where you see past them), so
-  // they glow round their outline and moves as they move. Faded in slowly, out the same way.
-  function auraMat(col) {
-    const m = new THREE.MeshBasicMaterial({ color: col, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-    const uK = { value: 0 }; m.userData.uK = uK;
-    m.onBeforeCompile = (sh) => {
-      sh.uniforms.uK = uK;
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vF;')
-        .replace('#include <project_vertex>', '#ifdef USE_SKINNING\n  transformed += normalize(objectNormal)*0.012;\n#endif\n#include <project_vertex>\n  { vec3 nV = normalize(normalMatrix*objectNormal); vF = pow(1.0 - abs(dot(nV, normalize(-mvPosition.xyz))), 2.4); }');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vF;\nuniform float uK;')
-        .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  gl_FragColor = vec4(diffuse*(0.35 + 1.8*vF), (0.05 + 0.95*vF)*uK);');
-    };
-    return m;
+  let noise = null;
+  const noiseBuf = (C) => { if (noise) return noise; const n = C.sampleRate, b = C.createBuffer(1, n, C.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random()*2 - 1; return (noise = b); };
+  // where a sound is, for your ears: quieter further off, to the side it's on
+  function placed(x, z, C, out) {
+    const cam = G.camera, cp = cam.position, dir = new THREE.Vector3(); cam.getWorldDirection(dir);
+    const dx = x - cp.x, dz = z - cp.z, d = Math.hypot(dx, dz) || 1, rx = -dir.z, rz = dir.x;
+    const g = C.createGain(); g.gain.value = 1/(1 + d/7);
+    const pn = C.createStereoPanner(); pn.pan.value = Math.max(-0.9, Math.min(0.9, (dx*rx + dz*rz)/d));
+    g.connect(pn); pn.connect(out); return g;
   }
-  const auras = new Map(); let auraN = 0;
-  function aura(H, col, want, xray = false) {
-    if (!H || !H.root) return;
-    let A = auras.get(H);
-    if (!A) {
-      const mat = auraMat(col), shells = [];
-      H.root.traverse(o => { if (!o.isSkinnedMesh || o.userData.aura) return; const s = new THREE.SkinnedMesh(o.geometry, mat); s.userData.aura = true; s.bind(o.skeleton, o.bindMatrix); s.position.copy(o.position); s.quaternion.copy(o.quaternion); s.scale.copy(o.scale); s.frustumCulled = false; s.renderOrder = 20; s.castShadow = false; s.receiveShadow = false; shells.push([o.parent, s]); });
-      for (const [par, s] of shells) par.add(s);
-      A = { mat, shells, k: 0 }; auras.set(H, A);
+  // leaves and dry twigs pushed aside: a run of small crackles in a hiss, rising and falling
+  function rustle(x, z) {
+    const a = G.audio; if (!a || !a.ctx || !a.master) return; const C = a.ctx, t0 = C.currentTime;
+    const out = placed(x, z, C, a.master);
+    for (let i = 0; i < 26; i++) {
+      const s = C.createBufferSource(); s.buffer = noiseBuf(C);
+      const bp = C.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600 + Math.random()*3200; bp.Q.value = 1.4 + Math.random()*2;
+      const g = C.createGain(), at = t0 + 0.02 + Math.pow(i/26, 0.85)*0.75 + Math.random()*0.03, L = 0.025 + Math.random()*0.06, v = 0.25 + 0.5*Math.sin(Math.PI*i/26);
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(v, at + 0.004); g.gain.exponentialRampToValueAtTime(0.001, at + L);
+      s.connect(bp); bp.connect(g); g.connect(out); s.start(at, Math.random()*0.8, L + 0.02);
     }
-    A.want = want; A.seen = auraN; A.mat.color.set(col); A.mat.depthTest = !xray;
+    const s = C.createBufferSource(); s.buffer = noiseBuf(C);
+    const hp = C.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000;
+    const g = C.createGain(); g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.12, t0 + 0.15); g.gain.linearRampToValueAtTime(0, t0 + 0.8);
+    s.connect(hp); hp.connect(g); g.connect(out); s.start(t0, 0, 0.85);
   }
-  function auraTick(dt) {
-    for (const [H, A] of auras) {
-      if (A.seen !== auraN) A.want = 0;
-      A.k += (A.want - A.k)*Math.min(1, dt*2.2);
-      A.mat.userData.uK.value = A.k;
-      if (A.want === 0 && A.k < 0.01) { for (const [par, s] of A.shells) par.remove(s); A.mat.dispose(); auras.delete(H); }
-    }
-    auraN++;
+  // a small stone on the road: a sharp tok, and two smaller ones as it skips
+  function stone(x, z) {
+    const a = G.audio; if (!a || !a.ctx || !a.master) return; const C = a.ctx, t0 = C.currentTime;
+    const out = placed(x, z, C, a.master);
+    [[0, 1, 2300], [0.13, 0.45, 2700], [0.22, 0.2, 3100]].forEach(([dt, v, fq]) => {
+      const s = C.createBufferSource(); s.buffer = noiseBuf(C);
+      const bp = C.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = fq; bp.Q.value = 9;
+      const g = C.createGain(), at = t0 + dt;
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.9*v, at + 0.002); g.gain.exponentialRampToValueAtTime(0.001, at + 0.07);
+      s.connect(bp); bp.connect(g); g.connect(out); s.start(at, Math.random()*0.5, 0.09);
+    });
   }
-  const bodyOf = (p) => p && p.body && p.body.H;
 
-  // ---------------------------------------------------------------- Vetal
-  let dz = null, leaving = false, justIn = false, target = null, calm = 0, drag = null, dazeT = 0, link = null, host = null, home = null, strain = 0, held = 0, wasV = false, heat0 = 0, hp0 = 100, punches = 0;
-  const RANGE = 45;
-  let coolT = 0, hops = 0;
-  const candidates = () => ppl() ? ppl().list.filter(p => !p.hidden && !p.corpse && !(p.fallen > 0) && !p.pax && !p._vetalBody && p.look) : [];
+  // ---------------------------------------------------------------- aiming: whoever's in the middle of the screen
   const cp = new THREE.Vector3(), cf = new THREE.Vector3(), tv = new THREE.Vector3();
-  const aimed = () => aimAt(candidates(), RANGE);
   function aimAt(list, range) {
     const cam = G.camera; if (!P().onFoot || !cam) return null;
     cam.getWorldPosition(cp); cam.getWorldDirection(cf);
@@ -150,77 +215,102 @@ export function powers(G) {
     for (const p of list) {
       const d = Math.hypot(p.x - F.x, p.z - F.z); if (d > range || d < 0.4) continue;
       const y = G.W?.surf ? G.W.surf.height(p.x, p.z) : 0;
-      // the middle of the screen on them: the camera's line passes through their body (chest, head to hips)
+      // the camera's line passes through their body (chest; more give the further off they are)
       tv.set(p.x, y + 1.15, p.z).sub(cp); const along = tv.dot(cf); if (along <= 0.5) continue;
       const off = Math.sqrt(Math.max(0, tv.lengthSq() - along*along));
-      if (off > 0.42) continue;
-      const sc = off + along*0.004; if (sc < bs) { bs = sc; best = p; }
+      if (off > 0.42 + along*0.006) continue;
+      const sc = off/along + along*0.0004; if (sc < bs) { bs = sc; best = p; }
     }
     return best;
   }
+  const candidates = () => ppl() ? ppl().list.filter(p => !p.hidden && !p.corpse && !(p.fallen > 0) && !p.pax && !p._vetalBody && !p._wake && p.look) : [];
+  const bodyOf = (p) => p && p.body && p.body.H;
+
+  // ---------------------------------------------------------------- Vetal
+  let link = null, host = null, home = null, strain = 0, calm = 0, held = 0, wasV = false, justIn = false, leaving = false;
+  let heat0 = 0, hp0 = 100, punches = 0, coolT = 0, hops = 0, dazeT = 0, hauntT = 0;
   const raw = (look) => Object.getPrototypeOf(P()).setLook.call(P(), look);
   const fromBody = () => home ? Math.hypot(R().x - home.x, R().z - home.z) : 0;
-  const costIn = (p) => 0.14*(WILL[persona(p)] || 1)*(1 - 0.4*mastery())*(host ? 0.5 : 1);
-  const timeIn = (p) => 3.0*(0.75 + 0.25*(WILL[persona(p)] || 1))*(1 - 0.3*mastery())*(host ? 0.8 : 1);
+  const will = (p) => WILL[persona(p)] || 1;
+  // how it's going: their will, how far you are from your own body, how low you are; mostly near the low end
+  const sit = (p) => Math.pow(clamp01(0.5*(will(p) - 0.75)/1.25 + 0.3*Math.min(1, Math.hypot(p.x - (home ? home.x : R().x), p.z - (home ? home.z : R().z))/V_RANGE) + 0.2*(1 - S.vu/100)), 1.6);
+  const hopRange = (k) => k < HOP.length ? HOP[k] : [10 + 3*(k - 4), 15 + 4*(k - 4)];
+  const costIn = (p) => { const [lo, hi] = hopRange(hops); return lo + (hi - lo)*sit(p); };
+  const holdFor = (p) => V_HOLD*(0.92 + 0.08*will(p));
+  const spend = (u) => { if (!S.free) S.vu = Math.max(0, S.vu - u); };
+  function earlyCost(l) {
+    if (l.t < 0.4) return;
+    const p = l.p, d = Math.hypot(p.x - R().x, p.z - R().z);
+    spend(1 + 2*Math.pow(clamp01(0.45*l.t/l.need + 0.3*(will(p) - 0.75)/1.25 + 0.25*d/V_RANGE), 2));
+  }
 
-  function take(p, instant = false) {
+  function take(q) {
     humOn(0);
-    if (!p) throw new Error('nobody to take');
-    const c = S.free ? 0 : costIn(p);
-    if (S.bar < c) { toast('Vetal', 'Not enough left in you for that one', 'warn'); return false; }
-    S.bar -= c;
+    if (!q) throw new Error('nobody to take');
+    spend(costIn(q));
     const Pl = P(), F = R();
+    if (AC.dragging) AC.stopDrag();
     if (!home) {
       // your own body stays where it fell: one of the street's people now, out cold, for as long as you're away
       const body = ppl().spawnAt(Pl.look, F.x, F.z, 'kaka');
-      if (body) { Object.assign(body, { fallen: 1e6, ko: true, unconscious: true, mode: 'stand', wait: 1e9, v: 0, anim: null, yaw: yaw(), _vetalBody: true, persona: null }); body.anchor = { x: body.x, z: body.z }; }
+      if (body) { Object.assign(body, { fallen: 1e6, ko: true, unconscious: true, mode: 'stand', wait: 1e9, v: 0, anim: null, yaw: yaw(), _vetalBody: true, persona: null, _downAt: performance.now() }); body.anchor = { x: body.x, z: body.z }; }
       home = { look: Pl.look, x: F.x, z: F.z, yaw: yaw(), hp: Pl.hp ?? 100, body, t: 0, crowd: false };
-    } else if (host) release(host, F.x, F.z);
-    host = { look: p.look, persona: p.persona, cop: p.cop || p.police, name: p.name, female: p.female, id: p.id, kind: persona(p) };
-    const x = p.x, z = p.z, th = p.yaw || 0;
-    ppl().remove(p);
+    } else if (host) release(host, F.x, F.z, 'soft');
+    host = { look: q.look, persona: q.persona, cop: q.cop || q.police, name: q.name, female: !!(q.female || q.look?.female), id: q.id, kind: persona(q), hp0: q.hp0 || 100 };
+    const hpR = clamp01((q.hp ?? q.hp0 ?? 100)/(q.hp0 || 100));
+    HB.enter(q, Pl);
+    const x = q.x, z = q.z, th = q.yaw || 0;
+    ppl().remove(q);
     raw(host.look);
     Pl.teleportFoot(x, z, th, G.traffic);
-    Pl.hp = 100; hp0 = 100; heat0 = G.police?.heat || 0; strain = 0; punches = 0;
-    G.hud?.flash?.();
-    toast('Vetal', `You are ${host.name || WHO[host.kind] || 'someone else'} now. V to go back`, 'info', 3.5);
+    Pl.hp = hpMax()*(hpR || 1); hp0 = Pl.hp; heat0 = G.police?.heat || 0; strain = 0; strainShow = 0; punches = 0; calm = 0;
+    hops++;
+    AC.shudder();
+    toast('Vetal', `You are ${host.name || WHO[host.kind] || 'someone else'} now. Tap V to go back`, 'info', 3);
     coolT = 4;
     return true;
   }
-  // the moment of going in: the world goes dark, and either you wake up in them or they throw you off. How likely
-  // that is comes from them and from you: a strong will, a low bar, one hop too many, and less mastery all count
-  // (at full strength, first try, it's very rare: about one in a hundred with an ordinary person)
+  // the moment of going in: dark, and either you wake up in them or they throw you off. How likely that is comes
+  // from them and from you: a strong will, a low bar, one hop too many (fresh, at full strength, an ordinary person:
+  // about one in a hundred)
   function attempt(q) {
-    const w = WILL[persona(q)] || 1, m = mastery();
-    const pr = S.free ? 0 : Math.min(0.6, 0.009*w*w*(1 + 4*(1 - S.bar))*(1 + 0.9*hops)*(1 - 0.6*m));
-    black = true; veil.style.transition = 'opacity .3s'; veil.style.background = '#000'; veil.style.opacity = '1';
+    const w = will(q);
+    const pr = S.free ? 0 : Math.min(0.6, 0.009*w*w*(1 + 4*(1 - S.vu/100))*(1 + 0.9*hops));
     humOn(1);
-    setTimeout(() => {
-      try {
-        if (Math.random() < pr && ppl().list.includes(q)) {
-          const who = nameOf(q);
-          ppl().flee?.(q, R().x, R().z, 10); q.angry = 3;
-          if (host) goHome(`${who} threw you out`, true);
-          else { S.bar = Math.max(0, S.bar - costIn(q)*0.5); dazeT = 14; const Pl = P(); Pl.frozen = true; Pl.human?.play?.('knockback', { once: true, fade: 0.12 }); setTimeout(() => { Pl.frozen = false; }, 1800); toast('Vetal', `${who} fought you off`, 'warn', 3); coolT = 10; }
-        } else if (ppl().list.includes(q)) { take(q); hops++; justIn = true; }
-      } catch (e) { console.warn('vetal', e); }
-      finally { humOn(0); black = false; veil.style.transition = 'opacity .6s'; }
+    blackout(() => {
+      humOn(0);
+      if (!ppl().list.includes(q)) return;
+      if (Math.random() < pr) {
+        spend(3 + 2*sit(q));
+        const who = nameOf(q);
+        // they felt you at the door: startled, and wary of you (a dada squares up)
+        q.angry = 3; if (persona(q) === 'dada') { q.grudge = 30; ppl().watch(q, R().x, R().z, 3); } else ppl().flee?.(q, R().x, R().z, 10);
+        if (host) throwOut(`${who} threw you off`);
+        else { dazeT = 14; coolT = 10; AC.foughtOff(); toast('Vetal', `${who} fought you off`, 'warn', 3); }
+      } else { take(q); justIn = !!G.input?.key('KeyV'); }          // (still holding V: that letting go isn't a tap)
     }, 420);
   }
 
   // the one you were in comes to, where you left them, with no idea how they got there
-  function release(h, x, z) {
+  function release(h, x, z, how, D) {
+    HB.leave(P());
     const p = ppl().spawnAt(h.look, x, z, h.persona);
     if (!p) return;
     if (h.cop) p.cop = true; if (h.name) p.name = h.name;
-    p.mode = 'watch'; p.watch = { x: x + 1, z }; p.wait = 4; p.anim = null; p.id = h.id; p.dizzy = { t: 0, dur: 2.6, ph: Math.random()*6 };
-    setTimeout(() => G.hud?.say?.(h.name || WHO[h.kind] || 'Someone', '', h.female ? 'How… how did I get here?' : 'How did I get here?', 3), 600);
+    p.id = h.id; p.female = h.female; p.yaw = yaw(); p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
+    p.hp = (p.hp0 || h.hp0 || 100)*clamp01((P().hp ?? 100)/hpMax());
+    const sev = 1 + 0.25*Math.max(0, hops - 1);
+    if (how === 'ko') { Object.assign(p, { fallen: 40, ko: true, unconscious: true, v: 0 }); return; }
+    if (how === 'thrown') { p.act = { clip: 'getup', speed: 0.6, t: 0, dur: 1.57/0.6 }; PE.wake(p, { delay: 1.57/0.6, sev: sev + 0.3, hops, female: h.female }); return; }
+    PE.wake(p, { D, sev, hops, female: h.female });
   }
-  function goHome(why, hard = false, quiet = false) {
+  // how: soft (tapped V, or it ran out), thrown (they threw you out), ko (knocked out in them)
+  function goHome(why, how = 'soft', D) {
     if (!home) return;
     const Pl = P(), F = R(), b = home.body;
-    if (drag && drag.p === b) drag = null;
-    if (host) release(host, F.x, F.z);
+    if (AC.dragging) AC.stopDrag();
+    if (host) release(host, F.x, F.z, how, D);
+    HB.home(Pl);
     host = null;
     // whatever the street did to your body while you were out of it
     let hp = home.hp;
@@ -230,75 +320,63 @@ export function powers(G) {
     raw(home.look);
     Pl.teleportFoot(bx, bz, by, G.traffic);
     Pl.hp = hp; home = null; strain = 0; humOn(0); hops = 0; coolT = 8;
-    // you come to on the ground and get up: slowly if they threw you out (and it's two minutes later)
-    const H = Pl.human;
-    if (hard) {
-      if (!G.live && G.setHour) G.setHour(((G.hour + 2/60) % 24 + 24) % 24);
-      dazeT = 45; Pl.frozen = true; H?.play?.('knockback', { once: true, fade: 0.15 });
-      setTimeout(() => { H?.play?.('getup', { once: true, fade: 0.35, speed: 0.6 }); }, 2600);
-      setTimeout(() => { Pl.frozen = false; }, 5200);
-      if (why) toast('Vetal', why + '. You come round two minutes later, head pounding', 'warn', 4);
-    } else if (!quiet) {
-      Pl.frozen = true; H?.play?.('getup', { once: true, fade: 0.25, speed: 0.85 });
-      setTimeout(() => { Pl.frozen = false; }, 1700);
-      if (why) toast('Vetal', why, 'warn', 3);
-    }
+    const hard = how !== 'soft';
+    if (how === 'thrown' && !G.live && G.setHour) G.setHour(((G.hour + 2/60) % 24 + 24) % 24);
+    if (hard) dazeT = 45;
+    AC.wakeUp(hard);
+    if (why) toast('Vetal', how === 'thrown' ? why + '. You come round two minutes later, head pounding' : why, 'warn', 4);
   }
-  function leaveSoft() {
+  function leaveSoft(why) {
     if (!home || leaving) return;
-    const Pl = P(); leaving = true; Pl.frozen = true;
-    dz = { t: 0, dur: 0.5, ph: Math.random()*6 };
-    veil.style.opacity = 1;
-    setTimeout(() => {
-      try {
-        dz = null;
-        goHome(null, false, true);
-        const H2 = P().human, g = H2?.actions?.getup;
-        if (g) { H2.play('getup', { once: true, fade: 0.05 }); g.timeScale = 0; }
-        setTimeout(() => { if (g) g.timeScale = 0.9; setTimeout(() => { P().frozen = false; leaving = false; }, 1300); }, 500);
-        if (!g) { P().frozen = false; leaving = false; }
-      } catch (e) { P().frozen = false; leaving = false; }
-    }, 500);
+    if (!host) { goHome(why, 'soft'); return; }
+    leaving = true; AC.cancel();
+    const D = { t: 0, ph: Math.random()*6, dur: 9, sev: 1 + 0.25*Math.max(0, hops - 1), hand: 'r' };
+    AC.dizzyOut(D, 0.5, () => blackout(() => { leaving = false; goHome(why, 'soft', D); }));
+  }
+  function throwOut(why) {
+    if (!home || leaving) return;
+    leaving = true; AC.cancel();
+    AC.thrownOut(() => blackout(() => { leaving = false; goHome(why, 'thrown'); }));
   }
   // the punch key and the mouse, counted while you're in someone (a gentle body fighting strains the hold)
   addEventListener('keydown', (e) => { if (host && e.code === 'KeyX' && !e.repeat) punches++; }, true);
-  addEventListener('mousedown', (e) => { if (host && e.button === 0 && document.pointerLockElement) punches++; }, true);
+  addEventListener('mousedown', (e) => { if (host && e.button === 0 && document.pointerLockElement && !(nk > 0)) punches++; }, true);
 
   function vetal(dt) {
     // hold V on someone until you're in them (then let go: you stay); hold it on someone else to hop; a tap goes home
-    const down = !!G.input?.key('KeyV') && !G.talkUI?.cur && !leaving, rel = !down && wasV;
+    const down = !!G.input?.key('KeyV') && !leaving && !AC.busy, rel = !down && wasV;
     wasV = down;
     if (down) held += dt;
     if (coolT > 0) coolT -= dt;
-    if (down && !link && held > 0.12 && !justIn && coolT <= 0 && !black) { const p = aimed(); if (p) link = { p, t: 0, need: timeIn(p) }; }
+    if (down && !link && held > 0.35 && !justIn && coolT <= 0 && !black && P().onFoot) {
+      const p = aimAt(candidates(), V_RANGE);
+      if (p) { if (!S.free && S.vu < hopRange(hops)[0]) { toast('Vetal', 'Not enough left in you for that', 'warn', 2); held = -1e9; } else link = { p, t: 0, need: holdFor(p) }; }
+    }
     if (rel) {
       if (justIn) justIn = false;
       else if (black) { /* going in */ }
-      else if (link) { link = null; humOn(0); toast('Vetal', 'Hold V until you\'re in', 'info', 1.6); }
-      else if (held < 0.35) { if (host) leaveSoft(); else toast('Vetal', 'Look at someone and hold V', 'info', 2); }
+      else if (link) { earlyCost(link); link = null; humOn(0); }
+      else if (held > 0 && held < 0.35) { if (host) leaveSoft(); else toast('Vetal', 'Hold V with someone in the middle of the screen', 'info', 2); }
       held = 0;
     }
-    target = link ? link.p : aimed();
     if (link) {
-      const p = aimed();
+      const p = aimAt(candidates(), V_RANGE);
       // look across to someone else and the link moves to them, from nothing again; look at nobody and it breaks
-      if (p && p !== link.p) link = { p, t: 0, need: timeIn(p) };
-      else if (!p) { link.lost = (link.lost || 0) + dt; if (link.lost > 0.35) { link = null; humOn(0); toast('Vetal', 'The link broke: keep them in your eyes', 'warn', 1.6); } }
+      if (p && p !== link.p) link = { p, t: 0, need: holdFor(p) };
+      else if (!p) { link.lost = (link.lost || 0) + dt; if (link.lost > 0.35) { earlyCost(link); link = null; humOn(0); toast('Vetal', 'The link broke: keep them in the middle', 'warn', 1.6); } }
       else link.lost = 0;
       if (link) {
         link.t += dt;
-        // they feel it: they stop and look round
-        if (link.t > 0.4 && link.p.mode !== 'watch' && link.p.mode !== 'fight') ppl().watch(link.p, R().x, R().z, 2);
+        // they feel it: they stop and look round, uneasy
+        if (link.t > 1.2 && link.p.mode !== 'watch' && link.p.mode !== 'fight' && !link.p._startle) ppl().watch(link.p, link.p.x + Math.cos(link.p.yaw || 0)*4, link.p.z + Math.sin(link.p.yaw || 0)*4, 2.5);
         humOn(link.t/link.need);
         if (link.t >= link.need) { const q = link.p; link = null; attempt(q); }
       }
     }
     if (host) {
       // the cost of being someone else
-      S.xp += dt;
       const d = fromBody(), w = WILL[host.kind] || 1;
-      const drain = 0.008*w*(1 + d/220)*(1 - 0.45*mastery());
-      if (!S.free) S.bar = Math.max(0, S.bar - drain*dt);
+      spend(STAY*(0.8 + 0.2*w)*(1 + d/500)*dt);
       // doing what they never would
       const Pl = P(), F = Pl.foot;
       if (OLD.has(host.kind) && Pl.onFoot && Math.hypot(F.vx || 0, F.vz || 0) > 3.6) { strain += dt*0.2; calm = 0; }
@@ -307,92 +385,247 @@ export function powers(G) {
       if (heat > heat0) { strain += (heat - heat0)*(host.kind === 'cop' ? 0.35 : 0.1); heat0 = heat; calm = 0; } else heat0 = heat;
       if ((Pl.hp ?? 100) < hp0) { strain += (hp0 - Pl.hp)*0.004; calm = 0; } hp0 = Pl.hp ?? 100;
       calm += dt;
-      if (calm > 3) strain = Math.max(0, strain - dt*0.1*(1 + mastery()));
+      if (calm > 3) strain = Math.max(0, strain - dt*0.1);
       if (S.free) strain = 0;
-      if (strain >= 1 + mastery()*0.5) goHome('They threw you out', true);
-      else if (S.bar <= 0) goHome('Vetal ran out: pulled home');
-      else if (Pl.ko || (Pl.hp ?? 100) <= 0) goHome('Knocked out of them', true);
+      if (!leaving && !AC.busy) {
+        if (strain >= 1) throwOut('They threw you out');
+        else if (S.vu <= 0) leaveSoft('Vetal ran out: pulled home');
+        else if (Pl.ko || (Pl.hp ?? 100) <= 0) { leaving = true; blackout(() => { leaving = false; goHome('Knocked out of them', 'ko'); }); }
+      }
       // the street finds your body after a while
       if (home && !home.crowd && (home.t += dt) > 18 && home.body) { home.crowd = true; try { ppl().gather?.(home.body.x, home.body.z, 3, 'foot'); } catch (e) { /* no crowd here */ } }
     } else if (!link) {
-      S.bar = Math.min(1, S.bar + dt*0.0045*(night() ? 1.8 : 1));
+      S.vu = Math.min(100, S.vu + dt*(R_DAY + (R_NIGHT - R_DAY)*nightK())*haunt(dt));
     }
   }
+  // near the burning grounds, the burial grounds, a Vetal temple: it comes back three times as fast
+  let haunts = null, hauntChk = 0, hauntName = null;
+  const hauntSaid = new Set();
+  function haunt(dt) {
+    if (!haunts && (hauntChk -= dt) <= 0) {
+      hauntChk = 5;
+      const pl = G.W?.cityMap?.places || G.cityMap?.places;
+      if (pl && pl.length) haunts = pl.filter(q => q.n && (HAUNT.test(q.n) || (/vetal/i.test(q.n) && (q.c === 'temple' || q.sub === 'temple' || /mandir|temple/i.test(q.n))))).map(q => ({ n: q.n, x: q.x, z: q.z }));
+    }
+    if (!haunts || !haunts.length) return 1;
+    const F = R(); let best = null, bd = 1e9;
+    if ((hauntT -= dt) <= 0) { hauntT = 1; for (const q of haunts) { const d = Math.hypot(q.x - F.x, q.z - F.z); if (d < bd) { bd = d; best = q; } } hauntName = best && bd < 400 ? { q: best, d: bd } : null; }
+    if (!hauntName) return 1;
+    const k = 1 + 2*clamp01(1 - (hauntName.d - 120)/280);
+    if (k > 2.5 && !hauntSaid.has(hauntName.q.n) && S.vu < 99) { hauntSaid.add(hauntName.q.n); toast('Vetal', `${hauntName.q.n}: it comes back faster here`, 'info', 3); }
+    return k;
+  }
 
-  // ---------------------------------------------------------------- Brahmarakshas (B, on foot): the one you look at
-  let readP = null, readT = 0;
-  function read(p) {
-    if (!p) { toast('Brahmarakshas', 'Look at someone, then B', 'info', 2); return false; }
-    if (!use('brahma')) { toast('Brahmarakshas', 'Spent for today. Back tomorrow', 'warn', 2.5); return false; }
-    const k = persona(p), mem = ppl().mem?.get(p.id) || {}, rep = ppl().rep?.at?.(p.x, p.z) || { good: 0, bad: 0 };
-    const mood = p.mode === 'fight' ? 'ready to fight' : p.angry > 0 ? 'angry' : p.grudge > 0 ? 'holding a grudge' : p.mode === 'flee' ? 'frightened' : p.fallen > 0 ? 'hurt' : 'calm';
-    const you = mem.hit ? 'You hit them, and they haven\'t forgotten' : mem.shoved ? 'You shoved them; still sore about it' : mem.saw ? 'They saw what you did and are wary of you' : rep.bad > 2 ? 'They\'ve heard about you round here, and not good things' : rep.good > 2 ? 'They\'ve heard good things about you' : 'They don\'t know you';
-    const sec = SECRET[k] || SECRET.kaka, sc = sec[Math.abs(p.id || 0) % sec.length];
-    readP = p; readT = 7;
-    toast(nameOf(p), `${WHO[k] || k}, ${DOING[p.mode] || 'about'}. ${mood[0].toUpperCase() + mood.slice(1)}. ${you}. Keeps to themselves: ${sc}.${p.cash !== undefined ? ` Carrying ₹${Math.round(p.cash)}.` : ''}`, 'info', 7);
+  // ---------------------------------------------------------------- Brahmarakshas (B, on foot): hold on someone
+  let bl = null, bDone = false, readP = null, readT = 0;
+  const readable = () => (ppl()?.list || []).filter(p => !p.hidden && !p._vetalBody && p.look);
+  function reading(p) {
+    const k = persona(p), id = p.id || 0, mem = ppl().mem?.get(p.id) || {}, rep = ppl().rep?.at?.(p.x, p.z) || { good: 0, bad: 0 }, h = G.hour ?? 12;
+    const [a0, a1] = AGE[k] || [30, 50], age = Math.round(a0 + (a1 - a0)*rnd(id, 1));
+    const work = (WORK[k] || WORK.kaka)[Math.floor(rnd(id, 2)*(WORK[k] || WORK.kaka).length)];
+    // home: one of the real neighbourhoods round here
+    const subs = (G.hud?.suburbs || []).map(s => [s, Math.hypot(s.x - p.x, s.z - p.z)]).sort((x, y) => x[1] - y[1]).slice(0, 6);
+    const homeA = subs.length ? subs[Math.floor(rnd(id, 3)*subs.length)][0].n : null;
+    // where they're going: the real place at the end of their way, or the road they're on
+    const places = G.W?.cityMap?.places || [];
+    const nearPlace = (x, z, m) => { let b = null, bd = m; for (const q of places) { const d = Math.abs(q.x - x) + Math.abs(q.z - z); if (d < bd) { bd = d; b = q; } } return b; };
+    let going = DOING[p.mode] || 'about';
+    if (p.goal) { const q = nearPlace(p.goal.x, p.goal.z, 120); if (q) going = `heading to ${q.n}`; }
+    else if (p.mode === 'walk' && p.e) { const rn = G.W?.graph?.names?.[p.e.name]?.[0]; if (rn) going = `walking along ${rn}`; }
+    const mood = p.mode === 'fight' ? 'ready to fight' : p.angry > 0 ? 'angry' : p.grudge > 0 ? 'holding a grudge' : p.mode === 'flee' ? 'frightened' : p.fallen > 0 ? 'hurt' : (HB.vitalsFor(p).mood > 0.62 ? 'in a good mood' : 'calm');
+    const you = mem.hit ? 'you hit them, and they haven\'t forgotten' : mem.shoved ? 'you shoved them; still sore about it' : mem.saw ? 'they saw what you did and are wary of you' : rep.bad > 2 ? 'they\'ve heard about you round here, and not good things' : rep.good > 2 ? 'they\'ve heard good things about you' : 'they don\'t know you';
+    const [c0, c1] = CASH[k] || [100, 800], cash = p.cash !== undefined ? Math.round(p.cash) : Math.round((c0 + (c1 - c0)*rnd(id, 4))/10)*10;
+    const bag = Object.keys(HB.bagFor(p)).map(it => (ITEMS[it]?.name || it).toLowerCase());
+    // what's on their mind: the hour, the weather, what's near
+    const V = HB.vitalsFor(p), mind = [];
+    if (V.hunger < 0.35) mind.push('food'); else if (h >= 6 && h < 10) mind.push(OLD.has(k) ? 'the morning walk and the milk' : 'getting there on time'); else if (h >= 13 && h < 15) mind.push('lunch, and the heat'); else if (h >= 18 && h < 21) mind.push('what\'s for dinner'); else if (h >= 21 || h < 1) mind.push('getting home'); else if (h < 6) mind.push('sleep, and why they\'re still out'); else mind.push('the day\'s work');
+    if (G.weather?.cur && /rain|storm/i.test(G.weather.cur)) mind.push('the rain');
+    if (V.drunk > 0.3) mind.push('the last drink');
+    if ((G.police?.heat || 0) > 0) mind.push('the sirens');
+    const np = nearPlace(p.x, p.z, 45); if (np && /food|tapri|cafe|bakery|sweets|misal|thali|biryani/.test(np.c || np.sub || '')) mind.push(`the smell from ${np.n}`);
+    if (mem.hit || mem.shoved) mind.push('you');
+    const sec = (SECRET[k] || SECRET.kaka)[Math.abs(id) % (SECRET[k] || SECRET.kaka).length];
+    const w = will(p), wl = w <= 0.8 ? 'weak' : w <= 1.05 ? 'ordinary' : w <= 1.3 ? 'firm' : w <= 1.7 ? 'strong' : 'iron';
+    const [lo, hi] = hopRange(home ? hops : 0), est = Math.round(lo + (hi - lo)*sit(p));
+    const pr = Math.min(0.6, 0.009*w*w*(1 + 4*(1 - S.vu/100))*(1 + 0.9*(home ? hops : 0)));
+    return {
+      title: `${nameOf(p)}, ${age}`,
+      lines: [
+        `${work[0].toUpperCase() + work.slice(1)}${homeA ? ` · lives in ${homeA}` : ''}`,
+        `${going[0].toUpperCase() + going.slice(1)} · ${mood}`,
+        `Of you: ${you}`,
+        `Carrying ₹${cash}${bag.length ? ' · ' + bag.join(', ') : ''}, a phone`,
+        `On their mind: ${mind.slice(0, 3).join(', ')}`,
+        `Keeps to themselves: ${sec}`,
+        `Will: ${wl}. Vetal into them about ${est}; ${pr < 0.02 ? 'they won\'t fight you off' : pr < 0.08 ? 'they might fight you off' : 'they may well throw you off'}`,
+      ],
+    };
+  }
+  function read(p, free = false) {
+    if (!p) return false;
+    if (!free && !S.free) { if (left() <= 0) { toast('Brahmarakshas', 'Spent for today. Back tomorrow', 'warn', 2.5); return false; } S.brahma++; save(); }
+    const r = reading(p);
+    toast(r.title, r.lines.join('\n'), 'info', 11);
+    const T = G.hud?.toasts; if (T && T.length) T[T.length - 1].el.classList.add('nh-read');
+    readP = p; readT = 9;
     return true;
   }
-  const readable = () => aimAt((ppl()?.list || []).filter(p => !p.hidden && !p._vetalBody && p.look), 14);
+  function brahma(dt) {
+    const down = !!G.input?.key('KeyB') && P().onFoot && !AC.busy;
+    if (!down) { bl = null; bDone = false; return; }
+    if (bDone) return;
+    const p = aimAt(readable(), B_RANGE);
+    if (!bl) {
+      if (!p) return;
+      if (!S.free && left() <= 0) { toast('Brahmarakshas', 'Spent for today. Back tomorrow', 'warn', 2.5); bDone = true; return; }
+      bl = { p, t: 0 };
+    } else if (p && p !== bl.p) bl = { p, t: 0 };
+    else if (!p) { bl.lost = (bl.lost || 0) + dt; if (bl.lost > 0.35) { bl = null; return; } } else bl.lost = 0;
+    bl.t += dt;
+    if (bl.t >= B_HOLD) { read(bl.p); bl = null; bDone = true; }
+  }
 
   // ---------------------------------------------------------------- Munja (N, on foot): everyone near, through walls
-  let senseT = 0;
-  function senseOn(t = SENSE) { if (!use('munja')) { toast('Munja', 'Spent for today. Back tomorrow', 'warn', 2.5); return false; } senseT = t; toast('Munja', `Everyone within ${SENSE_R} m, through the walls: red to fight, amber wary, green kind, blue police`, 'info', 3); return true; }
+  let nk = 0, nForce = 0, nSaid = false;
   const intent = (p) => {
     const m = ppl().mem?.get(p.id) || {};
+    if (p._vetalBody) return '#c79bff';
+    if (p.corpse) return '#777777';
     if (p.cop || p.police) return '#4aa3ff';
     if (p.mode === 'fight' || p.angry > 0 || p.grudge > 0 || (m.hit && /dada|bhaiya|tai/.test(p.persona || ''))) return '#ff4d4d';
     if (p.mode === 'flee' || m.saw || m.hit || m.shoved) return '#ffb020';
     if (p.act && p.act.clip === 'wave') return '#3ddc84';
     return '#e9e2d0';
   };
-  // the auras this frame: Vetal's on whoever you're going into (only while you hold V), Brahmarakshas' on whoever you
-  // read, Munja's on everyone near (through walls), and your own body while you're out of it
-  function auraFrame(dt) {
-    if (link && G.state === 'play') aura(bodyOf(link.p), '#b26bff', 0.25 + 0.85*Math.min(1, link.t/link.need));
-    if (readP && readT > 0) { readT -= dt; aura(bodyOf(readP), '#ffb020', Math.min(0.8, readT*0.4)); }
-    if (senseT > 0) {
-      senseT -= dt;
-      const F = R(), k = Math.min(1, senseT/1.2, (SENSE - senseT + 0.2)/0.8);
-      let n = 0;
-      for (const p of ppl().list) { if (p.hidden || n > 40 || Math.hypot(p.x - F.x, p.z - F.z) > SENSE_R) continue; const H = bodyOf(p); if (!H) continue; aura(H, p._vetalBody ? '#c79bff' : p.corpse ? '#777777' : intent(p), 0.9*k, true); n++; }
+  const near = () => { const F = R(), out = []; for (const p of ppl()?.list || []) { if (p.hidden) continue; const d = Math.hypot(p.x - F.x, p.z - F.z); if (d <= N_R) out.push([p, d]); } return out.sort((x, y) => x[1] - y[1]); };
+  function munja(dt) {
+    const want = (nForce > 0 || (!!G.input?.key('KeyN') && P().onFoot && !AC.busy)) && (S.mu > 0 || S.free);
+    if (nForce > 0) nForce -= dt;
+    nk = want ? Math.min(1, nk + dt/N_UP) : Math.max(0, nk - dt/0.6);
+    if (want && nForce <= 0) spend2(N_DRAIN*dt);
+    if (want && S.mu <= 0 && !S.free) toast('Munja', 'Spent. It comes back in time', 'warn', 2);
+    if (!want) nSaid = false;
+    if (!want && nk <= 0) S.mu = Math.min(100, S.mu + dt*(R_DAY + (R_NIGHT - R_DAY)*nightK())*N_REFILL);
+    if (nk >= 1 && !nSaid) {
+      nSaid = true;
+      let hos = 0, wary = 0, cop = 0, calm2 = 0;
+      for (const [p] of near()) { const c = intent(p); if (c === '#ff4d4d') hos++; else if (c === '#ffb020') wary++; else if (c === '#4aa3ff') cop++; else if (!p._vetalBody && !p.corpse) calm2++; }
+      toast('Munja', [hos && `${hos} hostile`, wary && `${wary} wary`, cop && `${cop} police`, `${calm2} calm`].filter(Boolean).join(', '), 'info', 2.5);
     }
-    auraTick(dt);
+  }
+  const spend2 = (u) => { if (!S.free) S.mu = Math.max(0, S.mu - u); };
+  // where each of them is about to walk, lit on the ground ahead of them
+  const TR_N = 28, TR_M = 12;
+  let trail = null, trT = 0;
+  const TMP = [0, 0, 0, 0];
+  function trailMesh() {
+    const g = new THREE.BufferGeometry(), nv = TR_N*TR_M*4;
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nv*3), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(nv*3), 3));
+    const idx = new Uint32Array(TR_N*TR_M*6); for (let i = 0; i < TR_N*TR_M; i++) { const v = i*4; idx.set([v, v + 1, v + 2, v + 1, v + 3, v + 2], i*6); }
+    g.setIndex(new THREE.BufferAttribute(idx, 1)); g.setDrawRange(0, 0);
+    const m = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, opacity: 0 });
+    const mesh = new THREE.Mesh(g, m); mesh.frustumCulled = false; mesh.renderOrder = 19;
+    G.scene.add(mesh); return mesh;
+  }
+  function pathOf(p) {
+    const pts = [p.x, p.z], cap = 28;
+    let len = 0;
+    const push = (x, z) => { const lx = pts[pts.length - 2], lz = pts[pts.length - 1], d = Math.hypot(x - lx, z - lz); if (d < 0.5) return true; if (len + d > cap) { const k = (cap - len)/d; pts.push(lx + (x - lx)*k, lz + (z - lz)*k); return false; } len += d; pts.push(x, z); return pts.length < TR_M*2; };
+    if (p.goal) {
+      const g = p.goal; if (g.path) { for (let i = g.k || 0; i + 1 < g.path.length; i += 2) if (!push(g.path[i], g.path[i + 1])) break; } else push(g.x, g.z);
+    } else if (p.mode === 'walk' && p.e && ppl().g?.at) {
+      const e = p.e, dir = p.dir || 1;
+      for (let i = 1; i < TR_M; i++) { const s = p.s + dir*i*2.5; if (s < 0 || s > e.len) break; ppl().g.at(e, s, TMP); if (!push(TMP[0] + TMP[3]*p.lat, TMP[1] - TMP[2]*p.lat)) break; }
+    } else if (p.mode === 'flee' && p.goal == null && p.fleeTo) push(p.fleeTo.x, p.fleeTo.z);
+    return pts;
+  }
+  const col = new THREE.Color();
+  function trails(dt) {
+    if (nk <= 0.01) { if (trail) trail.material.opacity = 0; return; }
+    if (!trail) trail = trailMesh();
+    trail.material.opacity = 0.75*smooth(nk);
+    if ((trT -= dt) > 0) return; trT = 0.12;
+    const pos = trail.geometry.attributes.position.array, cl = trail.geometry.attributes.color.array, surf = G.W?.surf;
+    let q = 0;
+    for (const [p] of near().slice(0, TR_N)) {
+      if (p.fallen > 0 || p._vetalBody || p.corpse) continue;
+      const pts = pathOf(p); if (pts.length < 4) continue;
+      col.set(intent(p));
+      const nseg = pts.length/2 - 1;
+      for (let i = 0; i < nseg && q < TR_N*TR_M; i++, q++) {
+        const ax = pts[i*2], az = pts[i*2 + 1], bx = pts[i*2 + 2], bz = pts[i*2 + 3], dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz) || 1, nx = -dz/l*0.08, nz = dx/l*0.08;
+        const ay = (surf ? surf.height(ax, az) : 0) + 0.05, by = (surf ? surf.height(bx, bz) : 0) + 0.05;
+        const fa = 1 - i/nseg, fb = 1 - (i + 1)/nseg, v = q*12;
+        pos.set([ax + nx, ay, az + nz, ax - nx, ay, az - nz, bx + nx, by, bz + nz, bx - nx, by, bz - nz], v);
+        for (let j = 0; j < 4; j++) { const fk = (j < 2 ? fa : fb)*0.9; cl[v + j*3] = col.r*fk; cl[v + j*3 + 1] = col.g*fk; cl[v + j*3 + 2] = col.b*fk; }
+      }
+    }
+    trail.geometry.setDrawRange(0, q*6);
+    trail.geometry.attributes.position.needsUpdate = true; trail.geometry.attributes.color.needsUpdate = true;
+  }
+  // startling: with Munja open, click someone (a rustle behind them), right-click a spot (a stone lands there)
+  function startle(p) {
+    if (!p) return false;
+    if (!S.free && S.mu < 6) { toast('Munja', 'Not enough left', 'warn', 1.5); return false; }
+    spend2(6);
+    const F = R(), dx = p.x - F.x, dz = p.z - F.z, d = Math.hypot(dx, dz) || 1, x = p.x + dx/d*1.6, z = p.z + dz/d*1.6;
+    rustle(x, z); PE.startle(p, x, z);
+    return true;
+  }
+  function groundHit(max = 40) {
+    const cam = G.camera; cam.getWorldPosition(cp); cam.getWorldDirection(cf);
+    const surf = G.W?.surf;
+    for (let s = 1; s < max; s += 0.5) { const x = cp.x + cf.x*s, y = cp.y + cf.y*s, z = cp.z + cf.z*s; if (y <= (surf ? surf.height(x, z) : 0)) return { x, z }; }
+    return null;
+  }
+  function throwStone(at) {
+    const h = at || groundHit(); if (!h) return false;
+    if (!S.free && S.mu < 5) { toast('Munja', 'Not enough left', 'warn', 1.5); return false; }
+    spend2(5);
+    setTimeout(() => {
+      stone(h.x, h.z);
+      for (const p of ppl()?.list || []) {
+        if (p.hidden || p.fallen > 0 || p._vetalBody || p.pax || p.mode === 'fight' || p._wake) continue;
+        const d = Math.hypot(p.x - h.x, p.z - h.z);
+        if ((p.cop || p.police) && d < 18) { ppl().goTo(p, h.x, h.z, (q) => ppl().watch(q, h.x, h.z, 3)); continue; }
+        if (d < 12 && Math.random() < 1 - d/14) setTimeout(() => PE.startle(p, h.x, h.z), d*40);
+      }
+    }, 350);
+    return true;
+  }
+  addEventListener('mousedown', (e) => {
+    if (!(nk > 0.4) || G.state !== 'play' || !P().onFoot || !document.pointerLockElement) return;
+    if (e.button === 0) { const p = aimAt(candidates(), N_R); if (!p) return; e.preventDefault(); e.stopImmediatePropagation(); startle(p); }
+    else if (e.button === 2) { e.preventDefault(); e.stopImmediatePropagation(); throwStone(); }
+  }, true);
+
+  // the lights on people this frame: Vetal's on whoever you're going into (only while you hold V), Brahmarakshas' on
+  // whoever you're reading and have read, Munja's on everyone near (through walls); all building over the whole hold
+  function lights(dt) {
+    if (link && G.state === 'play') AU.light(link.p, '#b26bff', 0.12 + 0.88*clamp01(link.t/link.need));
+    if (bl) AU.light(bl.p, '#ffb020', 0.12 + 0.88*clamp01(bl.t/B_HOLD));
+    if (readP && readT > 0) { readT -= dt; AU.light(readP, '#ffb020', Math.min(0.9, readT*0.35)); }
+    if (nk > 0) { const k = 0.9*smooth(nk); for (const [p] of near().slice(0, 28)) AU.light(p, intent(p), k, true); }
+    AU.tick(dt);
   }
 
-  // ---------------------------------------------------------------- dragging someone who's down (your own body too)
-  const downed = () => { if (!P().onFoot) return null; const F = R(), th = yaw(); let best = null, bs = 1e9; for (const p of (ppl()?.list || [])) { if (p.hidden || !(p.fallen > 0)) continue; const dx = p.x - F.x, dz = p.z - F.z, d = Math.hypot(dx, dz); if (d > 1.9) continue; const a = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - th), Math.cos(Math.atan2(dz, dx) - th))); if (a > 1.2) continue; if (d + a < bs) { bs = d + a; best = p; } } return best; };
-  const grab = new THREE.Vector3();
+  // ---------------------------------------------------------------- dragging (Z, with someone out cold at your feet)
+  const downed = () => { if (!P().onFoot) return null; const F = R(), th = yaw(); let best = null, bs = 1e9; for (const p of (ppl()?.list || [])) { if (p.hidden || !(p.fallen > 1.6) || !(p.ko || p.corpse || p._vetalBody)) continue; const dx = p.x - F.x, dz = p.z - F.z, d = Math.hypot(dx, dz); if (d > 2.6) continue; const a = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - th), Math.cos(Math.atan2(dz, dx) - th))); if (a > 1.4) continue; if (d + a < bs) { bs = d + a; best = p; } } return best; };
   let zPress = false;
   addEventListener('keydown', (e) => {
     if (e.code !== 'KeyZ' || e.repeat || G.state !== 'play' || !G.player?.onFoot) return;
-    if (!drag && !downed()) return;               // nobody down at your feet: Z is the weapons wheel as ever
+    if (!AC.dragging && !downed()) return;               // nobody down at your feet: Z is the weapons wheel as ever
     e.preventDefault(); e.stopImmediatePropagation(); zPress = true;
   }, true);
   addEventListener('keyup', (e) => { if (e.code === 'KeyZ' && zPress) e.stopImmediatePropagation(); }, true);
-  function dragStep(dt) {
-    if (zPress) {
-      zPress = false;
-      if (drag) { drag = null; toast('Drag', 'Let go', 'info', 1); }
-      else { const p = downed(); if (p) { drag = { p, ease: 0 }; toast('Drag', `Dragging ${p._vetalBody ? 'your own body' : nameOf(p)}. Z to let go`, 'info', 2.5); } }
-    }
-    if (!drag) return;
-    const p = drag.p, Pl = P(), F = Pl.foot;
-    if (!Pl.onFoot || p.hidden || !ppl().list.includes(p)) { drag = null; return; }
-    // a heavy thing behind you: slow, and they come along a step behind, head first, pulled by the shoulders
-    Pl.limpT = Math.max(Pl.limpT || 0, 0.3);
-    const th = F.yaw, bx = F.x - Math.cos(th)*1.05, bz = F.z - Math.sin(th)*1.05;
-    drag.ease = Math.min(1, drag.ease + dt*2.5);
-    const k = 1 - Math.exp(-dt*6*drag.ease);
-    p.x += (bx - p.x)*k; p.z += (bz - p.z)*k; p.v = 0; p.yaw = Math.atan2(F.z - p.z, F.x - p.x);
-    p.fallen = Math.max(p.fallen, 4); if (p.anchor) { p.anchor.x = p.x; p.anchor.z = p.z; }
-    if (Math.hypot(p.x - F.x, p.z - F.z) > 3) { drag = null; return; }
-    // the near hand back on them
-    const H = Pl.human; if (H) { grab.set(p.x + Math.cos(p.yaw)*0.55, (G.W?.surf ? G.W.surf.height(p.x, p.z) : F.y) + 0.35, p.z + Math.sin(p.yaw)*0.55); try { ikArm(H, 'r', grab, null, drag.ease); } catch (e) { /* no arm here */ } }
+  function dragKeys() {
+    if (!zPress) return; zPress = false;
+    if (AC.dragging) AC.letGo();
+    else if (!AC.busy) { const p = downed(); if (p) AC.grab(p); }
   }
 
   // ---------------------------------------------------------------- every frame
-  const keyEdge = {};
-  const took = (code) => { const d = !!G.input?.key(code); const e = d && !keyEdge[code]; keyEdge[code] = d; return e; };
   const frame = G.frame.bind(G);
   let last = performance.now();
   G.frame = (dt) => {
@@ -400,16 +633,13 @@ export function powers(G) {
     const now = performance.now(), el = Math.min(0.1, (now - last)/1000); last = now;
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
     if (G.state === 'play' && !G.talkUI?.cur && !typing) {
-      vetal(el);
-      if (P().onFoot && took('KeyB')) read(readable());
-      if (P().onFoot && took('KeyN')) senseOn();
-      dragStep(el);
-      if (dz && !dizzyPose(P().human, dz, el, P().foot.yaw)) dz = null;
-    } else { wasV = false; held = 0; target = null; if (link) { link = null; humOn(0); } }
+      vetal(el); brahma(el); munja(el); dragKeys();
+    } else { wasV = false; held = 0; if (link) { link = null; humOn(0); } bl = null; nk = Math.max(0, nk - el/0.6); }
+    if (G.state === 'play') { PE.tick(el); AC.dragTick(el); }
     // a heavy head after you were thrown out: blurred, slow, clearing over the next minute
     if (dazeT > 0) { dazeT -= el; P().limpT = Math.max(P().limpT || 0, 0.3); const cv = G.renderer?.domElement; if (cv) cv.style.filter = dazeT > 0 ? `blur(${Math.min(3, dazeT/12).toFixed(2)}px) saturate(${(1 - Math.min(0.4, dazeT/100)).toFixed(2)})` : ''; }
-    auraFrame(el);
-    draw();
+    lights(el); trails(el);
+    draw(el); HB.draw(el);
     return r;
   };
   addEventListener('beforeunload', save);
@@ -417,37 +647,54 @@ export function powers(G) {
 
   // ---------------------------------------------------------------- the terminal
   const api = {
-    S, take, goHome, read, senseOn, mastery, left,
+    S, take, goHome, leaveSoft, throwOut, read, reading, startle, throwStone, acts: AC, wake: PE, body: HB, aura: AU,
     get host() { return host; }, get home() { return home; }, get strain() { return strain; }, set strain(x) { strain = x; },
   };
   G.powers = api;
+  const ro = () => { throw new Error('read only'); };
   (G.varHooks = G.varHooks || []).push((v) => {
-    v('power.vetal', 'Vetal left, 0 to 1', () => S.bar, (x) => { S.bar = x; save(); }, { min: 0, max: 1 });
-    v('power.mastery', 'how good you are at Vetal, 0 to 1 (half an hour inside others to master)', () => mastery(), (x) => { S.xp = x*1800; save(); }, { min: 0, max: 1 });
-    v('power.strain', 'how hard the one you\'re in is fighting you, 0 to 1', () => strain, (x) => { strain = x; }, { min: 0, max: 2 });
+    v('power.vetal', 'Vetal units left, 0 to 100', () => Math.round(S.vu*10)/10, (x) => { S.vu = Math.max(0, Math.min(100, x)); save(); }, { min: 0, max: 100 });
+    v('power.munja', 'Munja units left, 0 to 100', () => Math.round(S.mu*10)/10, (x) => { S.mu = Math.max(0, Math.min(100, x)); save(); }, { min: 0, max: 100 });
+    v('power.strain', 'how hard the one you\'re in is fighting you (1 throws you out)', () => strain, (x) => { strain = x; }, { min: 0, max: 2 });
     v('power.free', 'powers cost nothing', () => S.free, (x) => { S.free = x; save(); }, { kind: 'bool' });
-    v('power.brahma', 'Brahmarakshas reads left today', () => left('brahma'), (x) => { S.brahma = DAILY - Math.round(x); save(); }, { min: 0, max: DAILY });
-    v('power.munja', 'Munja senses left today', () => left('munja'), (x) => { S.munja = DAILY - Math.round(x); save(); }, { min: 0, max: DAILY });
+    v('power.brahma', 'Brahmarakshas reads left today', () => left(), (x) => { S.brahma = DAILY - Math.round(x); save(); }, { min: 0, max: DAILY });
+    v('power.hops', 'how many bodies in this run (the next one costs more)', () => hops, (x) => { hops = Math.max(0, Math.round(x)); }, { min: 0, max: 12 });
+    v('power.refill', 'Vetal coming back, units a minute, here and now', () => Math.round((R_DAY + (R_NIGHT - R_DAY)*nightK())*60*10)/10, ro);
   });
   const shell = () => {
     const T = G.terminal; if (!T || !G.registry) { setTimeout(shell, 600); return; }
     const { sh } = T, say = (s, k) => sh.print ? sh.print(s, k) : T.term?.say?.(s, k);
     const persons = (s) => G.registry.select(s).filter(e => e.k === 'person').map(e => e.o);
+    const one = (s) => { const [p] = persons(s); if (!p) throw new Error('nobody there'); return p; };
     const status = () => [
-      `Vetal ${Math.round(S.bar*100)}%  mastery ${Math.round(mastery()*100)}%  ${host ? `in ${host.name || WHO[host.kind]} · strain ${Math.round(strain*100)}% · ${Math.round(fromBody())} m from your body` : 'yourself'}`,
-      `Brahmarakshas ${left('brahma')}/${DAILY} today   Munja ${left('munja')}/${DAILY} today${S.free ? '   (free)' : ''}`,
+      `Vetal ${Math.round(S.vu)}/100   Munja ${Math.round(S.mu)}/100   Brahmarakshas ${left()}/${DAILY} today${S.free ? '   (free)' : ''}`,
+      host ? `in ${host.name || WHO[host.kind]} · hop ${hops} · strain ${Math.round(strain*100)}% · ${Math.round(fromBody())} m from your body` : `yourself · next way in costs ${hopRange(0).join('–')}`,
     ];
-    sh.reg('list powers', 'the three powers: what\'s left, who you are in, how far from your body', () => status().forEach(l => say(l)), { group: 'powers' });
-    sh.type('power', () => [{ v: 'all', note: 'everything' }, { v: 'vetal', note: 'the bar' }, { v: 'brahma', note: 'Brahmarakshas, today\'s reads' }, { v: 'munja', note: 'Munja, today\'s senses' }]);
-    sh.reg('refill power [which:power]', 'fill them up: vetal, brahma, munja or all (default)', ([w = 'all']) => { if (w === 'all' || w === 'vetal') S.bar = 1; if (w === 'all' || w === 'brahma') S.brahma = 0; if (w === 'all' || w === 'munja') S.munja = 0; save(); say('refilled ' + w, 'ok'); }, { group: 'powers' });
-    sh.reg('retake power', 'today\'s uses back, the bar full, and the strain gone', () => { S.bar = 1; S.brahma = 0; S.munja = 0; strain = 0; save(); say('all yours again', 'ok'); }, { group: 'powers' });
-    sh.reg('take <who:sel>', 'Vetal: into them, now (no link)', ([s]) => { const [p] = persons(s); take(p, true); say('in', 'ok'); }, { group: 'powers' });
-    sh.reg('return body', 'Vetal: back to your own body', () => { if (!home) throw new Error('you are yourself'); leaveSoft(); say('home', 'ok'); }, { group: 'powers' });
-    sh.reg('read <who:sel>', 'Brahmarakshas on anyone (uses one)', ([s]) => { const [p] = persons(s); read(p); }, { group: 'powers' });
-    sh.reg('sense [seconds:num]', 'Munja (uses one)', ([t]) => { senseOn(+t || SENSE); }, { group: 'powers' });
-    sh.reg('toggle powerfree [on:onoff]', 'powers cost nothing (testing)', ([a]) => { S.free = a === undefined ? !S.free : a === 'on'; save(); say(`free ${S.free ? 'on' : 'off'}`, 'ok'); }, { group: 'powers' });
-    sh.reg('set mastery <amount:num>', 'Vetal mastery 0 to 1', ([x]) => { S.xp = Math.max(0, Math.min(1, +x))*1800; save(); say(`mastery ${Math.round(mastery()*100)}%`, 'ok'); }, { group: 'powers' });
-    if (sh.order && !sh.order.includes('powers')) sh.order.splice(sh.order.indexOf('you') + 1, 0, 'powers');
+    const G_ = 'powers';
+    sh.reg('list powers', 'the three powers: what\'s left, who you are in, how far from your body', () => status().forEach(l => say(l)), { group: G_ });
+    sh.type('power', () => [{ v: 'all', note: 'everything' }, { v: 'vetal', note: 'the Vetal bar' }, { v: 'munja', note: 'the Munja bar' }, { v: 'brahma', note: 'Brahmarakshas, today\'s reads' }]);
+    sh.reg('refill power [which:power]', 'fill them up: vetal, munja, brahma or all (default)', ([w = 'all']) => { if (w === 'all' || w === 'vetal') S.vu = 100; if (w === 'all' || w === 'munja') S.mu = 100; if (w === 'all' || w === 'brahma') S.brahma = 0; save(); say('refilled ' + w, 'ok'); }, { group: G_ });
+    sh.reg('set power <which:power> <units:num>', 'a bar to so many units (0 to 100), or reads left today', ([w, x]) => { x = +x; if (w === 'vetal') S.vu = Math.max(0, Math.min(100, x)); else if (w === 'munja') S.mu = Math.max(0, Math.min(100, x)); else if (w === 'brahma') S.brahma = DAILY - Math.max(0, Math.min(DAILY, Math.round(x))); else throw new Error('vetal, munja or brahma'); save(); say(`${w} ${x}`, 'ok'); }, { group: G_ });
+    sh.reg('retake power', 'everything full again, today\'s reads back, the strain gone', () => { S.vu = 100; S.mu = 100; S.brahma = 0; strain = 0; save(); say('all yours again', 'ok'); }, { group: G_ });
+    sh.reg('take <who:sel>', 'Vetal: into them, now (no link, no cost)', ([s]) => { const fr = S.free; S.free = true; try { take(one(s)); } finally { S.free = fr; } say('in', 'ok'); }, { group: G_ });
+    sh.reg('return body', 'Vetal: back to your own body', () => { if (!home) throw new Error('you are yourself'); leaveSoft(); say('home', 'ok'); }, { group: G_ });
+    sh.reg('read <who:sel>', 'Brahmarakshas on anyone (free)', ([s]) => { read(one(s), true); }, { group: G_ });
+    sh.reg('sense [seconds:num]', 'Munja open for so many seconds (no cost)', ([t]) => { nForce = +t || 8; say('open', 'ok'); }, { group: G_ });
+    sh.reg('startle <who:sel>', 'Munja: a rustle behind them', ([s]) => { const fr = S.free; S.free = true; try { startle(one(s)); } finally { S.free = fr; } say('rustle', 'ok'); }, { group: G_ });
+    sh.reg('throw stone', 'Munja: a stone where you look', () => { const fr = S.free; S.free = true; try { if (!throwStone()) throw new Error('look at the ground'); } finally { S.free = fr; } say('tok', 'ok'); }, { group: G_ });
+    sh.reg('drag <who:sel>', 'drag someone who\'s out cold (Z to let go)', ([s]) => { const p = one(s); if (!(p.fallen > 1.6)) throw new Error('they\'re not down'); AC.grab(p); say('dragging', 'ok'); }, { group: G_ });
+    sh.reg('toggle powerfree [on:onoff]', 'powers cost nothing (testing)', ([a]) => { S.free = a === undefined ? !S.free : a === 'on'; save(); say(`free ${S.free ? 'on' : 'off'}`, 'ok'); }, { group: G_ });
+    // the moves, one at a time
+    const T_ = 'tests';
+    sh.reg('test getup', 'you: lying, then the slow get-up and a sway', () => { AC.wakeUp(false); say('ok', 'ok'); }, { group: T_ });
+    sh.reg('test getuphard', 'you: thrown-out get-up (a stumble, a heavier sway)', () => { AC.wakeUp(true); say('ok', 'ok'); }, { group: T_ });
+    sh.reg('test shudder', 'you: the shudder of going into someone', () => { AC.shudder(); say('ok', 'ok'); }, { group: T_ });
+    sh.reg('test thrownout', 'you: thrown out (both hands to the head, the stagger, down)', () => { AC.thrownOut(() => AC.wakeUp(true)); say('ok', 'ok'); }, { group: T_ });
+    sh.reg('test foughtoff', 'you: fought off at the door', () => { AC.foughtOff(); say('ok', 'ok'); }, { group: T_ });
+    sh.reg('test dizzy [who:sel]', 'dizzy: you, or someone', ([s]) => { if (!s) { const D = { t: 0, dur: 4, ph: 0, sev: 1.3, hand: 'r' }; AC.dizzyOut(D, 4, () => {}); } else for (const p of persons(s)) PE.wake(p, { sev: 1.3 }); say('ok', 'ok'); }, { group: T_ });
+    sh.reg('test cometo <who:sel> [hops:int]', 'someone coming round after Vetal leaves them', ([s, h]) => { for (const p of persons(s)) PE.wake(p, { hops: +h || 0, sev: 1 + 0.25*(+h || 0), female: !!(p.female || p.look?.female) }); say('ok', 'ok'); }, { group: T_ });
+    sh.reg('test startle <who:sel>', 'a rustle behind someone (free)', ([s]) => { for (const p of persons(s)) { const F = R(), dx = p.x - F.x, dz = p.z - F.z, d = Math.hypot(dx, dz) || 1; rustle(p.x + dx/d*1.6, p.z + dz/d*1.6); PE.startle(p, p.x + dx/d*1.6, p.z + dz/d*1.6); } say('ok', 'ok'); }, { group: T_ });
+    if (sh.order && !sh.order.includes(G_)) sh.order.splice(sh.order.indexOf('you') + 1, 0, G_);
   };
   shell();
   return api;
