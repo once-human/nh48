@@ -54,8 +54,9 @@ function tick(TR, v, dt) {
     S.th += S.w*dt;
     if (Math.abs(S.th) >= LIE) { S.th = Math.sign(S.th)*LIE; S.w = -S.w*0.22; S.down = true; S.bounce = Math.abs(S.w); }
   } else if (!S.lift) {
-    // a rock on the bar end, settling
-    S.w -= Math.sign(S.th)*12*dt; S.th += S.w*dt;
+    // a rock on the bar end, settling: its weight takes it on over onto that side (it had the sign the wrong way: the
+    // weight swung it back up through upright and over onto the other side, and back, rocking for ever)
+    S.w += Math.sign(S.th)*12*dt; S.th += S.w*dt;
     if (Math.abs(S.th) > LIE) { S.th = Math.sign(S.th)*LIE; S.w = 0; }
   }
   // sliding: on its tyres while it's still going over, on its side once it's down (steel and plastic on tar)

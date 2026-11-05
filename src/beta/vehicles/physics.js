@@ -36,6 +36,25 @@ function boxBox(a, b, cx, cz, ex, ez, A, B) {
   return best;
 }
 
+// where on the body (local) a push (ux, uz) out of something lands, the something spanning [x0, x1] along the body
+// and [z0, z1] across it: at a corner when the body meets it at an angle, across the middle of the face where the two
+// are flush (and in between as it turns flush). It was always a corner: lying along a wall or against a car after a
+// crash, the corner taking the push swapped ends every time the angle crossed zero, each push spun the body the other
+// way, and it rocked left and right against it.
+function where(ux, uz, a, b, x0, x1, z0, z1) {
+  const side = Math.abs(uz) > Math.abs(ux);                // the push is across the body: a side face
+  const off = side ? Math.abs(ux) : Math.abs(uz);           // how far from flush (the sine of the angle)
+  const t = Math.min(1, off/0.17);                          // flush below ~0, a corner from ~10 degrees
+  if (side) {
+    const lo = Math.max(-a, Math.min(x0, x1)), hi = Math.min(a, Math.max(x0, x1)), mid = lo <= hi ? (lo + hi)/2 : clamp((x0 + x1)/2, -a, a);
+    const corner = ux ? -Math.sign(ux)*a : mid;
+    return [mid + (corner - mid)*t, -Math.sign(uz)*b];
+  }
+  const lo = Math.max(-b, Math.min(z0, z1)), hi = Math.min(b, Math.max(z0, z1)), mid = lo <= hi ? (lo + hi)/2 : clamp((z0 + z1)/2, -b, b);
+  const corner = uz ? -Math.sign(uz)*b : mid;
+  return [-Math.sign(ux)*a, mid + (corner - mid)*t];
+}
+
 const P = Vehicle.prototype;
 // the deepest thing the body is into, in world terms: { nx, nz, depth, kind, lx, lz } (lx, lz: where on the body, local)
 P.contact = function () {
@@ -49,7 +68,7 @@ P.contact = function () {
     if (ls) for (const s of ls) {
       if (seen.has(s)) continue; seen.add(s);
       const [x0, z0] = loc(s.ax, s.az), [x1, z1] = loc(s.bx, s.bz), m = boxSeg(a, b, x0, z0, x1, z1);
-      if (m && (!best || m.d > best.d)) best = { ...m, kind: s.kind, lx: -Math.sign(m.ux)*a, lz: -Math.sign(m.uz)*b };
+      if (m && (!best || m.d > best.d)) { const [lx, lz] = where(m.ux, m.uz, a, b, x0, x1, z0, z1); best = { ...m, kind: s.kind, lx, lz }; }
     }
     if (lc) for (const q of lc) {
       if (q.off || seen.has(q)) continue; seen.add(q);
@@ -79,7 +98,8 @@ P.bounce = function (res, ox, oz) {
   if (vn >= 0) return 0;
   const m = S.mass + (this.load || 0)*70, I = m*(S.L*S.L + S.W*S.W)/12, spin = !S.two;
   const hard = Math.min(1, Math.max(0, (-vn - 3)/9));
-  const e = 0.28 - 0.24*hard;                                             // a knock bounces a little; a real hit crunches
+  // a knock bounces a little; a real hit crunches; leaning on something (under a walking pace into it) doesn't bounce
+  const e = -vn < 1 ? 0 : (0.28 - 0.24*hard)*Math.min(1, (-vn - 1)/1.5);
   const rn = rx*nz - rz*nx, kn = 1/m + (spin ? rn*rn/I : 0), J = -(1 + e)*vn/kn;
   vx += J*nx/m; vz += J*nz/m; let dw = spin ? J*rn/I : 0;
   // friction along the surface: the slide's speed scraped off by how hard it's pressed (never reversed)
@@ -115,7 +135,10 @@ P.collideTraffic = function (traffic) {
     if (!m) return;
     const share = o.parked ? 1 : T.mass/(S.mass + T.mass);
     const nx = m.ux*hx - m.uz*hz, nz = m.ux*hz + m.uz*hx;
-    const imp = this.bounce({ nx, nz, depth: m.d*share, lx: -Math.sign(m.ux)*a*0.8, lz: -Math.sign(m.uz)*b*0.8 }, ohx*(o.v || 0), ohz*(o.v || 0));
+    // (the other box's reach along and across this one, for where on the body they meet)
+    const ra = T.L/2*Math.abs(ex) + T.W/2*Math.abs(ez), rb = T.L/2*Math.abs(ez) + T.W/2*Math.abs(ex);
+    const [lx, lz] = where(m.ux, m.uz, a, b, cx - ra, cx + ra, cz - rb, cz + rb);
+    const imp = this.bounce({ nx, nz, depth: m.d*share, lx, lz }, ohx*(o.v || 0), ohz*(o.v || 0));
     if (imp <= 0) return;
     if (!o.parked) {
       o.v = Math.max(0, o.v - imp*(1 - share)*0.8);
