@@ -27,6 +27,7 @@ import './game/prompt2.js';
 import './game/ask.js';           // what people tell you: the way, food, where you are, a lift
 import './game/outing.js';
 import './game/talk.js';          // T at anyone: talk
+import './game/attend.js';        // who you talk to stays sat / goes back to what they were doing
 import './game/hands.js';
 import './game/fists.js';
 import './world/staff.js';

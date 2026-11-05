@@ -15,9 +15,21 @@ const bone = (H, n) => (H._ab || (H._ab = {}))[n] || (H._ab[n] = H.root.getObjec
 Crowd.prototype.postPed = function (p, H, dt) {
   if (p.rideOf || p.fallen > 0 || p.ko || p.mode === 'fight' || p.mode === 'flee' || p.act) return;
   const G = window.__nhAskG, P = G && G.player; if (!P) return;
-  const L = p._lk || (p._lk = { a: 0, want: 0, t: Math.random()*4, hold: 0 });
+  const L = p._lk || (p._lk = { a: 0, want: 0, t: Math.random()*4, hold: 0, w: 0 });
   L.t -= dt;
   const dx = P.x - p.x, dz = P.z - p.z, d = Math.hypot(dx, dz), rel = wrap(Math.atan2(dz, dx) - (p.yaw ?? 0));
+  // talking to you from their seat (game/attend.js): round from the waist, the neck, the head, as far as that goes
+  // (about 100 degrees all told); further behind them than that, they look over their shoulder
+  if (p.attend || L.w > 0.01) {
+    L.w += ((p.attend ? 1 : 0) - L.w)*Math.min(1, dt*3);
+    L.a += (Math.max(-1.75, Math.min(1.75, rel))*L.w - L.a)*Math.min(1, dt*4);
+    const s3 = bone(H, 'spine_03'), nk = bone(H, 'neck_01'), hd = bone(H, 'Head');
+    H.root.updateMatrixWorld(true);
+    if (s3) bendBone(s3, Y, -L.a*0.3);
+    if (nk) bendBone(nk, Y, -L.a*0.3);
+    if (hd) bendBone(hd, Y, -L.a*0.4);
+    return;
+  }
   const wanted = G.police && G.police.heat > 0;
   // you, close and where they can see you: a look (longer from the old, from everyone if you're wanted)
   if (d < (wanted ? 12 : 5) && Math.abs(rel) < 1.9 && L.hold <= 0 && L.t <= 0 && !BUSY.has(p.anim)) {
