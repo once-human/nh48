@@ -28,7 +28,7 @@ V.own = function () {
   let view = body;
   if (F) {
     const on = (src) => { const g = new THREE.BufferGeometry(); for (const k of Object.keys(body.attributes)) g.setAttribute(k, body.attributes[k]); g.setIndex(src.index); g.boundingSphere = body.boundingSphere; return g; };
-    view = on(B.geometry); F.mesh.geometry = on(F.mesh.geometry);
+    view = on(B.geometry); F.mesh.geometry = on(F.mesh.geometry); if (F.stand) F.stand.geometry = on(F.stand.geometry);
   }
   B.geometry = view; B.userData.ownGeo = true;
   let glass = null;

@@ -27,6 +27,7 @@ import './vehicles/twowheel.js';      // two-wheelers lean to turn, each its own
 import './vehicles/steerfront.js';    // the bars, fork and front wheel turn with the steering
 import './vehicles/damage.js';        // dents where it's hit, holes where it's shot, flat tyres, fire from the engine
 import './vehicles/crawl.js';         // never stuck: a crawl either way whatever state it's in
+import './vehicles/auto3w.js';        // an auto corners on two wheels, and goes over, instead of sliding
 import './people/stalls.js';          // stall keepers keep to their stalls
 import './people/walls.js';           // nobody walks through a building
 import './game/meow.js';              // a cat's meow

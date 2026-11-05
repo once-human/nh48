@@ -68,7 +68,9 @@ function newB(paintable = true) { const b = new ColorBuilder(); if (paintable) b
 // vertices fn adds are noted, and the built body carries them (and the steering axis, side view [x, y] top and
 // bottom) in userData.front for beta/vehicles/steerfront.js
 function front(b, fn) { const c0 = b.c; fn(); (b.front || (b.front = [])).push([c0, b.c]); }
-function withFront(m, b, ax) { if (b.front) m.body.userData.front = { r: b.front, ax }; return m; }
+// the stand: drawn only while nobody's on it (beta/vehicles/steerfront.js shows it parked, folds it away ridden)
+function stand(b, fn) { const c0 = b.c; fn(); (b.stand || (b.stand = [])).push([c0, b.c]); }
+function withFront(m, b, ax) { if (b.front) m.body.userData.front = { r: b.front, ax }; if (b.stand) m.body.userData.stand = b.stand; return m; }
 
 // ---------------------------------------------------------------- people
 // seated rider: hips at (x, y), facing +x. lean forward (rad). colours via channels when `inst`
@@ -507,7 +509,7 @@ export function buildScooter(opts = {}) {
   if (!opts.parked && !opts.noRider) {
     addRider(b, -0.38, 0.8, 0, { lean: 0.05, inst: true, handX: 0.62, handY: 1.0, handW: 0.3, footX: 0.12, footY: 0.36, helmet: opts.helmet ? [0.2, 0.2, 0.2] : null });
     if (opts.pillion) addPillion(b, -0.72, 0.82, 0, opts.sideSaddle, true);
-  } else if (opts.parked) { rod(b, [-.22, .28, -.13], [-.3, .02, -.26], .012, CHROME, HUB_G); rbox(b, -.34, .0, -.29, -.27, .02, -.23, BLACK); rod(b, [-.2, .24, -.08], [-.2, .03, -.09], .012, GREY, HUB_G); rod(b, [-.2, .24, .08], [-.2, .03, .09], .012, GREY, HUB_G); }
+  } else if (opts.parked) stand(b, () => { rod(b, [-.22, .28, -.13], [-.3, .02, -.26], .012, CHROME, HUB_G); rbox(b, -.34, .0, -.29, -.27, .02, -.23, BLACK); rod(b, [-.2, .24, -.08], [-.2, .03, -.09], .012, GREY, HUB_G); rod(b, [-.2, .24, .08], [-.2, .03, .09], .012, GREY, HUB_G); });
   front(b, () => wheel2(b, 0.66, R, 0, R, 0.1, { cast: true, disc: true })); wheel2(b, -0.62, R, 0, R, 0.11, { cast: true });
   return withFront({ body: b.build(), glass: gl.build(), dims: { L: 1.85, W: 0.72, H: 1.6, wb: 1.28 } }, b, [.6, 1.02, .66, R]);
 }
@@ -602,7 +604,7 @@ export function buildBike(opts = {}) {
   if (!opts.parked && !opts.noRider) {
     addRider(b, -0.32, 0.95, 0, { lean: 0.32, inst: true, handX: 0.6, handY: 1.08, handW: 0.34, footX: 0.05, footY: 0.42, helmet: opts.helmet ? [0.6, 0.6, 0.6] : null });
     if (opts.pillion) addPillion(b, -0.62, 0.97, 0, opts.sideSaddle, true);
-  } else if (opts.parked) { rod(b, [-.12, .28, -.08], [-.2, .02, -.28], .012, FRAME, HUB_G); }
+  } else if (opts.parked) stand(b, () => rod(b, [-.12, .28, -.08], [-.2, .02, -.28], .012, FRAME, HUB_G));
   front(b, () => wheel2(b, 0.78, R, 0, R, 0.09, { disc: true })); wheel2(b, -0.6, R, 0, R, 0.11);
   return withFront({ body: b.build(), glass: gl.build(), dims: { L: 2.0, W: 0.75, H: 1.75, wb: 1.3 } }, b, [.57, .96, .77, .33]);
 }
@@ -674,7 +676,7 @@ function buildSuperbike(opts = {}) {
   front(b, () => guard(b, xf, R + .015, 0, R + .02, .052, [1, 1, 1], 1));
   if (!opts.parked && !opts.noRider) {
     addRider(b, -.3, .98, 0, { lean: .78, inst: true, handX: .5, handY: .97, handW: .3, footX: -.26, footY: .54, helmet: opts.helmet ? [0.6, 0.6, 0.6] : null });
-  } else if (opts.parked) rod(b, [-.1, .32, -.1], [-.2, .02, -.28], .012, MAT, HUB_G);
+  } else if (opts.parked) stand(b, () => rod(b, [-.1, .32, -.1], [-.2, .02, -.28], .012, MAT, HUB_G));
   front(b, () => wheel2(b, xf, R, 0, R, .1, { cast: true })); wheel2(b, xr, R*1.02, 0, R*1.02, .15, { cast: true });
   rod(b, [xr, R, -.12], [xr, R, .12], .02, ALU, HUB_G);
   b.addGeo(HUB_G, M(xr, R, -.1, .11, .004, .11, Math.PI/2), [.6, .6, .63]);
