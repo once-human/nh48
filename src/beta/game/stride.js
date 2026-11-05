@@ -3,9 +3,11 @@
 // foot comes down on the ground under it, so up a kerb or a step the leading foot lands on the top and the hips sink
 // to let the trailing one reach; and you come down from a jump into your knees, deeper the harder you land, on the
 // move as well as standing. (The clips are made on flat ground and the body was set on the ground's height under
-// your middle: the feet hung in the air off a kerb's edge and went into the step in front.)
+// your middle: the feet hung in the air off a kerb's edge and went into the step in front.) The people near you
+// put their feet on the kerb and the step the same way.
 import * as THREE from 'three';
 import { Pilot } from '@orig/game/pilot.js';
+import { Crowd } from '@orig/people/crowd.js';
 import { ikLeg } from './fists.js';
 
 const ON = ['idle', 'walk', 'jog', 'sprint', 'jump_land', 'arms_folded', 'phone'];
@@ -93,4 +95,41 @@ Pilot.prototype.updateFoot = function (dt, ...rest) {
     }
     H.root.updateMatrixWorld(true);
   }
+};
+
+// the people walking and standing near you: the same feet on the ground under them (within 18 m, on a frame their
+// clip has just posed; the hips' drop every frame, since the body is put back where the crowd puts it each frame)
+const PED = /^(idle|walk|jog|sprint|talk|phone|arms_folded|carry)/;
+const dr = Crowd.prototype.drive;
+Crowd.prototype.drive = function (s, dt, cx, cz) {
+  dr.call(this, s, dt, cx, cz);
+  const p = s.p, H = s.H;
+  if (!p || !H || p.rideOf || p.fallen > 0 || p.ko || p.act || p.lift || p.liftY || p.hands || p.dead || p.corpse) { if (s._st) s._st = null; return; }
+  if (Math.abs(p.x - cx) + Math.abs(p.z - cz) > 18) { if (s._st) s._st = null; return; }
+  const cl = H.cur && H.cur.getClip && H.cur.getClip().name;
+  if (!cl || !PED.test(cl)) { if (s._st) s._st = null; return; }
+  const S = s._st || (s._st = { o: [0, 0], dr: 0, mt: -1 });
+  const posed = H.mixer.time !== S.mt; S.mt = H.mixer.time;
+  if (posed) {
+    H.root.updateMatrixWorld(true);
+    const y0 = H.holder.position.y;
+    for (let i = 0; i < 2; i++) {
+      const fb = bone(H, i ? 'foot_r' : 'foot_l'); if (!fb) return;
+      fb.getWorldPosition(_ft[i]); fb.getWorldQuaternion(_fq[i]);
+      S.o[i] = damp(S.o[i], Math.max(-0.3, Math.min(0.3, this.W.surf.height(_ft[i].x, _ft[i].z) - y0)), 16, dt);
+    }
+    S.dr = damp(S.dr, Math.min(0, S.o[0], S.o[1]), 14, dt);
+  }
+  if (Math.abs(S.o[0]) < 0.012 && Math.abs(S.o[1]) < 0.012 && S.dr > -0.004) return;
+  H.holder.position.y += S.dr;
+  if (!posed) return;
+  H.root.updateMatrixWorld(true);
+  const fx = Math.cos(p.yaw || 0), fz = Math.sin(p.yaw || 0);
+  for (let i = 0; i < 2; i++) {
+    const side = i ? 'r' : 'l', fb = bone(H, 'foot_' + side);
+    _ft[i].y += S.o[i];
+    ikLeg(H, side, _ft[i], _pole.set(fx, 0.15, fz), 1);
+    fb.parent.getWorldQuaternion(_pq).invert(); fb.quaternion.copy(_pq.multiply(_fq[i]));
+  }
+  H.root.updateMatrixWorld(true);
 };
