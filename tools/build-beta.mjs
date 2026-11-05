@@ -55,15 +55,22 @@ const SWAPS = [
 const PATCHES = {
   // compound walls along the roads: not Pune, Onkar wants them gone. Neither drawn nor solid (the city's edge wall is separate)
   [S('world/index.js')]: [["for (const w of D.walls) put('walls', at(w[0] / 100, w[1] / 100), cmRing(w));", "/* /beta: no compound walls */"]],
+  [S('world/world.js')]: [
+    ["for (const B of M.buildings) W.collision.addRing(cmRing(B[1]), 0);", "for (const B of M.buildings) buildingSolid(B, cmRing(B[1]), W.collision);"],
+    ["import { cmRing", "import { buildingSolid } from '../beta/world/solids.js';\nimport { cmRing"]],
   [S('world/tiles.js')]: [["for (let j = 0; j < D.walls.length; j += 60) {", "for (let j = 0; j < 0; j += 60) {"],
+    // a petrol pump's canopy is a roof on columns: you go in under it (beta/world/solids.js buildingSolid)
+    ["for (const B of D.buildings.slice(k, k + 160)) C.addRing(cmRing(B[1]), 0);", "for (const B of D.buildings.slice(k, k + 160)) buildingSolid(B, cmRing(B[1]), C);"],
     // stalls solid in their own shape, not a 0.9 m circle (beta/world/solids.js)
-    ["import { cmRing } from './geo.js';", "import { cmRing } from './geo.js';\nimport { makeSolids } from '../beta/world/solids.js';"],
+    ["import { cmRing } from './geo.js';", "import { cmRing } from './geo.js';\nimport { makeSolids, buildingSolid } from '../beta/world/solids.js';"],
     ["for (const s of D.stalls) C.addCircle(s[0] / 100, s[1] / 100, 0.9, 2);", "{ const SO = W.solid || (W.solid = makeSolids(W)); for (const s of D.stalls) SO.stall(s, C); }"]],
   [S('world/propsChunk.js')]: [["for (const w of M.walls) {", "for (const w of []) {"],
     // stalls, bus shelters, street-name boards and banner frames solid in their own shapes (beta/world/solids.js)
     ["import { RNG, hash1 } from '../core/util.js';", "import { RNG, hash1 } from '../core/util.js';\nimport { makeSolids } from '../beta/world/solids.js';"],
     ["for (const b of M.buses) collision.addCircle(b[0] / 100, b[1] / 100, 0.9, 2);", "const SO = W.solid || (W.solid = makeSolids(W)); for (const b of M.buses) SO.bus(b, collision);"],
     ["for (const s of M.stalls) collision.addCircle(s[0] / 100, s[1] / 100, 0.9, 2);", "for (const s of M.stalls) SO.stall(s, collision);"],
+    // a Metro pier stands on a 2.4 m square plinth (beta/world/propsChunk.js draws it): solid to its corners, not a 1 m circle
+    ["      collision.addCircle(x, z, 1.0, 2);\n    }, 10);", "      { const ry = -Math.atan2(dx, -dz) + Math.PI / 2, c = Math.cos(ry), s = Math.sin(ry); collision.addRing([[-1.2, -1.2], [1.2, -1.2], [1.2, 1.2], [-1.2, 1.2]].flatMap(([u, v]) => [x + u * c - v * s, z + u * s + v * c]), 2); }\n    }, 10);"],
     ["        collision.addCircle(x, z, 0.12, 2);", "        (W.solid || (W.solid = makeSolids(W))).board('street', x, z, fx, fz, collision);"],
     ["index.chunks[ci].extras.push({ kind: 'banner', x, z, fx, fz, s: rng.int(0, W.signs.banners.length - 1) });", "index.chunks[ci].extras.push({ kind: 'banner', x, z, fx, fz, s: rng.int(0, W.signs.banners.length - 1) }); (W.solid || (W.solid = makeSolids(W))).board('banner', x, z, fx, fz, collision);"]],
   [S('world/props.js')]: [["for (const w of M.walls) {", "for (const w of []) {"]],

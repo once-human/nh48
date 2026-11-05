@@ -67,7 +67,7 @@ export function buildChunk(job, area, kind = 'base') {
     blds(job, area, ms, xs);
     for (let c = 0; c < 4; c++) cells.push({ far: pk(fs[c]), mass: pk(ms[c]) });
   }
-  return { kind, cells };
+  return { kind, cells, solids: kind === 'near' && job.foot ? job.foot.solids || [] : null };
 }
 function blds(job, area, bs, cbs) {
   const ctx = { area, fronts: [], lines: 0 };

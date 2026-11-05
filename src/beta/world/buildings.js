@@ -213,11 +213,23 @@ function gotNear(L, out) {
     c.main = mesh(L, o.main, paint.world, true, 'near'); c.cut = mesh(L, o.cut, paint.cut, false, 'cut');
   }
   L.near = 2;
+  solidsIn(L, out.solids);
   setLod(L, lastX, lastZ, true);
 }
+// the footpath's carts, boxes and posts into the collision while they're drawn (world/footpath.js), out again after
+const tagOf = (L) => 'fp' + L.C.ci, rectOf = (L) => { const h = L.W.index.size/2 + 4; return [L.cx - h, L.cz - h, L.cx + h, L.cz + h]; };
+function solidsIn(L, sol) {
+  const C = L.W.collision; if (!C || !sol || !sol.length) return;
+  C.removeTag(tagOf(L), rectOf(L));
+  const t0 = C.tag; C.tag = tagOf(L);
+  try { for (const q of sol) { if (q[0] === 'r') C.addRing(q[1], 2); else C.addCircle(q[1], q[2], q[3], 2); } } finally { C.tag = t0; }
+  L.solids = true;
+}
+function solidsOut(L) { if (L.solids) { L.W.collision?.removeTag(tagOf(L), rectOf(L)); L.solids = false; } }
 function letGo(L) {
   if (L.near === 1) painter.drop(L.C, 'near');
   for (const c of L.cells) for (const k of ['main', 'cut']) { const m = c[k]; if (m) { L.g.remove(m); m.geometry.dispose(); c[k] = null; } }
+  solidsOut(L);
   L.near = 0;
   setLod(L, lastX, lastZ, true);
 }
@@ -363,6 +375,7 @@ export function* buildBuildingsChunk(W, C, group) {
   return () => {
     L.dead = true;
     lods.delete(L);
+    solidsOut(L);
     if (L.near === 1) painter.drop(C, 'near');
     if (shutMesh) { shutMesh.dispose(); C.shutters = null; }
     W.footprintsByChunk.delete(C.ci);

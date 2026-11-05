@@ -4,7 +4,9 @@
 // handcart, a cobbler under his umbrella. How much of it depends on where you are (the area's footpath and mess
 // settings, world/areas.js): Koregaon Park's are kept, Budhwar Peth's are not. It's laid along the game's own kerbs
 // and inside its own footpaths (world/groundChunk.js), none of it is in the way of anything (the game's collision is
-// its own) and nothing here decides anything.
+// its own) and nothing here decides anything, except that what stands up off it is solid: the handcarts, the cobbler's
+// box and stool, the umbrella poles, the posts of a trench's tape go out as F.solids (rings and posts, world/buildings.js
+// puts them into the collision while the close-up drawing's in).
 import { rng, insideRing } from './geom.js';
 import { K } from './kinds.js';
 import { blend } from './areas.js';
@@ -47,6 +49,7 @@ export function footpath(F, area, b) {
     return null;
   };
   const R = rng(F.ci * 7919 + 17);
+  SOL = F.solids = [];
   const A = blend(area.at(F.cx, F.cz));
   const broken = 1 - A.fp, mess = A.mess, Y = KERB_H + 0.012;
   // walk the kerbs: the footpath is on their south side (the road's on the north, world/groundChunk.js)
@@ -164,7 +167,7 @@ function thing(b, R, x, z, tx, tz, nx, nz, onPath, broken, mess, A, Y) {
     const [px, pz] = at(0.7 + R() * 1.2); const P = onPath(px, pz); if (!P) return 2;
     if (R() < 0.55) { b.set(K.metal, 0x3a3a3c, 0.6, R()); b.cyl(px, Y - 0.01, pz, 0.32, 0.32, 0.025, 10); b.set(K.concrete, 0x7a766e, 0.6); b.cyl(px, Y - 0.012, pz, 0.42, 0.42, 0.02, 10); }
     else { b.set(K.concrete, 0x8a857c, 0.6, R()); b.ybox(px, Y - 0.01, pz, 0.7, Y + 0.015, 0.7, yaw, 8); b.set(K.metal, 0x2a2a2a, 0.6); b.ybox(px, Y + 0.015, pz, 0.08, Y + 0.03, 0.4, yaw, 8); }
-    if (R() < 0.15 * broken) { b.set(K.wood, 0x6a5a42, 0.6); b.tube([px, Y, pz], [px + 0.2, Y + 1.0, pz + 0.1], 0.025, 3); b.set(K.cloth, 0xd83a2a, 0); b.blob(px + 0.2, Y + 1.0, pz + 0.1, 0.08, 0.06, 0.08, 4); }
+    if (R() < 0.15 * broken) { b.set(K.wood, 0x6a5a42, 0.6); b.tube([px, Y, pz], [px + 0.2, Y + 1.0, pz + 0.1], 0.025, 3); post(px + 0.05, pz + 0.03, 0.05); b.set(K.cloth, 0xd83a2a, 0); b.blob(px + 0.2, Y + 1.0, pz + 0.1, 0.08, 0.06, 0.08, 4); }
     return 6 + R() * 14;
   }
   // a trench for a cable, dug and left: the cut, a pipe in it, the earth heaped beside, a tape across
@@ -177,7 +180,7 @@ function thing(b, R, x, z, tx, tz, nx, nz, onPath, broken, mess, A, Y) {
     b.set(K.paint, R() < 0.5 ? 0x2a5ab8 : 0xd87a2a, 0.3); b.tube([px, Y + 0.05, pz], [ex, Y + 0.05, ez], 0.06, 5);
     b.set(K.soil, 0x8a6a4c, 0.8, R());
     for (let t = 0.3; t < len; t += 0.8 + R()) b.blob(px + tx * t + nx * 0.6, Y + 0.05, pz + tz * t + nz * 0.6, 0.4, 0.18, 0.3, 5);
-    if (R() < 0.5) { b.set(K.cloth, 0xf2c230, 0.2); b.tube([px + nx * 0.4, Y + 0.8, pz + nz * 0.4], [ex + nx * 0.4, Y + 0.8, ez + nz * 0.4], 0.01, 3); b.set(K.metal, 0xd83a2a, 0.3); b.tube([px + nx * 0.4, Y, pz + nz * 0.4], [px + nx * 0.4, Y + 0.85, pz + nz * 0.4], 0.02, 3); b.tube([ex + nx * 0.4, Y, ez + nz * 0.4], [ex + nx * 0.4, Y + 0.85, ez + nz * 0.4], 0.02, 3); }
+    if (R() < 0.5) { b.set(K.cloth, 0xf2c230, 0.2); b.tube([px + nx * 0.4, Y + 0.8, pz + nz * 0.4], [ex + nx * 0.4, Y + 0.8, ez + nz * 0.4], 0.01, 3); b.set(K.metal, 0xd83a2a, 0.3); b.tube([px + nx * 0.4, Y, pz + nz * 0.4], [px + nx * 0.4, Y + 0.85, pz + nz * 0.4], 0.02, 3); b.tube([ex + nx * 0.4, Y, ez + nz * 0.4], [ex + nx * 0.4, Y + 0.85, ez + nz * 0.4], 0.02, 3); post(px + nx * 0.4, pz + nz * 0.4, 0.04); post(ex + nx * 0.4, ez + nz * 0.4, 0.04); }
     return len + 5 + R() * 20;
   }
   // paan spat at the foot of a wall, oil, a damp patch
@@ -208,6 +211,7 @@ function thing(b, R, x, z, tx, tz, nx, nz, onPath, broken, mess, A, Y) {
     const [px, pz] = at(0.9); if (!onPath(px, pz)) return 3;
     const c = Math.cos(yaw), s = Math.sin(yaw);
     b.set(K.wood, 0x6a4a32, 0.6, R()); b.ybox(px, Y + 0.6, pz, 1.8, Y + 0.72, 0.9, yaw, 0);
+    box(px, pz, 1.8, 0.9, yaw); box(px - c * 1.15, pz - s * 1.15, 0.5, 0.06, yaw);      // (the bed, the handle)
     b.set(K.plain, 0x1a1a1a, 0.5);
     for (const sx of [-0.6, 0.6]) for (const sz of [-0.48, 0.48]) b.cyl(px + c * sx - s * sz, Y, pz + s * sx + c * sz, 0.03, 0.03, 0.6, 4, 0);
     b.set(K.metal, 0x2a2a2a, 0.5); b.tube([px - c * 0.9, Y + 0.65, pz - s * 0.9], [px - c * 1.4, Y + 0.85, pz - s * 1.4], 0.025, 3);
@@ -219,6 +223,7 @@ function thing(b, R, x, z, tx, tz, nx, nz, onPath, broken, mess, A, Y) {
   if (r < 0.9) {
     const [px, pz] = at(1.2); if (!onPath(px, pz)) return 3;
     b.set(K.wood, 0x5a3a24, 0.7, R()); b.ybox(px, Y, pz, 0.6, Y + 0.4, 0.4, yaw, 8);
+    box(px, pz, 0.6, 0.4, yaw); box(px + nx * 0.6, pz + nz * 0.6, 0.35, 0.3, yaw);
     b.set(K.plain, 0x3a3a3a, 0.6); b.ybox(px + nx * 0.6, Y, pz + nz * 0.6, 0.35, Y + 0.25, 0.3, yaw, 8);
     b.set(K.tarp, 0x2a5ab8, 0.4); b.quad([px - tx * 0.9 - nx * 0.4, Y + 0.004, pz - tz * 0.9 - nz * 0.4], [px + tx * 0.9 - nx * 0.4, Y + 0.004, pz + tz * 0.9 - nz * 0.4], [px + tx * 0.9 + nx * 0.9, Y + 0.004, pz + tz * 0.9 + nz * 0.9], [px - tx * 0.9 + nx * 0.9, Y + 0.004, pz - tz * 0.9 + nz * 0.9], [0, 1, 0]);
     b.set(K.plain, 0x2a1a12, 0.5); for (let i = 0; i < 5; i++) { const u = (i - 2) * 0.28; b.ybox(px + tx * u - nx * 0.3, Y, pz + tz * u - nz * 0.3, 0.1, Y + 0.08, 0.26, yaw + Math.PI / 2, 8); }
@@ -236,7 +241,7 @@ function blobPatch(b, x, y, z, w, d, yaw, R, n) {
 }
 function umbrella(b, x, y, z, R, col) {
   const h = 1.9, r = 1.1, c = col ?? [0x2a5ab8, 0xd83a2a, 0xf2c230, 0x2f8a5a, 0x1a1a1e][(R() * 5) | 0];
-  b.set(K.metal, 0x3a3a3a, 0.4); b.tube([x, y, z], [x, y + h, z], 0.02, 3);
+  b.set(K.metal, 0x3a3a3a, 0.4); b.tube([x, y, z], [x, y + h, z], 0.02, 3); post(x, z, 0.04);
   b.set(K.cloth, c, 0.4, R());
   const n = 8;
   for (let i = 0; i < n; i++) {
@@ -245,3 +250,12 @@ function umbrella(b, x, y, z, R, col) {
     b.tri([x, y + h + 0.05, z], p0, p1, [0, 1, 0]); b.tri([x, y + h + 0.05, z], p0, p1, [0, -1, 0]);
   }
 }
+
+// what's solid of it: a box w x d (w along yaw) round (x, z) as its four corners, or a post
+let SOL = null;
+function box(x, z, w, d, yaw) {
+  if (!SOL) return;
+  const c = Math.cos(yaw), s = Math.sin(yaw), u = w / 2, v = d / 2;
+  SOL.push(['r', [x - c * u + s * v, z - s * u - c * v, x + c * u + s * v, z + s * u - c * v, x + c * u - s * v, z + s * u + c * v, x - c * u - s * v, z - s * u + c * v]]);
+}
+function post(x, z, r) { if (SOL) SOL.push(['c', x, z, r]); }

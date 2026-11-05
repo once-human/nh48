@@ -5,6 +5,7 @@
 // under, its plinth you step over), laid out on a 6 cm grid, each separate piece (a post, the counter, a stool, the
 // bench) as the few rectangles that cover it, and those go into the collision as walls round them.
 import * as THREE from 'three';
+import { signedArea, offsetRing } from './geom.js';
 
 const CELL = 0.06, Y0 = 0.05, Y1 = 1.7;
 const cache = new Map();
@@ -100,4 +101,22 @@ export function makeSolids(W) {
       place(C, geo, x, z, Math.atan2(-fx, -fz));
     },
   };
+}
+
+// A building's collision: its outline as a wall, except a petrol pump's canopy (style 7), a roof on columns you drive
+// in under: only its columns and the two pumps are solid, where world/builder.js's canopy() stands them.
+export function buildingSolid(B, ring, C) {
+  if (B[3] !== 7) { C.addRing(ring, 0); return; }
+  const p = ring, n = p.length / 2; if (n < 3) return;
+  const sgn = signedArea(p) > 0 ? 1 : -1, normals = new Float64Array(p.length);
+  let cx = 0, cz = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n, dx = p[2 * j] - p[2 * i], dz = p[2 * j + 1] - p[2 * i + 1], L = Math.hypot(dx, dz) || 1;
+    normals[2 * i] = sgn * dz / L; normals[2 * i + 1] = -sgn * dx / L; cx += p[2 * i]; cz += p[2 * i + 1];
+  }
+  cx /= n; cz /= n;
+  const sq = (x, z, w, d) => C.addRing([x - w / 2, z - d / 2, x + w / 2, z - d / 2, x + w / 2, z + d / 2, x - w / 2, z + d / 2], 2);
+  const inner = offsetRing(p, normals, -1.5);
+  for (let i = 0; i < n; i += Math.max(1, Math.floor(n / 4))) sq(inner[2 * i], inner[2 * i + 1], 0.5, 0.5);
+  for (const k of [-1, 1]) sq(cx + k * 2.5, cz, 0.8, 0.5);
 }
