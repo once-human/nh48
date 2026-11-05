@@ -103,36 +103,75 @@ V.update = function (dt, inp, traffic) {
   return r;
 };
 // ---------------------------------------------------------------- on the rims: sparks and the grind of steel on tar
-// sparks: little hot streaks thrown back off the rim where it meets the road, falling, gone in a third of a second
-const SPK = 160;
+// sparks: hot streaks thrown back off the rim where it meets the road, white-hot as they leave it, cooling through
+// amber to a dull red as they fall, gone in a third of a second; and where the steel grinds on the tar, flame: a
+// flickering amber tongue at the contact, licking back and up off it
+const SPK = 360, FLM = 90;
 let spk = null;
+function flameTex() {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+  const g = x.createRadialGradient(32, 40, 2, 32, 34, 30);
+  g.addColorStop(0, 'rgba(255,240,200,1)'); g.addColorStop(0.25, 'rgba(255,170,60,0.9)'); g.addColorStop(0.6, 'rgba(230,80,10,0.45)'); g.addColorStop(1, 'rgba(120,20,0,0)');
+  x.fillStyle = g; x.beginPath(); x.ellipse(32, 36, 22, 28, 0, 0, 6.283); x.fill();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 function sparks() {
   if (spk) return spk;
   const G = window.__nhAskG; if (!G || !G.scene) return null;
-  const g = new THREE.BoxGeometry(0.012, 0.012, 0.09);
-  const m = new THREE.MeshBasicMaterial({ color: 0xffc36a, toneMapped: false, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
-  const mesh = new THREE.InstancedMesh(g, m, SPK); mesh.frustumCulled = false; mesh.count = 0; G.scene.add(mesh);
-  spk = { mesh, p: [], k: 0, m4: new THREE.Matrix4(), q: new THREE.Quaternion(), v: new THREE.Vector3(), s: new THREE.Vector3(), z: new THREE.Vector3(0, 0, 1), t: 0 };
+  const g = new THREE.BoxGeometry(0.016, 0.016, 0.12);
+  const m = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  const mesh = new THREE.InstancedMesh(g, m, SPK); mesh.frustumCulled = false; mesh.count = 0;
+  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(SPK*3), 3); G.scene.add(mesh);
+  const fm = new THREE.MeshBasicMaterial({ map: flameTex(), color: 0xffffff, toneMapped: false, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const flame = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1.4).translate(0, 0.45, 0), fm, FLM); flame.frustumCulled = false; flame.count = 0;
+  flame.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(FLM*3), 3); G.scene.add(flame);
+  spk = { mesh, flame, p: [], f: [], k: 0, kf: 0, m4: new THREE.Matrix4(), q: new THREE.Quaternion(), v: new THREE.Vector3(), s: new THREE.Vector3(), z: new THREE.Vector3(0, 0, 1), t: 0 };
   return spk;
 }
 function emitSpark(x, y, z, vx, vy, vz) {
   const S = sparks(); if (!S) return;
   const p = S.p[S.k] || (S.p[S.k] = {}); S.k = (S.k + 1) % SPK;
-  Object.assign(p, { x, y, z, vx, vy, vz, life: 0, max: 0.18 + Math.random()*0.2 });
+  Object.assign(p, { x, y, z, vx, vy, vz, life: 0, max: 0.2 + Math.random()*0.28 });
+}
+function emitFlame(x, y, z, vx, vz) {
+  const S = sparks(); if (!S) return;
+  const p = S.f[S.kf] || (S.f[S.kf] = {}); S.kf = (S.kf + 1) % FLM;
+  Object.assign(p, { x, y, z, vx, vz, life: 0, max: 0.1 + Math.random()*0.14, sz: 0.1 + Math.random()*0.1, sp: Math.random()*6.283 });
+}
+// white-hot, yellow, amber, red: what a spark of steel goes through as it cools
+const HOT = [[3.2, 2.9, 2.2], [2.8, 1.9, 0.6], [2.2, 0.95, 0.15], [1.1, 0.25, 0.03]];
+function heat(t, out, i) {
+  const u = Math.min(2.999, Math.max(0, t)*3), k = Math.floor(u), f = u - k, A = HOT[k], B = HOT[k + 1];
+  out[i] = A[0] + (B[0] - A[0])*f; out[i + 1] = A[1] + (B[1] - A[1])*f; out[i + 2] = A[2] + (B[2] - A[2])*f;
 }
 function tickSparks(dt) {
   const S = spk; if (!S) return;
   let n = 0;
+  const col = S.mesh.instanceColor.array;
   for (const p of S.p) {
     if (!p || p.life >= p.max) continue;
     p.life += dt; p.vy -= 9.8*dt; p.x += p.vx*dt; p.y += p.vy*dt; p.z += p.vz*dt;
+    if (p.y < 0.01 && p.vy < 0) { p.y = 0.01; p.vy *= -0.35; p.vx *= 0.6; p.vz *= 0.6; }      // (a skip off the road)
     if (p.life >= p.max) continue;
     S.v.set(p.vx, p.vy, p.vz); const sp = S.v.length() || 1;
     S.q.setFromUnitVectors(S.z, S.v.multiplyScalar(1/sp));
-    const k = 1 - p.life/p.max; S.s.set(1, 1, 0.5 + Math.min(2.5, sp*0.12)*k);
-    S.m4.compose(S.v.set(p.x, p.y, p.z), S.q, S.s); S.mesh.setMatrixAt(n++, S.m4);
+    const k = 1 - p.life/p.max; S.s.set(1, 1, 0.5 + Math.min(2.8, sp*0.14)*k);
+    S.m4.compose(S.v.set(p.x, p.y, p.z), S.q, S.s); S.mesh.setMatrixAt(n, S.m4); heat(p.life/p.max, col, n*3); n++;
   }
-  S.mesh.count = n; S.mesh.instanceMatrix.needsUpdate = true;
+  S.mesh.count = n; S.mesh.instanceMatrix.needsUpdate = true; S.mesh.instanceColor.needsUpdate = true;
+  // the flames face the camera, flicker, and go up and back as they burn out
+  const G = window.__nhAskG, cam = G && G.camera, fc = S.flame.instanceColor.array; let m = 0;
+  if (cam) S.q.copy(cam.quaternion);
+  for (const p of S.f) {
+    if (!p || p.life >= p.max) continue;
+    p.life += dt; if (p.life >= p.max) continue;
+    p.x += p.vx*dt; p.z += p.vz*dt; p.y += 0.7*dt;
+    const t = p.life/p.max, fl = 0.75 + 0.25*Math.sin(p.sp + p.life*70), sc = p.sz*(0.6 + t*1.1)*fl;
+    S.s.set(sc*(1 - 0.3*t), sc*(1 + 0.4*t), sc);
+    S.m4.compose(S.v.set(p.x, p.y, p.z), S.q, S.s); S.flame.setMatrixAt(m, S.m4);
+    heat(0.25 + t*0.75, fc, m*3); const a = (1 - t)*0.85; fc[m*3] *= a; fc[m*3 + 1] *= a; fc[m*3 + 2] *= a; m++;
+  }
+  S.flame.count = m; S.flame.instanceMatrix.needsUpdate = true; S.flame.instanceColor.needsUpdate = true;
 }
 function rims(v, dt) {
   const G = window.__nhAskG, sp = Math.abs(v.v || 0);
@@ -140,7 +179,10 @@ function rims(v, dt) {
   if (sp > 2.5 && v._flats) {
     const hx = Math.cos(v.th), hz = Math.sin(v.th), y0 = v.y || 0, dir = Math.sign(v.v);
     for (const w of v._flats) {
-      v._sa = (v._sa || 0) + dt*Math.min(60, sp*3);
+      v._sa = (v._sa || 0) + dt*Math.min(110, sp*5.5);
+      v._fa = (v._fa || 0) + dt*Math.min(40, sp*2.2);
+      const fx = v.x + hx*w.x - hz*w.z, fz = v.z + hz*w.x + hx*w.z;
+      while (v._fa >= 1) { v._fa -= 1; emitFlame(fx + (Math.random() - 0.5)*0.08, y0 + 0.02, fz + (Math.random() - 0.5)*0.08, -hx*dir*sp*0.25, -hz*dir*sp*0.25); }
       while (v._sa >= 1) {
         v._sa -= 1;
         const x = v.x + hx*w.x - hz*w.z, z = v.z + hz*w.x + hx*w.z, R = Math.random;
