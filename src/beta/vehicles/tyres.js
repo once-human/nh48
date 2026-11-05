@@ -100,9 +100,12 @@ Vehicle.prototype.tyres = function (dt, inp, thr) {
     if (sl > 0 && !hb) dw -= (w - u*Math.tan(d)/wb)*2.2*sl;
     const du = (-Fyf*sd + Fxr)/m + s*w, ds = (Fyf*cd + Fyr)/m - u*w;
     u += du*hs; s += ds*hs; w += dw*hs;
-    // slow, the tyres just roll where they point (no slip worth the name; and no jitter about zero)
+    // slow, the tyres just roll where they point (no slip worth the name; and no jitter about zero), and the car turns
+    // about its back axle the way a car does: the back wheels roll straight and the nose swings. (It turned about its
+    // middle: wheels on full lock, the back swung out sideways, and against a wall or a kerb post that sideways swing
+    // was blocked, which stopped it going forward or back at all while the wheels were turned)
     const k = clamp((Math.abs(u) - 1.2)/2.8, 0, 1);
-    if (k < 1) { const wk = u*Math.tan(d)/wb; w = lerp(wk, w, k); s *= k; }
+    if (k < 1) { const wk = u*Math.tan(d)/wb; w = lerp(wk, w, k); s = lerp(b*w, s, k); }
   }
   this.v = u; this.vl = s; this.w = clamp(w, -4, 4);
   this.th = Math.atan2(Math.sin(this.th + this.w*dt), Math.cos(this.th + this.w*dt));
