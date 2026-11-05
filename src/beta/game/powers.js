@@ -591,7 +591,7 @@ export function powers(G) {
   }
   const spend2 = (u) => { if (!S.free) S.mu = Math.max(0, S.mu - u/LV); };
   // where each of them is about to walk, lit on the ground ahead of them
-  const TR_N = 44, TR_M = 12, TR_Q = TR_N*40;
+  const TR_N = 44, TR_M = 12, TR_Q = 5200;
   let trail = null, trT = 0, trPh = 0;
   const TMP = [0, 0, 0, 0];
   function trailMesh() {
@@ -664,19 +664,29 @@ export function powers(G) {
     const pos = trail.geometry.attributes.position.array, cl = trail.geometry.attributes.color.array, surf = G.W?.surf;
     let q = 0;
     const list = [];
-    for (const [p] of near().slice(0, 28)) { if (!(p.fallen > 0 || p._vetalBody || p.corpse)) list.push([pathOf(p), intent(p)]); }
-    for (const [v] of vehNear().slice(0, 16)) list.push([pathOfVeh(v), vIntent(v)]);
-    // each path as dashes 1 m long, 0.6 m apart, flowing the way they're going; a ribbon 30 cm wide, fading out ahead
-    const DASH = 1.0, GAP = 0.6, PER = DASH + GAP, HW = 0.15, flow = (trPh*2.2) % PER;
-    const quad = (ax, az, bx, bz, ya, yb, aa, ab) => {
+    for (const [p] of near().slice(0, 28)) { if (!(p.fallen > 0 || p._vetalBody || p.corpse)) list.push([pathOf(p), intent(p), null]); }
+    // a vehicle's wheels: one line for a two-wheeler or an auto (its back wheels run in the front one's track... near
+    // enough: the auto's single front wheel leads), two for anything on four wheels, its track apart
+    for (const [v] of vehNear().slice(0, 16)) { const T = v.T || {}, one = T.two || v.type === 'auto'; list.push([pathOfVeh(v), vIntent(v), one ? [0] : [-(T.W || 1.7)*0.41, (T.W || 1.7)*0.41]]); }
+    // a rectangle on the ground: centre (cx, cz), along (fx, fz) half a long and b wide, at alpha al
+    const rect = (cx, cz, fx, fz, a, b, al) => {
       if (q >= TR_Q) return;
-      const dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz) || 1, nx = -dz/l*HW, nz = dx/l*HW, v = q*12, c = q*16;
-      pos.set([ax + nx, ya, az + nz, ax - nx, ya, az - nz, bx + nx, yb, bz + nz, bx - nx, yb, bz - nz], v);
-      for (let j = 0; j < 4; j++) { const al = j < 2 ? aa : ab; cl[c + j*4] = col.r; cl[c + j*4 + 1] = col.g; cl[c + j*4 + 2] = col.b; cl[c + j*4 + 3] = al; }
+      const nx = -fz*b, nz = fx*b, ex = fx*a, ez = fz*a, v = q*12, c = q*16, y = hAt(cx, cz);
+      pos.set([cx - ex + nx, y, cz - ez + nz, cx - ex - nx, y, cz - ez - nz, cx + ex + nx, y, cz + ez + nz, cx + ex - nx, y, cz + ez - nz], v);
+      for (let j = 0; j < 4; j++) { cl[c + j*4] = col.r; cl[c + j*4 + 1] = col.g; cl[c + j*4 + 2] = col.b; cl[c + j*4 + 3] = al; }
       q++;
     };
     const hAt = (x, z) => (surf ? surf.height(x, z) : 0) + 0.06;
-    for (const [pts, c] of list) {
+    // wheels: dashes 1 m long, 0.6 m apart, a hand wide, flowing the way it's going, fading out ahead
+    const DASH = 1.0, GAP = 0.6, PER = DASH + GAP, HW = 0.09, flow = (trPh*2.2) % PER;
+    // feet: a footprint (the sole, a gap, the heel) left and right in turn, a step apart, creeping ahead the way they walk
+    const STEP = 0.68, flowF = (trPh*1.3) % (2*STEP);
+    const foot = (x, z, fx, fz, side, al) => {
+      const ox = -fz*0.1*side, oz = fx*0.1*side;
+      rect(x + ox + fx*0.045, z + oz + fz*0.045, fx, fz, 0.085, 0.048, al);         // the sole and toes
+      rect(x + ox - fx*0.1, z + oz - fz*0.1, fx, fz, 0.042, 0.038, al);              // the heel
+    };
+    for (const [pts, c, wheels] of list) {
       if (pts.length < 4) continue;
       col.set(c);
       let tot = 0; for (let i = 0; i + 3 < pts.length; i += 2) tot += Math.hypot(pts[i + 2] - pts[i], pts[i + 3] - pts[i + 1]);
@@ -685,14 +695,25 @@ export function powers(G) {
       for (let i = 0; i + 3 < pts.length && q < TR_Q; i += 2) {
         const ax = pts[i], az = pts[i + 1], bx = pts[i + 2], bz = pts[i + 3], L = Math.hypot(bx - ax, bz - az);
         if (L < 1e-3) continue;
-        // the dashes on this piece: [k*PER + flow, k*PER + flow + DASH] along the whole path
-        for (let k = Math.floor((d0 - flow)/PER) - 1; ; k++) {
-          const s0 = k*PER + flow, s1 = s0 + DASH;
-          if (s0 >= d0 + L) break;
-          const u0 = Math.max(s0, d0), u1 = Math.min(s1, d0 + L);
-          if (u1 <= u0) continue;
-          const t0 = (u0 - d0)/L, t1 = (u1 - d0)/L, x0 = ax + (bx - ax)*t0, z0 = az + (bz - az)*t0, x1 = ax + (bx - ax)*t1, z1 = az + (bz - az)*t1;
-          quad(x0, z0, x1, z1, hAt(x0, z0), hAt(x1, z1), 0.85*(1 - u0/tot), 0.85*(1 - u1/tot));
+        const fx = (bx - ax)/L, fz = (bz - az)/L;
+        if (!wheels) {
+          // the steps on this piece of the way: left at k*2*STEP + flowF, right a step on
+          for (let k = Math.floor((d0 - flowF)/STEP) - 1; ; k++) {
+            const sd = k*STEP + flowF;
+            if (sd >= d0 + L) break;
+            if (sd < d0 || sd < 0.3) continue;
+            const t = (sd - d0)/L;
+            foot(ax + (bx - ax)*t, az + (bz - az)*t, fx, fz, (k & 1) ? 1 : -1, 0.9*(1 - sd/tot));
+          }
+        } else {
+          for (let k = Math.floor((d0 - flow)/PER) - 1; ; k++) {
+            const s0 = k*PER + flow, s1 = s0 + DASH;
+            if (s0 >= d0 + L) break;
+            const u0 = Math.max(s0, d0), u1 = Math.min(s1, d0 + L);
+            if (u1 <= u0) continue;
+            const um = (u0 + u1)/2, t = (um - d0)/L, mx = ax + (bx - ax)*t, mz = az + (bz - az)*t, al = 0.85*(1 - um/tot);
+            for (const o of wheels) rect(mx - fz*o, mz + fx*o, fx, fz, (u1 - u0)/2, HW, al);
+          }
         }
         d0 += L;
       }
