@@ -73,3 +73,6 @@
 .nhc-tel[hidden] { display: none; }
 @media (max-width: 760px) { .nhc { padding: 0; } .nhc-card { height: 88vh; grid-template: auto minmax(0, 1fr) minmax(0, 1fr) / minmax(0, 1fr); } .nhc-main { border-right: 0; border-bottom: 1px solid var(--ink); } .nhc-head h2 { font-size: 40px; } .nhc-tip { display: none; } .nhc-cols, .nhc-s { grid-template-columns: 30px max-content minmax(0, 1fr); } .nhc-cols span:nth-child(4), .nhc-s i { display: none; } }
 #h-prompt2 { margin-top: 6px; }
+
+/* the terminal's "hud off": a clean picture */
+body.nh-nohud #ui { display: none !important; }

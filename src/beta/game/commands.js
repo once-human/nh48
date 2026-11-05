@@ -7,6 +7,7 @@ import { WEATHERS } from '@orig/gfx/weather.js';
 import { ITEMS } from '@orig/game/life.js';
 import { lin } from '@orig/world/geo.js';
 import { SETTINGS } from './graphics.js';
+import { registry } from './registry.js';
 
 // every model by the name you'd call it, to the game's type for it: "spawn creta" is that car and nothing else.
 // The game's own names stay "911-style" and so on: no badges on anything
@@ -148,7 +149,9 @@ export function freeTerminal(G) {
   const flush = () => { const t = T(); for (let i = t.list.length - 1; i >= 0; i--) t.despawn(i); t.prefill(P().x, P().z); };
 
   // ------------------------------------------------------------ live object paths
-  const roots = () => ({ G, W: W(), P: P(), T: T(), V: P().onFoot ? null : P().cur, L: G.life, gfx: G.gfx, TYPES, SPECS });
+  // the code's own names (G W P T V L), and every part of the game by its name: story, date, police, shops, gym…
+  const systems = () => { const o = {}; for (const k of Object.keys(G)) { const q = G[k]; if (q && typeof q === 'object' && !Array.isArray(q) && !q.isObject3D && q.constructor && q.constructor !== Object && k[0] !== '_') o[k] = q; } return o; };
+  const roots = () => ({ ...systems(), G, W: W(), P: P(), T: T(), V: P().onFoot ? null : P().cur, L: G.life, gfx: G.gfx, TYPES, SPECS });
   const walk = (path) => {
     const seg = path.split('.'); let o = roots()[seg[0]], parent = null, key = seg[0];
     if (!(seg[0] in roots())) throw new Error(`no root "${seg[0]}". Roots: ${Object.keys(roots()).join(' ')}`);
@@ -382,8 +385,7 @@ export function freeTerminal(G) {
     say(`${ok}/${total} passed`, ok === total ? 'ok' : 'err');
   }, { group: 'shell' });
 
-  // ------------------------------------------------------------ the long list: one command for each thing you'd reach for
-  const one = (v, about, group) => sh.line(v, about, group);
+  // ------------------------------------------------------------ names: each command under what it works on
   // command, sub-command, then the values: what used to be one word each is grouped under what it works on
   function regroup() {
     for (const [a, b] of [['roster', 'spawn list'], ['despawn', 'spawn clear'], ['exit', 'vehicle exit'], ['fix', 'vehicle fix'], ['paint', 'vehicle paint'], ['tune', 'vehicle tune'],
@@ -401,63 +403,15 @@ export function freeTerminal(G) {
       St.fov = Math.max(20, Math.min(140, +f || 0)); say(`fov ${St.fov}`, 'ok');
     }, { group: 'picture' });
   }
-  function families() {
-    for (const w of ['on', 'off']) { one(`fly ${w}`, w === 'on' ? 'take off' : 'come down and land', 'flight'); one(`freecam ${w}`, w === 'on' ? 'detached camera' : 'back to you', 'flight'); }
-    for (const m of [0.5, 1, 2, 4, 8]) one(`fly speed ${m}`, `flight speed ${m}×`, 'flight');
-    one('fly up', 'straight up 100 m', 'flight'); one('fly up 500', 'straight up 500 m', 'flight'); one('fly high', 'up to 400 m, over the whole city', 'flight');
-    one('cam view', 'first or third person (C)', 'camera');
-    for (let f = 40; f <= 120; f += 5) one(`cam fov ${f}`, `field of view ${f}°`, 'camera');
-    one('cam fov reset', 'the camera\'s own field of view', 'camera');
-    for (const k of Object.keys(KIND)) { one(`spawn type ${k}`, `any ${k}: ${KIND[k].filter(t => SPECS[t]).map(modelOf).join(', ')}`, 'spawn'); one(`spawn type ${k} 4`, `four of them, mixed`, 'spawn'); one(`drive type ${k}`, `any ${k}, and get in`, 'drive'); }
-    for (const m of Object.keys(MODEL)) {
-      const t = MODEL[m], S = SPECS[t]; if (!S) continue;
-      one(`spawn ${m}`, `a ${S.model}`, 'spawn'); one(`spawn ${m} 4`, `four of them in a row`, 'spawn'); one(`drive ${m}`, `a ${S.model}, and get in`, 'drive');
-      for (const c of Object.keys(COLOURS)) one(`drive ${m} --paint=${c}`, `a ${c} ${m}, and get in`, 'paint jobs');
-      if (!TYPES[t]) continue;
-      one(`traffic only ${m}`, `nothing but ${m}s on the road`, 'traffic');
-      for (const [x, w] of [[0, 'never'], [0.5, 'half as often'], [1.5, '1.5× as often'], [2, 'twice as often'], [5, '5× as often'], [10, '10× as often'], [100, 'everywhere']]) one(`traffic rate ${m} ${x}`, `${m}: ${w}`, 'traffic');
-      one(`traffic rate ${m}`, `${m}: as the game has it`, 'traffic');
-    }
-    for (const c of Object.keys(COLOURS)) one(`vehicle paint ${c}`, `respray what you drive ${c}`, 'paint jobs');
-    for (const [w, a] of [['flush', 'clear the road and fill it again'], ['stop', 'everyone stands'], ['go', 'and off again'], ['census', 'what is out there now']]) one(`traffic ${w}`, a, 'traffic');
-    for (const n of [0, 10, 25, 50, 75, 100, 150, 200, 300]) one(`traffic density ${n}`, `up to ${n} vehicles at once`, 'traffic');
-    one('traffic density', 'as many as the game likes', 'traffic');
-    for (const w of Object.keys(WORDS)) one(`time ${w}`, `go to ${WORDS[w]}`, 'clock');
-    for (let h = 0; h < 24; h++) for (const m of ['00', '30']) one(`time ${h}:${m}`, `${String(h).padStart(2, '0')}:${m}`, 'clock');
-    one('time lock', 'hold the hour', 'clock'); one('time unlock', 'let it run', 'clock');
-    for (const v of [0, 0.1, 0.25, 0.5, 1, 2, 4, 8, 16]) one(`time scale ${v}`, v === 1 ? 'normal speed' : v < 1 ? `slow motion, ${v}×` : `fast forward, ${v}×`, 'clock');
-    for (const k of Object.keys(WEATHERS)) one(`weather ${k}`, `the sky: ${k}`, 'sky');
-    for (const n of [0, 1, 2, 3, 4, 5]) one(`player wanted ${n}`, n ? `police heat ${n}` : 'nobody is after you', 'body');
-    for (const n of [0, 1000, 10000, 100000, 1000000, 10000000]) one(`player money ${n}`, `₹${n.toLocaleString('en-IN')} in your pocket`, 'body');
-    for (const m of [0.5, 1, 1.5, 2, 3, 5, 10]) one(`player run ${m}`, `run ${m}× as fast`, 'body');
-    for (const w of ['on', 'off']) { one(`player god ${w}`, `god mode ${w}`, 'body'); one(`player noclip ${w}`, `through walls ${w}`, 'body'); one(`gfx readout ${w}`, `numbers top left ${w}`, 'picture'); }
-    for (const k of Object.keys(ITEMS)) { one(`player give ${k}`, `a ${ITEMS[k].name}`, 'jhola'); one(`player give ${k} 10`, `ten of ${ITEMS[k].name}`, 'jhola'); }
-    for (const p of ['auto', 'lite', 'low', 'medium', 'high', 'veryhigh', 'ultra']) one(`gfx preset ${p}`, `graphics preset: ${p}`, 'graphics');
-    for (const S of SETTINGS) {
-      if (!S.id) continue;
-      const nv = Math.min(6, (S.val && S.val.length) || 6);
-      for (let i = 0; i < nv; i++) { let t = ''; try { t = S.fmt ? S.fmt(S.val[i]) : fmt(S.val[i]); } catch (e) { t = ''; } one(`gfx ${S.id} ${i}`, `${S.label}: level ${i}${t ? ' (' + t + ')' : ''}`, 'graphics'); }
-      one(`gfx ${S.id}`, `${S.label}: let Auto choose`, 'graphics');
-    }
-    one('gfx reset', 'every setting back to the preset', 'graphics');
-  }
-  // what needs the city loaded: a line for every area of Pune and every landmark, and your stats
-  let placed = false;
-  function placeFamilies() {
-    if (placed) return; placed = true;
-    for (const p of allPlaces()) if (p.c === 'area' || p.c === 'landmark') one(`tp ${p.n}`, `${p.c === 'area' ? 'teleport to' : 'go to'} ${p.n} · ${ll(p.x, p.z, 4)}`, p.c === 'area' ? 'areas' : 'landmarks');
-    const L = G.life?.s || {};
-    for (const k of Object.keys(L)) if (typeof L[k] === 'number' && L[k] >= 0 && L[k] <= 1) for (const [w, v] of [['full', 1], ['half', 0.5], ['empty', 0]]) one(`player stat ${k} ${v}`, `${k}: ${w}`, 'body');
-  }
-
   // ------------------------------------------------------------ the terminal and its readout
   const term = new Terminal(sh, {
     status: () => { const Pl = P(), hh = G.hour || 0, two = (n) => String(Math.floor(n)).padStart(2, '0'); return `${ll(Pl.x, Pl.z)}   ${two(hh)}:${two(hh%1*60)}   ${Math.round(fps.cur)} fps   ${Pl.onFoot ? 'on foot' : Pl.cur.type}   traffic ${T().list.length}/${T().max}   ${G.weather?.kind || ''}`; },
     onOpen: () => { G.input?.keys?.clear(); G.input?.pressed?.clear(); G.releaseMouse?.(); },
     onClose: () => { G.input?.keys?.clear(); G.input?.pressed?.clear(); G.lockMouse?.(); },
   });
-  sh.order = ['vehicles', 'world', 'you', 'picture', 'live', 'shell', 'flight', 'camera', 'spawn', 'drive', 'paint jobs', 'traffic', 'areas', 'landmarks', 'clock', 'sky', 'body', 'jhola', 'graphics', 'yours'];
-  regroup(); families();
+  sh.order = ['variables', 'people', 'animals', 'animation', 'vehicles', 'world', 'you', 'systems', 'picture', 'live', 'shell', 'yours'];
+  regroup();
+  registry({ G, sh, say, St, make, go, target, fmt, lit, walk, vehType, SETTINGS, WEATHERS });
   // the "click to take the mouse" hint has no business showing while you're typing
   const lockHint = G.hud?.setLockHint?.bind(G.hud);
   if (lockHint) G.hud.setLockHint = (on) => lockHint(on && !term.open);
@@ -606,12 +560,12 @@ export function freeTerminal(G) {
 
   // ------------------------------------------------------------ in and out
   function arm() {
-    if (armed) return; armed = true; hook(); placeFamilies();
+    if (armed) return; armed = true; hook();
     tel.hidden = !St.hud; readout();
     term.clear();
     say('Free roam terminal. Nothing here reaches your own game.', 'head');
-    say(`${sh.cmds.size} commands and ${sh.lines.length} ready lines, every one in the list. Type to narrow it, Tab or a click to take one. Double-tap Space to fly.`, 'dim');
-    say('Try: spawn lambo --paint=verde --drive   ·   rate super 500; traffic flush   ·   tp fc road', 'dim');
+    say(`${sh.cmds.size} commands. Type to narrow the list, Tab or a click to take one. help <command> for detail. Double-tap Space to fly.`, 'dim');
+    say('vars player  ·  set player.karma 50  ·  npc spawn aaji; npc do @last dance  ·  anim play @me sit  ·  test mount classic350  ·  sys list', 'dim');
     for (const l of autoexec) St.timers.push({ t: 0.5, c: l });
   }
   function disarm() {
