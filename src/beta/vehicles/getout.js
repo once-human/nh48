@@ -33,10 +33,11 @@ Pilot.prototype.exit = function (traffic, force = false) {
   // where you start: on the seat (two-wheelers), in the doorway, under the roof, up on the step
   const inn = st === 'two' ? od : st === 'car' ? 0.5 : st === 'auto' ? 0.55 : 0.35;
   const sx = ex - ox/od*inn - (st === 'two' ? hx*0.15 : 0), sz = ez - oz/od*inn - (st === 'two' ? hz*0.15 : 0);
-  this._out = { veh, kind: kindOfVeh(this, veh), st, t: 0, T: st === 'two' ? 1.15 : st === 'auto' ? 1.9 : 0.45, sx, sz, ex, ez, y0: F.y, hx, hz, seatY: (veh.y || 0) + 0.8, leg: null };
+  this._out = { veh, kind: kindOfVeh(this, veh), st, t: 0, T: st === 'two' ? 1.15 : st === 'auto' ? 1.9 : 0.85, sx, sz, ex, ez, y0: F.y, hx, hz, seatY: (veh.y || 0) + 0.8, leg: null };
   F.x = sx; F.z = sz;
   this.frozen = true; this.act = { kind: 'getout', t: 0 };
   if ((st === 'two' || st === 'auto') && this.human) this.human.play('drive', { fade: 0 });
+  if (st === 'step' && this.human) this.human.play('walk', { speed: 0.5, fade: 0.2 });
   return out;
 };
 
@@ -173,7 +174,8 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
     const k = Math.min(1, O.t/O.T), e = sm(k);
     F.x = O.sx + (O.ex - O.sx)*e; F.z = O.sz + (O.ez - O.sz)*e;
     let y = O.y0;
-    if (O.st === 'step') y = O.y0 + 0.38*(1 - e) + Math.sin(Math.PI*k)*0.06;
+    // down the steps: one, then the other, a little drop onto each
+    if (O.st === 'step') { const a1 = seg(k, 0.05, 0.38), a2 = seg(k, 0.5, 0.82), h = O.kind === 'bus' ? 0.5 : 0.45; y = O.y0 + h*(1 - 0.5*a1 - 0.5*a2) + 0.04*(Math.sin(Math.PI*a1) + Math.sin(Math.PI*a2)); }
     H.holder.position.set(F.x, y, F.z); H.holder.rotation.set(0, -F.yaw, 0);
     const rx = -Math.sin(F.yaw), rz = Math.cos(F.yaw);        // (right of where you face: the bend is about it)
     if (O.st === 'auto') autoOut(this, O);
@@ -237,17 +239,26 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
       if (Math.hypot(F.x - I.side.x, F.z - I.side.z) < 0.35 || I.t > I.max) {
         I.phase = I.st === 'auto' ? 'turn' : 'in'; I.t = 0; this.puppet = null; this.act = { kind: 'getin', t: 0 };
         I.sx = F.x; I.sz = F.z; I.yaw0 = F.yaw; if (I.st !== 'auto') F.yaw = Math.atan2(src.z - F.z, src.x - F.x);
-        H.play('idle', { fade: 0.12 });
+        H.play(I.st === 'step' ? 'walk' : 'idle', { fade: 0.15, speed: I.st === 'step' ? 0.5 : 1 });
       }
     } else if (I.st === 'auto') autoIn(this, I);
     else {
-      const T = I.st === 'step' ? 0.55 : 0.5, k = Math.min(1, I.t/T), e = sm(k);
-      const tx = I.sx + (src.x - I.sx)*0.45, tz = I.sz + (src.z - I.sz)*0.45;
-      F.x = I.sx + (tx - I.sx)*e; F.z = I.sz + (tz - I.sz)*e;
-      const y = I.st === 'step' ? I.y0 + 0.38*e + Math.sin(Math.PI*k)*0.06 : I.y0;
+      // up the steps, square in through the doorway (not off along the bus): one step, the next, a hand on the post
+      const T = 0.95, k = Math.min(1, I.t/T), e = sm(k), Fr = carFrame(src), s = I.side.s, ix = Fr.hz*s, iz = -Fr.hx*s, bus = kindOf(I.offer) === 'bus';
+      F.x = I.sx + ix*0.8*e; F.z = I.sz + iz*0.8*e;
+      F.yaw = Math.atan2(iz, ix);
+      const a1 = seg(k, 0.1, 0.42), a2 = seg(k, 0.52, 0.84), h = bus ? 0.5 : 0.45;
+      const y = I.y0 + h*(0.5*a1 + 0.5*a2) + 0.05*(Math.sin(Math.PI*a1) + Math.sin(Math.PI*a2));
       H.holder.position.set(F.x, y, F.z); H.holder.rotation.set(0, -F.yaw, 0);
       const rx = -Math.sin(F.yaw), rz = Math.cos(F.yaw);
-      bent(H, rx, rz, (I.st === 'auto' ? 0.6 : 0.25)*Math.sin(Math.PI*Math.min(1, k*1.1)));
+      bent(H, rx, rz, 0.18*Math.sin(Math.PI*Math.min(1, k*1.1)));
+      if (bus) {
+        // the front post of the doorway, the hand toward the front on it, pulling up
+        const pst = Fr.at(11.4/2 - 0.28, 1.2, -(2.55/2 - 0.04), _c), sd = s < 0 ? 'l' : 'r';
+        _pole.set(-ix*0.5 + Fr.hx*0.2, -1, -iz*0.5 + Fr.hz*0.2);
+        const w = Math.sin(Math.PI*Math.min(1, k*1.15));
+        ikArm(H, sd, pst, _pole, w); close(H, sd, w);
+      }
       if (k >= 1) {
         const o = I.offer; this._in = null; this.frozen = false; this.puppet = null;
         if (this.act && this.act.kind === 'getin') this.act = null;
