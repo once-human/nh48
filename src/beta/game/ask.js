@@ -29,13 +29,22 @@ const SIDE = { left: ['डावीकडे', 'left'], right: ['उजवीक
 const one = (rng, a) => a[Math.floor(rng.next()*a.length)];
 const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
+// whoever you're facing, before whoever happens to be nearest: how far round you'd have to turn counts for more than
+// a step's difference in distance (a crowded club: the one in front of you, not the one at your elbow)
+export function facing(x, z, th, px, pz, reach) {
+  const dx = px - x, dz = pz - z, d = Math.hypot(dx, dz);
+  if (d > reach) return 1e9;
+  const a = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - th), Math.cos(Math.atan2(dz, dx) - th)));
+  if (a > 1.0 && d > 0.75) return 1e9;
+  return a*2.4 + d;
+}
 export function who(ppl, P) {
   if (!P.onFoot) return null;
-  const fx = Math.cos(P.th), fz = Math.sin(P.th); let best = null, bd = 2.6;
+  let best = null, bs = 1e9;
   for (const p of ppl.list) {
     if (p.hidden || p.corpse || p.dead || p.ko || p.fallen > 0 || p.pax || p.rideOf || p.lift || p.mode === 'fight' || p.mode === 'flee' || p.mode === 'chase' || p.mode === 'inside') continue;
-    const dx = p.x - P.x, dz = p.z - P.z, d = Math.hypot(dx, dz);
-    if (d < bd && (dx*fx + dz*fz)/Math.max(d, 1e-3) > 0.3) { bd = d; best = p; }
+    const sc = facing(P.x, P.z, P.th, p.x, p.z, 2.8);
+    if (sc < bs) { bs = sc; best = p; }
   }
   return best;
 }

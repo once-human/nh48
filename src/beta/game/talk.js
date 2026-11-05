@@ -8,7 +8,7 @@
 import { People } from '@orig/people/peds.js';
 import { KbNav } from '@orig/ui/kbnav.js';
 import { CAST } from '@orig/people/cast.js';
-import { who } from './ask.js';
+import { who, facing } from './ask.js';
 import { outing } from './outing.js';
 
 const one = (rng, a) => a[Math.floor(rng.next()*a.length)];
@@ -197,12 +197,12 @@ class Talk {
       return best ? this.open(best, null, 'window') : false;
     }
     if (I && I.inside) {
-      const C = I.cur, x = P.x, z = P.z, fx = Math.cos(P.th), fz = Math.sin(P.th);
-      let best = null, bd = 2.4;
+      const C = I.cur;
+      let best = null, bs = 1e9;
       for (const p of C.R.peds || []) {
         if (p.hidden || p.walkedOff) continue;
-        const dx = p.x - x, dz = p.z - z, d = Math.hypot(dx, dz);
-        if (d < bd && (d < 0.9 || (dx*fx + dz*fz)/d > 0.2)) { bd = d; best = p; }
+        const sc = facing(P.x, P.z, P.th, p.x, p.z, 2.6);
+        if (sc < bs) { bs = sc; best = p; }
       }
       if (!best) return false;
       // the one you're here with: that's the date

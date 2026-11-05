@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { Lights } from '@orig/game/lights.js';
 import { ikArm } from '@orig/people/humans.js';
+import { grip } from '../vehicles/fit.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const YAW = 1.0, UP = 0.6, DOWN = 0.95;
@@ -36,6 +37,7 @@ Lights.prototype.torchMesh = function (on) {
     _t.copy(_s).addScaledVector(aim, 0.5); _t.x -= -fz*0.08; _t.z -= fx*0.08; _t.y -= 0.1;
     _p.set(-fz*0.6 + aim.x*0.1, -1, fx*0.6 + aim.z*0.1).normalize();
     ikArm(H2, 'r', _t, _p, 1);
+    grip(H2, 'r', 0.85);
     // the torch in the grip: the palm is a hand's width past the wrist, along the forearm
     hand.getWorldPosition(_h); H2.root.getObjectByName('lowerarm_r').getWorldPosition(_l);
     const fa = _l.sub(_h).multiplyScalar(-1).normalize();

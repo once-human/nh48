@@ -58,6 +58,8 @@ function smash(P, E) {
 const doors = Pilot.prototype.tickDoors;
 Pilot.prototype.tickDoors = function (dt) {
   doors.call(this, dt);
+  // the opening shows once the door is off the body, and goes as it shuts
+  if (this.doors) for (const D of this.doors) if (D.hole) D.hole.visible = D.pivot.rotation.y > 0.06;
   for (let i = shards.length - 1; i >= 0; i--) {
     const S = shards[i]; S.t += dt;
     for (const s of S.g.children) {
@@ -73,9 +75,17 @@ Pilot.prototype.tickDoors = function (dt) {
 const openDoor = Pilot.prototype.openDoor;
 Pilot.prototype.openDoor = function (src, kind) {
   const D = openDoor.call(this, src, kind), E = this.entering;
+  // the dark of the cabin stays where the door was, on the car (it swung out with the door, so the car's own painted
+  // door showed behind the one opening: two doors). Just proud of the body, so the painted one is covered once it moves
+  const hole = D.hole, g = hole && hole.parent;
+  if (g) {
+    const stay = new THREE.Group(); stay.position.copy(D.pivot.position);
+    g.remove(hole); stay.add(hole); hole.position.z = 0.035; hole.scale.set(1.04, 1.03, 1);
+    hole.visible = false; D.pivot.parent.add(stay); D.stay = stay;
+  }
   if (E && E.pass && E.src === src) {
     const m = new THREE.Group(); m.scale.z = -1;
-    D.root.remove(D.pivot); m.add(D.pivot); D.root.add(m);
+    D.root.remove(D.pivot); if (D.stay) { D.root.remove(D.stay); m.add(D.stay); } m.add(D.pivot); D.root.add(m);
   }
   return D;
 };

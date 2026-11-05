@@ -1203,9 +1203,12 @@ export function buildBus() {
   const at = (x, y, z) => { const c = Math.pow(Math.abs(z)/hw, 3.4); return Math.max(rear(y) + 0.16*c, Math.min(front(y) - 0.2*c, x)); };
   const yArch = (x) => { let yb = 0; for (const w of WX) { const d = Math.abs(x - w); if (d < AR) yb = Math.max(yb, 0.5 + Math.sqrt(AR*AR - d*d)); } return yb; };
   const outline = (x) => { const a = yArch(x), yb = Math.max(0.42, a), low = Math.max(yb + 0.03, 0.56); return [[0, 0.42], [hw - 0.42, 0.42], [hw - 0.42, yb], [hw - 0.03, yb], [hw, low], [hw, Math.max(low + 0.05, 0.86)], [hw, Math.max(low + 0.1, 1.1)], [hw, 1.32], [hw, 1.38], [hw - 0.01, 1.66], [hw - 0.02, 2.0], [hw - 0.032, 2.32], [hw - 0.06, 2.66], [hw - 0.13, 2.88], [hw - 0.34, 3.05], [hw - 0.72, 3.13], [hw*0.3, 3.165], [0, 3.175]]; };
-  const xs = stationsOf([-hl, -hl + 0.12, ...Array.from({ length: 46 }, (_, i) => -hl + (i + 1)*L/47), hl - 0.12, hl, ...WX.flatMap(w => [-1, -.92, -.75, -.5, -.25, 0, .25, .5, .75, .92, 1].map(k => w + k*AR))], 0.02);
+  const DOORS = [[hl - 1.17, hl - 0.25], [-0.62, 0.42]];
+  const xs = stationsOf([-hl, -hl + 0.12, ...Array.from({ length: 46 }, (_, i) => -hl + (i + 1)*L/47), hl - 0.12, hl, ...DOORS.flat(), ...WX.flatMap(w => [-1, -.92, -.75, -.5, -.25, 0, .25, .5, .75, .92, 1].map(k => w + k*AR))], 0.02);
   const sideZ = (y) => hw - Math.max(0, y - 1.38)*0.034;
   shell(b, xs, outline, at, (q) => {
+    // the doorways are open: the leaves are their own pieces (vehicles/busdoors.js), folding in at a stop
+    if (q.z < -(hw - 0.25) && Math.abs(q.nz) > 0.5 && q.y > 0.46 && q.y < 2.42 && DOORS.some(([a, e]) => q.x > a + 0.005 && q.x < e - 0.005)) return null;
     if (q.ny < -0.55 || Math.abs(q.z) < hw - 0.05 && q.y < 1.0 && Math.abs(q.nx) < 0.7) return [...RUBBER, 0];
     if (q.y > 2.92) return [...roofC, 0];
     if (q.y > 1.3 && q.y < 1.385) return [...band, 0];
@@ -1233,16 +1236,11 @@ export function buildBus() {
     rbox(b, x0 - 0.02, 1.47, s*sideZ(1.47), x1 + 0.02, 1.5, s*(sideZ(1.47) + 0.02), [0.55, 0.55, 0.57]);
     rbox(b, x0 - 0.02, 2.33, s*sideZ(2.33), x1 + 0.02, 2.36, s*(sideZ(2.33) + 0.02), [0.55, 0.55, 0.57]);
   }
-  // doors: folding, glass nearly to the step, grab rails, the step lit
-  for (const [a, e] of [[hl - 1.17, hl - 0.25], [-0.62, 0.42]]) {
-    const m = (a + e)/2, z = -(hw + 0.007);
-    rbox(b, a - 0.04, 0.44, z - 0.012, e + 0.04, 2.42, z + 0.02, RUBBER);
-    for (const [u0, u1] of [[a + 0.015, m - 0.008], [m + 0.008, e - 0.015]]) {
-      rbox(b, u0, 0.5, z - 0.018, u1, 2.36, z, [0.82, 0.78, 0.68]);
-      patch(b, 2, 3, (u, v) => [u0 + 0.05 + (u1 - u0 - 0.1)*u, 1.42 + 0.86*v, z - 0.02], PANE, [0, 0, -1]);
-      patch(b, 2, 3, (u, v) => [u0 + 0.05 + (u1 - u0 - 0.1)*u, 0.62 + 0.68*v, z - 0.02], PANE, [0, 0, -1]);
-      rod(b, [u1 - 0.07, 0.95, z - 0.035], [u1 - 0.07, 1.95, z - 0.035], 0.012, [0.88, 0.75, 0.2]);
-    }
+  // the doorways: a rubber-sealed frame round each, the step below (the leaves fold in: vehicles/busdoors.js)
+  for (const [a, e] of DOORS) {
+    const z = -(hw + 0.007);
+    rbox(b, a - 0.05, 0.44, z - 0.012, a + 0.01, 2.44, z + 0.06, RUBBER); rbox(b, e - 0.01, 0.44, z - 0.012, e + 0.05, 2.44, z + 0.06, RUBBER);
+    rbox(b, a - 0.05, 2.4, z - 0.012, e + 0.05, 2.46, z + 0.06, RUBBER);
     box(b, a, 0.34, -hw - 0.02, e, 0.44, -hw + 0.3, [0.25, 0.25, 0.26]);
   }
   // the front: windscreen in two curved panes, wipers, a route board under a hood, grille, lamps, bumper
@@ -1291,7 +1289,7 @@ export function buildBus() {
   for (let x = -hl + 0.4; x < hl - 0.5; x += 0.12) box(b, x, fl, -0.3, x + 0.03, fl + 0.006, 0.3, [0.32, 0.32, 0.33]);
   box(b, -hl + 0.25, 2.86, -hw + 0.1, hl - 0.4, 2.9, hw - 0.1, panel);
   for (const s of [-1, 1]) {
-    box(b, -hl + 0.25, fl, s*(hw - 0.08), hl - 0.4, 1.46, s*(hw - 0.06), panel);
+    { let x0 = -hl + 0.25; for (const [a, e] of (s < 0 ? [[-0.62, 0.42], [hl - 1.17, hl - 0.25]] : [])) { box(b, x0, fl, s*(hw - 0.08), a, 1.46, s*(hw - 0.06), panel); x0 = e; } box(b, x0, fl, s*(hw - 0.08), hl - 0.4, 1.46, s*(hw - 0.06), panel); }
     box(b, -hl + 0.25, 2.38, s*(hw - 0.12), hl - 0.4, 2.86, s*(hw - 0.1), panel);
     box(b, -hl + 0.5, 2.8, s*0.62, hl - 1.6, 2.84, s*0.66, [1, 0.98, 0.92], 0, 0.8);                       // the tube lights
     rod(b, [-hl + 0.6, 2.62, s*0.4], [hl - 1.5, 2.62, s*0.4], 0.016, frameC);                                 // the roof rails
