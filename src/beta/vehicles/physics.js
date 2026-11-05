@@ -64,18 +64,32 @@ P.contact = function () {
   if (!best) return null;
   return { nx: best.ux*hx + best.uz*px, nz: best.ux*hz + best.uz*pz, depth: best.d, kind: best.kind, lx: best.lx, lz: best.lz };
 };
-// a push out of something: the speed into it goes (a crunch, not a bounce), and a hit off the middle turns the car
+// a push out of something, as one solid body hitting another: an impulse at the point of contact. Straight on, the
+// speed into it goes (a little bounce from a knock, a crunch from a real hit); off the middle it turns the car by how
+// far off the middle it struck (a corner clipped at speed spins you); along a wall you slide on, scraping speed off
+// by how hard you're pressed into it. (ox, oz: the velocity of what was hit; a wall's is nothing.)
 P.bounce = function (res, ox, oz) {
   const S = this.spec, hx = Math.cos(this.th), hz = Math.sin(this.th);
   this.x += res.nx*res.depth; this.z += res.nz*res.depth;
-  const vx = hx*this.v - hz*this.vl, vz = hz*this.v + hx*this.vl, vn = vx*res.nx + vz*res.nz - (ox*res.nx + oz*res.nz);
+  const nx = res.nx, nz = res.nz;
+  // the contact point from the middle (world), and how fast it's moving there: the body's speed plus its turning
+  const lx = res.lx ?? 0, lz = res.lz ?? 0, rx = hx*lx - hz*lz, rz = hz*lx + hx*lz, w = this.w || 0;
+  let vx = hx*this.v - hz*this.vl, vz = hz*this.v + hx*this.vl;
+  const cx = vx - w*rz - ox, cz = vz + w*rx - oz, vn = cx*nx + cz*nz;
   if (vn >= 0) return 0;
-  const hard = Math.min(1, Math.max(0, (-vn - 3)/9)), nvx = vx - res.nx*vn, nvz = vz - res.nz*vn;
-  this.v = (nvx*hx + nvz*hz)*(1 - hard*0.6); this.vl = (-nvx*hz + nvz*hx)*0.4;
-  if (!S.two && res.lx !== undefined) {
-    const ux = res.nx*hx + res.nz*hz, uz = -res.nx*hz + res.nz*hx, tq = res.lx*uz - res.lz*ux;
-    this.w = clamp(this.w + tq*(-vn)*1.2*12/(S.L*S.L + S.W*S.W), -1.6, 1.6);
-  }
+  const m = S.mass + (this.load || 0)*70, I = m*(S.L*S.L + S.W*S.W)/12, spin = !S.two;
+  const hard = Math.min(1, Math.max(0, (-vn - 3)/9));
+  const e = 0.28 - 0.24*hard;                                             // a knock bounces a little; a real hit crunches
+  const rn = rx*nz - rz*nx, kn = 1/m + (spin ? rn*rn/I : 0), J = -(1 + e)*vn/kn;
+  vx += J*nx/m; vz += J*nz/m; let dw = spin ? J*rn/I : 0;
+  // friction along the surface: the slide's speed scraped off by how hard it's pressed (never reversed)
+  const tx = -nz, tz = nx, vt = cx*tx + cz*tz, rt = rx*tz - rz*tx, kt = 1/m + (spin ? rt*rt/I : 0);
+  const Jt = Math.max(-0.45*J, Math.min(0.45*J, -vt/kt));
+  vx += Jt*tx/m; vz += Jt*tz/m; if (spin) dw += Jt*rt/I;
+  // a big hit crumples: some of the speed goes into the metal
+  const keep = 1 - 0.25*hard;
+  this.v = (vx*hx + vz*hz)*keep; this.vl = (-vx*hz + vz*hx)*keep;
+  if (spin) this.w = clamp(w + dw, -4, 4);
   return -vn;
 };
 P.collideStatic = function () {
