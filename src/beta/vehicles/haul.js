@@ -3,7 +3,8 @@
 // with both hands and haul them out past you onto the road. A tempo's cab and a bus's driver's door are on the right,
 // up high on a bus: you reach in (up, on the bus), get hold of them and drag them down and out. They land beside you;
 // then you get in. (Cars have their own door to open and the driver to haul out: beta/vehicles/cardoor.js. Two-wheelers,
-// a shove: beta/vehicles/mount.js, whose same swap this uses, so the one who lands is the one who was driving.)
+// a shove: beta/vehicles/mount.js, whose same swap this uses, so the one who lands is the one who was driving. Loaded
+// after beta/vehicles/getout.js, whose way in follows.)
 import * as THREE from 'three';
 import { Pilot } from '@orig/game/pilot.js';
 import { specOf } from '@orig/vehicles/vehicle.js';
@@ -37,7 +38,8 @@ Pilot.prototype.enter = function (offer, traffic) {
 function done(P, go) {
   const M = P._haul; P._haul = null; P.frozen = false; P.puppet = null; P.busy = 0;
   if (P.act && P.act.kind === 'haul') P.act = null;
-  if (go && M.d) enter.call(P, { kind: 'dropped', d: M.d, label: '', now: true }, M.traffic);
+  // in, the way you get into one (beta/vehicles/getout.js: up the step, onto the seat)
+  if (go && M.d) P.enter({ kind: 'dropped', d: M.d, label: '' }, M.traffic);
 }
 const upd = Pilot.prototype.updateFoot;
 Pilot.prototype.updateFoot = function (dt, ...a) {

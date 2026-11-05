@@ -60,8 +60,8 @@ import './draw/falls.js';
 import './draw/fauna.js';
 import './vehicles/mount.js';
 import './vehicles/cardoor.js';
-import './vehicles/haul.js';          // an auto's, a tempo's, a bus's driver hauled out before you take it
 import './vehicles/getout.js';
+import './vehicles/haul.js';          // an auto's, a tempo's, a bus's driver hauled out before you take it
 import './vehicles/busdoors.js';
 import './vehicles/busboards.js';     // PMPML route boards: a real route's number and destination
 import './world/stopnames.js';        // each bus shelter's own stop name on its board
