@@ -44,7 +44,7 @@ const STORE = 'puneri_powers', DAILY = 3;
 // 1/LV as much, so a full bar lasts LV as long) and how hard a take is (the chance of being thrown off, 1/LV)
 const LV = 0.5;
 const V_HOLD = 5, V_RANGE = 135*LV, B_HOLD = 2, B_RANGE = 40*LV, N_R = 60*LV, N_UP = 1.0;
-const V_LEASH = 1000*LV;                        // as far from your own body as Vetal reaches (m)
+const V_LEASH = Math.min(500, 1000*LV);         // the most Vetal ever reaches from your own body (m); each person less (leashOf)
 const STAY = 100/180;                           // units a second, being someone ordinary close to your own body
 const N_DRAIN = 8*STAY;
 const R_DAY = 0.075, R_NIGHT = 0.405, N_REFILL = 3;    // units a second
@@ -146,7 +146,8 @@ export function powers(G) {
     strainShow += (strain - strainShow)*Math.min(1, dt*0.6);        // (it spreads in slowly, as the strain builds)
     // the edges of your eyes: purple while the link builds (from the first moment, evenly to the end) and while you're
     // in someone (deeper as they fight you); amber while you read someone; pale while Munja's open
-    const kv = host ? 0.32 + 0.68*clamp01(strainShow) : link ? 0.12 + 0.88*clamp01(link.t/link.need) : 0;
+    if (!host) edgeK = 0;
+    const kv = host ? Math.min(1, 0.32 + 0.68*clamp01(strainShow) + 0.68*edgeK) : link ? 0.12 + 0.88*clamp01(link.t/link.need) : 0;
     const kb = bl ? 0.08 + 0.55*clamp01(bl.t/B_HOLD) : 0, kn = smooth(nk)*0.45;
     const L = [];
     if (kv > 0.005) L.push(`radial-gradient(ellipse at center,transparent ${54 - kv*24}%,rgba(${70 + strainShow*70},10,${120 + strainShow*20},${(0.3 + kv*0.45).toFixed(3)}) 100%)`);
@@ -272,6 +273,9 @@ export function powers(G) {
   const raw = (look) => Object.getPrototypeOf(P()).setLook.call(P(), look);
   const fromBody = () => home ? Math.hypot(R().x - home.x, R().z - home.z) : 0;
   const will = (p) => WILL[persona(p)] || 1;
+  // how far from your body you can go in this one: 300 to 500 m, mostly close to 500 (the same person, the same reach)
+  const leashOf = (id) => { const r = ((Math.sin(((id | 0) + 1)*12.9898)*43758.5453) % 1 + 1) % 1; return V_LEASH*(1 - 0.4*r*r*r); };
+  let edgeK = 0, edgeBeeps = 0;
   // how it's going: their will, how far you are from your own body, how low you are; mostly near the low end
   const sit = (p) => Math.pow(clamp01(0.5*(will(p) - 0.75)/1.25 + 0.3*Math.min(1, Math.hypot(p.x - (home ? home.x : R().x), p.z - (home ? home.z : R().z))/V_RANGE) + 0.2*(1 - S.vu/100)), 1.6);
   const hopRange = (k) => k < HOP.length ? HOP[k] : [10 + 3*(k - 4), 15 + 4*(k - 4)];
@@ -438,7 +442,8 @@ export function powers(G) {
     if (host) {
       // the cost of being someone else
       const d = fromBody(), w = WILL[host.kind] || 1;
-      spend(STAY*(0.8 + 0.2*w)*(1 + d/(V_LEASH/2))*dt);
+      const LL = host.leash || (host.leash = leashOf(host.id ?? Math.random()*1e6));
+      spend(STAY*(0.8 + 0.2*w)*(1 + d/(LL/2))*dt);
       // doing what they never would
       const Pl = P(), F = Pl.foot;
       if (OLD.has(host.kind) && Pl.onFoot && Math.hypot(F.vx || 0, F.vz || 0) > 3.6) { strain += dt*0.2; calm = 0; }
@@ -446,15 +451,20 @@ export function powers(G) {
       const heat = G.police?.heat || 0;
       if (heat > heat0) { strain += (heat - heat0)*(host.kind === 'cop' ? 0.35 : 0.1); heat0 = heat; calm = 0; } else heat0 = heat;
       if ((Pl.hp ?? 100) < hp0) { strain += (hp0 - Pl.hp)*0.012; calm = 0; } hp0 = Pl.hp ?? 100;     // their pain loosens the hold, fast
-      if (d > V_LEASH*0.8 && !farSaid) { farSaid = true; toast('Vetal', `${Math.round(d)} m from your body: it pulls. Past ${Math.round(V_LEASH)} m you're gone`, 'warn', 2.5); } else if (d < V_LEASH*0.7) farSaid = false;
+      // nearing the end of the reach: the purple closes in, the link says so, and it beeps at you (the challan's sound),
+      // once, again, a third time right at the edge
+      edgeK = clamp01((d/LL - 0.7)/0.3);
+      if (d > LL*0.8 && !farSaid) { farSaid = true; toast('Vetal', `The link's getting weaker: ${Math.round(LL - d)} m more and you're pulled home`, 'warn', 2.6); } else if (d < LL*0.72) { farSaid = false; edgeBeeps = 0; }
+      const nb = d > LL*0.97 ? 3 : d > LL*0.91 ? 2 : d > LL*0.84 ? 1 : 0;
+      if (nb > edgeBeeps) { edgeBeeps = nb; G.audio?.fine?.(); }
       calm += dt;
       if (calm > 3) strain = Math.max(0, strain - dt*0.1);
       if (S.free) strain = 0;
       if (!leaving && !AC.busy) {
         if (strain >= 1) throwOut('They threw you out');
         else if ((Pl.hp ?? 100) < 30) throwOut('Their body is too hurt to hold');
-        // as far from your own body as it reaches (V_LEASH): a pull from 80 % of it, home past it
-        else if (d > V_LEASH) leaveSoft('Too far from your body: pulled home');
+        // as far from your own body as this one lets you reach (LL): home past it
+        else if (d > LL) leaveSoft('Too far from your body: the link snapped');
         else if (S.vu <= 0) leaveSoft('Vetal ran out: pulled home');
         else if (Pl.ko || (Pl.hp ?? 100) <= 0) { leaving = true; blackout(() => { leaving = false; goHome('Knocked out of them', 'ko'); }); }
       }
