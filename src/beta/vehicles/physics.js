@@ -132,8 +132,9 @@ P.collideTraffic = function (traffic) {
 P.ground = function (hx, hz, sp) {
   const S = this.spec, half = S.wb/2, tw = S.two ? 0 : S.W*0.41, px = -hz, pz = hx, W = this.W;
   const pts = S.two ? [[half, 0], [-half, 0]] : [[half, tw], [half, -tw], [-half, tw], [-half, -tw]];
+  // (sag: a flat tyre puts that corner down on its rim, beta/vehicles/damage.js)
   const h = [], prev = this._wh; let off = 0;
-  for (const [u, s] of pts) { const x = this.x + hx*u + px*s, z = this.z + hz*u + pz*s; h.push(this.heightAt(x, z)); if (!W.surf.isRoad(x, z)) off++; }
+  for (const [u, s] of pts) { const x = this.x + hx*u + px*s, z = this.z + hz*u + pz*s; h.push(this.heightAt(x, z) - (this.sag ? this.sag[h.length] || 0 : 0)); if (!W.surf.isRoad(x, z)) off++; }
   let jolt = 0, climb = 0;
   const lead = this.v >= 0 ? (S.two ? [0] : [0, 1]) : (S.two ? [1] : [2, 3]);
   if (prev && prev.length === h.length) for (let i = 0; i < h.length; i++) { const d = h[i] - prev[i]; jolt = Math.max(jolt, Math.abs(d)*(S.two ? 1 : 0.8)); if (lead.includes(i) && d > 0.07) climb = Math.max(climb, d); }

@@ -1,0 +1,245 @@
+// A vehicle shows what's happened to it, where it happened. Damage was one number: past a point the paint went sooty
+// and it smoked, the same all over whichever way you'd hit it, and a shot at a car did nothing to it at all. Now:
+//   - a hit dents it where it struck, pushed in the way the blow came, as deep and as wide as the blow was hard (a
+//     knock at a signal a dimple in the bumper, a wall at speed the whole corner folded in), the glass with it; the
+//     dents stay, and add up, until a garage fixes it (garage repair puts the panels back)
+//   - a shot leaves a hole where it went in (a star in the glass), and a little dent round it; one into a tyre lets it
+//     down: that corner sags onto the rim, it drags and pulls to that side, and it limps. A big hit on a wheel bends it.
+//   - a car you shoot at in traffic stops, and whoever's driving gets out and runs; it's left there, a real car, holed
+//   - it smokes from the engine (the bonnet of a car, the back of an auto or a bus): white steam from the radiator first,
+//     grey, then black when it's the oil; and when it catches, the fire starts at the engine and spreads along it
+// Each vehicle gets its own copy of its model the first time it's dented (they share one until then).
+import * as THREE from 'three';
+import { Vehicle } from '@orig/vehicles/vehicle.js';
+import { Game } from '@orig/game/game.js';
+import { Arms, ARMS } from '@orig/game/arms.js';
+import { clamp } from '@orig/core/util.js';
+
+const V = Vehicle.prototype;
+const now = () => performance.now()/1000;
+
+// ---------------------------------------------------------------- its own model, dented
+V.own = function () {
+  const B = this.bodyMesh;
+  if (this._dg && B.geometry === this._dg.body) return this._dg;
+  const body = B.geometry.clone(); B.geometry = body; B.userData.ownGeo = true;
+  let glass = null;
+  if (this.glassMesh && this.glassMesh.geometry.attributes.position.count) { glass = this.glassMesh.geometry.clone(); this.glassMesh.geometry = glass; }
+  this._dg = { body, glass, b0: Float32Array.from(body.attributes.position.array), g0: glass ? Float32Array.from(glass.attributes.position.array) : null };
+  return this._dg;
+};
+V.box = function () {
+  if (!this._bb) { const g = this.bodyMesh.geometry; if (!g.boundingBox) g.computeBoundingBox(); this._bb = g.boundingBox.clone(); }
+  return this._bb;
+};
+const inWheel = (wh, x, y, z, pad = 0.02) => { for (const w of wh) if ((x - w.x)**2 + (y - w.y)**2 < (w.r + pad)**2 && Math.abs(z - w.z) < w.w/2 + 0.03) return w; return null; };
+// push the panels round (lx, ly, lz) in along (nx, ny, nz), deepest in the middle, nothing past r; never more than
+// 30 cm from where the panel was made, and never the tyres and wheels (their own damage is below)
+V.dent = function (lx, ly, lz, nx, ny, nz, r, depth) {
+  const D = this.own(), wh = this.wheels || [];
+  for (const [g, g0] of [[D.body, D.b0], [D.glass, D.g0]]) {
+    if (!g) continue;
+    const a = g.attributes.position.array; let hit = false;
+    for (let i = 0; i < a.length; i += 3) {
+      const x = a[i], y = a[i + 1], z = a[i + 2], dx = x - lx, dy = (y - ly)*0.85, dz = z - lz, d2 = dx*dx + dy*dy + dz*dz;
+      if (d2 >= r*r || inWheel(wh, x, y, z)) continue;
+      const f = 1 - d2/(r*r), k = depth*f*f*(0.85 + 0.3*Math.sin(x*37 + z*23 + y*17));      // (metal folds, it doesn't press smooth)
+      let px = x + nx*k, py = y + ny*k, pz = z + nz*k;
+      const ox = px - g0[i], oy = py - g0[i + 1], oz = pz - g0[i + 2], o = Math.hypot(ox, oy, oz);
+      if (o > 0.3) { const s = 0.3/o; px = g0[i] + ox*s; py = g0[i + 1] + oy*s; pz = g0[i + 2] + oz*s; }
+      a[i] = px; a[i + 1] = py; a[i + 2] = pz; hit = true;
+    }
+    if (hit) { g.attributes.position.needsUpdate = true; g.computeVertexNormals(); }
+  }
+};
+// a tyre let down (or a wheel bent): its bottom flattened onto the rim, that corner of the car down on it
+V.flatWheel = function (w) {
+  if (!w || this.noFlat || !this.wheels || !this.wheels.includes(w)) return;      // (bulletproof tyres from the garage)
+  const D = this.own(), a = D.body.attributes.position.array;
+  this._flats = this._flats || new Set(); if (this._flats.has(w)) return; this._flats.add(w);
+  for (let i = 0; i < a.length; i += 3) {
+    const x = a[i], y = a[i + 1], z = a[i + 2];
+    if (y >= w.y || !inWheel([w], x, y, z, 0.01)) continue;
+    const q = (w.y - y)/w.r; a[i + 1] = w.y - (w.y - y)*(1 - 0.3*q*q);          // the bottom squashed flat
+    a[i + 2] = w.z + (z - w.z)*(1 + 0.12*q*q);                                   // and bulging out
+  }
+  D.body.attributes.position.needsUpdate = true; D.body.computeVertexNormals();
+  // which corner it is to the wheels on the ground (beta/vehicles/physics.js ground(): front right, front left, back
+  // right, back left; a two-wheeler front, back)
+  const S = this.spec, sag = w.r*0.3;
+  this.sag = this.sag || (S.two ? [0, 0] : [0, 0, 0, 0]);
+  if (S.two) this.sag[w.x > 0 ? 0 : 1] += sag;
+  else { const f = w.x > 0 ? 0 : 2; if (Math.abs(w.z) < 0.15) { this.sag[f] += sag/2; this.sag[f + 1] += sag/2; } else this.sag[f + (w.z > 0 ? 0 : 1)] += sag; }
+  this.flatSide = (this.flatSide || 0) + Math.sign(w.z)*(w.x > 0 ? 1.4 : 1);
+  this.flatN = (this.flatN || 0) + 1;
+};
+// a flat drags, and pulls to its side; the speed goes (the rim on the road)
+const upd = V.update;
+V.update = function (dt, inp, traffic) {
+  if (this.flatN && dt > 0) {
+    const v = this.v || 0, sp = Math.abs(v);
+    this.th += (this.flatSide || 0)*0.045*Math.min(1, sp/6)*Math.sign(v)*dt;
+    this.v -= Math.sign(v)*Math.min(sp, this.flatN*(0.5 + 0.004*v*v)*dt);
+  }
+  return upd.call(this, dt, inp, traffic);
+};
+// all of it put right (the garage: damage back to nothing)
+V.mend = function () {
+  const D = this._dg;
+  if (D && this.bodyMesh.geometry === D.body) {
+    D.body.attributes.position.array.set(D.b0); D.body.attributes.position.needsUpdate = true; D.body.computeVertexNormals();
+    if (D.glass) { D.glass.attributes.position.array.set(D.g0); D.glass.attributes.position.needsUpdate = true; D.glass.computeVertexNormals(); }
+  }
+  this._flats = null; this.sag = null; this.flatN = 0; this.flatSide = 0;
+  if (this._holes) { for (const h of this._holes) h.parent && h.parent.remove(h); this._holes = null; }
+};
+
+// ---------------------------------------------------------------- crashes
+const P = V, bounce = P.bounce;
+P.bounce = function (res, ox, oz) {
+  const imp = bounce.call(this, res, ox, oz);
+  if (imp > 3.5 && res.lx !== undefined && this.bodyMesh && !this.dead && !((this._dT || 0) > now())) {
+    this._dT = now() + 0.25;
+    const hx = Math.cos(this.th), hz = Math.sin(this.th), nlx = res.nx*hx + res.nz*hz, nlz = -res.nx*hz + res.nz*hx;
+    const bb = this.box(), ly = bb.min.y + (bb.max.y - bb.min.y)*(this.spec.two ? 0.5 : 0.36);
+    const r = clamp(0.35 + imp*0.035, 0.35, 0.95), depth = Math.min(0.28, (imp - 3)*0.022);
+    try { this.dent(res.lx, ly, res.lz, nlx, -0.12, nlz, r, depth); } catch (e) { /* drawn as it was */ }
+    // a big one on a wheel bends it
+    if (imp > 9 && this.wheels) { const w = this.wheels.find(q => Math.hypot(q.x - res.lx, q.z - res.lz) < q.r + 0.45); if (w) this.flatWheel(w); }
+  }
+  return imp;
+};
+
+// ---------------------------------------------------------------- shots
+const hole = { g: new THREE.CircleGeometry(0.03, 9), star: new THREE.CircleGeometry(0.075, 7) };
+const holeM = new THREE.MeshBasicMaterial({ color: 0x0b0b0b, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+const starM = new THREE.MeshBasicMaterial({ color: 0xe8eef2, transparent: true, opacity: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+const ray = new THREE.Raycaster(), _o = new THREE.Vector3(), _d = new THREE.Vector3(), _n = new THREE.Vector3(), _l = new THREE.Vector3();
+// how tall the traffic's vehicles are, for where a shot meets them
+const tall = (o) => { const T = o.T || {}; return T.two ? 1.3 : o.type === 'bus' ? 3.1 : o.type === 'tempo' ? 2.3 : o.type === 'auto' ? 1.75 : /suv|jeep/.test(o.type || '') ? 1.8 : 1.5; };
+// the ray against a box L x W x H on the ground at (x, y, z) heading th: how far along it goes in, or -1
+function boxHit(o3, d3, x, y, z, th, L, W, H) {
+  const c = Math.cos(th), s = Math.sin(th), dx = o3.x - x, dz = o3.z - z;
+  const ox = dx*c + dz*s, oz = -dx*s + dz*c, oy = o3.y - y, vx = d3.x*c + d3.z*s, vz = -d3.x*s + d3.z*c, vy = d3.y;
+  let t0 = 0, t1 = 1e9;
+  for (const [p, v, lo, hi] of [[ox, vx, -L/2, L/2], [oy, vy, 0, H], [oz, vz, -W/2, W/2]]) {
+    if (Math.abs(v) < 1e-9) { if (p < lo || p > hi) return -1; continue; }
+    let a = (lo - p)/v, b = (hi - p)/v; if (a > b) { const t = a; a = b; b = t; }
+    t0 = Math.max(t0, a); t1 = Math.min(t1, b); if (t0 > t1) return -1;
+  }
+  return t0;
+}
+const use = Arms.prototype.use;
+Arms.prototype.use = function (...args) {
+  const G = this.g, Pl = G.player, W = this.held && ARMS[this.held];
+  if (!W || !W.gun || !Pl || !Pl.onFoot || !(this.life.s.ammo > 0)) return use.apply(this, args);
+  const C = G.camera, F = Pl.foot;
+  C.getWorldPosition(_o); C.getWorldDirection(_d);
+  // the nearest vehicle the shot meets: one left in the street (a real one) or one in the traffic
+  let best = null, bt = 1e9;
+  for (const q of Pl.dropped || []) { const v = q.veh; if (!v || v.dead || !v.root || !v.root.visible) continue; const t = boxHit(_o, _d, v.x, v.y || 0, v.z, v.th, v.spec.L + 0.2, v.spec.W + 0.2, 3.2); if (t >= 0 && t < bt) { bt = t; best = { v }; } }
+  const T = G.traffic;
+  if (T) T.near(F.x, F.z, W.range + 4, (o) => { if (!o.alive || o.wreck || o.isPlayer || !o.T) return; const t = boxHit(_o, _d, o.x, o.y || 0, o.z, Math.atan2(o.hz ?? 0, o.hx ?? 1), o.T.L, o.T.W, tall(o)); if (t >= 0 && t < bt) { bt = t; best = { o }; } });
+  if (!best) return use.apply(this, args);
+  const hx = _o.x + _d.x*bt, hz = _o.z + _d.z*bt, dv = Math.hypot(hx - F.x, hz - F.z);
+  if (dv > W.range) return use.apply(this, args);
+  // whoever's behind it is safe: the vehicle takes the round (they're out of the line while the shot's worked out)
+  const hid = [];
+  for (const p of G.people.list) { if (p.hidden) continue; const d = Math.hypot(p.x - F.x, p.z - F.z); if (d > dv + 0.3) { p.hidden = true; hid.push(p); } }
+  let r;
+  try { r = use.apply(this, args); } finally { for (const p of hid) p.hidden = false; }
+  try { shotAt(G, best, _o, _d); } catch (e) { console.warn('shot', e); }
+  return r;
+};
+function shotAt(G, best, o3, d3) {
+  let v = best.v;
+  if (best.o) {
+    const o = best.o, T = o.T;
+    if (T.two) {
+      // a rider shot at goes over (and runs, if they can)
+      o.fallen = Math.max(o.fallen || 0, 3.5); o.angry = 0;
+      return;
+    }
+    v = promote(G, o);
+    if (!v) return;
+  }
+  v.root.updateMatrixWorld(true);
+  ray.set(o3, d3); ray.far = 80;
+  const hits = ray.intersectObjects([v.bodyMesh, v.glassMesh].filter(Boolean), false);
+  if (!hits.length) return;
+  const h = hits[0], m = h.object;
+  m.worldToLocal(_l.copy(h.point));
+  _n.copy(h.face ? h.face.normal : new THREE.Vector3(0, 1, 0));
+  const glass = m === v.glassMesh, wheel = !glass && v.wheels && inWheel(v.wheels, _l.x, _l.y, _l.z, 0.04);
+  if (wheel) { v.flatWheel(wheel); G.hud && G.hud.toast && G.player.cur === v && G.hud.toast('Tyre', 'One of your tyres is gone', 'bad', 2); }
+  else v.dent(_l.x, _l.y, _l.z, -_n.x, -_n.y, -_n.z, 0.1, 0.025);
+  // the hole (a star in glass)
+  const dm = new THREE.Mesh(glass ? hole.star : hole.g, glass ? starM : holeM);
+  dm.position.copy(_l).addScaledVector(_n, 0.004); dm.lookAt(_l.clone().add(_n)); dm.matrixAutoUpdate = false; dm.updateMatrix();
+  m.parent.add(dm); (v._holes || (v._holes = [])).push(dm);
+  if (v._holes.length > 40) { const old = v._holes.shift(); old.parent && old.parent.remove(old); }
+  // into the engine it's worse
+  const S = v.spec, eng = engineAt(v);
+  v.dmg = Math.min(0.97, (v.dmg || 0) + (Math.abs(_l.x - eng[0]) < 0.9 ? 0.07 : 0.02));
+  G.audio && G.audio.at && G.audio.at(v.x, v.z, () => G.audio.thud && G.audio.thud(0.35));
+  if (S && G.smoke) G.smoke.emit(h.point.x, h.point.y, h.point.z, 'smoke', 0.05);
+}
+// a car in the traffic, shot at: it stops where it is, the driver's out and running, and it's a real car now (left there)
+function promote(G, o) {
+  const Pl = G.player;
+  if ((o.y || 0) > 0.5) return null;                                     // (up on a flyover: not worth the trouble)
+  const v = new Vehicle(Pl.W, Pl.scene, Pl.vmats, o.type, o.col);
+  v.reset(o.x, o.z, Math.atan2(o.hz ?? 0, o.hx ?? 1)); v.v = 0;
+  v.plate = Pl.randomPlate ? Pl.randomPlate() : v.plate; v.dmg = o.dmg || 0;
+  v.sync && v.sync(0);
+  const dr = Pl.spawnAngryDriver ? Pl.spawnAngryDriver(o, 'bump') : null;
+  const idx = G.traffic.list.indexOf(o); if (idx >= 0) G.traffic.despawn(idx);
+  Pl.addDropped(v, G.traffic);
+  if (dr && G.people && G.people.flee) { dr.angry = 0; dr.grudge = 0; G.people.flee(dr, Pl.x, Pl.z, 35); }
+  return v;
+}
+
+// ---------------------------------------------------------------- smoke and fire
+// where the engine is (along it, how high): a car's under the bonnet, an auto's and a bus's at the back, a tempo's
+// under the cab, a two-wheeler's low in the middle
+function engineAt(v) {
+  const S = v.spec || {}, L = S.L || 3, t = v.type;
+  if (S.two) return [0.05, 0.5];
+  if (t === 'auto' || t === 'bus') return [-L/2 + (t === 'bus' ? 0.9 : 0.55), t === 'bus' ? 1.3 : 0.7];
+  if (t === 'tempo') return [L/2 - 0.7, 0.9];
+  return [L/2 - 0.75, 0.85];
+}
+Game.prototype.smokeFrom = function (v, dt) {
+  const d = v.dmg || 0;
+  if (d < 0.45) return;
+  v._smT = (v._smT || 0) - dt;
+  if (v._smT > 0) return;
+  v._smT = d > 0.95 ? 0.04 : d > 0.75 ? 0.07 : 0.16 - (d - 0.45)*0.2;
+  const th = v.th ?? Math.atan2(v.hz || 0, v.hx || 1), hx = Math.cos(th), hz = Math.sin(th), y0 = v.y || 0, L = (v.spec && v.spec.L) || 3;
+  const [ex, ey] = engineAt(v), R = Math.random, at = (a, s) => [v.x + hx*a - hz*s, v.z + hz*a + hx*s];
+  // from the bonnet's seams: steam, then grey, then black
+  const [x, z] = at(ex + (R() - 0.5)*0.5, (R() - 0.5)*0.6);
+  this.smoke.emit(x, y0 + ey, z, d > 0.75 ? 'black' : 'steam', 0.25 + (d - 0.45)*0.5);
+  if (d > 0.95) {
+    // burning: from the engine first, then along it toward the other end as it takes hold
+    const f = clamp((d - 0.95)/0.05, 0, 1), back = -Math.sign(ex || 1), n = 1 + Math.floor(f*3.99);
+    const k = Math.floor(R()*n), a = ex + back*L*0.85*(k/4), [fx, fz] = at(a + (R() - 0.5)*0.4, (R() - 0.5)*0.8);
+    this.smoke.emit(fx, y0 + ey*0.85, fz, 'fire', 0.45);
+    if (R() < 0.5) this.smoke.emit(fx, y0 + ey + 0.4, fz, 'black', 0.5);
+  }
+};
+// put right at the garage (damage to nothing), and gone up in flames (crumpled all over)
+const paint = Game.prototype.paintDamage;
+Game.prototype.paintDamage = function (v) {
+  if (v && !v.dead && (v.dmg || 0) < 0.02 && (v._dg || v.flatN || v._holes) && v.mend) v.mend();
+  return paint.call(this, v);
+};
+const boom = Game.prototype.explode;
+Game.prototype.explode = function (v) {
+  const r = boom.call(this, v);
+  try {
+    if (v.dent) { const bb = v.box(), S = v.spec; for (let i = 0; i < 7; i++) { const a = (Math.random() - 0.5)*S.L, s = (Math.random() < 0.5 ? -1 : 1)*S.W/2, y = bb.min.y + Math.random()*(bb.max.y - bb.min.y); v.dent(a, y, s, 0, -0.3, -Math.sign(s), 0.6, 0.12); } }
+    if (v.wheels) for (const w of v.wheels) v.flatWheel(w);
+  } catch (e) { /* drawn as it was */ }
+  return r;
+};
