@@ -76,10 +76,11 @@ P.contact = function () {
     }
     if (lc) for (const q of lc) {
       if (q.off || seen.has(q)) continue; seen.add(q);
-      // (a parked vehicle driven into at any speed stops being scenery: a real one takes its place, and it's hit as one)
-      if (q.rec && !q.rec.taken && this.W.playerVeh === this && (Math.abs(this.v) > 1.2 || (this.throttle || 0) > 0.5 || this.reverse) && this.wakeParked && this.wakeParked(q.rec)) continue;
       const [cx, cz] = loc(q.x, q.z), kx = clamp(cx, -a, a), kz = clamp(cz, -b, b), ex = cx - kx, ez = cz - kz, d = Math.hypot(ex, ez), rr = RC + q.r;
       if (d >= rr) continue;
+      // (a parked vehicle driven into at any speed stops being scenery: a real one takes its place, and it's hit as one. Only the
+      // one you've actually touched: this came before the check above, so every car near you was swapped for a new one as you came up)
+      if (q.rec && !q.rec.taken && this.W.playerVeh === this && (Math.abs(this.v) > 1.2 || (this.throttle || 0) > 0.5 || this.reverse) && this.wakeParked && this.wakeParked(q.rec)) continue;
       let m;
       if (d > 1e-5) m = { d: rr - d, ux: -ex/d, uz: -ez/d };
       else { const ox = a - Math.abs(cx), oz = b - Math.abs(cz); m = ox < oz ? { d: ox + rr, ux: -Math.sign(cx) || -1, uz: 0 } : { d: oz + rr, ux: 0, uz: -Math.sign(cz) || -1 }; }
