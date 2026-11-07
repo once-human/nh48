@@ -33,6 +33,7 @@ import './vehicles/brakes.js';        // each vehicle's own brakes; ABS, tractio
 import './vehicles/exotic.js';        // a supercar's flames; slides wear tyres away
 import './vehicles/auto3w.js';        // an auto corners on two wheels, and goes over, instead of sliding
 import './vehicles/wheels.js';        // wheels that go round and turn
+import './vehicles/details.js';       // springs and wheel travel, the rising wing, wipers, the wheel in your hands, discs, a cold start
 import './vehicles/lamps.js';         // brake and reverse lamps that answer the pedals, yours and everyone's
 import './vehicles/potholes.js';      // potholes jolt each kind of vehicle its own way
 import './people/stalls.js';          // stall keepers keep to their stalls

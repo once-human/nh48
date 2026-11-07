@@ -44,7 +44,9 @@ function box(b, x0, y0, z0, x1, y1, z1, c, paint = 0, glow = 0) {
 }
 const MATTE = -1;       // glow channel value for matte parts (see vehmat.js)
 let WHEELS = null;                    // collecting wheel positions for the model being built (see wheelsOf)
-export function wheelsOf(build) { WHEELS = []; const m = build(); m.wh = WHEELS; WHEELS = null; return m; }
+// and the moving bits of a car's body, by their vertices (beta/vehicles/details.js): the wipers, the rear wing
+let MOVING = null;
+export function wheelsOf(build) { WHEELS = []; MOVING = {}; const m = build(); m.wh = WHEELS; m.moving = MOVING; WHEELS = MOVING = null; return m; }
 function extrude(b, pts, z0, z1, c, paint = 0, bevel = 0.04, glow = 0) {
   const shape = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)));
   const depth = Math.max(0.01, z1 - z0 - 2 * bevel);
@@ -856,7 +858,12 @@ function carBody(b, gl, spec, kind = 'sedan') {
     patch(b, 8, 2, (u, v) => { const x = lerp(xf0 + .06, hl - .2, u), w = tableAt(T, x, 1)*lerp(.42, .49, v); return [x, yTop(x, w) + .001 + Math.sin(v*Math.PI)*.006, s*w]; }, PAINTED, [0, 1, 0]); }
   if (sedan) { seamT(xr0 - .03, xr0 - .022, -hw*.84, hw*.84, 1); for (const s of [-1, 1]) patch(b, 6, 1, (u, v) => { const x = lerp(-hl + .1, xr0 - .025, u), w = hw*.84 + (v - .5)*.008*s; return [x, yTop(x, w) + .002, s*w]; }, SEAM, [0, 1, 0]); }
   // wipers lying at the foot of the windscreen
-  for (const zz of [-.12, .42]) tube(b, [[xf0 - .03, beltY + .035, zz], [xf0 - .09, beltY + .058, zz - .25], [xf0 - .12, beltY + .08, zz - .5]], .0055, TRIM, 4, 4);
+  for (const zz of [-.12, .42]) {
+    const v0 = b.c;
+    tube(b, [[xf0 - .03, beltY + .035, zz], [xf0 - .09, beltY + .058, zz - .25], [xf0 - .12, beltY + .08, zz - .5]], .0055, TRIM, 4, 4);
+    // (the glass's slope, foot to roof, for the sweep: it turns about the line straight out of the glass)
+    if (MOVING) (MOVING.wipers || (MOVING.wipers = [])).push({ v0, v1: b.c, at: [xf0 - .03, beltY + .035, zz], up: [roofF - xf0, H - beltY, 0] });
+  }
   // an aerial on the roof, a roof seam
   { const Ha = roofAt(roofR + .1); tube(b, [[roofR + .1, Ha, 0], [roofR + .02, Ha + .05, 0], [roofR - .1, Ha + .15, 0]], .004, TRIM, 4, 4);
     rbox(b, roofR + .06, Ha - .01, -.022, roofR + .2, Ha + .035, .022, TRIM, 0, MATTE); }
@@ -941,9 +948,10 @@ function carBody(b, gl, spec, kind = 'sedan') {
   onEnd(-1, -.27, .27, rY0 + .08, rY0 + .205, [.03, .03, .03, 0, MATTE], { off: .03, nu: 4, nv: 1 });
   onEnd(-1, -.25, .25, rY0 + .09, rY0 + .195, plate, { off: .036, nu: 4, nv: 1 });
   // a rear wiper and a stop lamp in the glass on a hatch; a lip on a boot; a wing on the fast ones
+  // (the wing's made down flush with the deck; it rises at speed, beta/vehicles/details.js)
   if (!sedan) { const H = SH.Hr, ry = lerp(deck, H, .25); tube(b, [[xr0 + .02, ry, 0], [xr0 + .05, ry + .1, .15], [xr0 + .06, ry + .2, .3]], .005, TRIM, 4, 4); rbox(b, roofR - .05, H - .05, -.25, roofR + .03, H - .015, .25, [...TAIL], 0, .7); }
   else patch(b, 10, 2, (u, v) => { const z = lerp(-hw*.84, hw*.84, u), x = lerp(-hl + .05, -hl + .12, v); return [x, yTop(x, z) + .004 + (1 - v)*.018*(1 - z*z), z]; }, PAINTED, [0, 1, 0]);
-  if (low) { for (const s of [-1, 1]) rbox(b, -hl + .12, deck, s*hw*.72, -hl + .22, deck + .14, s*hw*.66, TRIM, 0, MATTE); rbox(b, -hl - .01, deck + .13, -hw*.86, -hl + .24, deck + .165, hw*.86, [1, 1, 1], 1); for (const s of [-1, 1]) for (let i = 0; i < 3; i++) rbox(b, xf0 - .02 - i*.03 + hood*.5, yTop(hl - hood*.5, s*.36) - .005, s*.2, xf0 + .005 - i*.03 + hood*.5, yTop(hl - hood*.5, s*.36) + .007, s*.5, SEAM.slice(0, 3), 0, MATTE); }
+  if (low) { const w0 = b.c; for (const s of [-1, 1]) rbox(b, -hl + .12, deck, s*hw*.72, -hl + .22, deck + .14, s*hw*.66, TRIM, 0, MATTE); rbox(b, -hl - .01, deck + .13, -hw*.86, -hl + .24, deck + .165, hw*.86, [1, 1, 1], 1); for (let i = w0; i < b.c; i++) b.p[i*3 + 1] -= .12; if (MOVING) MOVING.wing = { v0: w0, v1: b.c, lift: .12 }; for (const s of [-1, 1]) for (let i = 0; i < 3; i++) rbox(b, xf0 - .02 - i*.03 + hood*.5, yTop(hl - hood*.5, s*.36) - .005, s*.2, xf0 + .005 - i*.03 + hood*.5, yTop(hl - hood*.5, s*.36) + .007, s*.5, SEAM.slice(0, 3), 0, MATTE); }
   // the exhaust: a pipe with its tip showing
   for (const s of low ? [-1, 1] : [1]) { const z = s*hw*.55; rod(b, [-hl + .3, sill + .1, z], [-hl - .02, sill + .1, z], low ? .045 : .028, CHROME, HUB_G); b.addGeo(G.circle, M(-hl - .021, sill + .1, z, low ? .036 : .02, low ? .036 : .02, 1, 0, -Math.PI/2), [.01, .01, .01], MATTE); }
   // the front plate
@@ -1145,7 +1153,9 @@ function exotic(b, spec, kind) {
     rod(b, [mx + .02, at(mx, 4) + .02, s*at(mx, 1)*GW*.97], [mx, my - .012, mz - s*.04], .014, TRIM, TUBE6);
     b.addGeo(G.sph2, M(mx, my, mz, .05, .05, .09), [1, 1, 1], 0, 1);
     b.addGeo(G.sph2, M(mx - .03, my, mz, .025, .042, .078), [.5, .55, .6]);
-    const wx = WIN.wind[1] - .04; tube(b, [[wx, yTop(wx, s*.05) + .02, s*.05], [wx - .05, yTop(wx - .05, s*.32) + .016, s*.32], [wx - .04, yTop(wx - .04, s*.56) + .012, s*.56]], .006, DARK, 6, 4);
+    const wx = WIN.wind[1] - .04, wv0 = b.c; tube(b, [[wx, yTop(wx, s*.05) + .02, s*.05], [wx - .05, yTop(wx - .05, s*.32) + .016, s*.32], [wx - .04, yTop(wx - .04, s*.56) + .012, s*.56]], .006, DARK, 6, 4);
+    // (each sweeps up the glass from its own side: beta/vehicles/details.js)
+    if (MOVING) (MOVING.wipers || (MOVING.wipers = [])).push({ v0: wv0, v1: b.c, at: [wx, yTop(wx, s*.05) + .02, s*.05], up: [WIN.wind[0] - WIN.wind[1], yTop(WIN.wind[0], 0) - yTop(WIN.wind[1], 0), 0], sg: -s });
     // the skirt, the brake behind the spokes
     onSide(s, -xw + Ra + .04, xw - Ra - .04, spec.sill + .02, spec.sill + .1, BLACKED, { nu: 6, off: .018 });
     for (const x of [xw, -xw]) rb(x + .1, R + .04, s*(at(x, 1) - .26), x + .2, R + .18, s*(at(x, 1) - .2), por ? [.75, .08, .06] : [.92, .75, .08]);
@@ -1170,9 +1180,11 @@ function exotic(b, spec, kind) {
     onTop(1.98, 2.02, -.5, .5, SEAM, { nu: 1, nv: 8, off: .003 });
     // the tail: a lip that rises off the lid, slats over the engine, one red bar across the whole car, two pipes in the middle
     for (let i = 0; i < 7; i++) { const x = -2.1 + i*.04; onTop(x, x + .022, -.42, .42, DARK, { nu: 1, nv: 6, off: .004 }); }
-    const lipH = (z) => .05 + (1 - Math.pow(Math.abs(z)/.74, 4))*.045;
+    const lipH = (z) => .05 + (1 - Math.pow(Math.abs(z)/.74, 4))*.045, lip0 = b.c;
     patch(b, 10, 3, (u, v) => { const z = lerp(-.74, .74, u), x = lerp(-2.24, -1.98, v); return [x, yTop(x, z) + .006 + (1 - v)*lipH(z), z]; }, PAINTED, [0, 1, 0]);
     patch(b, 10, 1, (u, v) => { const z = lerp(-.74, .74, u); return [-2.24, yTop(-2.24, z) - .03 + v*(.036 + lipH(z)), z]; }, PAINTED, [-1, 0, 0]);
+    // (the lip is the 911's spoiler: it rises off the lid at speed, beta/vehicles/details.js)
+    if (MOVING) MOVING.wing = { v0: lip0, v1: b.c, lift: .065 };
     onEnd(-1, -.72, .72, .765, .815, GLOW(TAIL, .9), { nu: 18, nv: 1, off: .016 });
     onEnd(-1, -.74, .74, .75, .83, [.1, .02, .02], { nu: 18, nv: 1, off: .01 });
     for (const s of [-1, 1]) onEnd(-1, s*.48, s*.68, .69, .725, GLOW(AMBER, .4), { nu: 3, nv: 1, off: .01 });

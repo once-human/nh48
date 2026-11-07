@@ -110,8 +110,11 @@ const PATCHES = {
     ["L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }", "if (!this._upSet) { this._upSet = true; L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; } }"],
   ],
   [S('vehicles/vehicle.js')]: [
-    // the nose goes down under brakes and up under power (it was the wrong way round, and hardly there)
-    ["this.pitch += (Math.atan2(hF - hR, S.wb) - clamp(a * 0.006, -0.025, 0.025) - this.pitch) * Math.min(1, dt * 12);", "this.pitch += (Math.atan2(hF - hR, S.wb) + clamp(a * 0.0065, -0.05, 0.025) - this.pitch) * Math.min(1, dt * 9);"],
+    // the moving bits of the body (wipers, the rear wing) by their vertices, for beta/vehicles/details.js
+    ["this.wheels = m.wh || [];", "this.wheels = m.wh || []; this.moving = m.moving || null;"],
+    // the nose goes down under brakes and up under power: a spring on the body now (beta/vehicles/details.js), so here
+    // only the road's own slope
+    ["this.pitch += (Math.atan2(hF - hR, S.wb) - clamp(a * 0.006, -0.025, 0.025) - this.pitch) * Math.min(1, dt * 12);", "this.pitch += (Math.atan2(hF - hR, S.wb) - this.pitch) * Math.min(1, dt * 12);"],
     // a body that dents counts its damage by its dents (beta/vehicles/damage.js), not twice
     ["if (imp < 4 || (v._kT || 0) > now) return;", "if (imp < 4 || (v._kT || 0) > now || v.dentDmg) return;"],
     // the wheel's drop into a pothole is the hole's and the wheel's own (beta/vehicles/potholes.js)
@@ -361,6 +364,8 @@ const PATCHES = {
   // the cabin inside /beta's bodies (they're not main's shapes): seats scaled under each roof, the rear bench under the
   // roof's back (none in the two-seaters), pillars and mirror under the roof's front edge
   [S('vehicles/cockpit.js')]: [
+    // the steering wheel's hub, so it turns with your hands in third person too (beta/vehicles/details.js)
+    ["    group, eye: [xf0 - 1.25, belt + 0.19, DRIVER_Z],", "    group, spin, eye: [xf0 - 1.25, belt + 0.19, DRIVER_Z],"],
     // the cabin's there from the moment the car is (it only came on when the camera changed view, so a first time in had
     // no seats, wheel or dash)
     ["group.visible = false;", "group.visible = true;"],
