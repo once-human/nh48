@@ -52,7 +52,7 @@ export function registry(C) {
     v('police.heat', 'wanted level 0 to 5', () => G.police?.heat || 0, (x) => sh.exec(`player wanted ${Math.round(x)}`, true), { min: 0, max: 5 });
     v('police.pts', 'heat points', () => G.police?.pts || 0, (x) => { G.police.pts = x; });
     v('cam.fov', 'field of view °, 0 = the camera\'s own', () => St.fov, (x) => { St.fov = x; }, { min: 0, max: 140 });
-    for (const s of C.SETTINGS || []) if (s.id) v('gfx.' + s.id, s.label + ', level 0 to 5', () => G.gfx.level(s.id), (x) => G.gfx.choose(s.id, Math.round(x)), { min: 0, max: 5 });
+    for (const s of C.SETTINGS || []) if (s.id) v('gfx.' + s.id, s.label + ', level 0 to ' + (s.val.length - 1), () => G.gfx.level(s.id), (x) => G.gfx.choose(s.id, Math.round(x)), { min: 0, max: s.val.length - 1 });
     // a vehicle's every number while you're in one
     const cur = !P().onFoot && P().cur;
     if (cur && cur.spec) for (const k of Object.keys(cur.spec)) if (typeof cur.spec[k] === 'number') v('vehicle.' + k, 'this vehicle', () => P().cur.spec[k], (x) => { P().cur.spec = { ...P().cur.spec, [k]: x }; });

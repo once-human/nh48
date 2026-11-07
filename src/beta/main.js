@@ -108,7 +108,7 @@ import { Shadows } from './gfx/shadows.js';
 import { paintSky } from './gfx/paintsky.js';
 import { Lamps } from './gfx/lamps.js';
 import { trackBodies } from './draw/skin.js';
-import { Graphics } from './game/graphics.js';
+import { Graphics, bootTier } from './game/graphics.js';
 
 // The streamer, taught two things about the painted city (when it builds, never what):
 //  - when it builds everything at once (loading screens, arriving somewhere) the buildings are drawn right there,
@@ -199,9 +199,9 @@ for (const k in QUALITY) { QUALITY[k].pixelRatio = Math.min(1, QUALITY[k].pixelR
 function pickQuality() {
   const q = params.get('q');
   if (q && QUALITY[q]) return { ...QUALITY[q] };
-  try { const s = localStorage.getItem('nh48_quality'); if (s && QUALITY[s]) return { ...QUALITY[s] }; } catch (e) { /* storage blocked */ }
-  if (GPU === 'soft') return { ...QUALITY.lite };
-  if (GPU === 'weak') return { ...QUALITY.low };
+  // the world is built for the graphics you chose (or where Auto starts on this PC), not for the graphics card alone
+  const tier = bootTier(GPU);
+  if (tier < 2) return { ...QUALITY[tier ? 'low' : 'lite'] };
   // laptop graphics (Intel UHD / Iris, Radeon Vega): Medium's look at the screen's own resolution with a
   // lighter shadow map, grass and crowd, so it holds a steady frame rate instead of swinging between 30 and 60
   // (and the edges smoothed after the frame rather than by 4x MSAA, which alone was a third of the frame there)
@@ -241,6 +241,9 @@ async function main() {
   // the same), which takes a big share of the GPU's work off half the frames
   renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
   renderer.info.autoReset = false;
+  // three asks the driver for each shader's error log the first time it's used, and that call waits for the compile to
+  // finish: a stall in the middle of a frame every time a new material comes on screen. Only for looking for bugs
+  renderer.debug.checkShaderErrors = params.has('shaders');
   // If the GPU driver resets (out of memory, a too-long frame) the browser drops the WebGL context
   // and the canvas goes black. Recover: remember where the player was, then reload into the same spot.
   let ctxGame = null;
@@ -386,6 +389,8 @@ async function main() {
   { const actors = new Actors(game, scene); const lamps = new Lamps(game); post.beforeDraw = (dt, cam) => { actors.update(dt, cam); lamps.update(); inside.value = game.interiors && game.interiors.inside ? 1 : 0; }; post.shadows = new Shadows(renderer, scene, sky, 2048); post.focusAt = () => { const f = post.shadowFocus(); return Math.max(2, camera.position.distanceTo(f.position || (f.root && f.root.position) || f)); }; post.indoors = () => inside.value > .5; post.shadowFocus = () => (game.player.onFoot ? game.player.foot : game.player); game.swapShadows = (on, size) => post.shadows.set(on, size); game.shadowsOn = () => post.shadows.on; }
   game.setAniso = (v) => { const a = Math.min(v, renderer.capabilities.getMaxAnisotropy()); THREE.Texture.DEFAULT_ANISOTROPY = a; const seen = new Set(), one = (t) => { if (t && t.isTexture && !seen.has(t) && t !== PU.tNoise.value && !t.isDepthTexture) { seen.add(t); if (t.anisotropy !== a) { t.anisotropy = a; t.needsUpdate = true; } } }; scene.traverse(o => { const m = o.material; if (!m) return; for (const q of Array.isArray(m) ? m : [m]) { one(q.map); if (q.uniforms && q.uniforms.tMap) one(q.uniforms.tMap.value); } }); };
   game.setVehicleDetail = (d) => { traffic.lodDist = d; const P = W.parked; if (P) for (const s of P.sets) { if (s.minRange > 0) { s.minRange = d; } else s.range = d; } updateProps(W, camera.position.x, camera.position.z); };
+  if (W.trees) W.trees.cam = camera;
+  sky.dome.renderOrder = 30;                          // (the sky last, only where nothing else has drawn: it was first, painted under everything)
   game.gfx = new Graphics(game, { gpu: GPU, post, PU, Vector2: THREE.Vector2 }); game.gfx.install();
   cityUp();
   if (game.audio && game.voiceRemote) game.audio.remote = game.voiceRemote;

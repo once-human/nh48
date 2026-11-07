@@ -42,7 +42,7 @@ const LEAF_FS = CHUNK + `void main(){
   vec3 n = normalize(vN); if (!gl_FrontFacing) n = -n;
   vec3 b = t.rgb*vC*1.15;
   float e = nz(vW.xz*.9 + vW.y*.7) - .5, ndl = dot(n, sunDir), lit = mix(smoothstep(-.05, .22, ndl + e*.5), smoothstep(-.35, .75, ndl + e*.25), uReal);
-  float sh = (shadowOn > .5 && lit > 0.) ? mix(smoothstep(.25, .7, shadowAt(vW, n) + e*.35), shadowAt(vW, n), uReal) : 1., L = lit*sh*dayK;
+  float sh = 1.; if (shadowOn > .5 && lit > 0.) { float s0 = shadowAt(vW, n); sh = mix(smoothstep(.25, .7, s0 + e*.35), s0, uReal); } float L = lit*sh*dayK;
   // dabs of paint: a dark hollow under the crown, warm top, each clump a little its own colour
   b *= .78 + .5*nz(vW.xz*.23 + vW.y*.17);
   vec3 c = mix(b*shadeCol*vec3(.7, .85, .8)*(.75 + .25*smoothstep(0., 8., vH)) + vec3(.008, .016, .01)*dayK, b*sunCol*vec3(1.1, 1.04, .84), L) + b*lampAt(vW, n)*.8;
@@ -71,6 +71,8 @@ function farCrown() {
   for (const [g0, r, gg, b, m] of parts) { const g = g0.index ? g0.toNonIndexed() : g0; g.applyMatrix4(m); g.computeVertexNormals(); const p = g.attributes.position, n = g.attributes.normal; for (let i = 0; i < p.count; i++) { P.push(p.getX(i), p.getY(i), p.getZ(i)); N.push(n.getX(i), n.getY(i), n.getZ(i)); C.push(r, gg, b); } }
   const g = new THREE.InstancedBufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); return g;
 }
+// a tree's place: turned about its upright, scaled, stood there
+function put(a, o, c, s, sx, sy, x, y, z) { a[o] = c*sx; a[o + 1] = 0; a[o + 2] = -s*sx; a[o + 3] = 0; a[o + 4] = 0; a[o + 5] = sy; a[o + 6] = 0; a[o + 7] = 0; a[o + 8] = s*sx; a[o + 9] = 0; a[o + 10] = c*sx; a[o + 11] = 0; a[o + 12] = x; a[o + 13] = y; a[o + 14] = z; a[o + 15] = 1; }
 const TINT = [[1, 1.05, .9], [.82, 1.1, .85], [1.2, 1.05, .7], [.9, .9, 1], [1.1, 1.2, .8], [.72, .95, .75], [1, 1, 1], [.9, 1.1, .9]];
 
 export class TreeField extends GameTrees {
@@ -90,6 +92,7 @@ export class TreeField extends GameTrees {
       S.nl.material = this.paintLeaf; S.ml.material = leafMid;
       S.nl.customDepthMaterial = S.ml.customDepthMaterial = this.leafShadow;
       for (const m of [S.nb, S.nl, S.mb, S.ml]) m.shadowStill = true;
+      S.nl.instanceMatrix = S.nb.instanceMatrix; S.ml.instanceMatrix = S.mb.instanceMatrix;     // (bark and leaves stand in the same places)
     });
     this.bb.visible = false;
     const G = farCrown(), cap = 4000;
@@ -98,30 +101,51 @@ export class TreeField extends GameTrees {
     // (two kinds of tree only: the full one close, the lighter real one out to the distance; the blob crowns are off)
     this.R = 0; this.farMesh.visible = false; this.fx = 1e9; this.fz = 1e9;
   }
-  // near and mid sets, refilled every 3 m: each tree in the one its distance says, and in both through the band where
-  // one fades into the other (with a little over the 3 m either way, so the shader always has what it needs)
+  // near and mid sets. Near ones cast shadows, so they're all there, behind you too. Mid ones are drawn only inside what
+  // the camera can see (about 1,500 trees of 1,000 to 2,700 triangles each were drawn all round you, most of them behind
+  // you, the biggest single cost of the frame). Refilled every 3 m or when the view has swung; each tree in the one its
+  // distance says, and in both through the band where one fades into the other (with a little over either way, so the
+  // shader always has what it needs). Only what's in use goes to the graphics card, once for bark and leaves (they
+  // share it): the whole of every list, 7,000 slots a species, went up each time, a stall every 3 m at speed.
   nearMid(cx, cz, force, Bn) {
-    if (!force && Math.hypot(cx - this.lastX, cz - this.lastZ) < 3) return;
+    const cam = this.cam; let vx = 0, vz = 0, cosK = -2, on = false;
+    if (cam) { const e = cam.matrixWorld.elements, fy = -e[9]; vx = -e[8]; vz = -e[10]; const h = Math.hypot(vx, vz);
+      // (looking steeply down or up the sides of the view open right out: no culling then)
+      if (h > .6 && fy < .6) { vx /= h; vz /= h; on = true; cosK = Math.tan(cam.fov*Math.PI/360)*cam.aspect; cosK = Math.atan(cosK)/h + 0.28; cosK = cosK >= Math.PI ? -2 : Math.cos(cosK); } }
+    const moved = Math.hypot(cx - this.lastX, cz - this.lastZ), sw = on ? (vx*(this._vx || 0) + vz*(this._vz || 0)) : -2;
+    if (!force && moved < 3 && sw > 0.9976 && this._on === on) return;
+    this._vx = vx; this._vz = vz; this._on = on;
+    if (this.lastX === 1e9) this._cx = 1e9;
     this.lastX = cx; this.lastZ = cz;
     const { nearR, midR, cell } = this, M = 4, nOut = nearR + M, mIn = Math.max(0, nearR - Bn - M), mOut = midR + M;
-    const cnt = this.sets.map(() => [0, 0]), m = this.m4, Q = this.q4, V = this.v3, S = this.s3, E = this.e3;
-    const i0 = Math.floor((cx - mOut)/cell), i1 = Math.floor((cx + mOut)/cell), j0 = Math.floor((cz - mOut)/cell), j1 = Math.floor((cz + mOut)/cell);
-    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
-      const l = this.grid.get(i + ',' + j); if (!l) continue;
-      for (const t of l) {
-        const d = Math.hypot(this.x[t] - cx, this.z[t] - cz); if (d >= mOut) continue;
-        const k = this.k[t], s = this.s[t], set = this.sets[k], c = cnt[k];
-        E.set(0, this.r[t], 0); Q.setFromEuler(E);
-        const sx = s*(0.92 + hash1(t*3.3)*0.16), sy = s*(0.9 + hash1(t*5.1)*0.2);
-        m.compose(V.set(this.x[t], 0.12 + this.y[t], this.z[t]), Q, S.set(sx, sy, sx));
-        if (d < nOut && c[0] < set.nb.instanceMatrix.count) { m.toArray(set.nb.instanceMatrix.array, c[0]*16); m.toArray(set.nl.instanceMatrix.array, c[0]*16); c[0]++; }
-        if (d > mIn && c[1] < set.mb.instanceMatrix.count) { m.toArray(set.mb.instanceMatrix.array, c[1]*16); m.toArray(set.ml.instanceMatrix.array, c[1]*16); c[1]++; }
-      }
+    // who's round here: looked up on the map every 40 m or so, not each time
+    if (force || !this._cand || Math.hypot(cx - this._cx, cz - this._cz) > 40 || this._cm !== mOut) {
+      this._cx = cx; this._cz = cz; this._cm = mOut;
+      const c = this._cand || (this._cand = []), R = mOut + 42; c.length = 0;
+      const i0 = Math.floor((cx - R)/cell), i1 = Math.floor((cx + R)/cell), j0 = Math.floor((cz - R)/cell), j1 = Math.floor((cz + R)/cell);
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const l = this.grid.get(i + ',' + j); if (l) for (let q = 0; q < l.length; q++) c.push(l[q]); }
     }
-    this.sets.forEach((set, k) => {
-      set.nb.count = set.nl.count = cnt[k][0]; set.mb.count = set.ml.count = cnt[k][1];
-      for (const mm of [set.nb, set.nl, set.mb, set.ml]) mm.instanceMatrix.needsUpdate = true;
-    });
+    const sets = this.sets, cnt = this._cnt || (this._cnt = sets.map(() => [0, 0])); for (const c of cnt) c[0] = c[1] = 0;
+    const cand = this._cand, X = this.x, Z = this.z, Y = this.y, K = this.k, SC = this.s, RO = this.r;
+    for (let q = 0; q < cand.length; q++) {
+      const t = cand[q], dx = X[t] - cx, dz = Z[t] - cz, d = Math.hypot(dx, dz); if (d >= mOut) continue;
+      const near = d < nOut; let mid = d > mIn;
+      if (!near && !mid) continue;
+      // out of the view, a crown's width to spare: not this frame
+      if (mid && on && d > 30 && (dx*vx + dz*vz)/d < cosK - 22/d) mid = false;
+      if (!near && !mid) continue;
+      const k = K[t], s = SC[t], set = sets[k], c = cnt[k], r = RO[t], cr = Math.cos(r), sr = Math.sin(r);
+      const sx = s*(0.92 + hash1(t*3.3)*0.16), sy = s*(0.9 + hash1(t*5.1)*0.2), y = 0.12 + Y[t];
+      if (near && c[0] < set.nb.instanceMatrix.count) { put(set.nb.instanceMatrix.array, c[0]*16, cr, sr, sx, sy, X[t], y, Z[t]); c[0]++; }
+      if (mid && c[1] < set.mb.instanceMatrix.count) { put(set.mb.instanceMatrix.array, c[1]*16, cr, sr, sx, sy, X[t], y, Z[t]); c[1]++; }
+    }
+    for (let k = 0; k < sets.length; k++) {
+      const set = sets[k], c = cnt[k];
+      set.nb.count = set.nl.count = c[0]; set.mb.count = set.ml.count = c[1];
+      const a = set.nb.instanceMatrix, b = set.mb.instanceMatrix;
+      a.clearUpdateRanges(); a.addUpdateRange(0, c[0]*16); a.needsUpdate = true;
+      b.clearUpdateRanges(); b.addUpdateRange(0, c[1]*16); b.needsUpdate = true;
+    }
   }
   sharpenLeaves() { super.sharpenLeaves(); this.paintLeaf.uniforms.tMap.value = this.leafMat.map; }
   update(cx, cz, force = false) {

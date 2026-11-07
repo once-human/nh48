@@ -1,113 +1,145 @@
-// /beta's graphics settings and its Auto. The whole picture takes Auto, Lite, Low, Medium, High, Very High or Ultra; each
-// setting takes Auto or any of six real values.
-// Auto starts from what the PC is, and while you play, when frames drop, it works out whether the graphics card or the
-// processor is holding things up and takes one step off the setting that's costing the most there, checks that it
-// helped (puts it back and tries the next one if it didn't), and gives steps back when there's room. MSAA is the
-// exception: Auto sets it from how powerful the PC is, and frame drops never touch it.
+// /beta's graphics settings and its Auto. The whole picture is Auto, Lite, Low, Medium, High, Very High, Ultra or Custom.
+// A named one sets every row below to a value of its own and the rows show that value. Touch any row and it's Custom,
+// because that isn't one of the set layouts any more; a row in Custom can be a value of yours or Auto.
+// What the names are for (a 1080p screen):
+//   Lite       4 GB of RAM, a weak processor, no graphics card. As smooth as that can be, whatever it takes
+//   Low        8 GB, an i3, integrated graphics: a steady 30 at the least
+//   Medium     16 GB, an i3, integrated graphics: 30 to 60 (on an 8 GB i3-1115G4 too)
+//   High       8-16 GB, a 4 GB card, an 11th gen i5 or later: 60, constantly (20 to 30 on that i3)
+//   Very High  16 GB, an 8 GB card, 12th gen or later: 60
+//   Ultra      looks first
+// Auto starts from what the PC is, and while you play, when frames drop or stutter (a slow PC, or something else running
+// on it), works out whether the graphics card or the processor is holding things up and takes steps off what's costing
+// the most there, as far down as Lite, checks that helped, and gives steps back slowly when there's room. Frame rate first
+// and looks second: under 30 it comes down at once, and about 60 is the aim.
 const NAMES = ['Lite', 'Low', 'Medium', 'High', 'Very High', 'Ultra'];
 const pct = (v) => Math.round(v*100) + '%';
 const onOff = (v, f) => (v ? f(v) : 'Off');
 const M = (v) => v + ' m';
-const look = (G) => G.gfx ? G.gfx.C.post : null;
 const fx = (C, o) => { Object.assign(C.post.fx, o); };
-// A setting: six levels, what it costs (w: how heavy, side: what it loads) and what it does. `style` ones are the look
-// itself: Auto picks them once, from the PC, and never changes how the picture is painted while you play.
+// A setting: its values (val), which of them each name uses (at: Lite to Ultra), what it costs (w: how heavy, side: what
+// it loads) and what it does. `style` ones are the look itself and `fixed` ones are slow to change: Auto picks them once
+// from the PC and leaves them alone while you play.
 export const SETTINGS = [
   { group: 'Image' },
-  { id: 'res', label: 'Render scale', sub: 'Pixels drawn, against your screen', side: 'gpu', w: 3, val: [.6, .75, 1, 1.25, 1.5, 2], fmt: pct, apply: (G, v) => { G.perf.pr = v; G.applyPixelRatio(v); } },
-  { id: 'msaa', label: 'Anti-aliasing', sub: 'MSAA. Auto goes by your PC, not your frame rate', fixed: true, val: [0, 0, 2, 4, 8, 16], fmt: (v) => (v ? 'MSAA ' + v + 'x' : 'Off'), apply: (G, v, C) => { const m = Math.min(v, G.renderer.capabilities.maxSamples); if (C.post.q.samples !== m) { C.post.q.samples = m; C.post.setSize(window.innerWidth, window.innerHeight); } } },
-  { id: 'aniso', label: 'Texture filtering', sub: 'Anisotropic, for surfaces at a low angle', side: 'gpu', w: 1, val: [1, 2, 4, 8, 16, 16], fmt: (v) => (v > 1 ? v + 'x AF' : 'Trilinear'), apply: (G, v) => G.setAniso(v) },
+  { id: 'res', label: 'Render scale', sub: 'Pixels drawn, against your screen', side: 'gpu', w: 3, val: [.5, .6, .75, 1, 1.25, 1.5, 2], at: [1, 2, 3, 4, 5, 6], fmt: pct, apply: (G, v) => { G.perf.pr = v; G.applyPixelRatio(v); } },
+  { id: 'msaa', label: 'Anti-aliasing', sub: 'MSAA. Auto goes by your PC, not your frame rate', fixed: true, val: [0, 2, 4, 8, 16], at: [0, 0, 1, 2, 3, 4], fmt: (v) => (v ? 'MSAA ' + v + 'x' : 'Off'), apply: (G, v, C) => { const m = Math.min(v, G.renderer.capabilities.maxSamples); if (C.post.q.samples !== m) { C.post.q.samples = m; C.post.setSize(window.innerWidth, window.innerHeight); } } },
+  { id: 'aniso', label: 'Texture filtering', sub: 'Anisotropic, for surfaces at a low angle', fixed: true, val: [1, 2, 4, 8, 16], at: [0, 1, 2, 3, 4, 4], fmt: (v) => (v > 1 ? v + 'x AF' : 'Trilinear'), apply: (G, v) => G.setAniso(v) },
   { group: 'Look' },
-  { id: 'shade', label: 'Lighting model', sub: 'From two painted tones to physically based light', style: true, val: [[0, 0], [0, 1], [.22, 1], [.5, 1], [.8, 1], [1, 1]], fmt: (v) => (!v[1] ? 'Flat cel' : ['Two-tone', 'Soft paint', 'Paint + PBR', 'PBR', 'Full PBR'][[0, .22, .5, .8, 1].indexOf(v[0])]), apply: (G, v, C) => { C.PU.uReal.value = v[0]; C.PU.uMarks.value = v[1]; } },
-  { id: 'ink', label: 'Ink lines', sub: 'Depth and colour edges, drawn over the frame', style: true, val: [[0, 1], [1, 1], [2, .85], [2, .5], [1, .22], [0, 0]], fmt: (v) => (v[1] === 0 ? 'Off' : ['1 pass', '2 passes', '3 passes'][v[0]] + ' · ' + pct(v[1])), apply: (G, v, C) => { C.post.U.inkQ.value = v[0]; C.post.U.inkS.value = v[1]; } },
-  { id: 'paper', label: 'Paper finish', sub: 'Grain, specks, brush strokes and the torn edge', style: true, val: [1, 1, 1, .55, .2, 0], fmt: (v) => onOff(v, pct), apply: (G, v, C) => { C.post.U.paper.value = v; } },
-  { id: 'grade', label: 'Tone mapping', sub: 'From poster colour to a film curve', style: true, val: [0, 0, .12, .45, .8, 1], fmt: (v) => (v === 0 ? 'Poster' : v === 1 ? 'ACES filmic' : 'Filmic ' + pct(v)), apply: (G, v, C) => { C.post.U.film.value = v; } },
-  { id: 'aerial', label: 'Aerial perspective', sub: 'The air between you and what is far off', side: 'gpu', w: .5, val: [0, 0, .35, .7, 1, 1.25], fmt: (v) => onOff(v, pct), apply: (G, v, C) => { C.post.U.aerial.value = v; } },
+  { id: 'shade', label: 'Lighting model', sub: 'From two painted tones to physically based light', style: true, val: [[0, 0], [0, 1], [.22, 1], [.5, 1], [.8, 1], [1, 1]], at: [0, 1, 2, 3, 4, 5], fmt: (v) => (!v[1] ? 'Flat cel' : ['Two-tone', 'Soft paint', 'Paint + PBR', 'PBR', 'Full PBR'][[0, .22, .5, .8, 1].indexOf(v[0])]), apply: (G, v, C) => { C.PU.uReal.value = v[0]; C.PU.uMarks.value = v[1]; } },
+  { id: 'ink', label: 'Ink lines', sub: 'Depth and colour edges, drawn over the frame', style: true, val: [[0, 0], [0, 1], [1, .22], [1, 1], [2, .5], [2, .85]], at: [1, 3, 5, 4, 2, 0], fmt: (v) => (v[1] === 0 ? 'Off' : ['1 pass', '2 passes', '3 passes'][v[0]] + ' · ' + pct(v[1])), apply: (G, v, C) => { C.post.U.inkQ.value = v[0]; C.post.U.inkS.value = v[1]; } },
+  { id: 'paper', label: 'Paper finish', sub: 'Grain, specks, brush strokes and the torn edge', style: true, val: [0, .2, .55, 1], at: [3, 3, 3, 2, 1, 0], fmt: (v) => onOff(v, pct), apply: (G, v, C) => { C.post.U.paper.value = v; } },
+  { id: 'grade', label: 'Tone mapping', sub: 'From poster colour to a film curve', style: true, val: [0, .12, .45, .8, 1], at: [0, 0, 1, 2, 3, 4], fmt: (v) => (v === 0 ? 'Poster' : v === 1 ? 'ACES filmic' : 'Filmic ' + pct(v)), apply: (G, v, C) => { C.post.U.film.value = v; } },
+  { id: 'aerial', label: 'Aerial perspective', sub: 'The air between you and what is far off', side: 'gpu', w: .5, val: [0, .35, .7, 1, 1.25], at: [0, 0, 1, 2, 3, 4], fmt: (v) => onOff(v, pct), apply: (G, v, C) => { C.post.U.aerial.value = v; } },
   { group: 'Shadows' },
-  { id: 'shadows', label: 'Shadow map', sub: 'Resolution', side: 'gpu', w: 4, val: [0, 1024, 2048, 3072, 4096, 8192], fmt: (v) => (v ? v + ' px' : 'Off'), apply: (G, v) => { const m = Math.min(v, G.renderer.capabilities.maxTextureSize); G.swapShadows(m > 0, m || 1024); } },
-  { id: 'sfilter', label: 'Shadow filter', sub: 'PCF taps, and how soft the edge is', side: 'gpu', w: 2, val: [[2, 1], [2, 1], [4, 1.4], [8, 2], [16, 3], [32, 4.5]], fmt: (v) => v[0] + '-tap PCF', apply: (G, v, C) => { C.PU.uTaps.value = v[0]; C.PU.uSoft.value = v[1]; } },
-  { id: 'sdist', label: 'Shadow distance', sub: 'How far from you things cast one', side: 'gpu', w: 2, val: [70, 95, 95, 130, 180, 260], fmt: M, apply: (G, v, C) => { if (C.post.shadows) C.post.shadows.reach(v); } },
+  { id: 'shadows', label: 'Shadow map', sub: 'Resolution', side: 'gpu', w: 4, val: [0, 1024, 2048, 3072, 4096, 8192], at: [0, 1, 2, 3, 4, 5], fmt: (v) => (v ? v + ' px' : 'Off'), apply: (G, v) => { const m = Math.min(v, G.renderer.capabilities.maxTextureSize); G.swapShadows(m > 0, m || 1024); } },
+  { id: 'sfilter', label: 'Shadow filter', sub: 'PCF taps, and how soft the edge is', side: 'gpu', w: 2, val: [[2, 1], [4, 1.4], [8, 2], [16, 3], [32, 4.5]], at: [0, 0, 1, 2, 3, 4], fmt: (v) => v[0] + '-tap PCF', apply: (G, v, C) => { C.PU.uTaps.value = v[0]; C.PU.uSoft.value = v[1]; } },
+  { id: 'sdist', label: 'Shadow distance', sub: 'How far from you things cast one', side: 'gpu', w: 2, val: [70, 95, 130, 180, 260], at: [0, 1, 1, 2, 3, 4], fmt: M, apply: (G, v, C) => { if (C.post.shadows) C.post.shadows.reach(v); } },
   { group: 'Post-processing' },
-  { id: 'ao', label: 'Ambient occlusion', sub: 'SSAO samples, at this share of the resolution', side: 'gpu', w: 3, val: [[0, .5], [0, .5], [8, .5], [16, .5], [32, .75], [64, 1]], fmt: (v) => (v[0] ? v[0] + ' spp · ' + pct(v[1]) : 'Off'), apply: (G, v, C) => fx(C, { ao: v[0], aoScale: v[1] }) },
-  { id: 'gi', label: 'Bounce light', sub: 'SSGI rays per pixel: sunlit walls lighting what is near', side: 'gpu', w: 3, val: [0, 0, 0, 0, 8, 16], fmt: (v) => onOff(v, x => x + ' rays'), apply: (G, v, C) => fx(C, { rays: v }) },
-  { id: 'ssr', label: 'Reflections', sub: 'Screen-space ray steps, on glass, paint and wet road', side: 'gpu', w: 3, val: [[0, .5], [0, .5], [0, .5], [16, .5], [32, .5], [64, 1]], fmt: (v) => (v[0] ? v[0] + ' steps · ' + pct(v[1]) : 'Off'), apply: (G, v, C) => fx(C, { ssr: v[0], ssrScale: v[1] }) },
-  { id: 'bloom', label: 'Bloom', sub: 'Blur chain length', side: 'gpu', w: 1, val: [0, 0, 3, 4, 5, 6], fmt: (v) => onOff(v, x => x + ' mips'), apply: (G, v, C) => fx(C, { bloom: v }) },
-  { id: 'shafts', label: 'Sun shafts', sub: 'Radial samples', side: 'gpu', w: 1, val: [0, 0, 0, 32, 64, 128], fmt: (v) => onOff(v, x => x + ' samples'), apply: (G, v, C) => fx(C, { shafts: v }) },
-  { id: 'dof', label: 'Depth of field', sub: 'Bokeh samples, for what is far behind you', side: 'gpu', w: 1, val: [0, 0, 0, 0, 8, 24], fmt: (v) => onOff(v, x => x + ' samples'), apply: (G, v, C) => fx(C, { dof: v }) },
-  { id: 'mb', label: 'Motion blur', sub: 'Samples, from the camera moving', side: 'gpu', w: 1, val: [0, 0, 0, 0, 6, 16], fmt: (v) => onOff(v, x => x + ' samples'), apply: (G, v, C) => fx(C, { mb: v }) },
+  { id: 'ao', label: 'Ambient occlusion', sub: 'SSAO samples, at this share of the resolution', side: 'gpu', w: 3, val: [[0, .5], [8, .5], [16, .5], [32, .75], [64, 1]], at: [0, 0, 1, 2, 3, 4], fmt: (v) => (v[0] ? v[0] + ' spp · ' + pct(v[1]) : 'Off'), apply: (G, v, C) => fx(C, { ao: v[0], aoScale: v[1] }) },
+  { id: 'gi', label: 'Bounce light', sub: 'SSGI rays per pixel: sunlit walls lighting what is near', side: 'gpu', w: 3, val: [0, 8, 16], at: [0, 0, 0, 0, 1, 2], fmt: (v) => onOff(v, x => x + ' rays'), apply: (G, v, C) => fx(C, { rays: v }) },
+  { id: 'ssr', label: 'Reflections', sub: 'Screen-space ray steps, on glass, paint and wet road', side: 'gpu', w: 3, val: [[0, .5], [16, .5], [32, .5], [64, 1]], at: [0, 0, 0, 1, 2, 3], fmt: (v) => (v[0] ? v[0] + ' steps · ' + pct(v[1]) : 'Off'), apply: (G, v, C) => fx(C, { ssr: v[0], ssrScale: v[1] }) },
+  { id: 'bloom', label: 'Bloom', sub: 'Blur chain length', side: 'gpu', w: 1, val: [0, 3, 4, 5, 6], at: [0, 0, 1, 2, 3, 4], fmt: (v) => onOff(v, x => x + ' mips'), apply: (G, v, C) => fx(C, { bloom: v }) },
+  { id: 'shafts', label: 'Sun shafts', sub: 'Radial samples', side: 'gpu', w: 1, val: [0, 32, 64, 128], at: [0, 0, 0, 1, 2, 3], fmt: (v) => onOff(v, x => x + ' samples'), apply: (G, v, C) => fx(C, { shafts: v }) },
+  { id: 'dof', label: 'Depth of field', sub: 'Bokeh samples, for what is far behind you', side: 'gpu', w: 1, val: [0, 8, 24], at: [0, 0, 0, 0, 1, 2], fmt: (v) => onOff(v, x => x + ' samples'), apply: (G, v, C) => fx(C, { dof: v }) },
   { group: 'World' },
-  { id: 'dist', label: 'View distance', sub: 'How much of the city is built around you', side: 'both', w: 2, val: [260, 360, 520, 720, 1000, 1400], fmt: M, apply: (G, v) => G.W.streamer.setRadius(v) },
-  { id: 'geo', label: 'World geometry', sub: 'Walls, kerbs and roads close up. Applies to what gets built as you move', fixed: true, val: [0, 0, 1, 1, 2, 2], fmt: (v) => ['Standard', 'Structured', 'Every window and stone'][v], apply: (G, v) => { if (G.W && G.W.painter) { G.W.painter.rich = v; G.W.painter.geoAt = (G.W.painter.geoAt || 0) + 1; } } },
-  { id: 'sdetail', label: 'Stall detail', sub: 'How far stalls get their full models', side: 'gpu', w: 2, val: [35, 60, 90, 140, 200, 300], fmt: M, apply: (G, v) => { if (G.W && G.W.stallNear) G.W.stallNear(v); } },
-  { id: 'vdist', label: 'Vehicle detail', sub: 'How far the full models go', side: 'gpu', w: 3, val: [30, 50, 80, 120, 180, 280], fmt: M, apply: (G, v) => G.setVehicleDetail(v) },
-  { id: 'trees', label: 'Trees', sub: 'Full trees to, then lighter trees to', side: 'gpu', w: 3, val: [[25, 250], [40, 400], [70, 600], [110, 900], [160, 1200], [240, 1600]], fmt: (v) => v[0] + ' m / ' + v[1] + ' m', apply: (G, v) => { const T = G.W.trees; if (T) { T.nearR = v[0]; T.midR = v[1]; T.R = 0; T.lastX = 1e9; } } },
-  { id: 'grass', label: 'Grass', sub: 'How far it is drawn', side: 'gpu', w: 2, val: [0, .35, .7, 1, 1.4, 2], fmt: (v) => (v ? Math.round(v*64) + ' m' : 'Off'), apply: (G, v) => { if (G.W.grass) G.W.grass.level = v; } },
-  { id: 'bodies', label: 'Skinned bodies', sub: 'How many, and how close the 50k-triangle ones are', side: 'both', w: 3, val: [[16, 0], [32, 6], [64, 12], [96, 22], [96, 40], [96, 70]], fmt: (v) => v[0] + ' · ' + v[1] + ' m', apply: (G, v) => { if (G.skin) { G.skin.max = v[0]; G.skin.hiR = v[1]; } } },
-  { id: 'people', label: 'Pedestrians', sub: 'On the streets', side: 'cpu', w: 3, val: [60, 90, 130, 170, 220, 280], fmt: (v) => String(v), apply: (G, v) => { if (G.people) G.people.max = Math.min(v, G.people.cap - 120); } },
-  { id: 'traffic', label: 'Traffic', sub: 'Vehicles on the roads', side: 'cpu', w: 3, val: [40, 70, 100, 130, 170, 220], fmt: (v) => String(v), apply: (G, v) => { if (G.traffic) G.traffic.max = v; } },
+  { id: 'dist', label: 'View distance', sub: 'How much of the city is built around you', side: 'both', w: 2, val: [220, 360, 520, 720, 1000, 1400], at: [0, 1, 2, 3, 4, 5], fmt: M, apply: (G, v) => G.W.streamer.setRadius(v) },
+  { id: 'geo', label: 'World geometry', sub: 'Walls, kerbs and roads close up. Applies to what gets built as you move', fixed: true, val: [0, 1, 2], at: [0, 0, 1, 1, 2, 2], fmt: (v) => ['Standard', 'Structured', 'Every window and stone'][v], apply: (G, v) => { if (G.W && G.W.painter) { G.W.painter.rich = v; G.W.painter.geoAt = (G.W.painter.geoAt || 0) + 1; } } },
+  { id: 'sdetail', label: 'Stall detail', sub: 'How far stalls get their full models', side: 'gpu', w: 2, val: [25, 60, 90, 140, 200, 300], at: [0, 1, 2, 3, 4, 5], fmt: M, apply: (G, v) => { if (G.W && G.W.stallNear) G.W.stallNear(v); } },
+  { id: 'vdist', label: 'Vehicle detail', sub: 'How far the full models go', side: 'gpu', w: 3, val: [25, 50, 80, 120, 180, 280], at: [0, 1, 2, 3, 4, 5], fmt: M, apply: (G, v) => G.setVehicleDetail(v) },
+  { id: 'trees', label: 'Trees', sub: 'Full trees to, then lighter trees to', side: 'gpu', w: 3, val: [[15, 180], [40, 400], [70, 600], [110, 900], [160, 1200], [240, 1600]], at: [0, 1, 2, 3, 4, 5], fmt: (v) => v[0] + ' m / ' + v[1] + ' m', apply: (G, v) => { const T = G.W.trees; if (T) { T.nearR = v[0]; T.midR = v[1]; T.R = 0; T.lastX = 1e9; } } },
+  { id: 'grass', label: 'Grass', sub: 'How far it is drawn', side: 'gpu', w: 2, val: [0, .35, .7, 1, 1.4, 2], at: [0, 1, 2, 3, 4, 5], fmt: (v) => (v ? Math.round(v*64) + ' m' : 'Off'), apply: (G, v) => { if (G.W.grass) G.W.grass.level = v; } },
+  { id: 'bodies', label: 'Skinned bodies', sub: 'How many, and how close the 50k-triangle ones are', side: 'both', w: 3, val: [[8, 0], [32, 6], [64, 12], [96, 22], [96, 40], [96, 70]], at: [0, 1, 2, 3, 4, 5], fmt: (v) => v[0] + ' · ' + v[1] + ' m', apply: (G, v) => { if (G.skin) { G.skin.max = v[0]; G.skin.hiR = v[1]; } } },
+  { id: 'people', label: 'Pedestrians', sub: 'On the streets', side: 'cpu', w: 3, val: [30, 90, 130, 170, 220, 280], at: [0, 1, 2, 3, 4, 5], fmt: (v) => String(v), apply: (G, v) => { if (G.people) G.people.max = Math.min(v, G.people.cap - 120); } },
+  { id: 'traffic', label: 'Traffic', sub: 'Vehicles on the roads', side: 'cpu', w: 3, val: [20, 70, 100, 130, 170, 220], at: [0, 1, 2, 3, 4, 5], fmt: (v) => String(v), apply: (G, v) => { if (G.traffic) G.traffic.max = v; } },
 ];
 const ALL = SETTINGS.filter(s => s.id);
-const TOP = 5, AUTO_TOP = 4;                              // (Auto stops at Very High: Ultra is yours to ask for)
+const AUTO_TOP = 4;                                       // (Auto stops at Very High: Ultra is yours to ask for)
 const CAPS = [30, 60, 90, 120, 144, 165, 240, 0], COUNTERS = ['Off', 'FPS', 'FPS and frame time', 'Full'];
-const KEY = 'nh48_beta_gfx2';
-const BASE = { discrete: 3, integrated: 2, weak: 1, soft: 0 };
+const KEY = 'nh48_beta_gfx3', OLD = 'nh48_beta_gfx2';
+const saved = () => { try { const j = JSON.parse(localStorage.getItem(KEY) || 'null'); if (j) return j; const o = JSON.parse(localStorage.getItem(OLD) || 'null'); if (o) return { preset: o.preset, cap: o.cap, counter: o.counter }; } catch (e) { /* no storage */ } return {}; };
+// where Auto starts on this PC: by its graphics, its memory and its processor (the browser reports memory up to 8 GB)
+export function hardwareTier(gpu) {
+  const gb = navigator.deviceMemory || 8, cores = navigator.hardwareConcurrency || 4;
+  if (gpu === 'soft' || gpu === 'none' || gb <= 4) return 0;
+  if (gpu === 'weak') return cores > 4 ? 1 : 0;
+  if (gpu === 'discrete') return gb < 8 || cores <= 4 ? 2 : 3;
+  return cores <= 2 ? 0 : 1;                              // integrated: Low, and it earns its way up
+}
+// what the world is built for when it loads: the name you chose, or what Auto starts at
+export function bootTier(gpu) { const p = saved().preset; return typeof p === 'number' ? p : hardwareTier(gpu); }
 
 export class Graphics {
   constructor(G, C) {
-    // Auto starts at Medium at the least, and only goes below it (to Low, never Lite) while frames stay under 40
-    this.G = G; this.C = C; this.base = Math.max(2, BASE[C.gpu] ?? 2);
-    this.auto = {}; for (const s of ALL) this.auto[s.id] = this.base;
-    this.auto.msaa = C.gpu === 'discrete' ? 3 : 0;       // set once, from the hardware
+    this.G = G; this.C = C; this.base = hardwareTier(C.gpu);
+    this.auto = {}; for (const s of ALL) this.auto[s.id] = s.at[this.base];
     this.preset = 'auto'; this.pin = {}; this.cap = 144; this.counter = 0;
-    try { const j = JSON.parse(localStorage.getItem(KEY) || '{}'); if (j.preset !== undefined) this.preset = j.preset; if (j.pin) this.pin = j.pin; if (j.cap !== undefined) this.cap = j.cap; if (j.counter !== undefined) this.counter = j.counter; } catch (e) { /* no storage: defaults */ }
+    const j = saved(); if (j.preset !== undefined) this.preset = j.preset; if (j.pin) this.pin = j.pin; if (j.cap !== undefined) this.cap = j.cap; if (j.counter !== undefined) this.counter = j.counter;
     G.fpsCap = this.cap; this.fN = 0; this.fT = 0; this.fW = 0;
-    this.acc = 0; this.n = 0; this.cpu = 0; this.low = 0; this.high = 0; this.wait = 8; this.blocked = {}; this.trial = null; this.was = {};
+    this.acc = 0; this.n = 0; this.cpu = 0; this.spikes = 0; this.low = 0; this.high = 0; this.wait = 8; this.blocked = {}; this.trial = null; this.was = {};
     G.afterRender = () => {};                            // (the game's own adaptive resolution: this replaces it)
     G.gfxTick = (dt, cpu) => this.tick(dt, cpu);
     this.applyAll();
   }
-  level(id) { const p = this.pin[id]; if (p !== undefined) return p; if (this.preset !== 'auto') return this.preset; return this.auto[id]; }
+  // which of a setting's values is in use. A name's own; yours in Custom; Auto's otherwise
+  level(id) { const n = typeof this.preset === 'number' ? this.preset : -1; if (n >= 0) return ALL.find(s => s.id === id).at[n]; const p = this.pin[id]; return p !== undefined ? p : this.auto[id]; }
   applyOne(s) { const v = s.val[this.level(s.id)]; if (this.was[s.id] === v) return; this.was[s.id] = v; try { s.apply(this.G, v, this.C); } catch (e) { console.warn('graphics', s.id, e); } }
-  applyAll() { for (const s of ALL) this.applyOne(s); const l = this.preset === 'auto' ? this.base : this.preset; this.G.qualityName = ['lite', 'low', 'med', 'high', 'high', 'high'][l]; this.sync(); }
+  tier() { return typeof this.preset === 'number' ? this.preset : this.preset === 'custom' ? Math.round(this.level('people')*5/6) : this.base; }
+  applyAll() { for (const s of ALL) this.applyOne(s); this.G.qualityName = ['lite', 'low', 'med', 'high', 'high', 'high'][this.tier()]; this.sync(); }
   save() { try { localStorage.setItem(KEY, JSON.stringify({ preset: this.preset, pin: this.pin, cap: this.cap, counter: this.counter })); } catch (e) { /* private window */ } }
   choose(id, v) {
     if (id === 'cap') { this.cap = this.G.fpsCap = +v; this.save(); this.sync(); return; }
     if (id === 'counter') { this.counter = +v; this.save(); this.sync(); return; }
-    if (id === 'all') { this.preset = v === 'auto' ? 'auto' : +v; this.pin = {}; }
-    else if (v === 'auto') delete this.pin[id]; else this.pin[id] = +v;
+    if (id === 'all') {
+      if (v === 'custom') { if (this.preset !== 'custom') { const now = {}; for (const s of ALL) now[s.id] = this.level(s.id); this.pin = now; this.preset = 'custom'; } }
+      else { this.preset = v === 'auto' ? 'auto' : +v; this.pin = {}; }
+    } else {
+      // any one row changed: it isn't a set layout now. Everything stays where it was, and this row changes
+      if (this.preset !== 'custom') { const now = {}; for (const s of ALL) now[s.id] = this.level(s.id); this.pin = now; this.preset = 'custom'; }
+      if (v === 'auto') delete this.pin[id]; else this.pin[id] = +v;
+    }
     this.trial = null; this.wait = 6; this.low = this.high = 0; this.save(); this.applyAll();
   }
   free(s, now) { return !s.fixed && !s.style && this.pin[s.id] === undefined && !(this.blocked[s.id] > now); }
-  // a two-second look at how it's going
+  // a step off what's costing the most on the side that's short. Returns the setting, or nothing left to take
+  stepDown(side, now) {
+    const score = (s) => s.w*this.auto[s.id]/Math.max(1, s.val.length - 1);
+    const pick = (f) => ALL.filter(s => this.free(s, now) && this.auto[s.id] > 0 && f(s)).sort((a, b) => score(b) - score(a))[0];
+    const s = pick(q => q.side === side || q.side === 'both') || pick(() => true); if (!s) return null;
+    this.auto[s.id]--; this.applyOne(s); return s;
+  }
+  // a look each second at how it's going. Smooth comes first: down quickly when frames are short or stuttering, up slowly
   tick(dt, cpuMs) {
     const G = this.G;
     this.counterTick(dt, cpuMs);
-    if (G.state !== 'play' || dt > .5 || this.preset !== 'auto') return;
-    this.acc += dt; this.n++; this.cpu += cpuMs;
-    if (this.acc < 2) return;
-    const fps = this.n/this.acc, cpu = this.cpu/this.n, share = cpu/(1000/fps), now = performance.now();
-    this.acc = 0; this.n = 0; this.cpu = 0;
-    this.wait -= 2; if (this.wait > 0) return;
+    if (G.state !== 'play' || dt > .5 || typeof this.preset === 'number') return;
+    this.acc += dt; this.n++; this.cpu += cpuMs; if (dt > .05) this.spikes++;
+    if (this.acc < 1) return;
+    const fps = this.n/this.acc, cpu = this.cpu/this.n, share = cpu/(1000/fps), now = performance.now(), spikes = this.spikes;
+    const want = this.cap > 0 ? Math.min(60, this.cap) : 60;
+    this.acc = 0; this.n = 0; this.cpu = 0; this.spikes = 0;
+    if ((this.wait -= 1) > 0) return;
     const T = this.trial;
     if (T && --T.left <= 0) {
       this.trial = null;
-      if (T.dir < 0 && fps < T.fps*1.05 && fps < 50) { this.auto[T.s.id]++; this.blocked[T.s.id] = now + 120000; this.applyOne(T.s); this.wait = 4; this.sync(); return; }     // didn't help: it wasn't this
-      if (T.dir > 0 && fps < 52) { this.auto[T.s.id]--; this.blocked[T.s.id] = now + 180000; this.applyOne(T.s); this.wait = 4; this.sync(); return; }                        // too much: back, and leave it a while
+      if (T.dir < 0 && fps < T.fps*1.05 && fps >= Math.min(30, want*.9) && fps < want*.83) { this.auto[T.s.id]++; this.blocked[T.s.id] = now + 120000; this.applyOne(T.s); this.wait = 2; this.sync(); return; }   // didn't help: it wasn't this
+      if (T.dir > 0 && (fps < want*.9 || spikes >= 3)) { this.auto[T.s.id]--; this.blocked[T.s.id] = now + 300000; this.applyOne(T.s); this.wait = 3; this.sync(); return; }           // too much: back, and leave it a while
     }
-    this.low = fps < 48 ? this.low + 1 : 0;
-    this.high = fps >= 58 ? this.high + 1 : 0;
-    if (this.low >= 2) {
-      const side = share > .6 ? 'cpu' : 'gpu', score = (s) => s.w*this.auto[s.id];
-      const floor = fps < 40 ? 1 : 2;
-      const pick = (f) => ALL.filter(s => this.free(s, now) && this.auto[s.id] > floor && f(s)).sort((a, b) => score(b) - score(a))[0];
-      const s = pick(q => q.side === side || q.side === 'both') || pick(() => true);
-      this.low = 0; if (!s) return;
-      this.auto[s.id]--; this.applyOne(s); this.trial = { s, fps, dir: -1, left: 2 }; this.wait = 4; this.sync();
-    } else if (this.high >= 10) {
-      this.high = 0;
-      const s = ALL.filter(q => this.free(q, now) && this.auto[q.id] < AUTO_TOP && !(q.side === 'cpu' && share > .5)).sort((a, b) => a.w*this.auto[a.id] - b.w*this.auto[b.id])[0];
+    // under 30 isn't playable: down at once and hard. Between 30 and 50 it can wait a few seconds and go gently. About 60 is the aim
+    const hard = Math.min(30, want*.9), bad = fps < hard;
+    this.low = fps < want*.83 || spikes >= 4 ? this.low + 1 : 0;
+    this.high = fps >= want*.97 && !spikes ? this.high + 1 : 0;
+    if (bad || this.low >= 5) {
+      const side = share > .6 ? 'cpu' : 'gpu', steps = fps < hard*.6 ? 4 : bad ? 2 : 1;
+      this.low = 0; let s = null;
+      for (let i = 0; i < steps; i++) s = this.stepDown(side, now) || s;
       if (!s) return;
-      this.auto[s.id]++; this.applyOne(s); this.trial = { s, fps, dir: 1, left: 3 }; this.wait = 4; this.sync();
+      this.trial = steps === 1 ? { s, fps, dir: -1, left: 3 } : null; this.wait = bad ? 1 : 3; this.sync();
+    } else if (this.high >= 25) {
+      this.high = 0;
+      const s = ALL.filter(q => this.free(q, now) && this.auto[q.id] < q.at[AUTO_TOP] && !(q.side === 'cpu' && share > .5)).sort((a, b) => a.w*this.auto[a.id]/a.val.length - b.w*this.auto[b.id]/b.val.length)[0];
+      if (!s) return;
+      this.auto[s.id]++; this.applyOne(s); this.trial = { s, fps, dir: 1, left: 5 }; this.wait = 2; this.sync();
     }
   }
   sync() {
@@ -115,7 +147,8 @@ export class Graphics {
     const on = (el, v) => el.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === String(v)));
     on(r.querySelector('[data-g="all"]'), this.preset);
     for (const s of ALL) {
-      on(r.querySelector(`[data-g="${s.id}"]`), this.pin[s.id] ?? 'auto');
+      const shown = this.preset === 'auto' ? 'auto' : typeof this.preset === 'number' ? this.level(s.id) : this.pin[s.id] ?? 'auto';
+      on(r.querySelector(`[data-g="${s.id}"]`), shown);
       r.querySelector(`[data-now="${s.id}"]`).textContent = s.sub + ' · now ' + s.fmt(s.val[this.level(s.id)]);
     }
     on(r.querySelector('[data-g="cap"]'), this.cap); on(r.querySelector('[data-g="counter"]'), this.counter);
@@ -128,7 +161,7 @@ export class Graphics {
     if (this.fT < .5) return;
     const R = this.G.renderer, i = R.info, fps = this.fN/this.fT, ms = this.fT/this.fN*1000, l = [`${fps.toFixed(0)} FPS`];
     if (this.counter >= 2) l.push(`${ms.toFixed(1)} ms · worst ${(this.fW*1000).toFixed(0)} ms`);
-    if (this.counter >= 3) { const v = R.getDrawingBufferSize(this._v || (this._v = new (this.C.Vector2)())); l.push(`CPU ${(this.fC/this.fN).toFixed(1)} ms · ${v.x}x${v.y}`, `${i.render.calls} draws · ${(i.render.triangles/1e6).toFixed(2)}M tris`, this.preset === 'auto' ? 'Auto' : NAMES[this.preset]); }
+    if (this.counter >= 3) { const v = R.getDrawingBufferSize(this._v || (this._v = new (this.C.Vector2)())); l.push(`CPU ${(this.fC/this.fN).toFixed(1)} ms · ${v.x}x${v.y}`, `${i.render.calls} draws · ${(i.render.triangles/1e6).toFixed(2)}M tris`, this.preset === 'auto' ? 'Auto' : this.preset === 'custom' ? 'Custom' : NAMES[this.preset]); }
     this.fpsEl.textContent = l.join('\n'); this.fN = 0; this.fT = 0; this.fW = 0; this.fC = 0;
   }
   // the Settings page: sections of its own (Graphics, Audio, Game), the same rows the rest of the menu uses
@@ -138,7 +171,7 @@ export class Graphics {
     const list = (id, pairs) => `<div class="seg" data-g="${id}">${pairs.map(([v, n]) => `<button data-v="${v}">${n}</button>`).join('')}</div>`;
     const row = (l, sub, c, nowId) => `<div class="row g-row"><div class="rl">${l}<small ${nowId ? `data-now="${nowId}"` : ''}>${sub}</small></div><div class="rc">${c}</div></div>`;
     const g = document.createElement('div'); g.className = 'group settings-gfx';
-    g.innerHTML = row('Graphics', 'The whole picture. Auto fits it to your PC as you play, up to Very High', seg('all', NAMES)) +
+    g.innerHTML = row('Graphics', 'The whole picture. Auto fits it to your PC and what else is running, smooth first. Change anything below and it\'s Custom', seg('all', NAMES).replace('</div>', '<button data-v="custom">Custom</button></div>')) +
       '<div class="g-head">Display</div>' +
       row('Frame rate limit', 'Your screen\'s refresh rate is the most any browser will show', list('cap', CAPS.map(v => [v, v ? v + ' FPS' : 'No limit']))) +
       row('Frame counter', 'In the corner of the screen', list('counter', COUNTERS.map((n, i) => [i, n]))) +
