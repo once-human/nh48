@@ -16,14 +16,15 @@ const MODES = { super: ['Strada', 'Sport', 'Corsa'], sports: ['Normal', 'Sport']
 // What each mode does to the car, and they're not subtle. thr: the pedal's map. acc, top: the power it lets through. turn: how
 // sharp the steering is. grip: tyres and how the dampers load them. loose: how soon the back lets go. vol: the exhaust's
 // valves. pops: how often it spits (beta/vehicles/exotic.js). tcs: traction control, off in the last mode of the wild ones.
+// esc: how hard the electronics keep the back in line: all of it in the calm modes, a little play in Sport, in Corsa nearly yours.
 const FX = {
-  super: { Strada: { thr: 0.78, acc: 0.72, top: 0.85, turn: 0.92, grip: 0.98, loose: -0.1, vol: 0.85, pops: 0.15 },
-    Sport: { thr: 0.95, acc: 0.92, top: 0.95, turn: 1.04, grip: 1, loose: 0, vol: 1, pops: 0.7 },
-    Corsa: { thr: 1, acc: 1.2, top: 1.05, turn: 1.18, grip: 1.05, loose: 0.14, vol: 1.3, pops: 1.4, tcs: false } },
-  sports: { Normal: { thr: 0.8, acc: 0.76, top: 0.88, turn: 0.94, grip: 0.98, loose: -0.08, vol: 0.85, pops: 0.2 },
-    Sport: { thr: 1, acc: 1.14, top: 1.03, turn: 1.12, grip: 1.04, loose: 0.12, vol: 1.25, pops: 1.2, tcs: false } },
-  lux: { Comfort: { thr: 0.68, acc: 0.72, top: 0.9, turn: 0.86, grip: 0.97, loose: -0.1, vol: 0.6 },
-    Sport: { thr: 1, acc: 1.14, top: 1.03, turn: 1.08, grip: 1.03, loose: 0.08, vol: 1.15 } },
+  super: { Strada: { esc: 1, thr: 0.78, acc: 0.72, top: 0.85, turn: 0.92, grip: 0.98, loose: -0.1, vol: 0.85, pops: 0.15 },
+    Sport: { esc: 0.65, thr: 0.95, acc: 0.92, top: 0.95, turn: 1.04, grip: 1, loose: 0, vol: 1, pops: 0.7 },
+    Corsa: { esc: 0.3, thr: 1, acc: 1.2, top: 1.05, turn: 1.18, grip: 1.05, loose: 0.14, vol: 1.3, pops: 1.4, tcs: false } },
+  sports: { Normal: { esc: 1, thr: 0.8, acc: 0.76, top: 0.88, turn: 0.94, grip: 0.98, loose: -0.08, vol: 0.85, pops: 0.2 },
+    Sport: { esc: 0.4, thr: 1, acc: 1.14, top: 1.03, turn: 1.12, grip: 1.04, loose: 0.12, vol: 1.25, pops: 1.2, tcs: false } },
+  lux: { Comfort: { esc: 1, thr: 0.68, acc: 0.72, top: 0.9, turn: 0.86, grip: 0.97, loose: -0.1, vol: 0.6 },
+    Sport: { esc: 0.65, thr: 1, acc: 1.14, top: 1.03, turn: 1.08, grip: 1.03, loose: 0.08, vol: 1.15 } },
   xuv: { Zip: { thr: 0.62, acc: 0.65, top: 0.8, turn: 0.94, grip: 0.98, vol: 0.8 }, Zap: { thr: 0.88, acc: 0.88, top: 0.92, turn: 1, grip: 1, vol: 0.95 },
     Zoom: { thr: 1, acc: 1.14, top: 1.03, turn: 1.06, grip: 1.02, vol: 1.15 } },
 };
@@ -41,7 +42,7 @@ V.update = function (dt, inp, traffic) {
   const mode = H.modes && H.modes[this.driveMode || 0], fx = mode && (FX[this.type] || FX[baseOf(this.type)] || {})[mode], tk = (fx && fx.thr) || 1;
   this.tcsOn = H.tcs && !(fx && fx.tcs === false) && thr > 0.8 && sp < 15 && S.acc > 4 && !this.reverse;
   this.hbOn = !!inp.handbrake;
-  this.modePops = fx ? fx.pops ?? 0 : 1; this.modeLoose = fx ? fx.loose || 0 : 0; this.turnMul = fx ? fx.turn || 1 : 1;
+  this.modeEsc = fx ? fx.esc ?? 1 : 0.8; this.modePops = fx ? fx.pops ?? 0 : 1; this.modeLoose = fx ? fx.loose || 0 : 0; this.turnMul = fx ? fx.turn || 1 : 1;
   if (this.W.playerVeh === this) { const A = window.__nhAskG?.audio; if (A) A.modeVol = fx ? fx.vol || 1 : 1; }
   let I = inp;
   if (locked || tk !== 1) { I = { ...inp, throttle: thr*tk }; if (locked) I.steer = (inp.steer || 0)*(S.two ? 0.5 : 0.2); }

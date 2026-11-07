@@ -37,6 +37,8 @@ const _w = new THREE.Vector3();
 function puff(Pl, v, P, s, big) {
   v.tilt.updateWorldMatrix(true, false);
   _w.set(P[2], P[1], s*P[0]).applyMatrix4(v.tilt.matrixWorld);
+  // (that matrix is from when it was last drawn: at 300 km/h the pipe's a metre or more on from there)
+  if (v.root) { _w.x += v.x - v.root.position.x; _w.z += v.z - v.root.position.z; }
   const hx = Math.cos(v.th), hz = Math.sin(v.th), fv = v.v || 0, lv = v.vl || 0, cx = hx*fv - hz*lv, cz = hz*fv + hx*lv;
   const q = Pl.p[Pl.k] || (Pl.p[Pl.k] = {}); Pl.k = (Pl.k + 1)%N;
   const out = (5 + Math.random()*11)*big, a = (Math.random() - 0.5)*0.24, up = Math.random()*0.16 - 0.03, bx = -(hx - hz*a), bz = -(hz + hx*a);
@@ -67,7 +69,9 @@ function fire(v, F, A) {
 const upd = Vehicle.prototype.update;
 Vehicle.prototype.update = function (dt, inp, traffic) {
   const r = upd.call(this, dt, inp, traffic), G = window.__nhAskG, S = this.spec;
-  if (pool && pool.live && dt > 0) tickPool(dt/Math.max(1, pool.ticks || 1));
+  // (once a frame, however many vehicles there are. Once for each of them, the fire went at two or three times your speed and
+  // came out ahead of the car)
+  if (pool && pool.live && dt > 0 && pool.at !== G?.renderer?.info?.render?.frame) { pool.at = G?.renderer?.info?.render?.frame; tickPool(dt); }
   if (this.W.playerVeh !== this || dt <= 0) return r;
   // ---- a slide wears the tyres; the back ones first
   if (!S.two && this.wheels && (this.skidL || 0) > 0.3) {

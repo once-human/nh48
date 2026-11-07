@@ -95,7 +95,10 @@ const PATCHES = {
   [S('game/camera.js')]: [
     // any auto's seat looks down over the dash the same way (not just your own)
     ["const pitch = (p.inAuto ? -0.17 : -0.035)", "const pitch = (p.inAnyAuto ? -0.17 : -0.035)"],
-    ["this.setFov(dt, (p.inAuto ? 78 : 70) + speed * 0.3);", "this.setFov(dt, (p.inAnyAuto ? 78 : 70) + speed * 0.3);"]],
+    ["this.setFov(dt, (p.inAuto ? 78 : 70) + speed * 0.3);", "this.setFov(dt, (p.inAnyAuto ? 78 : 70) + Math.min(speed, 27.8) * 0.3);"],
+    // (the view widens with speed up to 100 km/h and no further: past that it was all fisheye)
+    ["this.setFov(dt, 60 + speed * 0.65);", "this.setFov(dt, 60 + Math.min(speed, 27.8) * 0.65);"],
+    ["this.setFov(dt, 58 + Math.abs(p.v) * 0.8);", "this.setFov(dt, 58 + Math.min(Math.abs(p.v), 27.8) * 0.8);"]],
   [S('game/audio.js')]: [
     // (the smallest buffer the browser can manage leaves the audio thread no room at all: a heavy frame and the sound breaks up. A few
     // hundredths of a second more can't be heard)
@@ -302,6 +305,10 @@ const PATCHES = {
     ["B.board(pu, 1.25, pv - 0.27, 2.8, 1.5,", "B.board(pu, 1.25, pv - 0.3, 2.8, 1.5,"],
   ],
   [S('game/input.js')]: [
+    // (your keys win: a stick resting off centre, or something that only calls itself a gamepad, took the wheel off you and held it)
+    ["if (Math.abs(ax) > 0.12) steer = ", "if (Math.abs(ax) > 0.12 && !left && !right) steer = "],
+    // (a little quicker to the wheel: holding a key took nearly half a second to ask for all the lock)
+    ["(Math.sign(target) !== Math.sign(this.steerKb) ? 6 : 2.6)", "(Math.sign(target) !== Math.sign(this.steerKb) ? 7 : 3.4)"],
     // the pad's Y is the camera, as C is (V is Vetal)
     ["edge(3, 'KeyV');", "edge(3, 'KeyC');"],
   ],

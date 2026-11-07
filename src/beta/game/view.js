@@ -52,6 +52,6 @@ R.updateFoot = function (dt, p) {
   this.pos.set(ex, ey, ez); cam.position.copy(this.pos); cam.up.set(0, 1, 0);
   const cp = Math.cos(pitch);
   this.look.set(ex + cy*cp, ey - Math.sin(pitch), ez + sy*cp); cam.lookAt(this.look);
-  this.setFov(dt, 66 + Math.abs(p.v)*0.6);
+  this.setFov(dt, 66 + Math.min(Math.abs(p.v), 27.8)*0.6);
   this.applyShake(dt);
 };

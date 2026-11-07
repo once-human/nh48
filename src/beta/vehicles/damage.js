@@ -14,6 +14,7 @@ import { Vehicle } from '@orig/vehicles/vehicle.js';
 import { Game } from '@orig/game/game.js';
 import { Arms, ARMS } from '@orig/game/arms.js';
 import { clamp } from '@orig/core/util.js';
+import { baseOf } from './models.js';
 
 const V = Vehicle.prototype;
 const now = () => performance.now()/1000;
@@ -65,7 +66,8 @@ V.dent = function (lx, ly, lz, nx, ny, nz, r, depth) {
   const a = D.body.attributes.position.array, g0 = D.b0; let sum = 0, n = 0;
   for (let i = 0; i < a.length; i += 3) { if (inWheel(wh, g0[i], g0[i + 1], g0[i + 2])) continue; n++; sum += Math.min(0.3, Math.hypot(a[i] - g0[i], a[i + 1] - g0[i + 1], a[i + 2] - g0[i + 2])); }
   const M = n ? sum/n/0.3 : 0, dM = M - (this._dM || 0);
-  if (dM > 0) { this._dM = M; this.dmg = Math.min(0.97, (this.dmg || 0) + dM*3); }
+  // (by how it's built, and a two-wheeler is small enough that one knock moves most of it: that's not most of the way to gone)
+  if (dM > 0) { this._dM = M; this.dmg = Math.min(0.97, (this.dmg || 0) + dM*3*toughOf(this.type)*(this.spec && this.spec.two ? 0.35 : 1)); }
 };
 V.dentDmg = true;
 // how a tyre looks let down: the rubber under the rim squashed down onto the road and bulging out at the sides (you
@@ -255,7 +257,9 @@ V.mend = function () {
 // ---------------------------------------------------------------- crashes
 // (a 911 is the toughest thing on the road for its size, a carbon tub close behind, a big luxury saloon well built; a bus
 // is a bus. Tyres go a little before the body does)
-const TOUGH = { sports: 0.28, super: 0.33, bus: 0.45, lux: 0.6, jeep: 0.8, tempo: 0.8 }, TYRES = { super: 0.5, sports: 0.55, lux: 0.9, jeep: 0.9, bus: 0.7 };
+const TOUGH = { sports: 0.2, super: 0.24, superbike: 0.22, bullet: 0.4, bike: 0.45, bikeP: 0.45, scooter: 0.6, scooterP: 0.6, cycle: 0.6, bus: 0.35, lux: 0.42, jeep: 0.55, fortuner: 0.5, scorpio: 0.55, xuv: 0.55, tempo: 0.6, city: 0.65, nexon: 0.6 }, TYRES = { super: 0.5, sports: 0.55, superbike: 0.55, lux: 0.9, jeep: 0.9, bus: 0.7 };
+// (how much of a blow gets through: the quicker and better built, the less. Everything else takes a little under what it did)
+export const toughOf = (type) => TOUGH[type] ?? TOUGH[baseOf(type)] ?? 0.75;
 const P = V, bounce = P.bounce;
 P.bounce = function (res, ox, oz) {
   const imp = bounce.call(this, res, ox, oz);
@@ -264,10 +268,10 @@ P.bounce = function (res, ox, oz) {
   const felt = this._dv ?? imp;
   if (felt > 3.5 && imp > 0 && res.lx !== undefined && this.bodyMesh && !this.dead && !((this._dT || 0) > now())) {
     this._dT = now() + 0.25;
-    this.dmg = Math.min(0.97, (this.dmg || 0) + felt*felt*0.0009*(this.armorMul ?? 1)*(TOUGH[this.type] ?? 1));
+    this.dmg = Math.min(0.97, (this.dmg || 0) + felt*felt*0.0009*(this.armorMul ?? 1)*(toughOf(this.type)));
     const hx = Math.cos(this.th), hz = Math.sin(this.th), nlx = res.nx*hx + res.nz*hz, nlz = -res.nx*hz + res.nz*hx;
     const bb = this.box(), ly = bb.min.y + (bb.max.y - bb.min.y)*(this.spec.two ? 0.5 : 0.36);
-    const r = clamp(0.35 + felt*0.035, 0.35, 0.95), depth = Math.min(0.28, (felt - 3)*0.022*Math.sqrt(TOUGH[this.type] ?? 1));
+    const r = clamp(0.35 + felt*0.035, 0.35, 0.95)*(this.spec.two ? 0.6 : 1), depth = Math.min(0.28, (felt - 3)*0.022*Math.sqrt(toughOf(this.type)));
     try { this.dent(res.lx, ly, res.lz, nlx, -0.12, nlz, r, depth); } catch (e) { /* drawn as it was */ }
     // a big one on a wheel bends it
     if (felt > 6 && this.wheels) { const w = this.wheels.find(q => Math.hypot(q.x - res.lx, q.z - res.lz) < q.r + 0.45); if (w) this.hurtTyre(w, (felt - 5)*0.085); }

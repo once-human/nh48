@@ -71,7 +71,7 @@ const UP_FS = HEAD + `uniform sampler2D tCol; uniform vec2 px; void main(){ vec3
 const SHAFT_FS = HEAD + `uniform sampler2D tDep; uniform vec2 sun; uniform int samples; float ign(vec2 p){ return fract(52.9829189*fract(dot(p, vec2(.06711056, .00583715)))); }
 void main(){ vec2 d = (sun - vUv)/float(samples)*.85, p = vUv + d*ign(gl_FragCoord.xy); float s = 0., w = 1., W = 0.; for (int i = 0; i < samples; i++) { s += step(.99999, texture(tDep, p).r)*w; W += w; w *= .975; p += d; } float r = length((vUv - sun)*vec2(1.6, 1.)); o = vec4(vec3(s/W*exp(-r*1.6)), 1.); }`;
 
-const FS = HEAD + `uniform sampler2D tCol, tDep, tNoise, tAO, tSSR, tBloom, tShaft; uniform vec2 res, dOff; uniform float giK, dpr, cnear, cfar, time, drunk, inkQ, inkS, paper, film, aerial, bloomK, shaftK, focus, dofR; uniform int dofN, mbN, useAO, useSSR; uniform vec3 fogCol, sunCol, skyCol; uniform mat4 reproj, invVP; uniform float dayK;
+const FS = HEAD + `uniform sampler2D tCol, tDep, tNoise, tAO, tSSR, tBloom, tShaft; uniform vec2 res, dOff; uniform float giK, dpr, cnear, cfar, time, drunk, inkQ, inkS, paper, tear, film, aerial, bloomK, shaftK, focus, dofR; uniform int dofN, mbN, useAO, useSSR; uniform vec3 fogCol, sunCol, skyCol; uniform mat4 reproj, invVP; uniform float dayK;
 float h12(vec2 p){ vec3 q=fract(vec3(p.xyx)*.1031); q+=dot(q,q.yzx+33.33); return fract((q.x+q.y)*q.z); }
 vec2 rot(vec2 p,float a){ float c=cos(a),s=sin(a); return vec2(c*p.x+s*p.y,-s*p.x+c*p.y); }
 float lum(vec3 c){ return dot(c,vec3(.3,.59,.11)); }
@@ -135,7 +135,7 @@ void main(){
   if (paper > 0.) { float pap = fb2(fp*.35)*.8 + h12(floor(fp/1.5))*.2; c *= 1. + (.955 + pap*.075 - 1.)*paper;
     float speck = step(.995, h12(floor(fp/1.6) + 5.)); c = mix(c, c*.78, speck*.5*paper); }
   vec2 v = uv - .5; c *= 1. - dot(v, v)*.28*max(paper, film);
-  if (paper > .75) { float asp = res.x/res.y, dd2 = min(min(uv.x, 1. - uv.x)*asp, min(uv.y, 1. - uv.y)); float rn = fb2(fp*.012)*.7 + nR(fp*.08)*.3;
+  if (tear > .5) { float asp = res.x/res.y, dd2 = min(min(uv.x, 1. - uv.x)*asp, min(uv.y, 1. - uv.y)); float rn = fb2(fp*.012)*.7 + nR(fp*.08)*.3;
     float m = smoothstep(0., .006, dd2 - .014 - (rn - .5)*.03); float pap = fb2(fp*.35)*.8 + h12(floor(fp/1.5))*.2;
     vec3 sheet = vec3(.95, .925, .86)*(.97 + pap*.05); c = mix(sheet, c, m); }
   o = vec4(c, 1.);
@@ -156,7 +156,7 @@ export class Post {
     const res = { value: new THREE.Vector2() }, proj = { value: new THREE.Matrix4() }, invProj = { value: new THREE.Matrix4() };
     this.res = res; this.proj = proj; this.invProj = invProj;
     this.tDep = { value: null }; this.tColU = { value: null };
-    this.U = { giK: { value: 0 }, tCol: this.tColU, tDep: this.tDep, tNoise: PU.tNoise, res, dpr: { value: 1 }, cnear: { value: 0.1 }, cfar: { value: 1000 }, time: { value: 0 }, drunk: { value: 0 }, inkQ: { value: 2 }, inkS: { value: 1 }, paper: { value: 1 }, film: { value: 0 }, aerial: { value: 0 }, bloomK: { value: 0 }, shaftK: { value: 0 }, focus: { value: 8 }, dofR: { value: 8 }, dofN: { value: 0 }, mbN: { value: 0 }, useAO: { value: 0 }, useSSR: { value: 0 }, tAO: { value: null }, tSSR: { value: null }, tBloom: { value: null }, tShaft: { value: null }, dOff: { value: new THREE.Vector2() }, fogCol: PU.fogCol, sunCol: PU.sunCol, skyCol: PU.skyCol, dayK: PU.dayK, reproj: { value: new THREE.Matrix4() }, invVP: { value: new THREE.Matrix4() } };
+    this.U = { giK: { value: 0 }, tCol: this.tColU, tDep: this.tDep, tNoise: PU.tNoise, res, dpr: { value: 1 }, cnear: { value: 0.1 }, cfar: { value: 1000 }, time: { value: 0 }, drunk: { value: 0 }, inkQ: { value: 2 }, inkS: { value: 1 }, paper: { value: 1 }, tear: { value: 0 }, film: { value: 0 }, aerial: { value: 0 }, bloomK: { value: 0 }, shaftK: { value: 0 }, focus: { value: 8 }, dofR: { value: 8 }, dofN: { value: 0 }, mbN: { value: 0 }, useAO: { value: 0 }, useSSR: { value: 0 }, tAO: { value: null }, tSSR: { value: null }, tBloom: { value: null }, tShaft: { value: null }, dOff: { value: new THREE.Vector2() }, fogCol: PU.fogCol, sunCol: PU.sunCol, skyCol: PU.skyCol, dayK: PU.dayK, reproj: { value: new THREE.Matrix4() }, invVP: { value: new THREE.Matrix4() } };
     this.mat = raw(FS, this.U);
     const dep = { tDep: this.tDep, proj, invProj, res };
     this.aoM = raw(AO_FS, { ...dep, tCol: this.tColU, samples: { value: 16 }, rays: { value: 0 }, radius: { value: 1.3 } });

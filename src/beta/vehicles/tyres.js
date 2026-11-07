@@ -74,10 +74,16 @@ Vehicle.prototype.tyres = function (dt, inp, thr) {
   const beta = Math.abs(u0) > 2 ? Math.atan2(this.vl || 0, Math.abs(u0)) : 0;
   // steering the way the car's sliding: your hands go past where it's heading, so a slide one way can be flicked into one
   // the other way without getting speed up again (at speed the lock was too small for the wheels ever to get past the slide)
-  const flick = (inp.steer || 0)*beta*Math.sign(u0 || 1) > 0 && Math.abs(beta) > 0.06;
+  // (only if you've let it go on purpose: the handbrake, or a mode that lets you. This was on for everything from 3 degrees out,
+  // so left then right on the keys in Strada threw a Huracan 45 degrees sideways, and you pressed keys while it skated)
+  const esc = (hb ? 0 : this.modeEsc ?? 0.8)*(off || tyreE > 1.5 ? 0.5 : 1);
+  const flick = (inp.steer || 0)*beta*Math.sign(u0 || 1) > 0 && Math.abs(beta) > 0.1 && (hb || esc < 0.5);
   const hbL = hb && !flick;
   const maxSteer = maxSteer0*(1 + L*0.5) + (flick ? Math.abs(beta)*1.15 : 0);
-  const assist = (hb ? 0.3 : 0.7 - 0.3*Math.abs(inp.steer || 0))*(1 - L*0.5);
+  // (your hands come first. At speed the lock is small, so this help could outweigh everything you asked for: after any slide
+  // or a knock sideways the wheel sat where it wanted until the slide died, and pressing the other way did nothing)
+  const against = (inp.steer || 0)*beta*Math.sign(u0 || 1) < 0, asked = Math.abs(inp.steer || 0);
+  const assist = (hb ? 0.3 : 0.7*(1 - (against ? 0.92 : 0.5)*asked))*(1 - L*0.5);
   const target = clamp(clamp(inp.steer || 0, -1, 1)*maxSteer + beta*assist*Math.sign(u0 || 1), -S.steerMax, S.steerMax);
   // (a keypress is all or nothing, so the wheel takes a fifth of a second to whatever lock this speed allows, however fast you're
   // going: at speed that's a small lock, and snapped on it was a whip of the nose, then the turn sagging. Quick hands catching a
@@ -95,14 +101,14 @@ Vehicle.prototype.tyres = function (dt, inp, thr) {
   const push = Math.max(0, thr)*S.acc*(this.accMul || 1)*Math.max(0, 1 - Math.pow(Math.max(0, u)/(S.vTop*(this.powerMul ?? 1)), 3))*m;
   const pF = drive === 'F' ? push : drive === 'A' ? push*(base === 'super' ? 0.28 : 0.45) : 0, pR = push - pF;
   for (let i = 0; i < n; i++) {
-    const tr = clamp(m*ax*h/wb, -m*G*0.45, m*G*0.45);
+    const tr = clamp(m*ax*h/wb, -m*G*0.45, m*G*0.08);        // (flat out the nose stays on the road: it went so light the car wouldn't turn)
     const Fzf = Math.max(0.1*m*G, m*G*b/wb - tr), Fzr = Math.max(0.1*m*G, m*G*a/wb + tr);
     // front: the slip of the steered wheels
     const vfx = u, vfy = s + a*w, lonF = vfx*cd + vfy*sd, latF = -vfx*sd + vfy*cd;
     const alF = Math.atan2(latF, Math.max(0.5, Math.abs(lonF)));
     // (a driven axle can't push harder than its tyres hold, and spinning them still leaves some grip to the side:
     // the back steps out under power and stays catchable)
-    const qF = Math.min(pF, 0.9*mu*Fzf), capF = Math.sqrt(Math.max((0.45*mu*Fzf)**2, (mu*Fzf)**2 - qF*qF));
+    const qF = Math.min(pF, 0.9*mu*Fzf), capF = Math.sqrt(Math.max((0.9*mu*Fzf)**2, (mu*Fzf)**2 - qF*qF));
     const Fyf = -capF*MF(alF, Bf, Cf);
     // rear: rolling, or locked by the handbrake (then it slides, all of its grip against the way it's moving)
     const vry = s - b*w;
@@ -115,7 +121,7 @@ Vehicle.prototype.tyres = function (dt, inp, thr) {
       Fxr = -k*u/vr; Fyr = -k*vry/vr; slideR = 1;
     } else {
       const alR = Math.atan2(vry, Math.max(0.5, Math.abs(u)));
-      const qR = Math.min(pR, 0.9*muR*Fzr), capR = Math.sqrt(Math.max((0.45*muR*Fzr)**2, (muR*Fzr)**2 - qR*qR))*(hbSoft && !tw ? 0.8 : hb ? 0.7 : 1);
+      const qR = Math.min(pR, (0.9 - 0.5*esc)*muR*Fzr), capR = Math.sqrt(Math.max((0.45*muR*Fzr)**2, (muR*Fzr)**2 - qR*qR))*(hbSoft && !tw ? 0.8 : hb ? 0.7 : 1);
       Fyr = -capR*MF(alR, Br, Cr);
       slipR = Math.max(slipR, Math.abs(alR));
     }
@@ -131,7 +137,11 @@ Vehicle.prototype.tyres = function (dt, inp, thr) {
     if (sl > 0 && !hbL) dw -= (w - u*Math.tan(d)/wb)*(hbSlip > 0 ? 3 : 9)*sl*(1 - L*0.7)*(flick ? 0.25 : 1);
     // no snap: turning never runs past what the tyres can actually hold at this speed (a driver feeling it)
     if (!hb && !flick && Math.abs(u) > 6) { const wMax = mu*G*((1.12 + (AGILE[base] || 0))*(this.turnMul || 1) + L*0.9)/Math.abs(u); if (Math.abs(w) > wMax) dw -= (w - Math.sign(w)*wMax)*60*(1 - L*0.6); }
-    const du = (-Fyf*sd + Fxr)/m + s*w, ds = (Fyf*cd + Fyr)/m - u*w;
+    // the car's electronics: past the slip this mode allows, the turning's pulled to what the wheels ask and the sideways speed
+    // bled off (a brake on one corner, the way the real thing does it). You keep the corner; the back doesn't come round
+    let bleed = 0;
+    if (esc > 0 && !hbL && Math.abs(u) > 3) { const ex = Math.abs(bt) - lerp(0.34, 0.05, esc); if (ex > 0) { const ek = 0.35 + 0.65*esc; dw -= (w - u*Math.tan(d)/wb)*30*ek; bleed = s*Math.min(1, ex*18)*ek*14; } }
+    const du = (-Fyf*sd + Fxr)/m + s*w, ds = (Fyf*cd + Fyr)/m - u*w - bleed;
     u += du*hs; s += ds*hs; w += dw*hs;
     // slow, the tyres just roll where they point (no slip worth the name; and no jitter about zero), and the car turns
     // about its back axle the way a car does: the back wheels roll straight and the nose swings. (It turned about its

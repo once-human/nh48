@@ -7,7 +7,7 @@ import { Traffic } from '@orig/traffic/traffic.js';
 import { Vehicle, knock } from '@orig/vehicles/vehicle.js';
 import { Pilot } from '@orig/game/pilot.js';
 import { PlayerAuto } from '@orig/vehicles/player.js';
-import { promote } from './damage.js';
+import { promote, toughOf } from './damage.js';
 
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const now = () => performance.now()/1000, G0 = () => window.__nhAskG;
@@ -87,7 +87,7 @@ function struck(v, cx, cz, dirx, dirz, dv, m2) {
   if (dv > 3 && v.dent) {
     const bb = v.box(), ly = bb.min.y + (bb.max.y - bb.min.y)*0.36;
     try { v.dent(lx, ly, lz, nx, -0.12, nz, clamp(0.35 + dv*0.04, 0.35, 0.95), Math.min(0.28, (dv - 3)*0.024)); } catch (e) { /* drawn as it was */ }
-    v.dmg = Math.min(0.97, (v.dmg || 0) + dv*dv*0.0009*(v.armorMul ?? 1));
+    v.dmg = Math.min(0.97, (v.dmg || 0) + dv*dv*0.0009*(v.armorMul ?? 1)*toughOf(v.type));
   }
   return clamp(dv*(lx*nz - lz*nx)*12/(S.L*S.L + S.W*S.W), -3.5, 3.5);
 }
