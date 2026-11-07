@@ -1,3 +1,4 @@
+import { StaticDrawUsage } from 'three';
 // What the camera can see from above, for anything drawn as a list of instances: three can't leave out one instance
 // of many, so whatever was on the list was drawn, all round you. A thing near you stays in whichever way you're looking
 // (its shadow can still fall in front of you); past that it has to be inside the view, with room to spare for its own
@@ -23,3 +24,11 @@ export const view = {
 };
 // only the part of a list that's in use goes to the graphics card (each whole list, every time, was most of the uploads)
 export function ranged(a, n) { a.clearUpdateRanges(); a.addUpdateRange(0, n*a.itemSize); a.needsUpdate = true; }
+// the graphics card has it now: a street's geometry doesn't need a second copy in JS, all it did was fill the heap
+// (not what still changes: a board's light (aGlow) goes up again when its shutter moves. A lost context reloads the page)
+const drop = function () { this.array = new this.array.constructor(0); };
+export function letGo(g) {
+  if (g.userData.shared) return;
+  for (const k in g.attributes) { const a = g.attributes[k]; if (k !== 'aGlow' && a.isBufferAttribute && a.usage === StaticDrawUsage) a.onUpload(drop); }
+  if (g.index) g.index.onUpload(drop);
+}

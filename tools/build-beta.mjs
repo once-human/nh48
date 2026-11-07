@@ -60,7 +60,9 @@ const PATCHES = {
   [S('game/garageui.js')]: [["[tog('xenon', cyc ? 'LED lamp' : 'Xenon headlights', 'Cold white, reaches further', $(2500)), ...(cyc ? [] : [", "[...(cyc ? [] : [tog('xenon', 'Xenon headlights', 'Cold white, reaches further', $(2500)), "], ["(this.mine ? 'Your ' : '') + here.spec.name.toLowerCase();", "(this.mine ? 'Your ' : '') + (here.spec.real || here.spec.name);"]],
   [S('ui/jhola.js')]: [["if (this.queue.length && G.state === 'play') this.renderOne();", "if (this.queue.length && G.state === 'play' && (G.player.onFoot || Math.abs(G.player.cur.v || 0) < 2.5)) this.renderOne();"], ["name: 'Your ' + (v.spec && v.spec.name ? v.spec.name.toLowerCase() : 'vehicle') }", "name: 'Your ' + (v.spec ? v.spec.real || v.spec.name || 'vehicle' : 'vehicle') }"]],
   // compound walls along the roads: not Pune, Onkar wants them gone. Neither drawn nor solid (the city's edge wall is separate)
-  [S('world/index.js')]: [["for (const w of D.walls) put('walls', at(w[0] / 100, w[1] / 100), cmRing(w));", "/* /beta: no compound walls */"]],
+  [S('world/index.js')]: [["import TRANSIT from", "import { letGo } from '../beta/world/view.js';\nimport TRANSIT from"],
+    ["g.traverse(o => { if (o.isMesh || o.isLine) { o.matrixAutoUpdate = false; o.updateMatrix(); } });", "g.traverse(o => { if (o.isMesh || o.isLine) { o.matrixAutoUpdate = false; o.updateMatrix(); if (!o.isInstancedMesh && o.geometry) letGo(o.geometry); } });"],
+    ["for (const w of D.walls) put('walls', at(w[0] / 100, w[1] / 100), cmRing(w));", "/* /beta: no compound walls */"]],
   [S('world/world.js')]: [
     ["for (const B of M.buildings) W.collision.addRing(cmRing(B[1]), 0);", "for (const B of M.buildings) buildingSolid(B, cmRing(B[1]), W.collision);"],
     ["import { cmRing", "import { buildingSolid } from '../beta/world/solids.js';\nimport { cmRing"]],

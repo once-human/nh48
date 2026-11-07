@@ -10,7 +10,7 @@ import './core/storage.js';         // /beta's saves and settings live apart fro
 import './gfx/legacy.js';           // the look for everything still drawn with three's materials (before any is made)
 import '@orig/gfx/painted.js';
 import '@orig/game/keys.js';        // key rebinding: its listener goes first
-import { Loader, stripToArray, bitmapTexture, upgradeArray } from '@orig/core/assets.js';
+import { Loader, bitmapTexture } from '@orig/core/assets.js';
 import { buildWorld, updateWorldMaterials } from '@orig/world/world.js';
 import { updateProps } from '@orig/world/propsChunk.js';
 import { Sky } from '@orig/gfx/sky.js';
@@ -215,8 +215,6 @@ const ASSETS = {
   map: 'assets/map.gz.txt',
   // the ground and wall textures start small (a quarter size, 0.2 MB) and are swapped for the sharp ones once
   // you're playing
-  gAlb: 'assets/tex/ground_alb_lo.webp', gNrm: 'assets/tex/ground_nrm_lo.webp', gArm: 'assets/tex/ground_arm_lo.webp',
-  wAlb: 'assets/tex/wall_alb_lo.webp', wNrm: 'assets/tex/wall_nrm_lo.webp', wArm: 'assets/tex/wall_arm_lo.webp',
   bark: 'assets/tex/bark_brown_02_diff.webp', barkN: 'assets/tex/bark_brown_02_nor.webp', palm: 'assets/tex/palm_bark_diff.webp',
   // models ship gzipped
   peopleM: 'assets/people/people_m.glb.gz', peopleF: 'assets/people/people_f.glb.gz',
@@ -293,9 +291,8 @@ async function main() {
     const u = new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
     const [w, h] = new Uint32Array(u.buffer, 0, 2); return { w, h, data: u.subarray(8) };
   }).catch(() => null);
-  const [M, gAlb, gNrm, gArm, wAlb, wNrm, wArm, bark, barkN, palm] = await Promise.all([
-    PUNE ? loader.bytes(ASSETS.map).then(async (b) => cityFromBase(JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text()))) : loader.json(ASSETS.map), loader.bitmap(ASSETS.gAlb), loader.bitmap(ASSETS.gNrm), loader.bitmap(ASSETS.gArm),
-    loader.bitmap(ASSETS.wAlb), loader.bitmap(ASSETS.wNrm), loader.bitmap(ASSETS.wArm),
+  const [M, bark, barkN, palm] = await Promise.all([
+    PUNE ? loader.bytes(ASSETS.map).then(async (b) => cityFromBase(JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text()))) : loader.json(ASSETS.map),
     loader.bitmap(ASSETS.bark), loader.bitmap(ASSETS.barkN), loader.bitmap(ASSETS.palm)]);
   await sndJob;
   let kit = null;
@@ -309,12 +306,9 @@ async function main() {
   await progress('Preparing materials', 0.62);
   const tm = quality.texMax;
   const T = {
-    groundAlb: stripToArray(gAlb, { srgb: true, maxSize: tm, anisotropy: 8 }), groundNrm: stripToArray(gNrm, { maxSize: tm, anisotropy: 8 }), groundArm: stripToArray(gArm, { maxSize: tm }),
-    wallAlb: stripToArray(wAlb, { srgb: true, maxSize: tm }), wallNrm: stripToArray(wNrm, { maxSize: tm }), wallArm: stripToArray(wArm, { maxSize: tm }),
     bark: bitmapTexture(bark), barkN: bitmapTexture(barkN, { srgb: false }), palm: bitmapTexture(palm),
     leaves: await leavesJob,
   };
-  for (const b of [gAlb, gNrm, gArm, wAlb, wNrm, wArm]) b.close?.();
 
   // the new look's materials exist before the world is built (its builders draw with them)
   const paint = new Paint(renderer);
@@ -411,9 +405,6 @@ async function main() {
   if (!TEST) {
     await progress('Getting the city ready', 0.965);
     await Promise.all(SOUNDS.map(async (n) => { try { const b = await new Loader(() => {}).bytes(sndUrl(n)); game.audio.addRaw(n, b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)); } catch (e) { /* plays without it */ } }));
-    for (const [k, url] of [['groundAlb', 'ground_alb'], ['groundNrm', 'ground_nrm'], ['groundArm', 'ground_arm'], ['wallAlb', 'wall_alb'], ['wallNrm', 'wall_nrm'], ['wallArm', 'wall_arm']]) {
-      try { const b = await new Loader(() => {}).bitmap(`assets/tex/${url}.webp`); upgradeArray(T[k], b, { maxSize: quality.texMax }); b.close?.(); } catch (e) { /* stays soft */ }
-    }
     game.texUpgraded = true;
     try { W.trees.sharpenLeaves(); } catch (e) { /* keep the soft ones */ }
     await progress('Getting the people ready', 0.975);
@@ -444,9 +435,6 @@ async function main() {
     const bg = new Loader(() => {});
     if (game.texUpgraded) return;               // (done during loading)
     await Promise.all(SOUNDS.map(async (n) => { try { const b = await bg.bytes(sndUrl(n)); game.audio.addRaw(n, b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)); } catch (e) { /* plays without it */ } }));
-    for (const [k, url] of [['groundAlb', 'ground_alb'], ['groundNrm', 'ground_nrm'], ['groundArm', 'ground_arm'], ['wallAlb', 'wall_alb'], ['wallNrm', 'wall_nrm'], ['wallArm', 'wall_arm']]) {
-      try { const b = await bg.bitmap(`assets/tex/${url}.webp`); upgradeArray(T[k], b, { maxSize: quality.texMax }); b.close?.(); } catch (e) { /* stays soft */ }
-    }
   })();
 
   const frustum = new THREE.Frustum(), pv = new THREE.Matrix4();

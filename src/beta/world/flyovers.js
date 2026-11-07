@@ -16,7 +16,22 @@ const PARAPET_H = 0.95, DECK_T = 1.1;
 Flyovers.prototype.build = function (scene, mats) {
   const cbs = new Map();
   let cb = null;
-  const rec = () => { const ops = []; return { ops, addGeo: (g, m, col) => ops.push([g, m.clone(), col]) }; };
+  // half a million boxes for all of Pune, kept until you come near each piece: held as plain floats, not an
+  // object and a matrix for every box (that alone was 130 MB of the heap from the title screen on)
+  const rec = () => {
+    let a = new Float32Array(15*64), n = 0;
+    return {
+      addGeo: (g, m, col) => {
+        if (n + 15 > a.length) { const b = new Float32Array(a.length*2); b.set(a); a = b; }
+        const e = m.elements; a[n] = e[0]; a[n + 1] = e[1]; a[n + 2] = e[2]; a[n + 3] = e[4]; a[n + 4] = e[5]; a[n + 5] = e[6]; a[n + 6] = e[8]; a[n + 7] = e[9]; a[n + 8] = e[10]; a[n + 9] = e[12]; a[n + 10] = e[13]; a[n + 11] = e[14];
+        a[n + 12] = col[0]; a[n + 13] = col[1]; a[n + 14] = col[2]; n += 15;
+      },
+      ops() {
+        const d = a.slice(0, n); a = null;
+        return { *[Symbol.iterator]() { const m = new THREE.Matrix4(), col = [0, 0, 0]; for (let i = 0; i < d.length; i += 15) { m.set(d[i], d[i + 3], d[i + 6], d[i + 9], d[i + 1], d[i + 4], d[i + 7], d[i + 10], d[i + 2], d[i + 5], d[i + 8], d[i + 11], 0, 0, 0, 1); col[0] = d[i + 12]; col[1] = d[i + 13]; col[2] = d[i + 14]; yield [box, m, col]; } } };
+      },
+    };
+  };
   const at = (x, z) => { const k = Math.floor(x / BIN) + ',' + Math.floor(z / BIN); let c = cbs.get(k); if (!c) cbs.set(k, c = rec()); cb = c; };
   const box = new THREE.BoxGeometry(1, 1, 1);
   const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0), E = new THREE.Euler();
@@ -93,6 +108,6 @@ Flyovers.prototype.build = function (scene, mats) {
   }
   this.parts = [];
   this.scene = scene; this.mat = mats.prop;
-  for (const [k, c] of cbs) { const [i, j] = k.split(',').map(Number); this.parts.push({ ops: c.ops, mesh: null, x: (i + 0.5)*BIN, z: (j + 0.5)*BIN }); }
+  for (const [k, c] of cbs) { const [i, j] = k.split(',').map(Number); this.parts.push({ ops: c.ops(), mesh: null, x: (i + 0.5)*BIN, z: (j + 0.5)*BIN }); }
   this.lastX = 1e9; this.lastZ = 1e9;
 };
