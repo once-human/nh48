@@ -154,7 +154,7 @@ function tune(A, V, k) {
   const dr = V.w ? 1 + (C.drive - 1)*0.5 : C.drive;
   const c = new Float32Array(512); for (let i = 0; i < 512; i++) { const x = i/256 - 1; c[i] = Math.tanh(x*dr)/Math.tanh(dr); }
   V.shaper.curve = c;
-  V.nbp.frequency.setValueAtTime(C.nf, t);
+  if (V.nbp) V.nbp.frequency.setValueAtTime(C.nf, t);     // (only the older synth has a noise band; the worklet makes its own)
   V.f1.frequency.setValueAtTime(C.f1[0], t); V.f1.Q.setValueAtTime(C.f1[1], t); V.f1.gain.setValueAtTime(C.f1[2], t);
   V.f2.frequency.setValueAtTime(C.f2[0], t); V.f2.Q.setValueAtTime(C.f2[1], t); V.f2.gain.setValueAtTime(C.f2[2], t);
 }
