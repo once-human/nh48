@@ -32,6 +32,7 @@ import './vehicles/crawl.js';         // never stuck: a crawl either way whateve
 import './vehicles/brakes.js';        // each vehicle's own brakes; ABS, traction control and drive modes only where they're real
 import './vehicles/exotic.js';        // a supercar's flames; slides wear tyres away
 import './vehicles/auto3w.js';        // an auto corners on two wheels, and goes over, instead of sliding
+import './vehicles/wheels.js';        // wheels that go round and turn
 import './vehicles/lamps.js';         // brake and reverse lamps that answer the pedals, yours and everyone's
 import './vehicles/potholes.js';      // potholes jolt each kind of vehicle its own way
 import './people/stalls.js';          // stall keepers keep to their stalls

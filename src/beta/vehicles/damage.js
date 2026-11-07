@@ -15,6 +15,7 @@ import { Game } from '@orig/game/game.js';
 import { Arms, ARMS } from '@orig/game/arms.js';
 import { clamp } from '@orig/core/util.js';
 import { baseOf } from './models.js';
+import { tyreOnRay } from './wheels.js';
 
 const V = Vehicle.prototype;
 const now = () => performance.now()/1000;
@@ -25,11 +26,16 @@ V.own = function () {
   if (this._dg && B.geometry === this._dg.view) return this._dg;
   // (a two-wheeler draws its body as two meshes over one set of vertices, the front end turning with the bars,
   // beta/vehicles/steerfront.js: the copy is of all of it, and each mesh draws its own triangles of the copy)
-  const F = this._fr, body = (F ? F.full : B.geometry).clone();
+  const F = this._fr, W4 = this._wh4, body = (F ? F.full : W4 ? W4.src : B.geometry).clone();
   let view = body;
   if (F) {
     const on = (src) => { const g = new THREE.BufferGeometry(); for (const k of Object.keys(body.attributes)) g.setAttribute(k, body.attributes[k]); g.setIndex(src.index); g.boundingSphere = body.boundingSphere; return g; };
     view = on(B.geometry); F.mesh.geometry = on(F.mesh.geometry); if (F.stand) F.stand.geometry = on(F.stand.geometry);
+  }
+  // (a car's wheels are drawn the same way: beta/vehicles/wheels.js)
+  if (W4) {
+    const on = (src) => { const g = new THREE.BufferGeometry(); for (const k of Object.keys(body.attributes)) g.setAttribute(k, body.attributes[k]); g.setIndex(src.index); g.boundingSphere = src.boundingSphere; return g; };
+    view = on(B.geometry); for (const w of W4.list) w.m.geometry = on(w.m.geometry);
   }
   B.geometry = view; B.userData.ownGeo = true;
   let glass = null;
@@ -335,6 +341,8 @@ function shotAt(G, best, o3, d3) {
   v.root.updateMatrixWorld(true);
   ray.set(o3, d3); ray.far = 80;
   const hits = ray.intersectObjects([v.bodyMesh, v.glassMesh].filter(Boolean), false);
+  const tyre = tyreOnRay(v, ray, hits.length ? hits[0].distance : 80);
+  if (tyre) { if (v.hurtTyre(tyre, 0.55) && G.hud && G.hud.toast && G.player.cur === v) G.hud.toast('Tyre', 'One of your tyres is gone', 'bad', 2); return; }
   if (!hits.length) return;
   const h = hits[0], m = h.object;
   m.worldToLocal(_l.copy(h.point));
