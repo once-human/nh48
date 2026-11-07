@@ -30,6 +30,7 @@ import './vehicles/damage.js';        // dents where it's hit, holes where it's 
 import './vehicles/crash.js';          // crashes by weight and speed: the heavier carries on, the lighter is thrown
 import './vehicles/crawl.js';         // never stuck: a crawl either way whatever state it's in
 import './vehicles/brakes.js';        // each vehicle's own brakes; ABS, traction control and drive modes only where they're real
+import './vehicles/exotic.js';        // a supercar's flames; slides wear tyres away
 import './vehicles/auto3w.js';        // an auto corners on two wheels, and goes over, instead of sliding
 import './vehicles/lamps.js';         // brake and reverse lamps that answer the pedals, yours and everyone's
 import './vehicles/potholes.js';      // potholes jolt each kind of vehicle its own way

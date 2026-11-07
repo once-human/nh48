@@ -31,9 +31,10 @@ V.update = function (dt, inp, traffic) {
   let I = inp;
   if (locked || tk !== 1) { I = { ...inp, throttle: thr*tk }; if (locked) I.steer = (inp.steer || 0)*(S.two ? 0.5 : 0.2); }
   // (a locked tyre grips less than one still rolling)
-  const bm = this.brakeMul; if (locked) this.brakeMul = (bm || 1)*0.82;
+  const bm = this.brakeMul, gm = this.gripMul; if (locked) this.brakeMul = (bm || 1)*0.82;
+  if (this.flatN) this.gripMul = (gm || 1)*(1 - 0.2*Math.min(2, this.flatN));          // (on a flat, the back lets go far sooner)
   const r = upd.call(this, dt, I, traffic);
-  this.brakeMul = bm;
+  this.brakeMul = bm; this.gripMul = gm;
   // what the road and your ears get: a lock, a hard ABS stop from speed, a slide
   const dr = this.drift || 0, lvl = Math.max(locked ? 1 : 0, this.absOn && sp > 22 ? 0.4 : 0, dr > 0.2 ? dr : 0, this.hbOn && sp > 8 ? 0.7 : 0)*clamp((sp - 2)/4, 0, 1);
   this.skidL = lvl;

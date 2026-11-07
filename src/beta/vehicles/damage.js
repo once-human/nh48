@@ -111,7 +111,7 @@ V.flatWheel = function (w) {
 // it's gone (returns true when this one finished it)
 V.hurtTyre = function (w, k) {
   if (!w || this.noFlat || (this._flats && this._flats.has(w))) return false;
-  const hp = (this._thp || (this._thp = new Map())), left = (hp.has(w) ? hp.get(w) : 1) - k;
+  const hp = (this._thp || (this._thp = new Map())), left = (hp.has(w) ? hp.get(w) : 1) - k*(TYRES[this.type] ?? 1);
   hp.set(w, left);
   if (left > 0) return false;
   this.flatWheel(w); return true;
@@ -253,6 +253,8 @@ V.mend = function () {
 };
 
 // ---------------------------------------------------------------- crashes
+// (a carbon tub takes twice what a Swift does; a bus is a bus. Tyres likewise)
+const TOUGH = { super: 0.5, sports: 0.6, bus: 0.45, lux: 0.85, jeep: 0.8, tempo: 0.8 }, TYRES = { super: 0.55, sports: 0.65, jeep: 0.8, bus: 0.6 };
 const P = V, bounce = P.bounce;
 P.bounce = function (res, ox, oz) {
   const imp = bounce.call(this, res, ox, oz);
@@ -261,10 +263,10 @@ P.bounce = function (res, ox, oz) {
   const felt = this._dv ?? imp;
   if (felt > 3.5 && imp > 0 && res.lx !== undefined && this.bodyMesh && !this.dead && !((this._dT || 0) > now())) {
     this._dT = now() + 0.25;
-    this.dmg = Math.min(0.97, (this.dmg || 0) + felt*felt*0.0009*(this.armorMul ?? 1));
+    this.dmg = Math.min(0.97, (this.dmg || 0) + felt*felt*0.0009*(this.armorMul ?? 1)*(TOUGH[this.type] ?? 1));
     const hx = Math.cos(this.th), hz = Math.sin(this.th), nlx = res.nx*hx + res.nz*hz, nlz = -res.nx*hz + res.nz*hx;
     const bb = this.box(), ly = bb.min.y + (bb.max.y - bb.min.y)*(this.spec.two ? 0.5 : 0.36);
-    const r = clamp(0.35 + felt*0.035, 0.35, 0.95), depth = Math.min(0.28, (felt - 3)*0.022);
+    const r = clamp(0.35 + felt*0.035, 0.35, 0.95), depth = Math.min(0.28, (felt - 3)*0.022*Math.sqrt(TOUGH[this.type] ?? 1));
     try { this.dent(res.lx, ly, res.lz, nlx, -0.12, nlz, r, depth); } catch (e) { /* drawn as it was */ }
     // a big one on a wheel bends it
     if (felt > 7 && this.wheels) { const w = this.wheels.find(q => Math.hypot(q.x - res.lx, q.z - res.lz) < q.r + 0.45); if (w) this.hurtTyre(w, (felt - 6)*0.08); }

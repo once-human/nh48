@@ -24,8 +24,8 @@ const CLS = {
   i4t: { cyl: 4, idle: 750, red: 6500, h: 1.1, sub: 0.06, nz: 0.1, nf: 3600, f1: [130, 2, 6], f2: [520, 2, 3], lp: [320, 1700], drive: 1.1, vol: 0.036 },
   diesel4: { cyl: 4, idle: 750, red: 4200, h: 0.8, sub: 0.15, nz: 0.3, nf: 2800, f1: [120, 2, 7], f2: [900, 3, 5], lp: [300, 1200], drive: 1.9, vol: 0.05 },
   diesel6: { cyl: 6, idle: 600, red: 2500, h: 0.75, sub: 0.18, nz: 0.34, nf: 2400, f1: [90, 2.5, 9], f2: [700, 3, 5], lp: [240, 900], drive: 2.0, vol: 0.06 },
-  v8: { cyl: 8, idle: 850, red: 7200, h: 0.8, sub: 0.45, nz: 0.12, nf: 2200, f1: [160, 2, 8], f2: [600, 2, 5], lp: [400, 3200], drive: 2.0, vol: 0.05 },
-  v10: { cyl: 10, idle: 1000, red: 8500, h: 0.85, sub: 0.25, nz: 0.1, nf: 3000, f1: [260, 2, 7], f2: [900, 2, 6], lp: [550, 4500], drive: 1.9, vol: 0.05 },
+  v8: { cyl: 8, idle: 850, red: 7200, h: 0.8, sub: 0.45, nz: 0.12, nf: 2200, f1: [160, 2, 8], f2: [600, 2, 5], lp: [400, 3200], drive: 2.0, vol: 0.08, swell: 1.3 },
+  v10: { cyl: 10, idle: 1000, red: 8500, h: 0.85, sub: 0.25, nz: 0.1, nf: 3000, f1: [260, 2, 7], f2: [900, 2, 6], lp: [550, 4500], drive: 1.9, vol: 0.095, swell: 1.5 },
 };
 // the firing itself (beta: an AudioWorklet, below): ev, where in the two turns of the crank each cylinder fires (0..1);
 // amp, how hard each one (a V8's two banks into their pipes give the lope); dec, how fast a pulse dies (s); nz, how
@@ -62,8 +62,8 @@ const LAY = {
   i4t: { age: [0, 0.3], rattle: 0, rr: 1, rw: 1, tick: 0.002, whine: 0.009, whR: 21, roar: 0.012, roarF: 650 },
   diesel4: { age: [0.2, 0.9], rattle: 0.05, rr: 950, rw: 300, tick: 0.04, whine: 0.014, whR: 8, roar: 0.012, roarF: 420 },
   diesel6: { age: [0.3, 1], rattle: 0.1, rr: 750, rw: 220, tick: 0.03, whine: 0.04, whR: 4, roar: 0.02, roarF: 320 },
-  v8: { age: [0, 0.25], rattle: 0, rr: 1, rw: 1, tick: 0.003, whine: 0.004, whR: 6, roar: 0.32, roarF: 800, crk: 9 },
-  v10: { age: [0, 0.15], rattle: 0, rr: 1, rw: 1, tick: 0.003, whine: 0.006, whR: 6, roar: 0.48, roarF: 1250, crk: 12 },
+  v8: { age: [0, 0.25], rattle: 0, rr: 1, rw: 1, tick: 0.003, whine: 0.004, whR: 6, roar: 0.85, roarF: 800, crk: 9 },
+  v10: { age: [0, 0.15], rattle: 0, rr: 1, rw: 1, tick: 0.003, whine: 0.006, whR: 6, roar: 1.3, roarF: 1250, crk: 12 },
 };
 // no two alike: each vehicle's engine is its kind with its own pipe, its own unevenness, and whatever age has done to it
 const selves = new Map();
@@ -208,7 +208,7 @@ function drive(A, V, k, r, load, gain, seed = 0) {
     // (the worklet smooths both itself; here only where they're headed)
     V.rpm.setTargetAtTime(rpm*rate, t, 0.04); V.load.setTargetAtTime(load, t, 0.08);
     V.lp.frequency.setTargetAtTime((C.lp[0] + C.lp[1]*(0.35*r + 0.65*load*(0.4 + r)))*(loud > 1 ? 0.8 : 1), t, 0.12);
-    V.out.gain.setTargetAtTime(gain*C.vol*1.25*(0.6 + 0.25*r + 0.3*load)*loud, t, 0.12);
+    V.out.gain.setTargetAtTime(gain*C.vol*1.25*(0.6 + 0.25*r + 0.3*load)*(C.swell ? 0.55 + C.swell*load*(0.5 + r) : 1)*loud, t, 0.12);
     return;
   }
   // four-stroke: each cylinder fires once every two turns; a touch of wander, an engine's never metronomic

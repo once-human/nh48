@@ -1211,6 +1211,8 @@ function exotic(b, spec, kind) {
     for (const s of [-1, 1]) {
       onEnd(-1, s*.42, s*.72, .735, .765, GLOW(TAIL, .9), { nu: 5, nv: 1, off: .018 });
       onEnd(-1, s*.52, s*.72, 0, 0, GLOW(TAIL, .9), { yb: (u) => lerp(.72, .67, u), yt: (u) => lerp(.74, .69, u), nu: 3, nv: 1, off: .018 });
+      // (standing proud of the mesh, so they can be seen lit: the top bar red, the amber under it)
+      rbox(b, -2.3, .725, s*.42, -2.255, .775, s*.73, TAIL, 0, 1); rbox(b, -2.295, .655, s*.5, -2.25, .69, s*.73, AMBER, 0, 1);
       const z = s*.4; rod(b, [-2.05, .5, z], [-2.29, .5, z], .058, CHROME, HUB_G); b.addGeo(G.circle, M(-2.291, .5, z, .05, .05, 1, 0, -Math.PI/2), DARK);
     }
     onEnd(-1, -.8, .8, .28, .46, BLACKED, { nu: 10, nv: 2, off: .012 });
