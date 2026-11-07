@@ -359,7 +359,7 @@ export function powers(G) {
   function release(h, x, z, how, D) {
     HB.leave(P());
     const p = ppl().spawnAt(h.look, x, z, h.persona);
-    if (p) G.police?.hostOut?.(p);
+    G.police?.hostOut?.(p);
     if (!p) return;
     if (h.cop) p.cop = true; if (h.name) p.name = h.name;
     p.id = h.id; p.female = h.female; p.yaw = yaw(); p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);

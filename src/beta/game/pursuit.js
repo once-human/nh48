@@ -30,16 +30,55 @@ function remember(Po, G) {
     Po.raiseHeat(M.peak >= 3 ? 2 : 1, M.veh ? 'They know this one' : 'They know your face', 'rash');
   }
 }
-// ---- blamed on whoever it looks like: what you did in someone else's body is theirs. You walk away from it; the police go after them.
-Police.prototype.hostIn = function () { this._hostPts = this.pts || 0; };
+// ---- blamed on whoever it looks like: what you do in someone else's body is theirs. Going in, everything the world holds
+// against you is noted. Coming out, it's put back exactly, and whatever was added while you were them goes to them: the police
+// (their points, their charges, what they remember, the description they're looking for), a witness still on the phone, an
+// e-challan on its way, whoever you hit and whoever's after you, the neighbourhood's opinion, your own karma. Nobody saw you do
+// anything: you were lying down the road.
+Police.prototype.hostIn = function () {
+  if (this._host) return;
+  const G = this.g, L = this.law, ppl = G.people, life = G.life && G.life.s;
+  this._host = { pts: this.pts || 0, charges: new Set(this.charges), peak: this._peak || 0, lastV: this._lastV, mem: this._mem, unseenT: this.unseenT, lastSeen: this.lastSeen,
+    desc: L && L.desc, calls: new Set(L ? L.calls : []), sms: new Set(this.sms), dues: this.dues ? this.dues.length : 0, inc: new Set(G.brain ? G.brain.inc : []),
+    pmem: ppl && ppl.mem ? new Map([...ppl.mem].map(([k, v]) => [k, { ...v }])) : null, karma: life ? life.karma : undefined, respect: life ? life.respect : undefined };
+  if (G.rep) G.rep.deed = () => {};
+};
 Police.prototype.hostOut = function (p) {
-  if (this._hostPts === undefined) return;
-  const G = this.g, got = (this.pts || 0) > this._hostPts; this.pts = this._hostPts; this._hostPts = undefined;
-  if (!got) return;
-  this.heat = levelOf(this.pts); this.unseenT = 0; this._peak = this.heat; if (!this.heat) { this._peak = 0; this.clearCharges(); }
-  const Pl = G.player;
-  for (const q of G.people.list) if (q && q.chase === Pl && !q.cop) q.chase = p;      // (and whoever had it in for that face)
-  this.chaseNpc(p);
+  const B = this._host; if (!B) return;
+  this._host = null;
+  const G = this.g, L = this.law, ppl = G.people, Pl = G.player, life = G.life && G.life.s;
+  let got = (this.pts || 0) > B.pts;
+  // the police: back as they were
+  this.pts = B.pts; this.heat = levelOf(B.pts); this.charges = B.charges; this._peak = B.peak; this._lastV = B.lastV; this._mem = B.mem; this.unseenT = B.unseenT; this.lastSeen = B.lastSeen;
+  if (G.hud && G.hud.setHeat && !this.heat) G.hud.setHeat(0);
+  if (G.rep) delete G.rep.deed;
+  if (life) { if (B.karma !== undefined) life.karma = B.karma; if (B.respect !== undefined) life.respect = B.respect; }
+  // anything on its way to them about what you just did: it's about the person you were
+  if (L) {
+    L.desc = B.desc;
+    for (let i = L.calls.length - 1; i >= 0; i--) {
+      const q = L.calls[i]; if (B.calls.has(q)) continue;
+      const left = q.calling ? q.calling.t : 5;
+      q.calling = null; L.calls.splice(i, 1);
+      if (p) this.later(Math.max(1, left), () => this.chaseNpc(p));
+    }
+  }
+  this.sms = this.sms.filter((m) => B.sms.has(m));
+  if (this.dues && this.dues.length > B.dues) this.dues.length = B.dues;
+  if (G.brain) for (const I of G.brain.inc) if (!B.inc.has(I)) { I.byYou = false; I.reported = true; }
+  if (ppl) {
+    ppl.mem = B.pmem || new Map();
+    if (ppl.brawl) ppl.brawl.active = 0;
+    for (const q of ppl.list) {
+      if (!q || q === p) continue;
+      const fought = q.foe === Pl;
+      if (fought) ppl.endFight(q);
+      q.grudge = 0; q.angry = 0; q.youFirst = false; q.angryAtYou = false;
+      // whoever was after you, or squaring up to you, goes for the one they saw do it. They're the one standing there
+      if ((fought || q.chase === Pl) && !q.cop && p) { q.fixed = false; q.mode = 'chase'; q.chase = p; q.runSp = q.runSp || 3.4; q.chaseT = 0; q.anim = null; }
+    }
+  }
+  if (got && p) this.chaseNpc(p);
 };
 // someone else being wanted: a constable or two come for them on foot, they run, and if they're caught they stand there and it's over
 Police.prototype.chaseNpc = function (who) {
