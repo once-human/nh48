@@ -23,6 +23,18 @@ const ball = (r, x, y, z, c, o = {}) => put(new THREE.IcosahedronGeometry(r, o.d
 const ring = (R, r, x, y, z, c, o = {}) => put(new THREE.TorusGeometry(R, r, o.tseg || 5, o.seg || 14), x, y, z, c, o);
 const lathe = (pts, x, y, z, c, o = {}) => put(new THREE.LatheGeometry(pts.map(p => new THREE.Vector2(p[0], p[1])), o.seg || 12), x, y, z, c, o);
 const UP = new THREE.Vector3(0, 1, 0);
+// a bare bulb on its wire under the roof, warm, the brightest thing on the stall after dark (it glows as the lamps do)
+function bulb(x, top, z, drop = 0.24) {
+  box(0.006, drop, 0.006, x, top - drop/2, z, [0.1, 0.1, 0.1]);
+  cyl(0.017, 0.019, 0.04, x, top - drop - 0.015, z, [0.2, 0.19, 0.17], { seg: 8 });
+  ball(0.042, x, top - drop - 0.07, z, [1, 0.84, 0.56], { det: 1, glow: 1.5 });
+}
+// a cart's: a thin pole up from the deck, an arm out, the bulb hanging off it
+function poleBulb(x, z, y0, top, ax) {
+  rod([x, y0, z], [x, top, z], 0.012, [0.3, 0.3, 0.3], 5);
+  rod([x, top, z], [x + ax, top, z], 0.008, [0.3, 0.3, 0.3], 4);
+  bulb(x + ax, top, z, 0.14);
+}
 function rod(a, e, r, c, seg = 6) {
   const A = new THREE.Vector3(...a), d = new THREE.Vector3(...e).sub(A), L = d.length(), m = new THREE.Matrix4();
   m.compose(A.addScaledVector(d, 0.5), new THREE.Quaternion().setFromUnitVectors(UP, d.normalize()), new THREE.Vector3(1, 1, 1));
@@ -321,6 +333,7 @@ function tapri() {
   box(1.4, 0.05, 0.33, 0, 0.42, 1.0, jit([0.4, 0.3, 0.2], 0.1));
   for (const s of [-1, 1]) for (const z of [0.88, 1.12]) box(0.05, 0.4, 0.05, s*0.6, 0.2, z, [0.26, 0.2, 0.14]);
   box(1.2, 0.03, 0.03, 0, 0.15, 1.0, [0.26, 0.2, 0.14]);
+  bulb(0.45, 2.24, 0.62);
   return finish();
 }
 
@@ -374,6 +387,7 @@ function paan() {
   for (const a of [-0.5, 0.5]) ball(0.012, Math.sin(a)*0.018, 0.71, 0.61, [0.15, 0.5, 0.12], { det: 0, sy: 2.6 });
   cyl(0.15, 0.13, 0.03, -0.45, 0.42, 1.0, [0.2, 0.4, 0.7], { seg: 12 });
   for (let k = 0; k < 4; k++) { const a = k*1.57 + 0.8; rod([-0.45 + Math.cos(a)*0.1, 0.41, 1.0 + Math.sin(a)*0.1], [-0.45 + Math.cos(a)*0.13, 0, 1.0 + Math.sin(a)*0.13], 0.012, [0.2, 0.4, 0.7], 4); }
+  bulb(-0.42, 2.24, 0.5);
   return finish();
 }
 
@@ -422,6 +436,7 @@ function vadapav() {
   rod([0.1, 2.15, 0.6], [1.1, 2.15, 0.6], 0.012, [0.35, 0.35, 0.36], 4);
   rod([0.1, 2.15, -0.2], [1.1, 2.15, -0.2], 0.012, [0.35, 0.35, 0.36], 4);
   cloth(1.0, 0.8, 0.6, 2.2, 0.2, [0.9, 0.3, 0.1], { sag: 0.05, stripes: 4, cols: [[0.9, 0.3, 0.1], [0.92, 0.72, 0.15]], nx: 2, nz: 3, slope: 0.08 });
+  bulb(0.6, 2.14, 0.25, 0.2);
   return finish();
 }
 
@@ -468,6 +483,7 @@ function fruits() {
     for (const s of [-1, 1]) for (const y of [0.13, 0.2, 0.27]) { box(0.48, 0.03, 0.012, x, y, z + s*0.17, c); box(0.012, 0.03, 0.34, x + s*0.24, y, z, c); }
     for (let k = 0; k < 5; k++) ball(0.06, x - 0.14 + k*0.07, 0.3, z + (k % 2 ? 0.05 : -0.05), fruit[(k + (x > 0 ? 2 : 0)) % 4], { det: 1 });
   }
+  poleBulb(0.93, -0.44, 0.85, 1.95, -0.4);
   return finish();
 }
 
@@ -510,6 +526,7 @@ function flowers() {
   cyl(0.035, 0.035, 0.05, 0.72, 0.25, -0.05, [0.9, 0.88, 0.82], { seg: 8 });
   cyl(0.15, 0.13, 0.03, 0.55, 0.3, -0.75, [0.8, 0.3, 0.15], { seg: 12 });
   for (let k = 0; k < 4; k++) { const a = k*1.57 + 0.8; rod([0.55 + Math.cos(a)*0.1, 0.29, -0.75 + Math.sin(a)*0.1], [0.55 + Math.cos(a)*0.13, 0, -0.75 + Math.sin(a)*0.13], 0.012, [0.8, 0.3, 0.15], 4); }
+  bulb(0, 1.98, 0.2, 0.22);
   return finish();
 }
 
@@ -567,6 +584,7 @@ function ganna() {
   for (const [x, z] of [[-0.86, -0.46], [0.86, -0.46], [-0.86, 0.46], [0.86, 0.46]]) rod([x, 1.22, z], [x, 2.52, z], 0.018, [0.38, 0.38, 0.4], 5);
   for (const z of [-0.46, 0.46]) rod([-0.86, 2.52, z], [0.86, 2.52, z], 0.012, [0.38, 0.38, 0.4], 4);
   cloth(1.95, 1.16, 0, 2.56, 0, [0.9, 0.82, 0.3], { sag: 0.06, stripes: 6, cols: [[0.92, 0.82, 0.3], [0.2, 0.55, 0.32]], nx: 2, nz: 3, slope: 0.05 });
+  poleBulb(-0.85, -0.45, 1.2, 2.1, 0.38);
   return finish();
 }
 

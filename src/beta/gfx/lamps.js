@@ -43,6 +43,17 @@ export class Lamps {
       }
     }
     this.shops = this.eachShop((r) => shopSpill(d, x0, z0, k, r));
+    // a stall's bulb: a small warm pool round it, not every stall's on at once as it gets dark
+    const st = this.G.W.M && this.G.W.M.stalls, sr = 4.2*k, sr2 = sr*sr;
+    if (st) for (const s of st) {
+      const u = (s[0]/100 - x0)*k, v = (s[1]/100 - z0)*k; if (u < -sr || v < -sr || u > N + sr || v > N + sr) continue;
+      const h = ((s[0]*0.013 + s[1]*0.029) % 1 + 1) % 1; if (night < 0.05 + h*0.35) continue;
+      const a = 80 + h*50;
+      for (let j = Math.max(1, Math.ceil(v - sr)), je = Math.min(N - 2, Math.floor(v + sr)); j <= je; j++) for (let i = Math.max(1, Math.ceil(u - sr)), ie = Math.min(N - 2, Math.floor(u + sr)); i <= ie; i++) {
+        const q = 1 - ((i - u)*(i - u) + (j - v)*(j - v))/sr2; if (q <= 0) continue;
+        const o = j*N + i, n = d[o] + a*q*q; d[o] = n > 255 ? 255 : n;
+      }
+    }
     this.tex.needsUpdate = true;
     PU.lampC.value.set(cx, cz, 1/SIZE, 0);
   }
