@@ -71,6 +71,24 @@ function farCrown() {
   for (const [g0, r, gg, b, m] of parts) { const g = g0.index ? g0.toNonIndexed() : g0; g.applyMatrix4(m); g.computeVertexNormals(); const p = g.attributes.position, n = g.attributes.normal; for (let i = 0; i < p.count; i++) { P.push(p.getX(i), p.getY(i), p.getZ(i)); N.push(n.getX(i), n.getY(i), n.getZ(i)); C.push(r, gg, b); } }
   const g = new THREE.InstancedBufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); return g;
 }
+// a far tree's branches: the thickest of them. The twigs are under a pixel past the near range, and behind the leaves
+// anyway, and they were two thirds of the triangles in the trees
+function thin(g, keep = 0.38) {
+  const P = g.attributes.position, I = g.index, n = (I ? I.count : P.count)/3, A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), idx = (i) => (I ? I.getX(i) : i), list = [];
+  for (let t = 0; t < n; t++) { const a = idx(t*3), b = idx(t*3 + 1), c = idx(t*3 + 2); A.fromBufferAttribute(P, a); B.fromBufferAttribute(P, b); C.fromBufferAttribute(P, c); list.push([B.sub(A).cross(C.sub(A)).length(), a, b, c]); }
+  list.sort((x, y) => y[0] - x[0]);
+  const out = [], m = Math.ceil(n*keep); for (let t = 0; t < m; t++) out.push(list[t][1], list[t][2], list[t][3]);
+  const G = g.clone(); G.setIndex(out); return G;
+}
+// a far crown's leaves: every third card, grown to cover what the three did
+function fewCards(g, every = 3, grow = 1.6) {
+  const src = g.index ? g.toNonIndexed() : g, P = src.attributes.position, n = P.count/3, G = new THREE.BufferGeometry(), ids = [];
+  // (cards are pairs of triangles, next to each other)
+  for (let t = 0; t + 1 < n; t += 2) if ((t/2)%every === 0) ids.push(t, t + 1);
+  for (const name in src.attributes) { const A = src.attributes[name], a = new A.array.constructor(ids.length*3*A.itemSize); let o = 0; for (const t of ids) for (let v = t*3; v < t*3 + 3; v++) for (let c = 0; c < A.itemSize; c++) a[o++] = A.array[v*A.itemSize + c]; G.setAttribute(name, new THREE.BufferAttribute(a, A.itemSize, A.normalized)); }
+  const Q = G.attributes.position; for (let i = 0; i < ids.length; i += 2) { let x = 0, y = 0, z = 0; const v0 = i*3; for (let v = v0; v < v0 + 6; v++) { x += Q.getX(v); y += Q.getY(v); z += Q.getZ(v); } x /= 6; y /= 6; z /= 6; for (let v = v0; v < v0 + 6; v++) Q.setXYZ(v, x + (Q.getX(v) - x)*grow, y + (Q.getY(v) - y)*grow, z + (Q.getZ(v) - z)*grow); }
+  return G;
+}
 // a tree's place: turned about its upright, scaled, stood there
 function put(a, o, c, s, sx, sy, x, y, z) { a[o] = c*sx; a[o + 1] = 0; a[o + 2] = -s*sx; a[o + 3] = 0; a[o + 4] = 0; a[o + 5] = sy; a[o + 6] = 0; a[o + 7] = 0; a[o + 8] = s*sx; a[o + 9] = 0; a[o + 10] = c*sx; a[o + 11] = 0; a[o + 12] = x; a[o + 13] = y; a[o + 14] = z; a[o + 15] = 1; }
 const TINT = [[1, 1.05, .9], [.82, 1.1, .85], [1.2, 1.05, .7], [.9, .9, 1], [1.1, 1.2, .8], [.72, .95, .75], [1, 1, 1], [.9, 1.1, .9]];
@@ -84,6 +102,8 @@ export class TreeField extends GameTrees {
     this.paintLeaf = new THREE.ShaderMaterial({ vertexShader: VS.replace('LEAFY', '1.').replace('COL', 'color'), fragmentShader: LEAF_FS, uniforms: un({ tMap: { value: this.leafMat.map } }), defines: NEAR, vertexColors: true, side: THREE.DoubleSide });
     const leafMid = new THREE.ShaderMaterial({ vertexShader: this.paintLeaf.vertexShader, fragmentShader: LEAF_FS, uniforms: un({ tMap: this.paintLeaf.uniforms.tMap }), defines: MID, vertexColors: true, side: THREE.DoubleSide });
     this.leafShadow = new THREE.ShaderMaterial({ vertexShader: LEAF_SHADOW_VS, fragmentShader: LEAF_SHADOW_FS, uniforms: { tMap: this.paintLeaf.uniforms.tMap }, side: THREE.DoubleSide, colorWrite: false });
+    this.uLodM = { value: new THREE.Vector4(100, 12, 300, 18) };
+    const leafFar = new THREE.ShaderMaterial({ vertexShader: this.paintLeaf.vertexShader, fragmentShader: LEAF_FS, uniforms: Object.assign({}, leafMid.uniforms, { uLodF: this.uLodM }), defines: MID, vertexColors: true, side: THREE.DoubleSide });
     this.arch.forEach((A, k) => {
       const S = this.sets[k], m = this.barkMats[k];
       const bv = VS.replace('LEAFY', '.25').replace('COL', 'vec3(1.)'), bu = un({ tMap: { value: m.map }, uTint: { value: m.color.clone() } });
@@ -93,6 +113,13 @@ export class TreeField extends GameTrees {
       S.nl.customDepthMaterial = S.ml.customDepthMaterial = this.leafShadow;
       for (const m of [S.nb, S.nl, S.mb, S.ml]) m.shadowStill = true;
       S.nl.instanceMatrix = S.nb.instanceMatrix; S.ml.instanceMatrix = S.mb.instanceMatrix;     // (bark and leaves stand in the same places)
+      S.mb.geometry = thin(S.mb.geometry);
+      // and further out a third of the leaf cards, each that much bigger so the crown's as full, and the trunk and main
+      // limbs. Three quarters of the mid trees are out here, a few pixels across; the mid ones fade into these (LOD_MID,
+      // with the edges of this band)
+      const add = (g, mat) => { const m = new THREE.InstancedMesh(g, mat, 1); m.count = 0; m.frustumCulled = false; m.receiveShadow = true; m.shadowStill = true; scene.add(m); return m; };
+      S.fb = add(thin(A.mid.b, 0.12), S.mb.material.clone()); S.fb.material.uniforms = Object.assign({}, S.mb.material.uniforms, { uLodF: this.uLodM });
+      S.fl = add(fewCards(A.mid.l), leafFar); S.fb.instanceMatrix = S.fl.instanceMatrix = new THREE.InstancedBufferAttribute(new Float32Array(16*(quality.treeMidCap || 1600)), 16); S.fb.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     });
     this.bb.visible = false;
     const G = farCrown(), cap = 4000;
@@ -125,7 +152,8 @@ export class TreeField extends GameTrees {
       const i0 = Math.floor((cx - R)/cell), i1 = Math.floor((cx + R)/cell), j0 = Math.floor((cz - R)/cell), j1 = Math.floor((cz + R)/cell);
       for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const l = this.grid.get(i + ',' + j); if (l) for (let q = 0; q < l.length; q++) c.push(l[q]); }
     }
-    const sets = this.sets, cnt = this._cnt || (this._cnt = sets.map(() => [0, 0])); for (const c of cnt) c[0] = c[1] = 0;
+    const sets = this.sets, cnt = this._cnt || (this._cnt = sets.map(() => [0, 0, 0])); for (const c of cnt) c[0] = c[1] = c[2] = 0;
+    const split = this.uLodF.value.z, band = this.uLodM.value.y, fIn = split - band - M, mTop = split + M;
     const cand = this._cand, X = this.x, Z = this.z, Y = this.y, K = this.k, SC = this.s, RO = this.r;
     for (let q = 0; q < cand.length; q++) {
       const t = cand[q], dx = X[t] - cx, dz = Z[t] - cz, d = Math.hypot(dx, dz); if (d >= mOut) continue;
@@ -137,14 +165,16 @@ export class TreeField extends GameTrees {
       const k = K[t], s = SC[t], set = sets[k], c = cnt[k], r = RO[t], cr = Math.cos(r), sr = Math.sin(r);
       const sx = s*(0.92 + hash1(t*3.3)*0.16), sy = s*(0.9 + hash1(t*5.1)*0.2), y = 0.12 + Y[t];
       if (near && c[0] < set.nb.instanceMatrix.count) { put(set.nb.instanceMatrix.array, c[0]*16, cr, sr, sx, sy, X[t], y, Z[t]); c[0]++; }
-      if (mid && c[1] < set.mb.instanceMatrix.count) { put(set.mb.instanceMatrix.array, c[1]*16, cr, sr, sx, sy, X[t], y, Z[t]); c[1]++; }
+      if (mid && d < mTop && c[1] < set.mb.instanceMatrix.count) { put(set.mb.instanceMatrix.array, c[1]*16, cr, sr, sx, sy, X[t], y, Z[t]); c[1]++; }
+      if (mid && d > fIn && c[2] < set.fb.instanceMatrix.count) { put(set.fb.instanceMatrix.array, c[2]*16, cr, sr, sx, sy, X[t], y, Z[t]); c[2]++; }
     }
     for (let k = 0; k < sets.length; k++) {
       const set = sets[k], c = cnt[k];
-      set.nb.count = set.nl.count = c[0]; set.mb.count = set.ml.count = c[1];
+      set.nb.count = set.nl.count = c[0]; set.mb.count = set.ml.count = c[1]; set.fb.count = set.fl.count = c[2];
       const a = set.nb.instanceMatrix, b = set.mb.instanceMatrix;
       a.clearUpdateRanges(); a.addUpdateRange(0, c[0]*16); a.needsUpdate = true;
       b.clearUpdateRanges(); b.addUpdateRange(0, c[1]*16); b.needsUpdate = true;
+      const f = set.fb.instanceMatrix; f.clearUpdateRanges(); f.addUpdateRange(0, c[2]*16); f.needsUpdate = true;
     }
   }
   sharpenLeaves() { super.sharpenLeaves(); this.paintLeaf.uniforms.tMap.value = this.leafMat.map; }
@@ -152,7 +182,9 @@ export class TreeField extends GameTrees {
     if (this.lastX === 1e9) this.fx = 1e9;
     this.farR = 0;                                        // (the game's far pictures: never filled)
     const Bn = Math.min(8, Math.max(3, this.nearR*0.3)), Bm = Math.min(24, Math.max(8, this.midR*0.12));
-    this.uLodF.value.set(this.nearR, Bn, this.midR, Bm);
+    // mid to the middle of its range (never closer than 180 m), then the lighter ones out to the end
+    const split = Math.min(this.midR, Math.max(180, this.midR*.5)), Bs = Math.min(24, Math.max(8, split*.12));
+    this.uLodF.value.set(this.nearR, Bn, split, Bs); this.uLodM.value.set(split, Bs, this.midR, Bm);
     this.nearMid(cx, cz, force, Bn);
     if (!this.R) return;
     if (!force && Math.hypot(cx - this.fx, cz - this.fz) < 30) return;

@@ -22,9 +22,9 @@ float ign(vec2 p){ return fract(52.9829189*fract(dot(p, vec2(.06711056, .0058371
 // the colour it landed on (the light bounced off a sunny wall)
 const AO_FS = HEAD + DEPTH + `uniform sampler2D tCol; uniform int samples, rays; uniform float radius;
 void main(){
-  float d0 = texture(tDep, vUv).r; if (d0 >= .99999) { o = vec4(0., 0., 0., 1.); return; }
+  float d0 = texture(tDep, vUv).r; if (d0 >= .99999) { o = vec4(rays > 0 ? 0. : 1e4, 0., 0., 1.); return; }
   vec3 P = vp(vUv), n = vn(vUv, P), bounce = vec3(0.); float z = -P.z, pr = radius*proj[1][1]*.5/z, a0 = ign(gl_FragCoord.xy)*6.2832, occ = 0.;
-  if (pr*res.y < 1.) { o = vec4(0., 0., 0., 1.); return; }
+  if (pr*res.y < 1.) { o = vec4(rays > 0 ? 0. : z, 0., 0., 1.); return; }
   for (int i = 0; i < samples; i++) {
     float t = (float(i) + .5)/float(samples), th = a0 + float(i)*2.39996; vec2 uv = vUv + vec2(cos(th)*res.y/res.x, sin(th))*pr*t;
     if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) continue;
@@ -32,8 +32,13 @@ void main(){
     float w = max(nv - .08, 0.)*smoothstep(radius*radius*2., radius*radius*.25, dv);
     occ += w; if (i < rays) bounce += texture(tCol, uv).rgb*w;
   }
-  o = vec4(bounce/float(max(rays, 1)), clamp(1. - occ/float(samples)*2.6, 0., 1.));
+  o = vec4(rays > 0 ? bounce/float(rays) : vec3(z, 0., 0.), clamp(1. - occ/float(samples)*2.6, 0., 1.));
 }`;
+// (with no bounced light the picture's own first channel holds the depth: half the looks, for the same result)
+const BLUR_Z_FS = HEAD + `uniform sampler2D tAO; uniform vec2 dir;
+void main(){ vec4 s = texture(tAO, vUv); float z = s.r, A = s.a, W = 1.;
+  for (int i = 1; i <= 3; i++) for (int j = -1; j <= 1; j += 2) { vec4 q = texture(tAO, vUv + dir*float(i*j)); float w = (1. - float(i)*.2)*exp(-abs(q.r - z)/(.03*z + .02)); A += q.a*w; W += w; }
+  o = vec4(z, 0., 0., A/W); }`;
 const BLUR_FS = HEAD + `uniform sampler2D tAO, tDep; uniform vec2 dir; uniform float cnear, cfar;
 float lz(vec2 uv){ float d = texture(tDep, uv).r; return cnear*cfar/(cfar - d*(cfar - cnear)); }
 void main(){ float z = lz(vUv), W = 1.; vec4 s = texture(tAO, vUv);
@@ -64,7 +69,7 @@ const UP_FS = HEAD + `uniform sampler2D tCol; uniform vec2 px; void main(){ vec3
 const SHAFT_FS = HEAD + `uniform sampler2D tDep; uniform vec2 sun; uniform int samples; float ign(vec2 p){ return fract(52.9829189*fract(dot(p, vec2(.06711056, .00583715)))); }
 void main(){ vec2 d = (sun - vUv)/float(samples)*.85, p = vUv + d*ign(gl_FragCoord.xy); float s = 0., w = 1., W = 0.; for (int i = 0; i < samples; i++) { s += step(.99999, texture(tDep, p).r)*w; W += w; w *= .975; p += d; } float r = length((vUv - sun)*vec2(1.6, 1.)); o = vec4(vec3(s/W*exp(-r*1.6)), 1.); }`;
 
-const FS = HEAD + `uniform sampler2D tCol, tDep, tNoise, tAO, tSSR, tBloom, tShaft; uniform vec2 res, dOff; uniform float dpr, cnear, cfar, time, drunk, inkQ, inkS, paper, film, aerial, bloomK, shaftK, focus, dofR; uniform int dofN, mbN, useAO, useSSR; uniform vec3 fogCol, sunCol, skyCol; uniform mat4 reproj, invVP; uniform float dayK;
+const FS = HEAD + `uniform sampler2D tCol, tDep, tNoise, tAO, tSSR, tBloom, tShaft; uniform vec2 res, dOff; uniform float giK, dpr, cnear, cfar, time, drunk, inkQ, inkS, paper, film, aerial, bloomK, shaftK, focus, dofR; uniform int dofN, mbN, useAO, useSSR; uniform vec3 fogCol, sunCol, skyCol; uniform mat4 reproj, invVP; uniform float dayK;
 float h12(vec2 p){ vec3 q=fract(vec3(p.xyx)*.1031); q+=dot(q,q.yzx+33.33); return fract((q.x+q.y)*q.z); }
 vec2 rot(vec2 p,float a){ float c=cos(a),s=sin(a); return vec2(c*p.x+s*p.y,-s*p.x+c*p.y); }
 float lum(vec3 c){ return dot(c,vec3(.3,.59,.11)); }
@@ -92,7 +97,7 @@ void main(){
   if (mbN > 0 && z0 > focus + 1.5) { vec4 pw = invVP*vec4(uv*2. - 1., (sky ? 1. : d0)*2. - 1., 1.); pw /= pw.w; vec4 pr = reproj*pw; vec2 vel = uv - pr.xy/pr.w*.5 - .5; float vl = length(vel); if (vl > .001) { vel *= .35; vl *= .35; vel *= min(1., .012/max(vl, 1e-5)); if (vl < .0008) vel *= 0.; vec3 a = L; float jit = ign(gl_FragCoord.xy); for (int i = 0; i < mbN; i++) a += texture(tCol, uv - vel*(float(i) + jit)/float(mbN)).rgb; L = a/float(mbN + 1); } }
   if (!sky) {
     if (useSSR > 0) { vec4 r = texture(tSSR, uv); L = mix(L, r.rgb, r.a); }
-    if (useAO > 0) { vec4 a = texture(tAO, uv); float k = a.a; L = L*mix(1., k, 1. - min(1., lum(L)*.2)) + a.rgb*(.15 + L)*.35*dayK; }
+    if (useAO > 0) { vec4 a = texture(tAO, uv); float k = a.a; L = L*mix(1., k, 1. - min(1., lum(L)*.2)) + a.rgb*giK*(.15 + L)*.35*dayK; }
     if (aerial > 0.) { float ff = 1. - exp(-z0*.0005*aerial); L = mix(L, fogCol*(.8 + .1*dayK), ff); }
   }
   if (bloomK > 0.) L += texture(tBloom, uv).rgb*bloomK;
@@ -149,11 +154,12 @@ export class Post {
     const res = { value: new THREE.Vector2() }, proj = { value: new THREE.Matrix4() }, invProj = { value: new THREE.Matrix4() };
     this.res = res; this.proj = proj; this.invProj = invProj;
     this.tDep = { value: null }; this.tColU = { value: null };
-    this.U = { tCol: this.tColU, tDep: this.tDep, tNoise: PU.tNoise, res, dpr: { value: 1 }, cnear: { value: 0.1 }, cfar: { value: 1000 }, time: { value: 0 }, drunk: { value: 0 }, inkQ: { value: 2 }, inkS: { value: 1 }, paper: { value: 1 }, film: { value: 0 }, aerial: { value: 0 }, bloomK: { value: 0 }, shaftK: { value: 0 }, focus: { value: 8 }, dofR: { value: 8 }, dofN: { value: 0 }, mbN: { value: 0 }, useAO: { value: 0 }, useSSR: { value: 0 }, tAO: { value: null }, tSSR: { value: null }, tBloom: { value: null }, tShaft: { value: null }, dOff: { value: new THREE.Vector2() }, fogCol: PU.fogCol, sunCol: PU.sunCol, skyCol: PU.skyCol, dayK: PU.dayK, reproj: { value: new THREE.Matrix4() }, invVP: { value: new THREE.Matrix4() } };
+    this.U = { giK: { value: 0 }, tCol: this.tColU, tDep: this.tDep, tNoise: PU.tNoise, res, dpr: { value: 1 }, cnear: { value: 0.1 }, cfar: { value: 1000 }, time: { value: 0 }, drunk: { value: 0 }, inkQ: { value: 2 }, inkS: { value: 1 }, paper: { value: 1 }, film: { value: 0 }, aerial: { value: 0 }, bloomK: { value: 0 }, shaftK: { value: 0 }, focus: { value: 8 }, dofR: { value: 8 }, dofN: { value: 0 }, mbN: { value: 0 }, useAO: { value: 0 }, useSSR: { value: 0 }, tAO: { value: null }, tSSR: { value: null }, tBloom: { value: null }, tShaft: { value: null }, dOff: { value: new THREE.Vector2() }, fogCol: PU.fogCol, sunCol: PU.sunCol, skyCol: PU.skyCol, dayK: PU.dayK, reproj: { value: new THREE.Matrix4() }, invVP: { value: new THREE.Matrix4() } };
     this.mat = raw(FS, this.U);
     const dep = { tDep: this.tDep, proj, invProj, res };
     this.aoM = raw(AO_FS, { ...dep, tCol: this.tColU, samples: { value: 16 }, rays: { value: 0 }, radius: { value: 1.3 } });
     this.blurM = raw(BLUR_FS, { tAO: { value: null }, tDep: this.tDep, dir: { value: new THREE.Vector2() }, cnear: this.U.cnear, cfar: this.U.cfar });
+    this.blurZ = raw(BLUR_Z_FS, { tAO: { value: null }, dir: { value: new THREE.Vector2() } });
     this.ssrM = raw(SSR_FS, { ...dep, tCol: this.tColU, steps: { value: 16 }, camWorld: { value: new THREE.Matrix4() }, skyCol: PU.skyCol, fogCol: PU.fogCol, dayK: PU.dayK });
     this.brM = raw(BRIGHT_FS, { tCol: this.tColU, px: { value: new THREE.Vector2() } });
     this.downM = raw(DOWN_FS, { tCol: { value: null }, px: { value: new THREE.Vector2() } });
@@ -216,8 +222,10 @@ export class Post {
     U.useAO.value = F.ao > 0 ? 1 : 0;
     if (F.ao > 0) {
       const a = this.fxTarget('ao', F.aoScale), b = this.fxTarget('aoB', F.aoScale); this.aoM.uniforms.samples.value = F.ao; this.aoM.uniforms.rays.value = F.rays; this.pass(this.aoM, a);
-      this.blurM.uniforms.tAO.value = a.texture; this.blurM.uniforms.dir.value.set(1.5/a.width, 0); this.pass(this.blurM, b);
-      this.blurM.uniforms.tAO.value = b.texture; this.blurM.uniforms.dir.value.set(0, 1.5/a.height); this.pass(this.blurM, a);
+      const BM = F.rays > 0 ? this.blurM : this.blurZ;
+      BM.uniforms.tAO.value = a.texture; BM.uniforms.dir.value.set(1.5/a.width, 0); this.pass(BM, b);
+      BM.uniforms.tAO.value = b.texture; BM.uniforms.dir.value.set(0, 1.5/a.height); this.pass(BM, a);
+      U.giK.value = F.rays > 0 ? 1 : 0;
       U.tAO.value = a.texture;
     }
     U.useSSR.value = F.ssr > 0 ? 1 : 0;
