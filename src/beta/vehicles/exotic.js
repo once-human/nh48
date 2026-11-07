@@ -5,31 +5,69 @@ import * as THREE from 'three';
 import { Vehicle } from '@orig/vehicles/vehicle.js';
 
 const PORTS = { super: [0.4, 0.5, -2.31], sports: [0.14, 0.42, -2.3] };
-let tex = null;
+// The flames are fire, not a picture of one: each bang throws out a stream of little burning puffs from the pipe that leave at
+// speed, slow, swell and rise as they burn: blue-white at the lip, yellow, orange, then a dull red going out, each flickering
+// on its own, with a few sparks going further. They're left in the air behind the car, the way a real one is.
+const N = 220;
+let tex = null, pool = null;
 function flameTex() {
   if (tex) return tex;
-  const c = document.createElement('canvas'); c.width = 128; c.height = 32; const x = c.getContext('2d');
-  const g = x.createRadialGradient(118, 16, 1, 104, 16, 104);
-  g.addColorStop(0, 'rgba(255,250,235,1)'); g.addColorStop(0.22, 'rgba(150,190,255,0.95)'); g.addColorStop(0.4, 'rgba(255,170,60,0.85)'); g.addColorStop(0.75, 'rgba(235,70,10,0.3)'); g.addColorStop(1, 'rgba(90,10,0,0)');
-  x.fillStyle = g; x.fillRect(0, 0, 128, 32);
-  return (tex = new THREE.CanvasTexture(c));
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+  const g = x.createRadialGradient(32, 32, 1, 32, 32, 31);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.3, 'rgba(255,255,255,0.75)'); g.addColorStop(0.65, 'rgba(255,255,255,0.22)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return (tex = t);
 }
-function rig(v, P) {
+function poolOf(G) {
+  if (pool) return pool;
   const m = new THREE.MeshBasicMaterial({ map: flameTex(), color: 0xffffff, toneMapped: false, transparent: true, depthWrite: false, side: THREE.DoubleSide,
     blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor });
-  const g = new THREE.PlaneGeometry(0.62, 0.17).translate(-0.31, 0, 0), L = [];
-  for (const s of [-1, 1]) for (const a of [0, Math.PI/2]) { const q = new THREE.Mesh(g, m); q.position.set(P[2], P[1], s*P[0]); q.rotation.x = a; q.visible = false; q.frustumCulled = false; v.tilt.add(q); L.push(q); }
-  return { L, t: 0, q: [], on: 0, held: 0, launched: false };
+  const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), m, N); mesh.frustumCulled = false; mesh.count = 0;
+  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(N*3), 3); G.scene.add(mesh);
+  return (pool = { mesh, p: [], k: 0, m4: new THREE.Matrix4(), s: new THREE.Vector3(), v: new THREE.Vector3(), q: new THREE.Quaternion(), live: 0 });
 }
+// white-blue at the lip, then yellow, orange, a deep red, going out
+const RAMP = [[2.2, 2.6, 3.4], [3.2, 2.5, 1.2], [3, 1.3, 0.25], [1.7, 0.4, 0.05], [0.5, 0.08, 0.01]];
+function ramp(t, o, i, a) {
+  const u = Math.min(3.999, Math.max(0, t)*4), k = Math.floor(u), f = u - k, A = RAMP[k], B = RAMP[k + 1];
+  o[i] = (A[0] + (B[0] - A[0])*f)*a; o[i + 1] = (A[1] + (B[1] - A[1])*f)*a; o[i + 2] = (A[2] + (B[2] - A[2])*f)*a;
+}
+const _w = new THREE.Vector3();
+function puff(Pl, v, P, s, big) {
+  v.tilt.updateWorldMatrix(true, false);
+  _w.set(P[2], P[1], s*P[0]).applyMatrix4(v.tilt.matrixWorld);
+  const hx = Math.cos(v.th), hz = Math.sin(v.th), fv = v.v || 0, lv = v.vl || 0, cx = hx*fv - hz*lv, cz = hz*fv + hx*lv;
+  const q = Pl.p[Pl.k] || (Pl.p[Pl.k] = {}); Pl.k = (Pl.k + 1)%N;
+  const out = (5 + Math.random()*11)*big, a = (Math.random() - 0.5)*0.24, up = Math.random()*0.16 - 0.03, bx = -(hx - hz*a), bz = -(hz + hx*a);
+  Object.assign(q, { x: _w.x, y: _w.y, z: _w.z, vx: cx + bx*out, vy: up*out + 0.25, vz: cz + bz*out, cx, cz, life: 0, max: (0.07 + Math.random()*0.16)*(0.8 + big*0.4), sz: (0.07 + Math.random()*0.08)*(0.8 + big*0.35), ph: Math.random()*6.283, fr: 30 + Math.random()*50 });
+}
+function tickPool(dt) {
+  const S = pool, G = window.__nhAskG, cam = G && G.camera; if (!S || !cam) return;
+  S.q.copy(cam.quaternion);
+  const col = S.mesh.instanceColor.array; let n = 0;
+  for (const q of S.p) {
+    if (!q || q.life >= q.max) continue;
+    q.life += dt; if (q.life >= q.max) continue;
+    const dr = Math.max(0, 1 - 7*dt);                        // (it leaves fast and the air stops it; what's left is carried with the car for a moment)
+    q.vx = (q.vx - q.cx)*dr + q.cx*(1 - 2.5*dt); q.vz = (q.vz - q.cz)*dr + q.cz*(1 - 2.5*dt); q.cx *= 1 - 2.5*dt; q.cz *= 1 - 2.5*dt; q.vy += 2.2*dt;
+    q.x += q.vx*dt; q.y += q.vy*dt; q.z += q.vz*dt;
+    const t = q.life/q.max, fl = 0.72 + 0.28*Math.sin(q.ph + q.life*q.fr), sc = q.sz*(0.55 + t*2.2)*fl;
+    S.s.set(sc, sc, sc); S.m4.compose(S.v.set(q.x, q.y, q.z), S.q, S.s); S.mesh.setMatrixAt(n, S.m4);
+    ramp(t*0.95, col, n*3, (1 - t*t)*fl); n++;
+  }
+  S.mesh.count = n; S.live = n; S.mesh.instanceMatrix.needsUpdate = true; S.mesh.instanceColor.needsUpdate = true;
+}
+function rig(G) { poolOf(G); return { t: 0, q: [], on: 0, big: 1, held: 0, launched: false, em: 0, gear0: 0 }; }
 function fire(v, F, A) {
-  F.on = 0.05 + Math.random()*0.07;
-  const s1 = 0.65 + Math.random()*0.8, s2 = 0.65 + Math.random()*0.8;
-  F.L.forEach((q, i) => { q.visible = true; const s = i < 2 ? s1 : s2; q.scale.set(s, 0.8 + Math.random()*0.6, 1); });
+  // a bang: a stream for a moment, one pipe often a beat ahead of the other
+  F.on = 0.05 + Math.random()*0.08; F.big = 0.7 + Math.random()*0.8; F.lag = Math.random()*0.03;
   if (A && A.noiseBurst) { A.noiseBurst(0.05, 480 + Math.random()*520, 0.8, 0.14 + Math.random()*0.1); A.noiseBurst(0.018, 2300 + Math.random()*900, 1.4, 0.05); }
 }
 const upd = Vehicle.prototype.update;
 Vehicle.prototype.update = function (dt, inp, traffic) {
   const r = upd.call(this, dt, inp, traffic), G = window.__nhAskG, S = this.spec;
+  if (pool && pool.live && dt > 0) tickPool(dt/Math.max(1, pool.ticks || 1));
   if (this.W.playerVeh !== this || dt <= 0) return r;
   // ---- a slide wears the tyres; the back ones first
   if (!S.two && this.wheels && (this.skidL || 0) > 0.3) {
@@ -41,16 +79,25 @@ Vehicle.prototype.update = function (dt, inp, traffic) {
     }
   }
   const P = PORTS[this.type]; if (!P) return r;
-  // ---- the flames
-  const F = this._fl || (this._fl = rig(this, P)), thr = inp.throttle || 0, sp = Math.abs(this.v), rpm = this.rpm || 0;
+  // ---- the flames (how often by the drive mode: Corsa spits on every lift and shift, Strada hardly ever)
+  const F = this._fl || (this._fl = rig(G)), thr = inp.throttle || 0, sp = Math.abs(this.v), rpm = this.rpm || 0, pops = this.modePops ?? 1;
   F.t += dt;
   if (thr > 0.7) F.held += dt;
   const lift = (this._thr0 ?? 0) > 0.7 && thr < 0.15;
-  if (lift && (rpm > 0.55 || (sp < 2 && F.held < 0.5))) { let t = F.t + 0.03; for (let n = 1 + Math.floor(Math.random()*3); n > 0; n--) { F.q.push(t); t += 0.07 + Math.random()*0.12; } }
-  if (thr > 0.9 && sp < 4 && !this.reverse && !F.launched && F.held > 0.12) { F.launched = true; F.q.push(F.t, F.t + 0.09 + Math.random()*0.1); }
+  const go = (t, n) => { for (; n > 0; n--) { if (Math.random() < Math.min(1, pops)) F.q.push(t); t += 0.07 + Math.random()*0.12; } };
+  if (lift && (rpm > 0.55 || (sp < 2 && F.held < 0.5))) go(F.t + 0.03, 1 + Math.floor(Math.random()*(pops > 1 ? 5 : 3)));
+  if (thr > 0.9 && sp < 4 && !this.reverse && !F.launched && F.held > 0.12) { F.launched = true; go(F.t, 2); }
+  // an upshift under power, in the wild modes
+  if (this.gear > F.gear0 && thr > 0.7 && rpm > 0.5 && pops > 1) go(F.t, 2);
+  F.gear0 = this.gear;
   if (thr < 0.2) { F.launched = false; F.held = 0; }
   this._thr0 = thr;
   while (F.q.length && F.q[0] <= F.t) { F.q.shift(); fire(this, F, G?.audio); }
-  if (F.on > 0 && (F.on -= dt) <= 0) for (const q of F.L) q.visible = false;
+  if (F.on > 0) {
+    F.on -= dt; F.em += dt*420;
+    const Pl = poolOf(G);
+    while (F.em >= 1) { F.em -= 1; for (const s of [-1, 1]) if (s < 0 || F.on > (F.lag || 0)*0.5) puff(Pl, this, P, s, F.big); }
+    Pl.live = Math.max(Pl.live, 1);
+  }
   return r;
 };

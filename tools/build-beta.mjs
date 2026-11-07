@@ -354,9 +354,9 @@ const PATCHES = {
   // bumper (a parked scooter was one 0.45 m circle in its middle: you walked through its nose and its tail)
   [S('traffic/parked.js')]: [
     ["const pick = (a) => rng.pick(a).map(lin);", "const pick = (a) => rng.pick(a).map(lin);\n  const chain = (x, z, hx, hz, L, Wd) => { const r = Wd / 2, n = Math.max(1, Math.ceil((L - Wd) / (r * 0.8)) + 1), out = []; for (let i = 0; i < n; i++) { const o = n === 1 ? 0 : -(L / 2 - r) + (L - 2 * r) * i / (n - 1); out.push(W.collision.addCircle(x + hx * o, z + hz * o, r, 2)); } return out; };"],
-    ["rec.circles.push(W.collision.addCircle(x + tx * 1.1, z + tz * 1.1, 0.85, 2), W.collision.addCircle(x - tx * 1.1, z - tz * 1.1, 0.85, 2));", "rec.circles.push(...chain(x, z, tx, tz, { hatch: 3.65, sedan: 4.0, suv: 4.5 }[k], { hatch: 1.62, sedan: 1.72, suv: 1.82 }[k]));"],
-    ["rec.circles.push(W.collision.addCircle(px, pz, 0.45, 2));", "rec.circles.push(...chain(px, pz, hx, hz, k === 'bike' ? 2.0 : 1.85, 0.62));"],
-    ["rec.circles.push(W.collision.addCircle(px, pz, 0.8, 2), W.collision.addCircle(px - tx * 0.9, pz - tz * 0.9, 0.7, 2));", "rec.circles.push(...chain(px, pz, -tx, -tz, 2.7, 1.38));"],
+    ["rec.circles.push(W.collision.addCircle(x + tx * 1.1, z + tz * 1.1, 0.85, 2), W.collision.addCircle(x - tx * 1.1, z - tz * 1.1, 0.85, 2));", "rec.circles.push(...chain(x, z, tx, tz, { hatch: 3.65, sedan: 4.0, suv: 4.5 }[k], { hatch: 1.62, sedan: 1.72, suv: 1.82 }[k])); for (const c of rec.circles) c.rec = rec;"],
+    ["rec.circles.push(W.collision.addCircle(px, pz, 0.45, 2));", "rec.circles.push(...chain(px, pz, hx, hz, k === 'bike' ? 2.0 : 1.85, 0.62)); for (const c of rec.circles) c.rec = rec;"],
+    ["rec.circles.push(W.collision.addCircle(px, pz, 0.8, 2), W.collision.addCircle(px - tx * 0.9, pz - tz * 0.9, 0.7, 2));", "rec.circles.push(...chain(px, pz, -tx, -tz, 2.7, 1.38)); for (const c of rec.circles) c.rec = rec;"],
   ],
   // the police (beta/game/pursuit.js has the rest): they actually chase. Faster the higher the heat; quicker to react;
   // they go where you're going to be, not where you were a second ago; at three stars and up they ram you off the road

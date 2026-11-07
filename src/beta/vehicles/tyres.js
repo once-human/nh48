@@ -26,13 +26,15 @@ const DRIFT = { sports: [1.35, 0.72], super: [1.4, 0.68] }, ORDINARY = [1.85, 0.
 // How loose the back is right now, 0 to 1: the car, what's under it, the tyres on it. On a dry road an ordinary car holds
 // on unless you really ask for it and a 911 will go on steering alone if you're rough; on dirt or grass anything will,
 // rain helps, and drift tyres slide everywhere. This is what steering alone has to overcome; the handbrake skips the wait.
-const LOOSE = { hatch: 0.06, sedan: 0.06, taxi: 0.06, suv: 0.05, lux: 0.3, jeep: 0.18, sports: 0.3, super: 0.24, tempo: 0.02, bus: 0 };
+const LOOSE = { hatch: 0.06, sedan: 0.06, taxi: 0.06, suv: 0.05, lux: 0.3, jeep: 0.18, sports: 0.22, super: 0.22, tempo: 0.02, bus: 0 };
 // how much sideways pull full lock asks for at speed (m/s²): the lock is what gives this and no more, a little under the
 // tyres' peak, so the car turns hard and stays clean instead of ploughing on (too much lock) or barely turning (too little).
 // Supercars sharpest, heavy things slowest
 const TURN = { super: 13, sports: 12.5, lux: 10.5, hatch: 9, sedan: 9, taxi: 8.5, suv: 8.2, jeep: 7.6, auto: 6, tempo: 5.8, bus: 3.8 };
 // a low car's body pushes it onto the road at speed (share of grip added at 70 m/s)
-const AERO = { super: 0.4, sports: 0.3, lux: 0.08 };
+const AERO = { super: 0.75, sports: 0.5, lux: 0.12 };
+// how far past the plain limit the turning's let go on a dry road, by how much of a car it is
+const AGILE = { super: 0.25, sports: 0.2, lux: 0.08 };
 // An auto rickshaw doesn't slide: one wheel in front and a high seat, so it runs out of footprint before it runs out
 // of grip: the inside wheel comes up first (on two wheels), and pushed further it goes over (beta/vehicles/auto3w.js)
 const THREE_WHEEL = new Set(['auto']);
@@ -53,7 +55,9 @@ Vehicle.prototype.tyres = function (dt, inp, thr) {
   const off = !!this.onFootpath, tyreE = this.driftEase || 1, heavy = base === 'bus' || base === 'tempo' ? 0.4 : 1;
   const wantL = tw ? 0 : clamp(((LOOSE[base] ?? 0.06) + (off ? (this.offroad || base === 'jeep' ? 0.2 : 0.42) : 0) + wet*0.2 + (tyreE > 1.5 ? 0.45 : tyreE < 1 ? -0.08 : 0) + (this.modeLoose || 0))*heavy, 0, 1);
   this._loose = lerp(this._loose ?? wantL, wantL, Math.min(1, dt*3));
-  const L = this._loose;
+  // (a low car on a dry road is planted at speed: the looseness is for the speeds you'd throw one about at, not 200 km/h,
+  // where it came in as a whip on turning in. Dirt and drift tyres keep theirs)
+  const L = this._loose*(off || tyreE > 1.5 ? 1 : 1 - 0.8*clamp((Math.abs(this.v) - 24)/20, 0, 1));
   const mu = S.mu/G*(this.gripMul || 1)*(1 - wet*0.28)*(off && !this.offroad ? (base === 'jeep' ? 0.9 : 0.74) : 1)*(tw ? 1.4 : 1)*aero;
   const sporty = !!(DRIFT[base] || DRIFT[this.type]), dr = DRIFT[base] || DRIFT[this.type] || ORDINARY, muR = mu*lerp(dr[0], 1.02, Math.min(1, L*1.1));
   const ease = tyreE*dr[1]*(1 + wet*0.5)*(1 + L*0.9);
@@ -66,7 +70,7 @@ Vehicle.prototype.tyres = function (dt, inp, thr) {
   // ---- steering: the wheel turns at a hand's pace, less lock the faster you go; while the back's out the wheels
   // are helped round toward where the car's going (what your hands do: catch it), more the less you're asking for
   const u0 = this.v, sp = Math.hypot(u0, this.vl || 0);
-  const u2 = Math.max(16, u0*u0), maxSteer0 = Math.min(S.steerMax, Math.atan(wb*(TURN[base] || 8.5)*(1 - wet*0.3)*aero/u2) + 0.062);
+  const u2 = Math.max(16, u0*u0), maxSteer0 = Math.min(S.steerMax, Math.atan(wb*(TURN[base] || 8.5)*(this.turnMul || 1)*(1 - wet*0.3)*aero/u2) + 0.062 + (AGILE[base] || 0)*0.16*(this.turnMul || 1));
   const beta = Math.abs(u0) > 2 ? Math.atan2(this.vl || 0, Math.abs(u0)) : 0;
   // steering the way the car's sliding: your hands go past where it's heading, so a slide one way can be flicked into one
   // the other way without getting speed up again (at speed the lock was too small for the wheels ever to get past the slide)
@@ -75,8 +79,11 @@ Vehicle.prototype.tyres = function (dt, inp, thr) {
   const maxSteer = maxSteer0*(1 + L*0.5) + (flick ? Math.abs(beta)*1.15 : 0);
   const assist = (hb ? 0.3 : 0.7 - 0.3*Math.abs(inp.steer || 0))*(1 - L*0.5);
   const target = clamp(clamp(inp.steer || 0, -1, 1)*maxSteer + beta*assist*Math.sign(u0 || 1), -S.steerMax, S.steerMax);
-  // (a keypress is all or nothing, so the wheel takes a fifth of a second to full lock at any speed; quick hands catching a slide)
-  const rate = Math.max(Math.abs(beta) > 0.1 ? 6 : Math.abs(target) < Math.abs(this.steer) ? 5 : 3.8, 0)*(Math.abs(beta) > 0.06 ? 1 : Math.min(1, Math.max(0.3, maxSteer/S.steerMax*1.25)));
+  // (a keypress is all or nothing, so the wheel takes a fifth of a second to whatever lock this speed allows, however fast you're
+  // going: at speed that's a small lock, and snapped on it was a whip of the nose, then the turn sagging. Quick hands catching a
+  // slide; slow enough, as fast as a hand goes)
+  const easing = Math.abs(target) < Math.abs(this.steer);
+  const rate = Math.abs(beta) > 0.06 ? 6 : sp > 8 ? Math.max(0.2, maxSteer/(easing ? 0.14 : 0.2)) : easing ? 5 : 3.8;
   this.steer += clamp(target - this.steer, -rate*dt, rate*dt);
   const d = this.steer, cd = Math.cos(d), sd = Math.sin(d);
   // ---- the forces, in small steps (the tyres are stiff)
@@ -86,7 +93,7 @@ Vehicle.prototype.tyres = function (dt, inp, thr) {
   const hbSlip = hbSoft ? 1 : 0;
   // the driven axle's push (the game already added it to the speed; here it only uses up the tyres' grip)
   const push = Math.max(0, thr)*S.acc*(this.accMul || 1)*Math.max(0, 1 - Math.pow(Math.max(0, u)/(S.vTop*(this.powerMul ?? 1)), 3))*m;
-  const pF = drive === 'F' ? push : drive === 'A' ? push*0.45 : 0, pR = push - pF;
+  const pF = drive === 'F' ? push : drive === 'A' ? push*(base === 'super' ? 0.28 : 0.45) : 0, pR = push - pF;
   for (let i = 0; i < n; i++) {
     const tr = clamp(m*ax*h/wb, -m*G*0.45, m*G*0.45);
     const Fzf = Math.max(0.1*m*G, m*G*b/wb - tr), Fzr = Math.max(0.1*m*G, m*G*a/wb + tr);
@@ -123,7 +130,7 @@ Vehicle.prototype.tyres = function (dt, inp, thr) {
     const sl = clamp((Math.abs(bt) - 0.03)/0.12, 0, 1);
     if (sl > 0 && !hbL) dw -= (w - u*Math.tan(d)/wb)*(hbSlip > 0 ? 3 : 9)*sl*(1 - L*0.7)*(flick ? 0.25 : 1);
     // no snap: turning never runs past what the tyres can actually hold at this speed (a driver feeling it)
-    if (!hb && !flick && Math.abs(u) > 6) { const wMax = mu*G*(1.12 + L*0.9)/Math.abs(u); if (Math.abs(w) > wMax) dw -= (w - Math.sign(w)*wMax)*14*(1 - L*0.6); }
+    if (!hb && !flick && Math.abs(u) > 6) { const wMax = mu*G*((1.12 + (AGILE[base] || 0))*(this.turnMul || 1) + L*0.9)/Math.abs(u); if (Math.abs(w) > wMax) dw -= (w - Math.sign(w)*wMax)*60*(1 - L*0.6); }
     const du = (-Fyf*sd + Fxr)/m + s*w, ds = (Fyf*cd + Fyr)/m - u*w;
     u += du*hs; s += ds*hs; w += dw*hs;
     // slow, the tyres just roll where they point (no slip worth the name; and no jitter about zero), and the car turns

@@ -76,6 +76,8 @@ P.contact = function () {
     }
     if (lc) for (const q of lc) {
       if (q.off || seen.has(q)) continue; seen.add(q);
+      // (a parked vehicle driven into at any speed stops being scenery: a real one takes its place, and it's hit as one)
+      if (q.rec && !q.rec.taken && this.W.playerVeh === this && Math.abs(this.v) > 1.2 && this.wakeParked && this.wakeParked(q.rec)) continue;
       const [cx, cz] = loc(q.x, q.z), kx = clamp(cx, -a, a), kz = clamp(cz, -b, b), ex = cx - kx, ez = cz - kz, d = Math.hypot(ex, ez), rr = RC + q.r;
       if (d >= rr) continue;
       let m;

@@ -201,7 +201,7 @@ function tune(A, V, k, seed = 0) {
 }
 // set a voice going: r 0..1 of the way from idle to redline, load 0..1 (the throttle, how hard it's pulling), gain
 function drive(A, V, k, r, load, gain, seed = 0) {
-  const C = CLS[k], t = A.ctx.currentTime, rate = A.rateMul || 1, loud = A.engLoud || 1;
+  const C = CLS[k], t = A.ctx.currentTime, rate = A.rateMul || 1, loud = (A.engLoud || 1)*(A.modeVol || 1);
   const Q = tune(A, V, k, seed) || self(k, seed), idle = C.idle*Q.idle;
   const rpm = idle + (C.red - idle)*Math.max(0, Math.min(1.08, r));
   if (V.w) {

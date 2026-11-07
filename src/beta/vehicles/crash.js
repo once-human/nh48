@@ -10,7 +10,7 @@ import { promote } from './damage.js';
 
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const now = () => performance.now()/1000, G0 = () => window.__nhAskG;
-const THROWN = 7;            // m/s the blow gives a car before it's a real, dented one
+const THROWN = 8;            // m/s the blow gives a car before it's a real, dented one
 const SLIDE = 6.5;           // m/s² of a pushed vehicle's tyres scraping
 
 // where it stands in its lane (as traffic/spacing.js: along its link and across it, so it carries on from there)
@@ -42,7 +42,7 @@ Traffic.prototype.update = function (dt, ...rest) {
   return r;
 };
 function coast(TR, v, dt) {
-  const q = v._c, sp = Math.hypot(q.vx, q.vz), W = v.W, k = Math.max(0, sp - 7.5*dt)/(sp || 1);
+  const q = v._c, sp = Math.hypot(q.vx, q.vz), W = v.W, k = Math.max(0, sp - 8.5*dt)/(sp || 1);
   q.vx *= k; q.vz *= k; q.w *= Math.max(0, 1 - 1.8*dt);
   v.x += q.vx*dt; v.z += q.vz*dt; v.th += q.w*dt;
   const c = W.collision && W.collision.resolve(v.x, v.z, v.spec.W/2);
@@ -63,6 +63,20 @@ function coast(TR, v, dt) {
 const add = Pilot.prototype.addDropped;
 Pilot.prototype.addDropped = function (veh, traffic) { const r = add.call(this, veh, traffic); const d = this.dropped.find(q => q.veh === veh); if (d) d.st.veh = veh; return r; };
 
+// a car in a parked row, hit: the row's drawn one goes and a real one is standing there, the same colour, in the same spot
+Vehicle.prototype.wakeParked = function (r) {
+  const G = G0(), Pl = G && G.player, TR = G && G.traffic; if (!TR || r.taken) return false;
+  r.taken = true;
+  for (const it of r.items) it.off = true;
+  for (const c of r.circles) c.off = true;
+  if (r.static && TR.statics) { const i = TR.statics.indexOf(r.static); if (i >= 0) TR.statics.splice(i, 1); }
+  Pl.W._propX = undefined;
+  const v = new Vehicle(Pl.W, Pl.scene, Pl.vmats, r.kind, r.col);
+  v.reset(r.x, r.z, Math.atan2(r.hz, r.hx)); v.y = Pl.W.surf.height(r.x, r.z); v.v = 0;
+  v.plate = Pl.randomPlate ? Pl.randomPlate() : v.plate; v.sync && v.sync(0);
+  Pl.addDropped(v, TR); TR.staticsT = 0;
+  return true;
+};
 // where the blow went in on a real car: dented there, by how hard it was hit; turned by how far off its middle it was
 function struck(v, cx, cz, dirx, dirz, dv, m2) {
   const c = Math.cos(v.th), s = Math.sin(v.th), dx = cx - v.x, dz = cz - v.z, S = v.spec;
@@ -75,12 +89,15 @@ function struck(v, cx, cz, dirx, dirz, dv, m2) {
   return clamp(dv*(lx*nz - lz*nx)*12/(S.L*S.L + S.W*S.W), -3.5, 3.5);
 }
 Vehicle.prototype.hitTraffic = function (o, T, H, traffic) {
-  const { nx, nz, J, imp, lx, lz, m2 } = H, dv = J/m2, ix = -nx*dv, iz = -nz*dv, hx = Math.cos(this.th), hz = Math.sin(this.th);
+  // (what's thrown goes a little less far than the sums say: a body crumples and takes some of it, and an auto's so light it
+  // flew off like a toy)
+  const K = /^auto/.test(o.type || (o.veh && o.veh.type) || '') ? 0.72 : 0.88;
+  const { nx, nz, J, imp, lx, lz, m2 } = H, dv = J/m2, ix = -nx*dv*K, iz = -nz*dv*K, hx = Math.cos(this.th), hz = Math.sin(this.th);
   const cx = this.x + hx*lx - hz*lz, cz = this.z + hz*lx + hx*lz, G = G0();
   o._hitT = now() + 0.5;
   // one left in the street: it's a real car already
   if (o.parked) {
-    const v = o.veh, q = v._c, w = struck(v, cx, cz, -nx, -nz, dv, m2);
+    const v = o.veh, q = v._c, w = struck(v, cx, cz, -nx, -nz, dv, m2)*K;
     throwCar(v, o, (q ? q.vx : 0) + ix, (q ? q.vz : 0) + iz, (q ? q.w : 0) + w);
     if (imp > 2.2) this.events.push({ type: 'crash', speed: imp, kind: 2, x: o.x, z: o.z });
     return;
@@ -95,7 +112,7 @@ Vehicle.prototype.hitTraffic = function (o, T, H, traffic) {
   } else if (dv >= THROWN && !o.service && !o.wreck && !o.hideBody && !(o.argue > 0) && !((o.y || 0) > 0.5) && G) {
     const ovx = o.hx*(o.v || 0), ovz = o.hz*(o.v || 0), v = promote(G, o);
     if (v) {
-      const st = G.player.dropped.find(q => q.veh === v)?.st, w = struck(v, cx, cz, -nx, -nz, dv, m2);
+      const st = G.player.dropped.find(q => q.veh === v)?.st, w = struck(v, cx, cz, -nx, -nz, dv, m2)*K;
       if (st) throwCar(v, st, ovx + ix, ovz + iz, w);
       this.events.push({ type: 'crash', speed: imp, kind: 2, x: v.x, z: v.z });
       return;
