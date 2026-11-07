@@ -84,3 +84,12 @@ body.nh-nohud #ui { display: none !important; }
 
 /* the title's menu: every line starts at the same place and stays on one line */
 .ttl .pz-menu .pz-i{white-space:nowrap;text-align:left}
+/* what this car has, by the speedometer: dim until it's working */
+.dash .sys{display:flex;gap:5px;justify-content:flex-end;font:700 10px var(--font-ui);letter-spacing:.08em}
+.dash .sys[hidden],.dash .sys span[hidden],.dash.foot .sys{display:none}
+.dash .sys span{padding:2px 6px;border-radius:4px;color:rgba(244,241,234,.38);background:rgba(10,11,13,.55)}
+.dash .sys span[data-k=mode]{color:var(--paper)}
+.dash .sys span.on{color:#ffb020;animation:sys-pulse .22s steps(2) infinite}
+.dash .sys span.red.on{color:#ff6a5f;animation:none}
+.dash .sys span[data-k=lt].on{color:#9fd8ff;animation:none}
+@keyframes sys-pulse{50%{opacity:.35}}

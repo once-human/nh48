@@ -28,6 +28,7 @@ import './vehicles/twowheel.js';      // two-wheelers lean to turn, each its own
 import './vehicles/steerfront.js';    // the bars, fork and front wheel turn with the steering
 import './vehicles/damage.js';        // dents where it's hit, holes where it's shot, flat tyres, fire from the engine
 import './vehicles/crawl.js';         // never stuck: a crawl either way whatever state it's in
+import './vehicles/brakes.js';        // each vehicle's own brakes; ABS, traction control and drive modes only where they're real
 import './vehicles/auto3w.js';        // an auto corners on two wheels, and goes over, instead of sliding
 import './vehicles/lamps.js';         // brake and reverse lamps that answer the pedals, yours and everyone's
 import './vehicles/potholes.js';      // potholes jolt each kind of vehicle its own way
@@ -69,6 +70,7 @@ import './vehicles/busboards.js';     // PMPML route boards: a real route's numb
 import './world/fade.js';             // street furniture fades in and out at the edge of its range
 import './world/stopnames.js';        // each bus shelter's own stop name on its board
 import './game/medics.js';            // paramedics wait while you're dragging the one they came for
+import './game/dash.js';              // the car's lights on the speedometer; a continuous tyre squeal
 import './game/engines.js';           // every vehicle its own engine (a bicycle its freewheel), yours and the street's
 import './game/voices.js';            // overheard chatter and muttering quieter than talk aimed at you
 import './vehicles/cabinfit.js';    // the cabin kept inside each car's own shell

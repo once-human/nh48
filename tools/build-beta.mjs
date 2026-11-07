@@ -53,6 +53,8 @@ const SWAPS = [
 ];
 // a line in a game file swapped as it's bundled: only for what a module swap can't reach. Fails the build if the line has moved
 const PATCHES = {
+  // the tyres' squeal is one continuous sound now (beta/game/dash.js), not a burst every few frames
+  [S('game/modfx.js')]: [["if ((this._sqT = (this._sqT || 0) - 1 / 60) <= 0) { this._sqT = 0.09; G.audio.noiseBurst?.(0.12, 2400 + Math.random() * 600, 6, Math.min(0.22, ev.amount * 0.03)); }", ""]],
   // a postcard is a second full render and a stop-the-world read of its pixels: taken only when you're not moving fast, never mid-drive
   [S('game/postcards.js')]: [["if (G.state !== 'play' || !this.ok() || (G.jhola && G.jhola.on) || (G.phone && G.phone.on)) return;", "if (G.state !== 'play' || !this.ok() || (G.jhola && G.jhola.on) || (G.phone && G.phone.on) || (!G.player.onFoot && Math.abs(G.player.cur.v || 0) > 2.5)) return;"]],
   [S('game/garageui.js')]: [["[tog('xenon', cyc ? 'LED lamp' : 'Xenon headlights', 'Cold white, reaches further', $(2500)), ...(cyc ? [] : [", "[...(cyc ? [] : [tog('xenon', 'Xenon headlights', 'Cold white, reaches further', $(2500)), "], ["(this.mine ? 'Your ' : '') + here.spec.name.toLowerCase();", "(this.mine ? 'Your ' : '') + (here.spec.real || here.spec.name);"]],
@@ -93,6 +95,8 @@ const PATCHES = {
     ["const pitch = (p.inAuto ? -0.17 : -0.035)", "const pitch = (p.inAnyAuto ? -0.17 : -0.035)"],
     ["this.setFov(dt, (p.inAuto ? 78 : 70) + speed * 0.3);", "this.setFov(dt, (p.inAnyAuto ? 78 : 70) + speed * 0.3);"]],
   [S('vehicles/vehicle.js')]: [
+    // the nose goes down under brakes and up under power (it was the wrong way round, and hardly there)
+    ["this.pitch += (Math.atan2(hF - hR, S.wb) - clamp(a * 0.006, -0.025, 0.025) - this.pitch) * Math.min(1, dt * 12);", "this.pitch += (Math.atan2(hF - hR, S.wb) + clamp(a * 0.0065, -0.05, 0.025) - this.pitch) * Math.min(1, dt * 9);"],
     // a body that dents counts its damage by its dents (beta/vehicles/damage.js), not twice
     ["if (imp < 4 || (v._kT || 0) > now) return;", "if (imp < 4 || (v._kT || 0) > now || v.dentDmg) return;"],
     // the wheel's drop into a pothole is the hole's and the wheel's own (beta/vehicles/potholes.js)
