@@ -131,7 +131,10 @@ function hang(P, veh, s) {
   if (cg && cg.door.index.count) { gm = new THREE.Mesh(cg.door, Gm.material); gm.position.copy(dm.position); pivot.add(gm); }
   B.geometry = cb.rest; if (cg) Gm.geometry = cg.rest;
   veh.tilt.add(pivot);
-  const R = { veh, s, D, pivot, dm, gm, body0, glass0, ang: 0, vel: 0, goal: 0, t: 0, auto: false, slam: false, closeAt: null, root: pivot };
+  // its inside goes with it: the card, the armrest, the pull
+  const trim = veh.cockpit && veh.cockpit.group.userData.trim ? veh.cockpit.group.userData.trim[s] : null;
+  if (trim) { trim.position.copy(dm.position); pivot.add(trim); }
+  const R = { veh, s, D, pivot, dm, gm, trim, body0, glass0, ang: 0, vel: 0, goal: 0, t: 0, auto: false, slam: false, closeAt: null, root: pivot };
   (P.doors || (P.doors = [])).push(R);
   return R;
 }
@@ -139,6 +142,7 @@ function unhang(P, R) {
   const { veh } = R;
   if (veh.bodyMesh.geometry !== R.body0) veh.bodyMesh.geometry = R.body0;
   if (R.glass0 && veh.glassMesh) veh.glassMesh.geometry = R.glass0;
+  if (R.trim) { R.trim.position.set(0, 0, 0); veh.cockpit.group.add(R.trim); }
   R.pivot.parent && R.pivot.parent.remove(R.pivot);
   R.dm.dispose();
   const i = P.doors ? P.doors.indexOf(R) : -1; if (i >= 0) P.doors.splice(i, 1);

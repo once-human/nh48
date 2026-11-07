@@ -109,6 +109,7 @@ const PATCHES = {
     ["-clamp(this.latAcc * 0.01, -0.06, 0.06);", "-clamp(this.latAcc * 0.01, -0.06, 0.06) + gr.roll;"],
     ["import { buildScooter, buildBike, buildCycle, buildCar, buildBus, buildTempo, buildAuto, PAINTS, wheelsOf } from './models.js';", "import { buildScooter, buildBike, buildCycle, buildCar, buildBus, buildTempo, buildAuto, PAINTS, wheelsOf, VARIANTS, baseOf } from './models.js';"],
     ["default: return buildCar('hatch');", "default: return VARIANTS[type] ? buildCar(type, { interior: true }) : buildCar('hatch');"],
+    ["this.cockpitEye = this.cockpit.eye;", "this.cockpitEye = this.cockpit.eye; this.fitCabin && this.fitCabin();"],
     ["if (['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super'].includes(type)) {", "if (['hatch', 'sedan', 'suv', 'taxi', 'lux', 'jeep', 'sports', 'super'].includes(baseOf(type))) {"],
     ["export function defaultPaint(type, rng) {", "export function defaultPaint(type, rng) {\n  type = baseOf(type);"],
     // a car corners on its tyres (beta/vehicles/tyres.js); two-wheelers keep the leaning model below
@@ -155,7 +156,7 @@ const PATCHES = {
     ["const target = (fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0;", "const target = ((fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0) * (this.slowMul ? this.slowMul() : 1) * (this.crouchMul ? this.crouchMul() : 1);"],
     // knocked down by a vehicle only if it's coming at you: walking into the back of a scooter riding away from you
     // (or alongside one) is a bump, not being run over (it counted its speed, not which way it was going)
-    ["if ((o.v || 0) > 3.5 && !this.downT) {", "if (!this.downT && ((o.hx * (o.v || 0) - F.vx) * rx + (o.hz * (o.v || 0) - F.vz) * rz) / (Math.hypot(rx, rz) || 1) > 3.5) {"],
+    ["if ((o.v || 0) > 3.5 && !this.downT) {", "if (!this.downT && (o.v || 0) > 2.5 && (o.hx * o.v * rx + o.hz * o.v * rz) / (Math.hypot(rx, rz) || 1) > 2.5) {"],
     // sat in a chair you're not pushed out of it (a salon chair, the jhula: solid now, beta interiors)
     ["if (res && !(F.air && res.kind === 2 && F.y - groundY() > 0.55) && !(F.swim && res.kind === 4)) {", "if (res && !this.seated && !(F.air && res.kind === 2 && F.y - groundY() > 0.55) && !(F.swim && res.kind === 4)) {"],
     // a scene that moves you itself (beta/game/acts.js: dragging someone, walking up to them) sets the pace, as a roll does
@@ -309,6 +310,16 @@ const PATCHES = {
   // the cabin inside /beta's bodies (they're not main's shapes): seats scaled under each roof, the rear bench under the
   // roof's back (none in the two-seaters), pillars and mirror under the roof's front edge
   [S('vehicles/cockpit.js')]: [
+    // the cabin's there from the moment the car is (it only came on when the camera changed view, so a first time in had
+    // no seats, wheel or dash)
+    ["group.visible = false;", "group.visible = true;"],
+    // the door card, armrest and pull belong to the door: they hang off it when it opens (beta/vehicles/cardoor.js), and
+    // only what's behind the door's shut line stays with the cabin. They used to stay put as a wall in the doorway.
+    ["import { carSpec } from './models.js';", "import { carSpec, doorOf } from './models.js';"],
+    ["const c = new ColorBuilder(), CLOTH =", "let c = new ColorBuilder(); const CLOTH ="],
+    ["bx(xb, fl, zi - sd * 0.05, xd, belt - 0.02, zi, TRIM);", "const D = doorOf(kind), d0 = Math.max(xb, D.x0 + 0.015), d1 = Math.min(xd, D.x1 - 0.02), dc = new ColorBuilder(), c0 = c; if (d0 > xb) bx(xb, fl, zi - sd * 0.05, d0 - 0.01, belt - 0.02, zi, TRIM); if (d1 < xd) bx(d1 + 0.01, fl, zi - sd * 0.05, xd, belt - 0.02, zi, TRIM); c = dc; bx(d0, D.y0 + 0.01, zi - sd * 0.05, d1, belt - 0.02, zi, TRIM);"],
+    ["bx(xf0 - 1.55, belt - 0.32, zi - sd * 0.13, xf0 - 0.85, belt - 0.26, zi - sd * 0.04, SOFT.concat([0, MATTE]));", "bx(Math.max(xf0 - 1.55, d0), belt - 0.32, zi - sd * 0.13, Math.min(xf0 - 0.85, d1), belt - 0.26, zi - sd * 0.04, SOFT.concat([0, MATTE]));"],
+    ["bx(xf0 - 0.4, belt - 0.05, zi - sd * 0.12, xf0 - 0.1, belt + 0.02, zi, TRIM);", "if (xf0 - 0.1 >= D.x1) c = c0; bx(xf0 - 0.4, belt - 0.05, zi - sd * 0.12, xf0 - 0.1, belt + 0.02, zi, TRIM); c = c0; { const tm = new THREE.Mesh(dc.build(), mats.solid); group.add(tm); (group.userData.trim || (group.userData.trim = {}))[sd] = tm; }"],
     // the wheel turns the way you steer, about three times the tyres, and eases there instead of snapping
     ["spin.rotation.z = steer * 7.5;", "spin.userData.s = (spin.userData.s || 0) + (-steer * 3.2 - (spin.userData.s || 0)) * 0.14; spin.rotation.z = spin.userData.s;"],
     ["const fl = S.sill + 0.06, xb = -hl + 0.55, xd = xf0 - 0.55;", "const fl = S.sill + 0.06, xb = -hl + 0.55, xd = xf0 - 0.55, kS = Math.min(1, (S.H - (kind === 'sports' || kind === 'super' ? 0.24 : 0.15) - fl) / 1.2);"],
