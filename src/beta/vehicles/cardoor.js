@@ -49,10 +49,25 @@ function cutGeo(geo, D, s) {
   };
   const xs = [D.x0, D.x0g, D.x1].filter((v, i, a) => a.indexOf(v) === i), planes = [...xs.map(v => [0, v]), [1, D.y0]];
   const [wx, wy, wr] = D.wheel;
+  // how wide the body really is at each height along the door (it tucks in towards the sill: under a fixed line, the lower
+  // half of the door's skin stayed behind on the body while the top half swung open). From the skin itself: what faces out.
+  const NB = 12, bandY = (y) => Math.max(0, Math.min(NB - 1, Math.floor((y - D.y0)/(D.belt - D.y0)*NB))), prof = new Float32Array(NB).fill(-1), NA = ni >= 0 ? data[ni] : null;
+  for (let t = 0; t < nt && NA; t++) {
+    const v = ix ? [ix[t*3], ix[t*3 + 1], ix[t*3 + 2]] : [t*3, t*3 + 1, t*3 + 2];
+    if (Math.max(at(v[0], 0), at(v[1], 0), at(v[2], 0)) < D.x0 || Math.min(at(v[0], 0), at(v[1], 0), at(v[2], 0)) > D.x1) continue;
+    if (NA[v[0]*3 + 2]*s < 0.3 || NA[v[1]*3 + 2]*s < 0.3 || NA[v[2]*3 + 2]*s < 0.3) continue;
+    v.sort((p, q) => at(p, 1) - at(q, 1));
+    const yl = at(v[0], 1), yh = at(v[2], 1), zl = at(v[0], 2)*s, zh = at(v[2], 2)*s;
+    if (yh < D.y0 || yl > D.belt) continue;
+    for (let b = bandY(yl); b <= bandY(yh); b++) { const yc = D.y0 + (b + 0.5)/NB*(D.belt - D.y0), k = yh > yl ? Math.max(0, Math.min(1, (yc - yl)/(yh - yl))) : 0; prof[b] = Math.max(prof[b], zl + (zh - zl)*k); }
+  }
+  for (let b = 1; b < NB; b++) if (prof[b] < 0) prof[b] = prof[b - 1];
+  for (let b = NB - 2; b >= 0; b--) if (prof[b] < 0) prof[b] = prof[b + 1];
+  const zMin = (x, y) => y < D.belt + .012 && prof[0] > 0 ? Math.max(D.hw(x)*0.35, Math.min(D.zIn(x, y), prof[bandY(y)] - 0.09)) : D.zIn(x, y);
   const inDoor = (x, y, z) => {
     z *= s;
     if (y < D.y0 || x > D.x1 || x < (y < D.belt + .012 ? D.x0 : D.x0g)) return false;
-    if (z < D.zIn(x, y) || y > D.top(x)) return false;
+    if (z < zMin(x, y) || y > D.top(x)) return false;
     if (x > D.hood && y > D.belt - .012) return false;
     return Math.hypot(x - wx, y - wy) > wr;
   };
@@ -198,6 +213,11 @@ Pilot.prototype.enter = function (offer, traffic) {
   let p = stand(1);
   // the driver's door blocked: the passenger door, and over to the driver's seat once in
   if (!free(this, traffic, p.x, p.z, src)) { const q = stand(-1); if (free(this, traffic, q.x, q.z, src)) { p = q; E.s = -1; E.pass = true; } }
+  // an empty car, and you're standing on its left: you get in on the left and slide across
+  else if (offer.kind !== 'traffic') {
+    const F = this.foot, th = src.th ?? Math.atan2(src.hz, src.hx), lat = -(F.x - src.x)*Math.sin(th) + (F.z - src.z)*Math.cos(th);
+    if (lat < -0.2) { const q = stand(-1); if (free(this, traffic, q.x, q.z, src)) { p = q; E.s = -1; E.pass = true; } }
+  }
   E.door = { x: p.x, z: p.z }; this.puppet = E.door;
   E.locked = offer.kind === 'parked' ? hash(src.x, src.z) < 0.55 : offer.kind === 'traffic' ? Math.random() < 0.3 : false;
   E.wire = E.locked && offer.kind === 'parked';

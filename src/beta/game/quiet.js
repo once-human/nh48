@@ -58,6 +58,26 @@ function overhear(G, dt) {
   G.hud.say('', l[0], l[1], 3.6, true);
   Q.t = 35 + Math.random()*70;       // (not all the time: it's something you happen to catch)
 }
+// Aai. Most evenings, a line, about nothing. You can't answer from here and nothing happens if you don't; it just stays there.
+const AAI = [
+  (f) => f ? 'Jevlis ka?' : 'Jevlas ka?',
+  () => 'Phone uchal na.',
+  () => 'Baba vicharat hote.',
+  () => 'Thandi aahe tikde? Swetter ghe.',
+  () => 'Kahi nahi, asach.',
+  (f) => f ? 'Diwali la yetes na?' : 'Diwali la yetos na?',
+  () => 'Mi gharich aahe. Ye kadhi pan.',
+  () => 'Tuza avadta ladu kela hota. Thevla aahe.',
+  () => 'Bank che papers kuthe thevle?',
+  () => 'Ajoba thik aahet, kalji karu nako.',
+];
+function aai(G) {
+  const Ph = G.phone, h = G.hour ?? 12; if (!Ph || !Ph.push || G.state !== 'play' || h < 19.5 || h > 22) return;
+  const day = Math.floor((G.clock || 0)/24); if (G._aaiDay === day) return;
+  G._aaiDay = day; if (Math.random() > 0.7) return;
+  const n = G._aaiN = ((G._aaiN ?? Math.floor(Math.random()*AAI.length)) + 1) % AAI.length;
+  Ph.push('Aai', AAI[n](!!G.player?.look?.female));
+}
 const upd = HUD.prototype.update;
 HUD.prototype.update = function (dt) {
   const r = upd.call(this, dt), G = this.game, P = G && G.player;
@@ -67,7 +87,7 @@ HUD.prototype.update = function (dt) {
   this._walkT = !busy && moving ? (this._walkT || 0) + dt : Math.max(0, (this._walkT || 0) - dt*40);
   const q = this._walkT > 14;
   if (q !== this._q) { this._q = q; this.root.classList.toggle('walking', q); }
-  if (dt > 0) overhear(G, dt);
+  if (dt > 0) { overhear(G, dt); aai(G); }
   return r;
 };
 // ---- the buses and the metro keep their hours: PMPML about half past five till eleven, the Metro six till ten. At night the road's your own
