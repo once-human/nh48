@@ -142,6 +142,8 @@ const PATCHES = {
   [S('ui/hud.js')]: [["this.nerd = el('div', 'h nerd', 'E jhola · J diary · F3 stats');", "this.nerd = el('div', 'h nerd', 'Q jhola · I phone · J diary · F3 stats');"]],
   [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'], ['E', 'Jhola'],", "['F', 'Walk in, counters, pet'], ['E', 'Get in or out of a vehicle'], ['T', 'Talk to someone'], ['Q', 'Jhola'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
   [S('game/pilot.js')]: [
+    // you go over with the auto when it goes over (and up with it on two wheels)
+    ["H.holder.rotateX(v.lean || 0);", "H.holder.rotateX(v.lean || (/^auto/.test(v.type || 'auto') ? v.tilt.rotation.x : 0));"],
     // prompts name the vehicle: its real model, not its body type
     ["S.two ? `Get on the ${S.name.toLowerCase()}` : `Get in the ${S.name.toLowerCase()}`", "S.two ? `Mount ${S.real || S.name}` : `Get in the ${S.real || S.name}`"],
     ["label: `Take the parked ${S.name.toLowerCase()}`", "label: `Take the parked ${S.real || S.name}`"],

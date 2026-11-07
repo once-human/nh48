@@ -52,7 +52,7 @@ function setup(v) {
 }
 // how far the bars are turned: the steer itself at a walk, less as it speeds up (at speed it steers by leaning, the
 // bars hardly move)
-const barsOf = (v) => { const sp = Math.abs(v.v || 0); return Math.max(-0.6, Math.min(0.6, (v.steer || 0)*(sp < 1 ? 1 : 1/(1 + (sp - 1)*0.18)))); };
+const barsOf = (v) => { if (v.barVis !== undefined) return v.barVis; const sp = Math.abs(v.v || 0); return Math.max(-0.6, Math.min(0.6, (v.steer || 0)*(sp < 1 ? 1 : 1/(1 + (sp - 1)*0.18)))); };
 const sync = Vehicle.prototype.sync;
 Vehicle.prototype.sync = function (dt = 0) {
   if (this.spec && this.spec.two && this._fr === undefined && this.bodyMesh) setup(this);

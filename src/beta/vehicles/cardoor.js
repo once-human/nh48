@@ -232,7 +232,7 @@ function smash(P, E) {
 
 // what pilot.js asks for (getting out of a car the old way): this car's own door, open, and shut a moment later
 Pilot.prototype.openDoor = function (src, kind, s = 1) {
-  if (this._noDoor || !src.bodyMesh) return { veh: null, closeAt: null, dud: true };
+  if (this._noDoor || !src.bodyMesh || /^auto/.test(src.type || 'auto')) return { veh: null, closeAt: null, dud: true };     // (an auto has no doors)
   const R = hang(this, src, s); R.auto = true; return R;
 };
 Pilot.prototype.tickDoors = function (dt) {
@@ -541,7 +541,7 @@ Pilot.prototype.updateFoot = function (dt, input, ...a) { this._inp = input; ret
 const exit = Pilot.prototype.exit;
 Pilot.prototype.exit = function (traffic, force = false) {
   const veh = this.cur, H = this.human, was = this.onFoot;
-  const car = !was && veh && veh !== this.auto && veh.bodyMesh && veh.spec && !veh.spec.two && veh.type !== 'bus' && veh.type !== 'tempo' && (() => { try { doorOf(veh.type); return true; } catch (e) { return false; } })();
+  const car = !was && veh && veh !== this.auto && veh.bodyMesh && veh.spec && !veh.spec.two && veh.type !== 'bus' && veh.type !== 'tempo' && !/^auto/.test(veh.type) && (() => { try { doorOf(veh.type); return true; } catch (e) { return false; } })();
   if (!car || force || !H) return exit.call(this, traffic, force);
   const from = H.holder.position.clone();
   this._noDoor = true;

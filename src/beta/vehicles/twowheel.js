@@ -12,7 +12,7 @@ import { clamp, lerp } from '@orig/core/util.js';
 
 // the furthest it leans (rad), how fast it can roll (rad/s), how keen it is to tip in (1/s)
 const BIKE = {
-  cycle: [0.6, 4.2, 9], scooter: [0.6, 3.2, 7], bike: [0.72, 3.0, 6.5], bullet: [0.62, 2.1, 4.5], superbike: [0.96, 3.6, 7.5],
+  cycle: [0.6, 4.2, 9], scooter: [0.6, 3.2, 7], bike: [0.72, 3.0, 6.5], bullet: [0.62, 2.1, 4.5], superbike: [0.98, 4.3, 8.5],
 };
 const G = 9.81;
 const sstep = (a, b, x) => { const t = clamp((x - a)/(b - a), 0, 1); return t*t*(3 - 2*t); };
@@ -23,7 +23,11 @@ Vehicle.prototype.twoWheel = function (dt, inp, thr) {
   const W = this.W, wet = (W.wet || 0)*(this.rainTyre ? 0.3 : 1);
   const mu = S.mu*(this.gripMul || 1)*(1 - wet*0.3)*(this.onFootpath && !this.offroad ? 0.85 : 1);
   // grip used braking or driving leaves less for the corner (the friction circle)
-  const ax = clamp(Math.abs(v - (this._pv ?? v))/Math.max(dt, 1e-3), 0, mu);
+  // (driving counts for less than braking: the front's light under power, and a litre bike's acceleration alone used to
+  // take all the grip, so at full throttle it wouldn't turn. Smoothed, or every frame's difference shakes the lean)
+  const dV = (v - (this._pv ?? v))/Math.max(dt, 1e-3);
+  this._ax = (this._ax || 0) + (clamp(dV > 0 ? dV*0.35 : -dV, 0, mu) - (this._ax || 0))*Math.min(1, dt*7);
+  const ax = this._ax;
   this._pv = v;
   const latCap = mu*Math.sqrt(Math.max(0.12, 1 - (ax/mu)**2));
   const maxLean = Math.min(B[0], Math.atan(latCap/G));
@@ -56,6 +60,10 @@ Vehicle.prototype.twoWheel = function (dt, inp, thr) {
   this.drift = clamp(Math.abs(this.vl)/4, 0, 1);
   // the bars as they'd be turned for this (a few degrees at speed, full lock at a crawl)
   this.steer = clamp(Math.atan(w*S.wb/Math.max(Math.abs(v), 0.5))*Math.sign(v || 1), -S.steerMax, S.steerMax);
+  // the bars you see: a real bit of turn in the direction you're going, shrinking as it speeds up; and at speed, while the
+  // lean's changing, the small push the other way that starts it (countersteer)
+  const push = clamp((want - L)*0.75, -0.13, 0.13)*sstep(3, 9, sp), barT = lerp(s*lock, s*0.12/(1 + sp*0.025) - push, k);
+  this.barVis = (this.barVis ?? 0) + (barT - (this.barVis ?? 0))*Math.min(1, dt*11);
   // what you see: the lean at speed, the little tilt of steering by the bars below it
   this.bikeLean = lerp(Math.atan(v*wBars/G), L, k);
   // a litre bike's front comes up on full throttle in the low gears
