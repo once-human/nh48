@@ -7,10 +7,84 @@
 // vehicles/driver.js in tools/build-beta.mjs.)
 import { Police } from '@orig/game/police.js';
 import { Interiors } from '@orig/world/interiors.js';
+import { Brain } from '@orig/people/brain.js';
+
+// ---- they remember. When they lose you it isn't over: for a while, a cop who sees that same vehicle (or you, up close, on
+// foot) knows it, and it starts again. Changing vehicles is how you get away with it.
+const HEAT_AT = [0, 1, 3, 7, 15, 25], levelOf = (x) => { let l = 0; for (let i = 1; i < 6; i++) if (x >= HEAT_AT[i]) l = i; return l; };
+function remember(Po, G) {
+  const P = G.player, now = performance.now()/1000, M = Po._mem;
+  if (Po.heat > 0) {
+    Po._peak = Math.max(Po._peak || 0, Po.heat);
+    Po._lastV = P.onFoot ? null : P.cur;
+    return;
+  }
+  if (Po._peak) { Po._mem = { veh: Po._lastV, until: now + 240 + Po._peak*160, peak: Po._peak }; Po._peak = 0; return; }
+  if (!M || G.free) return;
+  if (now > M.until) { Po._mem = null; return; }
+  if ((Po._memT = (Po._memT || 0) - 1/60) > 0) return;
+  Po._memT = 0.5;
+  const it = M.veh ? !P.onFoot && P.cur === M.veh : P.onFoot;
+  if (it && Po.copSeeing(P.x, P.z, M.veh ? 40 : 14)) {
+    Po._mem = null;
+    Po.raiseHeat(M.peak >= 3 ? 2 : 1, M.veh ? 'They know this one' : 'They know your face', 'rash');
+  }
+}
+// ---- blamed on whoever it looks like: what you did in someone else's body is theirs. You walk away from it; the police go after them.
+Police.prototype.hostIn = function () { this._hostPts = this.pts || 0; };
+Police.prototype.hostOut = function (p) {
+  if (this._hostPts === undefined) return;
+  const G = this.g, got = (this.pts || 0) > this._hostPts; this.pts = this._hostPts; this._hostPts = undefined;
+  if (!got) return;
+  this.heat = levelOf(this.pts); this.unseenT = 0; this._peak = this.heat; if (!this.heat) { this._peak = 0; this.clearCharges(); }
+  const Pl = G.player;
+  for (const q of G.people.list) if (q && q.chase === Pl && !q.cop) q.chase = p;      // (and whoever had it in for that face)
+  this.chaseNpc(p);
+};
+// someone else being wanted: a constable or two come for them on foot, they run, and if they're caught they stand there and it's over
+Police.prototype.chaseNpc = function (who) {
+  const G = this.g, ppl = G.people, kit = G.W && G.W.kit; if (!ppl || !kit || !who) return;
+  const L = this._npc || (this._npc = []); if (L.length >= 3 || L.some(c => c.who === who)) return;
+  const donor = ppl.list.find(q => q && q.cop && q.look) || this.marshals.find(m => m.H && m.H.look)?.H;
+  if (!donor) return;
+  for (let i = 0; i < 2; i++) {
+    const a = Math.random()*6.28, d = 26 + Math.random()*14, c = ppl.spawnAt(donor.look, who.x + Math.cos(a)*d, who.z + Math.sin(a)*d, 'kaka');
+    if (!c) continue;
+    c.cop = true; c.lathi = true; c.fixed = false; c.mode = 'chase'; c.chase = who; c.runSp = 3.7 + Math.random()*0.5; c.chaseT = 0; c.anim = null;
+    L.push({ c, who, t: 0, caught: 0 });
+  }
+};
+function npcChases(Po, G, dt) {
+  const L = Po._npc; if (!L || !L.length) return;
+  const ppl = G.people, on = (p) => p && ppl.list.includes(p);
+  for (let i = L.length - 1; i >= 0; i--) {
+    const q = L[i], { c, who } = q; q.t += dt;
+    if (!on(c) || !on(who) || who.fallen > 0 && who.corpse || q.t > 100) { if (on(c)) { c.mode = 'walk'; c.chase = null; } L.splice(i, 1); continue; }
+    const d = Math.hypot(c.x - who.x, c.z - who.z);
+    c.chase = who; c.chaseT = 0; c.mode = 'chase';
+    if (q.caught) {
+      who.mode = 'stand'; who.wait = 30; c.runSp = 1.2;
+      if ((q.caught += dt) > 9 && Math.hypot(who.x - G.player.x, who.z - G.player.z) > 18) { ppl.remove(who); ppl.remove(c); L.splice(i, 1); }
+    } else if (d < 1.5) q.caught = 0.01;
+    else if ((q.run = (q.run || 0) - dt) <= 0) { q.run = 3.5; if (ppl.flee) ppl.flee(who, c.x, c.z, 30); }
+  }
+}
+// a witness to a fight rings it in, some of the time, and in a while somebody comes for whoever started it
+const inc = Brain.prototype.incident;
+Brain.prototype.incident = function (kind, x, z, o = {}) {
+  const r = inc.call(this, kind, x, z, o);
+  if (kind === 'fight' && !o.byYou && o.p && o.p !== window.__nhAskG?.player && Math.random() < 0.45) {
+    const G = window.__nhAskG, who = o.foe && o.foe.foot ? null : o.foe;
+    const off = who && who.x !== undefined ? who : o.p;
+    setTimeout(() => { try { if (G.police && G.people.list.includes(off)) G.police.chaseNpc(off); } catch (e) { /* they got away */ } }, 6000 + Math.random()*9000);
+  }
+  return r;
+};
 
 const upd = Police.prototype.updateHeat;
 Police.prototype.updateHeat = function (dt) {
   const G = this.g, P = G.player, now = G.t || 0;
+  remember(this, G); npcChases(this, G, dt);
   // who's seen you lately, and where they were
   if (this.heat > 0) for (const m of this.marshals) if (m.sees) { m._sawAt = now; m._sawP = { x: P.x, z: P.z }; }
   // following you in

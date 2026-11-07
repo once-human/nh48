@@ -325,6 +325,8 @@ const PATCHES = {
     ["if (far || (k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21)) {", "const seen = !far && G.crowd && G.crowd.inView && Math.hypot(k.p.x - P.x, k.p.z - P.z) < 60 && (G.crowd.inView(k.p.x, k.p.z) || Math.hypot(k.p.x - P.x, k.p.z - P.z) < 10);\n      if (far || !seen && ((k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21))) {"],
   ],
   [S('people/peds.js')]: [
+    // who started it, so a witness can say (beta/game/pursuit.js)
+    ["if (this.brain && foe && foe.foot) this.brain.incident('fight', p.x, p.z, { byYou: false });", "if (this.brain && foe && foe.foot) this.brain.incident('fight', p.x, p.z, { byYou: false, foe, p });"],
     // (the stall list changes as map tiles come and go: an old index can point past its end, which threw and dropped the whole frame)
     ["if (Math.hypot(st[0] / 100 - px, st[1] / 100 - pz) > 220) { this.stallsUsed.delete(k); }", "if (!st || Math.hypot(st[0] / 100 - px, st[1] / 100 - pz) > 220) { this.stallsUsed.delete(k); }"],
     ["if (d < r && pv > 2) {", "if (pv > 2 && (this.vehTouches ? this.vehTouches(a, player) : d < r)) {"],
@@ -345,6 +347,10 @@ const PATCHES = {
   // instead of following politely; a vehicle counts as caught when you're slow beside one of them (or boxed in by two),
   // not only at a crawl; on foot they run as fast as a fit constable does, and keep it up longer
   [S('game/police.js')]: [
+    // they look for you a good while longer before easing off, and there are more of them from the first star up
+    ["const SEARCH = [0, 40, 60, 90, 120, 160];", "const SEARCH = [0, 70, 110, 170, 260, 400];"],
+    ["wantBikes = [0, 1, 2, 2, 3, 4][H]", "wantBikes = [0, 2, 3, 3, 4, 5][H]"],
+    ["wantJeeps = [0, 0, 0, 1, 1, 2][H]", "wantJeeps = [0, 0, 1, 1, 2, 2][H]"],
     ["want = (pursuing ? (this.jeep ? 16 : 18) : 11) * this.skill.top;", "want = (pursuing ? (this.jeep ? [16, 18, 20, 23, 25, 26][police.heat] : [18, 21, 23, 25, 27, 28][police.heat]) : 11) * this.skill.top;"],
     ["if (!this.skill) this.skill = { lag: 0.7 + police.rng.next() * 1.1, top: 0.82 + police.rng.next() * 0.2 };", "if (!this.skill) this.skill = { lag: 0.35 + police.rng.next() * 0.6, top: 0.9 + police.rng.next() * 0.12 };"],
     ["      tx = ls.x; tz = ls.z;", "      tx = ls.x; tz = ls.z;\n      if (this.sees && !P.onFoot) { const ld = Math.min(2.5, d / 18), pv = P.v || 0; tx += Math.cos(P.th) * pv * ld; tz += Math.sin(P.th) * pv * ld; }"],

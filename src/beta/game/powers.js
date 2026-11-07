@@ -326,7 +326,7 @@ export function powers(G) {
       const idx = G.traffic.list.indexOf(o); if (idx >= 0) G.traffic.despawn(idx);
       Pl.switchTo(veh);
     }
-    Pl.hp = hpMax()*(hpR || 1); hp0 = Pl.hp; heat0 = G.police?.heat || 0; strain = 0; strainShow = 0; punches = 0; calm = 0;
+    Pl.hp = hpMax()*(hpR || 1); hp0 = Pl.hp; heat0 = G.police?.heat || 0; G.police?.hostIn?.(); strain = 0; strainShow = 0; punches = 0; calm = 0;
     hops++;
     AC.shudder();
     toast('Vetal', `You are ${host.name || WHO[host.kind] || 'someone else'} now. Tap V to go back`, 'info', 3);
@@ -359,6 +359,7 @@ export function powers(G) {
   function release(h, x, z, how, D) {
     HB.leave(P());
     const p = ppl().spawnAt(h.look, x, z, h.persona);
+    if (p) G.police?.hostOut?.(p);
     if (!p) return;
     if (h.cop) p.cop = true; if (h.name) p.name = h.name;
     p.id = h.id; p.female = h.female; p.yaw = yaw(); p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
