@@ -11,6 +11,10 @@ import { RNG } from '@orig/core/util.js';
 import { Wardrobe, buildCloth, dress } from './wardrobe.js';
 
 const TEX_W = 256, LOOK = 200, SLOTS = 96, CAST2 = 45*45;
+// how much of a body is drawn in full detail as it takes over from the simple figure or hands back to it (people/crowd.js
+// stamps when), over half a second; anyone who isn't a street body (you, a preview) is always whole
+export const FD = 500;
+export const visOf = (H, now) => { let v = 1; if (H._fdA) v = Math.min(1, (now - H._fdA)/FD); if (H._fdR) v *= Math.max(0, 1 - (now - H._fdR)/FD); return v; };
 
 // (called right after the kit is made: it must see every body from the first one)
 // a bone's looked up by name dozens of times a frame, by going through the whole body each time: once is enough
@@ -24,16 +28,16 @@ export function trackBodies(kit) {
 const VS = `precision highp float; precision highp sampler2D;
 in vec3 position, normal, bp; in vec4 skinIndex, skinWeight; in vec2 uv; in float iSlot; in vec3 iCol;
 uniform sampler2D tSkin; uniform mat4 viewMatrix, projectionMatrix;
-out vec3 vN, vW, vB, vC; out vec2 vU; out float vZ; flat out int vS;
+out vec3 vN, vW, vB, vC; out vec2 vU; out float vZ, vF; flat out int vS;
 mat4 bone(int s, float f){ int x = int(f)*3; vec4 a = texelFetch(tSkin, ivec2(x, s), 0), b = texelFetch(tSkin, ivec2(x + 1, s), 0), c = texelFetch(tSkin, ivec2(x + 2, s), 0);
   return mat4(a.x, b.x, c.x, 0., a.y, b.y, c.y, 0., a.z, b.z, c.z, 0., a.w, b.w, c.w, 1.); }
-void main(){ int s = int(iSlot + .5); vS = s;
+void main(){ int s = int(iSlot + .5); vS = s; vF = texelFetch(tSkin, ivec2(${LOOK} + 12, s), 0).x;
   mat4 M = bone(s, skinIndex.x)*skinWeight.x + bone(s, skinIndex.y)*skinWeight.y + bone(s, skinIndex.z)*skinWeight.z + bone(s, skinIndex.w)*skinWeight.w;
   vec4 w = M*vec4(position, 1.); vW = w.xyz; vN = mat3(M)*normal; vB = bp; vC = iCol; vU = uv;
   vec4 v = viewMatrix*w; vZ = -v.z; gl_Position = projectionMatrix*v; }`;
-const RIGID_VS = `precision highp float; in vec3 position, normal; in float sway; in vec4 iM0, iM1, iM2, iM3; in vec3 iCol; uniform mat4 viewMatrix, projectionMatrix; uniform float uTime;
-out vec3 vN, vW, vB, vC; out vec2 vU; out float vZ; flat out int vS;
-void main(){ mat4 M = mat4(iM0, iM1, iM2, iM3); vec4 w = M*vec4(position, 1.); if (sway > 0.) { float ph = uTime*2.6 + M[3].x*1.7 + M[3].z*1.3; w.xz += vec2(sin(ph), cos(ph*.8))*sway*.022; } vW = w.xyz; vN = mat3(M)*normal; vB = position; vC = iCol; vU = vec2(0.); vS = -1; vec4 v = viewMatrix*w; vZ = -v.z; gl_Position = projectionMatrix*v; }`;
+const RIGID_VS = `precision highp float; in vec3 position, normal; in float sway; in vec4 iM0, iM1, iM2, iM3; in vec3 iCol; in float iF; uniform mat4 viewMatrix, projectionMatrix; uniform float uTime;
+out vec3 vN, vW, vB, vC; out vec2 vU; out float vZ, vF; flat out int vS;
+void main(){ mat4 M = mat4(iM0, iM1, iM2, iM3); vec4 w = M*vec4(position, 1.); if (sway > 0.) { float ph = uTime*2.6 + M[3].x*1.7 + M[3].z*1.3; w.xz += vec2(sin(ph), cos(ph*.8))*sway*.022; } vW = w.xyz; vN = mat3(M)*normal; vB = position; vC = iCol; vU = vec2(0.); vS = -1; vF = iF; vec4 v = viewMatrix*w; vZ = -v.z; gl_Position = projectionMatrix*v; }`;
 
 const SHADOW_VS = `precision highp float; precision highp sampler2D; in vec3 position; in vec4 skinIndex, skinWeight; in float iSlot; uniform sampler2D tSkin; uniform mat4 viewMatrix, projectionMatrix;
 mat4 bone(int s, float f){ int x = int(f)*3; vec4 a = texelFetch(tSkin, ivec2(x, s), 0), b = texelFetch(tSkin, ivec2(x + 1, s), 0), c = texelFetch(tSkin, ivec2(x + 2, s), 0);
@@ -42,7 +46,7 @@ void main(){ int s = int(iSlot + .5); mat4 M = bone(s, skinIndex.x)*skinWeight.x
 const SHADOW_RIGID = `precision highp float; in vec3 position; in vec4 iM0, iM1, iM2, iM3; uniform mat4 viewMatrix, projectionMatrix; void main(){ gl_Position = projectionMatrix*viewMatrix*mat4(iM0, iM1, iM2, iM3)*vec4(position, 1.); }`;
 const SHADOW_FS = `precision highp float; out vec4 o; void main(){ o = vec4(0.); }`;
 const COMMON = `precision highp float; precision highp sampler2D; precision highp sampler2DShadow;
-in vec3 vN, vW, vB, vC; in vec2 vU; in float vZ; flat in int vS; out vec4 o;
+in vec3 vN, vW, vB, vC; in vec2 vU; in float vZ, vF; flat in int vS; out vec4 o;
 uniform sampler2D tSkin, tMap, tNoise; uniform vec3 cameraPosition; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, fogCol; uniform float shadowTexel, shadowOn, fogDensity, dayK;
 uniform vec4 uHead;
 ${LAMP}
@@ -51,7 +55,9 @@ vec4 LK(int i){ return texelFetch(tSkin, ivec2(${LOOK} + i, vS), 0); }
 // from inside your head (your own eyes, first person) sees out past it: for that camera alone the head, hair, helmet and
 // glasses above the neck aren't drawn. Every other view of you (a mirror, a cutscene, someone else) has the whole head.
 bool inHead(vec4 h){ return h.w > .5 && distance(cameraPosition, h.xyz) < .45; }
-bool seatClip(){ if (vS < 0) return inHead(uHead) && vW.y > uHead.y && length(vW.xz - uHead.xz) < .22;
+// coming into full detail or going out of it: only some pixels yet, the simple figure has the rest (draw/actors.js)
+float ign(vec2 p){ return fract(52.9829189*fract(dot(p, vec2(.06711056, .00583715)))); }
+bool seatClip(){ if (vF < .999 && ign(gl_FragCoord.xy) >= vF) return true; if (vS < 0) return inHead(uHead) && vW.y > uHead.y && length(vW.xz - uHead.xz) < .22;
   vec4 c = LK(10); if (c.w > .5 && vW.y < c.x) return true; vec4 h = LK(11); return inHead(h) && ((vW.y > h.y && length(vW.xz - h.xz) < .2) || distance(vW, cameraPosition) < .17); }
 float nz(vec2 p){ return texture(tNoise, p/16.).r; }
 // a little height on the surface, seen as light: folds, weave, pores
@@ -336,6 +342,7 @@ export class Skin {
     const g = new THREE.InstancedBufferGeometry(); g.setAttribute('position', geo.attributes.position); g.setAttribute('normal', geo.attributes.normal); if (geo.index) g.setIndex(geo.index);
     const cap = SLOTS; for (let i = 0; i < 4; i++) g.setAttribute('iM' + i, new THREE.InstancedBufferAttribute(new Float32Array(cap*4), 4).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('iCol', new THREE.InstancedBufferAttribute(new Float32Array(cap*3), 3).setUsage(THREE.DynamicDrawUsage)); g.instanceCount = 0;
+    g.setAttribute('iF', new THREE.InstancedBufferAttribute(new Float32Array(cap).fill(1), 1).setUsage(THREE.DynamicDrawUsage));
     if (!this.rigidMats) { this.rigidMats = {}; for (const [kn, fs] of [['plain', PLAIN], ['hair', HAIR2], ['cloth', SOFT]]) { const un = Object.assign({}, PU, this.uOver, { tSkin: { value: this.tex }, tMap: { value: null }, uHead: HEAD }); this.rigidMats[kn] = new THREE.RawShaderMaterial({ vertexShader: RIGID_VS, fragmentShader: this.fsOf(fs), uniforms: un, glslVersion: THREE.GLSL3, side: THREE.DoubleSide }); } this.rigidMat = this.rigidMats.plain; }
     if (false) { const un = {}; this.rigidMat = new THREE.RawShaderMaterial({ vertexShader: RIGID_VS, fragmentShader: PLAIN, uniforms: un, glslVersion: THREE.GLSL3, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -8 }); }
     if (geo.attributes.sway) g.setAttribute('sway', geo.attributes.sway);
@@ -365,7 +372,7 @@ export class Skin {
     }
     near.sort((a, b) => a._d2 - b._d2);
     for (const M of this.parts.m.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; if (M.sh) M.sh.fill = 0; } for (const M of this.parts.f.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; if (M.sh) M.sh.fill = 0; } for (const r of this.rigid.values()) r.fill = 0;
-    const D = this.data, n = Math.min(near.length, this.max, SLOTS), hi2 = this.hiR*this.hiR;
+    const D = this.data, n = Math.min(near.length, this.max, SLOTS), hi2 = this.hiR*this.hiR, now = performance.now();
     for (let s = 0; s < n; s++) {
       const H = near[s], k = H.look && H.look.female ? 'f' : 'm', row = s*TEX_W*4;
       H.holder.updateWorldMatrix(true, true);
@@ -378,6 +385,7 @@ export class Skin {
       col(0, u.top); col(1, u.bottom); col(2, u.skin); col(3, u.shoe); vec(4, u.cut); vec(5, H.style); col(6, H.pat); vec(7, H.fit); vec(8, H.arm); vec(9, u.body); D[O + 40] = H._clipY ?? 0; D[O + 43] = H._clipY === undefined ? 0 : 1; D[O + 47] = 0;
       if (H === playerH) { const hb = H._hb || (H._hb = H.body.skeleton.getBoneByName('Head') || H.body.skeleton.bones.find(q => /head/i.test(q.name))); if (hb) { hb.getWorldPosition(_hp); const hm = H.holder.matrixWorld.elements; H._headOff = { x: _hp.x - hm[12], y: _hp.y - hm[13], z: _hp.z - hm[14] }; D[O + 44] = _hp.x; D[O + 45] = _hp.y - 0.03; D[O + 46] = _hp.z; D[O + 47] = 1; HEAD.value.set(_hp.x, _hp.y - 0.03, _hp.z, 1); } }
       if (D_ && D_.clothK) { D[O + 23] = D_.clothK; col(6, D_.pat); }
+      const vis = visOf(H, now); D[O + 48] = vis;
       const helmeted = H.xtra && H.xtra.helm && H.xtra.helm.visible, topC = u.top;
       for (const o of H._sk) {
         if (!o.visible) continue;
@@ -390,7 +398,7 @@ export class Skin {
       }
       if (D_) {
         for (const X of D_.cloth) { const R = this.parts[k].get(X.n); if (!R) continue; const P = (H._d2 < hi2 && R.hi) ? R.hi : R.lo, A = P.geometry.attributes, j = P.fill++; if (j >= SLOTS) continue; const c = X.c || topC; A.iSlot.array[j] = s; A.iCol.array[j*3] = c.r; A.iCol.array[j*3 + 1] = c.g; A.iCol.array[j*3 + 2] = c.b; if (R.sh && H._d2 < CAST2) R.sh.geometry.attributes.iSlot.array[R.sh.fill++] = s; }
-        const put = (g, b, c) => { const r = this.rigidOf(g), j = r.fill++; if (j >= r.cap) return; const A = r.geometry.attributes, o = b*16; for (let i = 0; i < 4; i++) { const a = A['iM' + i].array; a[j*4] = m[o + i*4]; a[j*4 + 1] = m[o + i*4 + 1]; a[j*4 + 2] = m[o + i*4 + 2]; a[j*4 + 3] = m[o + i*4 + 3]; } A.iCol.array[j*3] = c.r; A.iCol.array[j*3 + 1] = c.g; A.iCol.array[j*3 + 2] = c.b; };
+        const put = (g, b, c) => { const r = this.rigidOf(g), j = r.fill++; if (j >= r.cap) return; const A = r.geometry.attributes; A.iF.array[j] = vis; const o = b*16; for (let i = 0; i < 4; i++) { const a = A['iM' + i].array; a[j*4] = m[o + i*4]; a[j*4 + 1] = m[o + i*4 + 1]; a[j*4 + 2] = m[o + i*4 + 2]; a[j*4 + 3] = m[o + i*4 + 3]; } A.iCol.array[j*3] = c.r; A.iCol.array[j*3 + 1] = c.g; A.iCol.array[j*3 + 2] = c.b; };
         if (!helmeted && D_.hair && W_.hair[D_.hair]) put(W_.hair[D_.hair], W_.headB, D_.hairCol);
         for (const it of D_.items) { if (helmeted && it.b === W_.headB && it.g.userData.kind !== 'hair' && it.g.index && it.g.index.count > 3000) continue; put(it.g, it.b, it.c); }
       }
@@ -398,13 +406,13 @@ export class Skin {
         if (D_ && H.xtra && (o === H.xtra.pony || o === H.xtra.braid || o === H.xtra.cap || o === H.xtra.glasses || o === H.xtra.lens)) continue;      // (theirs are drawn above)
         let on = o.visible, q = o.parent; while (on && q && q !== H.holder) { on = q.visible; q = q.parent; } if (!on) continue;
         const r = this.rigidOf(o.geometry), j = r.fill++; if (j >= r.cap) continue;
-        const A = r.geometry.attributes, E = o.matrixWorld.elements, c = o.material.color || { r: .5, g: .5, b: .5 };
+        const A = r.geometry.attributes, E = o.matrixWorld.elements, c = o.material.color || { r: .5, g: .5, b: .5 }; A.iF.array[j] = vis;
         for (let i = 0; i < 4; i++) { const a = A['iM' + i].array; a[j*4] = E[i*4]; a[j*4 + 1] = E[i*4 + 1]; a[j*4 + 2] = E[i*4 + 2]; a[j*4 + 3] = E[i*4 + 3]; }
         A.iCol.array[j*3] = c.r; A.iCol.array[j*3 + 1] = c.g; A.iCol.array[j*3 + 2] = c.b;
       }
     }
     this.n = n; this.tex.needsUpdate = n > 0;
-    const done = (P) => { const c = Math.min(P.fill, P.cap || SLOTS); P.visible = c > 0; if (!c) return; P.geometry.instanceCount = c; const A = P.geometry.attributes; if (A.iCol) A.iCol.needsUpdate = true; if (A.iSlot) A.iSlot.needsUpdate = true; else for (let i = 0; i < 4; i++) A['iM' + i].needsUpdate = true; };
+    const done = (P) => { const c = Math.min(P.fill, P.cap || SLOTS); P.visible = c > 0; if (!c) return; P.geometry.instanceCount = c; const A = P.geometry.attributes; if (A.iCol) A.iCol.needsUpdate = true; if (A.iF) A.iF.needsUpdate = true; if (A.iSlot) A.iSlot.needsUpdate = true; else for (let i = 0; i < 4; i++) A['iM' + i].needsUpdate = true; };
     for (const M of [this.parts.m, this.parts.f]) for (const R of M.values()) { done(R.lo); if (R.hi) done(R.hi); if (R.sh) done(R.sh); }
     for (const r of this.rigid.values()) done(r);
     return near.slice(0, n);

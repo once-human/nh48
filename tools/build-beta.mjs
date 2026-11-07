@@ -260,6 +260,11 @@ const PATCHES = {
     ["l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  R.updateMatrixWorld(true);\n}", "l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  u.updateMatrixWorld(true);\n}"],
   ],
   [S('people/crowd.js')]: [
+    // into full detail and back out of it over half a second (beta/draw/skin.js visOf, draw/actors.js): a body that's
+    // wanted fades in where the simple figure fades out; one that isn't wanted now stays half a second, fading, before
+    // it's given back (and someone who comes back into range takes it up again from where it had faded to)
+    ["    for (const s of this.pool) if (s.p && (!want.has(s.p) || s.p.hidden)) s.release();", "    const fdNow = performance.now();\n    for (const s of this.pool) if (s.p) {\n      const H = s.H;\n      if (s.p.hidden) { H._fdR = 0; s.release(); continue; }\n      if (want.has(s.p)) { if (H._fdR) { const v = Math.max(0, 1 - (fdNow - H._fdR) / 500) * Math.min(1, H._fdA ? (fdNow - H._fdA) / 500 : 1); H._fdA = fdNow - v * 500; H._fdR = 0; } continue; }\n      if (!H._fdR) H._fdR = fdNow;\n      else if (fdNow - H._fdR > 520) { H._fdR = 0; s.release(); }\n    }"],
+    ["      s.p = p; p.body = s;", "      s.p = p; p.body = s; s.H._fdA = performance.now(); s.H._fdR = 0;"],
     // someone getting out of a vehicle (people/fight.js bail): eased from the seat to where they stand
     ["H.holder.rotation.set(0, -p.yaw, 0);", "H.holder.rotation.set(0, -p.yaw, 0);\n      if (p._out) { const u = Math.min(1, (performance.now() - p._out.t0)/600), e = 1 - u*u*(3 - 2*u); if (u >= 1) p._out = null; else { H.holder.position.x += p._out.dx*e; H.holder.position.y += p._out.dy*e; H.holder.position.z += p._out.dz*e; } }"],
     // smooth up to 45 m, half rate to 100 m; a frame someone isn't animated, their bones go back to the clip's pose

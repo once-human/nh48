@@ -5,7 +5,7 @@ import { paintMaterial, paintNoise, U } from '@orig/experiment/paint.js';
 import { Crowd, NEAR, makeLook, B } from '@orig/experiment/people.js';
 import { rng } from '@orig/experiment/geo.js';
 import { PU, LAMP } from '../gfx/paint.js';
-import { Skin } from './skin.js';
+import { Skin, visOf } from './skin.js';
 
 // the stress test paints in screen colour; /beta's picture is linear until its last pass
 const linear = (m) => { for (const s of [m]) s.fragmentShader = s.fragmentShader.replace('fragColor = vec4(c, 1.);', 'fragColor = vec4(pow(max(c, vec3(0.)), vec3(2.2)), 1.);').replace('fragColor = vec4(mix(c, fogCol, smoothstep(fogR.x, fogR.y, vZ)*.9), 1.);', 'fragColor = vec4(pow(max(mix(c, fogCol, smoothstep(fogR.x, fogR.y, vZ)*.9), vec3(0.)), vec3(2.2)), 1.);'); return m; };
@@ -16,13 +16,25 @@ const lit = (m) => {
   m.fragmentShader = fs; for (const k of ['tLamp', 'lampC', 'headP', 'headD', 'headS', 'lampY', 'dayK', 'shadeCol', 'sunCol']) m.uniforms[k] = PU[k];
   return m;
 };
+// the simple figure's half of the hand-over to a full body (draw/skin.js): it keeps the pixels the body doesn't have yet
+const handover = (m) => {
+  const vs = m.vertexShader.replace('out vec3 vW; out vec3 vN; out vec3 vC; flat out float vK; out float vZ;', 'out vec3 vW; out vec3 vN; out vec3 vC; flat out float vK; out float vZ;\n#ifdef PEOPLE\nflat out float vFd;\n#endif')
+    .replace('  vec3 p = position, n = normal, c = color;\n#ifdef PEOPLE', '  vec3 p = position, n = normal, c = color;\n#ifdef PEOPLE\n  vFd = iAnim.w;');
+  const i = m.fragmentShader.indexOf('out vec4 fragColor;'), j = m.fragmentShader.indexOf('void main(){', i);
+  if (vs === m.vertexShader || !vs.includes('vFd = iAnim.w;') || i < 0 || j < 0) throw new Error('far crowd: the hand-over lines have moved');
+  const f = m.fragmentShader;
+  m.fragmentShader = f.slice(0, i) + '#ifdef PEOPLE\nflat in float vFd;\nfloat ign(vec2 p){ return fract(52.9829189*fract(dot(p, vec2(.06711056, .00583715)))); }\n#endif\n' + f.slice(i, j + 12) +
+    '\n#ifdef PEOPLE\n  if (vFd > 0. && ign(gl_FragCoord.xy) < vFd) discard;\n#endif\n' + f.slice(j + 12);
+  m.vertexShader = vs;
+  return m;
+};
 const CAP = 500;
 
 export class Actors {
   constructor(G, scene) {
     this.G = G;
     U.tNoise.value = paintNoise();
-    const pm = lit(linear(paintMaterial({ people: true })));
+    const pm = handover(lit(linear(paintMaterial({ people: true }))));
     this.crowd = new Crowd(CAP, pm); U.crowdTex.value = this.crowd.tex;
     const R = rng(21); for (let i = 1; i < CAP; i++) this.crowd.look(i, makeLook(R));
     this.crowd.look(0, { shirt: 0xeeeeea, lower: 0x161a2a, skin: 0xa06a48, hair: 0x1a1512, acc: 0xeeeeea, acc2: 0xeeeeea, mask: B.CURLY, h: 1, girth: .55 });
@@ -49,17 +61,20 @@ export class Actors {
     if (!on) return;
     const C = this.crowd, nA = C.near.geometry.attributes, fA = C.far.geometry.attributes, cx = camera.position.x, cz = camera.position.z;
     let a = 0, b = 0;
-    const put = (x, y, z, yaw, ph, amp, id) => { const dx = x - cx, dz = z - cz, d2 = dx*dx + dz*dz; if (d2 > 90000) return;
+    const now = performance.now();
+    const put = (x, y, z, yaw, ph, amp, id, fd = 0) => { const dx = x - cx, dz = z - cz, d2 = dx*dx + dz*dz; if (d2 > 90000) return;
       const near = d2 < NEAR*NEAR, A = near ? nA : fA, o = near ? a++ : b++; if (o >= CAP) return;
-      A.iPos.array.set([x, y, z, Math.PI/2 - yaw], o*4); A.iAnim.array.set([ph, amp, id, 0], o*4); };
+      A.iPos.array.set([x, y, z, Math.PI/2 - yaw], o*4); A.iAnim.array.set([ph, amp, id, fd], o*4); };
     for (const p of (G.people ? G.people.list : [])) {
-      if (p.hidden || p.pax || p.body) continue;     // (who has a real body close by is drawn by the skin)
+      if (p.hidden || p.pax) continue;
+      // (who has a real body close by is drawn by the skin; while it's coming in or going, this figure has the rest)
+      const fd = p.body && p.body.H ? visOf(p.body.H, now) : 0; if (fd >= 0.999) continue;
       if (!p._dk) { p._dk = this.next; this.next = this.next%(CAP - 1) + 1; p._dph = Math.random()*9; p._lx = p.x; p._lz = p.z; p._dv = 0; }
       // the legs go with how far they really moved this frame (not the speed they mean to walk at), so nobody glides:
       // a step is about 0.68 m, half a cycle
       const m = Math.hypot(p.x - p._lx, p.z - p._lz); p._lx = p.x; p._lz = p.z;
       if (m < 3 && dt > 0) { p._dv += (m/dt - p._dv)*Math.min(1, dt*6); p._dph += m/.68*Math.PI; }
-      put(p.x, p.y || 0, p.z, p.yaw || 0, p._dph, Math.min(1, p._dv/1.1), p._dk);
+      put(p.x, p.y || 0, p.z, p.yaw || 0, p._dph, Math.min(1, p._dv/1.1), p._dk, fd);
     }
     C.near.geometry.instanceCount = a; C.far.geometry.instanceCount = b; nA.iPos.needsUpdate = nA.iAnim.needsUpdate = fA.iPos.needsUpdate = fA.iAnim.needsUpdate = true;
   }
