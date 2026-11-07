@@ -13,7 +13,7 @@ const band = (r) => Math.min(14, Math.max(4, r*0.12));
 // vehicles' (parked rows) are /beta's own shader (beta/vehicles/vehmat.js), copied with every uniform still shared
 function fadeOf(src, U) {
   if (src.isShaderMaterial) {
-    const c = new THREE.ShaderMaterial({ vertexShader: src.vertexShader, fragmentShader: src.fragmentShader, uniforms: Object.assign({}, src.uniforms, { uFade: U }), defines: Object.assign({}, src.defines, { FADE: '' }),
+    const c = new THREE.ShaderMaterial({ glslVersion: src.glslVersion, vertexShader: src.vertexShader, fragmentShader: src.fragmentShader, uniforms: Object.assign({}, src.uniforms, { uFade: U }), defines: Object.assign({}, src.defines, { FADE: '' }),
       vertexColors: src.vertexColors, side: src.side, transparent: src.transparent, depthWrite: src.depthWrite, blending: src.blending });
     c.onBeforeRender = src.onBeforeRender; c.color = src.color; c.roughness = src.roughness; c.metalness = src.metalness;
     return c;
