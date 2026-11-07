@@ -398,6 +398,8 @@ const PATCHES = {
     // (the stall list changes as map tiles come and go: an old index can point past its end, which threw and dropped the whole frame)
     ["if (Math.hypot(st[0] / 100 - px, st[1] / 100 - pz) > 220) { this.stallsUsed.delete(k); }", "if (!st || Math.hypot(st[0] / 100 - px, st[1] / 100 - pz) > 220) { this.stallsUsed.delete(k); }"],
     ["if (d < r && pv > 2) {", "if (pv > 2 && (this.vehTouches ? this.vehTouches(a, player) : d < r)) {"],
+    // only into a shop that's open: not through a shutter that's down (d._sh is its shutter, beta/world/shutters.js)
+    ["        if (d.n > 1) continue;", "        if (d.n > 1 || (d._sh && (d._sh.k ?? 1) < 0.95)) continue;"],
     // into a shop and out again through its door (beta/people/doors.js), not gone at the step and back out of nowhere
     ["this.goTo(p, d.x, d.z, (q) => { q.mode = 'inside'; q.hidden = true; q.door = d; q.wait = this.rng.range(6, 35); });", "this.goTo(p, d.x, d.z, (q) => { q.mode = 'inside'; q.door = d; q.wait = this.rng.range(6, 35); if (this.thruDoor) this.thruDoor(q, d, true); else q.hidden = true; });"],
     ["const d = p.door; p.hidden = false; p.door = null; if (d) d.n--;", "const d = p.door; p.hidden = false; p.door = null; if (d) d.n--;\n        if (d && this.thruDoor) { this.thruDoor(p, d, false); return; }"],

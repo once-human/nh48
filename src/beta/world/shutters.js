@@ -84,6 +84,8 @@ function step(G, dt, px, pz) {
     S.list.forEach((r, i) => {
       if (r.k === r.t || r.k === undefined) return;
       if (!r.rolling) { r.rolling = true; if (Math.hypot(r.x - px, r.z - pz) < HEAR) rattle(G, r, r.t > r.k); }
+      // closing: whoever's still in the shop comes out before it's down
+      if (r.t < r.k && r.door && G.people) for (const q of G.people.list) if (q.door === r.door && q.mode === 'inside') q.wait = Math.min(q.wait, 0.1);
       r.k = r.t > r.k ? Math.min(r.t, r.k + dt/SECS) : Math.max(r.t, r.k - dt/SECS);
       if (r.k === r.t) r.rolling = false; else any = true;
       // rolled up into its box at the top: the bottom edge rises, the steel above it is in the box
