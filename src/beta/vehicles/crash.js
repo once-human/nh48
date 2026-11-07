@@ -6,6 +6,7 @@
 import { Traffic } from '@orig/traffic/traffic.js';
 import { Vehicle, knock } from '@orig/vehicles/vehicle.js';
 import { Pilot } from '@orig/game/pilot.js';
+import { PlayerAuto } from '@orig/vehicles/player.js';
 import { promote } from './damage.js';
 
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -124,6 +125,99 @@ Vehicle.prototype.hitTraffic = function (o, T, H, traffic) {
   o.v = v1;
   if (Math.hypot(sx, sz) > 0.15) o._sh = { vx: (o._sh?.vx || 0) + sx, vz: (o._sh?.vz || 0) + sz };
   if (imp > 1.5) this.events.push({ type: 'hit', who: o.type, speed: imp, x: o.x, z: o.z, o });
+};
+// Leaning on something with your foot down. No speed in it, so no blow: what counts is force. Your engine's pull at the
+// wheels (its weight times its acceleration, by the drive mode and how far down your foot is), as far as your tyres can
+// put it down (past that they spin), against what holds the other: its weight on its brakes, a parked one's on the
+// handbrake alone. More than that and the two go together, as fast as what's left over can move the both of them; less
+// and nothing moves. So a Huracan shoves a hatchback off the line, Corsa harder than Strada, and a scooter leans on a
+// bus for ever. (m1, m2: what each weighs. Returns true when it's taken care of the contact.)
+const DRIVEN = { super: 1, jeep: 1, sports: 0.65, lux: 0.55, auto: 0.7, tempo: 0.6, bus: 0.6 };
+const HOLD = 7.4, HANDBRAKE = 3.2, FOOT = 3;         // m/s² of grip on: a driver's brakes, a handbrake (back wheels only), a rider's brake and feet
+const AUTO_SPEC = { acc: 2.35, mu: 6.8 };
+function press(o, T, nx, nz, depth, m1, m2, traffic) {
+  const dt = this._cdt || 0; if (!(dt > 0)) return false;
+  const S = this.spec || AUTO_SPEC, hx = Math.cos(this.th), hz = Math.sin(this.th), dx = -nx, dz = -nz, fa = dx*hx + dz*hz;
+  const thr = this.throttle || 0, back = this.reverse && (this.brake || 0) > 0.1;
+  if (back ? fa > -0.4 : !(thr > 0.05 && fa > 0.4)) return false;
+  const hasVl = this.vl !== undefined, vl = hasVl ? this.vl : 0, vx = hx*this.v - hz*vl, vz = hz*this.v + hx*vl;
+  const sl = o.parked ? o.veh && o.veh._c : o._sh, ovx = (o.hx ?? 1)*(o.v || 0) + (sl ? sl.vx : 0), ovz = (o.hz ?? 0)*(o.v || 0) + (sl ? sl.vz : 0);
+  const mine = vx*dx + vz*dz, theirs = ovx*dx + ovz*dz;
+  if (mine - theirs > 1.6) return false;              // (that's a hit, not a lean)
+  const t = now();
+  let P = this._press;
+  if (!P || P.o !== o || t - P.t > 0.2) P = this._press = { o, vc: Math.max(0, theirs), t, sc: 0, x: o.x, z: o.z, jam: 0, told: false };
+  P.t = t;
+  const base = (this.type || 'auto').replace(/P$/, ''), a = back ? S.acc*0.7 : thr*S.acc*(this.accMul || 1)/(1 + (this.load || 0)*0.1);
+  const F0 = m1*a, grip = m1*(S.mu || 8)*0.85*(DRIVEN[base] ?? (S.two ? 0.6 : 0.55)), F = Math.min(F0, grip);
+  let hold = o.parked ? (o.veh && o.veh.spec.two ? 6 : HANDBRAKE) : T.two ? FOOT : HOLD;
+  if (P.vc > 0.05) hold *= 0.82;                      // (tyres already sliding hold less than tyres standing)
+  const R = m2*hold;
+  P.vc = Math.max(0, P.vc + (F - R)/(m1 + m2)*dt);
+  // you: out of it, and going as fast as the two are
+  this.x += nx*depth; this.z += nz*depth;
+  if (hasVl) { const nvx = vx + (P.vc - mine)*dx, nvz = vz + (P.vc - mine)*dz; this.v = nvx*hx + nvz*hz; this.vl = -nvx*hz + nvz*hx; }
+  else this.v = Math.sign(fa)*P.vc/Math.max(0.5, Math.abs(fa));
+  if (F0 > grip) { this.skidL = Math.max(this.skidL || 0, 0.5 + thr*0.5); this.rpm = Math.max(this.rpm || 0, 0.5 + thr*0.4); }
+  if (!(P.vc > 0)) return true;
+  // it: goes with you, turning if you've got it off its middle
+  if ((P.sc -= dt) <= 0) { P.sc = 0.22 + Math.random()*0.22; this.events.push({ type: 'scrape', speed: 1.1, kind: 2 }); }
+  if (o.parked) {
+    const v = o.veh; if (!v) return true;
+    const q = v._c, I = m2*(v.spec.L*v.spec.L + v.spec.W*v.spec.W)/12, lv = (o.x - this.x)*dz - (o.z - this.z)*dx;
+    throwCar(v, o, P.vc*dx, P.vc*dz, clamp((q ? q.w : 0) - lv*(F - R)/I*dt, -1.5, 1.5));
+    return true;
+  }
+  if (T.two && !o.fallen && (F > R*2.5 || P.vc > 1.2)) { o._hit = { vx: P.vc*dx*1.2, vz: P.vc*dz*1.2 }; o.fallen = 3.5; o.angry = 6; this.events.push({ type: 'knock', who: 'two', speed: 2, x: o.x, z: o.z }); return true; }
+  o.v = 0; o.angry = 6; o._sh = { vx: P.vc*dx, vz: P.vc*dz };
+  if (!T.two) o.dmg = Math.min(0.97, (o.dmg || 0) + dt*0.006);
+  if (!(o.honkT > 0)) { o.honkT = 2.5; traffic.honks.push({ x: o.x, z: o.z, kind: T.honk, n: 3 }); }
+  if (!P.told) { P.told = true; this.events.push({ type: 'hit', who: o.type, speed: 1.6, x: o.x, z: o.z, o }); }
+  // a lane only goes so far: out of it, or in a junction, it's held to its lane no longer. The driver's out, and it's a real car being pushed
+  const got = Math.hypot(o.x - P.x, o.z - P.z); P.x = o.x; P.z = o.z;
+  P.jam = got < P.vc*dt*0.4 ? P.jam + dt : 0;
+  const G = G0();
+  if ((o.jc || P.jam > 0.2 || P.vc > 6) && P.vc > 0.15 && !o.service && !o.wreck && !o.hideBody && !(o.argue > 0) && !((o.y || 0) > 0.5) && G) {
+    const v = promote(G, o), st = v && G.player.dropped.find(q => q.veh === v)?.st;
+    if (st) { throwCar(v, st, P.vc*dx, P.vc*dz, 0); P.o = st; }
+  }
+  return true;
+}
+Vehicle.prototype.pressTraffic = press;
+const vu = Vehicle.prototype.update;
+Vehicle.prototype.update = function (dt, inp, traffic) { this._cdt = dt; return vu.call(this, dt, inp, traffic); };
+// your own auto: the same lean, then its bump as it was
+const au = PlayerAuto.prototype.update;
+PlayerAuto.prototype.update = function (dt, inp, traffic) { this._cdt = dt; return au.call(this, dt, inp, traffic); };
+PlayerAuto.prototype.collideTraffic = function (traffic) {
+  const hx = Math.cos(this.th), hz = Math.sin(this.th);
+  const mine = [[1.0, 0.5], [0.0, 0.7], [-0.95, 0.7]].map(([o, r]) => [this.x + hx*o, this.z + hz*o, r]);
+  traffic.near(this.x, this.z, 9, (o) => {
+    if (o.isPlayer || o.T === undefined || Math.abs((o.y || 0) - this.agent.y) > 2) return;
+    const T = o.T, n = Math.max(1, Math.round(T.L/T.W));
+    for (let k = 0; k < n; k++) {
+      const off = n === 1 ? 0 : -T.L/2 + T.W/2 + (T.L - T.W)*k/(n - 1), ox = o.x + o.hx*off, oz = o.z + o.hz*off, orr = T.W/2 + 0.05;
+      for (const [mx, mz, mr] of mine) {
+        const dx = mx - ox, dz = mz - oz, d = Math.hypot(dx, dz), rr = mr + orr;
+        if (d >= rr || d < 1e-4) continue;
+        const nx = dx/d, nz = dz/d, depth = rr - d, myMass = 520, oMass = T.mass;
+        if (press.call(this, o, T, nx, nz, depth, myMass, oMass, traffic)) return;
+        const share = oMass/(myMass + oMass);
+        this.x += nx*depth*share; this.z += nz*depth*share;
+        const vx = hx*this.v, vz = hz*this.v, ovx = o.hx*o.v, ovz = o.hz*o.v, rel = (vx - ovx)*nx + (vz - ovz)*nz;
+        if (rel < 0) {
+          const imp = -rel, dv = imp*share*1.1, nvx = vx + nx*dv, nvz = vz + nz*dv;
+          this.v = nvx*hx + nvz*hz;
+          o.v = Math.max(0, o.v - imp*(1 - share)*0.8);
+          o.angry = 6;
+          if (T.two && imp > 3.0 && !o.fallen) { o.fallen = 3.5; this.events.push({ type: 'knock', who: 'two', speed: imp, x: o.x, z: o.z }); }
+          else if (imp > 1.5) this.events.push({ type: 'hit', who: o.type, speed: imp, x: o.x, z: o.z });
+          if (!(o.honkT > 0)) { o.honkT = 2.5; traffic.honks.push({ x: o.x, z: o.z, kind: T.honk, n: 2 }); }
+        }
+        return;
+      }
+    }
+  });
 };
 // (something much lighter you're still driving through: out of the way, no more cost to you)
 Vehicle.prototype.shoveTraffic = function (o, dx, dz) { if (o.parked) return; shift(o, dx, dz); };

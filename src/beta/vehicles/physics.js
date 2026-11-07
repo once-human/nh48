@@ -77,7 +77,7 @@ P.contact = function () {
     if (lc) for (const q of lc) {
       if (q.off || seen.has(q)) continue; seen.add(q);
       // (a parked vehicle driven into at any speed stops being scenery: a real one takes its place, and it's hit as one)
-      if (q.rec && !q.rec.taken && this.W.playerVeh === this && Math.abs(this.v) > 1.2 && this.wakeParked && this.wakeParked(q.rec)) continue;
+      if (q.rec && !q.rec.taken && this.W.playerVeh === this && (Math.abs(this.v) > 1.2 || (this.throttle || 0) > 0.5 || this.reverse) && this.wakeParked && this.wakeParked(q.rec)) continue;
       const [cx, cz] = loc(q.x, q.z), kx = clamp(cx, -a, a), kz = clamp(cz, -b, b), ex = cx - kx, ez = cz - kz, d = Math.hypot(ex, ez), rr = RC + q.r;
       if (d >= rr) continue;
       let m;
@@ -151,6 +151,8 @@ P.collideTraffic = function (traffic) {
     const nx = m.ux*hx - m.uz*hz, nz = m.ux*hz + m.uz*hx;
     // far lighter and just hit, or a two-wheeler already down: pushed out of your way, with nothing more to you
     if (me && !o.parked && m2 < m1*0.4 && (o._hitT > performance.now()/1000 || T.two && o.fallen > 0)) { this.shoveTraffic(o, -nx*m.d, -nz*m.d); return; }
+    // leaning on it with the engine: a matter of force, not of speed (crash.js)
+    if (me && m2 !== Infinity && this.pressTraffic(o, T, nx, nz, m.d, m1, m2, traffic)) return;
     // (the other box's reach along and across this one, for where on the body they meet)
     const ra = T.L/2*Math.abs(ex) + T.W/2*Math.abs(ez), rb = T.L/2*Math.abs(ez) + T.W/2*Math.abs(ex);
     const [lx, lz] = where(m.ux, m.uz, a, b, cx - ra, cx + ra, cz - rb, cz + rb);

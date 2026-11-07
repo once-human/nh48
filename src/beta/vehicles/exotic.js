@@ -1,5 +1,5 @@
-// What a supercar does that nothing else in Pune does. Lift off at high revs, blip it, or launch it hard, and one to three
-// flames spit from the pipes, each with its own crack, never in step. And what it costs: slides wear tyres away, an
+// What a supercar does that nothing else in Pune does. Work it hard and lift off, shift or launch, and flames spit from
+// the pipes, each with its own crack, never in step, by the drive mode and how hard it's been worked. And what it costs: slides wear tyres away, an
 // ordinary car's in half a minute of sliding, a supercar's in over a minute, and a flat one lets go sooner.
 import * as THREE from 'three';
 import { Vehicle } from '@orig/vehicles/vehicle.js';
@@ -61,7 +61,7 @@ function tickPool(dt) {
 function rig(G) { poolOf(G); return { t: 0, q: [], on: 0, big: 1, held: 0, launched: false, em: 0, gear0: 0 }; }
 function fire(v, F, A) {
   // a bang: a stream for a moment, one pipe often a beat ahead of the other
-  F.on = 0.05 + Math.random()*0.08; F.big = 0.7 + Math.random()*0.8; F.lag = Math.random()*0.03;
+  const z = F.size ?? 1; F.on = (0.05 + Math.random()*0.08)*(0.7 + z*0.3); F.big = (0.7 + Math.random()*0.8)*z; F.lag = Math.random()*0.03;
   if (A && A.noiseBurst) { A.noiseBurst(0.05, 480 + Math.random()*520, 0.8, 0.14 + Math.random()*0.1); A.noiseBurst(0.018, 2300 + Math.random()*900, 1.4, 0.05); }
 }
 const upd = Vehicle.prototype.update;
@@ -79,17 +79,29 @@ Vehicle.prototype.update = function (dt, inp, traffic) {
     }
   }
   const P = PORTS[this.type]; if (!P) return r;
-  // ---- the flames (how often by the drive mode: Corsa spits on every lift and shift, Strada hardly ever)
+  // ---- the flames: unburnt fuel lighting in a hot pipe. It takes work to get there: revs held with your foot in it, a good
+  // while in the calmest mode (a tap gives nothing at all, and it wants real speed), hardly any in the wildest, which runs
+  // so rich it spits on every lift and shift and now and then with your foot flat. How big by the same reckoning.
   const F = this._fl || (this._fl = rig(G)), thr = inp.throttle || 0, sp = Math.abs(this.v), rpm = this.rpm || 0, pops = this.modePops ?? 1;
+  const calm = pops < 0.3, wild = pops > 1;
   F.t += dt;
   if (thr > 0.7) F.held += dt;
+  F.work = Math.max(0, Math.min(1, (F.work || 0) + (thr > 0.7 ? dt*(0.25 + rpm)*(calm ? 0.55 : wild ? 1.8 : 1) : -dt*0.5)));
+  F.size = (calm ? 0.65 : wild ? 1.3 : 1)*(0.7 + F.work*0.5);
   const lift = (this._thr0 ?? 0) > 0.7 && thr < 0.15;
-  const go = (t, n) => { for (; n > 0; n--) { if (Math.random() < Math.min(1, pops)) F.q.push(t); t += 0.07 + Math.random()*0.12; } };
-  if (lift && (rpm > 0.55 || (sp < 2 && F.held < 0.5))) go(F.t + 0.03, 1 + Math.floor(Math.random()*(pops > 1 ? 5 : 3)));
-  if (thr > 0.9 && sp < 4 && !this.reverse && !F.launched && F.held > 0.12) { F.launched = true; go(F.t, 2); }
-  // an upshift under power, in the wild modes
-  if (this.gear > F.gear0 && thr > 0.7 && rpm > 0.5 && pops > 1) go(F.t, 2);
+  const go = (t, n, p) => { for (; n > 0; n--) { if (Math.random() < p) F.q.push(t); t += 0.07 + Math.random()*0.12; } };
+  if (lift) {
+    if (calm) { if (sp > 30 && rpm > 0.42 && F.work > 0.55) go(F.t + 0.05, 1 + Math.floor(Math.random()*2), 0.75); }
+    else if (wild) { if (rpm > 0.35 || F.held > 0.06) go(F.t + 0.03, 2 + Math.floor(Math.random()*5), 1); }
+    else if (sp > 13 && rpm > 0.55 && F.work > 0.25) go(F.t + 0.03, 1 + Math.floor(Math.random()*3), 0.85);
+  }
+  // pulling away flat out, in anything but the calmest
+  if (!calm && thr > 0.9 && sp < 4 && !this.reverse && !F.launched && F.held > (wild ? 0.12 : 0.35)) { F.launched = true; go(F.t, wild ? 3 : 1, 1); }
+  // an upshift under power
+  if (this.gear > F.gear0 && thr > 0.7) { if (wild) go(F.t, 2 + Math.floor(Math.random()*2), 1); else if (!calm && rpm > 0.6 && F.work > 0.5) go(F.t, 1, 0.5); else if (calm && sp > 34 && F.work > 0.7) go(F.t, 1, 0.2); }
   F.gear0 = this.gear;
+  // the wildest, foot flat and high up the revs: it can't burn it all
+  if (wild && thr > 0.9 && rpm > 0.72 && Math.random() < dt*0.9) go(F.t, 1, 1);
   if (thr < 0.2) { F.launched = false; F.held = 0; }
   this._thr0 = thr;
   while (F.q.length && F.q[0] <= F.t) { F.q.shift(); fire(this, F, G?.audio); }
