@@ -72,6 +72,7 @@ import './vehicles/busboards.js';     // PMPML route boards: a real route's numb
 import './world/fade.js';             // street furniture fades in and out at the edge of its range
 import './world/stopnames.js';        // each bus shelter's own stop name on its board
 import './game/medics.js';            // paramedics wait while you're dragging the one they came for
+import './game/quiet.js';             // walking and nothing's going on: the screen gets out of the way; what you overhear; service hours
 import './game/dash.js';              // the car's lights on the speedometer; a continuous tyre squeal
 import './game/engines.js';           // every vehicle its own engine (a bicycle its freewheel), yours and the street's
 import './game/voices.js';            // overheard chatter and muttering quieter than talk aimed at you

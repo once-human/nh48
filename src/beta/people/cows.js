@@ -5,7 +5,7 @@
 import { People } from '@orig/people/peds.js';
 import { Strays } from '@orig/people/strays.js';
 
-const AMBLE = 0.55, TURN = 1.6;          // across the road (m/s), and how fast it turns (rad/s)
+const AMBLE = 0.32, TURN = 0.7;          // across the road (m/s), and how fast it turns (rad/s)
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const place = People.prototype.placeAnimal;
 People.prototype.placeAnimal = function (a) {

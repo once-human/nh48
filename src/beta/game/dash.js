@@ -30,7 +30,7 @@ addEventListener('keydown', (e) => {
   if (e.code !== 'KeyO' || e.repeat) return;
   const G = window.__nhAskG, P = G && G.player, v = P && !P.onFoot && P.cur; if (!v || G.state !== 'play') return;
   const H = v._has || (v._has = has(v.type)); if (!H.modes) return;
-  v.driveMode = ((v.driveMode || 0) + 1) % H.modes.length; G.hud.toast?.('Drive mode', H.modes[v.driveMode], 'info', 1.2);
+  v.driveMode = ((v.driveMode || 0) + 1) % H.modes.length;      // (the chip by the speedometer says which)
 });
 
 // the squeal: tyre noise through two narrow bands with a thin tone inside, always running, its level and pitch following

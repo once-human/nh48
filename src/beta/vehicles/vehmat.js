@@ -90,8 +90,9 @@ void main(){
   if (vG > 0.) {
     float k = .25 + uNight*3.;
     bool rear = vL.x < 0.;
-    if (rear && vG > .45 && vC.r > .5 && vC.g < .3 && vC.b < .3) k = vLp.x < -.5 ? 0. : uNight*1.1 + max(vLp.x, 0.)*(1.7 + uNight*1.6);
+    if (rear && vG > .45 && vC.r > .5 && vC.g < .3 && vC.b < .3) k = vLp.x < -.5 ? 0. : uNight*.3 + max(vLp.x, 0.)*(2.2 + uNight*2.4) + max(vLp.y, 0.)*(.5 + uNight*.6);
     else if (rear && vG > .1 && vG < .2 && vC.r > .8 && vC.g > .8 && vC.b > .75) k = max(vLp.y, 0.)*(9. + uNight*12.);
+    else if (rear && vC.r > .8 && vC.g > .3 && vC.g < .7 && vC.b < .3) k = vLp.x < -.5 ? 0. : uNight*1.3;     // (amber at the back: on with the lights, steady, and the brakes have nothing to do with it)
     c += vC*vG*k;
   }
   float f = fogDensity*vZ, mir = matte > .5 ? 0. : (glassy*.72 + painted*(.3 - .22*grime) + (1. - painted)*(1. - glassy)*.18); gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1. - clamp(mir, 0., .95)); }`;

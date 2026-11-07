@@ -1031,7 +1031,7 @@ const LOOK = {
 export function carSpec(kind) {
   if (VARIANTS[kind]) { const V = VARIANTS[kind], b = carSpec(V.base); return { ...b, ...V.spec, yellowPlate: b.yellowPlate, look: LOOK[kind] || {} }; }
   let spec;
-  if (kind === 'hatch') spec = { L: 3.65, W: 1.6, H: 1.66, hood: 0.75, roofF: 0.95, roofR: -1.5, beltY: 0.95, sill: 0.25, R: 0.29, tail: 0.15, overhang: 0.6 };
+  if (kind === 'hatch') spec = { L: 3.65, W: 1.6, H: 1.5, hood: 0.86, roofF: 0.72, roofR: -1.42, beltY: 0.89, sill: 0.22, R: 0.29, tail: 0.15, overhang: 0.6 };      // (low, a long raked screen: it was as tall as an SUV)
   else if (kind === 'suv') spec = { L: 4.5, W: 1.8, H: 1.88, hood: 1.05, roofF: 0.85, roofR: -2.05, beltY: 1.12, sill: 0.38, R: 0.36, tail: 0.12, overhang: 0.75 };
   else spec = { L: 4.0, W: 1.7, H: 1.5, hood: 1.0, roofF: 0.6, roofR: -1.05, beltY: 0.88, sill: 0.24, R: 0.3, tail: 0.6, overhang: 0.72 };
   // (low and wide; long and formal; tall and boxy)

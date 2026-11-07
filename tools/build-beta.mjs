@@ -259,7 +259,7 @@ const PATCHES = {
   ],
   // a cow goes at a cow's pace, shooed off or following you (beta/people/cows.js)
   [S('people/strays.js')]: [
-    ["      if (sp > 0) {", "      if (a.kind === 'cow' || a.cow) sp = Math.min(sp, 2.2);\n      if (sp > 0) {"],
+    ["      if (sp > 0) {", "      if (a.kind === 'cow' || a.cow) sp = Math.min(sp, 1.1);\n      if (sp > 0) {"],
   ],
   [S('people/fight.js')]: [
     ["if (input.took('KeyC') && !busyDown", "if ((input.took('ControlLeft') || input.took('ControlRight')) && !busyDown && !(P.act && P.act.move)"],
@@ -325,6 +325,8 @@ const PATCHES = {
     ["if (far || (k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21)) {", "const seen = !far && G.crowd && G.crowd.inView && Math.hypot(k.p.x - P.x, k.p.z - P.z) < 60 && (G.crowd.inView(k.p.x, k.p.z) || Math.hypot(k.p.x - P.x, k.p.z - P.z) < 10);\n      if (far || !seen && ((k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21))) {"],
   ],
   [S('people/peds.js')]: [
+    // a cow is in no hurry
+    ["      a.s += a.dir * sp * dt;", "      if (a.cow) sp = Math.min(sp, a.hurtT > 0 ? 1.5 : 0.4);\n      a.s += a.dir * sp * dt;"],
     // who started it, so a witness can say (beta/game/pursuit.js)
     ["if (this.brain && foe && foe.foot) this.brain.incident('fight', p.x, p.z, { byYou: false });", "if (this.brain && foe && foe.foot) this.brain.incident('fight', p.x, p.z, { byYou: false, foe, p });"],
     // (the stall list changes as map tiles come and go: an old index can point past its end, which threw and dropped the whole frame)
