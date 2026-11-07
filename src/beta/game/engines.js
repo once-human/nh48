@@ -48,6 +48,7 @@ const CLS = {
 // amp, how hard each one (a V8's two banks into their pipes give the lope); dec, how fast a pulse dies (s); nz, how
 // much of it is roar rather than thump; pipe, the exhaust's length as its echo (s: its note is 1/pipe); fb and damp, how
 // much it rings and how dull; irr, how uneven it runs at idle (cycle to cycle); knock, a diesel's clatter
+const REACH = { v10: 420, i4bike: 380, v8: 320, thumper: 110 };
 const even = (n) => [...Array(n).keys()].map(i => i/n);
 const PULSE = {
   scooter: { ev: [0], amp: [1], dec: 0.0025, nz: 0.22, pipe: 0.0021, fb: 0.55, damp: 0.5, irr: 0.06, knock: 0, g: 1 },
@@ -319,8 +320,10 @@ Audio.prototype.engines = function (list, lx, lz) {
   for (const v of list) {
     if (v.isPlayer || v.wreck || v.parked || v.hideBody) continue;
     const k = engineOf(v.type); if (k === 'cycle') continue;
-    const q = (v.x - lx)**2 + (v.z - lz)**2; if (q > 3600) continue;
-    near.push([q, v, k]);
+    // (a V10 or a litre bike on full song carries across half the town, a Splendor doesn't get past the next shop. Ranked by how
+    // loud it'd be where you are, not by how near: that Huracan three streets off comes before the scooter at the kerb)
+    const R = REACH[k] || 60, q = (v.x - lx)**2 + (v.z - lz)**2; if (q > R*R) continue;
+    near.push([q*(3600/(R*R)), v, k]);
   }
   // (flat out you can't pick out five engines over your own, and that's when the audio thread has the least to spare)
   const G = window.__nhAskG, Pc = G && G.player, fast = Pc && !Pc.onFoot && Math.abs(Pc.cur?.v || 0) > 22;
@@ -333,6 +336,7 @@ Audio.prototype.engines = function (list, lx, lz) {
     if (this._te.some(T => T.v === n[1])) continue;
     const T = this._te.find(q => !q.v && !(q.quiet > t)); if (!T) continue;
     T.v = n[1]; T.sp0 = Math.abs(n[1].v || 0); T.ld = 0.15;
+    T.pn.refDistance = (REACH[n[2]] || 60) > 100 ? (REACH[n[2]] || 60)*0.1 : 6;
   }
   this._te.forEach((T) => {
     const n = T.v && want.get(T.v);
