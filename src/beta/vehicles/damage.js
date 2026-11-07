@@ -111,7 +111,7 @@ V.flatWheel = function (w) {
 // it's gone (returns true when this one finished it)
 V.hurtTyre = function (w, k) {
   if (!w || this.noFlat || (this._flats && this._flats.has(w))) return false;
-  const hp = (this._thp || (this._thp = new Map())), left = (hp.has(w) ? hp.get(w) : 1) - k*(TYRES[this.type] ?? 1);
+  const hp = (this._thp || (this._thp = new Map())), left = (hp.has(w) ? hp.get(w) : 1) - k*(TYRES[this.type] ?? 1.15);
   hp.set(w, left);
   if (left > 0) return false;
   this.flatWheel(w); return true;
@@ -253,8 +253,9 @@ V.mend = function () {
 };
 
 // ---------------------------------------------------------------- crashes
-// (a carbon tub takes twice what a Swift does; a bus is a bus. Tyres likewise)
-const TOUGH = { super: 0.33, sports: 0.4, bus: 0.45, lux: 0.85, jeep: 0.8, tempo: 0.8 }, TYRES = { super: 0.4, sports: 0.5, jeep: 0.8, bus: 0.6 };
+// (a 911 is the toughest thing on the road for its size, a carbon tub close behind, a big luxury saloon well built; a bus
+// is a bus. Tyres go a little before the body does)
+const TOUGH = { sports: 0.28, super: 0.33, bus: 0.45, lux: 0.6, jeep: 0.8, tempo: 0.8 }, TYRES = { super: 0.5, sports: 0.55, lux: 0.9, jeep: 0.9, bus: 0.7 };
 const P = V, bounce = P.bounce;
 P.bounce = function (res, ox, oz) {
   const imp = bounce.call(this, res, ox, oz);
@@ -269,7 +270,7 @@ P.bounce = function (res, ox, oz) {
     const r = clamp(0.35 + felt*0.035, 0.35, 0.95), depth = Math.min(0.28, (felt - 3)*0.022*Math.sqrt(TOUGH[this.type] ?? 1));
     try { this.dent(res.lx, ly, res.lz, nlx, -0.12, nlz, r, depth); } catch (e) { /* drawn as it was */ }
     // a big one on a wheel bends it
-    if (felt > 7 && this.wheels) { const w = this.wheels.find(q => Math.hypot(q.x - res.lx, q.z - res.lz) < q.r + 0.45); if (w) this.hurtTyre(w, (felt - 6)*0.08); }
+    if (felt > 6 && this.wheels) { const w = this.wheels.find(q => Math.hypot(q.x - res.lx, q.z - res.lz) < q.r + 0.45); if (w) this.hurtTyre(w, (felt - 5)*0.085); }
   }
   return imp;
 };
