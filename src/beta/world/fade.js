@@ -6,8 +6,9 @@
 // fills in exactly the pixels the near one leaves (beta/gfx/paint.js DITHER), so nothing doubles or goes missing.
 import * as THREE from 'three';
 import { InstancedSet } from '@orig/world/props.js';
-import { view, ranged } from './view.js';
+import { view, ranged, seenOnly } from './view.js';
 
+const behind = [];
 const MARGIN = 9;          // (more than the 6 m between re-culls)
 const band = (r) => Math.min(14, Math.max(4, r*0.12));
 // a set's own copy of its material, with the fade: the game's stock ones go through beta/gfx/repaint.js (FADE); the
@@ -27,14 +28,17 @@ function fadeOf(src, U) {
 const upd = function (cx, cz, fr) {
   const M = this.mesh, arr = M.instanceMatrix.array, col = this.hasColor ? M.instanceColor.array : null, r2 = this.range*this.range, m2 = this.minRange*this.minRange, I = this.items;
   let n = 0;
-  for (let k = 0; k < I.length; k++) {
+  const still = M.shadowStill && M.castShadow, reach = view.reach*view.reach, cap = this.capacity; behind.length = 0;
+  const put = (it) => { arr.set(it.m, n*16); if (col && it.c) { col[n*3] = it.c[0]; col[n*3 + 1] = it.c[1]; col[n*3 + 2] = it.c[2]; } n++; };
+  for (let k = 0; k < I.length && n < cap; k++) {
     const it = I[k]; if (it.off) continue;
     const dx = it.x - cx, dz = it.z - cz, d2 = dx*dx + dz*dz;
-    if (d2 > r2 || d2 < m2 || (fr && !fr(it.x, it.z)) || !view.sees(it.x, it.z)) continue;
-    arr.set(it.m, n*16);
-    if (col && it.c) { col[n*3] = it.c[0]; col[n*3 + 1] = it.c[1]; col[n*3 + 2] = it.c[2]; }
-    if (++n >= this.capacity) break;
+    if (d2 > r2 || d2 < m2 || (fr && !fr(it.x, it.z))) continue;
+    if (view.sees(it.x, it.z)) put(it); else if (still && d2 < reach) behind.push(it);
   }
+  // (behind you and still: not in the picture, but on the list for the sun: its map isn't drawn again when you turn round)
+  M.seen = n; for (let k = 0; k < behind.length && n < cap; k++) put(behind[k]); M.all = n;
+  if (still) M.onBeforeRender = seenOnly;
   M.count = n; M.visible = n > 0;
   if (n) { ranged(M.instanceMatrix, n); if (col) ranged(M.instanceColor, n); }
 };

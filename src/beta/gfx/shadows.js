@@ -4,6 +4,7 @@
 // their holes, people on their bones) sets it as customDepthMaterial, as it would for three.
 import * as THREE from 'three';
 import { PU } from './paint.js';
+import { view } from '../world/view.js';
 
 const STILL = 6, MOVES = 7, FAR = 700, STEP = 24;
 const STILL_ROOT = /^(chunk|landmark|hills)/;
@@ -35,7 +36,7 @@ export class Shadows {
     this.c = new THREE.Vector3(1e9, 0, 1e9); this.sd = new THREE.Vector3(0, 1, 0); this.M = new THREE.Matrix4();
   }
   set(on, size) { this.on = on; if (size !== this.size) { this.size = size; this.free(); } this.dirty = true; }
-  reach(h) { if (h === this.half) return; this.half = h; const C = this.cam; C.left = C.bottom = -h; C.right = C.top = h; C.updateProjectionMatrix(); this.dirty = true; }
+  reach(h) { if (h === this.half) return; this.half = h; view.reach = h*1.6; const C = this.cam; C.left = C.bottom = -h; C.right = C.top = h; C.updateProjectionMatrix(); this.dirty = true; }
   free() { if (this.a) { for (const t of [this.a, this.b]) { t.depthTexture.dispose(); t.dispose(); } this.a = this.b = null; } }
   depth(m) {
     if (m.customDepthMaterial) return m.customDepthMaterial;
@@ -62,6 +63,8 @@ export class Shadows {
   isStill(c) { return STILL_ROOT.test(c.name) || c.shadowStill; }
   // (called once a frame just before the picture; it leaves the render target for the caller to set)
   render(focus, forward) {
+    // (a list of instances is drawn where its instances say: its own place never changes, and with 300 of them it adds up)
+    if (this.scene.children.length !== this.kids) { this.kids = this.scene.children.length; for (const c of this.scene.children) if (c.isInstancedMesh && c.matrixAutoUpdate && !c.position.x && !c.position.y && !c.position.z) { c.updateMatrix(); c.matrixAutoUpdate = false; } }
     this.scene.updateMatrixWorld();
     if (!this.on || !this.sky.state) { PU.shadowOn.value = 0; return; }
     const R = this.R, S = this.scene, kids = S.children, ld = this.sky.state.lightDir;

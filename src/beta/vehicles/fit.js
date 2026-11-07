@@ -27,11 +27,13 @@ export const WRIST = [-0.05, 0.035];
 // the way that brings the fingertips down to the thumb (found once for each hand: rigs differ)
 const FING = ['index', 'middle', 'ring', 'pinky'];
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _ax = new THREE.Vector3(), _q = new THREE.Quaternion(), _pq = new THREE.Quaternion();
+const _v = new THREE.Vector3(), _sc = new THREE.Vector3();
 function turn(b, axis, ang) {
   if (!b || !b.parent) return;
   const u = b.userData;
   if (u.gq && b.quaternion.equals(u.gq)) b.quaternion.copy(u.gb); else (u.gb || (u.gb = new THREE.Quaternion())).copy(b.quaternion);
-  b.parent.getWorldQuaternion(_pq).invert();
+  // (the parent's just been brought up to date: going back up the whole body from every joint of every finger was a tenth of the frame)
+  b.parent.matrixWorld.decompose(_v, _pq, _sc); _pq.invert();
   b.quaternion.premultiply(_q.setFromAxisAngle(_c.copy(axis).applyQuaternion(_pq), ang));
   (u.gq || (u.gq = new THREE.Quaternion())).copy(b.quaternion);
   b.updateMatrixWorld(true);
@@ -71,12 +73,12 @@ function hand(H, side) {
 export function grip(H, side, k = 1) {
   if (!H || !k) return;
   const f = hand(H, side); if (!f) return;
-  H.root.updateMatrixWorld(true);
-  f.f[0][0].getWorldPosition(_a); f.f[3][0].getWorldPosition(_b); _ax.subVectors(_b, _a).normalize();
+  const palm = H.root.getObjectByName(`hand_${side}`); palm.updateWorldMatrix(true, true);
+  _a.setFromMatrixPosition(f.f[0][0].matrixWorld); _b.setFromMatrixPosition(f.f[3][0].matrixWorld); _ax.subVectors(_b, _a).normalize();
   const a = f.s*k;
   for (const ch of f.f) { turn(ch[0], _ax, a*1.15); turn(ch[1], _ax, a*1.35); turn(ch[2], _ax, a*0.85); }
   if (f.ts && f.th[0]) {
-    H.root.getObjectByName(`hand_${side}`).getWorldPosition(_a); f.f[1][0].getWorldPosition(_b); _b.sub(_a).normalize();
+    _a.setFromMatrixPosition(palm.matrixWorld); _b.setFromMatrixPosition(f.f[1][0].matrixWorld).sub(_a).normalize();
     turn(f.th[0], _b, f.ts*k*0.45); turn(f.th[1], _ax, a*0.5); turn(f.th[2], _ax, a*0.6);
   }
 }
@@ -132,20 +134,23 @@ function atWheel(H, v) {
   const rIs1 = _g[1].dot(_r) >= _g[0].dot(_r), wr = rIs1 ? [_g[0], _g[1]] : [_g[1], _g[0]];
   const u = R.getObjectByName('upperarm_l'), l = R.getObjectByName('lowerarm_l'), h = R.getObjectByName('hand_l'); if (!u || !l || !h) return;
   H.holder.updateMatrixWorld(true);
-  const L = (u.getWorldPosition(_a).distanceTo(l.getWorldPosition(_b)) + _b.distanceTo(h.getWorldPosition(_c)))*0.96;
+  _a.setFromMatrixPosition(u.matrixWorld); _b.setFromMatrixPosition(l.matrixWorld); _c.setFromMatrixPosition(h.matrixWorld);
+  const L = (_a.distanceTo(_b) + _b.distanceTo(_c))*0.96;
   let over = 0;
-  for (const [i, sd] of [[0, 'l'], [1, 'r']]) { R.getObjectByName('upperarm_' + sd).getWorldPosition(_sh); over = Math.max(over, _sh.distanceTo(wr[i]) - L); }
+  for (const [i, sd] of [[0, 'l'], [1, 'r']]) { _sh.setFromMatrixPosition(R.getObjectByName('upperarm_' + sd).matrixWorld); over = Math.max(over, _sh.distanceTo(wr[i]) - L); }
   if (over > 0) {
     _fw.set(1, 0, 0).transformDirection(m);
     H.holder.position.addScaledVector(_fw, Math.min(0.3, over*1.05));
     H.holder.updateMatrixWorld(true);
   }
+  H._fresh = true;     // (the whole body's up to date as of just now: ikArm needn't do it all again)
   for (const [i, sd] of [[0, 'l'], [1, 'r']]) {
     const s = sd === 'r' ? 1 : -1;
     _pole.set(-0.3, -1, s*0.6).transformDirection(m);
     ikArm(H, sd, wr[i], _pole, 1);
     grip(H, sd, 1);
   }
+  H._fresh = false;
 }
 
 const pr = Pilot.prototype.placeRider;

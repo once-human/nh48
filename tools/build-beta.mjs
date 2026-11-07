@@ -60,8 +60,8 @@ const PATCHES = {
   [S('game/garageui.js')]: [["[tog('xenon', cyc ? 'LED lamp' : 'Xenon headlights', 'Cold white, reaches further', $(2500)), ...(cyc ? [] : [", "[...(cyc ? [] : [tog('xenon', 'Xenon headlights', 'Cold white, reaches further', $(2500)), "], ["(this.mine ? 'Your ' : '') + here.spec.name.toLowerCase();", "(this.mine ? 'Your ' : '') + (here.spec.real || here.spec.name);"]],
   [S('ui/jhola.js')]: [["if (this.queue.length && G.state === 'play') this.renderOne();", "if (this.queue.length && G.state === 'play' && (G.player.onFoot || Math.abs(G.player.cur.v || 0) < 2.5)) this.renderOne();"], ["name: 'Your ' + (v.spec && v.spec.name ? v.spec.name.toLowerCase() : 'vehicle') }", "name: 'Your ' + (v.spec ? v.spec.real || v.spec.name || 'vehicle' : 'vehicle') }"]],
   // compound walls along the roads: not Pune, Onkar wants them gone. Neither drawn nor solid (the city's edge wall is separate)
-  [S('world/index.js')]: [["import TRANSIT from", "import { letGo } from '../beta/world/view.js';\nimport TRANSIT from"],
-    ["g.traverse(o => { if (o.isMesh || o.isLine) { o.matrixAutoUpdate = false; o.updateMatrix(); } });", "g.traverse(o => { if (o.isMesh || o.isLine) { o.matrixAutoUpdate = false; o.updateMatrix(); if (!o.isInstancedMesh && o.geometry) letGo(o.geometry); } });"],
+  [S('world/index.js')]: [["import TRANSIT from", "import { letGo, freeze } from '../beta/world/view.js';\nimport TRANSIT from"],
+    ["g.traverse(o => { if (o.isMesh || o.isLine) { o.matrixAutoUpdate = false; o.updateMatrix(); } });", "g.traverse(o => { if (o.isMesh || o.isLine) { o.matrixAutoUpdate = false; o.updateMatrix(); if (!o.isInstancedMesh && o.geometry) letGo(o.geometry); } }); freeze(g);"],
     ["for (const w of D.walls) put('walls', at(w[0] / 100, w[1] / 100), cmRing(w));", "/* /beta: no compound walls */"]],
   [S('world/world.js')]: [
     ["for (const B of M.buildings) W.collision.addRing(cmRing(B[1]), 0);", "for (const B of M.buildings) buildingSolid(B, cmRing(B[1]), W.collision);"],
@@ -160,7 +160,7 @@ const PATCHES = {
     ["label: `Take the ${specOf(o.type).name.toLowerCase()} from its driver`", "label: `Take the ${specOf(o.type).real || specOf(o.type).name} from its driver`"],
     ["name: veh.spec.name.toLowerCase(), x: r.x", "name: veh.spec.real || veh.spec.name, x: r.x"],
     // a parked ride taken: off the parked rows now, not once the camera's gone 6 m (two of it drawn till then)
-    ["      for (const it of r.items) it.off = true;\n", "      for (const it of r.items) it.off = true;\n      this.W._propX = undefined;\n"],
+    ["      for (const it of r.items) it.off = true;\n", "      for (const it of r.items) it.off = true;\n      this.W._propX = undefined; if (window.__post && window.__post.shadows) window.__post.shadows.dirty = true;\n"],
     // slowed on foot (dazed after Vetal: beta/game/powers.js sets slowMul)
     ["const target = (fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0;", "const target = ((fw || sd) ? (F.swim ? (run ? 2.1 : 1.35) : run ? SPRINT * (this.sprintMul ? this.sprintMul() : 1) : k('AltLeft') ? WALK : JOG) : 0) * (this.slowMul ? this.slowMul() : 1) * (this.crouchMul ? this.crouchMul() : 1);"],
     // knocked down by a vehicle only if it's coming at you: walking into the back of a scooter riding away from you
@@ -242,6 +242,15 @@ const PATCHES = {
     ["if (dd > (big ? 16 : 7) || (best && dd >= bd)) continue;", "if (dd > (big ? 9 : 3.5) || (best && dd >= bd)) continue;"],
   ],
   // a one-off gesture (a wave as they pass) is upper body too: the legs keep walking under it
+  // an arm reached for its target by going back up the whole body from each bone, several times over; the body's up to date
+  // by then, so it's read off instead, and only the arm brought up to date after
+  [S('people/humans.js')]: [
+    ["bone.getWorldQuaternion(_wq); bone.parent.getWorldQuaternion(_pq);", "bone.matrixWorld.decompose(_ikV, _wq, _ikS); bone.parent.matrixWorld.decompose(_ikV, _pq, _ikS);"],
+    ["function aim(bone, from, to) {", "const _ikV = new THREE.Vector3(), _ikS = new THREE.Vector3();\nfunction aim(bone, from, to) {"],
+    ["  R.updateMatrixWorld(true);\n  _q0.copy(u.quaternion); _q1.copy(l.quaternion);\n  u.getWorldPosition(_a); l.getWorldPosition(_b); h.getWorldPosition(_c);", "  if (!H._fresh) R.updateMatrixWorld(true);\n  _q0.copy(u.quaternion); _q1.copy(l.quaternion);\n  _a.setFromMatrixPosition(u.matrixWorld); _b.setFromMatrixPosition(l.matrixWorld); _c.setFromMatrixPosition(h.matrixWorld);"],
+    ["  l.getWorldPosition(_b); h.getWorldPosition(_c);\n  aim(l,", "  _b.setFromMatrixPosition(l.matrixWorld); _c.setFromMatrixPosition(h.matrixWorld);\n  aim(l,"],
+    ["l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  R.updateMatrixWorld(true);\n}", "l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  u.updateMatrixWorld(true);\n}"],
+  ],
   [S('people/crowd.js')]: [
     // smooth up to 45 m, half rate to 100 m; a frame someone isn't animated, their bones go back to the clip's pose
     // (beta/people/clippose.js), so whatever's built on it (hands on the grips, a lean) is rebuilt on that, never on itself
@@ -364,6 +373,19 @@ const PATCHES = {
   // parked vehicles solid over their real length and width: a chain of circles as wide as the vehicle from bumper to
   // bumper (a parked scooter was one 0.45 m circle in its middle: you walked through its nose and its tail)
   [S('traffic/parked.js')]: [
+    // further off, the same vehicle with less in it instead of a few boxes (beta/vehicles/lod.js): it doesn't change as you
+    // come up to it. Its shadow and glass stay on; a parked one stands still, so its shadow goes in the still map
+    ["import { RNG } from '../core/util.js';", "import { RNG } from '../core/util.js';\nimport { reduced } from '../beta/vehicles/lod.js';"],
+    ["const sF = new InstancedSet(scene, low, vmats.body, capFar, far, { minRange: near, color: true });", "const sF = new InstancedSet(scene, low, vmats.body, capFar, far, { minRange: near, color: true, cast: quality.shadows }); const sM = new InstancedSet(scene, reduced(geoNear, .12), vmats.body, cap, near*2.3, { minRange: near, color: true, cast: quality.shadows }); sM.lvl = 1; sF.lvl = 2; sN.mesh.shadowStill = sM.mesh.shadowStill = sF.mesh.shadowStill = true;"],
+    ["for (const s of [sN, sF]) {", "for (const s of [sN, sM, sF]) {"],
+    ["sets[k] = { sN, sF, sG };", "sets[k] = { sN, sM, sF, sG };"],
+    ["items: [S.sN.add(x, z, m, col), S.sF.add(x, z, m, col)]", "items: [S.sN.add(x, z, m, col), S.sM.add(x, z, m, col), S.sF.add(x, z, m, col)]"],
+    ["all.push(S.sN, S.sF);", "all.push(S.sN, S.sM, S.sF);"],
+    ["sG = new InstancedSet(scene, glassGeo, vmats.glassI || vmats.glass, cap, near, {});", "{ sG = new InstancedSet(scene, glassGeo, vmats.glassI || vmats.glass, cap + capFar, far, {}); sG.keep = true; }"],
+    ["mk('scooter', kinds.scooter, null, buildLow('scooter', true), 520, 1100);", "mk('scooter', kinds.scooter, null, reduced(kinds.scooter, .25, false), 520, 1100);"],
+    ["mk('bike', kinds.bike, null, buildLow('bike', true), 260, 520);", "mk('bike', kinds.bike, null, reduced(kinds.bike, .25, false), 260, 520);"],
+    ["mk(c, kinds[c].body, kinds[c].glass, buildLow(c), 60, 120);", "mk(c, kinds[c].body, kinds[c].glass, reduced(kinds[c].body, .25, false), 60, 120);"],
+    ["mk('auto', kinds.auto.body, kinds.auto.glass, buildLow('auto'), 80, 120);", "mk('auto', kinds.auto.body, kinds.auto.glass, reduced(kinds.auto.body, .25, false), 80, 120);"],
     ["const pick = (a) => rng.pick(a).map(lin);", "const pick = (a) => rng.pick(a).map(lin);\n  const chain = (x, z, hx, hz, L, Wd) => { const r = Wd / 2, n = Math.max(1, Math.ceil((L - Wd) / (r * 0.8)) + 1), out = []; for (let i = 0; i < n; i++) { const o = n === 1 ? 0 : -(L / 2 - r) + (L - 2 * r) * i / (n - 1); out.push(W.collision.addCircle(x + hx * o, z + hz * o, r, 2)); } return out; };"],
     ["rec.circles.push(W.collision.addCircle(x + tx * 1.1, z + tz * 1.1, 0.85, 2), W.collision.addCircle(x - tx * 1.1, z - tz * 1.1, 0.85, 2));", "rec.circles.push(...chain(x, z, tx, tz, { hatch: 3.65, sedan: 4.0, suv: 4.5 }[k], { hatch: 1.62, sedan: 1.72, suv: 1.82 }[k])); for (const c of rec.circles) c.rec = rec;"],
     ["rec.circles.push(W.collision.addCircle(px, pz, 0.45, 2));", "rec.circles.push(...chain(px, pz, hx, hz, k === 'bike' ? 2.0 : 1.85, 0.62)); for (const c of rec.circles) c.rec = rec;"],
@@ -401,12 +423,12 @@ const PATCHES = {
     ["if (o.signals && !o.emergency && G.traffic.signals) {", "if (o.careful && !o.signals && G.traffic.signals) { const n = W.graph.nearest(v.x + hx * 14, v.z + hz * 14, 10), node = n && W.graph.nodes[n.s < n.e.len / 2 ? n.e.a : n.e.b]; if (node && node.signal && Math.hypot(node.x - v.x, node.z - v.z) < 24 && G.traffic.signals.stateForAngle(node.i, v.th) === 'r') target = Math.min(target, 6); }\n    if (o.signals && G.traffic.signals) {"],
   ],
   [S('traffic/traffic.js')]: [
-    ["import { TRAFFIC, curve } from '../world/activity.js';", "import { TRAFFIC, curve } from '../world/activity.js';\nimport { view, ranged } from '../beta/world/view.js';"],
+    ["import { TRAFFIC, curve } from '../world/activity.js';", "import { TRAFFIC, curve } from '../world/activity.js';\nimport { view, ranged } from '../beta/world/view.js';\nimport { reduced } from '../beta/vehicles/lod.js';"],
     // a bus or a tempo keeps its full model a good deal further out (it's big: its detail was missing until right up close)
-    ["const far = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) > L2;", "if (!view.sees(v.x, v.z, 35, 12)) continue;\n      const far = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) > L2 * (v.type === 'bus' || v.type === 'tempo' ? 6.25 : 1);"],
+    ["const far = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) > L2;", "if (!view.sees(v.x, v.z, 35, 12)) continue;\n      const dd = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz), LK = L2 * (v.type === 'bus' || v.type === 'tempo' ? 6.25 : 1), lv = dd > LK * 5.3 ? 2 : dd > LK ? 1 : 0;"],
     // only what's in the view is drawn (beta/world/view.js), only what's in use uploaded, and an empty list not visited at all
     ["        mesh.count = n;\n        mesh.instanceMatrix.needsUpdate = true;\n        mesh.instanceColor.needsUpdate = true;\n        mesh.geometry.attributes.aColB.needsUpdate = true;\n        mesh.geometry.attributes.aColC.needsUpdate = true;", "        mesh.count = n; mesh.visible = n > 0; if (!n) continue;\n        ranged(mesh.instanceMatrix, n); ranged(mesh.instanceColor, n); ranged(mesh.geometry.attributes.aColB, n);\n        ranged(mesh.geometry.attributes.aColC, n);"],
-    ["if (I.glass) { I.glass.count = I.n; I.glass.instanceMatrix.needsUpdate = true; }", "if (I.glass) { I.glass.count = I.n; I.glass.visible = I.n > 0; if (I.n) ranged(I.glass.instanceMatrix, I.n); }"],
+    ["if (I.glass) { I.glass.count = I.n; I.glass.instanceMatrix.needsUpdate = true; }", "if (I.glass) { I.glass.count = I.ng; I.glass.visible = I.ng > 0; if (I.ng) ranged(I.glass.instanceMatrix, I.ng); }"],
     // brake and reverse lamps per car (beta/vehicles/lamps.js, beta/vehicles/vehmat.js)
     ["      body.geometry.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));", "      body.geometry.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));\n      body.geometry.setAttribute('aLamp', new THREE.InstancedBufferAttribute(new Float32Array(c * 2), 2));"],
     ["      lowGeo.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));", "      lowGeo.setAttribute('aColC', new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3));\n      lowGeo.setAttribute('aLamp', new THREE.InstancedBufferAttribute(new Float32Array(c * 2), 2));"],
@@ -430,7 +452,14 @@ const PATCHES = {
     ["tot += t.w * (mix[k] ?? 1);", "tot += t.w * (mix[k] ?? mix[baseOf(k)] ?? 1);"],
     // the far model of the empty two-wheeler / auto (real riders up close, a wreck) is that vehicle without its baked
     // rider, not a car: buildLow('scooterE') fell through to the car box, so a scooter past the detail range drew as a car
-    ["const lowGeo = buildLow(k);", "const lowGeo = /E$/.test(k) ? buildLow(k.slice(0, -1), true) : buildLow(k);"],
+    ["const lowGeo = buildLow(k);", "const lowGeo = reduced(m.body, /^(bus|tempo)/.test(k) ? .4 : .25, false);"],
+    ["this.inst[k] = { body, glass, low, cap: c, n: 0, nl: 0 };", "const midGeo = reduced(m.body, /^(bus|tempo)/.test(k) ? .18 : .12), mid = new THREE.InstancedMesh(midGeo, mats.body, c); mid.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3);\n      for (const a of ['aColB', 'aColC', 'aLamp']) if (lowGeo.attributes[a]) midGeo.setAttribute(a, lowGeo.attributes[a].clone());\n      mid.castShadow = quality.shadows; mid.receiveShadow = true; mid.frustumCulled = false; mid.count = 0; scene.add(mid);\n      this.inst[k] = { body, glass, low, mid, cap: c, n: 0, nl: 0, nm: 0, ng: 0 };"],
+    ["const mesh = far ? I.low : I.body;", "const mesh = lv === 2 ? I.low : lv === 1 ? I.mid : I.body;"],
+    ["const i = far ? I.nl : I.n;", "const i = lv === 2 ? I.nl : lv === 1 ? I.nm : I.n;"],
+    ["for (const [mesh, n] of [[I.body, I.n], [I.low, I.nl]]) {", "for (const [mesh, n] of [[I.body, I.n], [I.mid, I.nm], [I.low, I.nl]]) {"],
+    ["low.castShadow = false;", "low.castShadow = quality.shadows;"],
+    ["if (far) I.nl++;\n      else { if (I.glass) I.glass.setMatrixAt(i, m); I.n++; }", "if (I.glass) I.glass.setMatrixAt(I.ng++, m);\n      if (lv === 2) I.nl++; else if (lv === 1) I.nm++; else I.n++;"],
+    ["this.inst[k].nl = 0;", "this.inst[k].nl = 0; this.inst[k].nm = 0; this.inst[k].ng = 0;"],
     ["x -= t.w * (mix[k] ?? 1);", "x -= t.w * (mix[k] ?? mix[baseOf(k)] ?? 1);"],
   ],
 };

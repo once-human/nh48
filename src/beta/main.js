@@ -211,6 +211,9 @@ function pickQuality() {
   return { ...QUALITY.med };
 }
 
+// the loading screen's gone once it has faded: left see-through it kept its 90 px blur and five big blended layers
+// animating under the whole game, each frame
+const loaded = () => { const ld = document.getElementById('loading'); ld.classList.add('done'); setTimeout(() => { if (ld.classList.contains('done')) ld.classList.add('gone'); }, 2000); };
 const ASSETS = {
   map: 'assets/map.gz.txt',
   // the ground and wall textures start small (a quarter size, 0.2 MB) and are swapped for the sharp ones once
@@ -231,7 +234,7 @@ async function main() {
   if (params.has('fxaa')) { quality.fxaa = params.get('fxaa') === '1'; if (quality.fxaa && !params.has('msaa')) quality.msaa = false; }
   installAtmosphere();
   const canvas = document.getElementById('gl');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: params.has('msaa') ? params.get('msaa') === '1' : !!quality.msaa, powerPreference: 'high-performance', stencil: false, depth: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: false, antialias: params.has('msaa') ? params.get('msaa') === '1' : !!quality.msaa, powerPreference: 'high-performance', stencil: false, depth: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatio));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.shadowMap.enabled = false;                 // (gfx/shadows.js draws the sun's own)
@@ -250,7 +253,7 @@ async function main() {
     e.preventDefault();
     try { ctxGame?.saveResume(); } catch (err) { /* ignore */ }
     const m = document.getElementById('ld-msg'), ld = document.getElementById('loading');
-    if (ld) { ld.classList.remove('done'); ld.hidden = false; }
+    if (ld) { ld.classList.remove('done', 'gone'); ld.hidden = false; }
     if (m) m.textContent = 'Graphics driver reset, reloading where you were…';
     setTimeout(() => location.reload(), 1200);
   });
@@ -381,9 +384,9 @@ async function main() {
   }
   await game.init(progress);
   betaTitle(game);
-  { const actors = new Actors(game, scene); const lamps = new Lamps(game); post.beforeDraw = (dt, cam) => { actors.update(dt, cam); lamps.update(); inside.value = game.interiors && game.interiors.inside ? 1 : 0; }; post.shadows = new Shadows(renderer, scene, sky, 2048); post.focusAt = () => { const f = post.shadowFocus(); return Math.max(2, camera.position.distanceTo(f.position || (f.root && f.root.position) || f)); }; post.indoors = () => inside.value > .5; post.shadowFocus = () => (game.player.onFoot ? game.player.foot : game.player); game.swapShadows = (on, size) => post.shadows.set(on, size); game.shadowsOn = () => post.shadows.on; }
+  { const actors = new Actors(game, scene); const lamps = new Lamps(game); post.beforeDraw = (dt, cam) => { actors.update(dt, cam); lamps.update(); inside.value = game.interiors && game.interiors.inside ? 1 : 0; }; post.streamer = W.streamer; post.shadows = new Shadows(renderer, scene, sky, 2048); post.focusAt = () => { const f = post.shadowFocus(); return Math.max(2, camera.position.distanceTo(f.position || (f.root && f.root.position) || f)); }; post.indoors = () => inside.value > .5; post.shadowFocus = () => (game.player.onFoot ? game.player.foot : game.player); game.swapShadows = (on, size) => post.shadows.set(on, size); game.shadowsOn = () => post.shadows.on; }
   game.setAniso = (v) => { const a = Math.min(v, renderer.capabilities.getMaxAnisotropy()); THREE.Texture.DEFAULT_ANISOTROPY = a; const seen = new Set(), one = (t) => { if (t && t.isTexture && !seen.has(t) && t !== PU.tNoise.value && !t.isDepthTexture) { seen.add(t); if (t.anisotropy !== a) { t.anisotropy = a; t.needsUpdate = true; } } }; scene.traverse(o => { const m = o.material; if (!m) return; for (const q of Array.isArray(m) ? m : [m]) { one(q.map); if (q.uniforms && q.uniforms.tMap) one(q.uniforms.tMap.value); } }); };
-  game.setVehicleDetail = (d) => { traffic.lodDist = d; const P = W.parked; if (P) for (const s of P.sets) { if (s.minRange > 0) { s.minRange = d; } else s.range = d; } updateProps(W, camera.position.x, camera.position.z); };
+  game.setVehicleDetail = (d) => { traffic.lodDist = d; const P = W.parked; if (P) for (const s of P.sets) { if (s.keep) continue; if (s.lvl === 1) { s.minRange = d; s.range = d*2.3; } else if (s.lvl === 2) s.minRange = d*2.3; else s.range = d; } updateProps(W, camera.position.x, camera.position.z); };
   if (W.trees) W.trees.cam = camera;
   sky.dome.renderOrder = 30;                          // (the sky last, only where nothing else has drawn: it was first, painted under everything)
   game.gfx = new Graphics(game, { gpu: GPU, post, PU, Vector2: THREE.Vector2 }); game.gfx.install();
@@ -425,7 +428,7 @@ async function main() {
   window.addEventListener('resize', onResize);
   onResize();
   await progress('Ready', 1);
-  document.getElementById('loading').classList.add('done');
+  loaded();
   // the map, sharp everywhere: the 2 km pictures of all of Pune, then the 1 km ones around you
   if (W.tiles && W.cityMap) setTimeout(() => { const P = game.player; W.cityMap.prefetch(1, P.x, P.z); W.cityMap.prefetch(2, P.x, P.z, 5000); }, 12000);
   if (TEST) setTimeout(() => { try { W.trees.sharpenLeaves(); } catch (e) { /* keep the soft ones */ } }, 2500);
@@ -596,7 +599,7 @@ async function runFly({ W, renderer, scene, camera, sky, post, quality, progress
   window.addEventListener('resize', onResize);
   onResize();
   await progress('Ready', 1);
-  document.getElementById('loading').classList.add('done');
+  loaded();
   const dev = document.createElement('div');
   dev.className = 'dev';
   if (!TEST) document.getElementById('ui').appendChild(dev);

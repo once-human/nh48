@@ -191,14 +191,14 @@ function showStandIn(P, E) {
   // its cabin in from the start (seats, wheel, dash): the door opens on the inside of a car, not an empty shell
   if (v.cockpit) v.cockpit.group.visible = true;
   // (the parked rows only re-cull once the camera's moved 6 m: made to now, or the parked car stays drawn round this one)
-  if (E.offer.kind === 'parked') { for (const it of src.items) it.off = true; P.W._propX = undefined; }
+  if (E.offer.kind === 'parked') { for (const it of src.items) it.off = true; P.W._propX = undefined; if (window.__post && window.__post.shadows) window.__post.shadows.dirty = true; }
   else if (E.offer.kind === 'traffic') src.hideBody = true;
 }
 function dropStandIn(P, E) {
   const v = E.pre; if (!v || P.cur === v) return;
   if (P.doors) for (const R of P.doors.slice()) if (R.veh === v) unhang(P, R);
   v.root.parent && v.root.parent.remove(v.root);
-  if (E.offer.kind === 'parked' && !E.src.taken) { for (const it of E.src.items) it.off = false; P.W._propX = undefined; }
+  if (E.offer.kind === 'parked' && !E.src.taken) { for (const it of E.src.items) it.off = false; P.W._propX = undefined; if (window.__post && window.__post.shadows) window.__post.shadows.dirty = true; }
   else if (E.offer.kind === 'traffic') E.src.hideBody = false;
   E.pre = null; E.offer.pre = null;
 }

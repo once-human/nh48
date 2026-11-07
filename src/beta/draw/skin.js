@@ -13,10 +13,12 @@ import { Wardrobe, buildCloth, dress } from './wardrobe.js';
 const TEX_W = 256, LOOK = 200, SLOTS = 96, CAST2 = 45*45;
 
 // (called right after the kit is made: it must see every body from the first one)
+// a bone's looked up by name dozens of times a frame, by going through the whole body each time: once is enough
+function bonesByName(R) { const seen = new Map(), find = R.getObjectByName; R.getObjectByName = function (n) { let o = seen.get(n); if (o === undefined) { o = find.call(this, n); if (o) seen.set(n, o); } return o; }; }
 export function trackBodies(kit) {
   const make = kit.create.bind(kit);
   kit.makeRaw = make; kit.bodies = new Set();
-  kit.create = (look) => { const H = make(look), d = H.dispose; kit.bodies.add(H); H.dispose = () => { kit.bodies.delete(H); if (d) d(); }; return H; };
+  kit.create = (look) => { const H = make(look), d = H.dispose; bonesByName(H.root); kit.bodies.add(H); H.dispose = () => { kit.bodies.delete(H); if (d) d(); }; return H; };
 }
 
 const VS = `precision highp float; precision highp sampler2D;

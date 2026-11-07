@@ -7,6 +7,7 @@
 // shader warm-ups draw into the same kind of picture the game does), .paint (the old "experimental graphics"
 // switch, which /beta doesn't need: it's always painted).
 import * as THREE from 'three';
+import { hideUnseen, showAll } from '../world/view.js';
 import { PU } from './paint.js';
 
 const VS = `in vec3 position; in vec2 uv; out vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }`;
@@ -62,9 +63,10 @@ void main(){
 // bright things bleed: down the chain, then back up it
 const BRIGHT_FS = HEAD + `uniform sampler2D tCol; uniform vec2 px; float lum(vec3 c){ return dot(c, vec3(.3, .59, .11)); }
 void main(){ vec3 c = (texture(tCol, vUv + px*vec2(-.5,-.5)).rgb + texture(tCol, vUv + px*vec2(.5,-.5)).rgb + texture(tCol, vUv + px*vec2(-.5,.5)).rgb + texture(tCol, vUv + px*vec2(.5,.5)).rgb)*.25; float l = lum(c), k = smoothstep(.78, 1.35, l); o = vec4(min(c, vec3(6.))*k, 1.); }`;
+// (four looks between the texels stand in for eight: the card's own filtering does the rest, a blur can't tell)
 const DOWN_FS = HEAD + `uniform sampler2D tCol; uniform vec2 px;
-void main(){ vec3 a = texture(tCol, vUv).rgb*.25; for (int i = 0; i < 4; i++) { vec2 s = vec2(i < 2 ? -1. : 1., (i == 0 || i == 2) ? -1. : 1.); a += texture(tCol, vUv + px*s).rgb*.125; a += texture(tCol, vUv + px*s*2.).rgb*.0625; } o = vec4(a, 1.); }`;
-const UP_FS = HEAD + `uniform sampler2D tCol; uniform vec2 px; void main(){ vec3 a = texture(tCol, vUv).rgb*4.; for (int i = -1; i <= 1; i += 2) { a += texture(tCol, vUv + vec2(px.x*float(i), 0.)).rgb*2.; a += texture(tCol, vUv + vec2(0., px.y*float(i))).rgb*2.; a += texture(tCol, vUv + px*float(i)).rgb; a += texture(tCol, vUv + px*vec2(float(i), -float(i))).rgb; } o = vec4(a/16., 1.); }`;
+void main(){ vec3 a = texture(tCol, vUv).rgb*.25; for (int i = 0; i < 4; i++) { vec2 s = vec2(i < 2 ? -1. : 1., (i == 0 || i == 2) ? -1. : 1.); a += texture(tCol, vUv + px*s*1.35).rgb*.1875; } o = vec4(a, 1.); }`;
+const UP_FS = HEAD + `uniform sampler2D tCol; uniform vec2 px; void main(){ vec3 a = vec3(0.); for (int i = -1; i <= 1; i += 2) { a += texture(tCol, vUv + px*vec2(float(i), .5)*.75).rgb; a += texture(tCol, vUv + px*vec2(-.5, float(i))*.75).rgb; } o = vec4(a*.25, 1.); }`;
 // shafts of sun: from each point walk towards the sun on the screen, counting how much open sky there is
 const SHAFT_FS = HEAD + `uniform sampler2D tDep; uniform vec2 sun; uniform int samples; float ign(vec2 p){ return fract(52.9829189*fract(dot(p, vec2(.06711056, .00583715)))); }
 void main(){ vec2 d = (sun - vUv)/float(samples)*.85, p = vUv + d*ign(gl_FragCoord.xy); float s = 0., w = 1., W = 0.; for (int i = 0; i < samples; i++) { s += step(.99999, texture(tDep, p).r)*w; W += w; w *= .975; p += d; } float r = length((vUv - sun)*vec2(1.6, 1.)); o = vec4(vec3(s/W*exp(-r*1.6)), 1.); }`;
@@ -208,7 +210,9 @@ export class Post {
     this.paintLook.update(this.sky, cam, this.scene);
     if (this.shadows) this.shadows.render(this.shadowFocus(), cam.getWorldDirection(this._f || (this._f = new THREE.Vector3())));
     const rt = this.target();
+    const St = this.streamer; if (St) hideUnseen(cam, St.built, St.W.index.size);
     R.setRenderTarget(rt); R.render(this.scene, cam);
+    if (St) showAll();
     this.t += dt || 0.016;
     const d = this.drunk || 0;
     if (d >= 0.35) {

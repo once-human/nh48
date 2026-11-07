@@ -69,6 +69,7 @@ Vehicle.prototype.wakeParked = function (r) {
   const G = G0(), Pl = G && G.player, TR = G && G.traffic; if (!TR || r.taken) return false;
   r.taken = true;
   for (const it of r.items) it.off = true;
+  if (window.__post && window.__post.shadows) window.__post.shadows.dirty = true;   // (parked ones are in the still shadows)
   for (const c of r.circles) c.off = true;
   if (r.static && TR.statics) { const i = TR.statics.indexOf(r.static); if (i >= 0) TR.statics.splice(i, 1); }
   Pl.W._propX = undefined;

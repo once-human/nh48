@@ -7,6 +7,8 @@ import { TreeField as GameTrees } from '@orig/world/trees.js';
 import { U } from '@orig/gfx/materials.js';
 import { hash1 } from '@orig/core/util.js';
 import { PU, LAMP, PCF, DITHER } from '../gfx/paint.js';
+import { seenOnly } from './view.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // near trees hand over to the mid ones, and the mid ones to the far crowns, over a band of distance (from the camera,
 // per tree), pixel by pixel: the one going keeps the pixels above the fade, the one coming those below (DITHER), so
@@ -87,7 +89,7 @@ function fewCards(g, every = 3, grow = 1.6) {
   for (let t = 0; t + 1 < n; t += 2) if ((t/2)%every === 0) ids.push(t, t + 1);
   for (const name in src.attributes) { const A = src.attributes[name], a = new A.array.constructor(ids.length*3*A.itemSize); let o = 0; for (const t of ids) for (let v = t*3; v < t*3 + 3; v++) for (let c = 0; c < A.itemSize; c++) a[o++] = A.array[v*A.itemSize + c]; G.setAttribute(name, new THREE.BufferAttribute(a, A.itemSize, A.normalized)); }
   const Q = G.attributes.position; for (let i = 0; i < ids.length; i += 2) { let x = 0, y = 0, z = 0; const v0 = i*3; for (let v = v0; v < v0 + 6; v++) { x += Q.getX(v); y += Q.getY(v); z += Q.getZ(v); } x /= 6; y /= 6; z /= 6; for (let v = v0; v < v0 + 6; v++) Q.setXYZ(v, x + (Q.getX(v) - x)*grow, y + (Q.getY(v) - y)*grow, z + (Q.getZ(v) - z)*grow); }
-  return G;
+  return mergeVertices(G);   // (a card's two triangles share their corners: half again as many corners to work out without it)
 }
 // a tree's place: turned about its upright, scaled, stood there
 function put(a, o, c, s, sx, sy, x, y, z) { a[o] = c*sx; a[o + 1] = 0; a[o + 2] = -s*sx; a[o + 3] = 0; a[o + 4] = 0; a[o + 5] = sy; a[o + 6] = 0; a[o + 7] = 0; a[o + 8] = s*sx; a[o + 9] = 0; a[o + 10] = c*sx; a[o + 11] = 0; a[o + 12] = x; a[o + 13] = y; a[o + 14] = z; a[o + 15] = 1; }
@@ -112,6 +114,7 @@ export class TreeField extends GameTrees {
       S.nl.material = this.paintLeaf; S.ml.material = leafMid;
       S.nl.customDepthMaterial = S.ml.customDepthMaterial = this.leafShadow;
       for (const m of [S.nb, S.nl, S.mb, S.ml]) m.shadowStill = true;
+      S.nb.onBeforeRender = S.nl.onBeforeRender = seenOnly;
       S.nl.instanceMatrix = S.nb.instanceMatrix; S.ml.instanceMatrix = S.mb.instanceMatrix;     // (bark and leaves stand in the same places)
       S.mb.geometry = thin(S.mb.geometry);
       // and further out a third of the leaf cards, each that much bigger so the crown's as full, and the trunk and main
@@ -119,7 +122,7 @@ export class TreeField extends GameTrees {
       // with the edges of this band)
       const add = (g, mat) => { const m = new THREE.InstancedMesh(g, mat, 1); m.count = 0; m.frustumCulled = false; m.receiveShadow = true; m.shadowStill = true; scene.add(m); return m; };
       S.fb = add(thin(A.mid.b, 0.12), S.mb.material.clone()); S.fb.material.uniforms = Object.assign({}, S.mb.material.uniforms, { uLodF: this.uLodM });
-      S.fl = add(fewCards(A.mid.l), leafFar); S.fb.instanceMatrix = S.fl.instanceMatrix = new THREE.InstancedBufferAttribute(new Float32Array(16*(quality.treeMidCap || 1600)), 16); S.fb.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      S.fl = add(fewCards(A.mid.l, 4, 1.85), leafFar); S.fb.instanceMatrix = S.fl.instanceMatrix = new THREE.InstancedBufferAttribute(new Float32Array(16*(quality.treeMidCap || 1600)), 16); S.fb.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     });
     this.bb.visible = false;
     const G = farCrown(), cap = 4000;
@@ -128,7 +131,8 @@ export class TreeField extends GameTrees {
     // (two kinds of tree only: the full one close, the lighter real one out to the distance; the blob crowns are off)
     this.R = 0; this.farMesh.visible = false; this.fx = 1e9; this.fz = 1e9;
   }
-  // near and mid sets. Near ones cast shadows, so they're all there, behind you too. Mid ones are drawn only inside what
+  // near and mid sets. Near ones cast shadows, so they're all on the list, behind you too, those in view first: the
+  // shadow map draws the lot, the picture only the ones it can see (seenOnly). Mid ones are drawn only inside what
   // the camera can see (about 1,500 trees of 1,000 to 2,700 triangles each were drawn all round you, most of them behind
   // you, the biggest single cost of the frame). Refilled every 3 m or when the view has swung; each tree in the one its
   // distance says, and in both through the band where one fades into the other (with a little over either way, so the
@@ -154,7 +158,7 @@ export class TreeField extends GameTrees {
     }
     const sets = this.sets, cnt = this._cnt || (this._cnt = sets.map(() => [0, 0, 0])); for (const c of cnt) c[0] = c[1] = c[2] = 0;
     const split = this.uLodF.value.z, band = this.uLodM.value.y, fIn = split - band - M, mTop = split + M;
-    const cand = this._cand, X = this.x, Z = this.z, Y = this.y, K = this.k, SC = this.s, RO = this.r;
+    const cand = this._cand, X = this.x, Z = this.z, Y = this.y, K = this.k, SC = this.s, RO = this.r, behind = this._behind || (this._behind = []); behind.length = 0;
     for (let q = 0; q < cand.length; q++) {
       const t = cand[q], dx = X[t] - cx, dz = Z[t] - cz, d = Math.hypot(dx, dz); if (d >= mOut) continue;
       const near = d < nOut; let mid = d > mIn;
@@ -164,12 +168,19 @@ export class TreeField extends GameTrees {
       if (!near && !mid) continue;
       const k = K[t], s = SC[t], set = sets[k], c = cnt[k], r = RO[t], cr = Math.cos(r), sr = Math.sin(r);
       const sx = s*(0.92 + hash1(t*3.3)*0.16), sy = s*(0.9 + hash1(t*5.1)*0.2), y = 0.12 + Y[t];
-      if (near && c[0] < set.nb.instanceMatrix.count) { put(set.nb.instanceMatrix.array, c[0]*16, cr, sr, sx, sy, X[t], y, Z[t]); c[0]++; }
+      if (near && on && d > 22 && (dx*vx + dz*vz)/d < cosK - 22/d) behind.push(t);
+      else if (near && c[0] < set.nb.instanceMatrix.count) { put(set.nb.instanceMatrix.array, c[0]*16, cr, sr, sx, sy, X[t], y, Z[t]); c[0]++; }
       if (mid && d < mTop && c[1] < set.mb.instanceMatrix.count) { put(set.mb.instanceMatrix.array, c[1]*16, cr, sr, sx, sy, X[t], y, Z[t]); c[1]++; }
       if (mid && d > fIn && c[2] < set.fb.instanceMatrix.count) { put(set.fb.instanceMatrix.array, c[2]*16, cr, sr, sx, sy, X[t], y, Z[t]); c[2]++; }
     }
+    for (let k = 0; k < sets.length; k++) sets[k].nb.seen = sets[k].nl.seen = cnt[k][0];
+    for (let q = 0; q < behind.length; q++) {
+      const t = behind[q], k = K[t], s = SC[t], set = sets[k], c = cnt[k], r = RO[t]; if (c[0] >= set.nb.instanceMatrix.count) continue;
+      put(set.nb.instanceMatrix.array, c[0]*16, Math.cos(r), Math.sin(r), s*(0.92 + hash1(t*3.3)*0.16), s*(0.9 + hash1(t*5.1)*0.2), X[t], 0.12 + Y[t], Z[t]); c[0]++;
+    }
     for (let k = 0; k < sets.length; k++) {
       const set = sets[k], c = cnt[k];
+      set.nb.all = set.nl.all = c[0];
       set.nb.count = set.nl.count = c[0]; set.mb.count = set.ml.count = c[1]; set.fb.count = set.fl.count = c[2];
       set.nb.visible = set.nl.visible = c[0] > 0; set.mb.visible = set.ml.visible = c[1] > 0; set.fb.visible = set.fl.visible = c[2] > 0;   // (nothing on a list: not even looked at)
       const a = set.nb.instanceMatrix, b = set.mb.instanceMatrix;
