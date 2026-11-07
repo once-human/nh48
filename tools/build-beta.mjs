@@ -279,6 +279,9 @@ const PATCHES = {
     ["H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; }", "H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; } else H.mixer.rest && H.mixer.rest();\n    if (this.postPed && dd < 40) this.postPed(p, H, dt);"]],
   // animals: the walk follows how far they really move (no gliding when the game moves them, no 2.6x cap when they run)
   [S('people/animals.js')]: [
+    // (what's down lies down: beta/people/runover.js)
+    ["      m.holder.rotation.set(0, -yaw, roll);\n", "      m.holder.rotation.set(0, -yaw, roll);\n      if (a.dead || a._lying) window.__nhDown(m, a, dt);\n"],
+    ["      m.mixer.update(d < 60 ? dt : dt);", "      if (!(a.dead && a._lying && a._lying.ang > 1.2)) m.mixer.update(dt);"],
     ["      const lie = !a.moving && a.kind !== 'cow' && !a.cow;\n      m.play(a.moving ? (a.cow ? 'WalkSlow' : 'Walk') : 'Idle', a.moving ? (a.cow ? 0.9 : Math.min(2.6, Math.max(1, a.v / 1.1))) : 1);",
      "      const q = m._lx === undefined ? 0 : Math.hypot(a.x - m._lx, a.z - m._lz); m._lx = a.x; m._lz = a.z;\n      if (q < 3 && dt > 0) m._v = (m._v || 0) + (q / dt - (m._v || 0)) * Math.min(1, dt * 6);\n      const cowS = a.cow || a.kind === 'cow', mv = cowS ? Math.min(m._v || 0, 1.3) : m._v || 0, walking = mv > 0.12, slow = cowS && mv < 0.9;\n      if (walking && mv > 2.4) { m._ph = (m._ph || 0) + dt * mv * 2.2; m.holder.position.y += Math.abs(Math.sin(m._ph)) * Math.min(0.07, (mv - 2.4) * 0.02); }\n      const lie = !walking && a.kind !== 'cow' && !a.cow;\n      m.play(walking ? (slow ? 'WalkSlow' : 'Walk') : 'Idle', walking ? Math.max(0.45, mv / (cowS ? (slow ? 0.7 : 1.1) : a.kind === 'cat' ? 0.6 : 0.95)) : 1);"],
   ],
@@ -316,6 +319,9 @@ const PATCHES = {
     ["edge(3, 'KeyV');", "edge(3, 'KeyC');"],
   ],
   [S('game/game.js')]: [
+    // (the blow itself is beta/people/runover.js: not a wall any more)
+    ["v.v = 0; v.vl = 0; this.rig.shake(Math.min(0.9, ev.speed * 0.08)); this.audio.crash(1);\n        knock(v, ev.speed + 2, 0.012);", "this.rig.shake(Math.min(0.9, ev.speed * 0.05)); this.audio.crash(Math.min(1, 0.3 + ev.speed * 0.03));"],
+    ["kmh > 25 ? 'She\u2019s hurt, your vehicle\u2019s wrecked, and a crowd is forming fast' : 'She barely moved. Your bumper did. Everyone is staring'", "ev.how === 'dead' ? 'She\u2019s dead, your front\u2019s gone, and a crowd is forming fast' : ev.how === 'down' ? 'She\u2019s down, your front\u2019s gone, and a crowd is forming fast' : 'She\u2019s hurt. So is your bumper. Everyone is staring'"],
     // Enter on "Quit to title" is one key press, and it went on to the title screen, where Enter starts the story: you left
     // free roam and were straight into story mode. The title only listens to a fresh press, a moment after it's up.
     ["if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space') && !(this.hud.pickerOpen)) this.begin();", "if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space') && !e.repeat && !e.defaultPrevented && performance.now() - (this._titleAt || 0) > 500 && !(this.hud.pickerOpen)) this.begin();"],
@@ -369,6 +375,9 @@ const PATCHES = {
     ["if (far || (k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21)) {", "const seen = !far && G.crowd && G.crowd.inView && Math.hypot(k.p.x - P.x, k.p.z - P.z) < 60 && (G.crowd.inView(k.p.x, k.p.z) || Math.hypot(k.p.x - P.x, k.p.z - P.z) < 10);\n      if (far || !seen && ((k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21))) {"],
   ],
   [S('people/peds.js')]: [
+    // (a cow hit: beta/people/runover.js. She walks a good part of the time, and doesn't stand half a minute at a stretch)
+    ["if (a.cow) { this.events.push({ type: 'cowHit', a, speed: pv, x: a.x, z: a.z }); a.rest = 20; a.moving = false; }", "if (a.cow) { /* */ }"],
+    ["a.rest = a.moving ? this.rng.range(4, 15) : this.rng.range(10, 60); }", "a.rest = a.cow ? (a.moving ? this.rng.range(12, 40) : this.rng.range(4, 18)) : a.moving ? this.rng.range(4, 15) : this.rng.range(10, 60); }"],
     // (beta/people/runover.js has what happens when you hit someone; this only saw it once they were within a metre of your middle)
     ["if (d < 1.15 && pv > 2.0) {", "if (false) {"],
     // (people talk to you less for no reason)

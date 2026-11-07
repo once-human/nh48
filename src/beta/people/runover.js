@@ -42,6 +42,7 @@ People.prototype.struck = function (p, V, S, player, sp, fx, fz, al, ac) {
   const base = baseOf(V.type || 'auto'), two = !!S.two, tall = TALL.has(base) || TALL.has(V.type) || !V.spec, kmh = sp*3.6, R = this.rng.next();
   const wide = Math.abs(ac)/(S.W/2 + MARGIN), side = Math.sign(ac) || (this.rng.next() < 0.5 ? -1 : 1), sx = -fz*side, sz = fx*side;
   const dead = kmh > 70 ? R < 0.8 : kmh > 50 ? R < 0.4 : kmh > 35 ? R < 0.08 : false, ko = dead || kmh > 25, crit = !dead && kmh > 45;
+  p._down = true; p._slide = null;      // (draw/falls.js has nothing to add to this)
   p.fallen = dead || ko ? 1e6 : 3 + kmh*0.12; p.ko = ko; p.corpse = dead; p.unconscious = ko && !dead; p.v = 0; p.dodge = 0; p.steerT = 0;
   p.inj = { sev: dead ? 'dead' : crit ? 'critical' : ko ? 'ko' : 'knock', t: 0 };
   if (!ko) p.limp = 40 + kmh*2;
@@ -155,4 +156,82 @@ People.prototype.update = function (dt, player, ...rest) {
   if (dt > 0) for (const p of this.list) if (p._hit) flying(this, p, dt, V, S);
   const G = window.__nhAskG; if (G) tickVoice(G);
   return r;
+};
+
+// ---- a cow. Half a tonne, and she doesn't get out of the way. Slowly you stop against her (people/bodies.js). Harder, you shove
+// her and she goes off hurt, and it's cost your front. Fast, her legs go from under her: she comes up over the bonnet, you lose
+// a good share of your speed and most of your front, and she lands on her side, dead if you were going hard enough. Everything
+// that dies lies down the same way, a dog or a cat too, turning over rather than appearing on its side.
+const COW_M = 420, DOWN = { cow: [0.75, -0.42], dog: [0.28, -0.2], cat: [0.18, -0.13] };
+const TMP4 = new Float64Array(4), _qa = new THREE.Quaternion(), _ax = new THREE.Vector3(), _pv = new THREE.Vector3();
+window.__nhDown = (m, a, dt) => {
+  if (a.dead && !a._lying && !(a._thrown && a._thrown.stagger)) a._lying = { ang: 0, to: Math.PI/2, side: Math.random() < 0.5 ? -1 : 1 };
+  const d = a._lying; if (!d) return;
+  if (!a.dead && !a._thrown && !d.up) { d.up = true; d.to = 0; }
+  const k = Math.min(1, (d.up ? 2.2 : 3.4)*dt); d.ang += (d.to - d.ang)*k*(d.up ? 1 : 1.4); d.ang = Math.min(d.ang, Math.PI/2);
+  if (d.up && d.ang < 0.02) { a._lying = null; return; }
+  const [c, low] = DOWN[a.cow ? 'cow' : a.kind || 'dog'] || DOWN.dog, yaw = a.yaw || 0;
+  _ax.set(Math.cos(yaw), 0, Math.sin(yaw)); _qa.setFromAxisAngle(_ax, d.ang*d.side);
+  m.holder.quaternion.premultiply(_qa); _pv.set(0, c, 0).applyQuaternion(_qa);
+  const w = Math.sin(Math.min(1, d.ang/(Math.PI/2))*Math.PI/2);
+  m.holder.position.x -= _pv.x; m.holder.position.z -= _pv.z; m.holder.position.y += c - _pv.y + low*w + (a._thrown ? a._thrown.y : 0);
+};
+People.prototype.hitCow = function (a, V, S, player, sp, fx, fz) {
+  const kmh = sp*3.6, M = S.mass || 1000, two = !!S.two, big = M > 5000, before = V.v;
+  // what you lose is the weight of her against yours, and it's not all of her at once at speed: her legs go first
+  const share = (kmh > 45 ? 0.6 : 0.9)*COW_M/(M + COW_M), dv = Math.abs(V.v)*share;
+  V.v -= Math.sign(V.v)*dv; V.vl = (V.vl || 0)*(1 - share);
+  if (two) V.w = (V.w || 0) + (Math.random() < 0.5 ? -1 : 1)*Math.min(1.6, sp*0.06);
+  V.dmg = Math.min(0.97, (V.dmg || 0) + dv*dv*0.004*(big ? 0.3 : 1)*(V.armorMul ?? 1));
+  if (V.dent) { try { const bb = V.box(), ly = bb.min.y + (bb.max.y - bb.min.y)*0.5; V.dent(S.L/2*Math.sign(before || 1), ly, 0, Math.sign(before || 1), -0.15, 0, Math.min(0.95, 0.45 + kmh*0.005), Math.min(0.25, 0.04 + kmh*0.0018)); } catch (e) { /* drawn as it was */ } }
+  const down = kmh > 42, R = this.rng.next(), dead = kmh > 70 || big && kmh > 35 || (down && R < 0.45);
+  const lift = big || two ? 0 : Math.min(2.1, Math.max(0, (kmh - 42)*0.035)), away = Math.min(sp*(lift > 0.5 ? 0.42 : 0.78), 12);
+  a.dead = true; a.moving = false; a.v = 0; a.rest = 25; a._dead = dead;
+  a._thrown = { x: a.x, z: a.z, y: 0, vy: lift, vx: fx*away, vz: fz*away, t: 0, V, S, H: heightOf(V, S), tall: big || TALL.has(baseOf(V.type || 'auto')), down, dead, up: down && !dead ? 12 + this.rng.next()*10 : 0, stagger: !down };
+  if (down) a._lying = { ang: 0.01, to: Math.PI/2, side: this.rng.next() < 0.5 ? -1 : 1 };
+  this.events.push({ type: 'cowHit', a, speed: sp, x: a.x, z: a.z, how: dead ? 'dead' : down ? 'down' : 'hurt', kmh });
+};
+function cowFly(P, a, dt, V, S) {
+  const f = a._thrown, C = P.W && P.W.collision; f.t += dt;
+  f.vy -= G0*dt; f.y += f.vy*dt; f.x += f.vx*dt; f.z += f.vz*dt;
+  const O = f.V;
+  if (O && O === V && !f.tall) { const hx = Math.cos(O.th), hz = Math.sin(O.th), rx = f.x - O.x, rz = f.z - O.z, la = rx*hx + rz*hz, lc = -rx*hz + rz*hx; if (Math.abs(lc) < S.W/2 + 0.5 && Math.abs(la) < S.L/2 + 0.6 && f.vy !== 0) { const top = topAt(Math.sign(O.v || 1)*la/(S.L/2), f.H, false) - 0.35; if (f.y < top && f.down) { f.y = top; f.vy = Math.max(f.vy, 0.4); } } }
+  if (f.y <= 0) { f.y = 0; f.vy = 0; const v = Math.hypot(f.vx, f.vz), dv = 6.5*dt; if (v > dv) { f.vx -= f.vx/v*dv; f.vz -= f.vz/v*dv; } else { f.vx = f.vz = 0; } }
+  if (C) { const r = C.resolve(f.x, f.z, 0.55); if (r && r.depth > 0 && r.kind !== 3 && r.kind !== 4) { f.x += r.nx*r.depth; f.z += r.nz*r.depth; f.vx *= 0.3; f.vz *= 0.3; } }
+  a.x = f.x; a.z = f.z;
+  if (f.y === 0 && !f.vx && !f.vz) {
+    if (f.dead) { a._dead = true; a._thrown = null; return; }
+    if (f.up > 0) { f.up -= dt; if (f.up > 0) return; }
+    // back on her feet, and off, hurt
+    a._thrown = null; a.dead = false; a.hurtT = 9; a.moving = true; a.dir = -a.dir; a.rest = 10;
+    if (a.e && P.g && P.g.at) { P.g.at(a.e, a.s, TMP4); a.s = Math.max(2, Math.min(a.e.len - 2, a.s + (a.x - TMP4[0])*TMP4[2] + (a.z - TMP4[1])*TMP4[3])); P.g.at(a.e, a.s, TMP4); a.lat = (a.x - TMP4[0])*TMP4[3] - (a.z - TMP4[1])*TMP4[2]; }
+  }
+}
+const SHAPE = [[0.72, 0.3], [0.12, 0.33], [-0.5, 0.31]];
+const up2 = People.prototype.update;
+People.prototype.update = function (dt, player, ...rest) {
+  const V = player && !player.onFoot ? player.cur : null, S = player && player.spec;
+  if (V && S && dt > 0 && !(V.deck >= 0 && player.y > 2.2)) {
+    const vx = (V.v || 0)*Math.cos(V.th) - (V.vl || 0)*Math.sin(V.th), vz = (V.v || 0)*Math.sin(V.th) + (V.vl || 0)*Math.cos(V.th), sp = Math.hypot(vx, vz);
+    if (sp > 4.2) {
+      const hx = Math.cos(V.th), hz = Math.sin(V.th), s = Math.sign(V.v || 1), reach = sp*dt + 0.05, RAD = S.L + reach + 3;
+      for (const a of this.animals) {
+        if (!a.cow || a.gone || Math.abs(a.x - V.x) > RAD || Math.abs(a.z - V.z) > RAD) continue;
+        if (a._thrown) continue;
+        const ax = Math.cos(a.yaw || 0), az = Math.sin(a.yaw || 0);
+        for (const [o, r] of SHAPE) {
+          const rx = a.x + ax*o - V.x, rz = a.z + az*o - V.z, al = (rx*hx + rz*hz)*s, ac = -rx*hz + rz*hx;
+          if (Math.abs(ac) < S.W/2 + r && al < S.L/2 + r && al > -S.L/2 - reach) {
+            // (one that's down already is a bump you go over, not a wall)
+            if (a.dead) { if (!(a._ovT > performance.now())) { a._ovT = performance.now() + 1200; if (V.vy !== undefined) V.vy += S.two ? 1.6 : (S.mass || 1000) > 5000 ? 0.3 : 1.1; V.v *= S.two ? 0.72 : 0.94; window.__nhAskG?.audio?.thud?.(0.5); } }
+            else this.hitCow(a, V, S, player, sp, vx/sp, vz/sp);
+            break;
+          }
+        }
+      }
+    }
+  }
+  const res = up2.call(this, dt, player, ...rest);
+  if (dt > 0) for (const a of this.animals) if (a._thrown) cowFly(this, a, dt, V, S);
+  return res;
 };
