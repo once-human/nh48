@@ -94,6 +94,13 @@ const PATCHES = {
     // any auto's seat looks down over the dash the same way (not just your own)
     ["const pitch = (p.inAuto ? -0.17 : -0.035)", "const pitch = (p.inAnyAuto ? -0.17 : -0.035)"],
     ["this.setFov(dt, (p.inAuto ? 78 : 70) + speed * 0.3);", "this.setFov(dt, (p.inAnyAuto ? 78 : 70) + speed * 0.3);"]],
+  [S('game/audio.js')]: [
+    // (the smallest buffer the browser can manage leaves the audio thread no room at all: a heavy frame and the sound breaks up. A few
+    // hundredths of a second more can't be heard)
+    ["const ctx = this.ctx = new AC();", "const ctx = this.ctx = new AC({ latencyHint: 0.06 });"],
+    // (up is up: told so once, not sixty times a second)
+    ["L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }", "if (!this._upSet) { this._upSet = true; L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; } }"],
+  ],
   [S('vehicles/vehicle.js')]: [
     // the nose goes down under brakes and up under power (it was the wrong way round, and hardly there)
     ["this.pitch += (Math.atan2(hF - hR, S.wb) - clamp(a * 0.006, -0.025, 0.025) - this.pitch) * Math.min(1, dt * 12);", "this.pitch += (Math.atan2(hF - hR, S.wb) + clamp(a * 0.0065, -0.05, 0.025) - this.pitch) * Math.min(1, dt * 9);"],
@@ -340,7 +347,7 @@ const PATCHES = {
   ],
   [S('people/peds.js')]: [
     // a cow is in no hurry
-    ["      a.s += a.dir * sp * dt;", "      if (a.cow) sp = Math.min(sp, a.hurtT > 0 ? 1.5 : 0.4);\n      a.s += a.dir * sp * dt;"],
+    ["      a.s += a.dir * sp * dt;", "      if (a.cow) sp = a._cross ? 0 : Math.min(sp, a.hurtT > 0 ? 1.5 : 0.4)*(a._al ?? 1);\n      a.s += a.dir * sp * dt;"],
     // who started it, so a witness can say (beta/game/pursuit.js)
     ["if (this.brain && foe && foe.foot) this.brain.incident('fight', p.x, p.z, { byYou: false });", "if (this.brain && foe && foe.foot) this.brain.incident('fight', p.x, p.z, { byYou: false, foe, p });"],
     // (the stall list changes as map tiles come and go: an old index can point past its end, which threw and dropped the whole frame)

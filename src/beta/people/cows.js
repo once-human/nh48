@@ -10,10 +10,14 @@ const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const place = People.prototype.placeAnimal;
 People.prototype.placeAnimal = function (a) {
   if (!(a.cow || a.kind === 'cow')) return place.call(this, a);
-  const dt = Math.min(0.1, this._dt || 0), L = a.lat;
-  // (put on another street, out of sight: there at once. Nothing else moves her faster than she walks.)
-  if (a._latS === undefined || a._eS !== a.e) { a._latS = L; a._eS = a.e; }
-  const gap = L - a._latS, step = Math.sign(gap)*Math.min(Math.abs(gap), AMBLE*dt);
+  // (by the clock, not per call: she's placed several times a frame whenever anything nudges her)
+  const t = performance.now(), dt = Math.min(0.1, Math.max(0, (t - (a._tS ?? t))/1000)), L = a.lat; a._tS = t;
+  // (put on another street, out of sight: there at once, already facing along it. Nothing else moves her faster than she walks.)
+  if (a._latS === undefined || a._eS !== a.e) { a._latS = L; a._eS = a.e; a._yawS = undefined; }
+  const gap = L - a._latS;
+  // a cow walks where she faces: she turns first, on the spot, and only sets off when she's looking the way she's going.
+  // (She went on walking while she turned, so she drifted sideways, and backwards for seconds after every change of mind.)
+  const a0 = a._al ?? 1, step = Math.sign(gap)*Math.min(Math.abs(gap), AMBLE*a0*dt);
   a._latS += step;
   a.lat = a._latS;
   place.call(this, a);
@@ -27,6 +31,9 @@ People.prototype.placeAnimal = function (a) {
   const d = wrap(want - a._yawS);
   a._yawS = wrap(a._yawS + Math.sign(d)*Math.min(Math.abs(d), TURN*dt));
   a.yaw = a._yawS; a.hx = Math.cos(a.yaw); a.hz = Math.sin(a.yaw);
+  const c = Math.max(0, Math.cos(wrap(want - a._yawS)));
+  a._al = c*c*c*c;                                       // (how much of a step she'll take: none till she's nearly round)
+  a._cross = Math.abs(gap) > 0.05;                       // (crossing, she isn't also going along: peds.js)
 };
 
 // a cow let go after following you or being shooed off: back to its road from where it actually is (it was put

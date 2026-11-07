@@ -2,6 +2,7 @@
 // to shoulder, not inside one another); a cow is half a tonne that people walk round; cows and dogs don't walk into
 // cars, autos, parked scooters, poles or each other (they stop, or edge round), and you can't walk through them either.
 // (Nothing kept anyone apart but walls: a cow walked through the traffic, people stood inside each other.)
+import { Vehicle } from '@orig/vehicles/vehicle.js';
 import { People } from '@orig/people/peds.js';
 
 const R_PED = 0.26;                         // a person, shoulder to shoulder
@@ -13,6 +14,14 @@ const shapeOf = (a) => SHAPE[a.cow ? 'cow' : a.kind || 'dog'] || SHAPE.dog;
 // move an animal by (dx, dz): along its path and across it if it's on one, straight if it's loose (following you)
 function shove(P, a, dx, dz) {
   if (a.free || !a.e) { a.x += dx; a.z += dz; return; }
+  // a cow is half a tonne: leaned on by a wall or a bumper she shuffles, she doesn't fly. (Every push went straight into
+  // where she stood, up to a metre a frame from each of her three circles, so a parked car or a passing tempo sent her
+  // sideways down the road at tens of metres a second.)
+  if (a.cow) {
+    const t = performance.now(), m = Math.hypot(dx, dz);
+    a._shA = Math.min(0.05, (a._shA || 0) + Math.max(0, t - (a._shT ?? t))/1000*0.7); a._shT = t;
+    if (m > a._shA) { const k = a._shA/m; dx *= k; dz *= k; a._shA = 0; } else a._shA -= m;
+  }
   P.g.at(a.e, a.s, TMP);
   a.s += dx*TMP[2] + dz*TMP[3];
   const dl = dx*TMP[3] - dz*TMP[2];
@@ -122,9 +131,23 @@ People.prototype.update = function (dt, player, avoidView) {
     }
     // the traffic: a vehicle's box. An animal walking into one stops (and turns back now and then); one stood in a
     // vehicle's way is pushed clear of it rather than through it
-    if (T) T.near(a.x, a.z, 5, (o) => {
+    if (T) T.near(a.x, a.z, a.cow ? 16 : 5, (o) => {
       if (o.isPlayer || o.wreck && !o.T) return;
       const L = (o.T ? o.T.L : o.L) || 4, Wd = (o.T ? o.T.W : o.W) || 1.8, ohx = o.hx ?? Math.cos(o.yaw || 0), ohz = o.hz ?? Math.sin(o.yaw || 0);
+      // nobody here drives through a cow, and she doesn't get out of the way: they slow, edge round her, and wait if they can't
+      if (a.cow) {
+        const rx = a.x - o.x, rz = a.z - o.z, al = rx*ohx + rz*ohz, ac = -rx*ohz + rz*ohx, hl = L/2 + 1.15, hw = Wd/2 + 0.75;
+        if (Math.abs(al) < hl && Math.abs(ac) < hw && a.moving && !a.free) { a.moving = false; a.rest = 3 + Math.random()*5; }
+        if (!o.T || o.parked || o.wreck || o.fallen) return;
+        if (al > -L/2 && al < hl + 4 + (o.v || 0)*1.5 && Math.abs(ac) < hw + 0.2) {
+          const side = ac >= 0 ? -1 : 1, st = 1.3*dt;
+          Vehicle.prototype.shoveTraffic(o, -ohz*side*st, ohx*side*st);
+          o.v = Math.min(o.v || 0, Math.max(0, al - hl)*0.9);
+          if (Math.abs(al) < hl && Math.abs(ac) < hw) Vehicle.prototype.shoveTraffic(o, -ohx*0.8*dt, -ohz*0.8*dt);
+          if (o.v < 0.5 && !(o.honkT > 0) && Math.random() < dt*0.3) { o.honkT = 4; T.honks.push({ x: o.x, z: o.z, kind: o.T.honk, n: 1 }); }
+        }
+        return;
+      }
       for (const [off, r] of sh) {
         const cx = a.x + hx*off - o.x, cz = a.z + hz*off - o.z;
         const al = cx*ohx + cz*ohz, ac = -cx*ohz + cz*ohx;
