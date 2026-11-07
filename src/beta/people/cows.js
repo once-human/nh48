@@ -11,7 +11,8 @@ const place = People.prototype.placeAnimal;
 People.prototype.placeAnimal = function (a) {
   if (!(a.cow || a.kind === 'cow')) return place.call(this, a);
   const dt = Math.min(0.1, this._dt || 0), L = a.lat;
-  if (a._latS === undefined || !(dt > 0) || Math.abs(L - a._latS) > 30) a._latS = L;
+  // (put on another street, out of sight: there at once. Nothing else moves her faster than she walks.)
+  if (a._latS === undefined || a._eS !== a.e) { a._latS = L; a._eS = a.e; }
   const gap = L - a._latS, step = Math.sign(gap)*Math.min(Math.abs(gap), AMBLE*dt);
   a._latS += step;
   a.lat = a._latS;
@@ -40,5 +41,5 @@ Strays.prototype.release = function (a) {
   if (!a.e || !g || !g.at) return;
   g.at(a.e, a.s, TMP);
   const off = (x - TMP[0])*TMP[3] - (z - TMP[1])*TMP[2];          // (+lat is (hz, -hx) of the road)
-  a._latS = off;
+  a._latS = off; a._eS = a.e;
 };

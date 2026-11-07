@@ -254,7 +254,7 @@ V.mend = function () {
 
 // ---------------------------------------------------------------- crashes
 // (a carbon tub takes twice what a Swift does; a bus is a bus. Tyres likewise)
-const TOUGH = { super: 0.5, sports: 0.6, bus: 0.45, lux: 0.85, jeep: 0.8, tempo: 0.8 }, TYRES = { super: 0.55, sports: 0.65, jeep: 0.8, bus: 0.6 };
+const TOUGH = { super: 0.33, sports: 0.4, bus: 0.45, lux: 0.85, jeep: 0.8, tempo: 0.8 }, TYRES = { super: 0.4, sports: 0.5, jeep: 0.8, bus: 0.6 };
 const P = V, bounce = P.bounce;
 P.bounce = function (res, ox, oz) {
   const imp = bounce.call(this, res, ox, oz);

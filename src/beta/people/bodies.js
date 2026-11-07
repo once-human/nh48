@@ -15,7 +15,11 @@ function shove(P, a, dx, dz) {
   if (a.free || !a.e) { a.x += dx; a.z += dz; return; }
   P.g.at(a.e, a.s, TMP);
   a.s += dx*TMP[2] + dz*TMP[3];
-  a.lat += dx*TMP[3] - dz*TMP[2];
+  const dl = dx*TMP[3] - dz*TMP[2];
+  a.lat += dl;
+  // (a cow ambles to where it's told, beta/people/cows.js: a push moves her at once and she gives up going that way. It only
+  // moved where she was going, so the wall went on pushing frame after frame until she shot off down the road.)
+  if (a._latS !== undefined) { a._latS += dl; a.lat = a._latS; }
   if (a.e.len) a.s = Math.max(0.5, Math.min(a.e.len - 0.5, a.s));
   P.placeAnimal(a);
 }
