@@ -1180,11 +1180,16 @@ function exotic(b, spec, kind) {
     onTop(1.98, 2.02, -.5, .5, SEAM, { nu: 1, nv: 8, off: .003 });
     // the tail: a lip that rises off the lid, slats over the engine, one red bar across the whole car, two pipes in the middle
     for (let i = 0; i < 7; i++) { const x = -2.1 + i*.04; onTop(x, x + .022, -.42, .42, DARK, { nu: 1, nv: 6, off: .004 }); }
-    const lipH = (z) => .05 + (1 - Math.pow(Math.abs(z)/.74, 4))*.045, lip0 = b.c;
-    patch(b, 10, 3, (u, v) => { const z = lerp(-.74, .74, u), x = lerp(-2.24, -1.98, v); return [x, yTop(x, z) + .006 + (1 - v)*lipH(z), z]; }, PAINTED, [0, 1, 0]);
-    patch(b, 10, 1, (u, v) => { const z = lerp(-.74, .74, u); return [-2.24, yTop(-2.24, z) - .03 + v*(.036 + lipH(z)), z]; }, PAINTED, [-1, 0, 0]);
-    // (the lip is the 911's spoiler: it rises off the lid at speed, beta/vehicles/details.js)
-    if (MOVING) MOVING.wing = { v0: lip0, v1: b.c, lift: .065 };
+    // the 911's spoiler: a thin blade lying in the lid, a little curved on top and dark beneath, on two struts. At speed
+    // it stands up into the air with daylight under it, tilted back (beta/vehicles/details.js)
+    const lip0 = b.c, bx0 = -1.99, bx1 = -2.25, bz = .73, top = (x, z) => yTop(x, z) + .006, cam = (v) => .016*Math.sin(v*3.14);
+    patch(b, 12, 3, (u, v) => { const z = lerp(-bz, bz, u), x = lerp(bx1, bx0, v); return [x, top(x, z) + cam(v) + .012, z]; }, PAINTED, [0, 1, 0]);
+    patch(b, 12, 1, (u, v) => { const z = lerp(-bz, bz, u), x = lerp(bx0, bx1, v); return [x, top(x, z) + .002, z]; }, DARK, [0, -1, 0]);
+    patch(b, 12, 1, (u, v) => { const z = lerp(-bz, bz, u); return [bx1, top(bx1, z) + .002 + v*.01, z]; }, DARK, [-1, 0, 0]);
+    patch(b, 12, 1, (u, v) => { const z = lerp(bz, -bz, u); return [bx0, top(bx0, z) + .002 + v*.01, z]; }, DARK, [1, 0, 0]);
+    for (const s of [-1, 1]) { const x = (bx0 + bx1)/2; patch(b, 3, 1, (u, v) => { const xx = lerp(bx0, bx1, u); return [xx, top(xx, s*bz) + .002 + v*(.01 + cam(1 - u) + .002), s*bz]; }, DARK, [0, 0, s]);
+      rbox(b, x - .035, top(x, s*.4) - .2, s*.43, x + .035, top(x, s*.4) + .004, s*.39, DARK, 0, MATTE); }
+    if (MOVING) MOVING.wing = { v0: lip0, v1: b.c, lift: .15, x0: bx0, x1: bx1, tilt: .45, brakeTilt: .9 };
     onEnd(-1, -.72, .72, .765, .815, GLOW(TAIL, .9), { nu: 18, nv: 1, off: .016 });
     onEnd(-1, -.74, .74, .75, .83, [.1, .02, .02], { nu: 18, nv: 1, off: .01 });
     for (const s of [-1, 1]) onEnd(-1, s*.48, s*.68, .69, .725, GLOW(AMBER, .4), { nu: 3, nv: 1, off: .01 });

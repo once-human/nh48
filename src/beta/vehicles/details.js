@@ -123,22 +123,26 @@ function details(v, h, inp) {
 }
 
 // ---------------------------------------------------------------- the rear wing
-function shift(v, R, dy) {
-  const D = v.own(), A = D.body.attributes.position;
-  for (let i = R.v0; i < R.v1; i++) A.array[i*3 + 1] += dy;
-  A.needsUpdate = true;
+// where each point of it is, from where it was made: up by the lift, and the back edge up further (the wing tilts
+// back as it rises, steeper still as an air brake). Putting the body right (damage.js mend) puts it back where it was
+function setWing(v, R, up, ab) {
+  const D = v.own(), A = D.body.attributes.position.array, B = D.b0, x0 = R.x0 ?? -1.98, x1 = R.x1 ?? -2.24, tilt = (R.tilt || 0) + ab*(R.brakeTilt || 0);
+  for (let i = R.v0; i < R.v1; i++) { const u = Math.max(0, Math.min(1, (x0 - B[i*3])/(x0 - x1))); A[i*3 + 1] = B[i*3 + 1] + up*R.lift*(1 + tilt*u); }
+  D.body.attributes.position.needsUpdate = true;
 }
+Vehicle.prototype.reWing = function () { const R = this.moving && this.moving.wing, W = this._wing; if (R && W && W.off) setWing(this, R, W.off, sm(W.ab || 0)); };
 function wing(v, h) {
   const R = v.moving && v.moving.wing; if (!R) return;
-  const W = v._wing || (v._wing = { k: 0, t: 0, off: 0 }), sp = Math.abs(v.v || 0);
+  const W = v._wing || (v._wing = { k: 0, t: 0, ab: 0, abT: 0, off: 0 }), sp = Math.abs(v.v || 0);
   const hard = (v.brake || 0) > 0.6 && sp > 24;
   if (mine(v)) W.t = sp > 30 || hard ? 1 : sp < 20 ? 0 : W.t;
   else W.t = sp < 20 ? 0 : W.t;
-  if (W.k === W.t) return;
+  W.abT = hard && W.k > 0.5 ? 1 : 0;
+  if (W.k === W.t && W.ab === W.abT) return;
   if (W.t !== W.last) { W.last = W.t; const A = G0() && G0().audio; A && A.tone && A.tone('sine', W.t ? [150, 178] : [178, 150], 0.7, 0.018); }
   W.k = W.t > W.k ? Math.min(W.t, W.k + h/0.9) : Math.max(W.t, W.k - h/1.1);
-  const off = R.lift*sm(W.k);
-  shift(v, R, off - W.off); W.off = off;
+  W.ab = W.abT > W.ab ? Math.min(1, W.ab + h/0.35) : Math.max(0, W.ab - h/0.6);
+  W.off = sm(W.k); setWing(v, R, W.off, sm(W.ab));
 }
 
 // ---------------------------------------------------------------- wipers

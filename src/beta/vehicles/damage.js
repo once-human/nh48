@@ -64,13 +64,14 @@ V.dent = function (lx, ly, lz, nx, ny, nz, r, depth) {
       if (o > 0.3) { const s = 0.3/o; px = g0[i] + ox*s; py = g0[i + 1] + oy*s; pz = g0[i + 2] + oz*s; }
       a[i] = px; a[i + 1] = py; a[i + 2] = pz; hit = true;
     }
-    if (hit) { g.attributes.position.needsUpdate = true; g.computeVertexNormals(); }
+    if (hit) { g.attributes.position.needsUpdate = true; g.computeVertexNormals(); D.dented = true; }
   }
   // the damage you're shown is the damage you can see: how far the panels are from where they were made, all round
   // the body (not the tyres), three times over (a fender pushed in a hand's width is about a tenth; a car stoved in
   // down one side is most of the way to gone). Crashes no longer count on their own (knock() skips a body that dents)
   const a = D.body.attributes.position.array, g0 = D.b0; let sum = 0, n = 0;
-  for (let i = 0; i < a.length; i += 3) { if (inWheel(wh, g0[i], g0[i + 1], g0[i + 2])) continue; n++; sum += Math.min(0.3, Math.hypot(a[i] - g0[i], a[i + 1] - g0[i + 1], a[i + 2] - g0[i + 2])); }
+  const Rw = this.moving && this.moving.wing, w0 = Rw ? Rw.v0*3 : -1, w1 = Rw ? Rw.v1*3 : -1;      // (a raised spoiler isn't a bent panel)
+  for (let i = 0; i < a.length; i += 3) { if (i >= w0 && i < w1 || inWheel(wh, g0[i], g0[i + 1], g0[i + 2])) continue; n++; sum += Math.min(0.3, Math.hypot(a[i] - g0[i], a[i + 1] - g0[i + 1], a[i + 2] - g0[i + 2])); }
   const M = n ? sum/n/0.3 : 0, dM = M - (this._dM || 0);
   // (by how it's built, and a two-wheeler is small enough that one knock moves most of it: that's not most of the way to gone)
   if (dM > 0) { this._dM = M; this.dmg = Math.min(0.97, (this.dmg || 0) + dM*3*toughOf(this.type)*(this.spec && this.spec.two ? 0.35 : 1)); }
@@ -251,7 +252,10 @@ function grind(v, sp) {
 V.mend = function () {
   const D = this._dg;
   if (D && this.bodyMesh.geometry === D.view) {
-    D.body.attributes.position.array.set(D.b0); D.body.attributes.position.needsUpdate = true; D.body.computeVertexNormals();
+    D.body.attributes.position.array.set(D.b0); D.body.attributes.position.needsUpdate = true;
+    // (what moves on its own stays where it is: the 911's spoiler, beta/vehicles/details.js)
+    if (this.reWing) this.reWing();
+    D.body.computeVertexNormals(); D.dented = false;
     if (D.glass) { D.glass.attributes.position.array.set(D.g0); D.glass.attributes.position.needsUpdate = true; D.glass.computeVertexNormals(); }
   }
   if (this._grind) grind(this, 0);
@@ -408,7 +412,7 @@ Game.prototype.smokeFrom = function (v, dt) {
 // put right at the garage (damage to nothing), and gone up in flames (crumpled all over)
 const paint = Game.prototype.paintDamage;
 Game.prototype.paintDamage = function (v) {
-  if (v && !v.dead && (v.dmg || 0) < 0.02 && (v._dg || v.flatN || v._holes) && v.mend) v.mend();
+  if (v && !v.dead && (v.dmg || 0) < 0.02 && (v._dg && v._dg.dented || v.flatN || v._holes) && v.mend) v.mend();      // (only once there's something to put right: every frame, it put the spoiler back down)
   return paint.call(this, v);
 };
 const boom = Game.prototype.explode;
