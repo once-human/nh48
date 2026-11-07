@@ -204,7 +204,7 @@ export function* buildGroundChunk(W, C, group) {
   for (const s of C.bump) {
     const x = s[0] / 100, z = s[1] / 100, ang = s[2], w = s[3] / 100, painted = s[4];
     const ca = Math.cos(ang), sa = Math.sin(ang), nx = sa, nz = -ca, half = w / 2 + 0.2;
-    const prof = []; for (let k = 0; k <= 12; k++) { const d = -0.6 + k*0.1, t = d / 0.6; prof.push([d, 0.1*Math.pow(Math.cos(t*Math.PI/2), 1.4)]); }
+    const prof = []; for (let k = 0; k <= 12; k++) { const d = -0.6 + k*0.1, t = d / 0.6; prof.push([d, 0.1*Math.pow(Math.max(0, Math.cos(t*Math.PI/2)), 1.4)]); }
     for (let k = 0; k < prof.length - 1; k++) {
       const [d0, h0] = prof[k], [d1, h1] = prof[k + 1];
       const P = [[x + ca * d0 - nx * half, h0, z + sa * d0 - nz * half], [x + ca * d0 + nx * half, h0, z + sa * d0 + nz * half],

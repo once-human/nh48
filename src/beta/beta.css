@@ -81,3 +81,6 @@ body.nh-nohud #ui { display: none !important; }
    don't run into the vehicle caption */
 .nerd { left: max(22px, env(safe-area-inset-left, 0px)); transform: none; bottom: calc(4px + env(safe-area-inset-bottom, 0px)); white-space: nowrap; }
 @media (max-width: 900px) { .vit > span { width: 34px; height: 34px; } .vit { gap: 4px !important; padding: 5px !important; } }
+
+/* the title's menu: every line starts at the same place and stays on one line */
+.ttl .pz-menu .pz-i{white-space:nowrap;text-align:left}
