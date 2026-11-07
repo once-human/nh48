@@ -43,15 +43,44 @@ const PULSE = {
   i4t: { ev: even(4), amp: [1, 0.98, 1.02, 0.99], dec: 0.0024, nz: 0.12, pipe: 0.0047, fb: 0.5, damp: 0.45, irr: 0.03, knock: 0, g: 0.95 },
   diesel4: { ev: even(4), amp: [1, 0.96, 1.03, 0.98], dec: 0.0022, nz: 0.24, pipe: 0.006, fb: 0.55, damp: 0.35, irr: 0.05, knock: 0.5, g: 1 },
   diesel6: { ev: even(6), amp: [1, 0.97, 1.02, 0.99, 1.03, 0.98], dec: 0.0025, nz: 0.26, pipe: 0.0075, fb: 0.6, damp: 0.3, irr: 0.04, knock: 0.45, g: 1.05 },
-  v8: { ev: even(8), amp: [1, 0.78, 1.12, 0.74, 0.96, 1.08, 0.8, 1.02], dec: 0.0034, nz: 0.1, pipe: 0.0052, fb: 0.65, damp: 0.35, irr: 0.05, knock: 0, g: 1 },
-  v10: { ev: even(10), amp: [1, 0.92, 1.06, 0.95, 1.02, 0.97, 1.05, 0.93, 1.01, 0.99], dec: 0.002, nz: 0.1, pipe: 0.0034, fb: 0.55, damp: 0.5, irr: 0.02, knock: 0, g: 0.95 },
+  v8: { ev: even(8), amp: [1, 0.78, 1.12, 0.74, 0.96, 1.08, 0.8, 1.02], dec: 0.0034, nz: 0.1, pipe: 0.0052, fb: 0.65, damp: 0.35, irr: 0.05, knock: 0, g: 1.8 },
+  v10: { ev: even(10), amp: [1, 0.92, 1.06, 0.95, 1.02, 0.97, 1.05, 0.93, 1.01, 0.99], dec: 0.002, nz: 0.1, pipe: 0.0034, fb: 0.55, damp: 0.5, irr: 0.02, knock: 0, g: 2.3 },
 };
 // the engine as it runs, sample by sample: each cylinder's firing a pressure pulse into the pipe, never two cycles quite
 // alike (lumpier at idle, steadier as it revs), the pipe ringing with it, a diesel's knock on each firing; revs and
 // load glide (the parameters are smoothed per sample here, so nothing steps or zips)
+// what's on top of the firing, by the kind of engine, and how old they run (age [from, to]): rattle and the revs it buzzes
+// at (rr, rw), tick (tappets), whine and its ratio to the crank (whR), roar (the intake, roarF its note), crk (overrun, per s)
+const LAY = {
+  scooter: { age: [0.2, 0.8], rattle: 0.05, rr: 3200, rw: 700, tick: 0.012, whine: 0.016, whR: 3.1, roar: 0.02, roarF: 1400 },
+  commuter: { age: [0.2, 0.9], rattle: 0.05, rr: 2900, rw: 600, tick: 0.03, whine: 0.008, whR: 4.2, roar: 0.03, roarF: 1200 },
+  thumper: { age: [0.1, 0.7], rattle: 0.04, rr: 1500, rw: 400, tick: 0.055, whine: 0.006, whR: 3.6, roar: 0.03, roarF: 600 },
+  i4bike: { age: [0, 0.2], rattle: 0, rr: 1, rw: 1, tick: 0.006, whine: 0.022, whR: 5.5, roar: 0.2, roarF: 1700, crk: 7 },
+  auto: { age: [0.45, 1], rattle: 0.2, rr: 1500, rw: 650, tick: 0.09, whine: 0.04, whR: 6, roar: 0.015, roarF: 800 },
+  i3: { age: [0.1, 0.8], rattle: 0.012, rr: 1000, rw: 250, tick: 0.004, whine: 0.003, whR: 7, roar: 0.008, roarF: 500 },
+  i4: { age: [0.1, 0.7], rattle: 0.008, rr: 950, rw: 220, tick: 0.003, whine: 0.003, whR: 7, roar: 0.008, roarF: 500 },
+  i4t: { age: [0, 0.3], rattle: 0, rr: 1, rw: 1, tick: 0.002, whine: 0.009, whR: 21, roar: 0.012, roarF: 650 },
+  diesel4: { age: [0.2, 0.9], rattle: 0.05, rr: 950, rw: 300, tick: 0.04, whine: 0.014, whR: 8, roar: 0.012, roarF: 420 },
+  diesel6: { age: [0.3, 1], rattle: 0.1, rr: 750, rw: 220, tick: 0.03, whine: 0.04, whR: 4, roar: 0.02, roarF: 320 },
+  v8: { age: [0, 0.25], rattle: 0, rr: 1, rw: 1, tick: 0.003, whine: 0.004, whR: 6, roar: 0.32, roarF: 800, crk: 9 },
+  v10: { age: [0, 0.15], rattle: 0, rr: 1, rw: 1, tick: 0.003, whine: 0.006, whR: 6, roar: 0.48, roarF: 1250, crk: 12 },
+};
+// no two alike: each vehicle's engine is its kind with its own pipe, its own unevenness, and whatever age has done to it
+const selves = new Map();
+function self(k, seed) {
+  const key = k + (seed & 31); let Q = selves.get(key); if (Q) return Q;
+  let h = (Math.imul((seed & 31) + 1, 2654435761) ^ k.length*97) >>> 0;
+  const r = () => { h = (Math.imul(h, 1664525) + 1013904223) >>> 0; return h/4294967296; };
+  const P = PULSE[k], L = LAY[k], age = L.age[0] + r()*(L.age[1] - L.age[0]);
+  Q = { key, age, f1: 1 + (r() - 0.5)*0.14, f2: 1 + (r() - 0.5)*0.16, idle: 1 + (r() - 0.5)*0.1 + age*0.05,
+    pulse: { ...P, pipe: P.pipe*(1 + (r() - 0.5)*0.1), dec: P.dec*(1 + (r() - 0.5)*0.2), irr: P.irr*(0.7 + r()*0.5 + age*0.9), amp: P.amp.map(a => a*(1 + (r() - 0.5)*(0.04 + 0.14*age))),
+      miss: age*age*0.02, wand: 0.006 + 0.014*age, rattle: L.rattle*(0.35 + age), rr: L.rr*(0.8 + r()*0.5), rw: L.rw, tick: L.tick*(0.6 + age*0.8), whine: L.whine*(0.7 + r()*0.6), whR: L.whR*(1 + (r() - 0.5)*0.08), roar: L.roar, roarF: L.roarF*(0.92 + r()*0.16), crk: L.crk || 0 } };
+  selves.set(key, Q); return Q;
+}
+const seedOf = (v) => v._es ?? (v._es = Math.floor(Math.random()*32));
 const PROC = `class NhEngine extends AudioWorkletProcessor {
   static get parameterDescriptors() { return [{ name: 'rpm', defaultValue: 800, minValue: 0, maxValue: 20000 }, { name: 'load', defaultValue: 0, minValue: 0, maxValue: 1 }]; }
-  constructor() { super(); this.c = null; this.ph = 0; this.k = 0; this.nx = 0; this.env = 0; this.kn = 0; this.buf = new Float32Array(4096); this.w = 0; this.lp = 0; this.dc = 0; this.dx = 0; this.s = 22222; this.r = 0; this.l = 0;
+  constructor() { super(); this.wd = 0; this.tk = 0; this.rt = 0; this.wh = 0; this.rl = 0; this.rb = 0; this.res = 0; this.hn = 0; this.hc = 0; this.ck = 0; this.bk = 0; this.c = null; this.ph = 0; this.k = 0; this.nx = 0; this.env = 0; this.kn = 0; this.buf = new Float32Array(4096); this.w = 0; this.lp = 0; this.dc = 0; this.dx = 0; this.s = 22222; this.r = 0; this.l = 0;
     this.port.onmessage = (e) => { this.c = e.data; this.k = 0; this.nx = this.ph + 0.01; }; }
   rnd() { this.s = (Math.imul(this.s, 1664525) + 1013904223) >>> 0; return this.s/4294967296; }
   process(_, outs, P) {
@@ -59,11 +88,14 @@ const PROC = `class NhEngine extends AudioWorkletProcessor {
     const sr = sampleRate, R = P.rpm, L = P.load, ev = c.ev, n = ev.length, D = Math.max(2, Math.min(4000, Math.round(c.pipe*sr))), dE = Math.exp(-1/(c.dec*sr)), dK = Math.exp(-1/(0.0007*sr));
     for (let i = 0; i < o.length; i++) {
       this.r += ((R.length > 1 ? R[i] : R[0]) - this.r)*0.0015; this.l += ((L.length > 1 ? L[i] : L[0]) - this.l)*0.0008;
-      const rpm = Math.max(1, this.r), load = this.l;
+      if ((++this.bk & 63) === 0) { this.wd = (this.wd + (this.rnd() - 0.5)*(c.wand || 0)*0.25)*0.993; if (c.rattle) { const q = (this.r - c.rr)/c.rw; this.res = Math.exp(-q*q); } }
+      const rpm = Math.max(1, this.r)*(1 + this.wd), load = this.l;
       this.ph += rpm/120/sr;
       while (this.ph >= this.nx) {
         const idle = Math.max(0, 1 - (rpm - c.idle)/(c.idle*1.5)), irr = c.irr*(0.35 + 0.65*idle) + 0.012;
-        const a = c.amp[this.k % c.amp.length]*(1 + (this.rnd() - 0.5)*2*irr)*(0.55 + 0.45*load + 0.2*rpm/c.red);
+        let a = c.amp[this.k % c.amp.length]*(1 + (this.rnd() - 0.5)*2*irr)*(0.55 + 0.45*load + 0.2*rpm/c.red);
+        if (c.miss && this.rnd() < c.miss*(0.25 + 0.75*idle)) a *= 0.2;     // (a tired one that doesn't quite catch)
+        this.rt += a; if (this.k === 0) this.tk = 1;
         this.env += a; this.kn += c.knock*a*(0.5 + 0.5*load);
         this.k++; if (this.k >= n) { this.k = 0; this.ph -= 1; this.nx -= 1; }
         this.nx = Math.floor(this.nx) + ev[this.k] + (this.k === 0 ? 1 : 0) + (this.rnd() - 0.5)*irr*0.02;
@@ -74,7 +106,14 @@ const PROC = `class NhEngine extends AudioWorkletProcessor {
       const d = this.buf[(this.w - D) & 4095]; this.lp += (d - this.lp)*c.damp;
       const y = x + c.fb*this.lp; this.buf[this.w & 4095] = y; this.w++;
       const out = y - this.dx + 0.996*this.dc; this.dx = y; this.dc = out;
-      o[i] = out*c.g/(0.4 + rpm/120*n*c.dec*1.6);
+      // what's bolted to the engine: the tappets, a loose panel at the revs it buzzes at, the gears, the air going in, a crackle on the overrun
+      let ex = 0, rr = rpm/c.red;
+      if (c.tick) { ex += c.tick*this.tk*(this.rnd()*2 - 1); this.tk *= 0.955; }
+      if (c.rattle) { if (--this.hc <= 0) { this.hc = sr/(560 + this.rnd()*420); this.hn = this.rnd()*2 - 1; } ex += c.rattle*this.res*Math.min(1.5, this.rt)*this.hn; this.rt *= 0.9965; }
+      if (c.whine) { this.wh += rpm/60*c.whR/sr; if (this.wh > 1) this.wh -= 1; ex += c.whine*(0.2 + 0.8*load)*Math.min(1, rr*1.6)*Math.sin(6.2832*this.wh); }
+      if (c.roar) { const f = 6.2832*c.roarF/sr; this.rl += ((this.rnd()*2 - 1) - this.rl)*f; this.rb += (this.rl - this.rb)*f*0.45; ex += c.roar*load*load*(0.25 + 0.75*rr)*(this.rl - this.rb)*(0.55 + 0.45*Math.min(1, this.env)); }
+      if (c.crk) { if (load < 0.08 && rr > 0.45 && this.rnd() < c.crk/sr) this.ck = 0.6 + this.rnd()*0.8; if (this.ck > 0.001) { ex += this.ck*(this.rnd()*2 - 1)*0.5; this.ck *= 0.992; } }
+      o[i] = out*c.g/(0.4 + rpm/120*n*c.dec*1.6) + ex;
     }
     return true;
   }
@@ -146,28 +185,30 @@ function wvoice(A, dest) {
   eng.connect(pre).connect(shaper).connect(lp).connect(f1).connect(f2).connect(out).connect(dest);
   return { w: true, eng, rpm: eng.parameters.get('rpm'), load: eng.parameters.get('load'), shaper, lp, f1, f2, out, cls: null };
 }
-function tune(A, V, k) {
-  if (V.cls === k) return;
-  V.cls = k; const C = CLS[k], t = A.ctx.currentTime;
-  if (V.w) V.eng.port.postMessage({ ...PULSE[k], idle: C.idle, red: C.red });
+function tune(A, V, k, seed = 0) {
+  const Q = self(k, seed);
+  if (V.cls === Q.key) return Q;
+  V.cls = Q.key; const C = CLS[k], t = A.ctx.currentTime;
+  if (V.w) V.eng.port.postMessage({ ...Q.pulse, idle: C.idle*Q.idle, red: C.red });
   else V.osc.setPeriodicWave(waveFor(A.ctx, C));
   const dr = V.w ? 1 + (C.drive - 1)*0.5 : C.drive;
   const c = new Float32Array(512); for (let i = 0; i < 512; i++) { const x = i/256 - 1; c[i] = Math.tanh(x*dr)/Math.tanh(dr); }
   V.shaper.curve = c;
   if (V.nbp) V.nbp.frequency.setValueAtTime(C.nf, t);     // (only the older synth has a noise band; the worklet makes its own)
-  V.f1.frequency.setValueAtTime(C.f1[0], t); V.f1.Q.setValueAtTime(C.f1[1], t); V.f1.gain.setValueAtTime(C.f1[2], t);
-  V.f2.frequency.setValueAtTime(C.f2[0], t); V.f2.Q.setValueAtTime(C.f2[1], t); V.f2.gain.setValueAtTime(C.f2[2], t);
+  V.f1.frequency.setValueAtTime(C.f1[0]*Q.f1, t); V.f1.Q.setValueAtTime(C.f1[1], t); V.f1.gain.setValueAtTime(C.f1[2], t);
+  V.f2.frequency.setValueAtTime(C.f2[0]*Q.f2, t); V.f2.Q.setValueAtTime(C.f2[1], t); V.f2.gain.setValueAtTime(C.f2[2], t);
+  return Q;
 }
 // set a voice going: r 0..1 of the way from idle to redline, load 0..1 (the throttle, how hard it's pulling), gain
-function drive(A, V, k, r, load, gain) {
+function drive(A, V, k, r, load, gain, seed = 0) {
   const C = CLS[k], t = A.ctx.currentTime, rate = A.rateMul || 1, loud = A.engLoud || 1;
-  tune(A, V, k);
-  const rpm = C.idle + (C.red - C.idle)*Math.max(0, Math.min(1.08, r));
+  const Q = tune(A, V, k, seed) || self(k, seed), idle = C.idle*Q.idle;
+  const rpm = idle + (C.red - idle)*Math.max(0, Math.min(1.08, r));
   if (V.w) {
     // (the worklet smooths both itself; here only where they're headed)
     V.rpm.setTargetAtTime(rpm*rate, t, 0.04); V.load.setTargetAtTime(load, t, 0.08);
     V.lp.frequency.setTargetAtTime((C.lp[0] + C.lp[1]*(0.35*r + 0.65*load*(0.4 + r)))*(loud > 1 ? 0.8 : 1), t, 0.12);
-    V.out.gain.setTargetAtTime(gain*C.vol*1.5*(0.6 + 0.25*r + 0.3*load)*loud, t, 0.12);
+    V.out.gain.setTargetAtTime(gain*C.vol*1.25*(0.6 + 0.25*r + 0.3*load)*loud, t, 0.12);
     return;
   }
   // four-stroke: each cylinder fires once every two turns; a touch of wander, an engine's never metronomic
@@ -231,7 +272,7 @@ Audio.prototype.updateEngine = function (rpm, throttle, running, kind = 'auto') 
   // a scooter's belt: open the throttle and the revs go up and stay there while the speed catches up
   let r = Math.max(0, Math.min(1.1, rpm || 0));
   if (C.cvt) { const sp = Math.min(1, Math.abs(v.v || 0)/((v.spec && v.spec.vTop) || 20)); r = throttle > 0.1 ? Math.max(r, 0.45 + 0.4*sp + 0.1*throttle) : Math.min(r, 0.1 + sp*0.5); }
-  drive(this, this._pe, k, r, Math.max(0, Math.min(1, throttle)), 1.6);
+  drive(this, this._pe, k, r, Math.max(0, Math.min(1, throttle)), 1.6, seedOf(v));
 };
 
 // ---------------------------------------------------------------- everyone else's: the nearest few, each where it is
@@ -270,7 +311,7 @@ Audio.prototype.engines = function (list, lx, lz) {
     if (!n) return;
     const [, v, k] = n, sp = Math.abs(v.v || 0), acc = Math.max(0, sp - T.sp0)/0.12;
     T.sp0 = sp; T.ld += (Math.min(1, acc*0.6 + (sp > 0.5 ? 0.15 : 0)) - T.ld)*0.15;
-    drive(this, T.V, k, revsAt(k, sp), T.ld, 1);
+    drive(this, T.V, k, revsAt(k, sp), T.ld, 1, seedOf(v));
     if (T.pn.positionX) { T.pn.positionX.setTargetAtTime(v.rx ?? v.x, t, 0.08); T.pn.positionZ.setTargetAtTime(v.rz ?? v.z, t, 0.08); } else T.pn.setPosition(v.x, 0.8, v.z);
   });
 };

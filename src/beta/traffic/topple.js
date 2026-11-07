@@ -46,7 +46,7 @@ function throwRider(G, v, side) {
   const p = ppl.spawnAt(look, x, z, ppl.pickPersona ? ppl.pickPersona(look.female, x, z) : 'dada');
   if (!p) return;
   p.fallen = 2.2; p.yaw = Math.atan2(v.hz, v.hx); p.hx = v.hx; p.hz = v.hz;
-  v._tp.rider = p;
+  v._tp.rider = p; v._tp.rx = v._tp.vx*0.85; v._tp.rz = v._tp.vz*0.85;     // (they go along the road with it, a bit short of it)
   v._tp.empty = true;              // drawn without its baked rider while it's down
 }
 function tick(TR, v, dt) {
@@ -80,6 +80,10 @@ function tick(TR, v, dt) {
   }
   // the rider back to it: up, over, and haul it upright; then on and away
   const p = S.rider, G = G0();
+  if (p && S.rx !== undefined) {
+    const q = Math.hypot(S.rx, S.rz);
+    if (q > 0.05 && p.fallen > 0) { const k = Math.max(0, q - 6*dt)/q; S.rx *= k; S.rz *= k; p.x += S.rx*dt; p.z += S.rz*dt; } else S.rx = undefined;
+  }
   const L = G && G.people && G.people.list;
   const there = p && L && L.includes(p);
   if (!S.lift && S.t > 2.4) {
@@ -93,7 +97,9 @@ function tick(TR, v, dt) {
   }
   if (S.lift) {
     S.liftT += dt;
-    const k = Math.min(1, S.liftT/1.3), e = k*k*(3 - 2*k);
+    // it's heavy: the first go gets it a third of the way and it hangs there, sagging back a bit, then the real heave
+    const k = Math.min(1, S.liftT/2.6), e1 = Math.min(1, k/0.28), e2 = Math.max(0, (k - 0.46)/0.54);
+    const e = 0.36*e1*e1*(3 - 2*e1) - 0.05*Math.min(1, Math.max(0, (k - 0.28)/0.18)) + 0.69*e2*e2*(3 - 2*e2);
     S.th = Math.sign(S.th || 1)*LIE*(1 - e);
     if (p && L && L.includes(p)) { p.chase = null; p.mode = 'stand'; p.v = 0; p.yaw = Math.atan2(v.z - p.z, v.x - p.x); p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw); }
     if (k >= 1) {

@@ -37,6 +37,6 @@ V.update = function (dt, inp, traffic) {
   // what the road and your ears get: a lock, a hard ABS stop from speed, a slide
   const dr = this.drift || 0, lvl = Math.max(locked ? 1 : 0, this.absOn && sp > 22 ? 0.4 : 0, dr > 0.2 ? dr : 0, this.hbOn && sp > 8 ? 0.7 : 0)*clamp((sp - 2)/4, 0, 1);
   this.skidL = lvl;
-  if (this.W.playerVeh === this) { skidAt(this, lvl, dt); window.__nhAskG?.audio?.squeal?.(lvl, sp, dr); }
+  if (this.W.playerVeh === this) { skidAt(this, lvl, dt); window.__nhAskG?.audio?.squeal?.(lvl, sp, dr, this); }
   return r;
 };
