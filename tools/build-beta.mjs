@@ -158,6 +158,8 @@ const PATCHES = {
   [S('ui/hud.js')]: [["else if (e.code === 'Enter') { e.preventDefault(); vis()[this.tSel || 0]?.click(); }", "else if (e.code === 'Enter' && !e.repeat && performance.now() - (this.game._titleAt || 0) > 500) { e.preventDefault(); vis()[this.tSel || 0]?.click(); }"], ["this.nerd = el('div', 'h nerd', 'E jhola · J diary · F3 stats');", "this.nerd = el('div', 'h nerd', 'Q jhola · I phone · J diary · F3 stats');"]],
   [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'], ['E', 'Jhola'],", "['F', 'Walk in, counters, pet'], ['E', 'Get in or out of a vehicle'], ['T', 'Talk to someone'], ['Q', 'Jhola'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
   [S('game/pilot.js')]: [
+    // the walk to a door: a long way round the car you jog (beta/vehicles/route.js)
+    ["(pup && c[0] === 'AltLeft')", "(pup && !pup.jog && c[0] === 'AltLeft')"],
     // you go over with the auto when it goes over (and up with it on two wheels)
     ["H.holder.rotateX(v.lean || 0);", "H.holder.rotateX(v.lean || (/^auto/.test(v.type || 'auto') ? v.tilt.rotation.x : 0));"],
     // prompts name the vehicle: its real model, not its body type

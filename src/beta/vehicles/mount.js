@@ -9,6 +9,7 @@ import { Pilot } from '@orig/game/pilot.js';
 import { specOf } from '@orig/vehicles/vehicle.js';
 import { RIDER_HIPS, ikArm, bendBone } from '@orig/people/humans.js';
 import { ikLeg } from '../game/fists.js';
+import { routeTo, setRoute, follow, walkTime, tooFar, calledOff } from './route.js';
 import { fitOf, HIP_OFF, WRIST, grip as close, reachLean } from './fit.js';
 
 const _t = new THREE.Vector3(), _a = new THREE.Vector3(), _c = new THREE.Vector3(), _f = new THREE.Vector3(), _pole = new THREE.Vector3(), _ax = new THREE.Vector3();
@@ -75,8 +76,8 @@ Pilot.prototype.enter = function (offer, traffic) {
   const side = sides.find(q => free(this, traffic, q.x, q.z, src));
   const rider = offer.kind === 'traffic';
   if (rider) { offer.o.v = 0; offer.o.argue = 6; }
-  this._mount = { offer, traffic, src, kind, hx, hz, side, t: 0, phase: side ? 'walk' : 'hop', rider, max: side ? Math.hypot(side.x - F.x, side.z - F.z)/1.4 + 0.8 : 0 };
-  if (side) { this.frozen = true; this.puppet = { x: side.x, z: side.z, face: Math.atan2(hz, hx) }; }
+  const M = this._mount = { offer, traffic, src, kind, hx, hz, side, t: 0, phase: side ? 'walk' : 'hop', rider, max: 0 };
+  if (side) { this.frozen = true; M.max = walkTime(M, setRoute(this, M, routeTo(this, traffic, src, S, side), { x: side.x, z: side.z, face: Math.atan2(hz, hx) })); }
   this.busy = 4;
 };
 
@@ -112,7 +113,9 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
   const Fr = frameOf(M.src, M.kind), face = Math.atan2(Fr.hz, Fr.hx);
   const s = M.side ? M.side.s : 0;                          // -1: you're on its left
   if (M.phase === 'walk') {
+    follow(this, M);
     const near = M.side && Math.hypot(F.x - M.side.x, F.z - M.side.z) < 0.3;
+    if (calledOff(this, M) || (!near && M.t > M.max && tooFar(this, M.side))) { abort(this); return out; }
     if (near || M.t > M.max) {
       this.puppet = null; M.t = 0;
       this.act = { kind: 'mount', t: 0 };

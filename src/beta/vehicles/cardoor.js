@@ -9,10 +9,11 @@
 // steering and wire it, a few sparks, then it catches. A car with someone at the wheel: you haul them out first.
 import * as THREE from 'three';
 import { Pilot } from '@orig/game/pilot.js';
-import { Vehicle } from '@orig/vehicles/vehicle.js';
+import { Vehicle, specOf } from '@orig/vehicles/vehicle.js';
 import { bendBone, ikArm } from '@orig/people/humans.js';
 import { ikLeg } from '../game/fists.js';
 import { free } from './mount.js';
+import { routeTo, setRoute, follow, walkTime, tooFar, calledOff } from './route.js';
 import { grip } from './fit.js';
 import { carSpec, doorOf, baseOf } from './models.js';
 
@@ -222,11 +223,15 @@ Pilot.prototype.enter = function (offer, traffic) {
     const F = this.foot, th = src.th ?? Math.atan2(src.hz, src.hx), lat = -(F.x - src.x)*Math.sin(th) + (F.z - src.z)*Math.cos(th);
     if (lat < -0.2) { const q = stand(-1); if (free(this, traffic, q.x, q.z, src)) { p = q; E.s = -1; E.pass = true; } }
   }
-  E.door = { x: p.x, z: p.z }; this.puppet = E.door;
+  const size = src.T || src.spec || specOf(E.kind);
+  let way = routeTo(this, traffic, src, size, p);
+  // no way round to that side (a wall, the next car in the row): the other door, if you can get to that
+  if (!way) { const s2 = -E.s, q = stand(s2), w2 = free(this, traffic, q.x, q.z, src) && routeTo(this, traffic, src, size, q); if (w2) { p = q; way = w2; E.s = s2; E.pass = s2 < 0; } }
+  E.door = { x: p.x, z: p.z };
+  const len = setRoute(this, E, way, E.door);
   E.locked = offer.kind === 'parked' ? hash(src.x, src.z) < 0.55 : offer.kind === 'traffic' ? Math.random() < 0.3 : false;
   E.wire = E.locked && offer.kind === 'parked';
-  const F = this.foot;
-  E.max = Math.max(1.6, Math.hypot(E.door.x - F.x, E.door.z - F.z)/1.5 + 0.6);
+  E.max = Math.max(1.6, walkTime(E, len));
   E.real = 0;
   try { standIn(this, E); } catch (e) { E.pre = null; }
   return out;
@@ -342,8 +347,11 @@ Pilot.prototype.tickEnter = function (dt) {
   const out = Math.atan2(s*Fr.hx, -s*Fr.hz), fwd = Math.atan2(Fr.hz, Fr.hx), hwH = D.hw(D.handle[0]);
   const setAct = () => { this.puppet = null; this.frozen = true; this.act = { kind: 'getin', move: true, vx: 0, vz: 0, t: 0 }; };
   if (E.phase === 'walk') {
+    if (calledOff(this, E)) return abortIn(this, E, true);
+    follow(this, E);
     const near = Math.hypot(F.x - E.door.x, F.z - E.door.z) < 0.4;
     if (!(near || E.real >= E.max)) return;
+    if (tooFar(this, E.door)) return abortIn(this, E, true);
     setAct(); E.phase = E.locked && !E.broke ? 'smash' : 'reach'; E.t = 0; E.from = new THREE.Vector3(F.x, F.y, F.z);
     if (E.phase === 'smash') {
       F.yaw = Math.atan2(src.z - F.z, src.x - F.x);

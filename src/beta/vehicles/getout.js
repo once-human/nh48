@@ -8,6 +8,7 @@ import { specOf } from '@orig/vehicles/vehicle.js';
 import { bendBone } from '@orig/people/humans.js';
 import { ikLeg } from '../game/fists.js';
 import { free, frameOf, seg, bez, torso } from './mount.js';
+import { routeTo, setRoute, follow, walkTime, tooFar, calledOff } from './route.js';
 import { ikArm } from '@orig/people/humans.js';
 import { reachLean, grip as close } from './fit.js';
 import { frameOf as carFrame, stoop, put, originFor, feetDown } from './cardoor.js';
@@ -57,8 +58,9 @@ Pilot.prototype.enter = function (offer, traffic) {
   const side = sides.find(q => free(this, traffic, q.x, q.z, src));
   if (!side) return enter.call(this, offer, traffic);
   if (offer.kind === 'traffic') { offer.o.v = 0; offer.o.argue = 4; }
-  this._in = { offer, traffic, src, st, side, t: 0, phase: 'walk', max: Math.hypot(side.x - F.x, side.z - F.z)/1.5 + 0.6, y0: F.y };
-  this.frozen = true; this.puppet = { x: side.x, z: side.z }; this.busy = 3;
+  const I = this._in = { offer, traffic, src, st, side, t: 0, phase: 'walk', y0: F.y };
+  I.max = walkTime(I, setRoute(this, I, routeTo(this, traffic, src, S, side), { x: side.x, z: side.z }));
+  this.frozen = true; this.busy = 3;
 };
 
 // An auto: no door, a low roof. In: your back to the seat at the side opening, a duck under the roof's edge and down
@@ -236,7 +238,10 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
     I.t += dt;
     const src = I.src;
     if (I.phase === 'walk') {
-      if (Math.hypot(F.x - I.side.x, F.z - I.side.z) < 0.35 || I.t > I.max) {
+      follow(this, I);
+      const there = Math.hypot(F.x - I.side.x, F.z - I.side.z) < 0.35;
+      if (calledOff(this, I) || (!there && I.t > I.max && tooFar(this, I.side))) { this._in = null; this.frozen = false; this.puppet = null; this.busy = 0; return out; }
+      if (there || I.t > I.max) {
         I.phase = I.st === 'auto' ? 'turn' : 'in'; I.t = 0; this.puppet = null; this.act = { kind: 'getin', t: 0 };
         I.sx = F.x; I.sz = F.z; I.yaw0 = F.yaw; if (I.st !== 'auto') F.yaw = Math.atan2(src.z - F.z, src.x - F.x);
         H.play(I.st === 'step' ? 'walk' : 'idle', { fade: 0.15, speed: I.st === 'step' ? 0.5 : 1 });

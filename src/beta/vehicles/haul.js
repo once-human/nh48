@@ -10,6 +10,7 @@ import { Pilot } from '@orig/game/pilot.js';
 import { specOf } from '@orig/vehicles/vehicle.js';
 import { ikArm } from '@orig/people/humans.js';
 import { free, torso, seg, sm } from './mount.js';
+import { routeTo, setRoute, follow, walkTime, tooFar, calledOff } from './route.js';
 import { baseOf } from './models.js';
 
 const _c = new THREE.Vector3(), _t = new THREE.Vector3(), _h = new THREE.Vector3(), _p = new THREE.Vector3();
@@ -32,8 +33,9 @@ Pilot.prototype.enter = function (offer, traffic) {
   const side = sides.find(q => free(this, traffic, q.x, q.z, o));
   if (!side) return enter.call(this, offer, traffic);
   o.v = 0; o.argue = 6;
-  this._haul = { offer, traffic, o, kind, cab, side, t: 0, phase: 'walk', max: Math.hypot(side.x - F.x, side.z - F.z)/1.4 + 0.8 };
-  this.frozen = true; this.puppet = { x: side.x, z: side.z, face: Math.atan2(-rz*side.s, -rx*side.s) }; this.busy = 4;
+  const M = this._haul = { offer, traffic, o, kind, cab, side, t: 0, phase: 'walk' };
+  M.max = walkTime(M, setRoute(this, M, routeTo(this, traffic, o, o.T || specOf(kind), side), { x: side.x, z: side.z, face: Math.atan2(-rz*side.s, -rx*side.s) }));
+  this.frozen = true; this.busy = 4;
 };
 function done(P, go) {
   const M = P._haul; P._haul = null; P.frozen = false; P.puppet = null; P.busy = 0;
@@ -51,7 +53,10 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
   const hx = o.hx ?? Math.cos(o.th), hz = o.hz ?? Math.sin(o.th), rx = -hz, rz = hx, oy = o.y || 0;
   if (!M.d) { M.o.v = 0; M.o.argue = Math.max(M.o.argue || 0, 3); }
   if (M.phase === 'walk') {
-    if (Math.hypot(F.x - M.side.x, F.z - M.side.z) < 0.3 || M.t > M.max) {
+    follow(this, M);
+    const there = Math.hypot(F.x - M.side.x, F.z - M.side.z) < 0.3;
+    if (calledOff(this, M) || (!there && M.t > M.max && tooFar(this, M.side))) { done(this, false); return out; }
+    if (there || M.t > M.max) {
       this.puppet = null; M.t = 0; M.phase = 'grab'; M.x0 = F.x; M.z0 = F.z; M.yaw0 = F.yaw;
       this.act = { kind: 'haul', t: 0 }; H && H.play('idle', { fade: 0.2 });
     }
