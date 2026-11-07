@@ -27,6 +27,7 @@ import './vehicles/tyres.js';
 import './vehicles/twowheel.js';      // two-wheelers lean to turn, each its own way
 import './vehicles/steerfront.js';    // the bars, fork and front wheel turn with the steering
 import './vehicles/damage.js';        // dents where it's hit, holes where it's shot, flat tyres, fire from the engine
+import './vehicles/crash.js';          // crashes by weight and speed: the heavier carries on, the lighter is thrown
 import './vehicles/crawl.js';         // never stuck: a crawl either way whatever state it's in
 import './vehicles/brakes.js';        // each vehicle's own brakes; ABS, traction control and drive modes only where they're real
 import './vehicles/auto3w.js';        // an auto corners on two wheels, and goes over, instead of sliding

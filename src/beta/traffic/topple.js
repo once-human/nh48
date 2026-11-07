@@ -23,11 +23,14 @@ function start(TR, v) {
   if (P && !P.onFoot && P.cur && Math.hypot(P.cur.x - v.x, P.cur.z - v.z) < 6) { hx = Math.cos(P.cur.th); hz = Math.sin(P.cur.th); hv = Math.abs(P.cur.v || 0); hitX = P.cur.x; hitZ = P.cur.z; }
   else TR.near(v.x, v.z, 6, (o) => { if (o === v || !(Math.abs(o.v || 0) > hv)) return; hx = o.hx ?? 1; hz = o.hz ?? 0; hv = Math.abs(o.v); hitX = o.x; hitZ = o.z; });
   // it falls away from the hit: the side of it the hit came from (+roll tips it to its right, (-hz, hx))
-  const rel = (hitX - v.x)*(-v.hz) + (hitZ - v.z)*v.hx, side = rel > 0 ? -1 : 1;
-  const push = Math.min(6, hv*0.45);
+  const rel = (hitX - v.x)*(-v.hz) + (hitZ - v.z)*v.hx; let side = rel > 0 ? -1 : 1;
+  const H = v._hit; v._hit = null;                     // (the blow itself, when you know it: beta/vehicles/crash.js)
+  const across = H ? H.vx*(-v.hz) + H.vz*v.hx : 0;
+  if (H) { side = Math.abs(across) > 0.4 ? Math.sign(across) : (Math.random() < 0.5 ? -1 : 1); hv = Math.hypot(H.vx, H.vz); }
+  const push = H ? Math.min(1, 9/(hv || 1)) : Math.min(6, hv*0.45)/(hv || 1);
   v._tp = {
     side, th: (v.roll || 0) + side*0.08, w: side*(0.6 + Math.min(2, hv*0.15)),
-    vx: v.hx*(v.v || 0)*0.6 + hx*push, vz: v.hz*(v.v || 0)*0.6 + hz*push,
+    vx: v.hx*(v.v || 0)*0.6 + (H ? H.vx*push : hx*hv*push), vz: v.hz*(v.v || 0)*0.6 + (H ? H.vz*push : hz*hv*push),
     down: false, t: 0, rider: null, up: 0,
   };
   v.v = 0;

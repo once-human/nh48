@@ -256,14 +256,18 @@ V.mend = function () {
 const P = V, bounce = P.bounce;
 P.bounce = function (res, ox, oz) {
   const imp = bounce.call(this, res, ox, oz);
-  if (imp > 3.5 && res.lx !== undefined && this.bodyMesh && !this.dead && !((this._dT || 0) > now())) {
+  // (by what it felt, not the speed it met at: a bus through a cycle gets nothing; and what it takes goes up with the
+  // square of that, as the energy does: 20 km/h a scratch, 50 a real knock, 100 most of the car)
+  const felt = this._dv ?? imp;
+  if (felt > 3.5 && imp > 0 && res.lx !== undefined && this.bodyMesh && !this.dead && !((this._dT || 0) > now())) {
     this._dT = now() + 0.25;
+    this.dmg = Math.min(0.97, (this.dmg || 0) + felt*felt*0.0009*(this.armorMul ?? 1));
     const hx = Math.cos(this.th), hz = Math.sin(this.th), nlx = res.nx*hx + res.nz*hz, nlz = -res.nx*hz + res.nz*hx;
     const bb = this.box(), ly = bb.min.y + (bb.max.y - bb.min.y)*(this.spec.two ? 0.5 : 0.36);
-    const r = clamp(0.35 + imp*0.035, 0.35, 0.95), depth = Math.min(0.28, (imp - 3)*0.022);
+    const r = clamp(0.35 + felt*0.035, 0.35, 0.95), depth = Math.min(0.28, (felt - 3)*0.022);
     try { this.dent(res.lx, ly, res.lz, nlx, -0.12, nlz, r, depth); } catch (e) { /* drawn as it was */ }
     // a big one on a wheel bends it
-    if (imp > 7 && this.wheels) { const w = this.wheels.find(q => Math.hypot(q.x - res.lx, q.z - res.lz) < q.r + 0.45); if (w) this.hurtTyre(w, (imp - 6)*0.08); }
+    if (felt > 7 && this.wheels) { const w = this.wheels.find(q => Math.hypot(q.x - res.lx, q.z - res.lz) < q.r + 0.45); if (w) this.hurtTyre(w, (felt - 6)*0.08); }
   }
   return imp;
 };
@@ -343,7 +347,7 @@ function shotAt(G, best, o3, d3) {
   if (S && G.smoke) G.smoke.emit(h.point.x, h.point.y, h.point.z, 'smoke', 0.05);
 }
 // a car in the traffic, shot at: it stops where it is, the driver's out and running, and it's a real car now (left there)
-function promote(G, o) {
+export function promote(G, o) {
   const Pl = G.player;
   if ((o.y || 0) > 0.5) return null;                                     // (up on a flyover: not worth the trouble)
   const v = new Vehicle(Pl.W, Pl.scene, Pl.vmats, o.type, o.col);

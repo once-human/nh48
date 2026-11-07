@@ -56,6 +56,10 @@ function where(ux, uz, a, b, x0, x1, z0, z1) {
 }
 
 const P = Vehicle.prototype;
+// what each weighs when it comes to a crash (a cycle's nothing to a scooter, a scooter's nothing to a car, a car's not much
+// to a bus); the variants have their own in their specs
+const MASS = { cycle: 15, scooter: 120, bike: 130, bullet: 190, superbike: 200, auto: 350, hatch: 1000, sedan: 1150, taxi: 1150, sports: 1500, super: 1450, jeep: 1750, tempo: 1800, suv: 1900, lux: 1900, bus: 8000 };
+const massOf = (type, fb) => MASS[(type || '').replace(/P$/, '')] ?? fb ?? 1000;
 // the deepest thing the body is into, in world terms: { nx, nz, depth, kind, lx, lz } (lx, lz: where on the body, local)
 P.contact = function () {
   const S = this.spec, C = this.W.collision, a = S.L/2 - RC, b = S.W/2 - RC, hx = Math.cos(this.th), hz = Math.sin(this.th), px = -hz, pz = hx;
@@ -96,20 +100,25 @@ P.bounce = function (res, ox, oz) {
   let vx = hx*this.v - hz*this.vl, vz = hz*this.v + hx*this.vl;
   const cx = vx - w*rz - ox, cz = vz + w*rx - oz, vn = cx*nx + cz*nz;
   if (vn >= 0) return 0;
-  const m = S.mass + (this.load || 0)*70, I = m*(S.L*S.L + S.W*S.W)/12, spin = !S.two;
+  const m = massOf(this.type, S.mass) + (this.load || 0)*70, I = m*(S.L*S.L + S.W*S.W)/12, spin = !S.two, m2 = res.m2 ?? Infinity, vx0 = vx, vz0 = vz;
   const hard = Math.min(1, Math.max(0, (-vn - 3)/9));
-  // a knock bounces a little; a real hit crunches; leaning on something (under a walking pace into it) doesn't bounce
-  const e = -vn < 1 ? 0 : (0.28 - 0.24*hard)*Math.min(1, (-vn - 1)/1.5);
-  const rn = rx*nz - rz*nx, kn = 1/m + (spin ? rn*rn/I : 0), J = -(1 + e)*vn/kn;
+  // metal doesn't bounce: hardly any comes back, whatever the speed; leaning on something none does. And how much
+  // this body takes of the blow is by what the other weighs (a wall or a kerb: all of it)
+  const e = -vn < 1 ? 0 : 0.08*Math.min(1, (-vn - 1)/1.5);
+  const rn = rx*nz - rz*nx, kn = 1/m + 1/m2 + (spin ? rn*rn/I : 0), J = -(1 + e)*vn/kn;
   vx += J*nx/m; vz += J*nz/m; let dw = spin ? J*rn/I : 0;
   // friction along the surface: the slide's speed scraped off by how hard it's pressed (never reversed)
-  const tx = -nz, tz = nx, vt = cx*tx + cz*tz, rt = rx*tz - rz*tx, kt = 1/m + (spin ? rt*rt/I : 0);
+  const tx = -nz, tz = nx, vt = cx*tx + cz*tz, rt = rx*tz - rz*tx, kt = 1/m + 1/m2 + (spin ? rt*rt/I : 0);
   const Jt = Math.max(-0.45*J, Math.min(0.45*J, -vt/kt));
   vx += Jt*tx/m; vz += Jt*tz/m; if (spin) dw += Jt*rt/I;
   // a big hit crumples: some of the speed goes into the metal
-  const keep = 1 - 0.25*hard;
+  const keep = 1 - 0.25*hard*(m2 === Infinity ? 1 : m2/(m + m2));
   this.v = (vx*hx + vz*hz)*keep; this.vl = (-vx*hz + vz*hx)*keep;
   if (spin) this.w = clamp(w + dw, -4, 4);
+  // what it felt: how much its own speed changed, and which end took it
+  const nl = nx*hx + nz*hz, nw = -nx*hz + nz*hx, dv = Math.hypot(this.v*hx - this.vl*hz - vx0, this.v*hz + this.vl*hx - vz0);
+  this._J = J; this._dv = dv;
+  this.lastHit = { zone: Math.abs(nl) > Math.abs(nw) ? (nl < 0 ? 'front' : 'rear') : (nw < 0 ? 'right' : 'left'), nx, nz, dv, speed: -vn, t: performance.now()/1000 };
   return -vn;
 };
 P.collideStatic = function () {
@@ -133,17 +142,26 @@ P.collideTraffic = function (traffic) {
     const ohx = o.hx ?? 1, ohz = o.hz ?? 0, ex = ohx*hx + ohz*hz, ez = -ohx*hz + ohz*hx;
     const m = boxBox(a, b, cx, cz, ex, ez, T.L/2, T.W/2);
     if (!m) return;
-    const share = o.parked ? 1 : T.mass/(S.mass + T.mass);
+    const me = this.W.playerVeh === this, m1 = massOf(this.type, S.mass) + (this.load || 0)*70;
+    // what it weighs: anything in the street that can't be moved is as good as a wall, and to anyone but you the traffic is too
+    const m2 = !me || (o.parked && !o.veh) ? Infinity : o.parked ? massOf(o.veh.type, o.veh.spec.mass) : massOf(o.type, T.mass);
+    const share = m2 === Infinity ? (o.parked ? 1 : T.mass/(S.mass + T.mass)) : m2/(m1 + m2);
     const nx = m.ux*hx - m.uz*hz, nz = m.ux*hz + m.uz*hx;
+    // far lighter and just hit, or a two-wheeler already down: pushed out of your way, with nothing more to you
+    if (me && !o.parked && m2 < m1*0.4 && (o._hitT > performance.now()/1000 || T.two && o.fallen > 0)) { this.shoveTraffic(o, -nx*m.d, -nz*m.d); return; }
     // (the other box's reach along and across this one, for where on the body they meet)
     const ra = T.L/2*Math.abs(ex) + T.W/2*Math.abs(ez), rb = T.L/2*Math.abs(ez) + T.W/2*Math.abs(ex);
     const [lx, lz] = where(m.ux, m.uz, a, b, cx - ra, cx + ra, cz - rb, cz + rb);
-    const imp = this.bounce({ nx, nz, depth: m.d*share, lx, lz }, ohx*(o.v || 0), ohz*(o.v || 0));
+    // how fast it's going, slide and all
+    const sl = o.parked ? o.veh && o.veh._c : o._sh, ovx = ohx*(o.v || 0) + (sl ? sl.vx : 0), ovz = ohz*(o.v || 0) + (sl ? sl.vz : 0);
+    const imp = this.bounce({ nx, nz, depth: m.d*share, lx, lz, m2 }, ovx, ovz);
+    if (me && m2 !== Infinity) this.shoveTraffic(o, -nx*m.d*(1 - share), -nz*m.d*(1 - share));
     if (imp <= 0) return;
+    if (me && m2 !== Infinity) { this.hitTraffic(o, T, { nx, nz, J: this._J, imp, lx, lz, m2 }, traffic); return; }
     if (!o.parked) {
       o.v = Math.max(0, o.v - imp*(1 - share)*0.8);
       o.angry = 6;
-      if (this.W.playerVeh === this) knock(o, imp, T.two ? 0.016 : 0.012);
+      if (me) knock(o, imp, T.two ? 0.016 : 0.012);
       if (T.two && imp > 3.0 && !o.fallen) { o.fallen = 3.5; this.events.push({ type: 'knock', who: 'two', speed: imp, x: o.x, z: o.z }); }
       else if (imp > 1.5) this.events.push({ type: 'hit', who: o.type, speed: imp, x: o.x, z: o.z, o });
       if (!(o.honkT > 0)) { o.honkT = 2.5; traffic.honks.push({ x: o.x, z: o.z, kind: T.honk, n: 2 }); }
