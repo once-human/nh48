@@ -260,6 +260,8 @@ const PATCHES = {
     ["l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  R.updateMatrixWorld(true);\n}", "l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  u.updateMatrixWorld(true);\n}"],
   ],
   [S('people/crowd.js')]: [
+    // someone getting out of a vehicle (people/fight.js bail): eased from the seat to where they stand
+    ["H.holder.rotation.set(0, -p.yaw, 0);", "H.holder.rotation.set(0, -p.yaw, 0);\n      if (p._out) { const u = Math.min(1, (performance.now() - p._out.t0)/600), e = 1 - u*u*(3 - 2*u); if (u >= 1) p._out = null; else { H.holder.position.x += p._out.dx*e; H.holder.position.y += p._out.dy*e; H.holder.position.z += p._out.dz*e; } }"],
     // smooth up to 45 m, half rate to 100 m; a frame someone isn't animated, their bones go back to the clip's pose
     // (beta/people/clippose.js), so whatever's built on it (hands on the grips, a lean) is rebuilt on that, never on itself
     ["if (p.rideOf && upd && (seen || dd < 12) && dd < 70) {", "if (p.rideOf && (seen || dd < 12) && dd < 70) {"],
@@ -294,6 +296,9 @@ const PATCHES = {
     ["      if (sp > 0) {", "      if (a.kind === 'cow' || a.cow) sp = Math.min(sp, 1.1);\n      if (sp > 0) {"],
   ],
   [S('people/fight.js')]: [
+    // a driver getting out to have words: out of the seat and through the door, not standing there from nowhere
+    // (people/crowd.js eases them by p._out)
+    ["    const p = ppl.spawnAt(look, x, z, persona);\n    if (!p) return;", "    const p = ppl.spawnAt(look, x, z, persona);\n    if (!p) return;\n    if (!knocked) { const k = o.T.two ? 0.55 : 0.62; p._out = { t0: performance.now(), dx: (o.x - x)*k, dy: o.T.two ? 0.25 : 0.3, dz: (o.z - z)*k }; }"],
     ["if (input.took('KeyC') && !busyDown", "if ((input.took('ControlLeft') || input.took('ControlRight')) && !busyDown && !(P.act && P.act.move)"],
     // Ctrl standing still crouches (beta/game/crouch.js); moving, it's the roll the way you're going
     ["&& !(P.act && P.act.kind === 'roll')) this.roll(input);", "&& !(P.act && P.act.kind === 'roll')) { if (F.v < 0.5 && !P.act && P.crouchKey) P.crouchKey(); else { if (P.crouchOff) P.crouchOff(); this.roll(input); } }"],
