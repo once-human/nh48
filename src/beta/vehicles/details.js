@@ -10,6 +10,7 @@
 //  - a car that's been standing breathes white vapour from its exhaust for the first half minute after you start it
 //  - indicators: , for left, . for right, both together for the hazards. A soft tick-tock, and they cancel themselves once you've
 //    turned the wheel that way and straightened up again
+//  - launch control: hold the brake or the handbrake, floor it, let the brake go
 //  - heat haze over the exhaust once you've worked the engine: it shows when you slow down or stop, and takes a few
 //    minutes to go. A sports car's shimmers a little even idling
 // (The wipers and the wing are vertices of the body, beta/vehicles/models.js marks which: the car gets its own copy
@@ -26,7 +27,54 @@ const mine = (v) => { const P = G0() && G0().player; return !!P && !P.onFoot && 
 const sm = (k) => { k = Math.max(0, Math.min(1, k)); return k*k*(3 - 2*k); };
 const now = () => performance.now();
 
-// ---------------------------------------------------------------- springs
+// ---------------------------------------------------------------- launch control
+// hold the brake (or the handbrake) and floor it from a standstill: the revs come up to the launch point and bounce
+// there, and it waits. Let the brake go with the throttle still down and it goes: harder off the line than you'd
+// manage on your own, quick shifts, no bog. A bike's front comes up on it. (Defined before the springs, so they
+// feel the launch and the tail squats.)
+const lu = Vehicle.prototype.update, _li = {};
+Vehicle.prototype.update = function (dt, inp, traffic) {
+  if (!inp || !(dt > 0) || this.type === 'cycle' || !mine(this)) { if (this._lc) this._lc = null; return lu.call(this, dt, inp, traffic); }
+  const L = this._lc || (this._lc = { hold: 0, go: 0, wl: 0 }), thr = inp.throttle || 0, held = (inp.brake || 0) > 0.5 || !!inp.handbrake, S = this.spec;
+  if (thr > 0.7 && held && Math.abs(this.v || 0) < 0.6 && !this.reverse) {
+    if (!L.hold) L.rpm = this.rpm || 0.2;
+    L.hold += dt; L.go = 0;
+    {   // (held from the first frame: brake and throttle together would otherwise nudge it back and forth)
+      // nothing reaches the road: the handbrake holds it (so it doesn't creep, and the brake isn't taken as asking for reverse)
+      const r = lu.call(this, dt, Object.assign(_li, inp, { throttle: 0, brake: 0, handbrake: true }), traffic);
+      this.v = 0; this.throttle = 1;
+      const tgt = (S.gears && S.gears.length ? 0.62 : 0.5) + 0.035*Math.sin(now()*0.052);
+      L.rpm += (tgt - L.rpm)*Math.min(1, dt*6); this.rpm = L.rpm;
+      if (!L.armed && L.hold > 0.5) { L.armed = true; const A = G0() && G0().audio; A && A.tone && A.tone('sine', [880], 0.03, 0.012); }
+      wheelie(this, L, dt);
+      return r;
+    }
+  } else {
+    if (L.armed && !held && thr > 0.7 && Math.abs(this.v || 0) < 1) L.go = 2.6;
+    L.hold = 0; L.armed = false;
+  }
+  const r = lu.call(this, dt, inp, traffic);
+  if (L.go > 0) {
+    if (thr < 0.5 || (inp.brake || 0) > 0.3 || inp.handbrake || this.reverse) L.go = 0;
+    else {
+      L.go -= dt;
+      // strongest off the line, easing out over the last second; and nothing past what the car could reach anyway
+      const k = Math.min(1, L.go/1), room = Math.max(0, 1 - Math.pow(Math.max(0, this.v)/(S.vTop*(this.powerMul ?? 1)), 3));
+      this.v += S.acc*(this.accMul || 1)*0.3*k*room*dt;
+      if (this.shiftT > 0.07) this.shiftT = 0.07;
+    }
+  }
+  wheelie(this, L, dt);
+  return r;
+};
+function wheelie(v, L, dt) {
+  if (!v.spec.two) return;
+  const big = v.type === 'superbike' ? 1 : /bike/.test(baseOf(v.type)) ? 0.6 : 0.25;
+  const want = L.go > 0 ? 0.2*big*Math.min(1, L.go/1.4)*Math.max(0, 1 - Math.abs(v.v || 0)/20) : 0;
+  L.wl += (want - L.wl)*Math.min(1, dt*(want > L.wl ? 3 : 2.4));
+  if (L.wl > 0.001) v.wheelie = Math.max(v.wheelie || 0, L.wl);
+}
+
 // [radians per m/s² of pitch, natural frequency]: a supercar barely moves, an SUV or a jeep nods
 const SPRING = { super: [0.0028, 13], sports: [0.0032, 12], superbike: [0.0042, 12], bike: [0.0048, 11], scooter: [0.005, 10], cycle: [0.002, 12],
   lux: [0.0048, 9], suv: [0.0066, 8], jeep: [0.0072, 7.5], fortuner: [0.0066, 8], scorpio: [0.007, 7.5], xuv: [0.0062, 8], bus: [0.0034, 6.5], tempo: [0.005, 7], auto: [0.0062, 8] };
