@@ -53,6 +53,8 @@ const SWAPS = [
 ];
 // a line in a game file swapped as it's bundled: only for what a module swap can't reach. Fails the build if the line has moved
 const PATCHES = {
+  [S('game/garageui.js')]: [["[tog('xenon', cyc ? 'LED lamp' : 'Xenon headlights', 'Cold white, reaches further', $(2500)), ...(cyc ? [] : [", "[...(cyc ? [] : [tog('xenon', 'Xenon headlights', 'Cold white, reaches further', $(2500)), "], ["(this.mine ? 'Your ' : '') + here.spec.name.toLowerCase();", "(this.mine ? 'Your ' : '') + (here.spec.real || here.spec.name);"]],
+  [S('ui/jhola.js')]: [["name: 'Your ' + (v.spec && v.spec.name ? v.spec.name.toLowerCase() : 'vehicle') }", "name: 'Your ' + (v.spec ? v.spec.real || v.spec.name || 'vehicle' : 'vehicle') }"]],
   // compound walls along the roads: not Pune, Onkar wants them gone. Neither drawn nor solid (the city's edge wall is separate)
   [S('world/index.js')]: [["for (const w of D.walls) put('walls', at(w[0] / 100, w[1] / 100), cmRing(w));", "/* /beta: no compound walls */"]],
   [S('world/world.js')]: [
@@ -134,6 +136,11 @@ const PATCHES = {
   [S('ui/hud.js')]: [["this.nerd = el('div', 'h nerd', 'E jhola · J diary · F3 stats');", "this.nerd = el('div', 'h nerd', 'Q jhola · I phone · J diary · F3 stats');"]],
   [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'], ['E', 'Jhola'],", "['F', 'Walk in, counters, pet'], ['E', 'Get in or out of a vehicle'], ['T', 'Talk to someone'], ['Q', 'Jhola'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
   [S('game/pilot.js')]: [
+    // prompts name the vehicle: its real model, not its body type
+    ["S.two ? `Get on the ${S.name.toLowerCase()}` : `Get in the ${S.name.toLowerCase()}`", "S.two ? `Mount ${S.real || S.name}` : `Get in the ${S.real || S.name}`"],
+    ["label: `Take the parked ${S.name.toLowerCase()}`", "label: `Take the parked ${S.real || S.name}`"],
+    ["label: `Take the ${specOf(o.type).name.toLowerCase()} from its driver`", "label: `Take the ${specOf(o.type).real || specOf(o.type).name} from its driver`"],
+    ["name: veh.spec.name.toLowerCase(), x: r.x", "name: veh.spec.real || veh.spec.name, x: r.x"],
     // a parked ride taken: off the parked rows now, not once the camera's gone 6 m (two of it drawn till then)
     ["      for (const it of r.items) it.off = true;\n", "      for (const it of r.items) it.off = true;\n      this.W._propX = undefined;\n"],
     // slowed on foot (dazed after Vetal: beta/game/powers.js sets slowMul)
@@ -208,6 +215,7 @@ const PATCHES = {
     ["if (!p.name || p.walkedOff || !(p.dateWith || D && D.eligible(p)) || (C.seat && !p.dateWith)) continue;", "if (!p.name || p.walkedOff || !p.dateWith) continue;"],
   ],
   [S('game/shops.js')]: [
+    ["name: 'Your ' + S.name.toLowerCase() });", "name: 'Your ' + (S.real || S.name) });"],
     // eat here or parcel: only where there's food (a chowki has a bench, not a kitchen)
     ["const dineIn = !!(ctx.inside && ctx.spot === 'counter'", "const dineIn = !!(MENUS[k] && ctx.inside && ctx.spot === 'counter'"],
     // the door's prompt only right at the shutter, facing it; a map pin (a temple, a chowki) only close to it
@@ -269,6 +277,7 @@ const PATCHES = {
     ["edge(3, 'KeyV');", "edge(3, 'KeyC');"],
   ],
   [S('game/game.js')]: [
+    ["this.hud.toast(S.name, `${S.model} \\u00b7 top speed", "this.hud.toast(S.real || S.name, `${S.model} \\u00b7 top speed"],
     // quitting to the title always gets there: each step on its own (one that throws was leaving you stuck in the game)
     ["    this.togglePause(false);\n    if (this.free) this.leaveFree();\n    this.state = 'title';\n    this.rides.setEnabled(false);\n    this.hud.setPlaying(false);\n    this.audio.updateEngine(0, 0, false);\n    this.saveStats();", "    const tryIt = (f) => { try { f(); } catch (e) { console.warn('quit to title', e); } };\n    tryIt(() => this.togglePause(false)); if (this.free) tryIt(() => this.leaveFree());\n    this.state = 'title'; if (this.input && this.input.keys) tryIt(() => document.exitPointerLock && document.exitPointerLock());\n    tryIt(() => this.rides.setEnabled(false)); tryIt(() => this.hud.setPlaying(false)); tryIt(() => this.audio.updateEngine(0, 0, false)); tryIt(() => this.saveStats());\n    if (this.hud && this.hud.title) this.hud.title.hidden = false;"],
     // a driver who got out to have words goes back to their own door and gets in; one who can't get there in time
