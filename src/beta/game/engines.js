@@ -9,6 +9,23 @@
 import { Audio } from '@orig/game/audio.js';
 import { specOf } from '@orig/vehicles/vehicle.js';
 import { baseOf } from '../vehicles/models.js';
+// The audio thread has to read every sound's settings, and it can't wait: if the game's in the middle of changing one, it plays
+// that moment of the sound with the setting's default instead, which is a click or a hole in the sound. Every engine, tyre and
+// wind sound was changing a handful of settings on every frame, and more at high speed, with less time to spare. So a setting
+// changes at most 25 times a second, and only when it really changes. (Anything set for later, or a first or a big move, goes
+// straight through.)
+const stt0 = AudioParam.prototype.setTargetAtTime;
+AudioParam.prototype.setTargetAtTime = function (v, t, tc) {
+  const l = this._lv, T = this._lt;
+  if (T !== undefined && t >= T && t < T + 0.5) {
+    const c = Math.abs(v - l), big = v === 0 ? l !== 0 : c > Math.abs(l)*0.3 + 1e-4;
+    if (!big && (t < T + 0.04 || c <= Math.abs(l)*0.004)) return this;
+  }
+  this._lv = v; this._lt = t;
+  return stt0.call(this, v, t, tc);
+};
+const SHAPE_DR = 3, SHAPE_CURVE = new Float32Array(512);
+for (let i = 0; i < 512; i++) { const x = i/256 - 1; SHAPE_CURVE[i] = Math.tanh(x*SHAPE_DR)/Math.tanh(SHAPE_DR); }
 
 // cyl: cylinders; idle, red: rpm; h: harmonic fall-off (higher is smoother); sub: the half-order lope (uneven firing,
 // a single's thump); nz: combustion noise; nf: its band (Hz); f1, f2: exhaust and intake resonances [Hz, Q, dB];
@@ -81,10 +98,10 @@ const seedOf = (v) => v._es ?? (v._es = Math.floor(Math.random()*32));
 const PROC = `class NhEngine extends AudioWorkletProcessor {
   static get parameterDescriptors() { return [{ name: 'rpm', defaultValue: 800, minValue: 0, maxValue: 20000 }, { name: 'load', defaultValue: 0, minValue: 0, maxValue: 1 }]; }
   constructor() { super(); this.wd = 0; this.tk = 0; this.rt = 0; this.wh = 0; this.rl = 0; this.rb = 0; this.res = 0; this.hn = 0; this.hc = 0; this.ck = 0; this.bk = 0; this.c = null; this.ph = 0; this.k = 0; this.nx = 0; this.env = 0; this.kn = 0; this.buf = new Float32Array(4096); this.w = 0; this.lp = 0; this.dc = 0; this.dx = 0; this.s = 22222; this.r = 0; this.l = 0;
-    this.port.onmessage = (e) => { this.c = e.data; this.k = 0; this.nx = this.ph + 0.01; }; }
+    this.port.onmessage = (e) => { if (e.data.z !== undefined) { this.z = e.data.z; return; } this.c = e.data; this.k = 0; this.nx = this.ph + 0.01; }; }
   rnd() { this.s = (Math.imul(this.s, 1664525) + 1013904223) >>> 0; return this.s/4294967296; }
   process(_, outs, P) {
-    const o = outs[0] && outs[0][0]; if (!o) return true; const c = this.c; if (!c) { o.fill(0); return true; }
+    const o = outs[0] && outs[0][0]; if (!o) return true; const c = this.c; if (!c || this.z) { o.fill(0); return true; }
     const sr = sampleRate, R = P.rpm, L = P.load, ev = c.ev, n = ev.length, D = Math.max(2, Math.min(4000, Math.round(c.pipe*sr))), dE = Math.exp(-1/(c.dec*sr)), dK = Math.exp(-1/(0.0007*sr));
     for (let i = 0; i < o.length; i++) {
       this.r += ((R.length > 1 ? R[i] : R[0]) - this.r)*0.0015; this.l += ((L.length > 1 ? L[i] : L[0]) - this.l)*0.0008;
@@ -181,9 +198,12 @@ function wvoice(A, dest) {
   const ctx = A.ctx, eng = new AudioWorkletNode(ctx, 'nh-engine', { numberOfInputs: 0, outputChannelCount: [1] });
   const pre = ctx.createGain(); pre.gain.value = 0.7;
   const shaper = ctx.createWaveShaper(), lp = ctx.createBiquadFilter(), f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter(), out = ctx.createGain();
+  // (one curve, set once, how hard each engine drives it set by the gain before it: while a curve is swapped the audio thread can't
+  // get at it and that moment of this voice is silence, and a passing car was a new one every time)
+  shaper.curve = SHAPE_CURVE;
   lp.type = 'lowpass'; lp.Q.value = 0.6; f1.type = 'peaking'; f2.type = 'peaking'; out.gain.value = 0;
   eng.connect(pre).connect(shaper).connect(lp).connect(f1).connect(f2).connect(out).connect(dest);
-  return { w: true, eng, rpm: eng.parameters.get('rpm'), load: eng.parameters.get('load'), shaper, lp, f1, f2, out, cls: null };
+  return { w: true, eng, pre, rpm: eng.parameters.get('rpm'), load: eng.parameters.get('load'), shaper, lp, f1, f2, out, cls: null };
 }
 function tune(A, V, k, seed = 0) {
   const Q = self(k, seed);
@@ -193,7 +213,7 @@ function tune(A, V, k, seed = 0) {
   else V.osc.setPeriodicWave(waveFor(A.ctx, C));
   const dr = V.w ? 1 + (C.drive - 1)*0.5 : C.drive;
   const c = new Float32Array(512); for (let i = 0; i < 512; i++) { const x = i/256 - 1; c[i] = Math.tanh(x*dr)/Math.tanh(dr); }
-  V.shaper.curve = c;
+  if (V.w) V.pre.gain.value = 0.7*dr/SHAPE_DR; else V.shaper.curve = c;
   if (V.nbp) V.nbp.frequency.setValueAtTime(C.nf, t);     // (only the older synth has a noise band; the worklet makes its own)
   V.f1.frequency.setValueAtTime(C.f1[0]*Q.f1, t); V.f1.Q.setValueAtTime(C.f1[1], t); V.f1.gain.setValueAtTime(C.f1[2], t);
   V.f2.frequency.setValueAtTime(C.f2[0]*Q.f2, t); V.f2.Q.setValueAtTime(C.f2[1], t); V.f2.gain.setValueAtTime(C.f2[2], t);
@@ -202,6 +222,7 @@ function tune(A, V, k, seed = 0) {
 // set a voice going: r 0..1 of the way from idle to redline, load 0..1 (the throttle, how hard it's pulling), gain
 function drive(A, V, k, r, load, gain, seed = 0) {
   const C = CLS[k], t = A.ctx.currentTime, rate = A.rateMul || 1, loud = (A.engLoud || 1)*(A.modeVol || 1);
+  if (V.w && V.idle) { V.idle = false; clearTimeout(V.napT); V.eng.port.postMessage({ z: 0 }); }
   const Q = tune(A, V, k, seed) || self(k, seed), idle = C.idle*Q.idle;
   const rpm = idle + (C.red - idle)*Math.max(0, Math.min(1.08, r));
   if (V.w) {
@@ -225,7 +246,12 @@ function drive(A, V, k, r, load, gain, seed = 0) {
   V.lp.frequency.setTargetAtTime((C.lp[0] + C.lp[1]*(0.35*r + 0.65*load*(0.4 + r)))*(loud > 1 ? 0.8 : 1), t, 0.05);
   V.out.gain.setTargetAtTime(gain*C.vol*(0.55 + 0.25*r + 0.35*load)*loud, t, 0.08);
 }
-function silence(A, V, tc = 0.2) { if (V) V.out.gain.setTargetAtTime(0, A.ctx.currentTime, tc); }
+// (and once it's faded, a voice nobody's listening to stops working: five engines ran flat out all the time, sound or no sound)
+function silence(A, V, tc = 0.2) {
+  if (!V) return;
+  V.out.gain.setTargetAtTime(0, A.ctx.currentTime, tc);
+  if (V.w && !V.idle) { V.idle = true; V.napT = setTimeout(() => { if (V.idle) V.eng.port.postMessage({ z: 1 }); }, tc*6000); }
+}
 const mkVoice = (A, dest) => worklet(A) ? wvoice(A, dest) : voice(A, dest);
 
 // ---------------------------------------------------------------- a bicycle: freewheel and chain
@@ -296,7 +322,9 @@ Audio.prototype.engines = function (list, lx, lz) {
     const q = (v.x - lx)**2 + (v.z - lz)**2; if (q > 3600) continue;
     near.push([q, v, k]);
   }
-  near.sort((a, b) => a[0] - b[0]); near.length = Math.min(near.length, NV);
+  // (flat out you can't pick out five engines over your own, and that's when the audio thread has the least to spare)
+  const G = window.__nhAskG, Pc = G && G.player, fast = Pc && !Pc.onFoot && Math.abs(Pc.cur?.v || 0) > 22;
+  near.sort((a, b) => a[0] - b[0]); near.length = Math.min(near.length, fast ? 2 : NV);
   const t = this.ctx.currentTime, want = new Map(near.map(n => [n[1], n]));
   // each voice keeps to its vehicle while it's still among the nearest (handing a voice from one to another mid-note
   // was a jump in the sound); a free one takes a newcomer, faded in rather than switched
