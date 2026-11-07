@@ -171,6 +171,7 @@ export class TreeField extends GameTrees {
     for (let k = 0; k < sets.length; k++) {
       const set = sets[k], c = cnt[k];
       set.nb.count = set.nl.count = c[0]; set.mb.count = set.ml.count = c[1]; set.fb.count = set.fl.count = c[2];
+      set.nb.visible = set.nl.visible = c[0] > 0; set.mb.visible = set.ml.visible = c[1] > 0; set.fb.visible = set.fl.visible = c[2] > 0;   // (nothing on a list: not even looked at)
       const a = set.nb.instanceMatrix, b = set.mb.instanceMatrix;
       a.clearUpdateRanges(); a.addUpdateRange(0, c[0]*16); a.needsUpdate = true;
       b.clearUpdateRanges(); b.addUpdateRange(0, c[1]*16); b.needsUpdate = true;

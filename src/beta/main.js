@@ -109,6 +109,7 @@ import { paintSky } from './gfx/paintsky.js';
 import { Lamps } from './gfx/lamps.js';
 import { trackBodies } from './draw/skin.js';
 import { Graphics, bootTier } from './game/graphics.js';
+import { view } from './world/view.js';
 
 // The streamer, taught two things about the painted city (when it builds, never what):
 //  - when it builds everything at once (loading screens, arriving somewhere) the buildings are drawn right there,
@@ -539,7 +540,9 @@ async function main() {
     W.nearBoards.update(camera.position.x, camera.position.z, dt);
     W.trains?.update(dt, camera.position);
     propT -= dt;
-    if (propT <= 0) { updateProps(W, camera.position.x, camera.position.z); W.fly?.update?.(camera.position.x, camera.position.z); propT = 0.2; }
+    // (the view swung more than about 10 degrees since the lists were filled: fill them now)
+    view.set(camera); if (view.swung > .015) { propT = 0; }
+    if (propT <= 0) { view.swung = 0; updateProps(W, camera.position.x, camera.position.z); W.fly?.update?.(camera.position.x, camera.position.z); propT = 0.2; }
     const t1 = performance.now();
     // the map covers the screen, and while paused the last frame just sits there (blurred by CSS): no rendering at all
     if (compiled && game.state !== 'map' && !(game.state === 'pause' && !game.livePause && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2) && !(game.menuFreeze && game.state === 'shop' && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);
@@ -643,7 +646,9 @@ async function runFly({ W, renderer, scene, camera, sky, post, quality, progress
     pending = W.streamer.update(cam.x, cam.z, fwd);
     W.nearBoards.update(cam.x, cam.z, dt);
     propT -= dt;
-    if (propT <= 0) { updateProps(W, cam.x, cam.z); propT = 0.25; }
+    // (the view swung more than about 10 degrees since the lists were filled: fill them now)
+    view.set(camera); if (view.swung > .015) { propT = 0; }
+    if (propT <= 0) { view.swung = 0; updateProps(W, cam.x, cam.z); propT = 0.25; }
     post.render(dt);
     frames++; fpsAcc += dt; fpsN++;
     if (fpsAcc > 0.5) {
