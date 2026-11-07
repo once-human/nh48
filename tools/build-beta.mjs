@@ -267,6 +267,8 @@ const PATCHES = {
   ],
   // a cow goes at a cow's pace, shooed off or following you (beta/people/cows.js)
   [S('people/strays.js')]: [
+    // (a cow keeps to the side of the road: no wandering across it, walking sideways to get there and back. beta/people/cows.js)
+    ["if (a.kind === 'cow' && !f && !a.inRoad && this.rng.next() < dt * 0.004 &&", "if (false &&"],
     ["      if (sp > 0) {", "      if (a.kind === 'cow' || a.cow) sp = Math.min(sp, 1.1);\n      if (sp > 0) {"],
   ],
   [S('people/fight.js')]: [
@@ -347,7 +349,7 @@ const PATCHES = {
   ],
   [S('people/peds.js')]: [
     // a cow is in no hurry
-    ["      a.s += a.dir * sp * dt;", "      if (a.cow) sp = a._cross ? 0 : Math.min(sp, a.hurtT > 0 ? 1.5 : 0.4)*(a._al ?? 1);\n      a.s += a.dir * sp * dt;"],
+    ["      a.s += a.dir * sp * dt;", "      if (a.cow) sp = Math.min(sp, a.hurtT > 0 ? 1.5 : 0.4)*(a._al ?? 1);\n      a.s += a.dir * sp * dt;"],
     // who started it, so a witness can say (beta/game/pursuit.js)
     ["if (this.brain && foe && foe.foot) this.brain.incident('fight', p.x, p.z, { byYou: false });", "if (this.brain && foe && foe.foot) this.brain.incident('fight', p.x, p.z, { byYou: false, foe, p });"],
     // (the stall list changes as map tiles come and go: an old index can point past its end, which threw and dropped the whole frame)

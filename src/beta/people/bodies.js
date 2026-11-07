@@ -14,21 +14,11 @@ const shapeOf = (a) => SHAPE[a.cow ? 'cow' : a.kind || 'dog'] || SHAPE.dog;
 // move an animal by (dx, dz): along its path and across it if it's on one, straight if it's loose (following you)
 function shove(P, a, dx, dz) {
   if (a.free || !a.e) { a.x += dx; a.z += dz; return; }
-  // a cow is half a tonne: leaned on by a wall or a bumper she shuffles, she doesn't fly. (Every push went straight into
-  // where she stood, up to a metre a frame from each of her three circles, so a parked car or a passing tempo sent her
-  // sideways down the road at tens of metres a second.)
-  if (a.cow) {
-    const t = performance.now(), m = Math.hypot(dx, dz);
-    a._shA = Math.min(0.05, (a._shA || 0) + Math.max(0, t - (a._shT ?? t))/1000*0.7); a._shT = t;
-    if (m > a._shA) { const k = a._shA/m; dx *= k; dz *= k; a._shA = 0; } else a._shA -= m;
-  }
+  if (a.cow) return;            // (half a tonne, and in no hurry: nothing shoves her. beta/people/cows.js)
   P.g.at(a.e, a.s, TMP);
   a.s += dx*TMP[2] + dz*TMP[3];
   const dl = dx*TMP[3] - dz*TMP[2];
   a.lat += dl;
-  // (a cow ambles to where it's told, beta/people/cows.js: a push moves her at once and she gives up going that way. It only
-  // moved where she was going, so the wall went on pushing frame after frame until she shot off down the road.)
-  if (a._latS !== undefined) { a._latS += dl; a.lat = a._latS; }
   if (a.e.len) a.s = Math.max(0.5, Math.min(a.e.len - 0.5, a.s));
   P.placeAnimal(a);
 }
@@ -111,7 +101,7 @@ People.prototype.update = function (dt, player, avoidView) {
       // you can't walk through it either (your body, 0.26 across the shoulders, against hers)
       if (P && P.foot) {
         const F = P.foot, dx = F.x - cx, dz = F.z - cz, d = Math.hypot(dx, dz), m = r + R_PED;
-        if (d < m && d > 1e-4) { F.x += dx/d*(m - d); F.z += dz/d*(m - d); }
+        if (d < m && d > 1e-4) { F.x += dx/d*(m - d); F.z += dz/d*(m - d); if (a.cow && a.moving && !a.free) { a.moving = false; a.rest = 3 + Math.random()*5; a.dir = -a.dir; } }
       }
       // nor ride through her: rolling slowly into a cow stops you against her body; a dog or a cat is nudged aside
       if (!player.onFoot && player.cur && player.spec) {
@@ -119,14 +109,15 @@ People.prototype.update = function (dt, player, avoidView) {
         if (hit) {
           const [dep, nx, nz] = hit;
           if (a.cow) {
-            V.x -= nx*dep; V.z -= nz*dep;
+            // you stop against her if you're the one moving into her; if she walks into you she stops. A cow doesn't push a car
             const into = (V.v || 0)*(Math.cos(V.th)*nx + Math.sin(V.th)*nz);
-            if (into > 0) V.v = 0;
+            if (into > 0) { V.x -= nx*dep; V.z -= nz*dep; V.v = 0; }
+            if (a.moving && !a.free) { a.moving = false; a.rest = 3 + Math.random()*5; a.dir = -a.dir; }
           } else shove(this, a, nx*dep, nz*dep);
         }
       }
       // poles, walls, parked two-wheelers and cars: edged round
-      const res = W.collision.resolve(cx, cz, r);
+      const res = a.cow ? null : W.collision.resolve(cx, cz, r);
       if (res && res.depth > 0.01) { shove(this, a, res.nx*res.depth, res.nz*res.depth); if (a.moving && !a.free) { a.moving = false; a.rest = 2 + Math.random()*4; } }
     }
     // the traffic: a vehicle's box. An animal walking into one stops (and turns back now and then); one stood in a
