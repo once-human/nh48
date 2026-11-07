@@ -100,6 +100,9 @@ const PATCHES = {
     ["this.setFov(dt, 60 + speed * 0.65);", "this.setFov(dt, 60 + Math.min(speed, 27.8) * 0.65);"],
     ["this.setFov(dt, 58 + Math.abs(p.v) * 0.8);", "this.setFov(dt, 58 + Math.min(Math.abs(p.v), 27.8) * 0.8);"]],
   [S('game/audio.js')]: [
+    // (nobody in particular: a good bit quieter, and a longer breath before the next. Someone you've just done something to: a little quieter)
+    ["if (pri === 0 && this.voiceEnd && now < this.voiceEnd + 2.5) return false;", "if (pri === 0 && this.voiceEnd && now < this.voiceEnd + 9) return false;"],
+    ["let v; try { v = this.play('v_' + id, { vol: 0.95 * vol,", "let v; try { v = this.play('v_' + id, { vol: 0.95 * vol * (pri === 0 ? 0.75 : pri === 1 ? 0.95 : 1),"],
     // (the smallest buffer the browser can manage leaves the audio thread no room at all: a heavy frame and the sound breaks up. A few
     // hundredths of a second more can't be heard)
     ["const ctx = this.ctx = new AC();", "const ctx = this.ctx = new AC({ latencyHint: 0.06 });"],
@@ -366,8 +369,14 @@ const PATCHES = {
     ["if (far || (k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21)) {", "const seen = !far && G.crowd && G.crowd.inView && Math.hypot(k.p.x - P.x, k.p.z - P.z) < 60 && (G.crowd.inView(k.p.x, k.p.z) || Math.hypot(k.p.x - P.x, k.p.z - P.z) < 10);\n      if (far || !seen && ((k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21))) {"],
   ],
   [S('people/peds.js')]: [
+    // (beta/people/runover.js has what happens when you hit someone; this only saw it once they were within a metre of your middle)
+    ["if (d < 1.15 && pv > 2.0) {", "if (false) {"],
+    // (people talk to you less for no reason)
+    ["this.chatT = this.rng.range(14, 32);", "this.chatT = this.rng.range(34, 75);"],
+    ["if (this.rng.next() < (sc === 'greet' ? 0.3 : 0.5) && this.speakAs(sc, p, 1, 6)) {", "if (this.rng.next() < (sc === 'greet' ? 0.1 : 0.2) && this.speakAs(sc, p, 1, 14)) {"],
+    ["if (best) this.speakAs('mutter', best, 0.8, 5);", "if (best) this.speakAs('mutter', best, 0.35, 14);"],
     // a cow is in no hurry
-    ["      a.s += a.dir * sp * dt;", "      if (a.cow) sp = Math.min(sp, a.hurtT > 0 ? 1.5 : 0.4)*(a._al ?? 1);\n      a.s += a.dir * sp * dt;"],
+    ["      a.s += a.dir * sp * dt;", "      if (a.cow) sp = Math.min(sp, a.hurtT > 0 ? 1.5 : 0.72)*(a._al ?? 1);\n      a.s += a.dir * sp * dt;"],
     // who started it, so a witness can say (beta/game/pursuit.js)
     ["if (this.brain && foe && foe.foot) this.brain.incident('fight', p.x, p.z, { byYou: false });", "if (this.brain && foe && foe.foot) this.brain.incident('fight', p.x, p.z, { byYou: false, foe, p });"],
     // (the stall list changes as map tiles come and go: an old index can point past its end, which threw and dropped the whole frame)

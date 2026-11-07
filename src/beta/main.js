@@ -61,6 +61,7 @@ import './world/pins.js';
 import './draw/alive.js';
 import './people/bodies.js';        // people, cows and dogs take up room: round each other, vehicles, poles, you
 import './people/around.js';        // whatever's in the way, people go round it
+import './people/runover.js';        // being hit by what you're driving, and being driven over
 import './people/doors.js';          // into a shop and out again through its door
 import './draw/falls.js';
 import './draw/fauna.js';

@@ -10,7 +10,7 @@ import { People } from '@orig/people/peds.js';
 
 const NEAR = 60, FAR = 160, BODY = 0.27, LOOK = 1.25, PROBE = 0.36, SIDE = 1.15, TURN_BACK = 1.3;
 // (not on the street at all: indoors, carried, riding, sitting in something. Everyone else is held to this, whatever they're doing)
-const away = (p) => p.hidden || p.pax || p.rideOf || p.lift || p.seat || p.seated || p.mode === 'inside';
+const away = (p) => p._hit || p.hidden || p.pax || p.rideOf || p.lift || p.seat || p.seated || p.mode === 'inside';
 // (going their own way: walking the path, not stood at a post or being worked by a scene)
 const held = (p) => p.fixed || p.ctl || p.duty || p.dead || p.corpse || p.fallen > 0 || p._thru || p.mode === 'fight';
 const blocks = (k) => k !== 3 && k !== 4;                         // (the edge of the map, river banks and rails: their own rules)
@@ -82,7 +82,9 @@ People.prototype.update = function (dt, player, ...rest) {
       if (!r || !blocks(r.kind)) break;
       move(p, r.nx*r.depth, r.nz*r.depth); if (r.nx*hx + r.nz*hz < -.6) pressed = true;
     }
-    for (const [V, S] of mine) { const d = intoBox(p.x, p.z, V.x, V.z, Math.cos(V.th), Math.sin(V.th), S.L || 4, S.W || 1.7, BODY); if (d) { move(p, OUT[0]*d, OUT[1]*d); if (OUT[0]*hx + OUT[1]*hz < -.6) pressed = true; } }
+    // (someone lying in the road is under what you're driving, not in its way. Getting up from under it they crawl out, not jump)
+    const lying = p.fallen > 1.6 || p.corpse, rising = p.fallen > 0;
+    for (const [V, S] of mine) { if (lying && V === cur) continue; let d = intoBox(p.x, p.z, V.x, V.z, Math.cos(V.th), Math.sin(V.th), S.L || 4, S.W || 1.7, BODY); if (d) { if (rising) d = Math.min(d, 1.6*dt); move(p, OUT[0]*d, OUT[1]*d); if (OUT[0]*hx + OUT[1]*hz < -.6) pressed = true; } }
     if (T) T.near(p.x, p.z, 3.5, (o) => {
       if (!(o.T || o.parked) || o.isPlayer || Math.abs((o.y || 0) - py) > 2) return;
       const d = intoBox(p.x, p.z, o.x, o.z, o.hx ?? 1, o.hz ?? 0, o.T ? o.T.L : o.L, o.T ? o.T.W : o.W, BODY);

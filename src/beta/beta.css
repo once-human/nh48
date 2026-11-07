@@ -93,10 +93,6 @@ body.nh-nohud #ui { display: none !important; }
 .dash .sys span.red.on{color:#ff6a5f;animation:none}
 .dash .sys span[data-k=lt].on{color:#9fd8ff;animation:none}
 @keyframes sys-pulse{50%{opacity:.35}}
-/* just walking: the screen lets go, and comes back when you stop. Subtitles and toasts stay */
-.h.loc,.h.wallet,.h.mm,.h.vit,.h.obj,.h.corner,.h.zone{transition:opacity 1.2s ease}
-.walking .h.loc,.walking .h.wallet,.walking .h.vit,.walking .h.zone,.walking .h.corner{opacity:.06;transition:opacity 4s ease}
-.walking .h.mm,.walking .h.obj{opacity:.22;transition:opacity 4s ease}
 /* not drawn at all when they can't be seen: the page's own compositing was costing as much as a graphics setting */
 #loading.gone { display: none; }
 .edge-mist:not(.on) { display: none; }
