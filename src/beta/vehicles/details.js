@@ -8,6 +8,10 @@
 //  - your head turns into a corner a little before the car does
 //  - the brake discs glow after hard stops from high speed, and cool over a few seconds
 //  - a car that's been standing breathes white vapour from its exhaust for the first half minute after you start it
+//  - indicators: , for left, . for right, both together for the hazards. A soft tick-tock, and they cancel themselves once you've
+//    turned the wheel that way and straightened up again
+//  - heat haze over the exhaust once you've worked the engine: it shows when you slow down or stop, and takes a few
+//    minutes to go. A sports car's shimmers a little even idling
 // (The wipers and the wing are vertices of the body, beta/vehicles/models.js marks which: the car gets its own copy
 // of its model before they move, the way dents do, beta/vehicles/damage.js.)
 import * as THREE from 'three';
@@ -15,6 +19,7 @@ import { Vehicle } from '@orig/vehicles/vehicle.js';
 import { Pilot } from '@orig/game/pilot.js';
 import { bendBone } from '@orig/people/humans.js';
 import { baseOf } from './models.js';
+import { HAZE } from '../gfx/post.js';
 
 const G0 = () => window.__nhAskG;
 const mine = (v) => { const P = G0() && G0().player; return !!P && !P.onFoot && P.cur === v; };
@@ -207,3 +212,71 @@ Pilot.prototype.placeRider = function () {
 // (puffs left in the air when you get out still drift and go)
 const pu = Pilot.prototype.update;
 Pilot.prototype.update = function (...a) { const r = pu.apply(this, a); if (this.onFoot) tickPuffs(); return r; };
+
+// ---------------------------------------------------------------- indicators
+const BLINK = 353;                   // ms on, ms off: 85 a minute
+function indOf(v) { return v._ind || (v._ind = { s: 0, haz: false, t0: 0, peak: 0, ph: -1 }); }
+function indKeys(P, input) {
+  const v = P.cur; if (!v || !input || !input.took) return;
+  const I = indOf(v), t = now();
+  // , and . together (within a third of a second) for the hazards: / is the terminal's
+  const press = (s) => {
+    if (I.last && I.last.s === -s && t - I.last.t < 320) { I.haz = !I.haz; I.s = I.last.was; I.last = null; I.t0 = t; I.ph = -1; return; }
+    I.last = { s, t, was: I.s };
+    I.s = I.s === s ? 0 : s; I.peak = 0; if (!I.haz) { I.t0 = t; I.ph = -1; }
+  };
+  if (input.took('Comma')) press(-1);
+  if (input.took('Period')) press(1);
+}
+function indTick(v) {
+  const I = v._ind; if (!I || (!I.s && !I.haz)) return;
+  // turned that way and back: off (the wheel's own cancelling cam)
+  if (I.s) { const st = (v.steer || 0)*I.s; I.peak = Math.max(I.peak, st); if (I.peak > 0.16 && st < 0.04) { I.s = 0; I.peak = 0; } }
+  const ph = Math.floor((now() - I.t0)/BLINK) % 2;
+  if (ph !== I.ph) { I.ph = ph; const A = G0() && G0().audio; if (A && A.tone && (I.s || I.haz)) A.tone('sine', [ph ? 980 : 1240], 0.022, 0.022); }
+}
+const _iv = new THREE.Vector3();
+function indHook(v) {
+  const mesh = v.bodyMesh; if (!mesh || mesh._indHook) return;
+  mesh._indHook = true;
+  const b0 = mesh.onBeforeRender, a0 = mesh.onAfterRender;
+  mesh.onBeforeRender = function (r, sc, cam, geo, m, g) {
+    b0 && b0.call(this, r, sc, cam, geo, m, g);
+    const u = m && m.uniforms && m.uniforms.uInd, I = v._ind; if (!u || !I || (!I.s && !I.haz)) return;
+    const on = Math.floor((now() - I.t0)/BLINK) % 2 === 0 ? 1 : 0;
+    u.value.copy(_iv.set(I.s < 0 || I.haz ? 1 : 0, I.s > 0 || I.haz ? 1 : 0, on)); m.uniformsNeedUpdate = true;
+  };
+  mesh.onAfterRender = function (r, sc, cam, geo, m, g) {
+    a0 && a0.call(this, r, sc, cam, geo, m, g);
+    const u = m && m.uniforms && m.uniforms.uInd; if (u && (u.value.x || u.value.y)) { u.value.set(0, 0, 0); m.uniformsNeedUpdate = true; }
+  };
+}
+const pu2 = Pilot.prototype.update;
+Pilot.prototype.update = function (dt, inp, traffic, input, ...a) {
+  const r = pu2.call(this, dt, inp, traffic, input, ...a), v = this.cur;
+  if (!this.onFoot && v && v.bodyMesh) { try { indKeys(this, input); indHook(v); indTick(v); } catch (e) { if (!warned) { warned = true; console.warn('details', e); } } }
+  return r;
+};
+
+// ---------------------------------------------------------------- heat haze
+function haze(v, h) {
+  if (v.type === 'cycle') return;
+  const sp = Math.abs(v.v || 0), thr = Math.max(0, v.throttle || 0), low = /^(super|sports)$/.test(baseOf(v.type));
+  // hot from hard running (the throttle high, the revs up), cooling over three or four minutes
+  v._hot = Math.min(1, Math.max(0, (v._hot || 0) + h*(thr*(v.rpm || 0.5)*(sp > 2 ? 0.03 : 0.008)) - h*0.0045));
+  const G = G0(), rain = (G && G.weather && G.weather.cur && G.weather.cur.rain) || 0;
+  // at speed it's blown flat behind the car and you don't see it
+  const k = (Math.max(v._hot, low ? 0.22 : 0.06))*(1 - Math.min(1, Math.max(0, (sp - 3)/9)))*(1 - 0.75*rain);
+  if (k < 0.02 || HAZE.length) return;
+  const S = v.spec || {}, L = S.L || 4, Wd = S.W || 1.7;
+  v.tilt.updateWorldMatrix(true, false);
+  _hz.set(-L/2 - 0.12, S.two ? 0.4 : 0.34, (low ? 0 : 0.27)*Wd).applyMatrix4(v.tilt.matrixWorld);
+  HAZE.push({ x: _hz.x, y: _hz.y, z: _hz.z, k: Math.min(1, k)*(low ? 1 : 0.8) });
+}
+const _hz = new THREE.Vector3();
+const pu3 = Pilot.prototype.update;
+Pilot.prototype.update = function (dt, ...a) {
+  const r = pu3.call(this, dt, ...a), v = this.cur;
+  if (!this.onFoot && v && v.tilt) { try { haze(v, Math.min(0.1, dt || 0.016)); } catch (e) { if (!warned) { warned = true; console.warn('details', e); } } }
+  return r;
+};

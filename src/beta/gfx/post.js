@@ -10,6 +10,9 @@ import * as THREE from 'three';
 import { hideUnseen, showAll } from '../world/view.js';
 import { PU } from './paint.js';
 
+// heat haze: up to two hot spots a frame (beta/vehicles/details.js fills it: your exhaust after it's been worked)
+export const HAZE = [];
+
 const VS = `in vec3 position; in vec2 uv; out vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }`;
 const HEAD = `precision highp float; precision highp sampler2D; in vec2 vUv; out vec4 o;\n`;
 const DEPTH = `uniform sampler2D tDep; uniform mat4 proj, invProj; uniform vec2 res;
@@ -71,7 +74,7 @@ const UP_FS = HEAD + `uniform sampler2D tCol; uniform vec2 px; void main(){ vec3
 const SHAFT_FS = HEAD + `uniform sampler2D tDep; uniform vec2 sun; uniform int samples; float ign(vec2 p){ return fract(52.9829189*fract(dot(p, vec2(.06711056, .00583715)))); }
 void main(){ vec2 d = (sun - vUv)/float(samples)*.85, p = vUv + d*ign(gl_FragCoord.xy); float s = 0., w = 1., W = 0.; for (int i = 0; i < samples; i++) { s += step(.99999, texture(tDep, p).r)*w; W += w; w *= .975; p += d; } float r = length((vUv - sun)*vec2(1.6, 1.)); o = vec4(vec3(s/W*exp(-r*1.6)), 1.); }`;
 
-const FS = HEAD + `uniform sampler2D tCol, tDep, tNoise, tAO, tSSR, tBloom, tShaft; uniform vec2 res, dOff; uniform float giK, dpr, cnear, cfar, time, drunk, inkQ, inkS, paper, tear, film, aerial, bloomK, shaftK, focus, dofR; uniform int dofN, mbN, useAO, useSSR; uniform vec3 fogCol, sunCol, skyCol; uniform mat4 reproj, invVP; uniform float dayK;
+const FS = HEAD + `uniform sampler2D tCol, tDep, tNoise, tAO, tSSR, tBloom, tShaft; uniform vec2 res, dOff; uniform float giK, dpr, cnear, cfar, time, drunk, inkQ, inkS, paper, tear, film, aerial, bloomK, shaftK, focus, dofR; uniform int dofN, mbN, useAO, useSSR; uniform vec3 fogCol, sunCol, skyCol; uniform mat4 reproj, invVP; uniform float dayK; uniform vec4 hzP[2]; uniform vec2 hzK;
 float h12(vec2 p){ vec3 q=fract(vec3(p.xyx)*.1031); q+=dot(q,q.yzx+33.33); return fract((q.x+q.y)*q.z); }
 vec2 rot(vec2 p,float a){ float c=cos(a),s=sin(a); return vec2(c*p.x+s*p.y,-s*p.x+c*p.y); }
 float lum(vec3 c){ return dot(c,vec3(.3,.59,.11)); }
@@ -93,7 +96,14 @@ void main(){
   vec2 wob = (vec2(nR(fp*.09), nR(fp*.09 + 9.)) - .5)*px*2.4*dpr*paper;
   float d0 = texture(tDep, uv).r, z0 = lz(uv);
   bool sky = d0 >= .99999;
-  vec3 L = texture(tCol, uv + wob*.6).rgb;
+  // heat haze: the air over a hot exhaust bends what's behind it, in a column that rises and widens and wavers
+  vec2 hb = vec2(0.);
+  for (int i = 0; i < 2; i++) { float k = hzK[i]; if (k <= 0.) continue; vec4 h = hzP[i];
+    vec2 q = (uv - h.xy)*vec2(res.x/res.y, 1.)/h.z; float up = q.y, w = .55 + max(up, 0.)*.3;
+    float m = (1. - smoothstep(.35*w, w, abs(q.x)))*smoothstep(-.25, .15, up)*(1. - smoothstep(1.4, 4., up));
+    if (m > 0. && (sky || z0 > h.w - .4)) { vec2 n = vec2(nR(q*2.2 - vec2(0., time*3.1)), nR(q*2.2 + vec2(7.3, 2.1) - vec2(time*.4, time*2.6))) - .5;
+      hb += n*m*k*h.z*.05; } }
+  vec3 L = texture(tCol, uv + wob*.6 + hb).rgb;
   // the lens: things out of focus open up into discs; the camera's own movement smears the frame
   if (dofN > 0) { float coc = clamp((z0 - focus - 25.)/380., 0., 1.)*dofR; if (coc > .6) { vec3 a = L; float W = 1., a0 = ign(gl_FragCoord.xy)*6.28; for (int i = 0; i < dofN; i++) { float t = sqrt((float(i) + .5)/float(dofN)), th = a0 + float(i)*2.39996; vec2 q = uv + vec2(cos(th), sin(th))*t*coc*px; float zq = lz(q), w = zq > focus - 1. ? 1. : .12; a += texture(tCol, q).rgb*w; W += w; } L = a/W; } }
   if (mbN > 0 && z0 > focus + 1.5) { vec4 pw = invVP*vec4(uv*2. - 1., (sky ? 1. : d0)*2. - 1., 1.); pw /= pw.w; vec4 pr = reproj*pw; vec2 vel = uv - pr.xy/pr.w*.5 - .5; float vl = length(vel); if (vl > .001) { vel *= .35; vl *= .35; vel *= min(1., .012/max(vl, 1e-5)); if (vl < .0008) vel *= 0.; vec3 a = L; float jit = ign(gl_FragCoord.xy); for (int i = 0; i < mbN; i++) a += texture(tCol, uv - vel*(float(i) + jit)/float(mbN)).rgb; L = a/float(mbN + 1); } }
@@ -156,7 +166,7 @@ export class Post {
     const res = { value: new THREE.Vector2() }, proj = { value: new THREE.Matrix4() }, invProj = { value: new THREE.Matrix4() };
     this.res = res; this.proj = proj; this.invProj = invProj;
     this.tDep = { value: null }; this.tColU = { value: null };
-    this.U = { giK: { value: 0 }, tCol: this.tColU, tDep: this.tDep, tNoise: PU.tNoise, res, dpr: { value: 1 }, cnear: { value: 0.1 }, cfar: { value: 1000 }, time: { value: 0 }, drunk: { value: 0 }, inkQ: { value: 2 }, inkS: { value: 1 }, paper: { value: 1 }, tear: { value: 0 }, film: { value: 0 }, aerial: { value: 0 }, bloomK: { value: 0 }, shaftK: { value: 0 }, focus: { value: 8 }, dofR: { value: 8 }, dofN: { value: 0 }, mbN: { value: 0 }, useAO: { value: 0 }, useSSR: { value: 0 }, tAO: { value: null }, tSSR: { value: null }, tBloom: { value: null }, tShaft: { value: null }, dOff: { value: new THREE.Vector2() }, fogCol: PU.fogCol, sunCol: PU.sunCol, skyCol: PU.skyCol, dayK: PU.dayK, reproj: { value: new THREE.Matrix4() }, invVP: { value: new THREE.Matrix4() } };
+    this.U = { giK: { value: 0 }, tCol: this.tColU, tDep: this.tDep, tNoise: PU.tNoise, res, dpr: { value: 1 }, cnear: { value: 0.1 }, cfar: { value: 1000 }, time: { value: 0 }, drunk: { value: 0 }, inkQ: { value: 2 }, inkS: { value: 1 }, paper: { value: 1 }, tear: { value: 0 }, film: { value: 0 }, aerial: { value: 0 }, bloomK: { value: 0 }, shaftK: { value: 0 }, focus: { value: 8 }, dofR: { value: 8 }, dofN: { value: 0 }, mbN: { value: 0 }, useAO: { value: 0 }, useSSR: { value: 0 }, tAO: { value: null }, tSSR: { value: null }, tBloom: { value: null }, tShaft: { value: null }, dOff: { value: new THREE.Vector2() }, fogCol: PU.fogCol, sunCol: PU.sunCol, skyCol: PU.skyCol, dayK: PU.dayK, reproj: { value: new THREE.Matrix4() }, invVP: { value: new THREE.Matrix4() }, hzP: { value: [new THREE.Vector4(), new THREE.Vector4()] }, hzK: { value: new THREE.Vector2() } };
     this.mat = raw(FS, this.U);
     const dep = { tDep: this.tDep, proj, invProj, res };
     this.aoM = raw(AO_FS, { ...dep, tCol: this.tColU, samples: { value: 16 }, rays: { value: 0 }, radius: { value: 1.3 } });
@@ -243,6 +253,15 @@ export class Post {
       if (front > .05 && dy > .05) { const sh = this.fxTarget('shaft', .5, THREE.UnsignedByteType); this.shM.uniforms.sun.value.set(S.x*.5 + .5, S.y*.5 + .5); this.shM.uniforms.samples.value = F.shafts; this.pass(this.shM, sh); U.tShaft.value = sh.texture; U.shaftK.value = .42*Math.min(1, front*2); }
     }
     U.dofN.value = F.dof; U.mbN.value = F.mb;
+    // the haze: each hot spot onto the screen, with how big a column of air ~0.5 m across looks from here
+    U.hzK.value.set(0, 0);
+    for (let i = 0; i < 2 && i < HAZE.length; i++) {
+      const h = HAZE[i], S = this._hv || (this._hv = new THREE.Vector3()); S.set(h.x, h.y, h.z).applyMatrix4(cam.matrixWorldInverse);
+      const z = -S.z; if (z < .3 || z > 60 || !(h.k > .01)) continue;
+      S.applyMatrix4(cam.projectionMatrix); if (Math.abs(S.x) > 1.3 || Math.abs(S.y) > 1.3) continue;
+      U.hzP.value[i].set(S.x*.5 + .5, S.y*.5 + .5, .25*cam.projectionMatrix.elements[5]/z, z); U.hzK.value.setComponent(i, h.k*(1 - Math.max(0, z - 30)/30));
+    }
+    HAZE.length = 0;
     if (F.dof > 0 && this.focusAt) { const f = this.focusAt(); U.focus.value += (f - U.focus.value)*Math.min(1, (dt || .016)*5); U.dofR.value = 5*U.dpr.value; }
     // motion blur from how you're moving through the world, not from turning the view: last frame's camera is taken
     // where it was but looking where it looks now, so flicking the camera round smears nothing; going fast does

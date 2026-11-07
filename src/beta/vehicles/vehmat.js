@@ -66,7 +66,7 @@ ${PCF}
 float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.05 + .002*vZ), 1.); if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.;
   return shadowPCF(vec3(s.xy, s.z - .0006)); }
 `;
-const FS = CHUNK + `varying vec2 vLp;
+const FS = CHUNK + `varying vec2 vLp; uniform vec3 uInd;
 void main(){
   FADE_OUT
   vec3 n = normalize(vN), V = normalize(cameraPosition - vW), b = vC; float matte = vG < -.5 ? 1. : 0., painted = abs(vP - 1.) < .5 ? 1. : 0.;
@@ -93,6 +93,9 @@ void main(){
     if (rear && vG > .45 && vC.r > .5 && vC.g < .3 && vC.b < .3) k = vLp.x < -.5 ? 0. : uNight*.3 + max(vLp.x, 0.)*(2.2 + uNight*2.4) + max(vLp.y, 0.)*(.5 + uNight*.6);
     else if (rear && vG > .1 && vG < .2 && vC.r > .8 && vC.g > .8 && vC.b > .75) k = max(vLp.y, 0.)*(9. + uNight*12.);
     else if (rear && vC.r > .8 && vC.g > .3 && vC.g < .7 && vC.b < .3) k = vLp.x < -.5 ? 0. : uNight*1.3;     // (amber at the back: on with the lights, steady, and the brakes have nothing to do with it)
+    // the indicators (yours: beta/vehicles/details.js): every amber lamp on that side, front, back and the repeater on
+    // the wing, on with the blink and dark between, whatever it was doing before (uInd: left, right, the blink)
+    if (vC.r > .8 && vC.g > .3 && vC.g < .7 && vC.b < .3 && (vL.z < 0. ? uInd.x : uInd.y) > .5) k = uInd.z*(2.6 + uNight*3.5);
     c += vC*vG*k;
   }
   float f = fogDensity*vZ, mir = matte > .5 ? 0. : (glassy*.72 + painted*(.3 - .22*grime) + (1. - painted)*(1. - glassy)*.18); gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1. - clamp(mir, 0., .95)); }`;
@@ -107,7 +110,7 @@ const GLASS_FS = CHUNK + `void main(){
 
 function mat(fs, vs, opts = {}) {
   const uniforms = Object.assign({}, PU, { uTint: { value: new THREE.Color(opts.tint ?? 0x15191d).convertSRGBToLinear() }, uRough: { value: opts.rough ?? .38 }, uMetal: { value: opts.metal ?? .1 } });
-  uniforms.uLamp = { value: new THREE.Vector2() };
+  uniforms.uLamp = { value: new THREE.Vector2() }; uniforms.uInd = { value: new THREE.Vector3() };
   const m = new THREE.ShaderMaterial({ vertexShader: vs, fragmentShader: fs, uniforms, vertexColors: !opts.glass, side: opts.glass ? THREE.DoubleSide : THREE.FrontSide });
   // every instanced body drawn with this needs its lamps' per-instance state: a model that came without (a parked
   // row, a door cut out of a body, a copy) gets one that's all zero (its tail lamps as any car's at night)
