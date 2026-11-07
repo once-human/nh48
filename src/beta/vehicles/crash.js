@@ -18,7 +18,8 @@ const SLIDE = 6.5;           // m/s² of a pushed vehicle's tyres scraping
 function shift(v, dx, dz) {
   v.x += dx; v.z += dz;
   if (v.rx !== undefined) { v.rx += dx; v.rz += dz; }
-  const e = v.l && v.l.e; if (!e || v.jc) return;
+  const J = v.jc; if (J) { J.p0x += dx; J.p0z += dz; J.cx += dx; J.cz += dz; J.p2x += dx; J.p2z += dz; return; }   // (on a junction's curve: the curve goes with it, or the next frame would put it straight back)
+  const e = v.l && v.l.e; if (!e) return;
   v.s += dx*v.hx + dz*v.hz; if (e.len) v.s = clamp(v.s, 0.5, e.len - 0.5);
   const lim = Math.max(0.3, e.w/2 - (v.T.W || 0.8)/2 - 0.1); v.lat = clamp(v.lat + dx*v.hz - dz*v.hx, -lim, lim);
 }
