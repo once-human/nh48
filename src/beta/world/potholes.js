@@ -2,10 +2,11 @@
 // the road (a brown blob a metre and a half across), and the rubbish was a scatter of coloured squares printed flat.
 // Now a pothole is a hole: a ragged outline, walls dropping through the tar's black top layer into the brown base course
 // under it, a bottom of dirt and loose stones, the broken edge crumbled a shade lighter, a few cracks running off it
-// and bits of the aggregate thrown out onto the road round it. It's sunk into the road for real: the road is drawn
-// first, then a lid over the hole clears the depth inside its outline (only where the road is what's showing there,
-// so a car or a person in front of it stays in front), and the hole is drawn into the gap. Its size and depth are the
-// ones the wheels feel (beta/vehicles/potholes.js asks potDepth). The rubbish by a stall: chai cups, a crushed bottle,
+// and bits of the aggregate thrown out onto the road round it. The hole is drawn on a skin lying just on the road, cut
+// to its outline: each pixel of it follows the eye's ray down into the bowl and paints what the ray lands on (POTHOLE in
+// beta/gfx/repaint.js), near wall hidden, far wall showing, the sun's edge falling across the floor. Nothing has to be
+// cut out of the road's depth, so it shows on every setting and whatever stands in front stays in front. Its outline
+// and depth are the ones the wheels feel (beta/vehicles/potholes.js asks potWhere). The rubbish by a stall: chai cups, a crushed bottle,
 // carry bags, wrappers, a sheet of newspaper, peel, each its own shape and colour, lying where it was dropped.
 import * as THREE from 'three';
 import { RNG } from '@orig/core/util.js';
@@ -61,52 +62,36 @@ function stone(G, x, y, z, s, rng, col) {
   for (const [i, j, k] of F) G.face(P[i], P[j], P[k], tint(col, rng.range(0.85, 1.15)));
 }
 const GRAVEL = [[0.42, 0.4, 0.37], [0.3, 0.29, 0.28], [0.5, 0.46, 0.4], [0.36, 0.3, 0.25], [0.22, 0.21, 0.2]];
-const N = 30, F = [0, 0.3, 0.55, 0.72, 0.84, 0.93, 1], Y = [1, 0.97, 0.9, 0.8, 0.62, 0.34, 0];
-// the colours down the hole: dirt and grit at the bottom, the brown base course in the walls, the tar's black top
-// layer at the lip, its broken edge lighter
-const COL = [[0.2, 0.17, 0.14], [0.21, 0.18, 0.15], [0.23, 0.2, 0.16], [0.27, 0.23, 0.18], [0.34, 0.29, 0.23], [0.13, 0.13, 0.13], [0.36, 0.35, 0.33]];
+const N = 30;
 export const LID_Y = 0.012;
 
 export function buildPotholes(W, C, group) {
   if (!C.pot || !C.pot.length) return;
-  const hole = new Geo(), lid = new Geo(), bits = new Geo(), q = [0, 0];
+  const lip = new Geo(), bits = new Geo(), skin = { p: [], i: [], A: [], P: [], B: [], S: [], Q: [] }, q = [0, 0];
   for (const p of C.pot) {
     const s = potShape(p), rng = new RNG(1 + Math.abs(Math.floor(p.x*31 + p.z*17)));
-    const base = hole.p.length/3, ring = (k) => base + 1 + k*N;
-    hole.v(p.x, -s.dep*(0.95 + rng.range(0, 0.1)), p.z, tint(COL[0], rng.range(0.8, 1.1)));
-    for (let k = 1; k < F.length; k++) for (let j = 0; j < N; j++) {
-      const a = j/N*6.283, e = edge(s, a)*(k === F.length - 1 ? 1 : 1 + rng.range(-0.035, 0.035));
-      at(s, p, a, e*F[k], q);
-      const y = -s.dep*Y[k]*(k < 4 ? rng.range(0.9, 1.08) : 1);
-      hole.v(q[0], y, q[1], tint(COL[k], rng.range(0.82, 1.15)));
-    }
+    // the skin: the outline just on the road, each corner carrying the hole's shape for the shader
+    const l0 = skin.p.length/3, H = s.harm;
+    const put = (x, z) => { skin.p.push(x, LID_Y, z); skin.A.push(H[0][1], H[1][1], H[2][1], H[3][1]); skin.P.push(H[0][2], H[1][2], H[2][2], H[3][2]); skin.B.push(H[4][1], H[4][2], p.x, p.z); skin.S.push(s.R, s.dep, s.ca, s.sa); skin.Q.push(s.sq); };
+    put(p.x, p.z);
+    for (let j = 0; j < N; j++) { const a = j/N*6.283; at(s, p, a, edge(s, a), q); put(q[0], q[1]); }
+    for (let j = 0; j < N; j++) skin.i.push(l0, l0 + 1 + (j + 1)%N, l0 + 1 + j);
     // the broken lip just outside: up a few millimetres, crumbled, then down to the road's own dark
-    const lip = hole.p.length/3;
-    for (const [f, y, c] of [[1.06, 0.008, [0.33, 0.32, 0.3]], [1.16, 0.005, [0.17, 0.17, 0.18]]]) for (let j = 0; j < N; j++) {
-      const a = j/N*6.283; at(s, p, a, edge(s, a)*(f + rng.range(-0.02, 0.03)), q);
-      hole.v(q[0], y, q[1], tint(c, rng.range(0.85, 1.12)));
+    const base = lip.p.length/3;
+    for (const [f, y, c] of [[1, 0.012, [0.2, 0.195, 0.19]], [1.06, 0.01, [0.25, 0.24, 0.23]], [1.16, 0.006, [0.17, 0.17, 0.18]]]) for (let j = 0; j < N; j++) {
+      const a = j/N*6.283; at(s, p, a, edge(s, a)*(f + (f > 1 ? rng.range(-0.02, 0.03) : 0)), q);
+      lip.v(q[0], y, q[1], tint(c, rng.range(0.85, 1.12)));
     }
-    for (let j = 0; j < N; j++) hole.tri(base, ring(0) + (j + 1)%N, ring(0) + j);
-    for (let k = 0; k < F.length - 2; k++) for (let j = 0; j < N; j++) {
-      const a = ring(k) + j, b = ring(k) + (j + 1)%N, c = ring(k + 1) + j, d = ring(k + 1) + (j + 1)%N;
-      hole.tri(a, b, c); hole.tri(b, d, c);
-    }
-    const last = ring(F.length - 2);
     for (let k = 0; k < 2; k++) for (let j = 0; j < N; j++) {
-      const r0 = k ? lip : last, r1 = k ? lip + N : lip;
-      const a = r0 + j, b = r0 + (j + 1)%N, c = r1 + j, d = r1 + (j + 1)%N;
-      hole.tri(a, b, c); hole.tri(b, d, c);
+      const a = base + k*N + j, b = base + k*N + (j + 1)%N, c = base + (k + 1)*N + j, d = base + (k + 1)*N + (j + 1)%N;
+      lip.tri(a, c, b); lip.tri(b, c, d);
     }
-    // the lid: the hole's outline at the road, a little above it
-    const l0 = lid.p.length/3; lid.v(p.x, LID_Y, p.z, [0, 0, 0]);
-    for (let j = 0; j < N; j++) { const a = j/N*6.283; at(s, p, a, edge(s, a), q); lid.v(q[0], LID_Y, q[1], [0, 0, 0]); }
-    for (let j = 0; j < N; j++) lid.tri(l0, l0 + 1 + (j + 1)%N, l0 + 1 + j);
-    // loose stones in the bottom, and aggregate thrown out onto the road
-    const nIn = Math.round(5 + s.R*16), nOut = Math.round(3 + s.R*10);
-    for (let k = 0; k < nIn + nOut; k++) {
-      const inside = k < nIn, a = rng.range(0, 6.28), e = edge(s, a), f = inside ? Math.sqrt(rng.next())*0.62 : rng.range(1.18, 1.9), sz = rng.range(0.012, inside ? 0.035 : 0.022);
-      at(s, p, a, e*f, q);
-      stone(bits, q[0], inside ? -s.dep*0.95 + sz*0.4 : 0.004 + sz*0.3, q[1], sz, rng, rng.pick(GRAVEL));
+    // aggregate thrown out onto the road
+    const nOut = Math.round(3 + s.R*10);
+    for (let k = 0; k < nOut; k++) {
+      const a = rng.range(0, 6.28), e = edge(s, a), sz = rng.range(0.012, 0.022);
+      at(s, p, a, e*rng.range(1.18, 1.9), q);
+      stone(bits, q[0], 0.004 + sz*0.3, q[1], sz, rng, rng.pick(GRAVEL));
     }
     // cracks running off the edge
     const nc = rng.int(2, 4);
@@ -123,24 +108,24 @@ export function buildPotholes(W, C, group) {
       }
     }
   }
-  // drawn after everything solid and the road's paint: the lid, then the hole (and its bits) into the gap it leaves
-  const lg = lid.build(false), hg = hole.build(true), bg = bits.build(false);
-  if (lg) { const m = new THREE.Mesh(lg, LID()); m.renderOrder = 2; m.frustumCulled = true; group.add(m); }
-  if (hg) { const m = new THREE.Mesh(hg, HOLE()); m.renderOrder = 3; m.receiveShadow = true; group.add(m); }
-  if (bg) { const m = new THREE.Mesh(bg, HOLE()); m.renderOrder = 3; m.receiveShadow = true; group.add(m); }
+  const sg = new THREE.BufferGeometry(), n = new Float32Array(skin.p.length); for (let i = 1; i < n.length; i += 3) n[i] = 1;
+  sg.setAttribute('position', new THREE.Float32BufferAttribute(skin.p, 3));
+  sg.setAttribute('normal', new THREE.BufferAttribute(n, 3));
+  sg.setAttribute('aPotA', new THREE.Float32BufferAttribute(skin.A, 4));
+  sg.setAttribute('aPotP', new THREE.Float32BufferAttribute(skin.P, 4));
+  sg.setAttribute('aPotB', new THREE.Float32BufferAttribute(skin.B, 4));
+  sg.setAttribute('aPotS', new THREE.Float32BufferAttribute(skin.S, 4));
+  sg.setAttribute('aPotQ', new THREE.Float32BufferAttribute(skin.Q, 1));
+  sg.setIndex(skin.i); sg.computeBoundingSphere();
+  const m = new THREE.Mesh(sg, SKIN()); m.receiveShadow = true; m.renderOrder = 1; group.add(m);
+  const lg = lip.build(true), bg = bits.build(false);
+  if (lg) { const k = new THREE.Mesh(lg, BITS()); k.receiveShadow = true; group.add(k); }
+  if (bg) { const k = new THREE.Mesh(bg, BITS()); k.receiveShadow = true; group.add(k); }
 }
-let lidM = null, holeM = null;
-// (in the see-through pass, so it comes after all that's solid and the paint on the road; it draws nothing, it only
-// pushes the depth back to the far plane inside the outline wherever the road is what's in front)
-function LID() {
-  return lidM || (lidM = new THREE.ShaderMaterial({
-    vertexShader: 'void main(){ gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.); }',
-    fragmentShader: 'void main(){ gl_FragDepth = 1.; gl_FragColor = vec4(0.); }',
-    colorWrite: false, depthWrite: true, depthFunc: THREE.LessEqualDepth, transparent: true,
-  }));
-}
-// (stock, so it's painted like everything else, beta/gfx/repaint.js; in the see-through pass after the lid, opaque)
-function HOLE() { return holeM || (holeM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, transparent: true, depthWrite: true })); }
+let skinM = null, bitsM = null;
+// (stock, so it's painted like everything else, beta/gfx/repaint.js; it pulls towards the eye so it never fights the road at range)
+function SKIN() { if (!skinM) { skinM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }); skinM.userData.pothole = true; skinM.customProgramCacheKey = () => 'pothole'; } return skinM; }
+function BITS() { return bitsM || (bitsM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); }
 
 // ---------------------------------------------------------------- rubbish
 const BAG = [[0.92, 0.92, 0.9], [0.92, 0.92, 0.9], [0.85, 0.35, 0.55], [0.25, 0.4, 0.75], [0.1, 0.1, 0.1], [0.3, 0.6, 0.35]];

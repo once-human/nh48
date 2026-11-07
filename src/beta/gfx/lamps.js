@@ -58,8 +58,14 @@ export class Lamps {
     C.w = (G.interiors && G.interiors.inside) ? 0 : night;
     PU.lampY.value = F.y || 0;
     // your own light: whichever of the two is on, as the game aims it
-    const L = G.lights && G.lights.torch && G.lights.torch.intensity > 0 ? G.lights.torch : P.headlight && P.headlight.intensity > 0 ? P.headlight : null;
-    if (L && !(G.interiors && G.interiors.inside)) { L.getWorldPosition(p); L.target.getWorldPosition(t); t.sub(p).normalize(); PU.headP.value.set(p.x, p.y, p.z, L === P.headlight ? 1.5 : 1); PU.headD.value.set(t.x, t.y, t.z, Math.cos(L.angle)); }
-    else PU.headP.value.w = 0;
+    // (a bicycle has none; a car, a bus or a tempo two, one from each housing; a two-wheeler or an auto one)
+    const S = !P.onFoot && P.spec, cycle = S && S.name === 'Bicycle';
+    const L = G.lights && G.lights.torch && G.lights.torch.intensity > 0 ? G.lights.torch : !cycle && P.headlight && P.headlight.intensity > 0 ? P.headlight : null;
+    if (L && !(G.interiors && G.interiors.inside)) {
+      L.getWorldPosition(p); L.target.getWorldPosition(t); t.sub(p).normalize();
+      PU.headP.value.set(p.x, p.y, p.z, L === P.headlight ? 1.5 : 1); PU.headD.value.set(t.x, t.y, t.z, Math.cos(L.angle));
+      const pair = L === P.headlight && S && !S.two && S.name !== 'Auto rickshaw', h = pair ? S.W*.36 : 0, l = Math.hypot(t.x, t.z) || 1;
+      PU.headS.value.set(-t.z/l*h, 0, t.x/l*h, pair ? 1 : 0);
+    } else PU.headP.value.w = 0;
   }
 }

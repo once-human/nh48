@@ -41,13 +41,16 @@ export const PU = {
   uStyle2: { value: STYLE_PARAMS.map(p => new THREE.Vector4(p[4], p[5], p[7], p[8])) },
   uTime: GU.uTime, uNight: GU.uNight, uWindowLit: GU.uWindowLit, uShopsOpen: GU.uShopsOpen, uWet: GU.uWet,
   uReal: { value: 0 }, uMarks: { value: 1 }, uTaps: { value: 2 }, uSoft: { value: 1 },
-  tLamp: { value: null }, lampC: { value: new THREE.Vector4(0, 0, 1/256, 0) }, lampY: { value: 0 }, headP: { value: new THREE.Vector4() }, headD: { value: new THREE.Vector4(1, 0, 0, .85) },
+  tLamp: { value: null }, lampC: { value: new THREE.Vector4(0, 0, 1/256, 0) }, lampY: { value: 0 }, headP: { value: new THREE.Vector4() }, headD: { value: new THREE.Vector4(1, 0, 0, .85) }, headS: { value: new THREE.Vector4() },
 };
 // the light of lamps and your own headlight or torch on a surface (gfx/lamps.js keeps it up to date)
-export const LAMP = `uniform sampler2D tLamp; uniform vec4 lampC, headP, headD; uniform float lampY;
+export const LAMP = `uniform sampler2D tLamp; uniform vec4 lampC, headP, headD, headS; uniform float lampY;
 vec3 lampAt(vec3 w, vec3 n){ vec3 c = vec3(0.); if (lampC.w > 0.) { vec2 q = (w.xz - lampC.xy)*lampC.z + .5;
     c = vec3(1., .72, .44)*.95*texture(tLamp, q).r*(.5 + .5*max(n.y, 0.))*(1. - smoothstep(8., 13., w.y - lampY))*lampC.w; }
-  if (headP.w > 0.) { vec3 d = w - headP.xyz; float r = length(d); d /= r; c += vec3(1., .93, .78)*headP.w*3.*smoothstep(headD.w, headD.w + .1, dot(d, headD.xyz))*max(dot(n, -d), .2)/(1. + r*r*.035); }
+  if (headP.w > 0.) { float both = step(.5, headS.w); for (float s = -1.; s < 1.5; s += 2.) { if (s > 0. && both < .5) break;
+      // (a car throws two beams, one from each lamp, a little toed out: up close they're two pools, far off they meet)
+      vec3 o = headP.xyz + headS.xyz*s*both, d = w - o; float r = length(d); d /= r; vec3 a = normalize(headD.xyz + headS.xyz*s*both*.05);
+      c += vec3(1., .93, .78)*headP.w*(both > .5 ? 1.9 : 3.)*smoothstep(headD.w, headD.w + .1, dot(d, a))*max(dot(n, -d), .2)/(1. + r*r*.035); } }
   return c; }
 // sunlight on something pale: the sun can go up to 1.25, so white went past the top and lost its carving. Bright colours are
 // eased into what's left instead, keeping their hue; everything darker than the knee is untouched

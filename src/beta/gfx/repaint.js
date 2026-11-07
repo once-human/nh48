@@ -20,7 +20,13 @@ attribute float aGlow; varying float vGlow;
 #ifdef FADE
 varying float vFd;
 #endif
+#ifdef POTHOLE
+attribute vec4 aPotA, aPotP, aPotB, aPotS; attribute float aPotQ; varying vec4 vPotA, vPotP, vPotB, vPotS; varying float vPotQ;
+#endif
 void main(){
+#ifdef POTHOLE
+  vPotA = aPotA; vPotP = aPotP; vPotB = aPotB; vPotS = aPotS; vPotQ = aPotQ;
+#endif
 #if defined(FADE) && defined(USE_INSTANCING)
   vFd = length((modelMatrix*instanceMatrix*vec4(0., 0., 0., 1.)).xz - cameraPosition.xz);
 #endif
@@ -73,6 +79,16 @@ float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.05 + .002*vZ), 1
 uniform vec4 uFade; varying float vFd;
 ${DITHER}
 #endif
+#ifdef POTHOLE
+// a pothole, on the skin laid over it (beta/world/potholes.js): follow the eye's ray down into the bowl and paint what it lands on.
+// The outline is the same sum of waves the wheels feel, so the floor and its walls meet the skin's edge exactly
+varying vec4 vPotA, vPotP, vPotB, vPotS; varying float vPotQ;
+float potE(vec2 l){ float a = atan(l.y, l.x); return vPotS.x*(1. + vPotA.x*sin(2.*a + vPotP.x) + vPotA.y*sin(3.*a + vPotP.y) + vPotA.z*sin(4.*a + vPotP.z) + vPotA.w*sin(5.*a + vPotP.w) + vPotB.x*sin(7.*a + vPotB.y)); }
+vec2 potL(vec3 p){ vec2 d = p.xz - vPotB.zw; return vec2(d.x*vPotS.z + d.y*vPotS.w, (-d.x*vPotS.w + d.y*vPotS.z)/vPotQ); }
+float potF(vec3 p){ vec2 l = potL(p); return length(l)/potE(l); }
+float potStone(vec2 q){ vec2 i = floor(q), f = fract(q); float m = 0.; for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 g = vec2(float(x), float(y)), r = texture2D(tNoise, (i + g + .5)/16.).rg; float k = texture2D(tNoise, (i + g + 3.5)/16.).b, d = length(g + r - f); m = max(m, (.42 + .3*k - d)*step(.35, k)); } return max(m, 0.); }
+float potFloor(vec3 p){ float f = potF(p); if (f >= 1.) return .05; float g = f*f*f*f*f; return -vPotS.y*(1. - g) + (1. - g)*.018*potStone(p.xz*34.); }
+#endif
 void main(){
 #ifdef FADE
   { float h = ditherH(), i = uFade.x > 0. ? clamp((vFd - uFade.x + uFade.y)/uFade.y, 0., 1.) : 1., o = clamp((vFd - uFade.z + uFade.w)/uFade.w, 0., 1.); if (h >= i || h < o) discard; }
@@ -97,6 +113,21 @@ void main(){
   if (!gl_FrontFacing) n = -n;
 #endif
 #endif
+#ifdef POTHOLE
+  vec3 rd = normalize(vW - cameraPosition), hit = vW; float tMax = (vPotS.y + .02)/max(-rd.y, .03), t0 = 0., t1 = tMax;
+  for (int i = 1; i <= 14; i++) { float t = tMax*float(i)/14.; vec3 q = vW + rd*t; if (q.y < potFloor(q)) { t1 = t; break; } t0 = t; }
+  for (int i = 0; i < 5; i++) { float t = (t0 + t1)*.5; vec3 q = vW + rd*t; if (q.y < potFloor(q)) t1 = t; else t0 = t; }
+  hit = vW + rd*t1;
+  float dp = clamp(-hit.y/vPotS.y, 0., 1.), ep = .006, Fh = potFloor(hit);
+  n = normalize(vec3(potFloor(hit - vec3(ep, 0., 0.)) - potFloor(hit + vec3(ep, 0., 0.)), 2.*ep, potFloor(hit - vec3(0., 0., ep)) - potFloor(hit + vec3(0., 0., ep))));
+  float stn = potStone(hit.xz*34.), grain = texture2D(tNoise, hit.xz*2.3).r*.6 + texture2D(tNoise, hit.xz*.71).g*.4;
+  // down the hole: the tar's broken edge, its black layer, the brown base course, dirt and stones at the bottom
+  c = dp < .1 ? vec3(.34, .33, .31) : dp < .32 ? vec3(.12, .12, .125) : mix(vec3(.26, .215, .165), vec3(.17, .145, .12), smoothstep(.32, .86, dp));
+  c *= .72 + .56*grain; c = mix(c, vec3(.42, .4, .37)*(.7 + .6*grain), smoothstep(.04, .16, stn)*smoothstep(.55, .85, dp));
+  // the rim's shadow: from where the ray landed, does the way to the sun clear the outline?
+  vec3 sq = hit + sunDir*(-hit.y/max(sunDir.y, .08)); float potSun = 1. - smoothstep(.97, 1.03, potF(sq));
+  c *= .3 + .7*(1. - dp)*(1. - dp) + .12*(1. - potSun);  // light doesn't reach far down
+#endif
   vec3 b = c;
   float e = texture2D(tNoise, gl_FragCoord.xy*.11/16.).r - .5;
   if (uInside > .5) {
@@ -104,6 +135,9 @@ void main(){
   } else {
     float pe = e*(1. - uReal), ndl = dot(n, sunDir), lit = sunOn(ndl, pe*.12, .0, .14);
     float sh = (shadowOn > .5 && lit > 0.) ? shadeOf(shadowAt(vW, n), pe*.3) : 1., L = lit*sh*dayK;
+#ifdef POTHOLE
+    L *= potSun;
+#endif
     c = mix(b*shadeCol*(.92 + .16*max(n.y, 0.)) + b*.04*dayK, sunRoll(b*sunCol), L) + b*lampAt(vW, n);
 #ifdef STANDARD
     // what shines catches the sky at a glance; metal is mostly that
@@ -125,9 +159,9 @@ void main(){
 }`;
 
 function paint(m, sh) {
-  const lit = m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial, head = (lit ? '#define PAINT_LIT\n' : '') + (sh.uniforms.tMask ? '#define MASK\n' : '') + (m.userData.glow ? '#define GLOW\n' : '') + (m._fadeU ? '#define FADE\n' : '');
+  const lit = m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial, head = (lit ? '#define PAINT_LIT\n' : '') + (sh.uniforms.tMask ? '#define MASK\n' : '') + (m.userData.glow ? '#define GLOW\n' : '') + (m._fadeU ? '#define FADE\n' : '') + (m.userData.pothole ? '#define POTHOLE\n' : '');
   sh.vertexShader = head + VS; sh.fragmentShader = head + FS;
-  Object.assign(sh.uniforms, { uReal: PU.uReal, uTaps: PU.uTaps, uSoft: PU.uSoft, sunDir: PU.sunDir, sunCol: PU.sunCol, shadeCol: PU.shadeCol, fogCol: PU.fogCol, fogDensity: PU.fogDensity, tNoise: PU.tNoise, shadowTex: PU.shadowTex, shadowMat: PU.shadowMat, shadowTexel: PU.shadowTexel, shadowOn: PU.shadowOn, dayK: PU.dayK, uInside: inside, tLamp: PU.tLamp, lampC: PU.lampC, lampY: PU.lampY, headP: PU.headP, headD: PU.headD });
+  Object.assign(sh.uniforms, { uReal: PU.uReal, uTaps: PU.uTaps, uSoft: PU.uSoft, sunDir: PU.sunDir, sunCol: PU.sunCol, shadeCol: PU.shadeCol, fogCol: PU.fogCol, fogDensity: PU.fogDensity, tNoise: PU.tNoise, shadowTex: PU.shadowTex, shadowMat: PU.shadowMat, shadowTexel: PU.shadowTexel, shadowOn: PU.shadowOn, dayK: PU.dayK, uInside: inside, tLamp: PU.tLamp, lampC: PU.lampC, lampY: PU.lampY, headP: PU.headP, headD: PU.headD, headS: PU.headS });
   if (m._fadeU) sh.uniforms.uFade = m._fadeU;
 }
 const stock = (m) => m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial || m.isMeshBasicMaterial || m.isLineBasicMaterial;

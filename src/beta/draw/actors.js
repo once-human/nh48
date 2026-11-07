@@ -13,7 +13,7 @@ const linear = (m) => { for (const s of [m]) s.fragmentShader = s.fragmentShader
 const lit = (m) => {
   const fs = m.fragmentShader.replace('out vec4 fragColor;', `uniform float dayK;\n${LAMP}\nout vec4 fragColor;`).replace('float L = lit*sh;', 'float L = lit*sh*dayK;').replace('+ vec3(.025, .03, .045);', '+ vec3(.025, .03, .045)*dayK;').replace('vec3 cl = base*sunCol;', 'vec3 cl = sunRoll(base*sunCol);').replace('if (k == 13) c = mix(c, base*1.05, .7);', 'c += base*lampAt(w, n);\n  if (k == 13) c = mix(c, base*1.05, .7);');
   if (!fs.includes('lampAt(w, n)') || !fs.includes('sunRoll(base') || !fs.includes('lit*sh*dayK')) throw new Error('far crowd: the light lines have moved');
-  m.fragmentShader = fs; for (const k of ['tLamp', 'lampC', 'headP', 'headD', 'lampY', 'dayK', 'shadeCol', 'sunCol']) m.uniforms[k] = PU[k];
+  m.fragmentShader = fs; for (const k of ['tLamp', 'lampC', 'headP', 'headD', 'headS', 'lampY', 'dayK', 'shadeCol', 'sunCol']) m.uniforms[k] = PU[k];
   return m;
 };
 const CAP = 500;
