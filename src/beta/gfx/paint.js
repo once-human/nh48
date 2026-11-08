@@ -603,4 +603,7 @@ export let paint = null;
 // the same few pixels for everyone, in a fine even scatter: a near model fading out over a band at the edge of its range
 // leaves exactly the pixels the far one fading in takes (keep h above the fade on one side, below it on the other), so
 // nothing's ever drawn twice or missing while one swaps for the other
-export const DITHER = `float ditherH(){ return fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715)))); }`;
+// (no blending between versions, ever: Onkar's call. Every hand-over, near model to far, one detail level to the next,
+// the edge of a range, used to dissolve pixel by pixel over a stretch; with one number for every pixel each is a clean
+// swap in the middle of that stretch, the one going and the one coming at the same spot, so nothing doubles or is missing)
+export const DITHER = `float ditherH(){ return .5; }`;

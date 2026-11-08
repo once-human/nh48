@@ -398,6 +398,11 @@ const PATCHES = {
     ["if (far || (k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21)) {", "const seen = !far && G.crowd && G.crowd.inView && Math.hypot(k.p.x - P.x, k.p.z - P.z) < 60 && (G.crowd.inView(k.p.x, k.p.z) || Math.hypot(k.p.x - P.x, k.p.z - P.z) < 10);\n      if (far || !seen && ((k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21))) {"],
   ],
   [S('people/peds.js')]: [
+    // nobody comes out of thin air where you're looking: the groups outside shops and clubs, and the stall vendors,
+    // only ever appear out of view (they stand still, so they can't walk in from far off like the rest)
+    ["avoidView(gx, gz) && Math.hypot(gx - px, gz - pz) < 110) return;", "avoidView(gx, gz)) return;"],
+    ["avoidView(gx, gz) && Math.hypot(gx - px, gz - pz) < 110) continue;", "avoidView(gx, gz)) continue;"],
+    ["if (d > 110 || d < 30 || (this.g_inView && this.g_inView(x, z) && d < 100)) continue;", "if (d > 110 || d < 30 || (this.g_inView && this.g_inView(x, z))) continue;"],
     // people are seen from far off and never come out of thin air: in view, they start out at 200-270 m (a figure in the
     // crowd) and walk in; out of view, close by as before. They stay till nearly 300 m (340 while you can see them), and
     // there are a few more of them, so the street round you is as busy as it was with the bigger ring
@@ -480,6 +485,9 @@ const PATCHES = {
     ["if (o.signals && !o.emergency && G.traffic.signals) {", "if (o.careful && !o.signals && G.traffic.signals) { const n = W.graph.nearest(v.x + hx * 14, v.z + hz * 14, 10), node = n && W.graph.nodes[n.s < n.e.len / 2 ? n.e.a : n.e.b]; if (node && node.signal && Math.hypot(node.x - v.x, node.z - v.z) < 24 && G.traffic.signals.stateForAngle(node.i, v.th) === 'r') target = Math.min(target, 6); }\n    if (o.signals && G.traffic.signals) {"],
   ],
   [S('traffic/traffic.js')]: [
+    // a vehicle you can see appears no nearer than 220 m (it used to be 140: a car arriving out of nothing down the road)
+    ["const hidden = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 140 : null;\n        this.spawn(px + hx * look", "const hidden = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 220 : null;\n        this.spawn(px + hx * look"],
+    ["const hidden = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 140 : null;\n        this.spawn(px, pz,", "const hidden = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 220 : null;\n        this.spawn(px, pz,"],
     ["import { TRAFFIC, curve } from '../world/activity.js';", "import { TRAFFIC, curve } from '../world/activity.js';\nimport { view, ranged } from '../beta/world/view.js';\nimport { reduced } from '../beta/vehicles/lod.js';\nimport { visOf } from '../beta/draw/skin.js';"],
     // a rider getting their full body (or giving it back) fades in over half a second: through it the vehicle is drawn
     // without its baked rider and with it, the baked one dropping exactly the pixels the real one has (vehmat.js aDis)
