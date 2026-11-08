@@ -81,7 +81,7 @@ function withFront(m, b, ax) { if (b.front) m.body.userData.front = { r: b.front
 export function addRider(b, x, y, z, opts = {}) {
   const lean = opts.lean ?? 0.15;
   const shirt = opts.shirt || [0.8, 0.8, 0.8], pants = opts.pants || [0.18, 0.2, 0.28];
-  const shirtP = opts.inst ? 2 : 0, headP = opts.inst ? 3 : 0;
+  const shirtP = opts.inst ? 2 : 0, headP = opts.inst && !opts.fixedHead ? 3 : 0;
   const helmet = opts.helmet;
   const fx = opts.footX ?? x + 0.42, fy = opts.footY ?? y - 0.42;
   for (const s of [-1, 1]) {
@@ -120,6 +120,15 @@ export function addRider(b, x, y, z, opts = {}) {
     b.addGeo(G.sph2, M(hdx - 0.02, hdy + 0.045, z, 0.108, 0.085, 0.102), opts.hair || HAIR, 0, headP);
   }
 }
+// someone at the wheel of a car, sat back in the driver's seat (on the right: these are right-hand drive), hands on
+// the wheel, feet down to the pedals. The traffic's cars all carry one (their shirt is the instance's own colour); the
+// car whose door you open has one too, till you haul them out (beta/vehicles/cardoor.js)
+export function addDriver(b, kind, inst, shirt) {
+  const c = carSpec(kind), seat = kind === 'hatch' ? [-0.2, 0.57, 0.36] : kind === 'suv' ? [-0.3, 0.7, 0.38] : [c.L/2 - c.hood - 1.25, c.sill + 0.33, c.W*0.22];
+  const hx = seat[0] - 0.15, hy = seat[1] + 0.04, z = seat[2];
+  addRider(b, hx, hy, z, { lean: -0.1, inst, fixedHead: true, shirt: shirt || [1, 1, 1], pants: [0.2, 0.2, 0.24], handX: hx + 0.5, handY: hy + 0.36, handW: 0.17, footX: hx + 0.86, footY: c.sill + 0.08 });
+}
+export function driverGeo(kind, shirt) { const b = newB(false); addDriver(b, kind, false, shirt); return b.build(); }
 // pillion rider (women often sit side-saddle)
 function addPillion(b, x, y, z, sideSaddle, inst) {
   if (!sideSaddle) { addRider(b, x, y, z, { lean: 0.05, inst, handX: x + 0.3, handY: y + 0.3, handW: 0.25, footX: x + 0.25, footY: y - 0.38 }); return; }
@@ -1269,6 +1278,7 @@ export function buildCar(kind0, opts = {}) {
   if (kind === 'taxi') {
     box(b, -0.15, spec.H, -0.25, 0.15, spec.H + 0.12, 0.25, [0.98, 0.85, 0.15], 0, 0.4);
   }
+  if (opts.driver) addDriver(b, kind0, true);
   if (V ? V.rails : kind === 'suv') {
     // roof rails, along the roof whatever its length
     const r0 = spec.roofR + 0.12, r1 = spec.roofF - 0.1, zr = spec.W/2 - 0.28;

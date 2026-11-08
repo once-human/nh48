@@ -15,7 +15,7 @@ import { ikLeg } from '../game/fists.js';
 import { free } from './mount.js';
 import { routeTo, setRoute, follow, walkTime, tooFar, calledOff } from './route.js';
 import { grip } from './fit.js';
-import { carSpec, doorOf, baseOf } from './models.js';
+import { carSpec, doorOf, baseOf, driverGeo } from './models.js';
 
 const _t = new THREE.Vector3(), _p = new THREE.Vector3(), _r = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _f = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -193,8 +193,15 @@ function showStandIn(P, E) {
   if (v.cockpit) v.cockpit.group.visible = true;
   // (the parked rows only re-cull once the camera's moved 6 m: made to now, or the parked car stays drawn round this one)
   if (E.offer.kind === 'parked') { for (const it of src.items) it.off = true; P.W._propX = undefined; if (window.__post && window.__post.shadows) window.__post.shadows.dirty = true; }
-  else if (E.offer.kind === 'traffic') src.hideBody = true;
+  else if (E.offer.kind === 'traffic') {
+    src.hideBody = true;
+    // whoever's driving it is still in it as the door opens, at the wheel, till you haul them out
+    if (!E.pulled && !v._drv && v.bodyMesh && v.bodyMesh.parent) {
+      try { const m = new THREE.Mesh(driverGeo(E.kind, src.colB), DRVM || (DRVM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 }))); m.castShadow = true; v.bodyMesh.parent.add(m); v._drv = m; } catch (e) { /* an empty seat */ }
+    }
+  }
 }
+let DRVM = null;
 function dropStandIn(P, E) {
   const v = E.pre; if (!v || P.cur === v) return;
   if (P.doors) for (const R of P.doors.slice()) if (R.veh === v) unhang(P, R);
@@ -419,6 +426,7 @@ Pilot.prototype.tickEnter = function (dt) {
       if (pull > 0) { const bk = Fv.at(hipX + 0.1, 0, s*(hwH + 0.38 + 0.35*sm(pull)), _a); F.x = bk.x; F.z = bk.z; put(H, _t.set(F.x, F.y, F.z), F.yaw); }
       if (t > 0.62 && !E.pulled) {
         E.pulled = true; this.audio?.thud?.(0.4);
+        if (E.veh && E.veh._drv) { E.veh._drv.parent && E.veh._drv.parent.remove(E.veh._drv); E.veh._drv.geometry.dispose(); E.veh._drv = null; }
         const dr = this.spawnAngryDriver ? this.spawnAngryDriver(E.offer.o) : null;
         if (dr) { dr.fallen = 1.6; dr.react = 3; }
         E.offer.drv = dr || null;
