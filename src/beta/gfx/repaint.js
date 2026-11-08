@@ -82,12 +82,19 @@ ${DITHER}
 #ifdef POTHOLE
 // a pothole, on the skin laid over it (beta/world/potholes.js): follow the eye's ray down into the bowl and paint what it lands on.
 // The outline is the same sum of waves the wheels feel, so the floor and its walls meet the skin's edge exactly
-varying vec4 vPotA, vPotP, vPotB, vPotS; varying float vPotQ;
-float potE(vec2 l){ float a = atan(l.y, l.x); return vPotS.x*(1. + vPotA.x*sin(2.*a + vPotP.x) + vPotA.y*sin(3.*a + vPotP.y) + vPotA.z*sin(4.*a + vPotP.z) + vPotA.w*sin(5.*a + vPotP.w) + vPotB.x*sin(7.*a + vPotB.y)); }
+varying vec4 vPotA, vPotP, vPotB, vPotS; varying float vPotQ; uniform float uWet; uniform vec3 skyCol;
+// (its edge crumbles in: a few centimetres bitten out of it here and there, finer than the outline the wheels feel)
+float potE(vec2 l){ float a = atan(l.y, l.x); float bite = texture2D(tNoise, vec2(a*1.9 + vPotB.z*.37, vPotB.w*.29)).r*.6 + texture2D(tNoise, vec2(a*5.3 + vPotB.w*.11, vPotB.z*.17)).g*.4;
+  return vPotS.x*(1. + vPotA.x*sin(2.*a + vPotP.x) + vPotA.y*sin(3.*a + vPotP.y) + vPotA.z*sin(4.*a + vPotP.z) + vPotA.w*sin(5.*a + vPotP.w) + vPotB.x*sin(7.*a + vPotB.y))*(1. - .09*bite); }
 vec2 potL(vec3 p){ vec2 d = p.xz - vPotB.zw; return vec2(d.x*vPotS.z + d.y*vPotS.w, (-d.x*vPotS.w + d.y*vPotS.z)/vPotQ); }
 float potF(vec3 p){ vec2 l = potL(p); return length(l)/potE(l); }
 float potStone(vec2 q){ vec2 i = floor(q), f = fract(q); float m = 0.; for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 g = vec2(float(x), float(y)), r = texture2D(tNoise, (i + g + .5)/16.).rg; float k = texture2D(tNoise, (i + g + 3.5)/16.).b, d = length(g + r - f); m = max(m, (.42 + .3*k - d)*step(.35, k)); } return max(m, 0.); }
-float potFloor(vec3 p){ float f = potF(p); if (f >= 1.) return .05; float g = f*f*f*f*f; return -vPotS.y*(1. - g) + (1. - g)*.018*potStone(p.xz*34.); }
+// broken pieces of the top layer lying in the bottom: flat-topped, a couple of centimetres thick, each its own
+float potChunk(vec2 q){ vec2 i = floor(q), f = fract(q); float best = 9., k = 0.; for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 g = vec2(float(x), float(y)), r = texture2D(tNoise, (i + g + 7.5)/16.).rg; float d = max(abs(g.x + r.x - f.x), abs(g.y + r.y - f.y)*1.3); if (d < best) { best = d; k = texture2D(tNoise, (i + g + 11.5)/16.).b; } } return step(.62, k)*smoothstep(.36, .3, best); }
+float potFloor(vec3 p){ float f = potF(p); if (f >= 1.) return .05;
+  // a step down through the tar (3 cm, nearly sheer), then the brown base falling away to the floor, stones and slabs on it
+  float tar = min(.035, vPotS.y*.4), ledge = smoothstep(1., .955, f), g = f*f*f*f*f*f, base = (1. - g);
+  return -tar*ledge - (vPotS.y - tar)*base*smoothstep(.97, .82, f) + base*(.018*potStone(p.xz*34.) + .012*potStone(p.xz*13.) + .022*potChunk(p.xz*9.)); }
 #endif
 void main(){
 #ifdef FADE
@@ -120,10 +127,16 @@ void main(){
   hit = vW + rd*t1;
   float dp = clamp(-hit.y/vPotS.y, 0., 1.), ep = .006, Fh = potFloor(hit);
   n = normalize(vec3(potFloor(hit - vec3(ep, 0., 0.)) - potFloor(hit + vec3(ep, 0., 0.)), 2.*ep, potFloor(hit - vec3(0., 0., ep)) - potFloor(hit + vec3(0., 0., ep))));
-  float stn = potStone(hit.xz*34.), grain = texture2D(tNoise, hit.xz*2.3).r*.6 + texture2D(tNoise, hit.xz*.71).g*.4;
-  // down the hole: the tar's broken edge, its black layer, the brown base course, dirt and stones at the bottom
-  c = dp < .1 ? vec3(.34, .33, .31) : dp < .32 ? vec3(.12, .12, .125) : mix(vec3(.26, .215, .165), vec3(.17, .145, .12), smoothstep(.32, .86, dp));
+  float stn = potStone(hit.xz*34.) + potStone(hit.xz*13.)*.7, grain = texture2D(tNoise, hit.xz*2.3).r*.6 + texture2D(tNoise, hit.xz*.71).g*.4, chk = potChunk(hit.xz*9.);
+  // down the hole: the tar's broken edge, its black layer and the pale line under it, the brown base course, dirt and stones at the bottom
+  float tarD = min(.035, vPotS.y*.4)/vPotS.y;
+  c = dp < .08 ? vec3(.34, .33, .31) : dp < tarD ? vec3(.11, .11, .115) : dp < tarD + .06 ? vec3(.38, .35, .3) : mix(vec3(.27, .22, .165), vec3(.17, .145, .12), smoothstep(tarD, .86, dp));
   c *= .72 + .56*grain; c = mix(c, vec3(.42, .4, .37)*(.7 + .6*grain), smoothstep(.04, .16, stn)*smoothstep(.55, .85, dp));
+  c = mix(c, vec3(.1, .1, .105)*(.8 + .4*grain), chk*smoothstep(.6, .8, dp));     // (a broken slab of tar down there)
+  // rain stands in it: a still pool across the bottom, the sky in it, darker round its edge
+  float pool = clamp(uWet, 0., 1.)*vPotS.y*.55, lev = -vPotS.y + pool;
+  if (pool > .004 && hit.y < lev) { float tw = (lev - vW.y)/rd.y; vec3 wp = vW + rd*tw; float fr = pow(1. - max(-rd.y, 0.), 4.);
+    c = mix(vec3(.13, .12, .1), skyCol*.55, .25 + .6*fr)*(1. - .3*smoothstep(.4, 1., potF(wp))); hit = wp; n = vec3(0., 1., 0.); dp = clamp(-hit.y/vPotS.y, 0., 1.); }
   // the rim's shadow: from where the ray landed, does the way to the sun clear the outline?
   vec3 sq = hit + sunDir*(-hit.y/max(sunDir.y, .08)); float potSun = 1. - smoothstep(.97, 1.03, potF(sq));
   c *= .3 + .7*(1. - dp)*(1. - dp) + .12*(1. - potSun);  // light doesn't reach far down
@@ -161,7 +174,7 @@ void main(){
 function paint(m, sh) {
   const lit = m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial, head = (lit ? '#define PAINT_LIT\n' : '') + (sh.uniforms.tMask ? '#define MASK\n' : '') + (m.userData.glow ? '#define GLOW\n' : '') + (m._fadeU ? '#define FADE\n' : '') + (m.userData.pothole ? '#define POTHOLE\n' : '');
   sh.vertexShader = head + VS; sh.fragmentShader = head + FS;
-  Object.assign(sh.uniforms, { uReal: PU.uReal, uTaps: PU.uTaps, uSoft: PU.uSoft, sunDir: PU.sunDir, sunCol: PU.sunCol, shadeCol: PU.shadeCol, fogCol: PU.fogCol, fogDensity: PU.fogDensity, tNoise: PU.tNoise, shadowTex: PU.shadowTex, shadowMat: PU.shadowMat, shadowTexel: PU.shadowTexel, shadowOn: PU.shadowOn, dayK: PU.dayK, uInside: inside, tLamp: PU.tLamp, lampC: PU.lampC, lampY: PU.lampY, headP: PU.headP, headD: PU.headD, headS: PU.headS });
+  Object.assign(sh.uniforms, { uReal: PU.uReal, uTaps: PU.uTaps, uSoft: PU.uSoft, sunDir: PU.sunDir, sunCol: PU.sunCol, shadeCol: PU.shadeCol, fogCol: PU.fogCol, fogDensity: PU.fogDensity, tNoise: PU.tNoise, shadowTex: PU.shadowTex, shadowMat: PU.shadowMat, shadowTexel: PU.shadowTexel, shadowOn: PU.shadowOn, dayK: PU.dayK, uInside: inside, tLamp: PU.tLamp, lampC: PU.lampC, lampY: PU.lampY, headP: PU.headP, headD: PU.headD, headS: PU.headS, uWet: PU.uWet, skyCol: PU.skyCol });
   if (m._fadeU) sh.uniforms.uFade = m._fadeU;
 }
 const stock = (m) => m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial || m.isMeshBasicMaterial || m.isLineBasicMaterial;
