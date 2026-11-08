@@ -79,7 +79,7 @@ function fistOf(H) {
 export function ragOn(p) { return !!(p && p._rag); }
 // start: the points where the body's bones are this moment, moving as the body was
 export function startRag(p, o = {}) {
-  const H = p.body && p.body.H; if (!H || !H.root) return null;
+  const H = o.H || (p.body && p.body.H); if (!H || !H.root) return null;
   H.holder.updateMatrixWorld(true);
   const R = { p: new Float64Array(N*3), q: new Float64Array(N*3), t: 0, acc: 0, still: 0, sleep: false, off: {}, car: null, gy: new Float64Array(N), out: -1, kmh: o.kmh || 0 };
   const hb = bone(H, 'Head');
@@ -102,7 +102,7 @@ export function startRag(p, o = {}) {
     R.q[i*3] = R.p[i*3] - ux*DT; R.q[i*3 + 1] = R.p[i*3 + 1] - uy*DT; R.q[i*3 + 2] = R.p[i*3 + 2] - uz*DT;
   }
   // limp: the knees give a touch forward, so nobody stands there stiff as a post until something knocks them
-  const fwd = _f.set(Math.cos(p.yaw || 0), 0, Math.sin(p.yaw || 0));
+  const fwd = _f.set(Math.cos(o.yaw ?? p.yaw ?? 0), 0, Math.sin(o.yaw ?? p.yaw ?? 0));
   for (const k of [11, 15]) { R.p[k*3] += fwd.x*0.03; R.p[k*3 + 2] += fwd.z*0.03; }
   if (o.V) { const V = o.V; R.car = { V, S: o.S, H: o.H || 1.4, tall: !!o.tall, top: o.top, x: V.x, z: V.z, th: V.th }; }
   p._rag = R; p._slide = null;
@@ -192,7 +192,7 @@ function step(R, W) {
     }
   }
 }
-function tick(R, dt, W) {
+export function tick(R, dt, W) {
   // the ground under each point, and walls, once a frame (they're not moving)
   const surf = W && W.surf, col = W && W.collision;
   for (let i = 0; i < N; i++) {
@@ -218,7 +218,7 @@ function tick(R, dt, W) {
 }
 
 // ---- the bones, from the points (after the clip's pose: whatever the clip doesn't move, the fingers, keep its pose)
-function pose(p, H) {
+export function pose(p, H) {
   const R = p._rag; H.holder.updateMatrixWorld(true);
   const w = R.out < 0 ? 1 : 1 - smooth((performance.now() - R.out)/(OUT*1000));
   const F = frames(R, FR);

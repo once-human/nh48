@@ -3,7 +3,7 @@
 // throws them along its way. You too: knocked down while running you go over with your speed, not on the spot.
 import { People } from '@orig/people/peds.js';
 import { Pilot } from '@orig/game/pilot.js';
-import { startRag } from '../people/ragdoll.js';
+import { startRag, tick as ragTick, pose as ragPose } from '../people/ragdoll.js';
 
 const upd = People.prototype.update;
 People.prototype.update = function (dt, player, ...a) {
@@ -60,6 +60,26 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
     this._fall = v > 1 ? { vx: vx*0.7, vz: vz*0.7 } : null;
     // falling the way you were going: face it (the clip falls backward), so turn to face where you came from
     if (v > 1) { F.yaw = Math.atan2(-vz, -vx); this.human.holder.rotation.set(0, -F.yaw, 0); }
+  }
+  // your own body goes down the way anyone's does (people/ragdoll.js): thrown with the speed you had, limp, landing
+  // how it lands; as you come round it goes from where you lie into getting up
+  const H = this.human;
+  if (this.downT > 0 && !was && H && !this._rag) {
+    const v = Math.hypot(vx, vz);
+    if (startRag(this, { H, yaw: F.yaw, push: v > 0.5 ? [vx*0.5, vz*0.5, 0.3] : null, vy: v > 0.5 ? 0 : -0.6 })) this._fall = null;
+  }
+  const R = this._rag;
+  if (R) {
+    if (!(this.downT > 0) || this.onFoot === false) {
+      if (R.out < 0) { R.out = performance.now(); const hx = R.p[0] - R.p[6], hz = R.p[2] - R.p[8]; if (Math.hypot(hx, hz) > 0.05) F.yaw = Math.atan2(hz, hx); F.x = R.p[0]; F.z = R.p[2]; }
+      if (performance.now() - R.out > 600 || this.onFoot === false) this._rag = null;
+      else if (H) { H.holder.position.set(F.x, F.y, F.z); H.holder.rotation.set(0, -F.yaw, 0); ragPose(this, H); }
+      return out;
+    }
+    if (!R.sleep) ragTick(R, dt, this.W);
+    F.x = R.p[0]; F.z = R.p[2];
+    if (H) { H.holder.position.set(F.x, F.y, F.z); H.holder.rotation.set(0, -F.yaw, 0); ragPose(this, H); }
+    return out;
   }
   const S = this._fall;
   if (S && this.downT > 0) {
