@@ -47,8 +47,22 @@ function coast(TR, v, dt) {
   const q = v._c, sp = Math.hypot(q.vx, q.vz), W = v.W, k = Math.max(0, sp - 8.5*dt)/(sp || 1);
   q.vx *= k; q.vz *= k; q.w *= Math.max(0, 1 - 1.8*dt);
   v.x += q.vx*dt; v.z += q.vz*dt; v.th += q.w*dt;
-  const c = W.collision && W.collision.resolve(v.x, v.z, v.spec.W/2);
-  if (c) { v.x += c.nx*c.depth; v.z += c.nz*c.depth; const vn = q.vx*c.nx + q.vz*c.nz; if (vn < 0) { q.vx -= vn*c.nx; q.vz -= vn*c.nz; q.vx *= 0.6; q.vz *= 0.6; q.w *= 0.5; } }
+  // solid along its whole length, nose, middle and tail, not just a circle in the middle (its ends went into things)
+  const hx = Math.cos(v.th), hz = Math.sin(v.th), r = v.spec.W/2, reach = Math.max(0, v.spec.L/2 - r);
+  for (const u of reach > 0.2 ? [reach, 0, -reach] : [0]) {
+    const c = W.collision && W.collision.resolve(v.x + hx*u, v.z + hz*u, r);
+    if (c) { v.x += c.nx*c.depth; v.z += c.nz*c.depth; const vn = q.vx*c.nx + q.vz*c.nz; if (vn < 0) { q.vx -= vn*c.nx; q.vz -= vn*c.nz; q.vx *= 0.6; q.vz *= 0.6; q.w = q.w*0.5 + u*vn*0.15; } }
+  }
+  // thrown into a parked one: it wakes as a real car and takes a share of the blow, shoved and spun on where it was hit
+  if (sp > 2.5 && W.parkedList) for (const rp of W.parkedList) {
+    if (rp.taken || Math.abs(rp.x - v.x) > 6 || Math.abs(rp.z - v.z) > 6) continue;
+    const two = rp.kind === 'scooter' || rp.kind === 'bike', d = Math.hypot(rp.x - v.x, rp.z - v.z);
+    if (d > (v.spec.L + (two ? 1.8 : 4))/2*0.7) continue;
+    if (!Vehicle.prototype.wakeParked.call(v, rp)) continue;
+    const G = G0(), D = G && G.player.dropped[G.player.dropped.length - 1];
+    if (D && D.veh && D.st) { const s2 = (rp.x - v.x)*q.vz - (rp.z - v.z)*q.vx; throwCar(D.veh, D.st, q.vx*(two ? 0.85 : 0.55), q.vz*(two ? 0.85 : 0.55), clamp(-s2*0.25, -3, 3)); }
+    q.vx *= two ? 0.85 : 0.55; q.vz *= two ? 0.85 : 0.55;
+  }
   // what it's thrown into goes too
   if (sp > 4) TR.near(v.x, v.z, v.spec.L/2 + 1.5, (o) => {
     if (!o.T || o.isPlayer || o.parked || o._hitT > now() || Math.hypot(o.x - v.x, o.z - v.z) > (v.spec.L + o.T.L)/2*0.8) return;
