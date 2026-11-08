@@ -55,30 +55,65 @@ function frameOf(p, i) {
 }
 // The room behind cell k of wall i: where it starts and ends along the wall (the cell less its pillars), how deep it
 // goes, or null (no business there that you walk into). famAt(i, k): the family of the business in that cell.
-//   At a corner of the building, where the wall before this one has a room in its last cell, the two rooms would share
-// the floor in the corner: the one round the corner keeps it, and this wall's first room starts beyond it. If that
-// leaves too little (the corner room can reach past the first cell), this one has no room: a window in the wall that serves you on the footpath (hatch).
-export function roomSpan(p, i, k, famAt, lvl = 0) {
-  const fam = famAt(i, k);
-  if (!fam) return null;
-  const { F, L } = frameOf(p, i), ns = Math.max(1, Math.floor(L / SHOP_CELL)), cw = L / ns;
-  let a = k * cw + 0.18; const c = (k + 1) * cw - 0.18;
-  if (lvl < 3 && a < CAP.eatery + 0.5) { const s0 = cornerStart(p, i, F, famAt, lvl); if (s0 > a) a = s0; }
-  if (c - a < 1.5) return { a, c, D: 0, F, fam, hatch: true };
-  return { a, c, D: cellDepth(p, F, a, c, fam), F, fam };
+//   The rooms of a building are laid out together, wall by wall in the ring's order, so no two ever share floor: at a
+// corner, round the inside of an L, across a thin building, each room is fitted round the ones already there (made
+// shallower, or narrowed from whichever end the other comes in at, whichever leaves the most floor). If nothing that
+// fits is enough to walk into, that business is a window in the wall that serves the footpath (hatch).
+const ROOMS = new WeakMap();
+export function roomSpan(p, i, k, famAt) {
+  let c = ROOMS.get(p);
+  if (!c || c.f !== famAt) { c = { f: famAt, m: layRooms(p, famAt) }; ROOMS.set(p, c); }
+  return c.m.get(i * 4096 + k) || null;
 }
-function cornerStart(p, i, F, famAt, lvl) {
-  const n = p.length / 2;
-  let j = (i - 1 + n) % n;
-  for (let g = 0; g < 2; g++) { const q = (j + 1) % n; if (Math.hypot(p[2 * q] - p[2 * j], p[2 * q + 1] - p[2 * j + 1]) >= 0.05) break; j = (j - 1 + n) % n; }
-  if (j === i) return 0;
-  const Lp = frameOf(p, j).L; if (Lp <= 2.6) return 0;
-  const nsp = Math.max(1, Math.floor(Lp / SHOP_CELL)), sp = roomSpan(p, j, nsp - 1, famAt, lvl + 1);
-  if (!sp || sp.hatch) return 0;
-  let mu = -1e9, md = 1e9;
-  for (const t of [sp.a, sp.c]) for (const d of [0, -sp.D]) { const P = sp.F.P(t, 0, d), ex = P[0] - F.ax, ez = P[2] - F.az; mu = Math.max(mu, ex * F.tx + ez * F.tz); md = Math.min(md, ex * F.nx + ez * F.nz); }
-  // (round an outside corner it reaches in along this wall; round an inside one it's out of the way)
-  return mu > 0.18 && md < -0.1 ? mu + 0.15 : 0;
+const MIN_D = { counter: 1.0 };
+function layRooms(p, famAt) {
+  const n = p.length / 2, out = new Map(), placed = [];
+  for (let i = 0; i < n; i++) {
+    const { F, L } = frameOf(p, i);
+    if (L <= 2.6) continue;
+    const ns = Math.max(1, Math.floor(L / SHOP_CELL)), cw = L / ns;
+    for (let k = 0; k < ns; k++) {
+      const fam = famAt(i, k); if (!fam) continue;
+      let a = k * cw + 0.18, c = (k + 1) * cw - 0.18, D = cellDepth(p, F, a, c, fam);
+      const minD = MIN_D[fam] || 2.4;
+      let ok = c - a >= 1.5 && D >= minD;
+      for (let pass = 0; pass < 6 && ok; pass++) {
+        const Q = placed.find(q => overlaps(quadOf(F, a, c, D), q));
+        if (!Q) break;
+        // the three ways round it: shallower, or in from the left, or in from the right
+        const o = [];
+        const dS = fit(x => !overlaps(quadOf(F, a, c, x), Q), 0, D, true); if (dS >= minD) o.push([a, c, dS]);
+        const aS = fit(x => !overlaps(quadOf(F, x, c, D), Q), a, c, false); if (c - aS >= 1.5) o.push([aS, c, D]);
+        const cS = fit(x => !overlaps(quadOf(F, a, x, D), Q), a, c, true); if (cS - a >= 1.5) o.push([a, cS, D]);
+        if (!o.length) { ok = false; break; }
+        o.sort((x, y) => (y[1] - y[0]) * y[2] - (x[1] - x[0]) * x[2]);
+        [a, c, D] = o[0];
+      }
+      if (ok && placed.some(q => overlaps(quadOf(F, a, c, D), q))) ok = false;
+      if (!ok) { out.set(i * 4096 + k, { a, c, D: 0, F, fam, hatch: true }); continue; }
+      D = cellDepth(p, F, a, c, fam) < D ? cellDepth(p, F, a, c, fam) : D;
+      out.set(i * 4096 + k, { a, c, D, F, fam });
+      placed.push(quadOf(F, a, c, D));
+    }
+  }
+  return out;
+}
+const quadOf = (F, a, c, D) => [[a, 0], [c, 0], [c, -D], [a, -D]].map(([u, d]) => { const q = F.P(u, 0, d); return [q[0], q[2]]; });
+// two convex quads sharing floor, or within a few centimetres of it (each room has its own wall)
+function overlaps(A, B) {
+  for (const P of [A, B]) for (let q = 0; q < 4; q++) {
+    const [x0, z0] = P[q], [x1, z1] = P[(q + 1) % 4], ax = -(z1 - z0), az = x1 - x0, l = Math.hypot(ax, az) || 1;
+    let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9;
+    for (const [x, z] of A) { const v = (x * ax + z * az) / l; a0 = Math.min(a0, v); a1 = Math.max(a1, v); }
+    for (const [x, z] of B) { const v = (x * ax + z * az) / l; b0 = Math.min(b0, v); b1 = Math.max(b1, v); }
+    if (a1 <= b0 - 0.03 || b1 <= a0 - 0.03) return false;
+  }
+  return true;
+}
+// the furthest x from `from` towards `to` (hi: the biggest x in [lo, hi] that's free; else the smallest) by halving
+function fit(free, lo, hi, biggest) {
+  if (biggest) { if (free(hi)) return hi; if (!free(lo)) return lo - 1; for (let s = 0; s < 18; s++) { const m = (lo + hi) / 2; if (free(m)) lo = m; else hi = m; } return lo; }
+  if (free(lo)) return lo; if (!free(hi)) return hi + 1; for (let s = 0; s < 18; s++) { const m = (lo + hi) / 2; if (free(m)) hi = m; else lo = m; } return hi;
 }
 export const planSeed = (bi, key) => hash2(bi | 0, key | 0) | 0;
 

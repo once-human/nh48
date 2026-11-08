@@ -499,7 +499,7 @@ function shopFront(b, cb, G, F, i, len, shopEdge) {
     const sh = G.shops.get(i * 4096 + k);
     // the shop's own layout (world/shopplan.js): the same one the game walks you into
     const span = sh && roomSpan(G.p, i, k, G.famAt || (G.famAt = famAtOf(G)));
-    const a = span ? span.a : k * cw + 0.18, c = (k + 1) * cw - 0.18;
+    const a = span ? span.a : k * cw + 0.18, c = span ? span.c : (k + 1) * cw - 0.18;
     if (span && span.hatch) { hatch(b, G, F, k * cw, (k + 1) * cw, a, c, oh, sh); continue; }
     const plan = span && shopPlan({ kind: sh[3], cat: sh[1], brand: sh[2], w: c - a, D: span.D, oh, seed: planSeed(G.B.bi, i * 4096 + k), glass: !shopEdge || sh[2] === 'brand' });
     if (plan) {

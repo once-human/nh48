@@ -329,7 +329,7 @@ export function* buildBuildingsChunk(W, C, group) {
         const ns = Math.max(1, Math.floor(L / SHOP_CELL)), cw = L / ns, oh = gh - 0.85;
         for (let k = 0; k < ns; k++) {
           const t = (k + 0.5) * cw;
-          if (k * cw < 6.1 && famAt(i, k)) { const sp = roomSpan(p, i, k, famAt); if (sp && sp.hatch) continue; }
+          if (famAt(i, k)) { const sp = roomSpan(p, i, k, famAt); if (sp && sp.hatch) continue; }
           shut.push({ x: ax + tx * t + nx * 0.035, y: BASE + dy, z: az + tz * t + nz * 0.035, ry: Math.atan2(nx, nz), w: Math.max(0.6, cw - 0.36), h: oh, key: i * 4096 + k, sd: slotDoor });
         }
       }
@@ -353,7 +353,7 @@ export function* buildBuildingsChunk(W, C, group) {
           const span = fam && roomSpan(p, i, k, famAt);
           if (span && span.hatch) C.doors[C.doors.length - 1].hatch = true;
           else if (span) {
-            const a = span.a, c = (k + 1) * cw - 0.18, Fr = new Frame(ax, az, tx, tz, nx, nz), oh = gh - 0.85;
+            const a = span.a, c = span.c, Fr = new Frame(ax, az, tx, tz, nx, nz), oh = gh - 0.85;
             const plan = shopPlan({ kind, cat, brand: nm ? nm[3] || '' : '', w: c - a, D: span.D, oh, seed: planSeed(bi, i * 4096 + k), glass: !shop || (nm && nm[3]) === 'brand' });
             if (plan) C.doors[C.doors.length - 1].cell = { F: Fr, a, plan, y: BASE + dy, shutter: shop };
           }
