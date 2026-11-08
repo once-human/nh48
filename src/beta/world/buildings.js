@@ -18,7 +18,7 @@ import { footJob } from './footpath.js';
 import { paint, packGeo } from '../gfx/paint.js';
 import { kindOf } from '@orig/game/shops.js';
 import { Frame } from './geom.js';
-import { familyOf, cellDepth, shopPlan, planSeed } from './shopplan.js';
+import { familyOf, cellDepth, shopPlan, planSeed, roomSpan } from './shopplan.js';
 import { cellsIn, cellsOut } from './shopin.js';
 
 export { setShutters, BASE };
@@ -313,6 +313,8 @@ export function* buildBuildingsChunk(W, C, group) {
     const wallTop = BASE + heightOf(levels, styleId).H + parapet;
     footprints.push({ bi, p, h: wallTop + dy });
     const shopsHere = styleId === 8 ? null : index.shopsByBld.get(bi);        // (a temple has no shops let into it)
+    // (the family of the business in cell k of wall j: the same the builder works out from its job)
+    const famAt = (j, k) => { const sh = shopsHere && shopsHere.get(j * 4096 + k); if (!sh) return null; const nm = index.shopNames[sh[3]]; return familyOf((nm && kindOf(nm[0], nm[2])) || '', nm ? nm[2] : 'generic'); };
     const slotDoor = new Map();
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
@@ -327,6 +329,7 @@ export function* buildBuildingsChunk(W, C, group) {
         const ns = Math.max(1, Math.floor(L / SHOP_CELL)), cw = L / ns, oh = gh - 0.85;
         for (let k = 0; k < ns; k++) {
           const t = (k + 0.5) * cw;
+          if (k * cw < 6.1 && famAt(i, k)) { const sp = roomSpan(p, i, k, famAt); if (sp && sp.hatch) continue; }
           shut.push({ x: ax + tx * t + nx * 0.035, y: BASE + dy, z: az + tz * t + nz * 0.035, ry: Math.atan2(nx, nz), w: Math.max(0.6, cw - 0.36), h: oh, key: i * 4096 + k, sd: slotDoor });
         }
       }
@@ -347,9 +350,11 @@ export function* buildBuildingsChunk(W, C, group) {
         // the shop behind the door, laid out exactly as world/builder.js draws it (world/shopplan.js)
         if (sh) {
           const nm = index.shopNames[sh[3]], kind = (nm && kindOf(nm[0], nm[2])) || '', cat = nm ? nm[2] : 'generic', fam = familyOf(kind, cat);
-          if (fam) {
-            const a = k * cw + 0.18, c = (k + 1) * cw - 0.18, Fr = new Frame(ax, az, tx, tz, nx, nz), oh = gh - 0.85;
-            const plan = shopPlan({ kind, cat, brand: nm ? nm[3] || '' : '', w: c - a, D: cellDepth(p, Fr, a, c, fam), oh, seed: planSeed(bi, i * 4096 + k), glass: !shop || (nm && nm[3]) === 'brand' });
+          const span = fam && roomSpan(p, i, k, famAt);
+          if (span && span.hatch) C.doors[C.doors.length - 1].hatch = true;
+          else if (span) {
+            const a = span.a, c = (k + 1) * cw - 0.18, Fr = new Frame(ax, az, tx, tz, nx, nz), oh = gh - 0.85;
+            const plan = shopPlan({ kind, cat, brand: nm ? nm[3] || '' : '', w: c - a, D: span.D, oh, seed: planSeed(bi, i * 4096 + k), glass: !shop || (nm && nm[3]) === 'brand' });
             if (plan) C.doors[C.doors.length - 1].cell = { F: Fr, a, plan, y: BASE + dy, shutter: shop };
           }
         }

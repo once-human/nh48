@@ -1,21 +1,15 @@
 // Walking in and out of places, all the way. F at a door: you walk up to it from wherever you are (as far as that is,
-// at a walk), and through it; the picture dims as you cross the doorway, and comes up with you still walking, a few
-// steps into the room. Going out (F at the door inside): you walk to the door, through it, and come out onto the
-// footpath walking, a couple of steps clear of the shop. Your keys are yours again once you've stopped.
+// at a walk), and through it; as you cross the doorway the picture cuts straight to the room (no dimming, no fade), with
+// you still walking, a few steps into it. Going out (F at the door inside): you walk to the door, through it, and the
+// picture cuts to you coming out onto the footpath walking, a couple of steps clear of the shop. Your keys are yours
+// again once you've stopped.
 import { Shops, openNow } from '@orig/game/shops.js';
 import { Interiors } from '@orig/world/interiors.js';
 import { Pilot } from '@orig/game/pilot.js';
 
-const SPEED = 1.4, FADE = 0.3;
-let veil = null;
-function dim(on) {
-  if (!veil) {
-    veil = document.createElement('div');
-    veil.style.cssText = `position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:40;transition:opacity ${FADE}s ease`;
-    document.body.appendChild(veil);
-  }
-  veil.style.opacity = on ? '1' : '0';
-}
+const SPEED = 1.4, FADE = 0;
+// (the cut: nothing dims; kept as a call so the walk reads the same)
+function dim() {}
 const walk = (P, W) => { P._walk = W; P.act = { kind: 'walk', t: 0 }; P.frozen = true; P.human.play('walk', { fade: 0.25, speed: 1.1 }); };
 
 // in: up to the door and through it

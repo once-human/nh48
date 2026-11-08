@@ -16,7 +16,7 @@ import { K, STYLE, BASE, SHOP_CELL, heightOf } from './kinds.js';
 import { KINDS, PALETTES, KIND_IDS as KI, blend, pick } from './areas.js';
 import { footpath } from './footpath.js';
 import { massing } from './massing.js';
-import { shopPlan, cellDepth, planSeed, familyOf, depthAt } from './shopplan.js';
+import { shopPlan, cellDepth, planSeed, familyOf, depthAt, roomSpan } from './shopplan.js';
 
 // what a kind of place builds like
 const TYPE = {};
@@ -464,6 +464,32 @@ function kandil(b, P, y, R) {
 // ---------------------------------------------------------------- shops
 // a board fits the band over the opening (0.85 m from the opening's top to the floor above), a few cm clear of each
 export const boardH = (w) => Math.min(0.72, w / 4.1);
+// which family the business in cell k of wall j is (null: none, or a wall that has no shops let into it)
+function famAtOf(G) {
+  return (j, k) => {
+    if (G.st === 8) return null;
+    const sh = G.shops.get(j * 4096 + k);
+    return sh ? familyOf(sh[3], sh[1]) : null;
+  };
+}
+// a business in a corner too tight for a room (the shop round the corner has the floor there): the wall, and a window
+// in it with a ledge, where they serve you on the footpath; behind it a shelf of what they sell, a bulb
+function hatch(b, G, F, u0, u1, a, c, oh, sh) {
+  const { L, R, gh } = G, yT = BASE + gh, w0 = Math.max(u0 + 0.25, c - 1.3), w1 = c - 0.1, y0 = BASE + 0.95, y1 = Math.min(BASE + oh - 0.1, BASE + 2.0);
+  b.set(L.wk === K.curtain ? K.cladding : L.wk, L.wall, L.wear);
+  F.rect(b, u0, w0, BASE, yT, 0); F.rect(b, w1, u1, BASE, yT, 0); F.rect(b, w0, w1, BASE, y0, 0); F.rect(b, w0, w1, y1, yT, 0);
+  // the opening: its reveals, the dark behind, a shelf of stock, the bulb
+  b.set(K.inside, 0x6a5a48, 0.4); F.rect(b, w1, w0, y0, y1, -0.35, 1);
+  b.quad(F.P(w0, y0, 0), F.P(w0, y0, -0.35), F.P(w0, y1, -0.35), F.P(w0, y1, 0), [F.tx, 0, F.tz]);
+  b.quad(F.P(w1, y0, 0), F.P(w1, y0, -0.35), F.P(w1, y1, -0.35), F.P(w1, y1, 0), [-F.tx, 0, -F.tz]);
+  b.quad(F.P(w0, y1, 0), F.P(w1, y1, 0), F.P(w1, y1, -0.35), F.P(w0, y1, -0.35), [0, -1, 0]);
+  b.set(K.goods, 0xffffff, 0.2, ((sh && sh[1] === 'food' ? 1 : 0) * 16 + ((R() * 16) | 0)) / 255); F.rect(b, w1 - 0.05, w0 + 0.05, y0 + 0.25, y1 - 0.1, -0.33, 1);
+  b.set(K.glow, [1, 0.94, 0.8], 0, 0.85); F.box(b, (w0 + w1) / 2 - 0.05, (w0 + w1) / 2 + 0.05, y1 - 0.12, y1 - 0.04, -0.2, -0.1, 0);
+  // the ledge, and a few jars on it
+  b.set(K.wood, 0x6a4a32, 0.3); F.box(b, w0 - 0.05, w1 + 0.05, y0 - 0.05, y0, -0.35, 0.25, 0);
+  for (let uu = w0 + 0.1; uu < w1 - 0.2; uu += 0.22) { if (R() < 0.4) continue; b.set(K.glass, 0xe8e2cc, 0, R()); F.box(b, uu, uu + 0.14, y0, y0 + 0.2, 0.02, 0.16, 8); b.set(K.plain, POP[(R() * POP.length) | 0], 0.1); F.box(b, uu - 0.005, uu + 0.145, y0 + 0.2, y0 + 0.24, 0.015, 0.165, 8); }
+  b.set(L.wk === K.curtain ? K.cladding : L.wk, L.wall, L.wear);
+}
 function shopFront(b, cb, G, F, i, len, shopEdge) {
   const { L, gh, R, type } = G;
   const ns = Math.max(1, Math.floor(len / SHOP_CELL)), cw = len / ns, oh = gh - 0.85;
@@ -471,10 +497,11 @@ function shopFront(b, cb, G, F, i, len, shopEdge) {
   b.set(L.wk === K.curtain ? K.cladding : L.wk, L.wall, L.wear);
   for (let k = 0; k < ns; k++) {
     const sh = G.shops.get(i * 4096 + k);
-    const a = k * cw + 0.18, c = (k + 1) * cw - 0.18;
     // the shop's own layout (world/shopplan.js): the same one the game walks you into
-    const fam = sh && familyOf(sh[3], sh[1]);
-    const plan = fam && shopPlan({ kind: sh[3], cat: sh[1], brand: sh[2], w: c - a, D: cellDepth(G.p, F, a, c, fam), oh, seed: planSeed(G.B.bi, i * 4096 + k), glass: !shopEdge || sh[2] === 'brand' });
+    const span = sh && roomSpan(G.p, i, k, G.famAt || (G.famAt = famAtOf(G)));
+    const a = span ? span.a : k * cw + 0.18, c = (k + 1) * cw - 0.18;
+    if (span && span.hatch) { hatch(b, G, F, k * cw, (k + 1) * cw, a, c, oh, sh); continue; }
+    const plan = span && shopPlan({ kind: sh[3], cat: sh[1], brand: sh[2], w: c - a, D: span.D, oh, seed: planSeed(G.B.bi, i * 4096 + k), glass: !shopEdge || sh[2] === 'brand' });
     if (plan) {
       W.rect(b, k * cw, a, BASE, yT, 0); W.rect(b, c, (k + 1) * cw, BASE, yT, 0);
       const famous = sh[2] === 'trad', lux = (sh[2] === 'brand' ? 0.55 : 0) + L.rich * 0.55 - (famous ? 0.2 : 0);

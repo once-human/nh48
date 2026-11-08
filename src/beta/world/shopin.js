@@ -143,7 +143,7 @@ function makeStaff(S) {
   try {
     for (const k of S.plan.keeper) {
       const [x, z] = at(S, k.u, k.d), female = rng.chance(S.plan.stock === 'medicine' || S.plan.stock === 'bakery' || S.plan.stock === 'cafe' ? 0.35 : 0.15);
-      const p = person(S, x, z, yawOf(S, k.face), k.anim, female, rng); p.role = k.role;
+      const p = person(S, x, z, yawOf(S, k.face), k.anim, female, rng); p.role = k.role; p._home = p.yaw;
       S.staff.push(p);
     }
     const R = roomOf(S), free = R.seats.filter(q => !q.wait);
@@ -183,6 +183,25 @@ function tend() {
   }
 }
 
+// whoever keeps the counter looks up at whoever's come in: you, if you're in the shop or at its counter, or a customer
+// standing there; with nobody, back to what they were doing (a turn of the head and shoulders, not a snap)
+function look(dt) {
+  const P = G.player;
+  for (const S of cells) {
+    const K = S.staff && S.staff[0];
+    if (!K || K.anim === 'sit' || K.fallen > 0 || K.ko || K.dead || K.corpse || K.mode !== 'fixed') continue;
+    if (Math.abs(S.door.x - P.x) > 30 || Math.abs(S.door.z - P.z) > 30) continue;
+    let tx = null, tz = 0, best = 3.2;
+    const dp = Math.hypot(P.x - K.x, P.z - K.z);
+    if ((here && here.S === S) || (P.onFoot && dp < best)) { tx = P.x; tz = P.z; }
+    else if (G.people) for (const q of G.people.list) { if (!q._inCell || q.door !== S.door) continue; const d = Math.hypot(q.x - K.x, q.z - K.z); if (d < best) { best = d; tx = q.x; tz = q.z; } }
+    const want = tx === null ? K._home : Math.atan2(tz - K.z, tx - K.x);
+    if (want === undefined) continue;
+    let dy = want - K.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    if (Math.abs(dy) < 0.01) continue;
+    K.yaw += Math.sign(dy) * Math.min(Math.abs(dy), dt * 3.5); K.hx = Math.cos(K.yaw); K.hz = Math.sin(K.yaw);
+  }
+}
 // ---------------------------------------------------------------- in and out
 const LABEL = { kirana: 'Buy something', shop: 'Buy something', paan: 'A paan, or something else', florist: 'Buy flowers', sweets: 'Buy sweets', bakery: 'Buy from the bakery',
   tapri: 'Order a cutting chai', cafe: 'Order at the counter', juice: 'Order a juice', icecream: 'Order an ice cream',
@@ -327,6 +346,8 @@ export function install() {
   Shops.prototype.tryUse = function () {
     G = this.g;
     const n = this.near, P = G.player, S = n && n.door && n.door.cell;
+    // a window in the wall that serves the footpath: what they sell, there
+    if (n && n.door && n.door.hatch && !this.open && !(G.interiors && G.interiors.cur)) { const oh = openNow(n, G.hour); if (!oh || oh.open) { this.show(n); return true; } }
     if (!S || !cells.has(S) || this.open || !P.onFoot || P._walk || (G.interiors && G.interiors.cur)) return tryUse.call(this);
     const oh = openNow(n, G.hour);
     if (!isOpen(S) || (oh && !oh.open)) return tryUse.call(this);
@@ -342,6 +363,12 @@ export function install() {
   // the door at the back of a bigger place's front room: walk to it and through, into the place itself
   const use = Interiors.prototype.use;
   Interiors.prototype.use = function (s) {
+    // the barber's chair nearest where you stood: sit, and the barber asks how you want it
+    if (s && s.kind === 'chair' && this.cur && this.cur.inPlace) {
+      const C = this.cur, seat = C.R.seats.filter(q => q.salon && !q.used).sort((p, q) => Math.hypot(p.x - s.x, p.z - s.z) - Math.hypot(q.x - s.x, q.z - s.z))[0];
+      if (!seat) { G.hud.toast('All the chairs are taken', 'Sit on the bench and wait', 'info', 2.4); return; }
+      this.sit(seat, true); if (G.trial) G.trial.show({ ...C.ctx, kind: 'barber', inside: true }, 'salon'); return;
+    }
     if (!s || s.kind !== 'backdoor' || !this.cur || !this.cur.inPlace) return use.call(this, s);
     const S = here && here.S, P = G.player, ctx = S && infoOf(S);
     if (!ctx || P._walk) return;
@@ -355,6 +382,7 @@ export function install() {
   Shops.prototype.label = function () {
     const n = this.near, S = n && n.door && n.door.cell;
     if (S && cells.has(S) && !S.hole && isOpen(S)) return `${n.name} · ${LABEL[n.kind] || 'Buy something'}`;
+    if (n && n.door && n.door.hatch && (!openNow(n, this.g.hour) || openNow(n, this.g.hour).open)) return `${n.name} · ${LABEL[n.kind] || 'At the window'}`;
     return label.call(this);
   };
   // the walk (world/walkin.js moves you along it), and the second leg of one that turns into the doorway
@@ -370,7 +398,7 @@ export function install() {
   People.prototype.update = function (dt, ...a) {
     const out = pu.call(this, dt, ...a);
     if (!G && this._G) G = this._G;
-    if (G && G.player) { if ((this._shopT = (this._shopT || 0) - dt) <= 0) { this._shopT = 0.25; tend(); } track(); }
+    if (G && G.player) { if ((this._shopT = (this._shopT || 0) - dt) <= 0) { this._shopT = 0.25; tend(); } track(); look(dt); }
     return out;
   };
 }

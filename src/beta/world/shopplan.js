@@ -4,7 +4,8 @@
 //
 // A shop is a cell of a building's ground floor: w along the front, D deep, oh to the ceiling. Everything is in the
 // cell's own frame: u along the front from the cell's left edge (0..w), d inward (0 at the front, -D at the back).
-import { rng, hash2 } from './geom.js';
+import { rng, hash2, Frame } from './geom.js';
+import { SHOP_CELL } from './kinds.js';
 
 // which way of fitting out a place takes (null: not done this way yet, the old room)
 const FAMILY = {
@@ -43,6 +44,41 @@ export function cellDepth(p, F, a, c, fam) {
   let d = 30;
   for (const u of [a + 0.25, (a + c) / 2, c - 0.25]) { const P = F.P(u, 0, -0.02); d = Math.min(d, depthAt(p, P[0], P[2], F.nx, F.nz)); }
   return Math.max(0.6, Math.min(CAP[fam] || 3.2, d - 0.35, Math.max(2.4, d / 2 - 0.1)));
+}
+// wall i of the building's ring as a frame (u along it from its start, d out of the building; the same frame both the
+// builder and the game make of it)
+function frameOf(p, i) {
+  const n = p.length / 2, j = (i + 1) % n, ax = p[2 * i], az = p[2 * i + 1], dx = p[2 * j] - ax, dz = p[2 * j + 1] - az, L = Math.hypot(dx, dz) || 1;
+  let a2 = 0; for (let q = 0; q < n; q++) { const r = (q + 1) % n; a2 += p[2 * q] * p[2 * r + 1] - p[2 * r] * p[2 * q + 1]; }
+  const sg = a2 > 0 ? 1 : -1;
+  return { F: new Frame(ax, az, dx / L, dz / L, sg * dz / L, -sg * dx / L), L };
+}
+// The room behind cell k of wall i: where it starts and ends along the wall (the cell less its pillars), how deep it
+// goes, or null (no business there that you walk into). famAt(i, k): the family of the business in that cell.
+//   At a corner of the building, where the wall before this one has a room in its last cell, the two rooms would share
+// the floor in the corner: the one round the corner keeps it, and this wall's first room starts beyond it. If that
+// leaves too little (the corner room can reach past the first cell), this one has no room: a window in the wall that serves you on the footpath (hatch).
+export function roomSpan(p, i, k, famAt, lvl = 0) {
+  const fam = famAt(i, k);
+  if (!fam) return null;
+  const { F, L } = frameOf(p, i), ns = Math.max(1, Math.floor(L / SHOP_CELL)), cw = L / ns;
+  let a = k * cw + 0.18; const c = (k + 1) * cw - 0.18;
+  if (lvl < 3 && a < CAP.eatery + 0.5) { const s0 = cornerStart(p, i, F, famAt, lvl); if (s0 > a) a = s0; }
+  if (c - a < 1.5) return { a, c, D: 0, F, fam, hatch: true };
+  return { a, c, D: cellDepth(p, F, a, c, fam), F, fam };
+}
+function cornerStart(p, i, F, famAt, lvl) {
+  const n = p.length / 2;
+  let j = (i - 1 + n) % n;
+  for (let g = 0; g < 2; g++) { const q = (j + 1) % n; if (Math.hypot(p[2 * q] - p[2 * j], p[2 * q + 1] - p[2 * j + 1]) >= 0.05) break; j = (j - 1 + n) % n; }
+  if (j === i) return 0;
+  const Lp = frameOf(p, j).L; if (Lp <= 2.6) return 0;
+  const nsp = Math.max(1, Math.floor(Lp / SHOP_CELL)), sp = roomSpan(p, j, nsp - 1, famAt, lvl + 1);
+  if (!sp || sp.hatch) return 0;
+  let mu = -1e9, md = 1e9;
+  for (const t of [sp.a, sp.c]) for (const d of [0, -sp.D]) { const P = sp.F.P(t, 0, d), ex = P[0] - F.ax, ez = P[2] - F.az; mu = Math.max(mu, ex * F.tx + ez * F.tz); md = Math.min(md, ex * F.nx + ez * F.nz); }
+  // (round an outside corner it reaches in along this wall; round an inside one it's out of the way)
+  return mu > 0.18 && md < -0.1 ? mu + 0.15 : 0;
 }
 export const planSeed = (bi, key) => hash2(bi | 0, key | 0) | 0;
 
