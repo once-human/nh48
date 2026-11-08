@@ -152,7 +152,9 @@ const tick = () => {
   // the door: open, the cabin's less of a room inside and the music gets out to you outside
   const door = doorOpen(P, v);
   let g = S.vol*0.55, cut = 20000, room = N.room || 0;
-  if (P.onFoot || P.cur !== v) { g *= Math.max(0, 1 - d/32)**2*(0.6 + 0.9*door); cut = 900 + 7000*door*door; room *= 0.3; }
+  // outside it: through shut doors and glass it's the bass and a murmur, gone a few car-lengths off; a door open lets
+  // the music out, and it still falls away fast as you walk off
+  if (P.onFoot || P.cur !== v) { g *= Math.max(0, 1 - d/24)**2/(1 + d*0.3)*(0.2 + 0.8*door); cut = (420 + 6500*door*door)/(1 + d*0.07); room *= 0.3; }
   else room *= 1 - 0.6*door;
   if (G.state !== 'play') g = 0;
   N.out.gain.setTargetAtTime(R.dj ? 0 : g, t, 0.12); N.shell.frequency.setTargetAtTime(cut, t, 0.15);
