@@ -102,8 +102,9 @@ void main(){
     // the indicators (yours: beta/vehicles/details.js): every amber lamp on that side, front, back and the repeater on
     // the wing, on with the blink and dark between, whatever it was doing before (uInd: left, right, the blink)
     // the traffic's own indicators (beta/vehicles/lamps.js: aLamp.y -1 left, -2 right)
-    float ti = vLp.y < -1.5 ? 2. : vLp.y < -.5 ? 1. : 0.;
-    if (amber && ti > .5 && ((ti < 1.5) == (vL.z < 0.))) { float bl = step(.5, fract(uTime*1.4)); k = bl*(4.5 + uNight*5.); c *= mix(.45, 1., bl); }
+    // (-1 to -1.9 left, -2 to -2.9 right: the fraction is that car's own place in the blink)
+    float ti = vLp.y < -1.95 ? 2. : vLp.y < -.5 ? 1. : 0., tph = ti > 1.5 ? (-vLp.y - 2.)/.9 : (-vLp.y - 1.)/.9;
+    if (amber && ti > .5 && ((ti < 1.5) == (vL.z < 0.))) { float bl = step(.5, fract(uTime*1.4 + tph)); k = bl*(4.5 + uNight*5.); c *= mix(.45, 1., bl); }
     if (amber && (vL.z < 0. ? uInd.x : uInd.y) > .5) { k = uInd.z*(4.5 + uNight*5.); c *= mix(.45, 1., uInd.z); }      // (between blinks the lens is dull plastic)
     c += vC*vG*k;
   }
