@@ -12,7 +12,7 @@ const VS = `attribute float glow; attribute float paint;
 #ifdef USE_INSTANCING
 attribute vec3 aColB, aColC; attribute vec2 aLamp, aDis;
 #endif
-uniform vec2 uLamp; varying vec2 vLp, vDs;
+uniform vec2 uLamp; varying vec2 vLp, vDs; varying vec3 vNL;
 #ifdef FADE
 varying float vFd;
 #endif
@@ -36,7 +36,7 @@ void main(){
 #else
   mat4 M = modelMatrix;
 #endif
-  vC = base; vG = glow; vP = paint; vL = position;
+  vC = base; vG = glow; vP = paint; vL = position; vNL = normal;
   vec4 w = M*vec4(position, 1.); vW = w.xyz; vN = mat3(M)*normal;
   vec4 v = viewMatrix*w; vZ = -v.z; gl_Position = projectionMatrix*v; }`;
 const GLASS_VS = `varying vec3 vN, vW, vC, vL; varying float vG, vP, vZ;
@@ -69,15 +69,29 @@ ${PCF}
 float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.05 + .002*vZ), 1.); if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.;
   return shadowPCF(vec3(s.xy, s.z - .0006)); }
 `;
-const FS = CHUNK + `varying vec2 vLp, vDs; uniform vec3 uInd; uniform float uTime;
+const FS = CHUNK + `varying vec2 vLp, vDs; varying vec3 vNL; uniform vec3 uInd; uniform float uTime;
 ${DITHER.replace('ditherH', 'disH')}
 void main(){
   FADE_OUT
   if (vDs.x + vDs.y > 0.) { float h = disH(); if (h < vDs.x || h >= 1. - vDs.y) discard; }
   vec3 n = normalize(vN), V = normalize(cameraPosition - vW), b = vC; float matte = vG < -.5 ? 1. : 0., painted = abs(vP - 1.) < .5 ? 1. : 0.;
   float glassy = step(3.5, vP), e = (nz(gl_FragCoord.xy*.11) - .5)*(1. - uReal), ndl = dot(n, sunDir), lit = sunOn(ndl, e*.1, .0, .13), sh = (shadowOn > .5 && lit > 0.) ? shadeOf(shadowAt(vW, n), e*.3) : 1., L = lit*sh*dayK;
+  // the cabin's finishes (beta/vehicles/cockpit.js), laid on the face each part shows: carbon weave in a 2x2 twill, its
+  // tows catching the light by which way they run (-2); quilted leather, diamonds sewn in with the seams sunk (-3);
+  // open-pore wood, the grain along the piece (-4); brushed aluminium (-5); suede (-6); perforated leather (-7)
+  if (vP < -1.5) {
+    vec3 an = abs(vNL); vec2 q = an.x > an.y && an.x > an.z ? vL.zy : an.y > an.z ? vL.xz : vL.xy;
+    if (vP > -2.5) { vec2 u = q*150., cc = floor(u), ff = fract(u); float w = step(mod(cc.x + cc.y, 4.), 1.5), lk = abs(dot(normalize(cameraPosition - vW), vec3(.7, .2, .7)));
+      b *= mix(.55 + .4*sin(3.1416*ff.x)*(.6 + .6*(1. - lk)), .7 + .55*sin(3.1416*ff.y)*(.6 + .6*lk), w); }
+    else if (vP > -3.5) { vec2 u = q*15.; float d1 = abs(fract(u.x + u.y) - .5), d2 = abs(fract(u.x - u.y) - .5), m = .5 - max(d1, d2);
+      b *= mix(.45, 1., smoothstep(.0, .05, m))*(.88 + .24*smoothstep(.0, .25, m)); }
+    else if (vP > -4.5) { float g = sin(q.y*95. + q.x*6. + nz(q*vec2(2., 30.))*9.); b *= .72 + .34*smoothstep(-.6, 1., g) - .12*step(.82, nz(q*vec2(9., 260.))); }
+    else if (vP > -5.5) b *= .82 + .32*nz(vec2(q.x*700., q.y*2.5));
+    else if (vP > -6.5) b *= .8 + .35*nz(q*900.);
+    else { vec2 f = fract(q*190.) - .5; b *= .55 + .45*smoothstep(.14, .2, length(f)); }
+  }
   // grime low down on the body, a little wear
-  float grime = (1. - smoothstep(.15, .7, vW.y))*(.6 + .6*nz(vL.xz*9.))*(1. - matte);
+  float grime = (1. - smoothstep(.15, .7, vW.y))*(.6 + .6*nz(vL.xz*9.))*(1. - matte)*step(-1.5, vP);
   b = mix(b, b*vec3(.62, .56, .48), grime*.4);
   if (matte > .5) b *= .9 + .2*nz(vL.xy*60.);
   vec3 c = mix(b*shadeCol*(.92 + .16*max(n.y, 0.)) + vec3(.022)*dayK, b*sunCol, L) + b*lampAt(vW, n);

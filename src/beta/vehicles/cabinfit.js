@@ -59,3 +59,10 @@ Vehicle.prototype.setCockpit = function (on) {
   try { fit(this); } catch (e) { /* (a cabin we can't measure stays as it is) */ }
   return set.call(this, on);
 };
+// the drive mode shows in the cabin (beta/vehicles/cockpit.js) from outside too, through the glass, not only once you're in
+const sync = Vehicle.prototype.sync;
+Vehicle.prototype.sync = function (dt) {
+  const r = sync.call(this, dt), C = this.cockpit;
+  if (C && C.mode) C.mode(this._modeName || '');
+  return r;
+};
