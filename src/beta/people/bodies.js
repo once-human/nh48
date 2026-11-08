@@ -4,6 +4,12 @@
 // (Nothing kept anyone apart but walls: a cow walked through the traffic, people stood inside each other.)
 import { Vehicle } from '@orig/vehicles/vehicle.js';
 import { People } from '@orig/people/peds.js';
+import { Crowd } from '@orig/people/crowd.js';
+
+// the riders of the two-wheelers and autos going by near you are real people too, whatever the setting (they were only
+// within 20 m on the lowest: past that a rider was the vehicle's own baked figure, going past right in front of you)
+const sq = Crowd.prototype.setQuality;
+Crowd.prototype.setQuality = function (q) { const r = sq.call(this, q); if (this.traffic) this.traffic.richR = Math.max(this.traffic.richR || 0, 32); return r; };
 
 const R_PED = 0.26;                         // a person, shoulder to shoulder
 const TMP = [0, 0, 0, 0];

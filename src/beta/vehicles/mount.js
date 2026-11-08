@@ -156,9 +156,17 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
       const o = M.offer, keep = { x: F.x, z: F.z, yaw: F.yaw, y: F.y };
       // the same person goes over, from where they sat, away from you (pilot.spawnAngryDriver, below)
       const R = M.src._riders && M.src._riders[0];
+      // and the one sitting behind them: knocked off with them, not taken away with the machine (read before the traffic
+      // lets it go: going back to its pool wipes its riders)
+      const R2 = M.src._riders && M.src._riders[1], two = /P$/.test(M.src.type || '') || !!R2, sx = M.src.hx ?? 1, sz = M.src.hz ?? 0;
+      const back = two ? { x: (R2 ? R2.x : M.src.x - sx*0.42) + fx*0.3, z: (R2 ? R2.z : M.src.z - sz*0.42) + fz*0.3, look: R2 && R2.look } : null;
       this._jab = { o: M.src, x: (R ? R.x : M.src.x) + fx*0.15, z: (R ? R.z : M.src.z) + fz*0.15, look: R && R.look };
       o.now = true; o.dragged = true;
       try { enter.call(this, o, M.traffic); } finally { this._jab = null; }
+      if (back) {
+        this._jab = { o: M.src, x: back.x, z: back.z, look: back.look };
+        try { const p2 = this.spawnAngryDriver(M.src, 'carjack'); if (p2) { p2.fallen = 1.9; p2.react = 3.2; } } catch (e) { /* (only the rider, then) */ } finally { this._jab = null; }
+      }
       const veh = this.cur;
       if (veh && !this.onFoot) {
         this.exit(M.traffic, true);

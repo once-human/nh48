@@ -78,6 +78,9 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
   const H = this.human;
   if (this.downT > 0 && !was && H && !this._rag) {
     const v = Math.hypot(vx, vz), o = this._hitBy; this._hitBy = null;
+    // how bad it is, for how long you stay down once you've stopped: a stumble or a shove next to nothing, a fall at a
+    // run a little, thrown by a car or off a bike at speed a good while (what was given as the time down says it too)
+    this._sev = Math.max(0, (this.downT - 2.4)/4, (v - 3)/9, o && o.T ? Math.abs(o.v || 0)*3.6/40 : 0);
     if (o && o.T && Math.abs(o.v || 0) > 1) {
       // hit by the traffic: the same as anyone it hits (people/runover.js). Its front sweeps your legs at its own speed,
       // your hips go less and your top hardly at all, so you fold onto it; its bonnet, glass and roof are solid under
@@ -94,14 +97,28 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
   }
   const R = this._rag;
   if (R) {
-    if (!(this.downT > 0) || this.onFoot === false) {
-      if (R.out < 0) { R.out = performance.now(); const hx = R.p[0] - R.p[6], hz = R.p[2] - R.p[8]; if (Math.hypot(hx, hz) > 0.05) F.yaw = Math.atan2(hz, hx); F.x = R.p[0]; F.z = R.p[2]; }
+    // getting up: out of the body's lie and into the get-up, already under way when the lie lets go
+    const sev = Math.max(this._sev || 0, (R.kmh || 0)/40), GU = 1.5/(sev > 0.8 ? 0.72 : sev > 0.35 ? 0.9 : 1.1);
+    const rise = () => {
+      R.out = performance.now(); const hx = R.p[0] - R.p[6], hz = R.p[2] - R.p[8]; if (Math.hypot(hx, hz) > 0.05) F.yaw = Math.atan2(hz, hx); F.x = R.p[0]; F.z = R.p[2];
+      if (H && H.actions && H.actions.getup && this.downT > 0.2 && this.onFoot !== false) H.play('getup', { once: true, fade: 0.25, restart: true, speed: 1.5/GU });
+    };
+    if (R.out >= 0 || !(this.downT > 0) || this.onFoot === false) {
+      if (R.out < 0) rise();
       if (performance.now() - R.out > 600 || this.onFoot === false) this._rag = null;
       else if (H) { H.holder.position.set(F.x, F.y, F.z); H.holder.rotation.set(0, -F.yaw, 0); ragPose(this, H); }
       return out;
     }
-    // (not up while you're still going: only once you've come to rest)
-    if (!R.sleep && R.t < 7) this.downT = Math.max(this.downT, 1.5);
+    // (not up while you're still going: only once you've come to rest; then down only as long as the fall was bad: a
+    // small one, you're straight up; a bad one, you lie there a while first)
+    const rest = R.sleep || R.t > (sev < 0.4 ? 2 : sev < 1 ? 4 : 7);
+    if (!rest) this.downT = Math.max(this.downT, GU + 0.1);
+    else {
+      if (R.restT === undefined) R.restT = performance.now();
+      const lie = Math.min(4.5, 0.15 + 2.6*sev*sev);
+      this.downT = Math.min(this.downT, Math.max(0, lie - (performance.now() - R.restT)/1000) + GU);
+      if (this.downT <= GU) { rise(); if (H) { H.holder.position.set(F.x, F.y, F.z); H.holder.rotation.set(0, -F.yaw, 0); ragPose(this, H); } return out; }
+    }
     if (!R.sleep) ragTick(R, dt, this.W);
     F.x = R.p[0]; F.z = R.p[2];
     if (H) { H.holder.position.set(F.x, F.y, F.z); H.holder.rotation.set(0, -F.yaw, 0); ragPose(this, H); }
