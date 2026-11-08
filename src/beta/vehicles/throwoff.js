@@ -50,7 +50,7 @@ function thrown(P, V, before, after, dv, traffic) {
   P.events.push({ type: 'gotHit', speed: dv*0.8, who: 'fall', x, z });
   // you go on as you were going (the machine's stopped or been knocked away under you), a little up off the seat
   const R = H && startRag(P, { H, yaw: V.th });
-  if (R) { seatRag(R, x, z, V.th, gy + seat, before[0]*0.95 + (after[0] - before[0])*0.25, 0.8 + Math.min(1.6, dv*0.08), before[1]*0.95 + (after[1] - before[1])*0.25); P._fall = null; }
+  if (R) { seatRag(R, x, z, V.th, gy + seat, before[0]*0.95 + (after[0] - before[0])*0.25, 0.3 + Math.min(0.6, dv*0.03), before[1]*0.95 + (after[1] - before[1])*0.25); P._fall = null; }
   // the machine: carrying on with what it had after the blow, turned over by it: onto its side away from you, spun if
   // it was hit off-centre, end over end if it stopped dead from the front
   V.v = 0; V.vl = 0;

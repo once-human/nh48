@@ -65,7 +65,7 @@ function throwRider(G, v, side, own = 0, bx = 0, bz = 0) {
   if (!p) return;
   const yaw = Math.atan2(v.hz, v.hx), hit = Math.hypot(bx, bz), kmh = Math.max(hit, Math.abs(own)*0.6)*3.6;
   // the blow goes into them about as much as into the machine (they're most of the weight on it), less at a glance
-  const vx = v.hx*own*0.9 + bx*0.75 - v.hz*side*0.6, vz = v.hz*own*0.9 + bz*0.75 + v.hx*side*0.6, vy = 0.6 + Math.min(2.2, kmh*0.03);
+  const vx = v.hx*own*0.85 + bx*0.6 - v.hz*side*0.5, vz = v.hz*own*0.85 + bz*0.6 + v.hx*side*0.5, vy = 0.25 + Math.min(0.7, kmh*0.01);
   const surf = G.W && G.W.surf, gy = surf ? surf.height(x, z) : 0;
   p._throw = { x, z, yaw, y: gy + (/^bike/.test(v.type) ? 0.92 : v.type === 'cycle' ? 0.95 : 0.85), vx, vy, vz };
   const dead = kmh >= 75, ko = dead || kmh >= 40, crit = !dead && kmh >= 55;

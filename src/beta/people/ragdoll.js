@@ -178,7 +178,7 @@ export function seatRag(R, x, z, yaw, y, vx, vy, vz) {
   set(0, x, y, z);
   fronts(R); lengths(R); togetherFrom(R); settle(R);
   for (let i = 0; i < N; i++) { R.q[i*3] = P[i*3] - vx*DT; R.q[i*3 + 1] = P[i*3 + 1] - vy*DT; R.q[i*3 + 2] = P[i*3 + 2] - vz*DT; }
-  R.sleep = false; R.still = 0;
+  R.sleep = false; R.still = 0; R.kmh = Math.max(R.kmh || 0, Math.hypot(vx, vz)*3.6);
 }
 // every point given its own speed (f(i) -> [vx, vy, vz])
 export function velRag(R, f) {
@@ -345,7 +345,7 @@ function step(R) {
           if (face === 0) {
             // carried up as the bonnet and the glass rise under them (the surface's own rise, not the distance it was put
             // back), and the glass and the bonnet give as a body lands on them: less than all of it
-            ny = 1; d = dTop; us = Math.min(Math.max(0, top - top0)*0.45, (0.12*cs/DT + 0.25)*DT);
+            ny = 1; d = dTop; us = Math.min(Math.max(0, top - top0)*0.3, (0.06*cs/DT + 0.12)*DT);
           } else if (face === 1) { nx = hx*fr; nz = hz*fr; d = dF; us = cs*ck*0.82; }
           else if (face === 2) { nx = -hx*fr; nz = -hz*fr; d = dB; us = 0; }
           else { const sg = Math.sign(lc) || 1; nx = -hz*sg; nz = hx*sg; d = dS; us = 0; }
@@ -377,6 +377,11 @@ function step(R) {
   let M = 0; vm[0] = vm[1] = vm[2] = 0;
   for (let i = 0; i < N; i++) { const j = i*3, m = MASS[i]; M += m; vm[0] += (p[j] - q[j])*m; vm[1] += (p[j + 1] - q[j + 1])*m; vm[2] += (p[j + 2] - q[j + 2])*m; }
   vm[0] /= M; vm[1] /= M; vm[2] /= M;
+  // nobody's sent up into the air: a car takes the legs and the body goes onto the bonnet or down the road, a hit off a
+  // two-wheeler sends them along the road, not up. However the contacts add up, the body as a whole rises no faster
+  // than a slow hop (a little more the harder the hit); its turn and its limbs are left as they are
+  const cap = (0.5 + R.kmh*0.02)*DT;
+  if (vm[1] > cap) { const ex = vm[1] - cap; for (let i = 0; i < N; i++) q[i*3 + 1] += ex; vm[1] = cap; }
   // the two legs go together: what one does, the other mostly follows
   for (const [a, b] of TOGETHER) for (let c = 0; c < 3; c++) {
     const A = a*3 + c, B = b*3 + c, va = p[A] - q[A], vb = p[B] - q[B], m = (va + vb)/2;
