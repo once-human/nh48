@@ -134,3 +134,4 @@ Transit.prototype.travel = function (to, fare, minutes, what, ...a) {
 // into the jhola
 const add = Life.prototype.add;
 Life.prototype.add = function (...a) { const G = window.__nhAskG; if (G && G.state === 'play' && G.life === this) SFX.jhola(AU()); return add.apply(this, a); };
+export { hiss, ring, tone, go };
