@@ -193,7 +193,7 @@ function roomOf(S) {
   // what F does where: the counter, a rail of clothes to try on, a wall of shoes or frames
   for (const q of P.spots) { if (q.kind === 'counter' && P.stock === 'clothes') continue; const [x, z] = at(S, q.u, q.d); R.spots.push({ x, z, r: q.kind === 'counter' ? 1.5 : 1.2, kind: q.kind, label: q.label || (inf && LABEL[inf.kind]) || 'Buy something', sub: q.sub }); }
   // the seats: a stool at the jeweller's counter, the bench in a shoe shop
-  for (const q of P.seats) { const [x, z] = at(S, q.u, q.d), [tx, tz] = at(S, q.tu, q.td); R.seats.push({ x, z, yaw: yawOf(S, q.face), table: { x: tx, z: tz }, used: false, wait: !!q.wait }); }
+  for (const q of P.seats) { const [x, z] = at(S, q.u, q.d), [tx, tz] = at(S, q.tu, q.td); R.seats.push({ x, z, yaw: yawOf(S, q.face), table: { x: tx, z: tz }, used: false, wait: !!q.wait, salon: !!q.salon }); }
   for (const [u, d] of P.browse) R.browse.push(at(S, u, d));
   return (S.R = R);
 }
