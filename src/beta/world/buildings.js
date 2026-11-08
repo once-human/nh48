@@ -351,7 +351,7 @@ export function* buildBuildingsChunk(W, C, group) {
         if (sh) {
           const nm = index.shopNames[sh[3]], kind = (nm && kindOf(nm[0], nm[2])) || '', cat = nm ? nm[2] : 'generic', fam = familyOf(kind, cat);
           const span = fam && roomSpan(p, i, k, famAt);
-          if (span && span.hatch) C.doors[C.doors.length - 1].hatch = true;
+          if (span && span.hatch) C.doors[C.doors.length - 1].hatch = { F: new Frame(ax, az, tx, tz, nx, nz), u0: k * cw, c: span.c, y: BASE + dy };
           else if (span) {
             const a = span.a, c = span.c, Fr = new Frame(ax, az, tx, tz, nx, nz), oh = gh - 0.85;
             const plan = shopPlan({ kind, cat, brand: nm ? nm[3] || '' : '', w: c - a, D: span.D, oh, seed: planSeed(bi, i * 4096 + k), glass: !shop || (nm && nm[3]) === 'brand' });
@@ -415,7 +415,7 @@ export function* buildBuildingsChunk(W, C, group) {
     const g = yield* ob.buildSliced(); glowOn(g, true); const m = new THREE.Mesh(g, localMat); m.receiveShadow = true; group.add(m);
   }
   if (W.nearBoards) W.nearBoards.addChunk(C.ci, C.cx, C.cz, nearRecs);
-  cellsIn(C.ci, C.doors.filter(d => d.cell));
+  cellsIn(C.ci, C.doors.filter(d => d.cell), C.doors.filter(d => d.hatch));
   // the shutters, one instance each; game.js lifts the ones whose shop is open (and keeps them in step with the clock)
   let shutMesh = null;
   if (shut.length) {

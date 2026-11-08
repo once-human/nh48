@@ -42,7 +42,9 @@ const at = (S, u, d) => { const F = S.F, U = S.a + u; return [F.ax + F.tx * U + 
 const local = (S, x, z) => { const F = S.F, dx = x - F.ax, dz = z - F.az; return [dx * F.tx + dz * F.tz - S.a, dx * F.nx + dz * F.nz]; };
 const yawOf = (S, face) => { const F = S.F; const v = face === 'out' ? [F.nx, F.nz] : face === 'in' ? [-F.nx, -F.nz] : face === 'left' ? [-F.tx, -F.tz] : [F.tx, F.tz]; return Math.atan2(v[1], v[0]); };
 
-export function cellsIn(ci, doors) {
+const windows = new Map();          // chunk -> its windows in the wall (door.hatch)
+export function cellsIn(ci, doors, wins) {
+  if (wins && wins.length) windows.set(ci, wins);
   if (!doors.length) return;
   chunks.set(ci, doors);
   for (const door of doors) {
@@ -63,6 +65,8 @@ export function cellsIn(ci, doors) {
   V++;
 }
 export function cellsOut(ci) {
+  const wins = windows.get(ci);
+  if (wins) { windows.delete(ci); for (const d of wins) dropWindow(d); }
   const doors = chunks.get(ci); if (!doors) return;
   chunks.delete(ci);
   for (const door of doors) {
@@ -239,6 +243,7 @@ function tend() {
   const P = G.player, inView = G.inView;
   // (through a place's back door into its room: the street round it stays as you left it)
   if (G.interiors && G.interiors.inside) return;
+  windowsTend(P, inView);
   let staffed = 0; for (const S of cells) if (S.staff) staffed++;
   for (const S of cells) {
     const dx = S.door.x - P.x, dz = S.door.z - P.z, d = Math.hypot(dx, dz);
@@ -312,6 +317,20 @@ function serveStep(dt) {
     serving.splice(n, 1);
   }
 }
+// the one behind a window in the wall: there while it's open, standing at the window looking out
+function windowsTend(P, inView) {
+  for (const wins of windows.values()) for (const d of wins) {
+    const dist = Math.hypot(d.x - P.x, d.z - P.z), seen = inView && inView(d.x, d.z);
+    const inf = (d._inf = d._inf || (G.shops && G.shops.infoOf(d))), oh = inf && openNow(inf, G.hour), open = !oh || oh.open;
+    if (!d._who && open && dist < 80 && (!seen || dist > 50)) {
+      const H = d.hatch, u = (Math.max(H.u0 + 0.25, H.c - 1.3) + H.c - 0.1) / 2, F = H.F;
+      const x = F.ax + F.tx * u - F.nx * 0.28, z = F.az + F.tz * u - F.nz * 0.28, rng = new RNG((Math.round(d.x * 17) * 31 + Math.round(d.z * 13)) >>> 0);
+      const keep = G.people && G.people.rng; if (!G.people) continue; G.people.rng = rng;
+      try { d._who = person({}, x, z, Math.atan2(F.nz, F.nx), 'idle', rng.chance(0.2), rng); d._who.role = 'keeper'; } finally { G.people.rng = keep; }
+    } else if (d._who && (dist > 110 || (!open && !seen))) dropWindow(d);
+  }
+}
+function dropWindow(d) { if (d._who && !d._who.corpse && !d._who.dead && G && G.people) G.people.remove(d._who); d._who = null; }
 // ---------------------------------------------------------------- in and out
 const LABEL = { kirana: 'Buy something', shop: 'Buy something', paan: 'A paan, or something else', florist: 'Buy flowers', sweets: 'Buy sweets', bakery: 'Buy from the bakery',
   tapri: 'Order a cutting chai', cafe: 'Order at the counter', juice: 'Order a juice', icecream: 'Order an ice cream',
