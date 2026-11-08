@@ -45,7 +45,7 @@ export function smash(W) { return W.smash || (W.smash = new Smash(W)); }
 
 class Smash {
   constructor(W) {
-    this.W = W; this.byMesh = new Map(); this.by = new Map(); this.grid = new Map(); this.down = new Set(); this.t = 0; this.chk = 0; this.nSnd = 0; this.sndT = 0;
+    this.W = W; this.byMesh = new Map(); this.lines = new Set(); this.sag = []; this.by = new Map(); this.grid = new Map(); this.down = new Set(); this.t = 0; this.chk = 0; this.nSnd = 0; this.sndT = 0;
     this.debris = new Debris();
     this.debris.onLand = (b, v) => { if (this.nSnd++ < 6) FX.land(b.mat, b.p.x, b.p.y, b.p.z, v, b.m); };
   }
@@ -97,6 +97,33 @@ class Smash {
   // a street let go: what was drawn in it no longer is
   unmesh(...ms) {
     for (const m of ms) { if (!m) continue; const l = this.byMesh.get(m); if (!l) continue; for (const r of l) r.draw = r.draw.filter(e => e.m !== m); this.byMesh.delete(m); }
+  }
+  // a street's wires, pole to pole (6 lengths a wire, 5 wires a span: world/propsChunk.js). A pole that's down already
+  // has its own down as the street comes in
+  wired(line) {
+    const w = { line, a: line.geometry.attributes.position };
+    this.lines.add(w);
+    for (const r of this.down) if (r.kind === 'pole' && r.st === 2) { const sp = this.spans(r, w); for (const q of sp) this.hang(q, 1); if (sp.length) { r.spans.push(...sp); w.a.needsUpdate = true; } }
+    return w;
+  }
+  unwire(w) { this.lines.delete(w); for (const r of this.down) if (r.spans) r.spans = r.spans.filter(q => q.w !== w); this.sag = this.sag.filter(q => q.w !== w); }
+  // the wires that run to this pole: [{ w, i (first corner), end (0: the pole's at its start, 1: at its end), keep }]
+  spans(r, w) {
+    const A = w.a.array, out = [];
+    for (let i = 0; i + 11 < w.a.count; i += 12) {
+      const d0 = Math.hypot(A[i*3] - r.x, A[i*3 + 2] - r.z), d1 = Math.hypot(A[(i + 11)*3] - r.x, A[(i + 11)*3 + 2] - r.z);
+      if (d0 < 1 || d1 < 1) out.push({ w, i, end: d0 < 1 ? 0 : 1, keep: A.slice(i*3, i*3 + 36) });
+    }
+    return out;
+  }
+  // a wire let go at one end: down from the pole that's still up, slack, to the road where the other one was. k: how far down
+  hang(q, k) {
+    const A = q.w.a.array, K = q.keep, f = q.end ? K[1] : K[34];       // (how high it's still held: the far end's corner)
+    for (let j = 0; j < 12; j++) {
+      const u = (Math.floor(j/2) + (j%2))/6, t = q.end ? u : 1 - u;      // (t: 0 at the end still held, 1 at the pole)
+      const y = Math.max(0.18, f*(1 - t) + 0.2*t - 1.6*t*(1 - t));
+      A[(q.i + j)*3 + 1] = K[j*3 + 1] + (y - K[j*3 + 1])*k;
+    }
   }
   near(x, z, rad, fn) {
     const i0 = Math.floor((x - rad)/CELL), i1 = Math.floor((x + rad)/CELL), j0 = Math.floor((z - rad)/CELL), j1 = Math.floor((z + rad)/CELL);
@@ -212,6 +239,8 @@ class Smash {
         rb.v.set(o.nx*u*0.5 + Math.cos(a)*1.4, 1 + hsh(k*11)*1.6, o.nz*u*0.5 + Math.sin(a)*1.4); rb.w.set(hsh(k)*8 - 4, hsh(k + 1)*8 - 4, hsh(k + 2)*8 - 4);
       }
     }
+    // its wires come down with it, sagging to the road from the next poles
+    if (r.kind === 'pole') { r.spans = []; for (const w of this.lines) r.spans.push(...this.spans(r, w)); for (const q of r.spans) this.sag.push(Object.assign(q, { t: 0 })); }
     FX.brk(S.snd, r.x, r.y + 0.6, r.z, 1);
     if (r.kind === 'lamp' && !r.dark) FX.brk('glass', r.x, r.y + 7, r.z, 0.5);
     return { broke: true, absorb: S.absorb, carried: S.mass*0.25 };
@@ -326,6 +355,12 @@ class Smash {
   tick(dt, cars) {
     this.t += dt; this.sndT -= dt; if (this.sndT <= 0) { this.sndT = 0.1; this.nSnd = 0; }
     if (this.debris.list.length) this.debris.step(dt, this.W, cars);
+    if (this.sag.length) {
+      const up = new Set();
+      for (const q of this.sag) { q.t = Math.min(1, q.t + dt/1.3); this.hang(q, q.t*q.t); up.add(q.w.a); }
+      for (const a of up) a.needsUpdate = true;
+      this.sag = this.sag.filter(q => q.t < 1);
+    }
     if ((this.chk -= dt) > 0) return;
     this.chk = 0.5;
     const G = window.__nhAskG, cam = G && G.camera, W = this.W;
@@ -347,6 +382,7 @@ class Smash {
     if (r.ti != null && this.W.trees && this.W.trees.dead) { this.W.trees.dead.delete(r.ti); this.W.trees.lastX = 1e9; }
     if (r.draw) { r.draw = r.draw.filter(e => e.m.parent); for (const e of r.draw) this.cut(e, false); }
     r.top = null;
+    if (r.spans) { for (const q of r.spans) { q.w.a.array.set(q.keep, q.i*3); q.w.a.needsUpdate = true; } this.sag = this.sag.filter(q => !r.spans.includes(q)); r.spans = null; }
     for (const m of r.meshes) { m.parent && m.parent.remove(m); m.geometry.dispose(); }
     r.bodies = []; r.meshes = [];
     r.tilt.set(0, 0, 0);

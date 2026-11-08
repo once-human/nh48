@@ -299,11 +299,13 @@ export function* buildPropsChunk(W, C, group) {
   if (!ks.empty) { kq = new THREE.Mesh(yield* ks.buildSliced(), mats.oldSign); kq.receiveShadow = true; kq.geometry.userData.shared = true; group.add(kq); }
   const X = smash(W);
   for (const [kind, x, z, ry, i0, i1, s0, s1] of knock) X.reg(kind, x, z, ry, { draw: [km && i1 > i0 ? [km, i0, i1] : null, kq && s1 > s0 ? [kq, s0, s1] : null] });
+  // (the wires kept as they are, so a pole that's down can bring its wires down with it)
+  let wl = null, ws = null;
   if (C.wires.length) {
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(C.wires, 3));
-    group.add(new THREE.LineSegments(g, W.wireMat));
+    g.setAttribute('position', new THREE.Float32BufferAttribute(C.wires, 3)); g.userData.shared = true;
+    wl = new THREE.LineSegments(g, W.wireMat); group.add(wl); ws = X.wired(wl);
   }
   // (kept by hand, so the runs can be taken out and put back: let go with the chunk)
-  return () => { X.unmesh(km, kq); for (const m of [km, kq]) if (m) m.geometry.dispose(); };
+  return () => { X.unmesh(km, kq); if (ws) X.unwire(ws); for (const m of [km, kq, wl]) if (m) m.geometry.dispose(); };
 }
