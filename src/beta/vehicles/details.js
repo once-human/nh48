@@ -25,6 +25,7 @@ import { baseOf } from './models.js';
 import { HAZE } from '../gfx/post.js';
 import { Audio } from '@orig/game/audio.js';
 import { keyOf } from '@orig/game/keys.js';
+import { startSound, stopSound, flareOf } from './starter.js';
 
 const G0 = () => window.__nhAskG;
 const mine = (v) => { const P = G0() && G0().player; return !!P && !P.onFoot && P.cur === v; };
@@ -344,12 +345,12 @@ Pilot.prototype.update = function (dt, ...a) {
 // little longer when it's cold, and it catches. Off for a few minutes and it starts cold (vapour, a high idle)
 function engineKey(v) {
   const A = G0() && G0().audio;
-  if (!v._off && !(v._crank > 0)) { v._off = true; A && A.tone && A.tone('sine', [70, 40], 0.5, 0.03); return; }
+  if (!v._off && !(v._crank > 0)) { v._off = true; stopSound(A, v); return; }
   if (v._crank > 0) return;
   const cold = v._lastRun === undefined || now() - v._lastRun > COLD;
-  v._crank = cold ? 1.15 : 0.6; v._off = false;
-  if (A && A.noiseBurst) { const n = Math.round(v._crank/0.085); for (let i = 0; i < n; i++) A.noiseBurst(0.05, 150 + (i % 2)*30, 1.3, 0.16, A.ctx ? A.ctx.currentTime + i*0.085 : undefined); }
-  A && A.tone && A.tone('sawtooth', [48, 62], v._crank, 0.012);
+  // (how long it takes to catch: longer cold, and never quite the same)
+  v._crank = (cold ? 1.0 : 0.45) + Math.random()*0.35; v._off = false;
+  startSound(A, v, v._crank);
 }
 const ue2 = Audio.prototype.updateEngine;
 Audio.prototype.updateEngine = function (rpm, thr, running, kind) {
@@ -363,9 +364,11 @@ Vehicle.prototype.update = function (dt, inp, traffic) {
     const r = eu.call(this, dt, inp, traffic);
     // cold: it idles high for a while
     if (this._coldT > 0 && (this.throttle || 0) < 0.1 && mine(this)) this.rpm = Math.max(this.rpm, 0.2 + 0.12*Math.min(1, this._coldT/20));
+    // just caught: the revs flare up and settle back to idle
+    if (this._flareT > 0) { this._flareT -= dt; if ((this.throttle || 0) < 0.1) this.rpm = Math.max(this.rpm, 0.18 + flareOf(this)*Math.pow(Math.max(0, this._flareT/0.9), 1.5)); }
     return r;
   }
-  if (this._crank > 0) { this._crank -= dt; if (this._crank <= 0) { this._crank = 0; this.rpm = 0.45; } }
+  if (this._crank > 0) { this._crank -= dt; if (this._crank <= 0) { this._crank = 0; this.rpm = 0.3 + flareOf(this); this._flareT = 0.9; } }
   const r = eu.call(this, dt, Object.assign(_ei, inp, { throttle: 0 }), traffic);
   this.rpm = 0; this.throttle = 0;
   return r;
