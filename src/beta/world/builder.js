@@ -198,7 +198,8 @@ function edge(b, cb, G, F, i, len, fl, ctx) {
   b.set(L.wk, L.wall, L.wear, (G.B.seed % 251) / 255);
   // the ground floor
   let y0 = BASE;
-  const shopsHere = !shop && st !== 8 && front && len > 2.6 && hasShops(G, i, len);
+  // (any wall a business is listed on gets its front, back and side walls too: the board goes wherever it's listed)
+  const shopsHere = !shop && st !== 8 && len > 2.6 && hasShops(G, i, len);
   if (shop || shopsHere) { shopFront(b, cb, G, F, i, len, shop); y0 = BASE + gh; }
   else if (front && L.stilt && fl !== '0' && len > 5) { stilt(b, G, F, len); y0 = BASE + gh; }
   else if (front && L.arcade && len > 5 && levels <= 3) { arcade(b, G, F, len); y0 = BASE + gh; }
@@ -454,6 +455,8 @@ function kandil(b, P, y, R) {
 }
 
 // ---------------------------------------------------------------- shops
+// a board fits the band over the opening (0.85 m from the opening's top to the floor above), a few cm clear of each
+export const boardH = (w) => Math.min(0.72, w / 4.1);
 function shopFront(b, cb, G, F, i, len, shopEdge) {
   const { L, gh, R, type } = G;
   const ns = Math.max(1, Math.floor(len / SHOP_CELL)), cw = len / ns, oh = gh - 0.85;
@@ -473,7 +476,7 @@ function shopFront(b, cb, G, F, i, len, shopEdge) {
       const dm = (a + c) / 2; W.box(b, dm - 0.03, dm + 0.03, BASE + 0.35, BASE + oh, 0.02, 0.05, 2 | 4 | 8);
       b.set(K.stone, 0x6a645c, L.wear); W.box(b, a, c, 0, BASE + 0.35, 0, 0.3, 2 | 8);
       b.set(K.metal, 0x1e1e20, 0.2);
-      const t0 = k * cw + 0.15, t1 = (k + 1) * cw - 0.15, h = Math.min(0.85, (t1 - t0) / 4.1), y1 = BASE + gh - 0.1, y0 = y1 - h;
+      const t0 = k * cw + 0.15, t1 = (k + 1) * cw - 0.15, h = boardH(t1 - t0), y1 = BASE + gh - 0.07, y0 = y1 - h;
       W.box(b, t0 - 0.03, t1 + 0.03, y1, y1 + 0.04, -0.05, 0.12, 2); W.box(b, t0 - 0.03, t1 + 0.03, y0 - 0.04, y0, -0.05, 0.12, 2);
       b.set(L.wk === K.curtain ? K.cladding : L.wk, L.wall, L.wear);
       continue;
@@ -482,12 +485,12 @@ function shopFront(b, cb, G, F, i, len, shopEdge) {
     W.rect(b, k * cw, a, BASE, yT, 0); W.rect(b, c, (k + 1) * cw, BASE, yT, 0);
     const trade = sh ? (TRADE[sh[1]] ?? 0) : -1, brand = sh && sh[2] === 'brand', famous = sh && sh[2] === 'trad';
     const lux = (brand ? 0.55 : 0) + L.rich * 0.55 + (trade === 5 ? 0.25 : 0) - (famous ? 0.2 : 0);
-    if (lux > 0.75 && sh) { b.set(K.cladding, R() < 0.5 ? [0.2, 0.2, 0.22] : [0.86, 0.85, 0.82], 0.05); W.box(b, a - 0.18, c + 0.18, BASE + oh, yT, 0, 0.12, 2); b.set(L.wk, L.wall, L.wear); }
+    if (lux > 0.75 && sh) { b.set(K.cladding, R() < 0.5 ? [0.2, 0.2, 0.22] : [0.86, 0.85, 0.82], 0.05); W.box(b, a - 0.18, c + 0.18, BASE + oh, yT, 0, 0.06, 2); b.set(L.wk, L.wall, L.wear); }
     else W.rect(b, a, c, BASE + oh, yT, 0);
     shopInside(b, cb, G, F, a, c, oh, trade, lux, sh, famous);
     if (!sh) continue;
     // the board's frame (the board itself is the game's)
-    const t0 = k * cw + 0.15, t1 = (k + 1) * cw - 0.15, w = t1 - t0, h = Math.min(0.85, w / 4.1), y1 = BASE + gh - 0.1, y0 = y1 - h;
+    const t0 = k * cw + 0.15, t1 = (k + 1) * cw - 0.15, w = t1 - t0, h = boardH(w), y1 = BASE + gh - 0.07, y0 = y1 - h;
     b.set(K.metal, 0x1e1e20, 0.2);
     W.box(b, t0 - 0.03, t1 + 0.03, y1, y1 + 0.04, -0.05, 0.12, 2);
     W.box(b, t0 - 0.03, t1 + 0.03, y0 - 0.04, y0, -0.05, 0.12, 2);
