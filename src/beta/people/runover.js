@@ -11,6 +11,7 @@ import { People } from '@orig/people/peds.js';
 import { baseOf } from '../vehicles/models.js';
 import { tickVoice } from '../game/voices.js';
 import { startRag, kickRag } from './ragdoll.js';
+import { startAnimalRag, releaseAnimalRag } from './animalrag.js';
 
 const G0 = 9.81, HIP = 0.9, FLAT = 0.2, MARGIN = 0.3;
 export const TALL = new Set(['bus', 'tempo', 'auto', 'bolero']);
@@ -211,6 +212,7 @@ People.prototype.update = function (dt, player, ...rest) {
 const COW_M = 420, DOWN = { cow: [0.75, -0.42], dog: [0.28, -0.2], cat: [0.18, -0.13] };
 const TMP4 = new Float64Array(4), _qa = new THREE.Quaternion(), _ax = new THREE.Vector3(), _pv = new THREE.Vector3();
 window.__nhDown = (m, a, dt) => {
+  if (a._arag) return;                  // (a body of its own: people/animalrag.js)
   if (a.dead && !a._lying && !(a._thrown && a._thrown.stagger)) a._lying = { ang: 0, to: Math.PI/2, side: Math.random() < 0.5 ? -1 : 1 };
   const d = a._lying; if (!d) return;
   if (!a.dead && !a._thrown && !d.up) { d.up = true; d.to = 0; }
@@ -232,7 +234,7 @@ window.__nhDown = (m, a, dt) => {
   m.holder.position.x -= _pv.x; m.holder.position.z -= _pv.z; m.holder.position.y += c - _pv.y + low*w + (a._thrown ? a._thrown.y : 0);
 };
 People.prototype.hitCow = function (a, V, S, player, sp, fx, fz) {
-  const kmh = sp*3.6, M = S.mass || 1000, two = !!S.two, big = M > 5000, before = V.v;
+  const kmh = sp*3.6, M = S.mass || 1000, two = !!S.two, big = M > 5000, before = V.v, wv = a.moving ? (a.v || 0) : 0, wy = a.yaw || 0;
   // what you lose is the weight of her against yours, and it's not all of her at once at speed: her legs go first
   // (a dog weighs 25 kg and a cat 4: it's them that goes, you hardly feel it)
   const AM = a.cow ? COW_M : a.kind === 'cat' ? 4 : 25, share = (kmh > 45 ? 0.6 : 0.9)*AM/(M + AM), dv = Math.abs(V.v)*share;
@@ -245,12 +247,20 @@ People.prototype.hitCow = function (a, V, S, player, sp, fx, fz) {
   const lift = small ? Math.min(2.4, kmh*0.03) : big || two ? 0 : Math.min(2.1, Math.max(0, (kmh - 42)*0.035)), away = small ? Math.min(sp*0.9, 16) : Math.min(sp*(lift > 0.5 ? 0.42 : 0.78), 12);
   a.dead = true; a.moving = false; a.v = 0; a.rest = 25; a._dead = dead;
   a._thrown = { x: a.x, z: a.z, y: 0, vy: lift, vx: fx*away, vz: fz*away, t: 0, V, S, H: heightOf(V, S), tall: big || TALL.has(baseOf(V.type || 'auto')), down, dead, up: down && !dead ? (small ? 4 : 15) : 0, stagger: !down };
-  if (down) a._lying = { ang: 0.01, to: Math.PI/2, side: -sd, w: Math.min(small ? 7 : 3, kmh*(small ? 0.12 : 0.04)) };
+  // knocked down: its own body from here (people/animalrag.js), the bumper taking its legs; only if it isn't drawn does
+  // it tip over the old way
+  const G = window.__nhAskG, mdl = down && G && G.fauna && G.fauna.models && G.fauna.models.get(a), tl = big || TALL.has(baseOf(V.type || 'auto')), Hh = heightOf(V, S);
+  let R = null;
+  try { R = mdl ? startAnimalRag(mdl, a, { V, S, M: M + (two ? 75 : 0), top: (u) => topAt(u, Hh, tl), vx: Math.cos(wy)*wv, vz: Math.sin(wy)*wv }) : null; } catch (e) { R = null; a._arag = null; }
+  if (R) a._thrown.rag = true;
+  else if (down) a._lying = { ang: 0.01, to: Math.PI/2, side: -sd, w: Math.min(small ? 7 : 3, kmh*(small ? 0.12 : 0.04)) };
   if (a.cow) this.events.push({ type: 'cowHit', a, speed: sp, x: a.x, z: a.z, how: dead ? 'dead' : down ? 'down' : 'hurt', kmh });
   else { a.hurtT = dead ? 0 : 8; this.events.push({ type: 'animalHit', a, dead, x: a.x, z: a.z }); }
 };
 function cowFly(P, a, dt, V, S) {
   const f = a._thrown, C = P.W && P.W.collision; f.t += dt;
+  // (a body of its own goes where its physics takes it, people/animalrag.js: this only says when it's over)
+  if (f.rag) { if (a._arag && !a._arag.sleep && f.t < 10) return; f.rag = false; f.x = a.x; f.z = a.z; f.y = 0; f.vx = f.vz = f.vy = 0; }
   f.vy -= G0*dt; f.y += f.vy*dt; f.x += f.vx*dt; f.z += f.vz*dt;
   const O = f.V;
   if (O && O === V && !f.tall) { const hx = Math.cos(O.th), hz = Math.sin(O.th), rx = f.x - O.x, rz = f.z - O.z, la = rx*hx + rz*hz, lc = -rx*hz + rz*hx; if (Math.abs(lc) < S.W/2 + 0.5 && Math.abs(la) < S.L/2 + 0.6 && f.vy !== 0) { const top = topAt(Math.sign(O.v || 1)*la/(S.L/2), f.H, false) - 0.35; if (f.y < top && f.down) { f.y = top; f.vy = Math.max(f.vy, 0.4); } } }
@@ -261,6 +271,7 @@ function cowFly(P, a, dt, V, S) {
     if (f.dead) { a._dead = true; a._thrown = null; return; }
     if (f.up > 0) { f.up -= dt; if (f.up > 0) return; }
     // back on her feet, and off, hurt
+    releaseAnimalRag(a);
     a._thrown = null; a.dead = false; a.hurtT = 9; a.moving = true; a.dir = -a.dir; a.rest = 10;
     if (a.e && P.g && P.g.at) { P.g.at(a.e, a.s, TMP4); a.s = Math.max(2, Math.min(a.e.len - 2, a.s + (a.x - TMP4[0])*TMP4[2] + (a.z - TMP4[1])*TMP4[3])); P.g.at(a.e, a.s, TMP4); a.lat = (a.x - TMP4[0])*TMP4[3] - (a.z - TMP4[1])*TMP4[2]; }
   }

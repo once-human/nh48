@@ -118,7 +118,7 @@ export function ragOn(p) { return !!(p && p._rag); }
 export function startRag(p, o = {}) {
   const H = (o.H && o.H.root ? o.H : null) || (p.body && p.body.H); if (!H || !H.root) return null;
   H.holder.updateMatrixWorld(true);
-  const R = { p: new Float64Array(N*3), q: new Float64Array(N*3), t: 0, acc: 0, still: 0, sleep: false, off: {}, car: null, gy: new Float64Array(N), out: -1, kmh: o.kmh || 0 };
+  const R = { p: new Float64Array(N*3), q: new Float64Array(N*3), t: 0, acc: 0, still: 0, sleep: false, off: {}, car: null, gy: new Float64Array(N).fill(-1e9), out: -1, kmh: o.kmh || 0 };
   const hb = bone(H, 'Head');
   for (let i = 0; i < 18; i++) {
     const n = NAMES[i], b = n ? bone(H, n) : null;
@@ -141,6 +141,7 @@ export function startRag(p, o = {}) {
   // the knees give a touch, so nobody goes over stiff as a post
   const fwd = _f.set(Math.cos(o.yaw ?? p.yaw ?? 0), 0, Math.sin(o.yaw ?? p.yaw ?? 0));
   for (const k of [11, 15]) { R.p[k*3] += fwd.x*0.03; R.p[k*3 + 2] += fwd.z*0.03; }
+  settle(R);
   if (o.V) {
     // how much of its speed it gives them: a car or a bus barely notices a person (it carries them at its own speed), a
     // scooter with its rider is only three or four times their weight and gives them less of its own
@@ -149,6 +150,13 @@ export function startRag(p, o = {}) {
   }
   p._rag = R; p._slide = null;
   return R;
+}
+// a body taken from a pose its joints don't allow (mid-stride, an arm behind the back) is put inside its limits before
+// it moves: the correction carries the points, it doesn't throw them (that was the first-frame kick and flail)
+function settle(R) {
+  const p = R.p, q = R.q, s0 = Float64Array.from(p);
+  solve(R, ITER*3);
+  for (let i = 0; i < p.length; i++) q[i] += p[i] - s0[i];
 }
 // sat astride something (a rider coming off): the hips at the seat, thighs forward, shins down to the pegs, leaning
 // into the bars, and every point moving at (vx, vy, vz)
@@ -168,7 +176,7 @@ export function seatRag(R, x, z, yaw, y, vx, vy, vz) {
     set(h, Hx, Hy, Hz); set(k, Kx, Ky, Kz); set(an, Ax, Ay, Az); set(b, Ax + bo[0] - ao[0], Ay + bo[1] - ao[1], Az + bo[2] - ao[2]);
   }
   set(0, x, y, z);
-  fronts(R); lengths(R); togetherFrom(R);
+  fronts(R); lengths(R); togetherFrom(R); settle(R);
   for (let i = 0; i < N; i++) { R.q[i*3] = P[i*3] - vx*DT; R.q[i*3 + 1] = P[i*3 + 1] - vy*DT; R.q[i*3 + 2] = P[i*3 + 2] - vz*DT; }
   R.sleep = false; R.still = 0;
 }
@@ -270,22 +278,9 @@ function carAt(R, k) {
   const C = R.car, V = C.V; return [C.x + (V.x - C.x)*k, C.z + (V.z - C.z)*k, C.th + Math.atan2(Math.sin(V.th - C.th), Math.cos(V.th - C.th))*k];
 }
 const vm = [0, 0, 0];
-function step(R) {
-  const p = R.p, q = R.q;
-  // moving on, falling, a little air
-  for (let i = 0; i < N; i++) {
-    const j = i*3;
-    for (let c = 0; c < 3; c++) { const x = p[j + c], v = (x - q[j + c])*0.998; q[j + c] = x; p[j + c] = x + v + (c === 1 ? -G0*DT*DT : 0); }
-  }
-  for (let k = 0; k < TOGETHER.length; k++) R.tog[k] = Math.max(TOGETHER[k][2], R.tog[k] - 0.7*DT);
-  // what hit them, where it is this step
-  const C = R.car;
-  let cx, cz, th, hx, hz, fr, L2, W2, gy, cvx, cvz;
-  if (C) {
-    [cx, cz, th] = carAt(R, R.sub); hx = Math.cos(th); hz = Math.sin(th); fr = Math.sign(C.V.v || 1); L2 = C.S.L/2; W2 = C.S.W/2;
-    gy = C.gy; cvx = (C.V.v || 0)*hx*DT; cvz = (C.V.v || 0)*hz*DT;
-  }
-  for (let it = 0; it < ITER; it++) {
+function solve(R, n) {
+  const p = R.p;
+  for (let it = 0; it < n; it++) {
     for (let k = 0; k < LINKS.length; k++) {
       const [a, b, s] = LINKS[k], A = a*3, B = b*3, dx = p[B] - p[A], dy = p[B + 1] - p[A + 1], dz = p[B + 2] - p[A + 2], d = Math.hypot(dx, dy, dz) || 1e-6;
       const wa = W_[a], wb = W_[b], e = (d - R.len[k])/d/(wa + wb)*s;
@@ -307,6 +302,23 @@ function step(R) {
     // the road, inside the solve, so the bones are never left holding a point under it
     for (let i = 0; i < N; i++) { const g = R.gy[i] + RAD[i]; if (p[i*3 + 1] < g) p[i*3 + 1] = g; }
   }
+}
+function step(R) {
+  const p = R.p, q = R.q;
+  // moving on, falling, a little air
+  for (let i = 0; i < N; i++) {
+    const j = i*3;
+    for (let c = 0; c < 3; c++) { const x = p[j + c], v = (x - q[j + c])*0.998; q[j + c] = x; p[j + c] = x + v + (c === 1 ? -G0*DT*DT : 0); }
+  }
+  for (let k = 0; k < TOGETHER.length; k++) R.tog[k] = Math.max(TOGETHER[k][2], R.tog[k] - 0.7*DT);
+  // what hit them, where it is this step
+  const C = R.car;
+  let cx, cz, th, hx, hz, fr, L2, W2, gy, cvx, cvz;
+  if (C) {
+    [cx, cz, th] = carAt(R, R.sub); hx = Math.cos(th); hz = Math.sin(th); fr = Math.sign(C.V.v || 1); L2 = C.S.L/2; W2 = C.S.W/2;
+    gy = C.gy; cvx = (C.V.v || 0)*hx*DT; cvz = (C.V.v || 0)*hz*DT;
+  }
+  solve(R, ITER);
   let touching = 0;
   for (let i = 0; i < N; i++) {
     const j = i*3, r = RAD[i];
@@ -333,8 +345,8 @@ function step(R) {
           if (face === 0) {
             // carried up as the bonnet and the glass rise under them (the surface's own rise, not the distance it was put
             // back), and the glass and the bonnet give as a body lands on them: less than all of it
-            ny = 1; d = dTop; us = Math.min(Math.max(0, top - top0)*0.6, (0.22*cs/DT + 0.4)*DT);
-          } else if (face === 1) { nx = hx*fr; nz = hz*fr; d = dF; us = cs*ck; }
+            ny = 1; d = dTop; us = Math.min(Math.max(0, top - top0)*0.45, (0.12*cs/DT + 0.25)*DT);
+          } else if (face === 1) { nx = hx*fr; nz = hz*fr; d = dF; us = cs*ck*0.82; }
           else if (face === 2) { nx = -hx*fr; nz = -hz*fr; d = dB; us = 0; }
           else { const sg = Math.sign(lc) || 1; nx = -hz*sg; nz = hx*sg; d = dS; us = 0; }
           p[j] += nx*d; p[j + 1] += ny*d; p[j + 2] += nz*d;
@@ -370,7 +382,10 @@ function step(R) {
     const A = a*3 + c, B = b*3 + c, va = p[A] - q[A], vb = p[B] - q[B], m = (va + vb)/2;
     q[A] = p[A] - (m + (va - m)*0.95); q[B] = p[B] - (m + (vb - m)*0.95);
   }
-  const keep = touching >= 6 ? 0.965 : touching >= 2 ? 0.985 : 0.995;
+  const keep = touching >= 6 ? 0.93 : touching >= 2 ? 0.965 : 0.988;
+  // lying on the road and hardly moving: it stops (the joints and the road nudging each other a hair every step was a
+  // body that twitched for seconds)
+  if (touching >= 5 && Math.hypot(vm[0], vm[1], vm[2])/DT < 0.25) { for (let i = 0; i < N*3; i++) { const c = i%3, v = p[i] - q[i]; q[i] = p[i] - (vm[c] + (v - vm[c])*keep)*0.6; } return; }
   for (let i = 0; i < N; i++) {
     const j = i*3;
     for (let c = 0; c < 3; c++) { const v = p[j + c] - q[j + c], rel = v - vm[c]; q[j + c] = p[j + c] - (vm[c] + rel*keep); }
@@ -396,9 +411,10 @@ export function tick(R, dt, W) {
   R.acc -= n*DT; R.t += n*DT;
   if (C && R.car) { C.x = C.V.x; C.z = C.V.z; C.th = C.V.th; }
   // still: asleep (moves again if something pushes it)
-  let mx = 0; for (let i = 0; i < N*3; i++) mx = Math.max(mx, Math.abs(R.p[i] - R.q[i]));
-  R.still = mx/DT < 0.12 && n > 0 ? R.still + dt : n > 0 ? 0 : R.still;
-  if ((R.still > 0.4 && R.t > 1) || R.t > 9) R.sleep = true;
+  let mv = 0; for (let i = 0; i < N; i++) mv += Math.hypot(R.p[i*3] - R.q[i*3], R.p[i*3 + 1] - R.q[i*3 + 1], R.p[i*3 + 2] - R.q[i*3 + 2]);
+  mv /= N;
+  R.still = mv/DT < 0.12 && n > 0 ? R.still + dt : n > 0 ? 0 : R.still;
+  if ((R.still > 0.3 && R.t > 0.8) || R.t > 7) R.sleep = true;
 }
 
 // ---- the bones, from the points (after the clip's pose: whatever the clip doesn't move, the fingers, keep its pose)

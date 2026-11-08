@@ -313,7 +313,7 @@ const PATCHES = {
   [S('people/animals.js')]: [
     // (what's down lies down: beta/people/runover.js)
     ["      m.holder.rotation.set(0, -yaw, roll);\n", "      m.holder.rotation.set(0, -yaw, roll);\n      if (a.dead || a._lying) window.__nhDown(m, a, dt);\n"],
-    ["      m.mixer.update(d < 60 ? dt : dt);", "      if (!(a.dead && a._lying && a._lying.ang > 1.2)) m.mixer.update(dt);"],
+    ["      m.mixer.update(d < 60 ? dt : dt);", "      if (a._arag) window.__nhARag(m, a, dt, this.W); else if (!(a.dead && a._lying && a._lying.ang > 1.2)) m.mixer.update(dt);"],
     ["      const lie = !a.moving && a.kind !== 'cow' && !a.cow;\n      m.play(a.moving ? (a.cow ? 'WalkSlow' : 'Walk') : 'Idle', a.moving ? (a.cow ? 0.9 : Math.min(2.6, Math.max(1, a.v / 1.1))) : 1);",
      "      const q = m._lx === undefined ? 0 : Math.hypot(a.x - m._lx, a.z - m._lz); m._lx = a.x; m._lz = a.z;\n      if (q < 3 && dt > 0) m._v = (m._v || 0) + (q / dt - (m._v || 0)) * Math.min(1, dt * 6);\n      const cowS = a.cow || a.kind === 'cow', mv = cowS ? Math.min(m._v || 0, 1.3) : m._v || 0, walking = mv > 0.12, slow = cowS && mv < 0.9;\n      if (walking && mv > 2.4) { m._ph = (m._ph || 0) + dt * mv * 2.2; m.holder.position.y += Math.abs(Math.sin(m._ph)) * Math.min(0.07, (mv - 2.4) * 0.02); }\n      const lie = !walking && a.kind !== 'cow' && !a.cow;\n      m.play(walking ? (slow ? 'WalkSlow' : 'Walk') : 'Idle', walking ? Math.max(0.45, mv / (cowS ? (slow ? 0.7 : 1.1) : a.kind === 'cat' ? 0.6 : 0.95)) : 1);"],
   ],
