@@ -98,6 +98,7 @@ import './game/seat.js';
 import './game/view.js';           // first or third person, on foot and driving     // vehicles as boxes on four wheels
 import './game/stride.js';        // lean into turns and starts, feet on the ground under them, knees on landing
 import './game/pet.js';           // down by a dog to stroke it or feed it, a banana up to a cow, namaskar to her
+import './game/sfx.js';           // the small sounds of doing things: switches, knobs, a holster, paying, the metro gate, eating
 import './game/eat.js';           // what you buy to eat or drink, in your hand: the cutting glass, the vada pav, the plate
 import './game/popless.js';       // out of a vehicle with no scene for it: eased from the seat, not a jump
 import { PU } from './gfx/paint.js';

@@ -11,6 +11,7 @@ import { Pilot } from '@orig/game/pilot.js';
 import { Shops, F as FOOD } from '@orig/game/shops.js';
 import { ikArm } from '@orig/people/humans.js';
 import { grip } from '../vehicles/fit.js';
+import { SFX } from './sfx.js';
 
 const sm = (k) => { k = Math.max(0, Math.min(1, k)); return k*k*(3 - 2*k); };
 const bone = (H, n) => (H._eb || (H._eb = {}))[n] || (H._eb[n] = H.root.getObjectByName(n));
@@ -122,8 +123,8 @@ const byName = new Map(Object.entries(FOOD).map(([k, v]) => [v[0], k]));
 function begin(P, id, scene) {
   end(P);
   let E = null;
-  if (DRINK[id]) { const [k, c] = DRINK[id], v = vessel(k, c); E = { type: 'drink', ...v, rim: k === 'cutting' || k === 'tumbler', n: k === 'cutting' ? 3 : k === 'tumbler' || k === 'cup' ? 3 : 4 }; }
-  else if (HAND[id]) E = { type: 'bite', G: handheld(HAND[id]), n: HAND[id] === 'slice' || HAND[id] === 'burger' ? 4 : 3 };
+  if (DRINK[id]) { const [k, c] = DRINK[id], v = vessel(k, c); E = { type: 'drink', ...v, hot: k === 'cutting' || k === 'tumbler' || k === 'cup', rim: k === 'cutting' || k === 'tumbler', n: k === 'cutting' ? 3 : k === 'tumbler' || k === 'cup' ? 3 : 4 }; }
+  else if (HAND[id]) E = { type: 'bite', crisp: /puff|khari|maska/.test(HAND[id]), G: handheld(HAND[id]), n: HAND[id] === 'slice' || HAND[id] === 'burger' ? 4 : 3 };
   else if (PLATE[id] || BOWL[id]) {
     const bw = BOWL[id], d = dish(bw ? bw[0] : 'plate', bw ? bw[1] : PLATE[id]);
     const ut = bw || SPOON.has(id) ? 'spoon' : FORK.has(id) ? 'fork' : null;
@@ -204,6 +205,8 @@ function pose(P, dt) {
   const ct = t - 0.6, i = Math.floor(ct/E.cyc), u = ct - i*E.cyc;
   const up = ct < 0 || i >= E.n ? 0 : sm(u/0.5)*(1 - sm((u - (E.type === 'drink' ? 1.25 : 0.85))/0.45));
   const done = Math.max(0, Math.min(E.n, i + (u > 0.8 ? 1 : 0)))/E.n;           // how much is gone
+  // at the mouth: the bite, the sip, a spoon on the plate on the way
+  if (ct >= 0 && i < E.n && u > 0.55 && E._si !== i) { E._si = i; const A = window.__nhAskG && window.__nhAskG.audio; if (E.type === 'drink') SFX.sip(A, E.hot); else { if (E.ut) SFX.spoon(A); SFX.bite(A, E.crisp || (E.type === 'plate' && /nachos|kebab|dosa/.test(E.id || ''))); } }
   // the head back for a sip, forward to meet a bite
   if (E.type === 'drink') { const nk = bone(H, 'neck_01'); if (nk) { nk.parent.getWorldQuaternion(_pq).invert(); nk.quaternion.premultiply(_q.setFromAxisAngle(_x.copy(_r).applyQuaternion(_pq), 0.16*up*(0.5 + done))); } }
   else { const nk = bone(H, 'neck_01'); if (nk) { nk.parent.getWorldQuaternion(_pq).invert(); nk.quaternion.premultiply(_q.setFromAxisAngle(_x.copy(_r).applyQuaternion(_pq), -0.14*up)); } }
