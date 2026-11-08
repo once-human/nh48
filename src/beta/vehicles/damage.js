@@ -371,6 +371,7 @@ function shotAt(G, best, o3, d3) {
 export function promote(G, o) {
   const Pl = G.player;
   if ((o.y || 0) > 0.5) return null;                                     // (up on a flyover: not worth the trouble)
+  if (!o.alive || !G.traffic.list.includes(o)) return null;              // (made real already: never a second one of it)
   const v = new Vehicle(Pl.W, Pl.scene, Pl.vmats, o.type, o.col);
   v.reset(o.x, o.z, Math.atan2(o.hz ?? 0, o.hx ?? 1)); v.v = 0;
   v.plate = Pl.randomPlate ? Pl.randomPlate() : v.plate; v.dmg = o.dmg || 0;

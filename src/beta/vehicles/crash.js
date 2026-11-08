@@ -32,7 +32,7 @@ const circles = (x, z, hx, hz, L, W) => { const n = Math.max(1, Math.round(L/W))
 function solid(TR, v, me, q, y, move) {
   let hit = false;
   TR.near(v.x, v.z, 9, (o) => {
-    if (o === v || o.veh === v || !o.T || o.isPlayer || o.hideBody || o.parked || Math.abs((o.y || 0) - y) > 1.5) return;
+    if (o.alive === false || o === v || o.veh === v || !o.T || o.isPlayer || o.hideBody || o.parked || Math.abs((o.y || 0) - y) > 1.5) return;
     let best = 0, nx = 0, nz = 0;
     for (const [bx, bz, br] of circles(o.x, o.z, o.hx ?? 1, o.hz ?? 0, o.T.L, o.T.W)) for (const [ax, az, ar] of me) {
       const dx = ax - bx, dz = az - bz, d = Math.hypot(dx, dz), dep = ar + br - d;
@@ -118,7 +118,7 @@ function coast(TR, v, dt) {
     solid(TR, v, me, q, y, (dx, dz) => { v.x += dx; v.z += dz; }); }
   // what it's thrown into goes too (thrown hard into a car, that car's thrown: a real one, and it can go over in its turn)
   if (sp > 4) TR.near(v.x, v.z, v.spec.L/2 + 1.5, (o) => {
-    if (!o.T || o.isPlayer || o.parked || o._hitT > now() || Math.hypot(o.x - v.x, o.z - v.z) > (v.spec.L + o.T.L)/2*0.8) return;
+    if (o.alive === false || !o.T || o.isPlayer || o.parked || o._hitT > now() || Math.hypot(o.x - v.x, o.z - v.z) > (v.spec.L + o.T.L)/2*0.8) return;
     o._hitT = now() + 0.8;
     const mv = v.spec.mass || 1100, mo = o.T.mass || 1100, k = 2*mv/(mv + mo)*0.88;
     if (o.T.two && !o.fallen) { o._hit = { vx: q.vx*0.7, vz: q.vz*0.7 }; o.fallen = 3.5; }
@@ -167,6 +167,7 @@ function struck(v, cx, cz, dirx, dirz, dv, m2) {
   return clamp(dv*(lx*nz - lz*nx)*12/(S.L*S.L + S.W*S.W), -3.5, 3.5);
 }
 Vehicle.prototype.hitTraffic = function (o, T, H, traffic) {
+  if (o.alive === false) return;
   // (what's thrown goes a little less far than the sums say: a body crumples and takes some of it, and an auto's so light it
   // flew off like a toy)
   const K = /^auto/.test(o.type || (o.veh && o.veh.type) || '') ? 0.72 : 0.88;
@@ -270,7 +271,7 @@ PlayerAuto.prototype.collideTraffic = function (traffic) {
   const hx = Math.cos(this.th), hz = Math.sin(this.th);
   const mine = [[1.0, 0.5], [0.0, 0.7], [-0.95, 0.7]].map(([o, r]) => [this.x + hx*o, this.z + hz*o, r]);
   traffic.near(this.x, this.z, 9, (o) => {
-    if (o.isPlayer || o.T === undefined || Math.abs((o.y || 0) - this.agent.y) > 2) return;
+    if (o.alive === false || o.isPlayer || o.T === undefined || Math.abs((o.y || 0) - this.agent.y) > 2) return;
     const T = o.T, n = Math.max(1, Math.round(T.L/T.W));
     for (let k = 0; k < n; k++) {
       const off = n === 1 ? 0 : -T.L/2 + T.W/2 + (T.L - T.W)*k/(n - 1), ox = o.x + o.hx*off, oz = o.z + o.hz*off, orr = T.W/2 + 0.05;

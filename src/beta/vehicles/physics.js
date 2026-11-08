@@ -139,7 +139,7 @@ P.collideStatic = function () {
 P.collideTraffic = function (traffic) {
   const S = this.spec, a = S.L/2, b = S.W/2;
   traffic.near(this.x, this.z, a + 8, (o) => {
-    if ((o.isPlayer && !this.service) || o === this.agent || o.T === undefined && !o.parked || Math.abs((o.y || 0) - this.agent.y) > 2) return;
+    if (o.alive === false || (o.isPlayer && !this.service) || o === this.agent || o.T === undefined && !o.parked || Math.abs((o.y || 0) - this.agent.y) > 2) return;
     const T = o.T || { L: o.L, W: o.W, mass: 1000, two: false }, hx = Math.cos(this.th), hz = Math.sin(this.th);
     const dx = o.x - this.x, dz = o.z - this.z, cx = dx*hx + dz*hz, cz = -dx*hz + dz*hx;
     const ohx = o.hx ?? 1, ohz = o.hz ?? 0, ex = ohx*hx + ohz*hz, ez = -ohx*hz + ohz*hx;
