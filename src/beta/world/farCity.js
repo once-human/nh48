@@ -175,5 +175,8 @@ function buildFarGround(W) {
   plane.matrixAutoUpdate = false; plane.updateMatrix();
   scene.add(plane);
   // the mask's row 0 must be the chunk row at z0 (top of the canvas = v 1)
-  W.farGround = { plane, mask, maskTex, set: (c, on) => { mask[c.i + (index.ncz - 1 - c.j) * index.ncx] = on ? 255 : 0; maskTex.needsUpdate = true; } };
+  W.farGround = { plane, mask, maskTex, set: (c, on) => { mask[c.i + (index.ncz - 1 - c.j) * index.ncx] = on ? 255 : 0; maskTex.needsUpdate = true; },
+    // the rivers and lakes: the map's water comes in tiles now (M.water is empty at the start), so the whole of Pune's
+    // water is drawn in when its outline arrives (main.js, with the coarse roads), and each tile's own as it streams
+    water: (rings) => { if (!rings || !rings.length) return; for (const r of rings) draw([r], '#3c4a4c'); tex.needsUpdate = true; } };
 }

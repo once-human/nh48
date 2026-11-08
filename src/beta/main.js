@@ -379,7 +379,7 @@ async function main() {
     game.preloads = game.preloads || [];
     if (W.tiles) game.preloads.push(bg.bytes('assets/pune/base_map.json.gz').then(async (b) => {
       const d = JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
-      await cityReady; W.cityMap.setCoarse(d.coarse, d.cwater);
+      await cityReady; W.cityMap.setCoarse(d.coarse, d.cwater); W.farGround?.water(d.cwater);
     }).catch(() => { /* names fill in as you go */ }));
     // every shop and place in Pune onto the map (names and spots only, about a megabyte)
     if (W.tiles) game.preloads.push(bg.bytes('assets/pune/pins.json.gz').then(async (b) => {
