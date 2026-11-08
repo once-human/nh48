@@ -52,6 +52,12 @@ People.prototype.struck = function (p, V, S, player, sp, fx, fz, al, ac) {
   if (!ko) p.limp = 40 + kmh*2;
   this.remember(p, dead ? 'dead' : 'hit');
   this.events.push({ type: 'pedHit', p, speed: sp, x: p.x, z: p.z, sev: dead ? 'dead' : ko ? 'ko' : 'knock' });
+  // the people who saw it: the nearest gets their phone out and calls it in, the next shakes their head at you
+  if (ko) { let n = 0; for (const q of this.list.filter(q => q !== p && !out(q) && !q.cop && !(q.fallen > 0) && !q.act && Math.abs(q.x - p.x) < 25 && Math.abs(q.z - p.z) < 25).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))) {
+    q.yaw = Math.atan2(p.z - q.z, p.x - q.x); q.hx = Math.cos(q.yaw); q.hz = Math.sin(q.yaw); q.v = 0;
+    q.act = n === 0 ? { kind: 'react', clip: 'phone', speed: 1, t: 0, dur: 9 } : { kind: 'react', clip: 'no', speed: 1, t: 0, dur: 3 };
+    if (++n >= 2) break;
+  } }
   // how they leave: the share of your speed they take, what's added to the side, how they lift and turn
   const cap = Math.min(sp, 26);
   let along, lat, vy, spin;
@@ -165,6 +171,11 @@ People.prototype.update = function (dt, player, ...rest) {
         if (p.fallen > 0) continue;
         const rx = p.x - V.x, rz = p.z - V.z, al = (rx*hx + rz*hz)*s, ac = -rx*hz + rz*hx;
         if (Math.abs(ac) < W2 && al < L2 && al > -L2 - reach) this.struck(p, V, S, player, sp, fx, fz, al, ac);
+        // a near thing: you came past close and fast and they flinch, arms up, and turn to see you go
+        else if (sp > 6 && !p.act && !(p._flinchT > performance.now()) && Math.abs(ac) < W2 + 1.3 && al > -L2 && al < L2 + sp*0.35) {
+          p._flinchT = performance.now() + 5000; p.act = { kind: 'react', clip: 'block', speed: 1.4, t: 0, dur: 0.75 };
+          p.react = 2.5; p.reactAnim = 'no'; p.reactAt = { x: V.x, z: V.z };
+        }
       }
     }
   }

@@ -103,7 +103,7 @@ function tick(TR, v, dt) {
     const k = Math.min(1, S.liftT/2.6), e1 = Math.min(1, k/0.28), e2 = Math.max(0, (k - 0.46)/0.54);
     const e = 0.36*e1*e1*(3 - 2*e1) - 0.05*Math.min(1, Math.max(0, (k - 0.28)/0.18)) + 0.69*e2*e2*(3 - 2*e2);
     S.th = Math.sign(S.th || 1)*LIE*(1 - e);
-    if (p && L && L.includes(p)) { p.chase = null; p.mode = 'stand'; p.v = 0; p.yaw = Math.atan2(v.z - p.z, v.x - p.x); p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw); }
+    if (p && L && L.includes(p)) { p.chase = null; p.mode = 'stand'; p.v = 0; p.anim = 'pickup'; p.yaw = Math.atan2(v.z - p.z, v.x - p.x); p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw); }      // (bent to the bars, hauling)
     if (k >= 1) {
       // on it and off: the rider's back on the machine (the baked one), the person who walked to it gone
       if (p && L && L.includes(p)) G.people.remove(p);

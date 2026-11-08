@@ -28,7 +28,11 @@ People.prototype.update = function (dt, player, ...a) {
         p.yaw = Math.atan2(-sz, -sx); p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
         p._slide = { vx: sx*sp, vz: sz*sp };
       }
-    } else if (!down && p._down) p._down = false;
+    } else if (!down && p._down) {
+      p._down = false;
+      // up again after being knocked over: a hand to the head a moment, getting their bearings
+      if (!p.corpse && !p.ko && !p.act && p.inj) p.act = { kind: 'hurt', clip: 'hit_head', speed: 1, t: 0, dur: 2.2 };
+    }
     const S = p._slide;
     if (S && down) {
       p.x += S.vx*dt; p.z += S.vz*dt;
