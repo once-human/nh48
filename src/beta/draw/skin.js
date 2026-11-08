@@ -368,7 +368,9 @@ export class Skin {
       if (o !== (this.only || this.scene)) continue;          // (a body in another scene, a preview's, is drawn by that scene's view)
       const p = H.holder.position, dx = p.x - cx, dz = p.z - cz, d2 = dx*dx + dz*dz;
       if (d2 > 25 && dx*fx + dz*fz < -3) continue;       // behind you
-      H._d2 = H === playerH ? -1 : d2; near.push(H);
+      // (whoever's riding a two-wheeler or an auto comes first after you: the vehicle's drawn empty for them, so a rider
+      // left without a place in the batch was a scooter going by with nobody on it)
+      H._d2 = H === playerH ? -1 : H._ride ? d2*0.02 : d2; near.push(H);
     }
     near.sort((a, b) => a._d2 - b._d2);
     for (const M of this.parts.m.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; if (M.sh) M.sh.fill = 0; } for (const M of this.parts.f.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; if (M.sh) M.sh.fill = 0; } for (const r of this.rigid.values()) r.fill = 0;
@@ -385,7 +387,7 @@ export class Skin {
       col(0, u.top); col(1, u.bottom); col(2, u.skin); col(3, u.shoe); vec(4, u.cut); vec(5, H.style); col(6, H.pat); vec(7, H.fit); vec(8, H.arm); vec(9, u.body); D[O + 40] = H._clipY ?? 0; D[O + 43] = H._clipY === undefined ? 0 : 1; D[O + 47] = 0;
       if (H === playerH) { const hb = H._hb || (H._hb = H.body.skeleton.getBoneByName('Head') || H.body.skeleton.bones.find(q => /head/i.test(q.name))); if (hb) { hb.getWorldPosition(_hp); const hm = H.holder.matrixWorld.elements; H._headOff = { x: _hp.x - hm[12], y: _hp.y - hm[13], z: _hp.z - hm[14] }; D[O + 44] = _hp.x; D[O + 45] = _hp.y - 0.03; D[O + 46] = _hp.z; D[O + 47] = 1; HEAD.value.set(_hp.x, _hp.y - 0.03, _hp.z, 1); } }
       if (D_ && D_.clothK) { D[O + 23] = D_.clothK; col(6, D_.pat); }
-      const vis = visOf(H, now); D[O + 48] = vis;
+      const vis = visOf(H, now); D[O + 48] = vis; H._drawnT = now;
       const helmeted = H.xtra && H.xtra.helm && H.xtra.helm.visible, topC = u.top;
       for (const o of H._sk) {
         if (!o.visible) continue;

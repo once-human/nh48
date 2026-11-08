@@ -559,6 +559,8 @@ const PATCHES = {
     ["hatch: buildCar('hatch'), sedan: buildCar('sedan'), suv: buildCar('suv'), taxi: buildCar('taxi'),\n      lux: buildCar('lux'), jeep: buildCar('jeep'), sports: buildCar('sports'), super: buildCar('super'),", "hatch: buildCar('hatch', { driver: true }), sedan: buildCar('sedan', { driver: true }), suv: buildCar('suv', { driver: true }), taxi: buildCar('taxi', { driver: true }),\n      lux: buildCar('lux', { driver: true }), jeep: buildCar('jeep', { driver: true }), sports: buildCar('sports', { driver: true }), super: buildCar('super', { driver: true }),"],
     // a car you're getting into: the one built for you stands in its place (beta/vehicles/cardoor.js)
     ["const seated = v.wreck || (v.rich", "if (v.hideBody) continue; const seated = v.wreck || (v._tp && v._tp.empty) || (v.rich"],
+    // and drawn empty only once the real riders are actually being drawn on it (beta/draw/skin.js marks them)
+    ["v._riders.every(r => r.body));", "v._riders.every(r => r.body && r.body.H && performance.now() - (r.body.H._drawnT || 0) < 250));"],
     // a two-wheeler going over: its roll and how high its middle sits as it falls (beta/traffic/topple.js)
     ["const roll = v.fallen > 0 ? 1.3 : v.roll;", "const roll = v.fallen > 0 ? (v._tp ? v._tp.th : 1.3) : v.roll;"],
     ["p.set(v.rx ?? v.x, (v.y || 0) + (v.fallen > 0 ? 0.3 : 0), v.rz ?? v.z);", "p.set(v.rx ?? v.x, (v.y || 0) + (v.fallen > 0 ? (v._tp ? 0.3 * Math.min(1, Math.abs(v._tp.th) / 1.36) : 0.3) : 0), v.rz ?? v.z);"],

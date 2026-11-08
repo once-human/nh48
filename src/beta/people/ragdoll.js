@@ -465,6 +465,7 @@ People.prototype.update = function (dt, ...rest) {
 };
 const post = Crowd.prototype.postPed;
 Crowd.prototype.postPed = function (p, H, dt) {
+  H._ride = !!p.rideOf;
   if (p._rag && !(p._drag || p._wake)) { pose(p, H); return; }
   return post && post.call(this, p, H, dt);
 };
