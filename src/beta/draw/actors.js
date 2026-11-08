@@ -79,8 +79,11 @@ export class Actors {
       A.iPos.array.set([x, y, z, Math.PI/2 - yaw], o*4); A.iAnim.array.set([ph, amp, id, fd], o*4); };
     for (const p of (G.people ? G.people.list : [])) {
       if (p.hidden || p.pax) continue;
-      // (who has a real body close by is drawn by the skin; while it's coming in or going, this figure has the rest)
-      if (p.body && p.body.H) continue;
+      // (who has a real body close by is drawn by the skin; while it's coming in or going, this figure has the rest.
+      // But only if the skin really drew it this frame: the crowd hands out up to 150 bodies and the skin draws as many
+      // as the graphics setting allows, nearest first, so the ones past that had a body nobody drew and no figure
+      // either, and went missing in the street while Munja still showed them there)
+      if (p.body && p.body.H && (p.body.H._drawnT === this.skin.drawnAt || p.fallen > 0 || p.corpse)) continue;
       // (someone lying down has a real body out to 100 m, crowd.js: past that, nobody's drawn standing up in their place)
       if (p.fallen > 0 || p.corpse) continue;
       if (!p._dk) { p._dk = this.next; this.next = this.next%(CAP - 1) + 1; p._dph = Math.random()*9; p._lx = p.x; p._lz = p.z; p._dv = 0; }
