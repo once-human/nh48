@@ -39,9 +39,13 @@ window.__nhTum = (holder, p) => {
 };
 
 People.prototype.struck = function (p, V, S, player, sp, fx, fz, al, ac) {
-  const base = baseOf(V.type || 'auto'), two = !!S.two, tall = TALL.has(base) || TALL.has(V.type) || !V.spec, kmh = sp*3.6, R = this.rng.next();
-  const wide = Math.abs(ac)/(S.W/2 + MARGIN), side = Math.sign(ac) || (this.rng.next() < 0.5 ? -1 : 1), sx = -fz*side, sz = fx*side;
-  const dead = kmh > 70 ? R < 0.8 : kmh > 50 ? R < 0.4 : kmh > 35 ? R < 0.08 : false, ko = dead || kmh > 25, crit = !dead && kmh > 45;
+  // the same hit always goes the same way: what happens is settled by how fast, by what (its weight, how tall and flat
+  // its front is) and where on its front it caught them, never by a roll of the dice
+  const base = baseOf(V.type || 'auto'), two = !!S.two, tall = TALL.has(base) || TALL.has(V.type) || !V.spec, kmh = sp*3.6;
+  const wide = Math.abs(ac)/(S.W/2 + MARGIN), side = Math.sign(ac) || 1, sx = -fz*side, sz = fx*side;
+  // (km/h at which it kills, and at which it's critical: a tall flat front is worse than a bonnet, a two-wheeler far less)
+  const [kD, kC, kK] = two ? [80, 55, 32] : tall ? [45, 32, 18] : [62, 45, 25];
+  const dead = kmh >= kD, ko = dead || kmh >= kK, crit = !dead && kmh >= kC;
   p._down = true; p._slide = null;      // (draw/falls.js has nothing to add to this)
   p.fallen = dead || ko ? 1e6 : 3 + kmh*0.12; p.ko = ko; p.corpse = dead; p.unconscious = ko && !dead; p.v = 0; p.dodge = 0; p.steerT = 0;
   p.inj = { sev: dead ? 'dead' : crit ? 'critical' : ko ? 'ko' : 'knock', t: 0 };
@@ -64,11 +68,19 @@ People.prototype.struck = function (p, V, S, player, sp, fx, fz, al, ac) {
   if (kmh > 18 && V.dent && !two) { try { const bb = V.box(), ly = bb.min.y + (bb.max.y - bb.min.y)*0.42; V.dent(S.L/2*Math.sign(V.v || 1), ly, ac, Math.sign(V.v || 1), -0.1, 0, 0.32, Math.min(0.07, kmh*0.0008)); } catch (e) { /* drawn as it was */ } }
 };
 
+// landed: straight into the lying pose, at once (the turn in the air comes off in the same frame: unwinding it while
+// the clip lay them down took them through the road)
+function lieNow(p) {
+  const H = p.body && p.body.H; if (!H || !H.play) return;
+  const a = H.play(p.ko ? 'death' : 'knockback', { once: true, fade: 0, restart: true });
+  if (a && a.getClip) a.time = a.getClip().duration*0.97;
+}
 function flying(P, p, dt, V, S) {
   const h = p._hit, C = P.W && P.W.collision; h.t += dt;
   if (h.lt < 0) {
     h.vy -= G0*dt; h.y += h.vy*dt; h.x += h.vx*dt; h.z += h.vz*dt;
-    h.ang += h.spin*dt*Math.min(1, h.t*6 + 0.3);
+    // turned about the hips by the blow, to flat at most: braced while in the air (crowd.js holds the clip), no somersaults
+    h.ang = Math.min(Math.PI/2, h.ang + h.spin*dt);
     // what they hit's outline, if they're still over it: they ride up it, they don't go through it
     const O = h.V;
     if (O && O === V && O.x !== undefined) {
@@ -76,21 +88,25 @@ function flying(P, p, dt, V, S) {
       if (Math.abs(lc) < W2 && Math.abs(la) < L2) {
         const top = topAt(Math.sign(O.v || 1)*la/(S.L/2), h.H, h.tall) + 0.14;
         if (h.tall) { const fr = Math.sign(O.v || 1); h.x = O.x + hx*fr*L2*1.001 + (lc*-hz); h.z = O.z + hz*fr*L2*1.001 + (lc*hx); }   // (a flat front has nothing to ride up: it carries them)
-        else if (h.y < top) { h.vy = Math.max(h.vy, Math.min(2.4, 0.5 + (top - h.y)/Math.max(dt, 0.01)*0.12)); h.y = top; }
+        else if (h.y <= top) {
+          // on it: the bonnet, the glass, the roof carry them as a ramp would (up at the speed the surface rises under
+          // them, the same at any frame rate), and its friction drags them towards its own speed
+          const fr = Math.sign(O.v || 1), u = fr*la/(S.L/2), dTop = (topAt(u + 0.02, h.H, false) - topAt(u - 0.02, h.H, false))/0.04;
+          const va = h.vx*hx + h.vz*hz, rel = va - (O.v || 0), rise = dTop*fr*rel/(S.L/2);
+          h.y = top; h.vy = Math.max(h.vy, Math.min(7, rise));
+          const pull = (1 - Math.exp(-dt*2.6))*-rel; h.vx += hx*pull; h.vz += hz*pull;
+        }
       }
     }
     if (h.y <= FLAT) {
       h.y = FLAT;
       if (h.bounce > 0 && h.vy < -2.6) { h.bounce--; h.vy *= -0.24; h.vx *= 0.72; h.vz *= 0.72; h.spin *= 0.4; }
-      else { h.vy = 0; h.lt = 0; h.ang = Math.PI/2 + wrapA(h.ang - Math.PI/2); }
+      else { h.vy = 0; h.lt = 0; h.show = 0; lieNow(p); }
     }
   } else {
     // on the ground: scraping to a stop, and settling as they lie (the clip takes the body down as this turn comes off)
     const v = Math.hypot(h.vx, h.vz), dv = 0.85*G0*dt; if (v > dv) { h.x += h.vx*dt; h.z += h.vz*dt; h.vx -= h.vx/v*dv; h.vz -= h.vz/v*dv; } else { h.vx = h.vz = 0; }
-    h.lt += dt;
-    const wa = 1 - smooth((h.lt - 0.1)/0.42);
-    h.ang = (Math.PI/2 + wrapA(h.ang - Math.PI/2)*Math.max(0, 1 - dt*14))*1;
-    h.show = wa;
+    h.lt += dt; h.show = 0;
   }
   // a wall's a wall
   if (C) { const r = C.resolve(h.x, h.z, 0.28); if (r && r.depth > 0 && r.kind !== 3 && r.kind !== 4) { h.x += r.nx*r.depth; h.z += r.nz*r.depth; const vn = h.vx*r.nx + h.vz*r.nz; if (vn < 0) { h.vx -= 1.25*vn*r.nx; h.vz -= 1.25*vn*r.nz; h.vx *= 0.55; h.vz *= 0.55; } } }
@@ -124,7 +140,7 @@ function overBody(P, p, V, S, player, sp, dt) {
     const G = window.__nhAskG; G?.audio?.thud?.(Math.min(0.5, 0.18 + sp*0.012));
     // and what it does to them
     if (!p.corpse) {
-      const kmh = sp*3.6, R = P.rng.next(), dead = kmh > 45 || (kmh > 20 ? R < 0.5 : R < 0.12) || (p.inj && p.inj.sev === 'critical');
+      const kmh = sp*3.6, heavy = (S.mass || 1000) > 3000, dead = kmh >= (S.two ? 40 : heavy ? 8 : 22) || (p.inj && p.inj.sev === 'critical' && kmh >= 10);
       p.ko = true; p.unconscious = !dead; p.corpse = dead; p.fallen = 1e6; p.inj = { sev: dead ? 'dead' : 'critical', t: 0 };
       if (dead) P.events.push({ type: 'pedDied', p, x: p.x, z: p.z });
     }
@@ -179,17 +195,20 @@ window.__nhDown = (m, a, dt) => {
 People.prototype.hitCow = function (a, V, S, player, sp, fx, fz) {
   const kmh = sp*3.6, M = S.mass || 1000, two = !!S.two, big = M > 5000, before = V.v;
   // what you lose is the weight of her against yours, and it's not all of her at once at speed: her legs go first
-  const share = (kmh > 45 ? 0.6 : 0.9)*COW_M/(M + COW_M), dv = Math.abs(V.v)*share;
+  // (a dog weighs 25 kg and a cat 4: it's them that goes, you hardly feel it)
+  const AM = a.cow ? COW_M : a.kind === 'cat' ? 4 : 25, share = (kmh > 45 ? 0.6 : 0.9)*AM/(M + AM), dv = Math.abs(V.v)*share;
   V.v -= Math.sign(V.v)*dv; V.vl = (V.vl || 0)*(1 - share);
-  if (two) V.w = (V.w || 0) + (Math.random() < 0.5 ? -1 : 1)*Math.min(1.6, sp*0.06);
+  const off = (a.x - V.x)*-Math.sin(V.th) + (a.z - V.z)*Math.cos(V.th), sd = off >= 0 ? 1 : -1;      // (which side of your nose she was)
+  if (two) V.w = (V.w || 0) - sd*Math.min(1.6, sp*0.06);
   V.dmg = Math.min(0.97, (V.dmg || 0) + dv*dv*0.004*(big ? 0.3 : 1)*(V.armorMul ?? 1));
-  if (V.dent) { try { const bb = V.box(), ly = bb.min.y + (bb.max.y - bb.min.y)*0.5; V.dent(S.L/2*Math.sign(before || 1), ly, 0, Math.sign(before || 1), -0.15, 0, Math.min(0.95, 0.45 + kmh*0.005), Math.min(0.25, 0.04 + kmh*0.0018)); } catch (e) { /* drawn as it was */ } }
-  const down = kmh > 42, R = this.rng.next(), dead = kmh > 70 || big && kmh > 35 || (down && R < 0.45);
-  const lift = big || two ? 0 : Math.min(2.1, Math.max(0, (kmh - 42)*0.035)), away = Math.min(sp*(lift > 0.5 ? 0.42 : 0.78), 12);
+  if (V.dent && a.cow) { try { const bb = V.box(), ly = bb.min.y + (bb.max.y - bb.min.y)*0.5; V.dent(S.L/2*Math.sign(before || 1), ly, 0, Math.sign(before || 1), -0.15, 0, Math.min(0.95, 0.45 + kmh*0.005), Math.min(0.25, 0.04 + kmh*0.0018)); } catch (e) { /* drawn as it was */ } }
+  const small = !a.cow, down = small ? kmh > 15 : kmh > 42, dead = small ? kmh >= 30 : kmh >= 62 || (big && kmh >= 35);
+  const lift = small ? Math.min(2.4, kmh*0.03) : big || two ? 0 : Math.min(2.1, Math.max(0, (kmh - 42)*0.035)), away = small ? Math.min(sp*0.9, 16) : Math.min(sp*(lift > 0.5 ? 0.42 : 0.78), 12);
   a.dead = true; a.moving = false; a.v = 0; a.rest = 25; a._dead = dead;
-  a._thrown = { x: a.x, z: a.z, y: 0, vy: lift, vx: fx*away, vz: fz*away, t: 0, V, S, H: heightOf(V, S), tall: big || TALL.has(baseOf(V.type || 'auto')), down, dead, up: down && !dead ? 12 + this.rng.next()*10 : 0, stagger: !down };
-  if (down) a._lying = { ang: 0.01, to: Math.PI/2, side: this.rng.next() < 0.5 ? -1 : 1 };
-  this.events.push({ type: 'cowHit', a, speed: sp, x: a.x, z: a.z, how: dead ? 'dead' : down ? 'down' : 'hurt', kmh });
+  a._thrown = { x: a.x, z: a.z, y: 0, vy: lift, vx: fx*away, vz: fz*away, t: 0, V, S, H: heightOf(V, S), tall: big || TALL.has(baseOf(V.type || 'auto')), down, dead, up: down && !dead ? (small ? 4 : 15) : 0, stagger: !down };
+  if (down) a._lying = { ang: 0.01, to: Math.PI/2, side: -sd };
+  if (a.cow) this.events.push({ type: 'cowHit', a, speed: sp, x: a.x, z: a.z, how: dead ? 'dead' : down ? 'down' : 'hurt', kmh });
+  else { a.hurtT = dead ? 0 : 8; this.events.push({ type: 'animalHit', a, dead, x: a.x, z: a.z }); }
 };
 function cowFly(P, a, dt, V, S) {
   const f = a._thrown, C = P.W && P.W.collision; f.t += dt;
@@ -207,7 +226,7 @@ function cowFly(P, a, dt, V, S) {
     if (a.e && P.g && P.g.at) { P.g.at(a.e, a.s, TMP4); a.s = Math.max(2, Math.min(a.e.len - 2, a.s + (a.x - TMP4[0])*TMP4[2] + (a.z - TMP4[1])*TMP4[3])); P.g.at(a.e, a.s, TMP4); a.lat = (a.x - TMP4[0])*TMP4[3] - (a.z - TMP4[1])*TMP4[2]; }
   }
 }
-const SHAPE = [[0.72, 0.3], [0.12, 0.33], [-0.5, 0.31]];
+const SHAPE = [[0.72, 0.3], [0.12, 0.33], [-0.5, 0.31]], SMALL_DOG = [[0.3, 0.16], [-0.25, 0.16]], SMALL_CAT = [[0.12, 0.1], [-0.12, 0.1]];
 const up2 = People.prototype.update;
 People.prototype.update = function (dt, player, ...rest) {
   const V = player && !player.onFoot ? player.cur : null, S = player && player.spec;
@@ -216,10 +235,11 @@ People.prototype.update = function (dt, player, ...rest) {
     if (sp > 4.2) {
       const hx = Math.cos(V.th), hz = Math.sin(V.th), s = Math.sign(V.v || 1), reach = sp*dt + 0.05, RAD = S.L + reach + 3;
       for (const a of this.animals) {
-        if (!a.cow || a.gone || Math.abs(a.x - V.x) > RAD || Math.abs(a.z - V.z) > RAD) continue;
-        if (a._thrown) continue;
+        const pet = a.kind === 'dog' || a.kind === 'cat';
+        if (!(a.cow || pet) || a.gone || a.free || Math.abs(a.x - V.x) > RAD || Math.abs(a.z - V.z) > RAD) continue;
+        if (a._thrown || (pet && a.dead)) continue;
         const ax = Math.cos(a.yaw || 0), az = Math.sin(a.yaw || 0);
-        for (const [o, r] of SHAPE) {
+        for (const [o, r] of a.cow ? SHAPE : a.kind === 'cat' ? SMALL_CAT : SMALL_DOG) {
           const rx = a.x + ax*o - V.x, rz = a.z + az*o - V.z, al = (rx*hx + rz*hz)*s, ac = -rx*hz + rz*hx;
           if (Math.abs(ac) < S.W/2 + r && al < S.L/2 + r && al > -S.L/2 - reach) {
             // (one that's down already is a bump you go over, not a wall)

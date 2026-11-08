@@ -89,9 +89,11 @@ function tick(TR, v, dt) {
   if (!S.lift && S.t > 2.4) {
     if (!there || p.ko || p.dead || p.corpse) { S.hold = true; return; }        // nobody's coming for it
     if (!(p.fallen > 0)) {
-      const dx = v.x - p.x, dz = v.z - p.z, d = Math.hypot(dx, dz);
-      // to the side its wheels are on (it went over the other way), where you get hold of the bars
-      if (d > 0.9) { p.mode = 'chase'; p.chase = { x: v.x + v.hz*S.side*0.7, z: v.z - v.hx*S.side*0.7 }; p.runSp = 1.4; S.hold = true; return; }
+      // to the side its wheels are on (it went over the other way), where you get hold of the bars. (They walk there and
+      // stop a metre short of where they're headed, as anyone walking up to something does: within 1.3 m of the bars
+      // they've arrived. It asked for 0.9, which they never got to, so nobody ever picked a bike up)
+      const gx = v.x + v.hz*S.side*0.7, gz = v.z - v.hx*S.side*0.7, d = Math.hypot(gx - p.x, gz - p.z);
+      if (d > 1.3 && !((S.walkT = (S.walkT || 0) + dt) > 12)) { p.mode = 'chase'; p.chase = { x: gx, z: gz }; p.runSp = 1.4; S.hold = true; return; }
       S.lift = true; S.liftT = 0; S.hold = true;
     } else { S.hold = true; return; }
   }

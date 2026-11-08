@@ -274,6 +274,9 @@ const PATCHES = {
     ["l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  R.updateMatrixWorld(true);\n}", "l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  u.updateMatrixWorld(true);\n}"],
   ],
   [S('people/crowd.js')]: [
+    // thrown by a vehicle: braced while in the air (the hit turns them about the hips: beta/people/runover.js), and the
+    // clip only takes them down once they've landed. Both at once twisted them through the road
+    ["    if (p.fallen > 0) return p.ko ?", "    if (p._hit && p._hit.lt < 0 && !p._hit.axle) return ['knockback', 0.0001, true];\n    if (p.fallen > 0) return p.ko ?"],
     // someone getting out of a vehicle (people/fight.js bail): eased from the seat to where they stand
     ["H.holder.rotation.set(0, -p.yaw, 0);", "H.holder.rotation.set(0, -p.yaw, 0);\n      if (p._out) { const u = Math.min(1, (performance.now() - p._out.t0)/600), e = 1 - u*u*(3 - 2*u); if (u >= 1) p._out = null; else { H.holder.position.x += p._out.dx*e; H.holder.position.y += p._out.dy*e; H.holder.position.z += p._out.dz*e; } }"],
     // smooth up to 45 m, half rate to 100 m; a frame someone isn't animated, their bones go back to the clip's pose
@@ -401,6 +404,8 @@ const PATCHES = {
     ["if (far || (k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21)) {", "const seen = !far && G.crowd && G.crowd.inView && Math.hypot(k.p.x - P.x, k.p.z - P.z) < 60 && (G.crowd.inView(k.p.x, k.p.z) || Math.hypot(k.p.x - P.x, k.p.z - P.z) < 10);\n      if (far || !seen && ((k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21))) {"],
   ],
   [S('people/peds.js')]: [
+    // an animal hit by traffic: dead or hurt by how fast, not a roll of the dice
+    ["const dead = kmh > 35 || (kmh > 20 && this.rng.next() < 0.4);", "const dead = kmh >= 30;"],
     // nobody comes out of thin air where you're looking: the groups outside shops and clubs, and the stall vendors,
     // only ever appear out of view (they stand still, so they can't walk in from far off like the rest)
     ["avoidView(gx, gz) && Math.hypot(gx - px, gz - pz) < 110) return;", "avoidView(gx, gz)) return;"],
