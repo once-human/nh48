@@ -70,6 +70,7 @@ import './people/around.js';        // whatever's in the way, people go round it
 import './people/runover.js';        // being hit by what you're driving, and being driven over
 import './people/doors.js';          // into a shop and out again through its door
 import './draw/falls.js';
+import './people/motion.js';         // the body's own weight on every clip: arms swing behind, the trunk leans and catches itself, breathing, everyone's own gait
 import './draw/fauna.js';
 import './vehicles/mount.js';
 import './vehicles/cardoor.js';

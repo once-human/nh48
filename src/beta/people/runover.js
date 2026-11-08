@@ -181,10 +181,16 @@ People.prototype.update = function (dt, player, ...rest) {
         if (p.fallen > 1.6 || p.corpse) { overBody(this, p, V, S, player, sp, dt); continue; }
         if (p.fallen > 0) continue;
         const rx = p.x - V.x, rz = p.z - V.z, al = (rx*hx + rz*hz)*s, ac = -rx*hz + rz*hx;
-        if (Math.abs(ac) < W2 && al < L2 && al > -L2 - reach) this.struck(p, V, S, player, sp, fx, fz, al, ac);
+        // rolling into someone at a crawl doesn't knock them down: they're shoved, stagger, catch themselves and step aside
+        if (Math.abs(ac) < W2 && al < L2 && al > -L2 - reach && sp < 2.6 && !S.two) {
+          if (!(p._shovT > performance.now())) { p._shovT = performance.now() + 900; window.__nhNudge?.(p, fx*sp*1.6, fz*sp*1.6); p.act = { kind: 'react', clip: 'block', speed: 1.2, t: 0, dur: 0.6 }; p.react = 3; p.reactAnim = 'no'; p.angry = 3; }
+          const sd = Math.sign(ac) || 1, push = (W2 - Math.abs(ac))*sd; p.x += -hz*push*0.5; p.z += hx*push*0.5;
+        }
+        else if (Math.abs(ac) < W2 && al < L2 && al > -L2 - reach) this.struck(p, V, S, player, sp, fx, fz, al, ac);
         // a near thing: you came past close and fast and they flinch, arms up, and turn to see you go
         else if (sp > 6 && !p.act && !(p._flinchT > performance.now()) && Math.abs(ac) < W2 + 1.3 && al > -L2 && al < L2 + sp*0.35) {
           p._flinchT = performance.now() + 5000; p.act = { kind: 'react', clip: 'block', speed: 1.4, t: 0, dur: 0.75 };
+          { const sd = Math.sign(ac) || 1; window.__nhNudge?.(p, -hz*sd*1.4 - fx*0.5, hx*sd*1.4 - fz*0.5); }     // (they jerk back from it)
           p.react = 2.5; p.reactAnim = 'no'; p.reactAt = { x: V.x, z: V.z };
         }
       }
