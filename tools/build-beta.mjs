@@ -567,9 +567,9 @@ const PATCHES = {
     ["const seated = v.wreck || (v.rich", "if (v.hideBody) continue; const seated = v.wreck || (v._tp && v._tp.empty) || (v.rich"],
     // and drawn empty only once the real riders are actually being drawn on it (beta/draw/skin.js marks them)
     ["v._riders.every(r => r.body));", "v._riders.every(r => r.body && r.body.H && performance.now() - (r.body.H._drawnT || 0) < 250));"],
-    // a two-wheeler going over: its roll and how high its middle sits as it falls (beta/traffic/topple.js)
-    ["const roll = v.fallen > 0 ? 1.3 : v.roll;", "const roll = v.fallen > 0 ? (v._tp ? v._tp.th : 1.3) : v.roll;"],
-    ["p.set(v.rx ?? v.x, (v.y || 0) + (v.fallen > 0 ? 0.3 : 0), v.rz ?? v.z);", "p.set(v.rx ?? v.x, (v.y || 0) + (v.fallen > 0 ? (v._tp ? 0.3 * Math.min(1, Math.abs(v._tp.th) / 1.36) : 0.3) : 0), v.rz ?? v.z);"],
+    // a two-wheeler going over: drawn however its body lies as it falls, slides and is hauled back up (beta/traffic/topple.js)
+    ["q.setFromEuler(e);", "q.setFromEuler(e); if (v._tp && v._tp.Q) q.copy(v._tp.Q);"],
+    ["p.set(v.rx ?? v.x, (v.y || 0) + (v.fallen > 0 ? 0.3 : 0), v.rz ?? v.z);", "if (v._tp && v._tp.Q) p.set(v._tp.ox, v._tp.oy, v._tp.oz); else p.set(v.rx ?? v.x, (v.y || 0) + (v.fallen > 0 ? 0.3 : 0), v.rz ?? v.z);"],
     ["tot += t.w * (mix[k] ?? 1);", "tot += t.w * (mix[k] ?? mix[baseOf(k)] ?? 1);"],
     // the far model of the empty two-wheeler / auto (real riders up close, a wreck) is that vehicle without its baked
     // rider, not a car: buildLow('scooterE') fell through to the car box, so a scooter past the detail range drew as a car

@@ -1,12 +1,23 @@
 // Off your own two-wheeler. Ride into something hard enough, or have something hit you, and you don't stay sat on it:
 // the machine stops (or is knocked away) under you and you go on with the speed you had, off the seat as a body of
 // your own (people/ragdoll.js), astride for the first instant, over the bars if you went in front-on, rolling and
-// sliding down the road till you stop, and you get up only once you've stopped. The scooter or the bike goes over on
-// its side away from you, slides on its side grinding to a halt, and lies there till you go back and get on it again.
+// sliding down the road till you stop, and you get up only once you've stopped. The scooter or the bike goes on as a
+// solid body of its own (bikebody.js): over on its side away from you and sliding, spun round, rolled over or end over
+// end, however the blow sent it, and it lies as it ended up till you go back and get on it again.
+import * as THREE from 'three';
 import { Pilot } from '@orig/game/pilot.js';
+import { Vehicle } from '@orig/vehicles/vehicle.js';
 import { startRag, seatRag } from '../people/ragdoll.js';
+import { makeBody, stepBody } from './bikebody.js';
 
-const LIE = 1.36, G0 = 9.8;
+const _e = new THREE.Euler();
+// drawn however its body lies while it's down
+const sync0 = Vehicle.prototype.sync;
+Vehicle.prototype.sync = function (dt = 0) {
+  const r = sync0.call(this, dt), B = this._rb;
+  if (B) { this.root.position.set(B.ox, B.oy, B.oz); this.root.quaternion.copy(B.Q); this.tilt.position.set(0, 0, 0); this.tilt.rotation.set(0, 0, 0); }
+  return r;
+};
 const velOf = (v) => { const c = Math.cos(v.th), s = Math.sin(v.th); return [(v.v || 0)*c - (v.vl || 0)*s, (v.v || 0)*s + (v.vl || 0)*c]; };
 
 const upd = Pilot.prototype.update;
@@ -40,28 +51,30 @@ function thrown(P, V, before, after, dv, traffic) {
   // you go on as you were going (the machine's stopped or been knocked away under you), a little up off the seat
   const R = H && startRag(P, { H, yaw: V.th });
   if (R) { seatRag(R, x, z, V.th, gy + seat, before[0]*0.95 + (after[0] - before[0])*0.25, 0.8 + Math.min(1.6, dv*0.08), before[1]*0.95 + (after[1] - before[1])*0.25); P._fall = null; }
-  // the machine: over on its side, carrying on with what it had after the blow
+  // the machine: carrying on with what it had after the blow, turned over by it: onto its side away from you, spun if
+  // it was hit off-centre, end over end if it stopped dead from the front
   V.v = 0; V.vl = 0;
-  P._down2 = { V, side: -side || 1, th: (V.lean || 0) + (-side || 1)*0.1, w: (-side || 1)*(0.8 + Math.min(2, dv*0.12)), vx: after[0], vz: after[1], down: false };
+  const s0 = -side || 1, rx = -hz, rz = hx, ahead = (after[0] - before[0])*hx + (after[1] - before[1])*hz;
+  const roll = s0*(0.8 + Math.min(2, dv*0.12) + Math.min(4, Math.max(0, dv - 9)*0.3))*(0.85 + Math.random()*0.3);
+  const pitchW = ahead < -6 && Math.abs(lat) < -ahead*0.5 ? Math.min(5, (-ahead - 6)*0.35 + 0.8) : 0;
+  const yawW = (Math.random() - 0.5)*Math.min(3, dv*0.15), vy = Math.min(2, Math.max(0, dv - 9)*0.12 + pitchW*0.15);
+  _e.set(V.lean || 0, -V.th, V.pitch || 0, 'YXZ');
+  const Q0 = new THREE.Quaternion().setFromEuler(_e);
+  V._rb = makeBody(V.type, Q0, V.x, V.y || 0, V.z, [after[0], vy, after[1]], [hx*roll - rx*pitchW, yawW, hz*roll - rz*pitchW]);
+  P._down2 = { V };
 }
 
 function tip(P, D, dt) {
-  const V = D.V;
-  if (!P.onFoot && P.cur === V) { P._down2 = null; return; }                       // (back on it: it's stood up as you ride)
-  if (!P.dropped.some(d => d.veh === V)) { P._down2 = null; return; }
-  if (!D.down) {
-    D.w += G0/0.62*Math.sin(D.th)*dt; D.th += D.w*dt;
-    if (Math.abs(D.th) >= LIE) { D.th = Math.sign(D.th)*LIE; D.w = 0; D.down = true; P.audio?.thud?.(0.5); }
-  }
-  // on its tyres while it goes over, on its side once it's down (steel and plastic on tar)
-  const mu = D.down ? 5.5 : 1.2, sp = Math.hypot(D.vx, D.vz);
-  if (sp > 0.01) {
-    const k = Math.max(0, sp - mu*dt)/sp; D.vx *= k; D.vz *= k;
-    V.x += D.vx*dt; V.z += D.vz*dt;
-    const r = P.W.collision && P.W.collision.resolve(V.x, V.z, 0.45);
-    if (r && r.depth > 0) { V.x += r.nx*r.depth; V.z += r.nz*r.depth; D.vx *= 0.3; D.vz *= 0.3; }
+  const V = D.V, B = V._rb;
+  const off = () => { if (B) { _e.setFromQuaternion(B.Q, 'YXZ'); V.th = -_e.y; V.lean = _e.x; V.x = B.ox; V.z = B.oz; } V._rb = null; P._down2 = null; };
+  if (!P.onFoot && P.cur === V) { off(); return; }                                  // (back on it: it's stood up as you ride)
+  if (!P.dropped.some(d => d.veh === V) || !B) { off(); return; }
+  if (!B.rest) {
+    const W = P.W, gy = W.surf ? W.surf.height(B.c[0], B.c[2]) : 0;
+    stepBody(B, dt, gy, W.collision ? (x, z) => W.collision.resolve(x, z, 0.45) : null);
+    if (B.rest) P.audio?.thud?.(0.3);
+    V.x = B.ox; V.z = B.oz;
     const d = P.dropped.find(q => q.veh === V); if (d && d.st) { d.st.x = V.x; d.st.z = V.z; }
-  }
-  V.lean = D.th;
+  } else { B.ox = V.x; B.oz = V.z; }                                               // (lying: pushed about, it goes where it's pushed)
   V.sync && V.sync(0);
 }
