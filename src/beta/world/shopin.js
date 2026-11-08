@@ -16,6 +16,7 @@ import { People } from '@orig/people/peds.js';
 import { RNG } from '@orig/core/util.js';
 import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const CELL = 8, key = (i, j) => i * 100003 + j;
 const chunks = new Map();           // chunk -> its shop doors (each with .cell)
@@ -47,6 +48,7 @@ export function cellsIn(ci, doors) {
   for (const door of doors) {
     const S = door.cell, P = S.plan;
     S.door = door; S.segs = []; cells.add(S);
+    fanIn(S);
     // the gap in the front (a shop served over the counter from the footpath has none)
     if (P.door[1] - P.door[0] > 0.3) {
       const [ax, az] = at(S, P.door[0], 0), [bx, bz] = at(S, P.door[1], 0);
@@ -68,10 +70,76 @@ export function cellsOut(ci) {
     if (S.hole) gridDel(holes, S.hole);
     for (const s of S.segs || []) gridDel(extra, s);
     S.segs = []; cells.delete(S);
+    fanOut(S);
     dropStaff(S);
     if (here && here.S === S) leave(true);
   }
   V++;
+}
+
+// ---------------------------------------------------------------- the ceiling fans
+// Every shop has its fan, turning over the floor while it's open (slowing to a stop when it shuts, starting up again in
+// the morning). One instanced mesh for all of them; only the ones near you are turned each frame (further off you
+// can't tell).
+const FANS = 768, fanFree = [];
+let fanMesh = null, fanPend = [];
+const fm = new THREE.Matrix4(), fq = new THREE.Quaternion(), fv = new THREE.Vector3(), fs = new THREE.Vector3(), fy = new THREE.Vector3(0, 1, 0);
+function fanGeo() {
+  const parts = [], rod = new THREE.CylinderGeometry(0.015, 0.015, 0.32, 6); rod.translate(0, -0.16, 0); parts.push(rod);
+  const hub = new THREE.CylinderGeometry(0.09, 0.11, 0.1, 12); hub.translate(0, -0.37, 0); parts.push(hub);
+  const cup = new THREE.CylinderGeometry(0.05, 0.07, 0.04, 10); cup.translate(0, -0.02, 0); parts.push(cup);
+  for (let k = 0; k < 3; k++) { const bl = new THREE.BoxGeometry(0.5, 0.012, 0.11); bl.translate(0.36, -0.38, 0); bl.rotateY(k * Math.PI * 2 / 3); parts.push(bl); }
+  return mergeGeometries(parts.map(g => g.toNonIndexed ? g.toNonIndexed() : g));
+}
+function fanPlace(S) {
+  const P = S.plan, w = P.w, D = P.D, r = Math.min(0.6, w / 2 - 0.2);
+  if (r < 0.35 || D < 1.5 || P.oh < 2.5 || !S.hole) return null;
+  let d = -D * 0.5;
+  if (P.tube) { const t = P.tube.d; d = t + 0.9 <= -r - 0.1 ? t + 0.9 : t - 0.9 >= -D + r + 0.1 ? t - 0.9 : null; if (d === null) return null; }
+  const [x, z] = at(S, w / 2, d);
+  return { x, y: S.y + P.oh, z, r, a: ((S.door.x * 7.3 + S.door.z * 3.1) % 6.283), v: 0 };
+}
+function fanIn(S) {
+  const f = fanPlace(S); if (!f) return;
+  S.fan = f;
+  if (!fanMesh) { fanPend.push(S); return; }
+  fanSet(S);
+}
+function fanSet(S) {
+  const f = S.fan; if (!f || f.i !== undefined) return;
+  if (!fanFree.length) return;
+  f.i = fanFree.pop(); fanPose(f);
+}
+function fanPose(f) {
+  fq.setFromAxisAngle(fy, f.a); fv.set(f.x, f.y, f.z); fs.set(f.r / 0.6, 1, f.r / 0.6);
+  fm.compose(fv, fq, fs); fanMesh.setMatrixAt(f.i, fm); fanMesh.instanceMatrix.needsUpdate = true;
+}
+function fanOut(S) {
+  const f = S.fan; S.fan = null;
+  const k = fanPend.indexOf(S); if (k >= 0) fanPend.splice(k, 1);
+  if (!f || f.i === undefined || !fanMesh) return;
+  fm.makeScale(0, 0, 0); fanMesh.setMatrixAt(f.i, fm); fanMesh.instanceMatrix.needsUpdate = true; fanFree.push(f.i);
+}
+function fans(dt) {
+  if (!fanMesh) {
+    if (!G.scene) return;
+    fanMesh = new THREE.InstancedMesh(fanGeo(), new THREE.MeshLambertMaterial({ color: 0xe8e4da }), FANS);
+    fanMesh.frustumCulled = false; fanMesh.name = 'shopFans';
+    fm.makeScale(0, 0, 0); for (let i = 0; i < FANS; i++) fanMesh.setMatrixAt(i, fm);
+    for (let i = FANS - 1; i >= 0; i--) fanFree.push(i);
+    G.scene.add(fanMesh);
+    for (const S of fanPend) fanSet(S); fanPend = [];
+  }
+  const P = G.player;
+  for (const S of cells) {
+    const f = S.fan; if (!f || f.i === undefined) continue;
+    if (Math.abs(f.x - P.x) > 35 || Math.abs(f.z - P.z) > 35) continue;
+    // up to speed in a few seconds, down slower (it coasts)
+    const on = S.hole && S.hole.on, want = on ? 9 : 0;
+    f.v += Math.max(-dt * 1.2, Math.min(dt * 3, want - f.v));
+    if (f.v < 0.01) continue;
+    f.a = (f.a + f.v * dt) % 6.2832; fanPose(f);
+  }
 }
 
 // ---------------------------------------------------------------- the collision, with the gaps and the rooms
@@ -428,7 +496,7 @@ export function install() {
   People.prototype.update = function (dt, ...a) {
     const out = pu.call(this, dt, ...a);
     if (!G && this._G) G = this._G;
-    if (G && G.player) { if ((this._shopT = (this._shopT || 0) - dt) <= 0) { this._shopT = 0.25; tend(); } track(); look(dt); }
+    if (G && G.player) { if ((this._shopT = (this._shopT || 0) - dt) <= 0) { this._shopT = 0.25; tend(); } track(); look(dt); fans(dt); }
     return out;
   };
 }
