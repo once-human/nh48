@@ -203,15 +203,6 @@ const disp = Vehicle.prototype.dispose;
 Vehicle.prototype.dispose = function () { if (this._disc) for (const d of this._disc) d.m.material.dispose(); return disp.call(this); };
 
 // ---------------------------------------------------------------- a cold start
-let puffTex = null;
-function tex() {
-  if (puffTex) return puffTex;
-  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 2, 32, 32, 31);
-  g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.45, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
-  return (puffTex = new THREE.CanvasTexture(c));
-}
-const puffs = [];
 const COLD = 180e3;                  // standing three minutes or more: a cold engine
 function vapour(v, h) {
   const t = now();
@@ -225,31 +216,21 @@ function vapour(v, h) {
   while (v._puffA >= 1) { v._puffA -= 1; emit(v, 0.6 + 0.5*k); }
 }
 const _w = new THREE.Vector3();
+// (through the game's own smoke (gfx/smoke.js), the same soft puffs an engine smokes with when it's hurt: the cold
+// start had sprites of its own, and those were drawing as black squares behind the car till the engine warmed up)
 function emit(v, big) {
-  const G = G0(); if (!G || !G.scene || !v.tilt) return;
-  let q = puffs.find(p => p.life >= p.max);
-  if (!q) { if (puffs.length >= 40) return; const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(), color: 0xeeeeea, transparent: true, depthWrite: false, opacity: 0 })); s.renderOrder = 2; G.scene.add(s); q = { s, life: 1, max: 0 }; puffs.push(q); }
+  const G = G0(); if (!G || !G.smoke || !v.tilt) return;
   const S = v.spec || {}, L = S.L || 4, Wd = S.W || 1.7, low = /^(super|sports)$/.test(baseOf(v.type)), side = low && Math.random() < 0.5 ? -1 : 1;
   v.tilt.updateWorldMatrix(true, false);
   _w.set(-L/2 - 0.06, S.two ? 0.35 : 0.3, side*Wd*0.27).applyMatrix4(v.tilt.matrixWorld);
-  const hx = Math.cos(v.th), hz = Math.sin(v.th), sp = v.v || 0;
-  Object.assign(q, { x: _w.x, y: _w.y, z: _w.z, vx: hx*sp*0.6 - hx*0.45 + (Math.random() - 0.5)*0.12, vy: 0.18 + Math.random()*0.12, vz: hz*sp*0.6 - hz*0.45 + (Math.random() - 0.5)*0.12, life: 0, max: 1.6 + Math.random()*1.1, sz: 0.14*big, a: 0.26*big });
+  if (!isFinite(_w.x + _w.y + _w.z)) return;
+  const hx = Math.cos(v.th), hz = Math.sin(v.th), sp = v.v || 0, Sm = G.smoke;
+  Sm.emit(_w.x, _w.y, _w.z, 'steam', 0.04);
+  const q = Sm.list[Sm.k]; if (!q) return;
+  q.vx = hx*sp*0.35 - hx*0.45 + (Math.random() - 0.5)*0.12; q.vz = hz*sp*0.35 - hz*0.45 + (Math.random() - 0.5)*0.12; q.vy = 0.18 + Math.random()*0.12;
+  q.max = 1.6 + Math.random()*1.1; q.size0 = 0.14*big; q.size1 = 0.14*big*6.5; q.op = 0.26*big;
 }
-let lastF = -1;
-function tickPuffs() {
-  const G = G0(), f = G && G.renderer ? G.renderer.info.render.frame : 0;
-  if (f === lastF) return; lastF = f;
-  const h = 1/60;
-  for (const q of puffs) {
-    if (q.life >= q.max) { q.s.visible = false; continue; }
-    q.life += h; const t = q.life/q.max;
-    q.vx *= 1 - 1.5*h; q.vz *= 1 - 1.5*h; q.vy += 0.05*h;
-    q.x += q.vx*h; q.y += q.vy*h; q.z += q.vz*h;
-    q.s.visible = true; q.s.position.set(q.x, q.y, q.z);
-    const sc = q.sz*(1 + t*5.5); q.s.scale.set(sc, sc, 1);
-    q.s.material.opacity = q.a*Math.pow(1 - t, 1.6)*Math.min(1, t*8);
-  }
-}
+function tickPuffs() {}
 
 // ---------------------------------------------------------------- your head, into the corner
 const _up = new THREE.Vector3(0, 1, 0);

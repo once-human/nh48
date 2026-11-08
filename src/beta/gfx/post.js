@@ -107,6 +107,7 @@ void main(){
   if (any(isnan(hb))) hb = vec2(0.);
   vec3 L = texture(tCol, uv + wob*.6 + hb).rgb;
   // (a bad value anywhere in the frame (a NaN) is one dark pixel at most, never spread into a block by the blurs)
+  if (any(isinf(L)) && !any(isnan(L))) L = clamp(L, vec3(0.), vec3(64.));     // (too bright to hold: as bright as it can be, not black)
   if (any(isnan(L)) || any(isinf(L))) L = texture(tCol, uv + px*2.).rgb;
   if (any(isnan(L)) || any(isinf(L))) L = vec3(0.);
   // the lens: things out of focus open up into discs; the camera's own movement smears the frame
