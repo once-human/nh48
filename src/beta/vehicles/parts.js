@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { Vehicle } from '@orig/vehicles/vehicle.js';
 import { Pilot } from '@orig/game/pilot.js';
 import { hang } from './cardoor.js';
-import { doorOf, baseOf, carSpec } from './models.js';
+import { doorOf, baseOf, carSpec, buildUnder } from './models.js';
 import { makePts, stepBody, bodyVel } from './bikebody.js';
 
 const NO = /^(auto|bus|tempo|truck|tractor|cycle)/;
@@ -29,15 +29,37 @@ function hoodOf(v) {
   for (let t = 0; t + 2 < I.length; t += 3) {
     const a = I[t], b = I[t + 1], c = I[t + 2];
     const x = (P[a*3] + P[b*3] + P[c*3])/3, y = (P[a*3 + 1] + P[b*3 + 1] + P[c*3 + 1])/3, z = (P[a*3 + 2] + P[b*3 + 2] + P[c*3 + 2])/3, ny = (N[a*3 + 1] + N[b*3 + 1] + N[c*3 + 1])/3;
-    (x > xf0 + 0.02 && x < hl - 0.06 && y > S.beltY - 0.2 && ny > 0.45 && Math.abs(z) < S.W/2 - 0.06 ? hood : rest).push(a, b, c);
+    // (the skin, and its inside under it: lift it and there's the underside of a bonnet, not a hole)
+    (x > xf0 + 0.02 && x < hl - 0.06 && Math.abs(z) < S.W/2 - 0.06 && (y > S.beltY - 0.2 && ny > 0.45 || y > S.beltY - 0.26 && ny < -0.45) ? hood : rest).push(a, b, c);
   }
   if (hood.length < 30) return null;
   const mk = (idx) => { const n = new THREE.BufferGeometry(); for (const k of Object.keys(g.attributes)) n.setAttribute(k, g.attributes[k]); n.setIndex(idx); n.boundingSphere = g.boundingSphere || (g.computeBoundingSphere(), g.boundingSphere); return n; };
   return { rest: mk(rest), hood: mk(hood), hinge: xf0 + 0.02, y: S.beltY };
 }
+// what's under a panel (beta/vehicles/models.js buildUnder): put in the moment the panel first moves, while it still
+// covers it, so it's there when the panel's gone and was never seen arriving
+const UNDER = new Map();
+function under(v, which) {
+  const Pt = v._parts || (v._parts = {}), key = 'u:' + which; if (Pt[key]) return;
+  Pt[key] = true;
+  const B = v.bodyMesh; if (!B || !B.parent) return;
+  const k = v.type + '|' + which; let g0 = UNDER.get(k);
+  if (!g0) { try { g0 = buildUnder(v.type, which); } catch (e) { g0 = null; } UNDER.set(k, g0); }
+  if (!g0 || !g0.attributes.position.count) return;
+  const g = new THREE.BufferGeometry(), A = B.geometry.attributes;
+  for (const n of Object.keys(g0.attributes)) g.setAttribute(n, g0.attributes[n]);
+  for (const n in A) if (A[n].isInstancedBufferAttribute && !g.attributes[n]) g.setAttribute(n, A[n]);
+  g.setIndex(g0.index); g.boundingSphere = g0.boundingSphere || (g0.computeBoundingSphere(), g0.boundingSphere);
+  const m = new THREE.InstancedMesh(g, B.material, 1);
+  m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(3), 3); if (B.instanceColor) m.instanceColor.array.set(B.instanceColor.array.subarray(0, 3));
+  m.setMatrixAt(0, _m.identity()); m.position.copy(B.position); m.quaternion.copy(B.quaternion); m.scale.copy(B.scale);
+  m.castShadow = false; m.receiveShadow = true; m.frustumCulled = false;
+  B.parent.add(m);
+}
 function popHood(v) {
   const Pt = v._parts || (v._parts = {}); if (Pt.hood) return Pt.hood;
   try { v.own && v.own(); } catch (e) { /* as it is */ }
+  under(v, 'front');
   const H = hoodOf(v); if (!H) return (Pt.hood = { none: true });
   const B = v.bodyMesh, pivot = new THREE.Group(); pivot.position.set(H.hinge, H.y, 0);
   const m = new THREE.InstancedMesh(H.hood, B.material, 1);
@@ -52,6 +74,9 @@ function springDoor(v, s) {
   const G = window.__nhAskG, P = G && G.player; if (!P || (P.doors && P.doors.some(R => R.veh === v))) return null;     // (not while someone's at a door)
   try { v.own && v.own(); } catch (e) { /* as it is */ }
   let R = null; try { R = hang(P, v, s); } catch (e) { return null; }
+  // the opening it leaves, and the cabin inside it (seats, dash, wheel: the same one you sit in, shown as a door does)
+  under(v, 'door' + s);
+  if (v.cockpit) v.cockpit.group.visible = true;
   R.sprung = true; R.held = true; R.ang = 0.12; R.vel = 1.5;
   const i = P.doors.indexOf(R); if (i >= 0) P.doors.splice(i, 1);                  // (it's ours, not the hand's)
   if (v._dg) v._dg.view = v.bodyMesh.geometry;
@@ -107,6 +132,7 @@ function dropBumper(v, e) {
   const Pt = v._parts || (v._parts = {}), key = 'bumper' + e; if (Pt[key]) return;
   const S = carSpec(v.type), hl = S.L/2, top = S.sill + (S.beltY - S.sill)*0.48;
   Pt[key] = true;
+  under(v, e > 0 ? 'front' : 'rear');
   const m = cutOut(v, (x, y) => x*e > hl - 0.24 && y < top && y > 0.04);
   if (m) tearOff(v, m, { x: Math.cos(v.th)*e*1.5, y: 0.5, z: Math.sin(v.th)*e*1.5 });
 }

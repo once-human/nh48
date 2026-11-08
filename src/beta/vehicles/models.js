@@ -1320,6 +1320,153 @@ export function buildCar(kind0, opts = {}) {
   return { body: b.build(), glass: gl.build(), dims: { L: spec.L, W: spec.W, H: spec.H, wb: spec.L - 2 * spec.overhang } };
 }
 
+// ---------------------------------------------------------------- what's under the panels
+// A car's skin is only a skin: take the bonnet or a bumper off and there was nothing under it, the road showing through
+// the car. This is what's there on a real one, for each family by its own numbers, put in only once a panel's moved
+// (beta/vehicles/parts.js), while the panel's still over it. which: 'front' (the engine bay: the bulkhead and the scuttle
+// under the screen, the inner wings and the arch liners, the strut tops, the engine with its cam cover, gearbox, air box,
+// battery, coolant bottle and radiator with its fan; behind the bumper, the crash beam on its two cans, the radiator's
+// lower support and the headlamps' backs. A rear-engined coupé and a mid-engined supercar have a luggage tub there
+// instead, between a radiator at each corner), 'rear' (behind the back bumper: the beam, the back panel, the boot floor's
+// end, the silencer and tail pipe, the tail lamps' backs; the coupé's engine), 'door1' / 'door-1' (a front door's
+// opening: the pillars' shut faces, the sill step with its scuff plate, and the seals round them).
+// the body's own skin, as carBody and exotic draw it: a point under it stays where it is, one that would show through
+// is drawn back in under it (so nothing put under a panel ever comes through the paint)
+function skinOf(spec, kind) {
+  const hl = spec.L/2, m = .025, cl = (v, a, e) => Math.max(a, Math.min(e, v));
+  if (kind === 'sports' || kind === 'super') {
+    const T = LINES[kind], at = (x, c) => tableAt(T, x, c);
+    return (x, y, z) => {
+      x = cl(x, -hl + m, hl - m); const w = at(x, 1), az = Math.abs(z);
+      y = Math.max(y, at(x, 2) + .005); y = Math.min(y, at(x, 5) - (at(x, 5) - at(x, 3))*Math.min(1, (az/w)**2) - m);
+      return [x, y, Math.sign(z)*Math.min(az, w - m)];
+    };
+  }
+  const { L, W, hood, beltY, sill, tail } = spec, hw = W/2, xf0 = hl - hood, lk = spec.look || {};
+  const SH = shapeOf(spec, kind), deck = SH.deck, bxf = lk.box || 0, nose = lk.nose ?? 1;
+  const pw = (f) => hw*lerp(f, 1 - (1 - f)*.45, bxf), xm0 = -hl + Math.max(.5, tail + .02);
+  const mid = [...new Set([xm0, SH.xKe, SH.xKs, 0, xf0 + .05].map(x => Math.round(x*1000)/1000))].filter(x => x >= xm0 && x <= xf0 + .05).sort((a, e) => a - e);
+  const T = [
+    [-hl, pw(.8), sill + .17, deck - .17], [-hl + .015, pw(.86), sill + .12, deck - .11], [-hl + .05, pw(.91), sill + .075, deck - .06], [-hl + .14, pw(.96), sill + .03, deck - .02],
+    [-hl + .32, pw(.99), sill, deck], ...mid.map(x => [x, hw, sill, SH.beltAt(x)]),
+    [hl - hood*.45, pw(.985), sill, beltY - .07*nose], [hl - .22, pw(.96), sill + .01, beltY - .13*nose], [hl - .09, pw(.91), sill + .035, beltY - .18*nose], [hl - .03, pw(.86), sill + .08, beltY - .22*nose], [hl, pw(.79), sill + .14, beltY - .27*nose],
+  ];
+  const ROWS = bxf ? LOW_ROWS.map(([fz, fy], i) => [i >= 3 && i <= 16 && fz < 1 ? lerp(fz, 1 - (1 - fz)*.3, bxf) : fz, fy]) : LOW_ROWS;
+  const ringAt = (x) => { const w = tableAt(T, x, 1), yb = tableAt(T, x, 2), yt = tableAt(T, x, 3); return ROWS.map(([fz, fy]) => [fz*w, yb + fy*(yt - yb)]); };
+  const zSide = (r, y) => { for (let i = 0; i < r.length - 1; i++) if (y <= r[i + 1][1]) { const k = (y - r[i][1])/Math.max(1e-5, r[i + 1][1] - r[i][1]); return lerp(r[i][0], r[i + 1][0], Math.max(0, k)); } return 0; };
+  const yTop = (r, z) => { z = Math.abs(z); for (let i = 12; i < r.length - 1; i++) if (z >= r[i + 1][0]) { const k = (r[i][0] - z)/Math.max(1e-5, r[i][0] - r[i + 1][0]); return lerp(r[i][1], r[i + 1][1], k); } return r[r.length - 1][1]; };
+  return (x, y, z) => {
+    x = cl(x, -hl + m, hl - m); const r = ringAt(x);
+    y = Math.max(y, tableAt(T, x, 2) + .005); y = Math.min(y, yTop(r, z) - m);
+    const zs = Math.max(.05, zSide(r, y) - m); return [x, y, Math.sign(z)*Math.min(Math.abs(z), zs)];
+  };
+}
+export function buildUnder(kind0, which) {
+  const b = newB(true), out = b.build.bind(b);
+  b.build = () => { const f = skinOf(S, kind); for (let i = 0; i < b.p.length; i += 3) { const q = f(b.p[i], b.p[i + 1], b.p[i + 2]); b.p[i] = q[0]; b.p[i + 1] = q[1]; b.p[i + 2] = q[2]; } return out(); };
+  const S = carSpec(kind0), kind = baseOf(kind0), hl = S.L/2, hw = S.W/2, xf0 = hl - S.hood, belt = S.beltY, sill = S.sill, R = S.R, Ra = R + .055, xw = hl - S.overhang;
+  const top = sill + (belt - sill)*.48, exo = kind === 'sports' || kind === 'super';
+  const MT = MATTE, PLA = [.07, .07, .075], DK = [.12, .12, .13], ALU = [.42, .42, .44], STL = [.36, .36, .38], RUST = [.3, .2, .14], PNT = [1, 1, 1];
+  const bx = (x0, y0, z0, x1, y1, z1, c, glow = 0, paint = 0) => box(b, x0, y0, z0, x1, y1, z1, c, paint, glow);
+  const near = (x, pad = .05) => Math.abs(Math.abs(x) - xw) < R + pad;          // (along the car, where a wheel is)
+  const zo = (x) => near(x) ? hw - .3 : hw - .13;                                  // as far out as it can go there without a tyre in it
+  if (which === 'front') {
+    const xa = hl - .28;
+    // behind the bumper: the beam on its cans, the lower support and the undertray, the liners ahead of the wheels
+    const bz = zo(hl - .2);
+    bx(hl - .24, top - .2, -bz, hl - .16, top - .06, bz, STL);
+    for (const s of [-1, 1]) bx(xa + .03, top - .18, s*(hw - .46), hl - .24, top - .08, s*(hw - .36), STL);
+    bx(xa, Math.max(.08, sill - .04), -bz, hl - .18, Math.max(.11, sill - .01), bz, PLA, MT);
+    const xl = Math.min(hl - .2, Math.max(xa, xw + R + .03));
+    for (const s of [-1, 1]) bx(xl, Math.max(.08, sill - .04), s*(hw - .3), xl + .025, top + .1, s*(hw - .08), PLA, MT);
+    // the headlamps' backs: a housing behind each, the bulb's cap in it
+    for (const s of [-1, 1]) {
+      const y0 = Math.max(top + .02, 2*R + .03), y1 = Math.max(y0 + .08, belt - .1);
+      bx(xa - .22, y0, s*(hw - .5), hl - .18, y1, s*(hw - .14), PLA, MT);
+      b.addGeo(G.cyl12, M(xa - .25, (y0 + y1)/2, s*(hw - .32), .05, .06, .05, 0, 0, Math.PI/2), DK, MT);
+    }
+    if (exo) {
+      // the luggage tub: floor and four walls, carpeted; a radiator in each front corner with its duct
+      const x0 = xf0 + .05, x1 = hl - .38, zt = hw - .38, y0 = sill + .1, y1 = belt - .06, C = [.1, .1, .1];
+      bx(x0, y0 - .03, -zt, x1, y0, zt, C, MT);
+      bx(x0 - .02, y0, -zt, x0, y1, zt, C, MT); bx(x1, y0, -zt, x1 + .02, y1, zt, C, MT);
+      for (const s of [-1, 1]) {
+        bx(x0, y0, s*zt, x1, y1, s*(zt + .02), C, MT);
+        bx(x1 - .02, y0, s*(zt + .03), hl - .3, y1 - .04, s*(hw - .16), DK);
+        for (let k = 0; k < 4; k++) bx(x1 + k*.04, y0 + .02, s*(zt + .02), x1 + k*.04 + .008, y1 - .06, s*(hw - .15), ALU);
+      }
+      bx(xf0 - .02, sill, -(hw - .1), xf0, belt - .02, hw - .1, PLA, MT);
+      return b.build();
+    }
+    // the bay's floor (between the aprons), the bulkhead and the scuttle under the screen
+    const za = hw - .3;
+    bx(xf0, sill - .03, -za, xa, sill, za, PLA, MT);
+    bx(xf0 - .04, sill, -(hw - .1), xf0 - .01, belt - .02, hw - .1, PLA, MT);
+    bx(xf0 - .02, belt - .07, -(hw - .12), xf0 + .12, belt - .04, hw - .12, PLA, MT);
+    // the radiator's support across the front, and the radiator behind the grille with its fan
+    bx(xa, sill, -za, xa + .03, belt - .1, za, PLA, MT);
+    bx(xa - .05, belt - .14, -(hw - .12), xa + .03, belt - .11, hw - .12, PNT, 0, 1);
+    bx(xa - .06, sill + .1, -(hw - .36), xa - .02, belt - .17, hw - .36, DK);
+    for (let k = -4; k <= 4; k++) bx(xa - .065, sill + .1, k*(hw - .38)/4.5 - .004, xa - .055, belt - .17, k*(hw - .38)/4.5 + .004, ALU);
+    b.addGeo(G.cyl16, M(xa - .09, (sill + belt)/2 - .04, .12, .17, .035, .17, 0, 0, Math.PI/2), PLA, MT);
+    for (const s of [-1, 1]) {
+      // the inner wing, the liner over the wheel, the strut's top
+      bx(xf0, sill, s*(za - .02), xa, belt - .06, s*(za + .01), PNT, 0, 1);
+      const yl = Math.min(belt - .1, R + Ra + .01);
+      bx(xf0, yl, s*(za + .01), xa, yl + .03, s*(hw - .1), PLA, MT);
+      if (xw > xf0 + .1 && xw < xa - .1) {
+        b.addGeo(G.cyl12, M(xw, yl + Math.min(.12, (belt - .1 - yl)/2), s*(za - .07), .07, Math.min(.24, belt - .1 - yl), .07), PNT, 0, 1);
+        b.addGeo(G.cyl12, M(xw, Math.min(belt - .09, yl + .24), s*(za - .07), .035, .03, .035), STL);
+      }
+    }
+    // the engine: a block across the bay, its cam cover, the oil cap; the gearbox on the left, the manifold on the front
+    const ex0 = xf0 + .12, ex1 = Math.max(ex0 + .2, xa - .2), et = belt - .17;
+    rbox(b, ex0, sill + .12, -.28, ex1, et - .06, .28, [.3, .3, .32]);
+    rbox(b, ex0 + .03, et - .07, -.22, ex1 - .03, et, .22, PLA, 0, MT);
+    bx(ex0 + .08, et - .005, -.1, ex1 - .08, et + .005, .1, ALU);
+    b.addGeo(G.cyl12, M((ex0 + ex1)/2, et + .015, .14, .025, .03, .025), [.85, .65, .1]);
+    rbox(b, ex0 - .02, sill + .1, -(za - .03), ex0 + .26, sill + .36, -.27, [.34, .34, .36]);
+    for (const z of [-.15, -.05, .05, .15]) tube(b, [[ex1, et - .12, z], [ex1 + .06, et - .2, z*.7], [ex1 + .07, sill + .2, 0]], .018, RUST, 6, 5);
+    tube(b, [[ex0 + .06, et - .02, .24], [(ex0 + ex1)/2, et + .03, za - .08], [xf0 + .3, belt - .22, za - .12]], .032, PLA, 8, 6, 0, MT);
+    // the air box (right), the battery (left), the coolant bottle, the brake fluid on the bulkhead
+    rbox(b, xf0 + .06, belt - .36, za - .2, xf0 + .38, belt - .18, za - .02, PLA, 0, MT);
+    bx(xf0 + .06, belt - .42, -(za - .02), xf0 + .28, belt - .2, -(za - .22), [.05, .05, .05], MT);
+    bx(xf0 + .09, belt - .2, -(za - .05), xf0 + .12, belt - .18, -(za - .08), [.7, .08, .06]);
+    bx(xf0 + .22, belt - .2, -(za - .05), xf0 + .25, belt - .18, -(za - .08), [.08, .08, .08]);
+    bx(xa - .24, belt - .38, za - .18, xa - .1, belt - .22, za - .04, [.82, .8, .74]);
+    b.addGeo(G.cyl12, M(xf0 + .06, belt - .2, za - .3, .04, .1, .04), [.75, .7, .45]);
+    return b.build();
+  }
+  if (which === 'rear') {
+    const bz = zo(-hl + .2), xp = -hl + .27;
+    bx(-hl + .16, top - .2, -bz, -hl + .24, top - .06, bz, STL);
+    for (const s of [-1, 1]) bx(-hl + .24, top - .18, s*(hw - .46), xp, top - .08, s*(hw - .36), STL);
+    bx(xp - .03, Math.max(.08, sill - .03), -zo(xp), xp, top + .14, zo(xp), PNT, 0, 1);                // the back panel
+    bx(xp, sill - .03, -(hw - .3), xp + .45, sill, hw - .3, PLA, MT);                                  // the boot floor's end
+    bx(-hl + .18, Math.max(.08, sill - .04), -bz, xp - .03, Math.max(.11, sill - .01), bz, PLA, MT);
+    // the silencer under the left and the pipe out of it
+    b.addGeo(G.cyl12, M(xp + .25, Math.max(.16, sill - .04), -(hw - .45), .08, .45, .1, 0, 0, Math.PI/2), [.2, .2, .21]);
+    rod(b, [xp + .02, Math.max(.16, sill - .04), -(hw - .45)], [-hl + .14, Math.max(.14, sill - .06), -(hw - .45)], .025, [.45, .44, .42], HUB_G);
+    for (const s of [-1, 1]) {
+      const y0 = Math.max(top + .05, 2*R + .03), y1 = Math.max(y0 + .08, belt - .1);
+      bx(-hl + .15, y0, s*(hw - .46), -hl + .34, y1, s*(hw - .14), PLA, MT);
+    }
+    if (kind === 'sports') rbox(b, xp + .05, sill + .1, -(hw - .42), xp + .75, belt - .16, hw - .42, [.3, .3, .32]);
+    return b.build();
+  }
+  // a front door's opening
+  const s = which === 'door1' ? 1 : -1, D = doorOf(kind0); if (!D) return b.build();
+  const w = D.hw((D.x0 + D.x1)/2), z0 = s*(w - .13), z1 = s*(w - .025), y0 = D.y0, y1 = D.belt;
+  bx(D.x0 - .03, y0, z0, D.x0, y1, z1, PNT, 0, 1);                       // the B pillar's shut face, its lock
+  bx(D.x0 - .035, y1 - .2, z0*.9 + z1*.1, D.x0 - .028, y1 - .14, z1, ALU);
+  bx(D.x1, y0, z0, D.x1 + .03, y1, z1, PNT, 0, 1);                       // the A pillar's, its hinges
+  for (const y of [y0 + .12, y1 - .12]) bx(D.x1 - .01, y - .04, z0*.6 + z1*.4, D.x1 + .005, y + .04, z1, DK);
+  bx(D.x0, y0 - .04, z0, D.x1, y0, z1, PNT, 0, 1);                       // the sill step, its scuff plate
+  bx(D.x0 + .03, y0, z0*.8 + z1*.2, D.x1 - .03, y0 + .004, z1 - s*.01, [.5, .5, .52]);
+  for (const [a, e] of [[[D.x0 - .005, y0, z1 - s*.012], [D.x0 - .005, y1, z1 - s*.012]], [[D.x1 + .005, y0, z1 - s*.012], [D.x1 + .005, y1, z1 - s*.012]], [[D.x0, y0 + .005, z1 - s*.012], [D.x1, y0 + .005, z1 - s*.012]]]) rod(b, a, e, .008, [.03, .03, .033], HUB_G);
+  return b.build();
+}
+
 // ---------------------------------------------------------------- city bus (fictional Pune livery)
 const PANE = [0.07, 0.085, 0.1, 4], RUBBER = [0.03, 0.03, 0.033], STEEL = [0.5, 0.5, 0.52];
 // a body of stations along x: outline(x) gives half the section, bottom middle round to the roof's middle, as [z, y]. `at`
