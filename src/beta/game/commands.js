@@ -336,7 +336,7 @@ export function freeTerminal(G) {
   sh.reg('freecam [on:onoff]', 'detached camera: WASD, Q down, E up, Shift fast, the mouse looks', ([a]) => setFly(onoff(a, !!St.fly)), { group: 'you' });
   sh.reg('run <multiplier:num>', 'how fast you run', ([m]) => { St.foot = +m; say(`${m}×`, 'ok'); }, { group: 'you' });
   sh.reg('money <amount:int>', 'set your cash', ([n]) => { G.stats.money = +n; say(`₹${(+n).toLocaleString('en-IN')}`, 'ok'); }, { group: 'you' });
-  sh.reg('give <item:item> [count:int]', 'put something in the jhola', ([k, n]) => { if (!ITEMS[k]) throw new Error('no such item. Tab lists them'); const L = G.life.s; L.inv = L.inv || {}; L.inv[k] = (L.inv[k] || 0) + (+n || 1); if (k === 'katta') L.ammo = (L.ammo || 0) + 6*(+n || 1); say(`${ITEMS[k].name} × ${L.inv[k]}`, 'ok'); }, { group: 'you' });
+  sh.reg('give <item:item> [count:int]', 'put something in the jhola', ([k, n]) => { if (!ITEMS[k]) throw new Error('no such item. Tab lists them'); const L = G.life.s; L.inv = L.inv || {}; L.inv[k] = (L.inv[k] || 0) + (+n || 1); if (k === 'katta') L.ammo = (L.ammo || 0) + 6*(+n || 1); if (k === 'ammo') { L.ammo = (L.ammo || 0) + L.inv.ammo; L.inv.ammo = 0; say(`${L.ammo} rounds loaded`, 'ok'); return; } say(`${ITEMS[k].name} × ${L.inv[k]}`, 'ok'); }, { group: 'you' });
   // a katta in your hand straight away: in the jhola with rounds, on the wheel (Z), drawn (click to fire)
   sh.reg('gun [rounds:int]', 'a pistol in your hand, loaded', ([n]) => {
     const L = G.life.s; L.inv = L.inv || {}; L.inv.katta = Math.max(1, L.inv.katta || 0); L.ammo = (L.ammo || 0) + (+n || 60);
