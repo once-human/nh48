@@ -1,9 +1,12 @@
 // The car radio (U): real stations playing now, the way a car in Pune would have them on: today's Bollywood chart,
-// club mixes for a night drive, the 2010s, the slow ones for the rain, Indian electronic. U goes to the next one, and
-// after the last, off. Between them a breath of static while it tunes.
-// It sounds like what it's coming out of: an auto's one small speaker is thin and a little rough, a hatchback's
-// doors are plain, an SUV has some bass, and a luxury car or a supercar is full and wide and deep. Step out and
-// leave it on and you hear it from outside, through the glass, fainter as you walk away.
+// club mixes for a night drive, the 2010s, the 2000s bangers, the slow ones for the rain, Marathi, Punjabi, hip-hop,
+// a London station with DJs live (the Fred again.. lane), Indian electronic. U goes to the next one, and after the
+// last, off. Between them a breath of static while it tunes.
+// It sounds like it's playing in the car you're sitting in: the speakers (an auto's one small one thin and rough and
+// out in the open air, a hatchback's doors plain, an SUV with some bass, a luxury car or a supercar full and deep),
+// a little glue on it like a mastered track, and the cabin itself, the sound coming back off the glass and the roof,
+// a short close room round you. Open the door and the room opens with it. Step out and leave it on and you hear it
+// from outside, through the glass, fainter as you walk away, clearer with the door open.
 // (Plain MP3 streams play as they are; an HLS one gets hls.js from the CDN the first time. A car with the garage's
 // DJ box has the dhol as its first station. These are other people's live stations: fine while we build, but a
 // public release needs their permission or our own music.)
@@ -16,16 +19,25 @@ const STATIONS = [
   { name: 'Bollywood Dance', sub: 'club mixes, for the night', url: UBER + 'bollywooddance/icecast.audio' },
   { name: 'Bollywood 2010s', sub: 'the ones you grew up on', url: UBER + 'bollywood2010s/icecast.audio' },
   { name: 'Mirchi Love', sub: 'the slow ones, for the rain', url: UBER + 'bollywoodlove/icecast.audio' },
+  { name: 'Bollywood 2000s', sub: 'the bangers', url: UBER + 'bollywood2000s/icecast.audio' },
+  { name: 'Maayboli Marathi', sub: 'Marathi, all day', url: 'https://stream.zeno.fm/48kybvzrwfeuv' },
+  { name: 'BritAsia Punjabi', sub: 'Punjabi hits', url: 'https://s4.radio.co/sfefce156f/listen' },
+  { name: '100 Hip Hop & RnB', sub: 'hip-hop, non-stop', url: 'https://streaming.shoutcast.com/100-hip-hop-and-rnb-fm' },
+  { name: 'NTS London', sub: 'DJs live from London', url: 'https://streams.radiomast.io/nts1' },
   { name: 'Bombay Beats', sub: 'Indian electronic, chill', url: 'https://strmreg.1.fm/bombaybeats_mobile_mp3' },
 ];
-// what the speakers make of it: high-pass, low-pass, bass and treble shelves, a mid bump, how hard it's driven, the level
+// (every one of these lets the page take its sound through Web Audio (CORS): one that doesn't plays silent here)
+// what the speakers and the car make of it: high-pass, low-pass, bass and treble shelves, the sub under it, a mid bump,
+// how hard it's driven, how much it's squeezed together, how much of the cabin you hear, the level
 const SPK = {
-  tinny: { hp: 420, lp: 3400, bass: 0, treb: -8, mid: [1500, 6], drive: 0.45, vol: 0.75 },
-  basic: { hp: 120, lp: 7500, bass: 1.5, treb: -3, mid: [2400, 2], drive: 0.1, vol: 0.85 },
-  good: { hp: 55, lp: 12500, bass: 4, treb: 0, mid: [2800, 0], drive: 0, vol: 0.92 },
-  prem: { hp: 28, lp: 19000, bass: 6.5, treb: 3, mid: [3200, -1.5], drive: 0, vol: 1 },
+  tinny: { hp: 480, lp: 3200, bass: -2, sub: 0, treb: -9, mid: [1400, 7], drive: 0.5, comp: 0, room: 0.03, vol: 0.72 },
+  basic: { hp: 110, lp: 8000, bass: 3, sub: 1.5, treb: -2, mid: [2400, 1.5], drive: 0.08, comp: 0.4, room: 0.13, vol: 0.86 },
+  good: { hp: 45, lp: 13500, bass: 6, sub: 4, treb: 1, mid: [2800, -0.5], drive: 0, comp: 0.7, room: 0.17, vol: 0.93 },
+  prem: { hp: 24, lp: 19500, bass: 8, sub: 7, treb: 3, mid: [3200, -2], drive: 0, comp: 1, room: 0.22, vol: 1 },
 };
-const kindOf = (v) => {
+// how far the door's open, 0 shut to 1 wide (beta/vehicles/cardoor.js keeps the doors that are swinging in P.doors)
+export const doorOpen = (P, v) => { let o = 0; if (P && v) for (const R of P.doors || []) if (R.veh === v) o = Math.max(o, Math.min(1, (R.ang || 0)/1.18)); return o; };
+export const kindOf = (v) => {
   if (!v || !v.spec || v.spec.two) return null;
   const b = baseOf(v.type);
   if (/^(auto|tempo)/.test(b) || v.inAuto) return 'tinny';
@@ -48,15 +60,36 @@ function graph(A) {
   if (R.nodes) return R.nodes;
   const ctx = A.ctx, el = R.el = new window.Audio(); el.crossOrigin = 'anonymous'; el.preload = 'none';
   const src = ctx.createMediaElementSource(el), f = (type) => { const b = ctx.createBiquadFilter(); b.type = type; return b; };
-  const hp = f('highpass'), bass = f('lowshelf'), mid = f('peaking'), treb = f('highshelf'), lp = f('lowpass'), shell = f('lowpass');
-  bass.frequency.value = 95; treb.frequency.value = 8500; mid.Q.value = 0.9; hp.Q.value = 0.8; lp.Q.value = 0.7; shell.frequency.value = 20000;
+  const hp = f('highpass'), bass = f('lowshelf'), sub = f('peaking'), mid = f('peaking'), treb = f('highshelf'), lp = f('lowpass'), shell = f('lowpass');
+  bass.frequency.value = 110; sub.frequency.value = 55; sub.Q.value = 1.1; treb.frequency.value = 8500; mid.Q.value = 0.9; hp.Q.value = 0.8; lp.Q.value = 0.7; shell.frequency.value = 20000;
+  // glue: the peaks brought in a little and the whole lifted, like a track off the desk
+  const comp = ctx.createDynamicsCompressor(); comp.knee.value = 12; comp.attack.value = 0.008; comp.release.value = 0.18;
+  const make = ctx.createGain();
+  // the cabin: a short close room, the sound back off the glass and the roof (a quarter of a second, darker than the dry)
+  const room = ctx.createConvolver(); room.buffer = cabinIR(ctx); const wet = ctx.createGain(), dry = ctx.createGain(); wet.gain.value = 0;
   const shaper = ctx.createWaveShaper(), out = ctx.createGain(); out.gain.value = 0;
-  src.connect(hp).connect(bass).connect(mid).connect(treb).connect(lp).connect(shaper).connect(shell).connect(out).connect(A.bus('music'));
-  R.nodes = { ctx, hp, bass, mid, treb, lp, shaper, shell, out };
+  src.connect(hp).connect(bass).connect(sub).connect(mid).connect(treb).connect(lp).connect(shaper).connect(comp).connect(make);
+  make.connect(dry).connect(shell); make.connect(room).connect(wet).connect(shell);
+  shell.connect(out).connect(A.bus('music'));
+  R.nodes = { ctx, hp, bass, sub, mid, treb, lp, shaper, comp, make, wet, dry, shell, out };
   return R.nodes;
+}
+// a car's inside, as an echo: a few hard early bounces off the glass inside the first 12 ms, then a quick dense tail,
+// each side its own, losing its top as it goes
+function cabinIR(ctx) {
+  const sr = ctx.sampleRate, n = Math.floor(sr*0.26), B = ctx.createBuffer(2, n, sr);
+  for (let c = 0; c < 2; c++) {
+    const d = B.getChannelData(c); let lo = 0;
+    for (let i = 0; i < n; i++) { const tt = i/sr, x = (Math.random()*2 - 1)*Math.exp(-tt/0.055); lo += (x - lo)*(0.55 - 0.4*Math.min(1, tt/0.2)); d[i] = lo*0.5; }
+    for (const [ms, a] of [[2.1, 0.7], [3.7, 0.5], [5.3, 0.45], [7.9, 0.32], [11.4, 0.22]]) { const i = Math.floor((ms + c*0.6)*sr/1000); if (i < n) d[i] += a*(c ? 0.9 : 1); }
+  }
+  return B;
 }
 function voice(N, k) {
   const S = SPK[k], t = N.ctx.currentTime;
+  N.sub.gain.setTargetAtTime(S.sub, t, 0.05);
+  N.comp.threshold.setTargetAtTime(-6 - 18*S.comp, t, 0.05); N.comp.ratio.setTargetAtTime(1 + 3*S.comp, t, 0.05); N.make.gain.setTargetAtTime(1 + 0.6*S.comp, t, 0.05);
+  N.room = S.room;
   N.hp.frequency.setTargetAtTime(S.hp, t, 0.05); N.lp.frequency.setTargetAtTime(S.lp, t, 0.05);
   N.bass.gain.setTargetAtTime(S.bass, t, 0.05); N.treb.gain.setTargetAtTime(S.treb, t, 0.05);
   N.mid.frequency.setTargetAtTime(S.mid[0], t, 0.05); N.mid.gain.setTargetAtTime(S.mid[1], t, 0.05);
@@ -98,9 +131,18 @@ function next() {
 }
 function off() { stopStream(); R.tok = null; R.i = -1; if (R.nodes) R.nodes.out.gain.setTargetAtTime(0, R.nodes.ctx.currentTime, 0.08); R.car = null; }
 
+// a tap of U is the next station (on letting go); held for a second it's off, whatever was on
+let held = null;
 addEventListener('keydown', (e) => {
-  if (e.code !== keyOf('music') || e.repeat) return;
+  if (e.code !== keyOf('music')) return;
   const G = G0(); if (!G || G.state !== 'play' || !G.player || G.player.onFoot) return;
+  e.stopImmediatePropagation(); if (e.repeat || held) return;
+  held = { done: false, t: setTimeout(() => { held.done = true; if (R.car || R.i >= 0) { off(); G.hud.toast('Radio off', 'hold U', 'info', 1.2); } }, 900) };
+}, true);
+addEventListener('keyup', (e) => {
+  if (e.code !== keyOf('music') || !held) return;
+  clearTimeout(held.t); const was = held; held = null;
+  const G = G0(); if (was.done || !G || G.state !== 'play' || !G.player || G.player.onFoot) return;
   e.stopImmediatePropagation(); next();
 }, true);
 // every frame: as loud as it should be from where you are
@@ -110,9 +152,13 @@ const tick = () => {
   const P = G.player, v = R.car, t = N.ctx.currentTime, S = SPK[N.kind] || SPK.basic;
   const F = P.onFoot ? P.foot : P.cur, d = F ? Math.hypot(F.x - v.x, F.z - v.z) : 0;
   if (v.dead || d > 90) { off(); return; }            // (gone, or left far behind: it's off)
-  let g = S.vol*0.55, cut = 20000;
-  if (P.onFoot || P.cur !== v) { g *= Math.max(0, 1 - d/32)**2*0.6; cut = 900; }
+  // the door: open, the cabin's less of a room inside and the music gets out to you outside
+  const door = doorOpen(P, v);
+  let g = S.vol*0.55, cut = 20000, room = N.room || 0;
+  if (P.onFoot || P.cur !== v) { g *= Math.max(0, 1 - d/32)**2*(0.6 + 0.9*door); cut = 900 + 7000*door*door; room *= 0.3; }
+  else room *= 1 - 0.6*door;
   if (G.state !== 'play') g = 0;
   N.out.gain.setTargetAtTime(R.dj ? 0 : g, t, 0.12); N.shell.frequency.setTargetAtTime(cut, t, 0.15);
+  N.wet.gain.setTargetAtTime(room*2.2, t, 0.1); N.dry.gain.setTargetAtTime(1 - room*0.5, t, 0.1);
 };
 requestAnimationFrame(tick);

@@ -118,7 +118,8 @@ export function soundscape(G) {
     a.muf.connect(shelf).connect(mud).connect(comp).connect(ctx.destination);
     // each kind of sound a little back from the rest (the voices stay clearest)
     const TRIM = { traffic: 0.4, world: 0.7, fx: 0.8, voice: 0.9, music: 0.85 };
-    for (const k in a.buses) { const b = a.buses[k], g = ctx.createGain(); g.gain.value = TRIM[k] ?? 0.8; try { b.disconnect(); } catch (e) { /* */ } b.connect(g).connect(a.master); }
+    a.trims = {};      // (kept: game/cabin.js puts the inside-a-car muffling between a bus and its trim)
+    for (const k in a.buses) { const b = a.buses[k], g = a.trims[k] = ctx.createGain(); g.gain.value = TRIM[k] ?? 0.8; try { b.disconnect(); } catch (e) { /* */ } b.connect(g).connect(a.master); }
     // the engine: rounder, not a buzz
     const E = a.eng;
     if (E && E.out) { try { E.out.disconnect(); } catch (e) { /* */ } const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 0.5; const g = ctx.createGain(); g.gain.value = 0.6; E.out.connect(lp).connect(g).connect(a.bus('traffic')); if (E.lp) E.lp.Q.value = 0.9; }
