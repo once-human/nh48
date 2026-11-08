@@ -65,6 +65,7 @@ import './game/pursuit.js';
 import './game/wanted.js';          // someone else wanted: a hit and run on you sends a marshal (and a jeep) after the vehicle         // a cop who saw you go into a shop comes in after you
 import './world/staff.js';
 import './world/walkin.js';
+import { install as shopIn } from './world/shopin.js'; shopIn();   // shops walked into where they stand (after every other patch, so it's the first to see F)
 import './world/busy.js';
 import './world/pins.js';
 import './draw/alive.js';

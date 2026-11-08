@@ -16,6 +16,7 @@ import { K, STYLE, BASE, SHOP_CELL, heightOf } from './kinds.js';
 import { KINDS, PALETTES, KIND_IDS as KI, blend, pick } from './areas.js';
 import { footpath } from './footpath.js';
 import { massing } from './massing.js';
+import { shopPlan, cellDepth, planSeed, familyOf, depthAt } from './shopplan.js';
 
 // what a kind of place builds like
 const TYPE = {};
@@ -465,6 +466,29 @@ function shopFront(b, cb, G, F, i, len, shopEdge) {
   for (let k = 0; k < ns; k++) {
     const sh = G.shops.get(i * 4096 + k);
     const a = k * cw + 0.18, c = (k + 1) * cw - 0.18;
+    // the shop's own layout (world/shopplan.js): the same one the game walks you into
+    const fam = sh && familyOf(sh[3], sh[1]);
+    const plan = fam && shopPlan({ kind: sh[3], cat: sh[1], brand: sh[2], w: c - a, D: cellDepth(G.p, F, a, c, fam), oh, seed: planSeed(G.B.bi, i * 4096 + k), glass: !shopEdge || sh[2] === 'brand' });
+    if (plan) {
+      W.rect(b, k * cw, a, BASE, yT, 0); W.rect(b, c, (k + 1) * cw, BASE, yT, 0);
+      const famous = sh[2] === 'trad', lux = (sh[2] === 'brand' ? 0.55 : 0) + L.rich * 0.55 - (famous ? 0.2 : 0);
+      if (lux > 0.75) { b.set(K.cladding, R() < 0.5 ? [0.2, 0.2, 0.22] : [0.86, 0.85, 0.82], 0.05); W.box(b, a - 0.18, c + 0.18, BASE + oh, yT, 0, 0.06, 2); b.set(L.wk, L.wall, L.wear); }
+      else W.rect(b, a, c, BASE + oh, yT, 0);
+      drawShop(b, cb, G, F, a, plan, lux);
+      if (plan.glass) glazedFront(b, G, F, a, plan, lux);
+      const t0 = k * cw + 0.15, t1 = (k + 1) * cw - 0.15, h = boardH(t1 - t0), y1 = BASE + gh - 0.07, y0 = y1 - h;
+      b.set(K.metal, 0x1e1e20, 0.2);
+      W.box(b, t0 - 0.03, t1 + 0.03, y1, y1 + 0.04, -0.05, 0.12, 2); W.box(b, t0 - 0.03, t1 + 0.03, y0 - 0.04, y0, -0.05, 0.12, 2);
+      if (shopEdge && lux < 0.6 && R() < L.awning * (type === 'peth' ? 0.9 : 0.55)) {
+        if (R() < 0.45) { b.set(K.tin, [0.6, 0.58, 0.54], Math.min(1, L.wear + 0.25)); W.slope(b, a - 0.1, c + 0.1, y0 - 0.05, 0.12, y0 - 0.5, 1.25); }
+        else { b.set(K.cloth, POP[(R() * POP.length) | 0], 0.3, R()); W.slope(b, a - 0.1, c + 0.1, y0 - 0.05, 0.12, y0 - 0.45, 1.1); }
+      }
+      // the step up into it: the old shops' stone ota, a brand's marble, everyone else's plain concrete one
+      if (type === 'peth' || type === 'village' || famous) { b.set(K.stone, 0x6a645c, L.wear); W.box(b, a - 0.1, c + 0.1, 0, BASE + 0.18, 0, 0.42, 2 | 8); }
+      else if (lux > 0.75) { b.set(K.marble, 0x8a8682, 0); W.box(b, a - 0.1, c + 0.1, 0, BASE + 0.1, 0, 0.5, 2 | 8); }
+      b.set(L.wk === K.curtain ? K.cladding : L.wk, L.wall, L.wear);
+      continue;
+    }
     if (!shopEdge) {
       // a business on a wall with no shutters of its own (the game gives it a board and a door, never a shutter): a
       // glazed front in the wall, so it never looks open when it's shut
@@ -505,18 +529,6 @@ function shopFront(b, cb, G, F, i, len, shopEdge) {
   }
   b.set(L.wk, L.wall, L.wear);
 }
-// how far in from (x, z) the building goes, along -n (the shop can't be deeper than the building)
-function depthAt(p, x, z, nx, nz) {
-  let best = 30;
-  const dx = -nx, dz = -nz;
-  for (let i = 0, n = p.length / 2; i < n; i++) {
-    const j = (i + 1) % n, ax = p[2 * i], az = p[2 * i + 1], ex = p[2 * j] - ax, ez = p[2 * j + 1] - az;
-    const den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) continue;
-    const t = ((ax - x) * ez - (az - z) * ex) / den, s = ((ax - x) * dz - (az - z) * dx) / den;
-    if (t > 0.05 && s >= 0 && s <= 1 && t < best) best = t;
-  }
-  return best;
-}
 const GOODS = [
   [0xf2c230, 0xd83a2a, 0x2f5fd0, 0xeee8dc, 0x2f8a5a, 0xf08a24, 0xc8a070],           // kirana
   [0xd8c8a0, 0xeee8dc, 0xc8a070, 0xb85a2a],                                           // food
@@ -533,6 +545,170 @@ const GOODS = [
   [0x2a2a2e, 0x8a5a3a, 0xe8e8ec, 0xd83a2a],                                           // shoes
   [0xd9a35b, 0xe8c27a, 0xc98a3a, 0xf0e0b0, 0xf2d8a0, 0xb8742e, 0xfaf3e3],             // bakery
 ];
+// ---------------------------------------------------------------- a shop from its plan (world/shopplan.js)
+// The room is the plan's size; each piece stands exactly where the plan puts it (the game walks you round the same
+// pieces); what's on them, the colours and the stock, is only for looking at.
+const STOCK_GOODS = { kirana: 0, paan: 0, flowers: 0, medicine: 2, mobile: 6, tv: 6, hardware: 8, sweets: 11, bakery: 13 };
+function drawShop(b, cb, G, F, a, P, lux) {
+  const { R, L } = G, w = P.w, D = P.D, c = a + w, yb = BASE, yt = BASE + P.oh, st = P.stock;
+  const U = (u) => a + u;
+  // the room
+  const wallC = st === 'medicine' ? 0xeef0ea : st === 'mobile' || st === 'tv' ? 0xe6e6e2 : st === 'sweets' || st === 'bakery' ? [0xf2ead8, 0xe8dcc0, 0xdfe8e0][(R() * 3) | 0]
+    : [0x8a6a48, 0x9a7a52, 0x7a6a58, 0xd8c8a8, 0xe0d8c8, 0xb8c8b8][(R() * 6) | 0];
+  b.set(K.inside, wallC, 0.25, R());
+  F.rect(b, c, a, yb, yt, -D, 1);
+  b.quad(F.P(a, yb, 0), F.P(a, yb, -D), F.P(a, yt, -D), F.P(a, yt, 0), [F.tx, 0, F.tz]);
+  b.quad(F.P(c, yb, 0), F.P(c, yb, -D), F.P(c, yt, -D), F.P(c, yt, 0), [-F.tx, 0, -F.tz]);
+  b.set(K.inside, 0xe8e4d8, 0.2); b.quad(F.P(a, yt, 0), F.P(c, yt, 0), F.P(c, yt, -D), F.P(a, yt, -D), [0, -1, 0]);
+  b.set(lux > 0.6 ? K.marble : K.sqTiles, lux > 0.6 ? 0xd8d0c4 : [0xb8b0a0, 0xc8c0b0, 0x8a8478, 0xd8d4cc][(R() * 4) | 0], 0.3);
+  b.quad(F.P(a, yb + 0.01, 0), F.P(c, yb + 0.01, 0), F.P(c, yb + 0.01, -D), F.P(a, yb + 0.01, -D), [0, 1, 0]);
+  // the tube light
+  if (P.tube) { b.set(K.glow, st === 'sweets' || st === 'bakery' ? [1, 0.94, 0.8] : [0.95, 0.98, 1], 0, 0.9); F.box(b, U(P.tube.u0), U(P.tube.u1), yt - 0.06, yt - 0.02, P.tube.d - 0.04, P.tube.d, 0); }
+  const gc = GOODS[STOCK_GOODS[st] ?? 0] || GOODS[0], pc = () => gc[(R() * gc.length) | 0];
+  for (const q of P.pieces) drawPiece(b, cb, G, F, U, q, yb, yt, st, pc, lux);
+  // the new phone's poster, lit, on a side wall
+  if (P.poster) {
+    const q = P.poster, u = q.wall === 'left' ? a + 0.01 : c - 0.01, n = q.wall === 'left' ? [F.tx, 0, F.tz] : [-F.tx, 0, -F.tz];
+    b.set(K.glow, [[0.95, 0.4, 0.3], [0.3, 0.55, 0.95], [0.25, 0.75, 0.55], [0.75, 0.35, 0.85]][(R() * 4) | 0], 0, 0.6);
+    b.quad(F.P(u, yb + q.y0, q.d0), F.P(u, yb + q.y0, q.d1), F.P(u, yb + q.y1, q.d1), F.P(u, yb + q.y1, q.d0), n);
+  }
+  // the recharge sign's light box over a mobile shop's opening
+  if (st === 'mobile' && R() < 0.7) { b.set(K.glow, R() < 0.5 ? [0.95, 0.15, 0.15] : [0.2, 0.45, 0.95], 0, 0.85); F.box(b, a + 0.1, a + Math.min(1.1, w * 0.4), yt - 0.28, yt - 0.06, 0.02, 0.1, 2); }
+  // a chemist's green cross over the opening
+  if (st === 'medicine') { b.set(K.glow, [0.2, 0.85, 0.35], 0, 0.95); F.box(b, c - 0.2, c + 0.1, yt + 0.12, yt + 0.42, 0.05, 0.12, 2); }
+  b.set(L.wk, L.wall, L.wear);
+}
+// the face of a shelf full of goods: one textured quad facing out of the shelf (the shader paints the packets)
+function goodsFace(b, F, U, q, y0, y1, st, R) {
+  b.set(K.goods, 0xffffff, 0.2, ((STOCK_GOODS[st] ?? 0) * 16 + ((R() * 16) | 0)) / 255);
+  if (q.face === 'out') F.rect(b, U(q.u1) - 0.03, U(q.u0) + 0.03, y0, y1, q.d1 - 0.03, 1);
+  else { const u = q.face === 'left' ? U(Math.min(q.u0, q.u1)) + 0.03 : U(Math.max(q.u0, q.u1)) - 0.03, s = q.face === 'left' ? -1 : 1;
+    b.quad(F.P(u, y0, q.d0 + 0.03), F.P(u, y0, q.d1 - 0.03), F.P(u, y1, q.d1 - 0.03), F.P(u, y1, q.d0 + 0.03), [F.tx * s, 0, F.tz * s], [q.d0, y0, q.d1, y0, q.d1, y1, q.d0, y1]); }
+}
+function drawPiece(b, cb, G, F, U, q, yb, yt, st, pc, lux) {
+  const { R, L } = G;
+  const u0 = U(Math.min(q.u0, q.u1)), u1 = U(Math.max(q.u0, q.u1)), d0 = Math.min(q.d0, q.d1), d1 = Math.max(q.d0, q.d1);
+  switch (q.t) {
+    case 'shelf': {
+      const h = Math.min(q.h, yt - yb - 0.05), wood = st === 'medicine' || st === 'mobile' || st === 'tv' ? 0xe8e8e4 : st === 'hardware' ? 0x5a6066 : [0x5a4232, 0x6a4a32, 0x2f5a4a, 0x8a6a48][(R() * 4) | 0];
+      b.set(st === 'hardware' ? K.metal : K.wood, wood, 0.25);
+      // the uprights and the boards (open towards where it faces)
+      if (q.face === 'out') { F.box(b, u0, u0 + 0.04, yb, yb + h, d0, d1, 2 | 8); F.box(b, u1 - 0.04, u1, yb, yb + h, d0, d1, 2 | 8); }
+      else { F.box(b, u0, u1, yb, yb + h, d0, d0 + 0.04, 2 | 8); F.box(b, u0, u1, yb, yb + h, d1 - 0.04, d1, 2 | 8); }
+      const step = st === 'tv' ? 0.75 : 0.4;
+      for (let y = yb + 0.1; y < yb + h - 0.05; y += step) F.box(b, u0, u1, y, y + 0.025, d0, d1, 2);
+      F.box(b, u0, u1, yb + h - 0.03, yb + h, d0, d1, 2);
+      if (st === 'tv' && q.face === 'out') {
+        // the televisions, all on
+        for (let y = yb + 0.85; y + 0.55 < yb + h - 0.1; y += step) for (let uu = u0 + 0.12; uu + 0.85 < u1; uu += 0.98) {
+          b.set(K.plain, 0x111113, 0.05); F.box(b, uu, uu + 0.86, y, y + 0.52, d0 + 0.05, d0 + 0.1, 2);
+          b.set(K.glow, [[0.35, 0.55, 0.9], [0.9, 0.5, 0.3], [0.3, 0.8, 0.5], [0.85, 0.85, 0.9]][(R() * 4) | 0], 0, 0.75); F.box(b, uu + 0.03, uu + 0.83, y + 0.03, y + 0.49, d0 + 0.1, d0 + 0.105, 2 | 4 | 8 | 16 | 32);
+        }
+      } else if (st === 'mobile' && q.face === 'out') {
+        // a pegboard of covers, cables, earphones, chargers on one half; the boxes stacked on the other
+        const pm = (u0 + u1) / 2;
+        b.set(K.plain, 0xd8d4cc, 0.2); F.rect(b, pm, u0 + 0.05, yb + 0.95, yb + h - 0.1, d0 + 0.03, 1);
+        cb.set(K.laundry, 0xffffff, 0, R());
+        for (let y = yb + 1.05; y < yb + h - 0.4; y += 0.32) for (let uu = u0 + 0.1; uu < pm - 0.14; uu += 0.15 + R() * 0.04) { if (R() < 0.15) continue; cb.col(R() < 0.35 ? [0x2a2a2e, 0xe8e8ec][(R() * 2) | 0] : POP[(R() * POP.length) | 0]); F.rect(cb, uu, uu + 0.1, y, y + 0.2 + R() * 0.06, d0 + 0.06); }
+        for (let y = yb + 0.13; y < yb + h - 0.25; y += step) for (let uu = pm + 0.05; uu < u1 - 0.12; uu += 0.12 + R() * 0.03) { if (y > yb + 0.9 && y < yb + 0.95) continue; b.set(K.plain, R() < 0.6 ? 0xf2f2f0 : 0x1a1a1c, 0.05); F.box(b, uu, uu + 0.09, y + 0.025, y + 0.2, d0 + 0.05, d1 - 0.05, 2 | 8); }
+      } else {
+        goodsFace(b, F, U, q, yb + 0.12, yb + h - 0.05, st, R);
+        if (st === 'hardware' && q.face === 'out') { b.set(K.metal, 0x8a8e92, 0.4); for (let s = 0; s < 4; s++) { const P0 = F.P(u0 + 0.2 + R() * (u1 - u0 - 0.4), 0, d1 + 0.1); b.tube([P0[0], yb, P0[2]], [P0[0] + (R() - 0.5) * 0.2, yb + 1.5 + R() * 0.5, P0[2] - 0.05], 0.03, 4); } }
+      }
+      break;
+    }
+    case 'counter': {
+      const h = q.h, top = st === 'sweets' || st === 'bakery' ? 0xe8e4dc : 0x3b3b3e;
+      const body = st === 'medicine' || st === 'mobile' || st === 'tv' ? 0xe8e8e4 : [0x5a4232, 0x2f5a4a, 0x8a6a48, 0x6a3a26][(R() * 4) | 0];
+      const fu0 = q.flap ? U(q.flap[0]) : u1, fu1 = q.flap ? U(q.flap[1]) : u1;
+      const parts = q.flap ? [[u0, fu0], [fu1, u1]].filter(([x0, x1]) => x1 - x0 > 0.05) : [[u0, u1]];
+      for (const [x0, x1] of parts) {
+        if (q.glass) {
+          b.set(K.wood, body, 0.15); F.box(b, x0, x1, yb, yb + 0.35, d0, d1, 8);
+          b.set(K.glass, st === 'bakery' ? 0xd8e8e0 : 0xc8d8d8, 0, R()); F.box(b, x0, x1, yb + 0.35, yb + h - 0.04, d0 + 0.02, d1, 2 | 8 | 4);
+          // what's under the glass
+          for (let uu = x0 + 0.08; uu < x1 - 0.18; uu += st === 'mobile' ? 0.2 + R() * 0.06 : 0.3) {
+            b.set(K.plain, pc(), 0.1);
+            if (st === 'mobile') F.box(b, uu, uu + 0.08, yb + 0.72, yb + 0.73, d1 - 0.35, d1 - 0.2, 2 | 8);
+            else F.box(b, uu, uu + (st === 'medicine' ? 0.12 : 0.26), yb + 0.4, yb + (st === 'medicine' ? 0.55 : 0.46), d0 + 0.08, d1 - 0.08, 2);
+          }
+        } else { b.set(K.wood, body, L.wear); F.box(b, x0, x1, yb, yb + h - 0.04, d0, d1, 2 | 8); }
+        b.set(K.plain, top, 0.15); F.box(b, x0 - 0.01, x1 + 0.01, yb + h - 0.04, yb + h, d0 - 0.01, d1 + 0.02, 2);
+      }
+      if (q.flap) {
+        // the keeper's flap: a half door under a hinged top, a darker line where it lifts
+        b.set(K.wood, mulc(hex(body), 0.8), L.wear); F.box(b, fu0 + 0.02, fu1 - 0.02, yb + 0.12, yb + h - 0.1, (d0 + d1) / 2 - 0.02, (d0 + d1) / 2 + 0.02, 2);
+        b.set(K.plain, top, 0.15); F.box(b, fu0, fu1, yb + h - 0.04, yb + h, d0, d1 + 0.02, 2);
+        b.set(K.metal, 0x2a2a2a, 0.3); F.box(b, q.flap[0] < 0.1 ? fu1 - 0.012 : fu0, q.flap[0] < 0.1 ? fu1 : fu0 + 0.012, yb + h - 0.05, yb + h + 0.002, d0, d1 + 0.02, 2);
+      }
+      // on top: the jars, the demo phones, the scale
+      if (st === 'kirana' || st === 'bakery' || st === 'paan') for (let uu = u0 + 0.2; uu < u1 - 0.3; uu += 0.26) { if (R() < 0.35 || (q.flap && uu > fu0 - 0.15 && uu < fu1)) continue; b.set(K.glass, 0xe8e2cc, 0, R()); F.box(b, uu, uu + 0.15, yb + h, yb + h + 0.24, d1 - 0.22, d1 - 0.08, 2 | 4 | 8); b.set(K.plain, [0xc8302a, 0xf2c230, 0x2f5fd0][(R() * 3) | 0], 0.1); F.box(b, uu - 0.005, uu + 0.155, yb + h + 0.24, yb + h + 0.28, d1 - 0.225, d1 - 0.075, 2); }
+      if (st === 'mobile') for (let uu = u0 + 0.25; uu < u1 - 0.3; uu += 0.32 + R() * 0.15) {
+        if (q.flap && uu > fu0 - 0.1 && uu < fu1) continue;
+        b.set(K.plain, 0xb8b8bc, 0.05); F.box(b, uu, uu + 0.07, yb + h, yb + h + 0.07, d1 - 0.27, d1 - 0.23, 2 | 8);
+        b.set(K.plain, 0x101012, 0.05); F.box(b, uu - 0.005, uu + 0.075, yb + h + 0.07, yb + h + 0.22, d1 - 0.25, d1 - 0.235, 2 | 8);
+        b.set(K.glow, [[0.4, 0.6, 1], [0.9, 0.6, 0.4], [0.5, 0.9, 0.7], [0.8, 0.5, 0.9]][(R() * 4) | 0], 0, 0.7); F.box(b, uu + 0.003, uu + 0.067, yb + h + 0.08, yb + h + 0.21, d1 - 0.235, d1 - 0.232, 2 | 4 | 8 | 16 | 32);
+      }
+      if (st === 'sweets' || st === 'kirana') { const uu = q.flap && q.flap[0] < 0.1 ? u1 - 0.45 : u0 + 0.15; b.set(K.metal, 0xb8bcc0, 0.2); F.box(b, uu, uu + 0.3, yb + h, yb + h + 0.06, d0 + 0.1, d0 + 0.38, 2); b.set(K.plain, 0x2a2a2e, 0.1); F.box(b, uu + 0.06, uu + 0.24, yb + h + 0.06, yb + h + 0.14, d0 + 0.12, d0 + 0.16, 2); }
+      break;
+    }
+    case 'fridge': {
+      const h = q.h;
+      b.set(K.plain, q.cake ? 0xe8e8e4 : [0xc8302a, 0x2f5fd0, 0xe8e8e4][(R() * 3) | 0], 0.15); F.box(b, u0, u1, yb, yb + h, d0, d1, 8);
+      // its glass door and what's behind it, lit
+      const fc = q.cake ? [1, 0.96, 0.88] : [0.85, 0.95, 1];
+      b.set(K.glow, fc, 0, 0.6);
+      if (q.face === 'out') F.box(b, u0 + 0.06, u1 - 0.06, yb + 0.25, yb + h - 0.15, d1, d1 + 0.005, 2 | 4 | 8 | 16 | 32);
+      else { const uf = q.face === 'left' ? u0 - 0.005 : u1, s = q.face === 'left' ? 1 : 32; F.box(b, uf, uf + 0.005, yb + 0.25, yb + h - 0.15, d0 + 0.06, d1 - 0.06, 2 | 4 | 8 | (s === 1 ? 32 : 16)); }
+      break;
+    }
+    case 'sacks': {
+      for (let s = 0, n = Math.max(1, Math.floor((u1 - u0) / 0.38)); s < n; s++) {
+        const P0 = F.P(u0 + 0.2 + s * 0.38, 0, (d0 + d1) / 2); b.set(K.cloth, [0xeee8dc, 0xd8c8a0, 0xc8a070][(R() * 3) | 0], 0.3); b.blob(P0[0], yb + 0.3, P0[2], 0.18, 0.3, 0.2, 5);
+        b.set(K.plain, [0xf2c230, 0xc8302a, 0x2f8a5a, 0xeee8dc][(R() * 4) | 0], 0.2); b.blob(P0[0], yb + 0.6, P0[2], 0.13, 0.05, 0.14, 4);
+      }
+      break;
+    }
+    case 'steps': {
+      b.set(K.wood, 0x6a4a32, 0.3);
+      for (let s = 0; s < 3; s++) {
+        const dd = d0 + (d1 - d0) * s / 3, y = yb + 0.25 + s * 0.22;
+        F.box(b, u0, u1, yb, y, dd, dd + (d1 - d0) / 3, 2 | 8);
+        for (let uu = u0 + 0.12; uu < u1 - 0.1; uu += 0.24) { const P0 = F.P(uu, 0, dd + (d1 - d0) / 6); b.set(K.plain, 0x3a5a6a, 0.3); b.cyl(P0[0], y, P0[2], 0.08, 0.09, 0.16, 6); b.set(K.leaf, [0xd83a2a, 0xf2c230, 0xe86a9a, 0xf08a24, 0xeeeae0][(R() * 5) | 0], 0); b.blob(P0[0], y + 0.28, P0[2], 0.13, 0.14, 0.13, 4); }
+        b.set(K.wood, 0x6a4a32, 0.3);
+      }
+      break;
+    }
+    case 'stand': {
+      b.set(K.plain, 0xe8e8e4, 0.1); F.box(b, u0, u1, yb, yb + q.h, d0, d1, 8);
+      for (let y = yb + 0.3; y < yb + q.h - 0.1; y += 0.25) for (let uu = u0 + 0.04; uu < u1 - 0.08; uu += 0.1) { b.set(K.plain, pc(), 0.1); F.box(b, uu, uu + 0.07, y, y + 0.14, d1, d1 + 0.03, 2 | 8); }
+      break;
+    }
+    case 'hang': {
+      cb.set(K.laundry, 0xffffff, 0, R());
+      for (let uu = u0; uu < u1 - 0.2; uu += 0.32 + R() * 0.2) { cb.col(st === 'paan' || st === 'kirana' ? pc() : POP[(R() * POP.length) | 0]); F.rect(cb, uu, uu + 0.2, yb + q.y0 + R() * 0.25, yt - 0.05, q.d); }
+      break;
+    }
+  }
+}
+// a glazed front: plate glass either side of the door, a steel frame, the door itself standing open into the shop
+function glazedFront(b, G, F, a, P, lux) {
+  const { R, L } = G, w = P.w, yb = BASE, yt = BASE + P.oh, c = a + w, g0 = a + P.door[0], g1 = a + P.door[1];
+  const frame = lux > 0.6 ? 0x2a2a2c : L.frame;
+  b.set(K.glass, lux > 0.6 ? 0x6a8088 : 0x4a5a5e, L.wear * 0.5, R());
+  if (g0 - a > 0.1) F.box(b, a, g0, yb + 0.05, yt, -0.01, 0.01, 0);
+  if (c - g1 > 0.1) F.box(b, g1, c, yb + 0.05, yt, -0.01, 0.01, 0);
+  F.box(b, g0, g1, yb + 2.15, yt, -0.01, 0.01, 0);
+  // the open leaf, hinged on the left of the doorway, swung in against the glass
+  F.box(b, g0 + 0.02, g0 + 0.05, yb + 0.03, yb + 2.12, -(g1 - g0) + 0.04, -0.04, 0);
+  b.set(K.metal, frame, L.wear);
+  F.box(b, a, c, yt - 0.06, yt, -0.04, 0.04, 0); F.box(b, a, c, yb, yb + 0.06, -0.04, 0.04, 8);
+  for (const u of [a, g0 - 0.05, g1, c - 0.05]) if (u >= a && u <= c - 0.05) F.box(b, u, u + 0.05, yb, yt, -0.04, 0.04, 8);
+  F.box(b, g0, g1, yb + 2.12, yb + 2.18, -0.04, 0.04, 0);
+  F.box(b, g0 + 0.01, g0 + 0.06, yb + 0.02, yb + 2.13, -(g1 - g0) + 0.02, -(g1 - g0) + 0.06, 0);
+  b.set(K.metal, 0xc8cacc, 0.1); F.box(b, g0 + 0.05, g0 + 0.07, yb + 0.9, yb + 1.3, -(g1 - g0) + 0.15, -(g1 - g0) + 0.18, 0);
+  b.set(L.wk, L.wall, L.wear);
+}
 function shopInside(b, cb, G, F, a, c, oh, trade, lux, sh, famous) {
   const { R, L } = G;
   const mid = F.P((a + c) / 2, 0, 0);

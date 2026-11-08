@@ -16,6 +16,10 @@ import { buildChunk, boardH } from './builder.js';
 import { AreaField } from './areas.js';
 import { footJob } from './footpath.js';
 import { paint, packGeo } from '../gfx/paint.js';
+import { kindOf } from '@orig/game/shops.js';
+import { Frame } from './geom.js';
+import { familyOf, cellDepth, shopPlan, planSeed } from './shopplan.js';
+import { cellsIn, cellsOut } from './shopin.js';
 
 export { setShutters, BASE };
 // a sign material whose boards each carry their own light (aGlow): its own program, not a plain sign's
@@ -191,7 +195,7 @@ function jobOf(W, C, kind) {
     templeOf(M, B);
     const ringCm = B[1];
     const sh = index.shopsByBld.get(bi), shops = [];
-    if (sh && B[3] !== 8) for (const [key, s] of sh) { const nm = index.shopNames[s[3]]; shops.push([key, nm ? nm[2] : 'generic', nm ? nm[3] || '' : '']); }
+    if (sh && B[3] !== 8) for (const [key, s] of sh) { const nm = index.shopNames[s[3]]; shops.push([key, nm ? nm[2] : 'generic', nm ? nm[3] || '' : '', (nm && kindOf(nm[0], nm[2])) || '']); }
     blds.push({ bi, ring: cmRing(ringCm), levels: B[2], style: B[3], roof: B[4], flags: B[5], y: B.y || 0, seed: hash2(ringCm[0] * 31 + ringCm[1] * 17, bi) | 0, shops });
   }
   return { cx: C.cx, cz: C.cz, blds, rich: painter.rich ?? 1, foot: kind === 'near' ? footJob(C) : null };
@@ -340,6 +344,15 @@ export function* buildBuildingsChunk(W, C, group) {
         const o = 0.1;
         const x0 = ax + tx * t0 + nx * o, z0 = az + tz * t0 + nz * o, x1 = ax + tx * t1 + nx * o, z1 = az + tz * t1 + nz * o;
         C.doors.push({ x: (x0 + x1) / 2 + nx * 0.25, z: (z0 + z1) / 2 + nz * 0.25, nx, nz, n: 0, shop: sh ? sh[3] : -1 });
+        // the shop behind the door, laid out exactly as world/builder.js draws it (world/shopplan.js)
+        if (sh) {
+          const nm = index.shopNames[sh[3]], kind = (nm && kindOf(nm[0], nm[2])) || '', cat = nm ? nm[2] : 'generic', fam = familyOf(kind, cat);
+          if (fam) {
+            const a = k * cw + 0.18, c = (k + 1) * cw - 0.18, Fr = new Frame(ax, az, tx, tz, nx, nz), oh = gh - 0.85;
+            const plan = shopPlan({ kind, cat, brand: nm ? nm[3] || '' : '', w: c - a, D: cellDepth(p, Fr, a, c, fam), oh, seed: planSeed(bi, i * 4096 + k), glass: !shop || (nm && nm[3]) === 'brand' });
+            if (plan) C.doors[C.doors.length - 1].cell = { F: Fr, a, plan, y: BASE + dy, shutter: shop };
+          }
+        }
         slotDoor.set(i * 4096 + k, C.doors[C.doors.length - 1]);
         const ltr = (tx * nz - tz * nx) > 0;
         glowRecs.push({ o: !!board.local, v: (board.local ? ob : sb).c, door: C.doors[C.doors.length - 1] });
@@ -397,6 +410,7 @@ export function* buildBuildingsChunk(W, C, group) {
     const g = yield* ob.buildSliced(); glowOn(g, true); const m = new THREE.Mesh(g, localMat); m.receiveShadow = true; group.add(m);
   }
   if (W.nearBoards) W.nearBoards.addChunk(C.ci, C.cx, C.cz, nearRecs);
+  cellsIn(C.ci, C.doors.filter(d => d.cell));
   // the shutters, one instance each; game.js lifts the ones whose shop is open (and keeps them in step with the clock)
   let shutMesh = null;
   if (shut.length) {
@@ -414,6 +428,7 @@ export function* buildBuildingsChunk(W, C, group) {
     if (L.near === 1) painter.drop(C, 'near');
     if (shutMesh) { shutMesh.dispose(); C.shutters = null; }
     W.footprintsByChunk.delete(C.ci);
+    cellsOut(C.ci);
     if (W.nearBoards) W.nearBoards.dropChunk(C.ci);
     if (local.tex) local.tex.dispose();
     if (localMat) { W.signMats.delete(localMat); localMat.dispose(); }
