@@ -475,11 +475,14 @@ const PATCHES = {
     ["if (o.signals && !o.emergency && G.traffic.signals) {", "if (o.careful && !o.signals && G.traffic.signals) { const n = W.graph.nearest(v.x + hx * 14, v.z + hz * 14, 10), node = n && W.graph.nodes[n.s < n.e.len / 2 ? n.e.a : n.e.b]; if (node && node.signal && Math.hypot(node.x - v.x, node.z - v.z) < 24 && G.traffic.signals.stateForAngle(node.i, v.th) === 'r') target = Math.min(target, 6); }\n    if (o.signals && G.traffic.signals) {"],
   ],
   [S('traffic/traffic.js')]: [
-    ["import { TRAFFIC, curve } from '../world/activity.js';", "import { TRAFFIC, curve } from '../world/activity.js';\nimport { view, ranged } from '../beta/world/view.js';\nimport { reduced } from '../beta/vehicles/lod.js';"],
+    ["import { TRAFFIC, curve } from '../world/activity.js';", "import { TRAFFIC, curve } from '../world/activity.js';\nimport { view, ranged } from '../beta/world/view.js';\nimport { reduced } from '../beta/vehicles/lod.js';\nimport { visOf } from '../beta/draw/skin.js';"],
+    // a rider getting their full body (or giving it back) fades in over half a second: through it the vehicle is drawn
+    // without its baked rider and with it, the baked one dropping exactly the pixels the real one has (vehmat.js aDis)
+    ["const I = this.inst[seated ? v.type.replace(/P$/, '') + 'E' : v.type] || this.inst[v.type];", "let fv = 1; for (const r of v._riders || []) if (r.body && r.body.H) fv = Math.min(fv, visOf(r.body.H, performance.now()));\n      const hand = fv < 0.999 && !v.wreck && !(v._tp && v._tp.empty) && !!this.inst[v.type.replace(/P$/, '') + 'E'];\n      const I0 = this.inst[seated || hand ? v.type.replace(/P$/, '') + 'E' : v.type] || this.inst[v.type];"],
     // a bus or a tempo keeps its full model a good deal further out (it's big: its detail was missing until right up close)
     // (and it hands over from one version to the next over the last few metres before the line, both drawn, one
     // thinning out pixel by pixel where the other fills in: beta/vehicles/vehmat.js aDis)
-    ["const far = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) > L2;", "if (!view.sees(v.x, v.z, 35, 12)) continue;\n      const dd = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz), LK = L2 * (v.type === 'bus' || v.type === 'tempo' ? 6.25 : 1), lv0 = dd > LK * 5.3 ? 2 : dd > LK ? 1 : 0;\n      const lvs = [[lv0, 0, 0]]; if (lv0 < 2) { const b = Math.sqrt(lv0 ? LK * 5.3 : LK), W = Math.max(4, b * 0.15), t = (Math.sqrt(dd) - b + W) / W; if (t > 0) { lvs[0][1] = t; lvs.push([lv0 + 1, 0, 1 - t]); } }"],
+    ["const far = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) > L2;", "if (!view.sees(v.x, v.z, 35, 12)) continue;\n      const dd = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz), LK = L2 * (v.type === 'bus' || v.type === 'tempo' ? 6.25 : 1), lv0 = dd > LK * 5.3 ? 2 : dd > LK ? 1 : 0;\n      const lvs = [[lv0, 0, 0]]; if (lv0 < 2) { const b = Math.sqrt(lv0 ? LK * 5.3 : LK), W = Math.max(4, b * 0.15), t = (Math.sqrt(dd) - b + W) / W; if (t > 0) { lvs[0][1] = t; lvs.push([lv0 + 1, 0, 1 - t]); } }\n      if (hand && this.inst[v.type]) lvs.push([lv0, Math.max(fv, lvs[0][1]), 0, this.inst[v.type]]);"],
     // only what's in the view is drawn (beta/world/view.js), only what's in use uploaded, and an empty list not visited at all
     ["        mesh.count = n;\n        mesh.instanceMatrix.needsUpdate = true;\n        mesh.instanceColor.needsUpdate = true;\n        mesh.geometry.attributes.aColB.needsUpdate = true;\n        mesh.geometry.attributes.aColC.needsUpdate = true;", "        mesh.count = n; mesh.visible = n > 0; if (!n) continue;\n        ranged(mesh.instanceMatrix, n); ranged(mesh.instanceColor, n); ranged(mesh.geometry.attributes.aColB, n);\n        ranged(mesh.geometry.attributes.aColC, n);"],
     ["if (I.glass) { I.glass.count = I.n; I.glass.instanceMatrix.needsUpdate = true; }", "if (I.glass) { I.glass.count = I.ng; I.glass.visible = I.ng > 0; if (I.ng) ranged(I.glass.instanceMatrix, I.ng); }"],
@@ -508,11 +511,11 @@ const PATCHES = {
     // rider, not a car: buildLow('scooterE') fell through to the car box, so a scooter past the detail range drew as a car
     ["const lowGeo = buildLow(k);", "const lowGeo = reduced(m.body, /^(bus|tempo)/.test(k) ? .4 : .25, false);"],
     ["this.inst[k] = { body, glass, low, cap: c, n: 0, nl: 0 };", "const midGeo = reduced(m.body, /^(bus|tempo)/.test(k) ? .18 : .12), mid = new THREE.InstancedMesh(midGeo, mats.body, c); mid.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(c * 3).fill(1), 3);\n      for (const a of ['aColB', 'aColC', 'aLamp', 'aDis']) if (lowGeo.attributes[a]) midGeo.setAttribute(a, lowGeo.attributes[a].clone());\n      mid.castShadow = quality.shadows; mid.receiveShadow = true; mid.frustumCulled = false; mid.count = 0; scene.add(mid);\n      this.inst[k] = { body, glass, low, mid, cap: c, n: 0, nl: 0, nm: 0, ng: 0 };"],
-    ["const mesh = far ? I.low : I.body;", "for (const [lv, dA, dB] of lvs) {\n      const mesh = lv === 2 ? I.low : lv === 1 ? I.mid : I.body;"],
+    ["const mesh = far ? I.low : I.body;", "for (const [lv, dA, dB, Ix] of lvs) { const I = Ix || I0;\n      const mesh = lv === 2 ? I.low : lv === 1 ? I.mid : I.body;"],
     ["const i = far ? I.nl : I.n;", "const i = lv === 2 ? I.nl : lv === 1 ? I.nm : I.n;"],
     ["for (const [mesh, n] of [[I.body, I.n], [I.low, I.nl]]) {", "for (const [mesh, n] of [[I.body, I.n], [I.mid, I.nm], [I.low, I.nl]]) {"],
     ["low.castShadow = false;", "low.castShadow = quality.shadows;"],
-    ["if (far) I.nl++;\n      else { if (I.glass) I.glass.setMatrixAt(i, m); I.n++; }", "if (I.glass && dB === 0) I.glass.setMatrixAt(I.ng++, m);\n      if (lv === 2) I.nl++; else if (lv === 1) I.nm++; else I.n++;\n      }"],
+    ["if (far) I.nl++;\n      else { if (I.glass) I.glass.setMatrixAt(i, m); I.n++; }", "if (I.glass && dB === 0 && !Ix) I.glass.setMatrixAt(I.ng++, m);\n      if (lv === 2) I.nl++; else if (lv === 1) I.nm++; else I.n++;\n      }"],
     ["this.inst[k].nl = 0;", "this.inst[k].nl = 0; this.inst[k].nm = 0; this.inst[k].ng = 0;"],
     ["x -= t.w * (mix[k] ?? 1);", "x -= t.w * (mix[k] ?? mix[baseOf(k)] ?? 1);"],
   ],
