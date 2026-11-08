@@ -85,9 +85,15 @@ export class Actors {
       if (p._dkL !== p.look || C._own[p._dk] !== p) { p._dkL = p.look; C._own[p._dk] = p; if (p.look) { C.look(p._dk, lookOf(p.look)); dirty = true; } }
       // the legs go with how far they really moved this frame (not the speed they mean to walk at), so nobody glides:
       // a step is about 0.68 m, half a cycle
-      const m = Math.hypot(p.x - p._lx, p.z - p._lz); p._lx = p.x; p._lz = p.z;
-      if (m < 3 && dt > 0) { p._dv += (m/dt - p._dv)*Math.min(1, dt*6); p._dph += m/.68*Math.PI; }
-      put(p.x, p.y || 0, p.z, p.yaw || 0, p._dph, Math.min(1, p._dv/1.1), p._dk, 0);
+      // far off the game moves people a few times a second, in steps: drawn, they glide after where they are (a real
+      // jump, more than 3 m, is taken at once), and they face the way they're really going, so nobody walks backwards
+      if (p._sx === undefined || Math.hypot(p.x - p._sx, p.z - p._sz) > 3) { p._sx = p.x; p._sz = p.z; p._sy = p.yaw || 0; }
+      const fk = Math.min(1, dt*9), ox = p._sx, oz = p._sz; p._sx += (p.x - p._sx)*fk; p._sz += (p.z - p._sz)*fk;
+      const m = Math.hypot(p._sx - ox, p._sz - oz);
+      if (dt > 0) { p._dv += (m/dt - p._dv)*Math.min(1, dt*6); p._dph += m/.68*Math.PI; }
+      const want = p._dv > 0.3 && m > 1e-4 ? Math.atan2(p._sz - oz, p._sx - ox) : (p.yaw || 0);
+      let dy = want - p._sy; dy -= Math.round(dy/(Math.PI*2))*Math.PI*2; p._sy += dy*Math.min(1, dt*7);
+      put(p._sx, p.y || 0, p._sz, p._sy, p._dph, Math.min(1, p._dv/1.1), p._dk, 0);
     }
     if (dirty) C.tex.needsUpdate = true;
     C.near.geometry.instanceCount = a; C.far.geometry.instanceCount = b; nA.iPos.needsUpdate = nA.iAnim.needsUpdate = fA.iPos.needsUpdate = fA.iAnim.needsUpdate = true;
