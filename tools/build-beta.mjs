@@ -438,6 +438,11 @@ const PATCHES = {
   // parked vehicles solid over their real length and width: a chain of circles as wide as the vehicle from bumper to
   // bumper (a parked scooter was one 0.45 m circle in its middle: you walked through its nose and its tail)
   [S('traffic/parked.js')]: [
+    // a parked car faces the way the traffic goes on its side of the road (Pune drives on the left: the kerb on its
+    // left), and sits in against the kerb, not out in the road: slid towards it till its kerb side is a hand's width off
+    ["      const rec = add(k, x, z, tx, tz, pick(PAINTS.car));\n      rec.circles.push(W.collision.addCircle(x + tx * 1.1, z + tz * 1.1, 0.85, 2), W.collision.addCircle(x - tx * 1.1, z - tz * 1.1, 0.85, 2));\n      rec.static = { x, z, hx: tx, hz: tz,",
+     "      const sd = side ? -side : 1, ix = -tz * (side || 0), iz = tx * (side || 0);\n      let x1 = x, z1 = z; if (side && W.surf.isRoad(x, z)) for (let d = 0; d <= 3; d += 0.25) if (!W.surf.isRoad(x + ix * (d + 1.15), z + iz * (d + 1.15))) { x1 = x + ix * d; z1 = z + iz * d; break; }\n      { const x = x1, z = z1, hx = tx * sd, hz = tz * sd;\n      const rec = add(k, x, z, hx, hz, pick(PAINTS.car));\n      rec.circles.push(W.collision.addCircle(x + tx * 1.1, z + tz * 1.1, 0.85, 2), W.collision.addCircle(x - tx * 1.1, z - tz * 1.1, 0.85, 2));\n      rec.static = { x, z, hx, hz,"],
+    ["      statics.push(rec.static);\n      continue;\n    }", "      statics.push(rec.static); }\n      continue;\n    }"],
     // further off, the same vehicle with less in it instead of a few boxes (beta/vehicles/lod.js): it doesn't change as you
     // come up to it. Its shadow and glass stay on; a parked one stands still, so its shadow goes in the still map
     ["import { RNG } from '../core/util.js';", "import { RNG } from '../core/util.js';\nimport { reduced } from '../beta/vehicles/lod.js';"],
