@@ -34,7 +34,7 @@ import './vehicles/exotic.js';        // a supercar's flames; slides wear tyres 
 import './vehicles/auto3w.js';        // an auto corners on two wheels, and goes over, instead of sliding
 import './vehicles/wheels.js';        // wheels that go round and turn
 import './vehicles/details.js';       // springs and wheel travel, the rising wing, wipers, the wheel in your hands, discs, a cold start
-import './game/radio.js';          // the car radio: All India Radio's live streams, through the car's own speakers
+import './game/radio.js';          // the car radio: live stations, through the car's own speakers
 import './vehicles/lamps.js';         // brake and reverse lamps that answer the pedals, yours and everyone's
 import './vehicles/potholes.js';      // potholes jolt each kind of vehicle its own way
 import './people/stalls.js';          // stall keepers keep to their stalls
@@ -53,6 +53,7 @@ import './game/attend.js';        // who you talk to stays sat / goes back to wh
 import './game/hands.js';
 import './game/fists.js';
 import './game/climb.js';          // up and over: hands planted on the ledge, the feet up the face, a knee onto the top
+import './game/vault.js';          // Space at a car: a hand on the bonnet, the hip slid across, down the far side (after climb.js)
 import './game/crouch.js';
 import './game/mirror.js';
 import './world/mirrors.js';         // the shops' mirrors reflect          // a pose in a shop's mirror, a different one each time          // Ctrl standing still: crouch (on the move it's still the roll)
