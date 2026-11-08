@@ -550,7 +550,7 @@ function shopInside(b, cb, G, F, a, c, oh, trade, lux, sh, famous) {
   // the tube light
   b.set(K.glow, trade === 5 ? [1, 0.92, 0.75] : [0.95, 0.98, 1], 0, 0.9); F.box(b, a + 0.3, Math.min(c - 0.3, a + 1.5), yt - 0.06, yt - 0.02, -D * 0.4 - 0.04, -D * 0.4, 0);
   // the stock: shelves painted on the back wall (one quad), then a few real things
-  if (trade !== 3 && trade !== 9 && trade !== 10 && trade !== 13) { b.set(K.goods, 0xffffff, 0.2, (trade * 16 + ((R() * 16) | 0)) / 255); F.rect(b, c - 0.05, a + 0.05, yb + 0.3, yt - 0.15, -D + 0.04, 1); }
+  if (trade !== 3 && trade !== 6 && trade !== 9 && trade !== 10 && trade !== 13) { b.set(K.goods, 0xffffff, 0.2, (trade * 16 + ((R() * 16) | 0)) / 255); F.rect(b, c - 0.05, a + 0.05, yb + 0.3, yt - 0.15, -D + 0.04, 1); }
   const gc = GOODS[Math.max(0, trade)] || GOODS[0];
   const pc = () => gc[(R() * gc.length) | 0];
   const w = c - a;
@@ -571,7 +571,52 @@ function shopInside(b, cb, G, F, a, c, oh, trade, lux, sh, famous) {
       if (lux > 0.6 && R() < 0.6) { b.set(K.leaf, 0x4f7a3a, 0); const P0 = F.P(c - 0.3, 0, 0.35); b.set(K.plain, 0x3a3a3a, 0); b.cyl(P0[0], 0, P0[2], 0.2, 0.25, 0.45, 6); b.set(K.leaf, 0x4f7a3a, 0); b.blob(P0[0], 0.9, P0[2], 0.32, 0.45, 0.32, 5); }
       break;
     }
-    case 2: case 5: case 6: {                                              // chemist, jeweller, mobiles: glass counters, bright
+    case 6: {
+      // a mobile shop, "Mobile & Accessories": phones under the glass at the front where you stand, the boxes stacked
+      // behind, a pegboard of what hangs on it (covers in every colour, cables, earphones, chargers), demo phones on
+      // their stands with their screens lit, the poster of whichever phone is new, the recharge sign's light box. An
+      // electronics shop: the televisions along the back wall, all on, and the counter
+      const elec = sh && sh[1] === 'electronics';
+      b.set(K.glass, 0xc8d8d8, 0, R()); F.box(b, a + 0.2, c - 0.2, yb, yb + 0.95, -0.85, -0.35, 2 | 8);
+      b.set(K.plain, 0xe8e8e4, 0.1); F.box(b, a + 0.18, c - 0.18, yb + 0.95, yb + 0.99, -0.87, -0.33, 2);
+      for (let uu = a + 0.3; uu < c - 0.35; uu += 0.2 + R() * 0.06) { b.set(K.plain, pc(), 0.1); F.box(b, uu, uu + 0.08, yb + 0.72, yb + 0.73, -0.75, -0.6, 2 | 8); }   // (in the case)
+      if (elec) {
+        for (let uu = a + 0.2, row = 0; row < 2; row++) for (uu = a + 0.2 + row * 0.3; uu < c - 0.9; uu += 1.05) {
+          const y = yb + 1.05 + row * 0.75; if (y + 0.6 > yt - 0.1) break;
+          b.set(K.plain, 0x111113, 0.05); F.box(b, uu, uu + 0.9, y, y + 0.55, -D + 0.04, -D + 0.09, 2);
+          b.set(K.glow, [[0.35, 0.55, 0.9], [0.9, 0.5, 0.3], [0.3, 0.8, 0.5], [0.85, 0.85, 0.9]][(R() * 4) | 0], 0, 0.75); F.box(b, uu + 0.03, uu + 0.87, y + 0.03, y + 0.52, -D + 0.09, -D + 0.095, 2 | 4 | 8 | 16 | 32);
+        }
+      } else {
+        // the pegboard and what's on it
+        const p0 = a + 0.15, p1 = a + Math.min(w * 0.55, 1.6);
+        b.set(K.plain, 0xd8d4cc, 0.2); F.rect(b, p1, p0, yb + 1.0, yt - 0.15, -D + 0.05, 1);
+        cb.set(K.laundry, 0xffffff, 0, R());
+        for (let y = yb + 1.1; y < yt - 0.45; y += 0.32) for (let uu = p0 + 0.06; uu < p1 - 0.14; uu += 0.15 + R() * 0.04) {
+          if (R() < 0.15) continue;
+          cb.col(R() < 0.35 ? [0x2a2a2e, 0xe8e8ec][(R() * 2) | 0] : POP[(R() * POP.length) | 0]); F.rect(cb, uu, uu + 0.1, y, y + 0.2 + R() * 0.06, -D + 0.08);
+        }
+        // the boxes stacked on the shelves behind the counter
+        b.set(K.wood, 0xe8e8e4, 0.1);
+        for (let s = 0; s < 3; s++) {
+          const y = yb + 1.05 + s * 0.42; if (y > yt - 0.35) break;
+          F.box(b, p1 + 0.1, c - 0.15, y, y + 0.03, -D + 0.05, -D + 0.35, 2);
+          for (let uu = p1 + 0.15; uu < c - 0.3; uu += 0.12 + R() * 0.03) { b.set(K.plain, R() < 0.6 ? 0xf2f2f0 : 0x1a1a1c, 0.05); F.box(b, uu, uu + 0.09, y + 0.03, y + 0.2, -D + 0.1, -D + 0.3, 2 | 8); }
+          b.set(K.wood, 0xe8e8e4, 0.1);
+        }
+        // the demo phones on the counter, their screens on
+        for (let uu = a + 0.35; uu < c - 0.4; uu += 0.32 + R() * 0.15) {
+          b.set(K.plain, 0xb8b8bc, 0.05); F.box(b, uu, uu + 0.07, yb + 0.99, yb + 1.06, -0.62, -0.58, 2 | 8);
+          b.set(K.plain, 0x101012, 0.05); F.box(b, uu - 0.005, uu + 0.075, yb + 1.06, yb + 1.21, -0.6, -0.585, 2 | 8);
+          b.set(K.glow, [[0.4, 0.6, 1], [0.9, 0.6, 0.4], [0.5, 0.9, 0.7], [0.8, 0.5, 0.9]][(R() * 4) | 0], 0, 0.7); F.box(b, uu + 0.003, uu + 0.067, yb + 1.07, yb + 1.2, -0.585, -0.582, 2 | 4 | 8 | 16 | 32);
+        }
+      }
+      // the poster of the new phone, lit, and the recharge sign's light box over the door
+      if (w > 1.8 && D > 1) { b.set(K.glow, [[0.95, 0.4, 0.3], [0.3, 0.55, 0.95], [0.25, 0.75, 0.55], [0.75, 0.35, 0.85]][(R() * 4) | 0], 0, 0.6); F.rect(b, c - 0.2, c - 0.85, yb + 1.25, yt - 0.25, -D + 0.06, 1); }
+      if (!elec && R() < 0.7) { b.set(K.glow, R() < 0.5 ? [0.95, 0.15, 0.15] : [0.2, 0.45, 0.95], 0, 0.85); F.box(b, a + 0.1, a + Math.min(1.1, w * 0.4), yt - 0.28, yt - 0.06, 0.02, 0.1, 2); }
+      if (lux > 0.6) { b.set(K.glass, 0x8aa0a8, 0, R()); F.rect(b, a, c, yb, yt, 0.0); }
+      break;
+    }
+    case 2: case 5: {                                                      // chemist, jeweller: glass counters, bright
       b.set(K.glass, trade === 5 ? 0xd8c890 : 0xc8d8d8, 0, R()); F.box(b, a + 0.2, c - 0.2, yb, yb + 1.0, -D + 0.3, -D + 0.8, 2 | 8);
       b.set(K.wood, trade === 5 ? 0x5a2a1a : 0xe8e8e4, 0.1); F.box(b, a + 0.25, c - 0.25, yb + 0.95, yb + 1.0, -D + 0.3, -D + 0.85, 2);
       if (trade === 5) { b.set(K.glow, [1, 0.85, 0.5], 0, 0.95); for (let s = 0; s < 3; s++) F.box(b, a + 0.4 + s * (w - 0.8) / 3, a + 0.55 + s * (w - 0.8) / 3, yt - 0.05, yt - 0.01, -D * 0.5 - 0.07, -D * 0.5 + 0.07, 0); }
