@@ -97,7 +97,7 @@ function shotAt(X, o, d, F, range) {
   const cand = (t, r, head, mat) => { if (t > 0.3 && (!best || t < best.t)) best = { t, r, head, mat }; };
   X.near(F.x, F.z, range, (r) => {
     if (r.st === 2) return;
-    const S = SPEC[r.kind]; if (!S) return;
+    const S = r.S || SPEC[r.kind]; if (!S) return;
     const inY = (t) => { const y = o.y + d.y*t; return y > r.y - 0.2 && y < r.y + S.h; };
     // a lamp's head: the glass under it
     if (r.kind === 'lamp' && !r.dark && r.lamp) {

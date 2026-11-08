@@ -8,6 +8,7 @@ import { U } from '@orig/gfx/materials.js';
 import { hash1 } from '@orig/core/util.js';
 import { PU, LAMP, PCF, DITHER } from '../gfx/paint.js';
 import { seenOnly } from './view.js';
+import { smash } from './smash.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // near trees hand over to the mid ones, and the mid ones to the far crowns, over a band of distance (from the camera,
@@ -158,9 +159,10 @@ export class TreeField extends GameTrees {
     }
     const sets = this.sets, cnt = this._cnt || (this._cnt = sets.map(() => [0, 0, 0])); for (const c of cnt) c[0] = c[1] = c[2] = 0;
     const split = this.uLodF.value.z, band = this.uLodM.value.y, fIn = split - band - M, mTop = split + M;
+    const DEAD = this.dead && this.dead.size ? this.dead : null;
     const cand = this._cand, X = this.x, Z = this.z, Y = this.y, K = this.k, SC = this.s, RO = this.r, behind = this._behind || (this._behind = []); behind.length = 0;
     for (let q = 0; q < cand.length; q++) {
-      const t = cand[q], dx = X[t] - cx, dz = Z[t] - cz, d = Math.hypot(dx, dz); if (d >= mOut) continue;
+      const t = cand[q], dx = X[t] - cx, dz = Z[t] - cz, d = Math.hypot(dx, dz); if (d >= mOut || (DEAD && DEAD.has(t))) continue;
       const near = d < nOut; let mid = d > mIn;
       if (!near && !mid) continue;
       // out of the view, a crown's width to spare: not this frame
@@ -187,6 +189,19 @@ export class TreeField extends GameTrees {
       a.clearUpdateRanges(); a.addUpdateRange(0, c[0]*16); a.needsUpdate = true;
       b.clearUpdateRanges(); b.addUpdateRange(0, c[1]*16); b.needsUpdate = true;
       const f = set.fb.instanceMatrix; f.clearUpdateRanges(); f.addUpdateRange(0, c[2]*16); f.needsUpdate = true;
+    }
+  }
+  // a young tree, its trunk thin enough, can be knocked down (world/smash.js): what it's down to is a trunk's solid, the
+  // one the collision hands back as it goes in
+  addTile(T, tag) {
+    const C = this.W.collision, add = C.addCircle, got = [], i0 = this.x.length;
+    C.addCircle = function (...a) { const c = add.apply(this, a); got.push(c); return c; };
+    try { super.addTile(T, tag); } finally { delete C.addCircle; if (C.addCircle !== add) C.addCircle = add; }
+    if (got.length !== this.x.length - i0) return;
+    const X = smash(this.W);
+    for (let i = i0; i < this.x.length; i++) {
+      const A = this.arch[this.k[i]], tr = A.trunkR*this.s[i];
+      if (tr < 0.21 && got[i - i0]) X.reg('tree', this.x[i], this.z[i], this.r[i], { cols: [got[i - i0]], tree: i, tr: Math.max(0.06, tr), h: (A.H || 10)*this.s[i] });
     }
   }
   sharpenLeaves() { super.sharpenLeaves(); this.paintLeaf.uniforms.tMap.value = this.leafMat.map; }

@@ -17,6 +17,7 @@ import { InstancedSet } from '@orig/world/props.js';
 import { Debris, partsOf, pieceOf } from './debris.js';
 import { FX } from './smashfx.js';
 import { view } from './view.js';
+import { hash1 } from '@orig/core/util.js';
 
 // kg; h: how tall (for shots); J: bend / lean, break, what breaking it takes out of the striker; tip: a stall goes over
 export const SPEC = {
@@ -32,6 +33,8 @@ export const SPEC = {
   board: { mass: 40, h: 2.9, mat: 'steel', bend: 1e3, brk: 3e3, absorb: 1.5e3, mode: 'fold', free: true, base: -1, snd: 'steelFold' },   // a street-name board on its two posts
   banner: { mass: 15, h: 2.9, mat: 'bamboo', bend: 60, brk: 160, absorb: 100, mode: 'fold', free: true, base: -1, snd: 'bamboo' },     // a banner on its bamboo frame: a kick has it over
   bus: { mass: 300, h: 3.3, mat: 'steel', bend: 1e4, brk: 4e4, absorb: 2.5e4, mode: 'fold', free: true, base: -1, snd: 'steelFold' },   // a bus shelter
+  // a young tree, a trunk 0.15 m across the middle: a thicker one by the cube of how much thicker (world/trees.js has which are small)
+  tree: { mass: 120, h: 6, mat: 'wood', bend: 3e3, brk: 1e4, absorb: 5e3, mode: 'tree', snd: 'wood' },
   stall5: { mass: 220, h: 2.5, mat: 'steel', tip: 3.5e3, brk: 12e3, absorb: 5e3, mode: 'cart', snd: 'tin', goods: 'wood' },         // ganna
 };
 const KEEP = 240, AWAY = 140, CELL = 8;
@@ -67,6 +70,11 @@ class Smash {
     if (o.cols) { for (const c of o.cols) if (c) { r.cols.push(c); if (r.st === 2) c.off = true; } if (r.cols.length > 96) r.cols.splice(0, r.cols.length - 96); }
     if (o.lamp) { r.lamp = o.lamp; if (r.dark || r.st === 2) o.lamp.out = true; }
     if (o.head) { r.head = o.head; if (r.st === 2) o.head.dead = true; }
+    if (o.tree != null) {
+      r.ti = o.tree; const f = o.tr/0.15, B = SPEC.tree;
+      r.S = Object.assign({}, B, { mass: B.mass*f*f, bend: B.bend*f*f*f, brk: B.brk*f*f*f, absorb: B.absorb*f*f*f, h: o.h || B.h });
+      if (r.st === 2) { const T = this.W.trees; if (T) (T.dead || (T.dead = new Set())).add(o.tree); }
+    }
     // its run of triangles in its street's mesh: [mesh, first index, end]
     if (o.draw) {
       r.draw = (r.draw || []).filter(e => e.m.parent);
@@ -120,14 +128,14 @@ class Smash {
   // o: { E (what the blow brings, after the striker's own crumpling), px, py, pz (where), nx, nz (into it), u (how fast the
   // striker goes on, m/s, if it does), m (striker kg), by: 'car' | 'kick' | 'shot' }. Returns { broke, absorb, carried }
   hit(r, o) {
-    const S = SPEC[r.kind]; if (!S || r.st === 2) return null;
+    const S = r.S || SPEC[r.kind]; if (!S || r.st === 2) return null;
     const tot = o.E + r.dmg;
     let out = { broke: false, absorb: 0, carried: 0 };
     if (S.mode === 'cart') {
       if (tot >= S.brk) out = this.apart(r, o, false);
       else if (tot >= S.tip) out = this.apart(r, o, true);
       else if (o.by !== 'shot') FX.knock(S.mat, o.px, o.py, o.pz, Math.min(1, 0.3 + o.E/S.tip));
-    } else if (tot >= S.brk) out = this.fall(r, o, tot);
+    } else if (tot >= S.brk) out = S.mode === 'tree' ? this.fell(r, o) : this.fall(r, o, tot);
     else if (o.E >= S.bend*0.6 && o.by === 'car' && r.items.length) {
       // it gives at its foot, by how much past giving the blow was
       const da = Math.min(0.3, Math.max(0, (o.E - S.bend*0.6)/(S.brk - S.bend*0.6))*0.32 + 0.02);
@@ -182,7 +190,7 @@ class Smash {
 
   // ---- a post: folds over at its foot (steel) or snaps there (concrete)
   fall(r, o, tot) {
-    const S = SPEC[r.kind], geo = this.geoOf(r); if (!geo) { this.gone(r); return { broke: true, absorb: S.absorb, carried: 0 }; }
+    const S = r.S || SPEC[r.kind], geo = this.geoOf(r); if (!geo) { this.gone(r); return { broke: true, absorb: S.absorb, carried: 0 }; }
     const parts = partsOf(geo), F = this.frame(r, new THREE.Matrix4());
     const low = parts.filter(p => p.max.y <= S.base + 1e-3), up = parts.filter(p => p.max.y > S.base + 1e-3);
     this.gone(r);
@@ -208,9 +216,45 @@ class Smash {
     if (r.kind === 'lamp' && !r.dark) FX.brk('glass', r.x, r.y + 7, r.z, 0.5);
     return { broke: true, absorb: S.absorb, carried: S.mass*0.25 };
   }
+  // ---- a young tree: snaps at its foot and comes down whole, crown and all, drawn as it stood (world/trees.js) but
+  // with nothing of the near-to-far handover, so it's there whatever the distance until it's put back
+  fell(r, o) {
+    const S = r.S || SPEC.tree, T = this.W.trees, t = r.ti;
+    this.gone(r);
+    if (!T || t == null || !T.arch || !T.sets) return { broke: true, absorb: S.absorb, carried: 0 };
+    (T.dead || (T.dead = new Set())).add(t); T.lastX = 1e9;
+    const k = T.k[t], A = T.arch[k], set = T.sets[k], s = T.s[t], ro = T.r[t];
+    const sx = s*(0.92 + hash1(t*3.3)*0.16), sy = s*(0.9 + hash1(t*5.1)*0.2), y0 = 0.12 + T.y[t], tr = A.trunkR*s;
+    const mk = (m) => new THREE.ShaderMaterial({ vertexShader: m.vertexShader, fragmentShader: m.fragmentShader, uniforms: m.uniforms, vertexColors: m.vertexColors, side: m.side });
+    const fm = (T._fm || (T._fm = []))[k] || (T._fm[k] = [mk(set.nb.material), mk(set.nl.material)]);
+    const bb = A.near.l.boundingBox || (A.near.l.computeBoundingBox(), A.near.l.boundingBox), b0 = A.near.b.boundingBox || (A.near.b.computeBoundingBox(), A.near.b.boundingBox);
+    const H = Math.max(bb.max.y, b0.max.y)*sy, cm = new THREE.Vector3(0, H*0.38, 0);
+    const Q = new THREE.Quaternion().setFromAxisAngle(_ax.set(0, 1, 0), ro);
+    const M = new THREE.Matrix4().compose(new THREE.Vector3(0, -cm.y, 0), Q, new THREE.Vector3(sx, sy, sx));
+    const g = new THREE.Group();
+    for (const [geo, mat, leaf] of [[A.near.b, fm[0], false], [A.near.l, fm[1], true]]) {
+      const im = new THREE.InstancedMesh(geo, mat, 1); im.setMatrixAt(0, M); im.frustumCulled = false; im.castShadow = true; im.receiveShadow = true;
+      if (leaf && T.leafShadow) im.customDepthMaterial = T.leafShadow;
+      g.add(im);
+    }
+    this.W.scene.add(g);
+    // what it lies on: its foot, along its trunk, and round its crown
+    const pts = [], P = (x, y, z) => pts.push(new THREE.Vector3(x, y, z).applyQuaternion(Q).setY(y - cm.y));
+    for (const h of [0, 0.25, 0.5]) for (const [a, c] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) P(a*tr, H*h, c*tr);
+    const cx = (bb.min.x + bb.max.x)/2*sx, cz = (bb.min.z + bb.max.z)/2*sx, hx = (bb.max.x - bb.min.x)/2*sx, hz = (bb.max.z - bb.min.z)/2*sx, y1 = bb.min.y*sy, y2 = bb.max.y*sy, ym = (y1 + y2)/2;
+    for (const a of [-1, 1]) for (const c of [-1, 1]) { P(cx + a*hx*0.7, y1 + (ym - y1)*0.3, cz + c*hz*0.7); P(cx + a*hx*0.7, y2 - (y2 - ym)*0.3, cz + c*hz*0.7); }
+    P(cx + hx, ym, cz); P(cx - hx, ym, cz); P(cx, ym, cz + hz); P(cx, ym, cz - hz); P(cx, y2, cz);
+    const p = new THREE.Vector3(T.x[t], y0, T.z[t]).add(cm);
+    const b = this.debris.add({ mesh: g, p, q: new THREE.Quaternion(), m: S.mass, half: new THREE.Vector3(Math.max(0.3, hx*0.6), H/2, Math.max(0.3, hz*0.6)), pts, mat: 'wood', keepGeo: true });
+    this.debris.iw(b); r.bodies.push(b);
+    const J = S.mass*Math.max(1, o.u ?? 2)*0.45;
+    this.push(b, o.px, Math.max(y0 + 1.2, o.py), o.pz, o.nx*J, 0, o.nz*J);
+    FX.brk('wood', r.x, y0 + 0.5, r.z, 1); FX.brk('cloth', r.x, y0 + H*0.6, r.z, 1.5);
+    return { broke: true, absorb: S.absorb, carried: S.mass*0.3 };
+  }
   // ---- a stall: over as one (tip), or into its pieces
   apart(r, o, tip) {
-    const S = SPEC[r.kind], geo = this.geoOf(r); if (!geo) { this.gone(r); return { broke: true, absorb: S.absorb, carried: S.mass }; }
+    const S = r.S || SPEC[r.kind], geo = this.geoOf(r); if (!geo) { this.gone(r); return { broke: true, absorb: S.absorb, carried: S.mass }; }
     const parts = partsOf(geo), F = this.frame(r, new THREE.Matrix4()), Fi = F.clone().invert();
     const big = (p) => Math.max(p.size.x, p.size.y, p.size.z);
     const goods = parts.filter(p => big(p) < 0.3), frame = parts.filter(p => big(p) >= 0.3);
@@ -299,7 +343,8 @@ class Smash {
     }
   }
   restore(r) {
-    for (const b of r.bodies) { this.debris.remove(b); if (b.mesh) { b.mesh.parent && b.mesh.parent.remove(b.mesh); b.mesh.traverse(o => o.geometry && o.geometry.dispose()); } }
+    for (const b of r.bodies) { this.debris.remove(b); if (b.mesh) { b.mesh.parent && b.mesh.parent.remove(b.mesh); b.mesh.traverse(o => { if (o.isInstancedMesh) o.dispose(); else if (o.geometry && !b.keepGeo) o.geometry.dispose(); }); } }
+    if (r.ti != null && this.W.trees && this.W.trees.dead) { this.W.trees.dead.delete(r.ti); this.W.trees.lastX = 1e9; }
     if (r.draw) { r.draw = r.draw.filter(e => e.m.parent); for (const e of r.draw) this.cut(e, false); }
     r.top = null;
     for (const m of r.meshes) { m.parent && m.parent.remove(m); m.geometry.dispose(); }
