@@ -259,7 +259,7 @@ function look(dt) {
   const P = G.player;
   for (const S of cells) {
     const K = S.staff && S.staff[0];
-    if (!K || K.anim === 'sit' || K.fallen > 0 || K.ko || K.dead || K.corpse || K.mode !== 'fixed') continue;
+    if (!K || K._serve || K.anim === 'sit' || K.fallen > 0 || K.ko || K.dead || K.corpse || K.mode !== 'fixed') continue;
     if (Math.abs(S.door.x - P.x) > 30 || Math.abs(S.door.z - P.z) > 30) continue;
     let tx = null, tz = 0, best = 3.2;
     const dp = Math.hypot(P.x - K.x, P.z - K.z);
@@ -270,6 +270,46 @@ function look(dt) {
     let dy = want - K.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
     if (Math.abs(dy) < 0.01) continue;
     K.yaw += Math.sign(dy) * Math.min(Math.abs(dy), dt * 3.5); K.hx = Math.cos(K.yaw); K.hz = Math.sin(K.yaw);
+  }
+}
+// your order, carried out to you: whoever's helping (or the keeper) comes round the counter by its flap with the plate,
+// across to your table, puts it down, and goes back behind the counter
+const serving = [];
+function serveTo(S, W, C, done) {
+  const P = S.plan, ctr = P.pieces.find(q => q.t === 'counter' && q.flap), seat = C.seat;
+  if (!ctr || !seat || !seat.table) return false;
+  const [hu, hd] = local(S, W.x, W.z), fu = (ctr.flap[0] + ctr.flap[1]) / 2, cb = Math.min(ctr.d0, ctr.d1), cf = Math.max(ctr.d0, ctr.d1);
+  const [tu, td] = local(S, seat.table.x, seat.table.z), [su, sd] = local(S, seat.x, seat.z);
+  // (beside the table, on the side away from the chair you're in)
+  const side = Math.abs(su - tu) > Math.abs(sd - td) ? [tu - Math.sign(su - tu) * 0.55, td] : [tu < P.w / 2 ? tu + 0.6 : tu - 0.6, td];
+  const L = [[hu, hd], [fu, Math.min(hd, cb - 0.25)], [fu, cf + 0.45], side].map(([u, d]) => at(S, Math.max(0.25, Math.min(P.w - 0.25, u)), d));
+  let plate = null;
+  if (G.scene) { plate = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.12, 0.03, 14), new THREE.MeshLambertMaterial({ color: 0xd9dde2 })); G.scene.add(plate); }
+  W.anim = null; W._serve = { pts: L, i: 0, t: 0, back: false, done, plate, S, y: S.y };
+  serving.push(W);
+  return true;
+}
+function serveStep(dt) {
+  for (let n = serving.length - 1; n >= 0; n--) {
+    const W = serving[n], V = W._serve;
+    if (!V || W.fallen > 0 || W.ko || W.dead || W.corpse || W.mode !== 'fixed') { if (V) { V.plate && G.scene.remove(V.plate); if (!V.back) V.done(); } if (W._serve) { W._serve = null; W.anim = W.idle; } serving.splice(n, 1); continue; }
+    const A = V.pts[V.i], B = V.pts[V.i + 1], L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+    V.t += dt * 1.25;
+    const k = L < 1e-3 ? 1 : Math.min(1, V.t / L);
+    W.x = A[0] + (B[0] - A[0]) * k; W.z = A[1] + (B[1] - A[1]) * k; W.v = 1.25;
+    if (L > 1e-3) { W.yaw = Math.atan2(B[1] - A[1], B[0] - A[0]); W.hx = Math.cos(W.yaw); W.hz = Math.sin(W.yaw); }
+    if (V.plate) V.plate.position.set(W.x + W.hx * 0.32, V.y + 1.02, W.z + W.hz * 0.32);
+    if (k < 1) continue;
+    V.t = 0;
+    if (V.i + 2 < V.pts.length) { V.i++; continue; }
+    if (!V.back) {
+      // at the table: down it goes (your plate), and back
+      if (V.plate) { G.scene.remove(V.plate); V.plate.geometry.dispose(); V.plate = null; }
+      V.done(); V.back = true; V.pts = V.pts.slice().reverse(); V.i = 0; W.v = 0;
+      continue;
+    }
+    W._serve = null; W.v = 0; W.anim = W.idle; if (W._home !== undefined) { W.yaw = W._home; W.hx = Math.cos(W.yaw); W.hz = Math.sin(W.yaw); }
+    serving.splice(n, 1);
   }
 }
 // ---------------------------------------------------------------- in and out
@@ -476,6 +516,20 @@ export function install() {
     const [tx, tz] = at(S, S.plan.back.u, S.plan.back.d);
     walkTo(P, tx, tz); P._backTo = S;
   };
+  // in a place to eat where it stands, the plate's carried out to your table rather than appearing on it
+  const eat = Interiors.prototype.eat;
+  Interiors.prototype.eat = function (...a) {
+    const C = this.cur;
+    if (!C || !C.inPlace || C._served || !here || !C.seat || !C.plate || C._coming) return eat.apply(this, a);
+    const S = here.S, W = S.staff && (S.staff.find(q => q.role === 'helper') || S.staff[0]);
+    if (!W || W._serve || W.fallen > 0 || W.ko || W.dead || W.mode !== 'fixed') return eat.apply(this, a);
+    C._coming = true;
+    const go = () => { C._coming = false; if (this.cur !== C) return; C._served = true; try { eat.apply(this, a); } finally { C._served = false; } };
+    if (!serveTo(S, W, C, go)) { C._coming = false; return eat.apply(this, a); }
+  };
+  // (someone carrying a plate isn't stood still behind the counter)
+  const pstep = People.prototype.step;
+  People.prototype.step = function (p, ...a) { if (p._serve) return; return pstep.call(this, p, ...a); };
   const label = Shops.prototype.label;
   Shops.prototype.label = function () {
     const n = this.near, S = n && n.door && n.door.cell;
@@ -496,7 +550,7 @@ export function install() {
   People.prototype.update = function (dt, ...a) {
     const out = pu.call(this, dt, ...a);
     if (!G && this._G) G = this._G;
-    if (G && G.player) { if ((this._shopT = (this._shopT || 0) - dt) <= 0) { this._shopT = 0.25; tend(); } track(); look(dt); fans(dt); }
+    if (G && G.player) { if ((this._shopT = (this._shopT || 0) - dt) <= 0) { this._shopT = 0.25; tend(); } track(); look(dt); fans(dt); serveStep(dt); }
     return out;
   };
 }
