@@ -65,7 +65,8 @@ void main(){
   o = vec4(c, amt); }`;
 // bright things bleed: down the chain, then back up it
 const BRIGHT_FS = HEAD + `uniform sampler2D tCol; uniform vec2 px; float lum(vec3 c){ return dot(c, vec3(.3, .59, .11)); }
-void main(){ vec3 c = (texture(tCol, vUv + px*vec2(-.5,-.5)).rgb + texture(tCol, vUv + px*vec2(.5,-.5)).rgb + texture(tCol, vUv + px*vec2(-.5,.5)).rgb + texture(tCol, vUv + px*vec2(.5,.5)).rgb)*.25; float l = lum(c), k = smoothstep(.78, 1.35, l); o = vec4(min(c, vec3(6.))*k, 1.); }`;
+vec3 sf(vec2 u){ vec3 c = texture(tCol, u).rgb; return any(isnan(c)) || any(isinf(c)) ? vec3(0.) : c; }
+void main(){ vec3 c = (sf(vUv + px*vec2(-.5,-.5)) + sf(vUv + px*vec2(.5,-.5)) + sf(vUv + px*vec2(-.5,.5)) + sf(vUv + px*vec2(.5,.5)))*.25; float l = lum(c), k = smoothstep(.78, 1.35, l); o = vec4(min(c, vec3(6.))*k, 1.); }`;
 // (four looks between the texels stand in for eight: the card's own filtering does the rest, a blur can't tell)
 const DOWN_FS = HEAD + `uniform sampler2D tCol; uniform vec2 px;
 void main(){ vec3 a = texture(tCol, vUv).rgb*.25; for (int i = 0; i < 4; i++) { vec2 s = vec2(i < 2 ? -1. : 1., (i == 0 || i == 2) ? -1. : 1.); a += texture(tCol, vUv + px*s*1.35).rgb*.1875; } o = vec4(a, 1.); }`;
@@ -103,13 +104,17 @@ void main(){
     float m = (1. - smoothstep(.35*w, w, abs(q.x)))*smoothstep(-.25, .15, up)*(1. - smoothstep(1.4, 4., up));
     if (m > 0. && (sky || z0 > h.w - .4)) { vec2 n = vec2(nR(q*2.2 - vec2(0., time*3.1)), nR(q*2.2 + vec2(7.3, 2.1) - vec2(time*.4, time*2.6))) - .5;
       hb += n*m*k*h.z*.05; } }
+  if (any(isnan(hb))) hb = vec2(0.);
   vec3 L = texture(tCol, uv + wob*.6 + hb).rgb;
+  // (a bad value anywhere in the frame (a NaN) is one dark pixel at most, never spread into a block by the blurs)
+  if (any(isnan(L)) || any(isinf(L))) L = texture(tCol, uv + px*2.).rgb;
+  if (any(isnan(L)) || any(isinf(L))) L = vec3(0.);
   // the lens: things out of focus open up into discs; the camera's own movement smears the frame
   if (dofN > 0) { float coc = clamp((z0 - focus - 25.)/380., 0., 1.)*dofR; if (coc > .6) { vec3 a = L; float W = 1., a0 = ign(gl_FragCoord.xy)*6.28; for (int i = 0; i < dofN; i++) { float t = sqrt((float(i) + .5)/float(dofN)), th = a0 + float(i)*2.39996; vec2 q = uv + vec2(cos(th), sin(th))*t*coc*px; float zq = lz(q), w = zq > focus - 1. ? 1. : .12; a += texture(tCol, q).rgb*w; W += w; } L = a/W; } }
   if (mbN > 0 && z0 > focus + 1.5) { vec4 pw = invVP*vec4(uv*2. - 1., (sky ? 1. : d0)*2. - 1., 1.); pw /= pw.w; vec4 pr = reproj*pw; vec2 vel = uv - pr.xy/pr.w*.5 - .5; float vl = length(vel); if (vl > .001) { vel *= .35; vl *= .35; vel *= min(1., .012/max(vl, 1e-5)); if (vl < .0008) vel *= 0.; vec3 a = L; float jit = ign(gl_FragCoord.xy); for (int i = 0; i < mbN; i++) a += texture(tCol, uv - vel*(float(i) + jit)/float(mbN)).rgb; L = a/float(mbN + 1); } }
   if (!sky) {
-    if (useSSR > 0) { vec4 r = texture(tSSR, uv); L = mix(L, r.rgb, r.a); }
-    if (useAO > 0) { vec4 a = texture(tAO, uv); float k = a.a; L = L*mix(1., k, 1. - min(1., lum(L)*.2)) + a.rgb*giK*(.15 + L)*.35*dayK; }
+    if (useSSR > 0) { vec4 r = texture(tSSR, uv); if (!any(isnan(r)) && !any(isinf(r))) L = mix(L, r.rgb, clamp(r.a, 0., 1.)); }
+    if (useAO > 0) { vec4 a = texture(tAO, uv); if (any(isnan(a)) || any(isinf(a))) a = vec4(0., 0., 0., 1.); float k = a.a; L = L*mix(1., k, 1. - min(1., lum(L)*.2)) + a.rgb*giK*(.15 + L)*.35*dayK; }
     if (aerial > 0.) { float ff = 1. - exp(-z0*.0005*aerial); L = mix(L, fogCol*(.8 + .1*dayK), ff); }
   }
   if (bloomK > 0.) L += texture(tBloom, uv).rgb*bloomK;
@@ -260,8 +265,8 @@ export class Post {
     U.hzK.value.set(0, 0);
     for (let i = 0; i < 2 && i < HAZE.length; i++) {
       const h = HAZE[i], S = this._hv || (this._hv = new THREE.Vector3()); S.set(h.x, h.y, h.z).applyMatrix4(cam.matrixWorldInverse);
-      const z = -S.z; if (z < .3 || z > 60 || !(h.k > .01)) continue;
-      S.applyMatrix4(cam.projectionMatrix); if (Math.abs(S.x) > 1.3 || Math.abs(S.y) > 1.3) continue;
+      const z = -S.z; if (!(z >= .3 && z <= 60) || !(h.k > .01) || !isFinite(S.x + S.y)) continue;
+      S.applyMatrix4(cam.projectionMatrix); if (!(Math.abs(S.x) <= 1.3 && Math.abs(S.y) <= 1.3)) continue;
       U.hzP.value[i].set(S.x*.5 + .5, S.y*.5 + .5, .25*cam.projectionMatrix.elements[5]/z, z); U.hzK.value.setComponent(i, h.k*(1 - Math.max(0, z - 30)/30));
     }
     HAZE.length = 0;
