@@ -17,9 +17,8 @@ const UBER = 'https://drive.uber.radio/uber/';
 const STATIONS = [
   { name: 'Mirchi Top 20', sub: 'the biggest songs this week', url: UBER + 'bollywoodnow/icecast.audio' },
   { name: 'Bollywood Dance', sub: 'club mixes, for the night', url: UBER + 'bollywooddance/icecast.audio' },
-  { name: 'Bollywood 2010s', sub: 'the ones you grew up on', url: UBER + 'bollywood2010s/icecast.audio' },
   { name: 'Mirchi Love', sub: 'the slow ones, for the rain', url: UBER + 'bollywoodlove/icecast.audio' },
-  { name: 'Bollywood 2000s', sub: 'the bangers', url: UBER + 'bollywood2000s/icecast.audio' },
+  { name: 'Bollywood 2000s', sub: 'the 90s and 2000s bangers', url: UBER + 'bollywood2000s/icecast.audio' },
   { name: 'Maayboli Marathi', sub: 'Marathi, all day', url: 'https://stream.zeno.fm/48kybvzrwfeuv' },
   { name: 'BritAsia Punjabi', sub: 'Punjabi hits', url: 'https://s4.radio.co/sfefce156f/listen' },
   { name: '100 Hip Hop & RnB', sub: 'hip-hop, non-stop', url: 'https://streaming.shoutcast.com/100-hip-hop-and-rnb-fm' },
@@ -31,9 +30,10 @@ const STATIONS = [
 // how hard it's driven, how much it's squeezed together, how much of the cabin you hear, the level
 const SPK = {
   tinny: { hp: 480, lp: 3200, bass: -2, sub: 0, treb: -9, mid: [1400, 7], drive: 0.5, comp: 0, room: 0.03, vol: 0.72 },
-  basic: { hp: 110, lp: 8000, bass: 3, sub: 1.5, treb: -2, mid: [2400, 1.5], drive: 0.08, comp: 0.4, room: 0.13, vol: 0.86 },
-  good: { hp: 45, lp: 13500, bass: 6, sub: 4, treb: 1, mid: [2800, -0.5], drive: 0, comp: 0.7, room: 0.17, vol: 0.93 },
-  prem: { hp: 24, lp: 19500, bass: 8, sub: 7, treb: 3, mid: [3200, -2], drive: 0, comp: 1, room: 0.22, vol: 1 },
+  basic: { hp: 110, lp: 8000, bass: 2, sub: 0.5, treb: -2, mid: [2400, 1.5], drive: 0.08, comp: 0.4, room: 0.12, vol: 0.86 },
+  good: { hp: 45, lp: 14000, bass: 2.5, sub: 1, treb: 0.5, mid: [2800, -0.5], drive: 0, comp: 0.5, room: 0.16, vol: 0.93 },
+  // (a good system is clean, not loud in the low end: a touch of warmth, the top open, the track left as it was mixed)
+  prem: { hp: 28, lp: 20000, bass: 2, sub: 0.5, treb: 1.5, mid: [3200, -1], drive: 0, comp: 0.35, room: 0.2, vol: 1 },
 };
 // how far the door's open, 0 shut to 1 wide (beta/vehicles/cardoor.js keeps the doors that are swinging in P.doors)
 export const doorOpen = (P, v) => { let o = 0; if (P && v) for (const R of P.doors || []) if (R.veh === v) o = Math.max(o, Math.min(1, (R.ang || 0)/1.18)); return o; };
@@ -65,30 +65,27 @@ function graph(A) {
   // glue: the peaks brought in a little and the whole lifted, like a track off the desk
   const comp = ctx.createDynamicsCompressor(); comp.knee.value = 12; comp.attack.value = 0.008; comp.release.value = 0.18;
   const make = ctx.createGain();
-  // the cabin: a short close room, the sound back off the glass and the roof (a quarter of a second, darker than the dry)
-  const room = ctx.createConvolver(); room.buffer = cabinIR(ctx); const wet = ctx.createGain(), dry = ctx.createGain(); wet.gain.value = 0;
+  // the cabin: the sound back off the glass, the roof and the dash, a few bounces inside the first 12 ms, each from its
+  // own side and a little duller than the dry (a handful of delays: a reverb was too heavy here and broke the sound up)
+  const wet = ctx.createGain(), dry = ctx.createGain(), dull = f('lowpass'); wet.gain.value = 0; dull.frequency.value = 6500; dull.Q.value = 0.5;
+  make.connect(dull);
+  for (const [ms, pan, a] of [[2.3, -0.7, 0.55], [3.9, 0.65, 0.45], [6.1, -0.35, 0.33], [8.6, 0.45, 0.25], [11.7, -0.15, 0.18]]) {
+    const d = ctx.createDelay(0.05), p = ctx.createStereoPanner(), g = ctx.createGain(); d.delayTime.value = ms/1000; p.pan.value = pan; g.gain.value = a;
+    dull.connect(d).connect(g).connect(p).connect(wet);
+  }
+  // and nothing past full scale, ever: a brick wall just under it
+  const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -1.5; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.002; lim.release.value = 0.12;
   const shaper = ctx.createWaveShaper(), out = ctx.createGain(); out.gain.value = 0;
   src.connect(hp).connect(bass).connect(sub).connect(mid).connect(treb).connect(lp).connect(shaper).connect(comp).connect(make);
-  make.connect(dry).connect(shell); make.connect(room).connect(wet).connect(shell);
-  shell.connect(out).connect(A.bus('music'));
-  R.nodes = { ctx, hp, bass, sub, mid, treb, lp, shaper, comp, make, wet, dry, shell, out };
+  make.connect(dry).connect(shell); wet.connect(shell);
+  shell.connect(lim).connect(out).connect(A.bus('music'));
+  R.nodes = { ctx, hp, bass, sub, mid, treb, lp, shaper, comp, make, wet, dry, shell, lim, out };
   return R.nodes;
-}
-// a car's inside, as an echo: a few hard early bounces off the glass inside the first 12 ms, then a quick dense tail,
-// each side its own, losing its top as it goes
-function cabinIR(ctx) {
-  const sr = ctx.sampleRate, n = Math.floor(sr*0.26), B = ctx.createBuffer(2, n, sr);
-  for (let c = 0; c < 2; c++) {
-    const d = B.getChannelData(c); let lo = 0;
-    for (let i = 0; i < n; i++) { const tt = i/sr, x = (Math.random()*2 - 1)*Math.exp(-tt/0.055); lo += (x - lo)*(0.55 - 0.4*Math.min(1, tt/0.2)); d[i] = lo*0.5; }
-    for (const [ms, a] of [[2.1, 0.7], [3.7, 0.5], [5.3, 0.45], [7.9, 0.32], [11.4, 0.22]]) { const i = Math.floor((ms + c*0.6)*sr/1000); if (i < n) d[i] += a*(c ? 0.9 : 1); }
-  }
-  return B;
 }
 function voice(N, k) {
   const S = SPK[k], t = N.ctx.currentTime;
   N.sub.gain.setTargetAtTime(S.sub, t, 0.05);
-  N.comp.threshold.setTargetAtTime(-6 - 18*S.comp, t, 0.05); N.comp.ratio.setTargetAtTime(1 + 3*S.comp, t, 0.05); N.make.gain.setTargetAtTime(1 + 0.6*S.comp, t, 0.05);
+  N.comp.threshold.setTargetAtTime(-8 - 10*S.comp, t, 0.05); N.comp.ratio.setTargetAtTime(1 + 1.5*S.comp, t, 0.05); N.make.gain.setTargetAtTime(1, t, 0.05);
   N.room = S.room;
   N.hp.frequency.setTargetAtTime(S.hp, t, 0.05); N.lp.frequency.setTargetAtTime(S.lp, t, 0.05);
   N.bass.gain.setTargetAtTime(S.bass, t, 0.05); N.treb.gain.setTargetAtTime(S.treb, t, 0.05);
@@ -159,6 +156,6 @@ const tick = () => {
   else room *= 1 - 0.6*door;
   if (G.state !== 'play') g = 0;
   N.out.gain.setTargetAtTime(R.dj ? 0 : g, t, 0.12); N.shell.frequency.setTargetAtTime(cut, t, 0.15);
-  N.wet.gain.setTargetAtTime(room*2.2, t, 0.1); N.dry.gain.setTargetAtTime(1 - room*0.5, t, 0.1);
+  N.wet.gain.setTargetAtTime(room*1.6, t, 0.1); N.dry.gain.setTargetAtTime(1 - room*0.4, t, 0.1);
 };
 requestAnimationFrame(tick);
