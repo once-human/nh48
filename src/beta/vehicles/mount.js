@@ -92,7 +92,7 @@ Pilot.prototype.spawnAngryDriver = function (o, mode) {
   if (J.look) kit.randomLook = () => J.look;
   let p;
   try { p = sad.call(this, o, mode); } finally { kit.randomLook = rl; }
-  if (p) { p.x = J.x; p.z = J.z; }
+  if (p) { p.x = J.x; p.z = J.z; J.p = p; }
   return p;
 };
 

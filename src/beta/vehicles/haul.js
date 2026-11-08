@@ -1,7 +1,9 @@
 // Taking an auto, a tempo or a bus off someone who's driving it. It used to swap on the spot: you were in, they were on
 // the road. Now you go to them first. An auto's open at the side: you step up beside the driver, take them by the shirt
 // with both hands and haul them out past you onto the road. A tempo's cab and a bus's driver's door are on the right,
-// up high on a bus: you reach in (up, on the bus), get hold of them and drag them down and out. They land beside you;
+// so you reach in there and drag them down and out. A bus is the one you go into from the left, by its front door, like
+// anyone getting on: up the steps, across to the driver in the cab on the right, hold of them, and you haul them out
+// past you, across and out of the door and down onto the road, coming down the steps with them. They land beside you;
 // then you get in. (Cars have their own door to open and the driver to haul out: beta/vehicles/cardoor.js. Two-wheelers,
 // a shove: beta/vehicles/mount.js, whose same swap this uses, so the one who lands is the one who was driving. Loaded
 // after beta/vehicles/getout.js, whose way in follows.)
@@ -19,7 +21,7 @@ function cabOf(kind) {
   const b = baseOf(kind), S = specOf(kind) || {};
   if (b === 'auto') return { f: 0.22, up: 1.08, r: 0, out: (S.W || 1.4)/2 + 0.38, both: true };
   if (b === 'tempo') return { f: 1.05, up: 1.3, r: 0.32, out: (S.W || 1.7)/2 + 0.42 };
-  if (b === 'bus') return { f: (S.L || 11.4)/2 - 1.0, up: 1.95, r: 0.75, out: (S.W || 2.55)/2 + 0.48, high: true };
+  if (b === 'bus') { const hl = (S.L || 11.4)/2, hw = (S.W || 2.55)/2; return { f: hl - 0.71, up: 1.86, r: 0, out: hw + 0.48, high: true, bus: { side: -1, inF: hl - 0.95, inR: -0.12, fl: 0.88, drvF: hl - 1.3, drvR: 0.75, hw } }; }
   return null;
 }
 const enter = Pilot.prototype.enter;
@@ -28,7 +30,7 @@ Pilot.prototype.enter = function (offer, traffic) {
   if (!cab || offer.now || this._haul || this._mount || this.entering || !this.onFoot) return enter.call(this, offer, traffic);
   const o = offer.o, F = this.foot, hx = o.hx ?? Math.cos(o.th), hz = o.hz ?? Math.sin(o.th), rx = -hz, rz = hx;
   // the right side (the driver's), or an auto's left if that's the one you can stand at
-  const sides = (cab.both ? [1, -1] : [1]).map(s => ({ s, x: o.x + hx*cab.f + rx*s*cab.out, z: o.z + hz*cab.f + rz*s*cab.out }));
+  const sides = (cab.both ? [1, -1] : [cab.bus ? cab.bus.side : 1]).map(s => ({ s, x: o.x + hx*cab.f + rx*s*cab.out, z: o.z + hz*cab.f + rz*s*cab.out }));
   if (cab.both) sides.sort((a, b) => Math.hypot(a.x - F.x, a.z - F.z) - Math.hypot(b.x - F.x, b.z - F.z));
   const side = sides.find(q => free(this, traffic, q.x, q.z, o));
   if (!side) return enter.call(this, offer, traffic);
@@ -63,6 +65,7 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
     return out;
   }
   if (!H) { done(this, false); return out; }
+  if (M.cab.bus) { bus(this, M, dt, o, hx, hz, rx, rz, oy); return out; }
   // the driver's chest, and the way out (from the cab towards you)
   _c.set(o.x + hx*M.cab.f + rx*s*M.cab.r*0.6, oy + M.cab.up, o.z + hz*M.cab.f + rz*s*M.cab.r*0.6);
   const ox = rx*s, oz = rz*s;
@@ -119,3 +122,62 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
   }
   return out;
 };
+
+// a bus: in by the front door on the left, up its steps, across to the driver's cab on the right; hold of them, and out
+// they come past you, across the cab, out of the door and down onto the road, you coming back down the steps with them
+function bus(P, M, dt, o, hx, hz, rx, rz, oy) {
+  const F = P.foot, H = P.human, B = M.cab.bus, t = M.t;
+  const at = (f, r) => [o.x + hx*f + rx*r, o.z + hz*f + rz*r];
+  const [ix, iz] = at(B.inF, B.inR), sx = M.side.x, sz = M.side.z, floor = oy + B.fl;
+  const [cx, cz] = at(B.drvF, B.drvR); _c.set(cx, floor + 0.62, cz);
+  const ox = rx*B.side, oz = rz*B.side;                                   // out of the door
+  const put = (x, z, y, yaw) => { F.x = x; F.z = z; F.yaw = yaw; H.holder.position.set(x, y, z); H.holder.rotation.set(0, -yaw, 0); };
+  const toward = (x, z) => Math.atan2(z - F.z, x - F.x);
+  if (M.phase === 'grab' && !M.boarded) {
+    // up the steps and in: two steps up and across the doorway, to the aisle beside the cab
+    if (!M.b0) { M.b0 = { x: F.x, z: F.z, y: F.y }; H.play('walk', { fade: 0.15 }); P.act = { kind: 'haul', t: 0 }; }
+    const T = 0.95, k = sm(Math.min(1, t/T)), y = M.b0.y + (floor - M.b0.y)*Math.min(1, k*1.25);
+    put(M.b0.x + (ix - M.b0.x)*k, M.b0.z + (iz - M.b0.z)*k, y, Math.atan2(iz - M.b0.z, ix - M.b0.x));
+    if (t >= T) { M.boarded = true; M.t = 0; H.play('idle', { fade: 0.2 }); M.yaw0 = F.yaw; }
+    return;
+  }
+  if (M.phase === 'grab') {
+    // square up to them and reach across, both hands on their shirt
+    const k = seg(t, 0, 0.42), want = toward(_c.x, _c.z);
+    put(ix - ox*0.12*k, iz - oz*0.12*k, floor, M.yaw0 + Math.atan2(Math.sin(want - M.yaw0), Math.cos(want - M.yaw0))*seg(t, 0, 0.25));
+    const fx = Math.cos(F.yaw), fz = Math.sin(F.yaw), frx = -fz, frz = fx;
+    torso(H, 0, 0.2*k, frx, frz);
+    for (const sd of [1, -1]) { _t.copy(_c).addScaledVector(_p.set(frx, 0, frz), sd*0.12); ikArm(H, sd > 0 ? 'r' : 'l', _t, _h.set(frx*sd*0.7, -1, frz*sd*0.7), k); }
+    if (t >= 0.48) { M.phase = 'yank'; M.t = 0; M.x1 = F.x; M.z1 = F.z; }
+    return;
+  }
+  if (M.phase !== 'yank') return;
+  // back out with them: across, out of the door and down the steps; they come with you and land on the road
+  const T = 1.05, k = sm(Math.min(1, t/T)), rel = seg(t, 0.75, T);
+  const x = M.x1 + (sx - M.x1)*k, z = M.z1 + (sz - M.z1)*k, y = floor + ((M.b0 ? M.b0.y : oy) - floor)*Math.max(0, (k - 0.35)/0.65);     // (down the steps in the last of it)
+  const yaw = Math.atan2(_c.z - z, _c.x - x);
+  put(x, z, y, k < 0.5 ? yaw : Math.atan2(-oz, -ox));
+  const fx = Math.cos(F.yaw), fz = Math.sin(F.yaw), frx = -fz, frz = fx;
+  torso(H, 0, -0.2*seg(t, 0, 0.3)*(1 - rel), frx, frz);
+  _p.set(x + ox*0.55, y + 0.85, z + oz*0.55);
+  for (const sd of [1, -1]) { _t.lerpVectors(_c, _p, seg(t, 0, 0.7)).addScaledVector(_h.set(frx, 0, frz), sd*0.12); ikArm(H, sd > 0 ? 'r' : 'l', _t, _h.set(frx*sd*0.7, -1, frz*sd*0.7), 1 - rel); }
+  if (t > 0.12 && !M.d) {
+    // out they come: the bus is yours, and they're drawn from the driver's seat out through the door to where they land
+    P.audio?.thud?.(0.5);
+    const lx = sx + ox*0.75 + hx*0.35, lz = sz + oz*0.75 + hz*0.35, keep = { x: F.x, z: F.z, yaw: F.yaw, y: F.y };
+    const J = P._jab = { o: M.o, x: lx, z: lz, look: null }, offer = M.offer;
+    offer.now = true; offer.dragged = true;
+    try { enter.call(P, offer, M.traffic); } finally { P._jab = null; }
+    const veh = P.cur;
+    if (veh && !P.onFoot) {
+      P.exit(M.traffic, true);
+      Object.assign(F, { x: keep.x, z: keep.z, yaw: keep.yaw, y: keep.y, v: 0, vx: 0, vz: 0 });
+      M.d = (P.dropped || []).find(q => q.veh === veh);
+      if (!M.d) { done(P, false); return; }
+      P.act = { kind: 'haul', t: 0 }; P.frozen = true;
+      const dp = J.p;
+      if (dp) dp._out = { t0: performance.now(), dx: _c.x - lx, dy: floor - (P.W.surf ? P.W.surf.height(lx, lz) : oy), dz: _c.z - lz };
+    } else { done(P, false); return; }
+  }
+  if (t >= T) done(P, true);
+}
