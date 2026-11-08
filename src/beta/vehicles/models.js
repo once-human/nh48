@@ -170,8 +170,8 @@ export function buildAuto(opts = {}) {
   // tail lamps + plate on the rear face
   for (const s of [-1, 1]) {
     rbox(b, -1.42, 0.41, s*0.42, -1.395, 0.53, s*0.58, RUB);
-    b.addGeo(G.sph2, M(-1.415, 0.47, s*0.5, 0.012, 0.045, 0.07), TAIL, 0, 0.9);
-    b.addGeo(G.sph2, M(-1.412, 0.52, s*0.55, 0.008, 0.012, 0.018), AMBER, 0, 0.5);
+    b.addGeo(G.sph2, M(-1.415, 0.47, s*0.5, 0.012, 0.045, 0.07), TAIL, 0.9, 0);
+    b.addGeo(G.sph2, M(-1.412, 0.52, s*0.55, 0.008, 0.012, 0.018), AMBER, 0.5, 0);
     rbox(b, -1.2, 0.36, s*0.665, -0.76, 0.385, s*0.672, [0.3, 0.3, 0.32]);                             // rubbing strip
     // the engine's side louvres
     for (let k = 0; k < 6; k++) rbox(b, -1.22 + k*0.05, 0.47, s*0.664, -1.2 + k*0.05, 0.545, s*0.672, [0.03, 0.03, 0.033]);
@@ -230,10 +230,10 @@ export function buildAuto(opts = {}) {
   // headlamp + indicators + horn grille
   b.addGeo(G.cyl16, M(1.25, 0.7, 0, 0.105, 0.09, 0.105, 0, 0, Math.PI / 2), BLACK);
   b.addGeo(RING_G, M(1.298, 0.7, 0, 0.098, 0.098, 0.14, 0, Math.PI / 2, 0), CHROME);
-  b.addGeo(G.sph2, M(1.283, 0.7, 0, 0.022, 0.09, 0.09), HEAD, 0, 1.0);
+  b.addGeo(G.sph2, M(1.283, 0.7, 0, 0.022, 0.09, 0.09), HEAD, 1.0, 0);
   for (const s of [-1, 1]) {
     rbox(b, 1.17, 0.81, s*0.32, 1.235, 0.9, s*0.41, RUB);
-    b.addGeo(G.sph2, M(1.228, 0.855, s*0.365, 0.012, 0.036, 0.036), AMBER, 0, 0.7);
+    b.addGeo(G.sph2, M(1.228, 0.855, s*0.365, 0.012, 0.036, 0.036), AMBER, 0.7, 0);
     tube(b, [[0.62, 0.32, s*0.5], [0.95, 0.31, s*0.5], [1.12, 0.33, s*0.46], [1.22, 0.38, s*0.38]], 0.008, [0.03, 0.03, 0.033], 10, 4);  // the panel's lower seam
     tube(b, [[0.62, 0.98, s*0.505], [0.9, 0.98, s*0.505]], 0.006, [0.03, 0.03, 0.033], 3, 4);
     rod(b, [1.02, 0.58, s*0.46], [1.02, 0.72, s*0.46], 0.005, [0.03, 0.03, 0.033]);
@@ -1333,8 +1333,8 @@ export function buildBus() {
     rod(b, [fz(1.2, s*0.8) + 0.04, 1.2, s*0.8], [fz(1.25, s*0.8) + 0.04, 1.26, s*0.8], 0.018, RUBBER);
     // headlamps, indicator, fog lamp
     rbox(b, hl - 0.03, 0.66, s*0.66, hl + 0.02, 0.94, s*(hw - 0.1), [0.1, 0.1, 0.11]);
-    for (const q of [0.82, 1.03]) { b.addGeo(G.cyl12, M(hl + 0.012, 0.8, s*q, 0.092, 0.03, 0.092, 0, 0, Math.PI/2), CHROME); b.addGeo(G.circle, M(hl + 0.03, 0.8, s*q, 0.078, 0.078, 1, 0, Math.PI/2), HEAD, 0, 1); }
-    b.addGeo(G.sph2, M(hl + 0.01, 1.01, s*(hw - 0.2), 0.05, 0.03, 0.09), AMBER, 0, 0.7);
+    for (const q of [0.82, 1.03]) { b.addGeo(G.cyl12, M(hl + 0.012, 0.8, s*q, 0.092, 0.03, 0.092, 0, 0, Math.PI/2), CHROME); b.addGeo(G.circle, M(hl + 0.03, 0.8, s*q, 0.078, 0.078, 1, 0, Math.PI/2), HEAD, 1, 0); }
+    b.addGeo(G.sph2, M(hl + 0.01, 1.01, s*(hw - 0.2), 0.05, 0.03, 0.09), AMBER, 0.7, 0);
     // mirrors on long arms
     tube(b, [[hl - 0.26, 2.68, s*(hw - 0.06)], [hl + 0.08, 2.74, s*(hw + 0.14)], [hl + 0.12, 2.42, s*(hw + 0.18)]], 0.014, RUBBER, 10, 6);
     rbox(b, hl + 0.07, 1.94, s*(hw + 0.1), hl + 0.17, 2.46, s*(hw + 0.3), RUBBER);
@@ -1355,7 +1355,7 @@ export function buildBus() {
   for (let k = 0; k < 12; k++) rbox(b, -hl - 0.022, 0.62 + k*0.058, -0.86, -hl + 0.02, 0.645 + k*0.058, 0.86, [0.09, 0.09, 0.1]);
   rbox(b, -hl - 0.09, 0.38, -hw - 0.012, -hl + 0.09, 0.6, hw + 0.012, [0.12, 0.12, 0.13]);
   box(b, rx(2.76) - 0.012, 2.62, -0.7, rx(2.76) + 0.01, 2.9, 0.7, [1, 0.45, 0.05], 0, 0.7);
-  for (const s of [-1, 1]) { rbox(b, -hl - 0.03, 0.72, s*(hw - 0.3), -hl + 0.02, 1.04, s*(hw - 0.06), [0.1, 0.1, 0.1]); for (const q of [0.8, 0.96]) b.addGeo(G.sph2, M(-hl - 0.02, q, s*(hw - 0.18), 0.03, 0.07, 0.09), TAIL, 0, 0.9); b.addGeo(G.sph2, M(-hl - 0.02, 1.1, s*(hw - 0.18), 0.03, 0.04, 0.08), AMBER, 0, 0.7); rod(b, [-hl + 0.1, 0.42, s*0.55], [-hl - 0.02, 0.2, s*0.55], 0.02, RUBBER); }
+  for (const s of [-1, 1]) { rbox(b, -hl - 0.03, 0.72, s*(hw - 0.3), -hl + 0.02, 1.04, s*(hw - 0.06), [0.1, 0.1, 0.1]); for (const q of [0.8, 0.96]) b.addGeo(G.sph2, M(-hl - 0.02, q, s*(hw - 0.18), 0.03, 0.07, 0.09), TAIL, 0.9, 0); b.addGeo(G.sph2, M(-hl - 0.02, 1.1, s*(hw - 0.18), 0.03, 0.04, 0.08), AMBER, 0.7, 0); rod(b, [-hl + 0.1, 0.42, s*0.55], [-hl - 0.02, 0.2, s*0.55], 0.02, RUBBER); }
   box(b, -hl - 0.03, 0.46, -0.17, -hl - 0.015, 0.56, 0.17, [0.98, 0.9, 0.3]);
   // the roof: the gas tanks' long housing with its ribs and vents, hatches, an antenna
   for (let x = -hl + 0.6; x < -hl + 4.6; x += 0.5) rbox(b, x + 0.02, 3.13, -0.72, x + 0.46, 3.44, 0.72, [0.82, 0.82, 0.79]);
@@ -1440,10 +1440,10 @@ export function buildTempo() {
     rod(b, [1.77, 1.2, s*0.62], [1.62, 1.6, s*0.2], 0.006, RUBBER);
     // lamps, indicator, the fender's stripe, bumper ends
     rbox(b, 1.94, 0.76, s*0.48, 2.0, 0.96, s*0.72, [0.8, 0.8, 0.82]);
-    b.addGeo(G.sph2, M(1.99, 0.86, s*0.6, 0.03, 0.08, 0.1), HEAD, 0, 1);
-    b.addGeo(G.sph2, M(1.97, 0.7, s*0.62, 0.025, 0.03, 0.07), AMBER, 0, 0.7);
+    b.addGeo(G.sph2, M(1.99, 0.86, s*0.6, 0.03, 0.08, 0.1), HEAD, 1, 0);
+    b.addGeo(G.sph2, M(1.97, 0.7, s*0.62, 0.025, 0.03, 0.07), AMBER, 0.7, 0);
     // tail lamps on the bed's end
-    rbox(b, -hl - 0.03, 0.56, s*(hw - 0.3), -hl + 0.02, 0.74, s*(hw - 0.06), [0.1, 0.1, 0.1]); b.addGeo(G.sph2, M(-hl - 0.03, 0.65, s*(hw - 0.18), 0.02, 0.07, 0.1), TAIL, 0, 0.9);
+    rbox(b, -hl - 0.03, 0.56, s*(hw - 0.3), -hl + 0.02, 0.74, s*(hw - 0.06), [0.1, 0.1, 0.1]); b.addGeo(G.sph2, M(-hl - 0.03, 0.65, s*(hw - 0.18), 0.02, 0.07, 0.1), TAIL, 0.9, 0);
     rbox(b, RX - 0.44, 0.12, s*(hw - 0.26), RX - 0.41, 0.48, s*(hw - 0.04), RUBBER);          // mud flaps
   }
   // the grille, its bars and badge; bumper, plate

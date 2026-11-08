@@ -55,6 +55,12 @@ Traffic.prototype.step = function (v, dt) {
     const sp = v.v || 0, want = !v.wreck && !v.parked && ((v0 - sp)/dt > 1.2 || sp < 0.3);
     v._brkT = want ? 0.4 : Math.max(0, (v._brkT || 0) - dt);
     v._brk = v.wreck ? -1 : v._brkT > 0 ? 1 : 0;
+    // turning at the next junction: the indicator on, from about 35 m before it till they're round (a fifth of drivers
+    // never bother; an auto's driver sticks a hand out instead, so nothing)
+    const n = v.next, len = v.l && v.l.e ? v.l.e.len : 0, left = len - (v.s || 0), lazy = ((v.id || 0)*2654435761 >>> 0)%5 === 0;
+    const turn = n && Math.abs(n.turn || 0) > 0.5 && Math.abs(n.turn) < 2.6 ? Math.sign(n.turn) : 0;
+    if (!lazy && !v.wreck && turn && (v.jc || left < 35)) v._ind = turn > 0 ? -2 : -1;
+    else if (!v.jc) v._ind = 0;
   }
   return r;
 };
