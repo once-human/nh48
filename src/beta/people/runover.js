@@ -212,9 +212,18 @@ window.__nhDown = (m, a, dt) => {
   if (a.dead && !a._lying && !(a._thrown && a._thrown.stagger)) a._lying = { ang: 0, to: Math.PI/2, side: Math.random() < 0.5 ? -1 : 1 };
   const d = a._lying; if (!d) return;
   if (!a.dead && !a._thrown && !d.up) { d.up = true; d.to = 0; }
-  const k = Math.min(1, (d.up ? 2.2 : 3.4)*dt); d.ang += (d.to - d.ang)*k*(d.up ? 1 : 1.4); d.ang = Math.min(d.ang, Math.PI/2);
-  if (d.up && d.ang < 0.02) { a._lying = null; return; }
   const [c, low] = DOWN[a.cow ? 'cow' : a.kind || 'dog'] || DOWN.dog, yaw = a.yaw || 0;
+  if (!d.up) {
+    // going over is worked out: tipped by the hit (d.w) and then by its own weight, slowly at first and faster as it
+    // goes (a body over its feet, g/h sin a), until its side meets the road; it doesn't bounce, it thumps and lies there
+    d.w = (d.w || 0) + 9.8/(c*1.6)*Math.sin(Math.max(d.ang, 0.04))*dt;
+    d.ang += d.w*dt;
+    if (d.ang >= Math.PI/2) { d.ang = Math.PI/2; d.w = 0; }
+  } else {
+    // getting up is muscle: legs under it, a heave, upright (quick for a dog, a cow takes her time)
+    const k = Math.min(1, 2.2*dt); d.ang += (d.to - d.ang)*k;
+    if (d.ang < 0.02) { a._lying = null; return; }
+  }
   _ax.set(Math.cos(yaw), 0, Math.sin(yaw)); _qa.setFromAxisAngle(_ax, d.ang*d.side);
   m.holder.quaternion.premultiply(_qa); _pv.set(0, c, 0).applyQuaternion(_qa);
   const w = Math.sin(Math.min(1, d.ang/(Math.PI/2))*Math.PI/2);
@@ -234,7 +243,7 @@ People.prototype.hitCow = function (a, V, S, player, sp, fx, fz) {
   const lift = small ? Math.min(2.4, kmh*0.03) : big || two ? 0 : Math.min(2.1, Math.max(0, (kmh - 42)*0.035)), away = small ? Math.min(sp*0.9, 16) : Math.min(sp*(lift > 0.5 ? 0.42 : 0.78), 12);
   a.dead = true; a.moving = false; a.v = 0; a.rest = 25; a._dead = dead;
   a._thrown = { x: a.x, z: a.z, y: 0, vy: lift, vx: fx*away, vz: fz*away, t: 0, V, S, H: heightOf(V, S), tall: big || TALL.has(baseOf(V.type || 'auto')), down, dead, up: down && !dead ? (small ? 4 : 15) : 0, stagger: !down };
-  if (down) a._lying = { ang: 0.01, to: Math.PI/2, side: -sd };
+  if (down) a._lying = { ang: 0.01, to: Math.PI/2, side: -sd, w: Math.min(small ? 7 : 3, kmh*(small ? 0.12 : 0.04)) };
   if (a.cow) this.events.push({ type: 'cowHit', a, speed: sp, x: a.x, z: a.z, how: dead ? 'dead' : down ? 'down' : 'hurt', kmh });
   else { a.hurtT = dead ? 0 : 8; this.events.push({ type: 'animalHit', a, dead, x: a.x, z: a.z }); }
 };

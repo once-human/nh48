@@ -99,11 +99,24 @@ function tick(TR, v, dt) {
   }
   if (S.lift) {
     S.liftT += dt;
-    // it's heavy: the first go gets it a third of the way and it hangs there, sagging back a bit, then the real heave
-    const k = Math.min(1, S.liftT/2.6), e1 = Math.min(1, k/0.28), e2 = Math.max(0, (k - 0.46)/0.54);
-    const e = 0.36*e1*e1*(3 - 2*e1) - 0.05*Math.min(1, Math.max(0, (k - 0.28)/0.18)) + 0.69*e2*e2*(3 - 2*e2);
-    S.th = Math.sign(S.th || 1)*LIE*(1 - e);
-    if (p && L && L.includes(p)) { p.chase = null; p.mode = 'stand'; p.v = 0; p.anim = 'pickup'; p.yaw = Math.atan2(v.z - p.z, v.x - p.x); p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw); }      // (bent to the bars, hauling)
+    // hauled up by a person, worked out: they heave, its weight pulls it back down (hardest when it's lying, nothing
+    // when it's upright: the way anything top-heavy is), and if they haven't the strength the first go gets it part way
+    // and it sags back; they let go, get their breath, take a better hold and heave harder. A strong one does it in one
+    // go, a big motorbike takes most people two or three; once it's most of the way up they just steady it upright.
+    if (!S.lp) { const h = (((p && p.id) || 7)*2654435761 >>> 0)/4294967296; S.lp = { str: 0.82 + h*0.55, w: 0, tries: 0, rest: 0, bt: 0, push: 0 }; S.mass = /^bike/.test(v.type) ? 1.3 : v.type === 'cycle' ? 0.35 : 1; }
+    const Lp = S.lp; let a = Math.abs(S.th);
+    if (Lp.rest > 0) { Lp.rest -= dt; Lp.push = Math.max(0, Lp.push - dt*4); }
+    else {
+      Lp.bt += dt; Lp.push = Math.min(1, Lp.bt/0.4);
+      if (Lp.bt > 1.5 && a > 0.3) { Lp.bt = 0; Lp.rest = 0.5 + Math.random()*0.5; Lp.tries++; Lp.str *= 1.14; if (p) window.__nhNudge?.(p, -p.hx*0.8, -p.hz*0.8); }
+    }
+    const grav = 9.8/0.62*Math.sin(a)*S.mass, musc = a > 0.3 ? Lp.push*Lp.str*15.8 : 0;
+    Lp.w += (musc - grav - Lp.w*2.5)*dt;
+    if (a < 0.3) Lp.w = Math.max(Lp.w*0.9, a*2.5);                     // (steadying it the last of the way)
+    a = Math.max(0, Math.min(LIE, a - Lp.w*dt)); if (a >= LIE) Lp.w = Math.max(0, Lp.w);
+    S.th = Math.sign(S.th || 1)*a;
+    const k = a < 0.03 || S.liftT > 14 ? 1 : 0;
+    if (p && L && L.includes(p)) { p.chase = null; p.mode = 'stand'; p.v = 0; p.anim = a > 0.45 && Lp.push > 0.2 ? 'pickup' : 'idle'; p.yaw = Math.atan2(v.z - p.z, v.x - p.x); p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw); }      // (bent to it, hauling; or stood, getting their breath)
     if (k >= 1) {
       // on it and off: the rider's back on the machine (the baked one), the person who walked to it gone
       if (p && L && L.includes(p)) G.people.remove(p);
