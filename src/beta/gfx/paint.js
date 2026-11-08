@@ -42,6 +42,8 @@ export const PU = {
   uTime: GU.uTime, uNight: GU.uNight, uWindowLit: GU.uWindowLit, uShopsOpen: GU.uShopsOpen, uWet: GU.uWet,
   uReal: { value: 0 }, uMarks: { value: 1 }, uTaps: { value: 2 }, uSoft: { value: 1 },
   tLamp: { value: null }, lampC: { value: new THREE.Vector4(0, 0, 1/256, 0) }, lampY: { value: 0 }, headP: { value: new THREE.Vector4() }, headD: { value: new THREE.Vector4(1, 0, 0, .85) }, headS: { value: new THREE.Vector4() },
+  // the lit street lamps nearest the camera, for their reflections in a wet road: where the head is, how bright
+  wetL: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) },
 };
 // the light of lamps and your own headlight or torch on a surface (gfx/lamps.js keeps it up to date)
 export const LAMP = `uniform sampler2D tLamp; uniform vec4 lampC, headP, headD, headS; uniform float lampY;
@@ -168,7 +170,7 @@ const FS = NOISE + `
 uniform vec3 sunDir, sunCol, shadeCol, sunLc, skyCol, fogCol; uniform float fogDensity, dayK;
 uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform float shadowTexel, shadowOn, pScale, dpr;
 uniform sampler2D tNoise;
-uniform float uTime, uNight, uWindowLit, uShopsOpen, uWet;
+uniform float uTime, uNight, uWindowLit, uShopsOpen, uWet; uniform vec4 wetL[12];
 ${LAMP}
 uniform vec4 uStyle[15], uStyle2[15];
 in vec3 vW; in vec3 vN; in vec3 vC; flat in float vK; in vec2 vA; in vec2 vU; in float vZ;
@@ -431,6 +433,22 @@ void main(){
     float pud = smoothstep(.58, .64, nR(w.xz*.22 + 3.) + (k == 20 || k == 28 ? .08 : 0.));
     c *= 1. - .3*uWet;
     c = mix(c, skyCol*(.55 + .2*nR(w.xz*vec2(.5, 3.))), pud*uWet*.75);
+    // and after dark the street lamps run in it: each one's reflection a long streak down the road toward you, from
+    // just short of where a mirror would show it out to the foot of the pole, broken up where it's only damp
+    if (lampC.w > 0.) {
+      vec2 cp = cameraPosition.xz, rel = w.xz - cp; float ch = max(cameraPosition.y - w.y, .3), g = 0.;
+      for (int i = 0; i < 12; i++) {
+        vec4 L = wetL[i]; if (L.w <= 0.) break;
+        vec2 d = L.xz - cp; float len = length(d); if (len < .5) continue; d /= len;
+        float al = dot(rel, d), lat = abs(rel.x*d.y - rel.y*d.x);
+        float m = len*ch/(ch + max(L.y - w.y, .5));                       // where a perfect mirror would put it
+        float t = (al - m)/(al < m ? .35*m + .6 : (len - m)*.6 + .6);
+        float wd = .12 + .028*al;
+        g += L.w*exp(-t*t*2.)*exp(-lat*lat/(wd*wd))/(1. + len*.035);
+      }
+      float br = mix(.45, 1., pud)*(.55 + .45*nR(w.xz*vec2(2.5, .7) + 7.));
+      c += vec3(1., .72, .42)*min(g, 1.6)*lampC.w*uWet*br;
+    }
   }
   // the marks, sized for the screen: far surfaces get the same strokes drawn bigger (two sizes blended)
   float lv = max(log2(max(vZ/pScale*3.*dpr/.016, 1e-3)), 0.), i0 = floor(lv), fr = fract(lv), k0 = exp2(i0), k1 = k0*2.;

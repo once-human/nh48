@@ -84,6 +84,26 @@ export class Lamps {
     for (const c of built) { const S = c.shutters; if (!S) continue; const a = S.im.instanceMatrix.array; S.list.forEach((r, i) => { if (isUp(a, i)) { n++; if (fn) fn(r); } }); }
     return n;
   }
+  // for a wet road: the dozen lit lamps nearest the camera out in front of it, their heads about 7.5 m up (one right
+  // beside you only lights your feet, and one behind you can't be seen in it at all). Picked again every few metres
+  // the camera moves, or a few times a second as it turns
+  wetLamps(night) {
+    const cam = this.G.camera, ls = this.G.W.lampPositions || [], t = performance.now(), out = PU.wetL.value; if (!cam) return;
+    const cx = cam.position.x, cz = cam.position.z;
+    if (t < (this.wT || 0) && Math.hypot(cx - this.wx, cz - this.wz) < 3) return;
+    this.wT = t + 250; this.wx = cx; this.wz = cz;
+    cam.getWorldDirection(p); const fl = Math.hypot(p.x, p.z) || 1, fx = p.x/fl, fz = p.z/fl;
+    const near = [];
+    for (const l of ls) {
+      const dx = l[0] - cx, dz = l[1] - cz, d2 = dx*dx + dz*dz; if (d2 > 6400 || d2 < 25 || dx*fx + dz*fz < Math.sqrt(d2)*0.35) continue;
+      const h1 = ((l[0]*7.3 + l[1]*3.1) % 1 + 1) % 1, h2 = ((l[0]*2.9 - l[1]*5.7) % 1 + 1) % 1;
+      if (night < 0.03 + h2*0.5) continue;
+      near.push([d2, l[0], l[1], (170 + h1*85)/255]);
+    }
+    near.sort((a, b) => a[0] - b[0]);
+    const surf = this.G.W.surf;
+    for (let i = 0; i < out.length; i++) { const q = near[i]; if (q) out[i].set(q[1], (surf ? surf.height(q[1], q[2]) : 0) + 7.5, q[2], q[3]); else out[i].w = 0; }
+  }
   // shops open and shut with the clock, and new streets load in: look every couple of seconds
   shopsMoved(night) {
     const t = performance.now(); if (night <= .01 || t < this.shopT) return false;
@@ -99,6 +119,7 @@ export class Lamps {
     if (night > .01 && (flick || step !== this.nStep || Math.hypot(cx - this.x, cz - this.z) > STEP || (G.W.lampPositions || []).length !== this.count || ((G.W.M && G.W.M.pins) || []).length !== this._pn || this.shopsMoved(night))) { this.nStep = step; this.draw(Math.round(cx/4)*4, Math.round(cz/4)*4); }
     C.w = (G.interiors && G.interiors.inside) ? 0 : night;
     PU.lampY.value = F.y || 0;
+    if (night > .01 && GU.uWet.value > .02) this.wetLamps(night);
     // your own light: whichever of the two is on, as the game aims it
     // (a bicycle has none; a car, a bus or a tempo two, one from each housing; a two-wheeler or an auto one)
     const S = !P.onFoot && P.spec, cycle = S && S.name === 'Bicycle';
