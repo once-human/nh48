@@ -8,6 +8,7 @@ import { Vehicle, knock } from '@orig/vehicles/vehicle.js';
 import { Pilot } from '@orig/game/pilot.js';
 import { PlayerAuto } from '@orig/vehicles/player.js';
 import { promote, toughOf } from './damage.js';
+import { tryRoll, kickRoll } from './rollover.js';
 
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const now = () => performance.now()/1000, G0 = () => window.__nhAskG;
@@ -73,12 +74,23 @@ Traffic.prototype.step = function (v, dt) {
   return step.call(this, v, dt);
 };
 // a real car thrown by a blow: it slides on its locked tyres and spins, stopped by whatever it meets
-const moving = new Set();
-function throwCar(v, st, vx, vz, w) { v._c = { vx, vz, w, st }; moving.add(v); }
+const moving = new Set(), late = [];
+// (or, hit hard enough from the side, it goes over: beta/vehicles/rollover.js; already over or going, it's moved on as it lies)
+function throwCar(v, st, vx, vz, w) {
+  if (v._rb && !v.spec.two) { v._st = st; kickRoll(v, vx, vz, w); return; }
+  if (!v.spec.two && Math.hypot(vx, vz) > 3 && tryRoll(v, vx, vz, w)) { v._st = st; moving.delete(v); return; }
+  v._c = { vx, vz, w, st }; moving.add(v);
+}
 const upd = Traffic.prototype.update;
 Traffic.prototype.update = function (dt, ...rest) {
   const r = upd.call(this, dt, ...rest);
-  if (moving.size && dt > 0) for (const v of moving) { if (!v.root || !v.root.parent) { moving.delete(v); v._c = null; continue; } coast(this, v, dt); }
+  if (moving.size && dt > 0) for (const v of moving) { if (!v.root || !v.root.parent || !v._c) { moving.delete(v); v._c = null; continue; } coast(this, v, dt); }
+  // (what it was thrown into hard enough is a real car now, thrown in its turn)
+  if (late.length) { const G = G0(); for (const [o, vx, vz, w, cx, cz, dv] of late.splice(0)) {
+    if (!G || !this.list.includes(o)) continue;
+    const v = promote(G, o), st = v && G.player.dropped.find(q => q.veh === v)?.st;
+    if (st) { const sp = Math.hypot(vx, vz) || 1, w2 = struck(v, cx, cz, vx/sp, vz/sp, dv, 1000); throwCar(v, st, vx, vz, w + w2*0.8); }
+  } }
   return r;
 };
 function coast(TR, v, dt) {
@@ -104,14 +116,22 @@ function coast(TR, v, dt) {
   // another vehicle in the traffic is as solid as a wall: it stops against it and shoves it on
   { const me = circles(v.x, v.z, Math.cos(v.th), Math.sin(v.th), v.spec.L, v.spec.W), y = v.y || 0;
     solid(TR, v, me, q, y, (dx, dz) => { v.x += dx; v.z += dz; }); }
-  // what it's thrown into goes too
+  // what it's thrown into goes too (thrown hard into a car, that car's thrown: a real one, and it can go over in its turn)
   if (sp > 4) TR.near(v.x, v.z, v.spec.L/2 + 1.5, (o) => {
     if (!o.T || o.isPlayer || o.parked || o._hitT > now() || Math.hypot(o.x - v.x, o.z - v.z) > (v.spec.L + o.T.L)/2*0.8) return;
     o._hitT = now() + 0.8;
+    const mv = v.spec.mass || 1100, mo = o.T.mass || 1100, k = 2*mv/(mv + mo)*0.88;
     if (o.T.two && !o.fallen) { o._hit = { vx: q.vx*0.7, vz: q.vz*0.7 }; o.fallen = 3.5; }
+    else if (!o.T.two && sp*k >= THROWN && !o.service && !o.wreck && !o.hideBody && !(o.argue > 0) && !((o.y || 0) > 0.5)) late.push([o, (o.hx || 0)*(o.v || 0) + q.vx*k*0.7, (o.hz || 0)*(o.v || 0) + q.vz*k*0.7, q.w*0.3, (o.x + v.x)/2, (o.z + v.z)/2, sp*k]);
     else if (!o.T.two) { o.v = 0; o._sh = { vx: q.vx*0.5, vz: q.vz*0.5 }; o.angry = 6; }
     q.vx *= 0.65; q.vz *= 0.65;
   });
+  // sliding sideways into a kerb: its tyres catch on it and it trips
+  { const lat = q.vx*-Math.sin(v.th) + q.vz*Math.cos(v.th);
+    if (Math.abs(lat) > 4.5 && W.surf) {
+      const s = Math.sign(lat), px = v.x - Math.sin(v.th)*s*(v.spec.W/2 + 0.12), pz = v.z + Math.cos(v.th)*s*(v.spec.W/2 + 0.12);
+      if (W.surf.height(px, pz) - W.surf.height(v.x, v.z) > 0.09 && tryRoll(v, q.vx, q.vz, q.w, { trip: 0.9 + Math.random()*0.1 })) { v._st = q.st; v._c = null; moving.delete(v); return; }
+    } }
   const st = q.st; st.x = v.x; st.z = v.z; st.hx = Math.cos(v.th); st.hz = Math.sin(v.th); TR.staticsT = 0;
   v.sync && v.sync(0);
   if (Math.hypot(q.vx, q.vz) < 0.08 && Math.abs(q.w) < 0.05) { v._c = null; moving.delete(v); }
