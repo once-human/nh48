@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { ColorBuilder } from '@orig/world/geo.js';
 import { buildProto as gameProto, compose, InstancedSet } from '@orig/world/props.js';
+import { smash } from './smash.js';
 
 const add0 = ColorBuilder.prototype.addGeo;
 ColorBuilder.prototype.addGeo = function (geo, m, ...rest) { return geo.userData?.lod ? geo.userData.lod(m) : add0.call(this, geo, m, ...rest); };
@@ -625,10 +626,13 @@ function bannerFrame() {
   return finish();
 }
 
+// the same model with nothing lit
+function unlit(g) { const c = g.clone(); if (c.attributes.glow) { c.setAttribute('glow', c.attributes.glow.clone()); c.attributes.glow.array.fill(0); } return c; }
 export function buildProto() {
   const P = gameProto();
   P.stallFar = [P.stall0, P.stall1, P.stall2, P.stall3, P.stall4, P.stall5];
   P.lamp = lamp();
+  P.lampDead = unlit(P.lamp);       // (shot out, or down in the road: world/smash.js)
   P.pole = pole();
   P.signal = signal();
   P.bus = shelter();
@@ -655,7 +659,8 @@ export function stallSets(W) {
     P['stall' + k].userData.lod = (m) => {      // (a chunk can be built again after it's been let go)
       const e = m.elements, id = Math.round(e[12]*10) + ',' + Math.round(e[14]*10);
       if (seen.has(id)) return;
-      seen.add(id); n.add(e[12], e[14], m); f.add(e[12], e[14], m);
+      seen.add(id);
+      smash(W).reg('stall' + k, e[12], e[14], Math.atan2(e[8], e[0]), { items: [[n, n.add(e[12], e[14], m)], [f, f.add(e[12], e[14], m)]] });
       W._propX = undefined;
     };
   });

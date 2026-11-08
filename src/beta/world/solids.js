@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { signedArea, offsetRing } from './geom.js';
 import { Collision } from '@orig/world/mapdata.js';
+import { smash } from './smash.js';
 
 const CELL = 0.06, Y0 = 0.05, Y1 = 1.7;
 const cache = new Map();
@@ -69,16 +70,30 @@ function footprint(geo) {
   return out;
 }
 
-// put a model's footprint into the collision, placed as compose(x, y, z, ry) places it
+// put a model's footprint into the collision, placed as compose(x, y, z, ry) places it; what went in (so it can be
+// switched off when the thing's knocked down, world/smash.js)
 function place(C, geo, x, z, ry, kind = 2) {
-  const cs = Math.cos(ry), sn = Math.sin(ry), W = (lx, lz) => [x + lx*cs + lz*sn, z - lx*sn + lz*cs];
+  const cs = Math.cos(ry), sn = Math.sin(ry), W = (lx, lz) => [x + lx*cs + lz*sn, z - lx*sn + lz*cs], out = [];
   for (const f of footprint(geo)) {
-    if (f.length === 3) { const [cx, cz] = W(f[0], f[1]); C.addCircle(cx, cz, f[2], kind); continue; }
+    if (f.length === 3) { const [cx, cz] = W(f[0], f[1]); out.push(C.addCircle(cx, cz, f[2], kind)); continue; }
     const [x0, z0, x1, z1] = f;
     if (x1 - x0 < 0.02 || z1 - z0 < 0.02) continue;
-    C.addRing([W(x0, z0), W(x1, z0), W(x1, z1), W(x0, z1)].flat(), kind);
+    C.addRingR([W(x0, z0), W(x1, z0), W(x1, z1), W(x0, z1)].flat(), kind, out);
   }
+  return out;
 }
+// a segment as it went in: the game's addSeg doesn't hand it back, but it's the last one in the cell of its far end
+Collision.prototype.addSegR = function (ax, az, bx, bz, kind = 0) {
+  this.addSeg(ax, az, bx, bz, kind);
+  const l = this.segs.get(this.key(Math.floor(bx/this.cell), Math.floor(bz/this.cell)));
+  return l && l[l.length - 1];
+};
+Collision.prototype.addRingR = function (pts, kind = 0, out = []) {
+  const n = pts.length;
+  for (let k = 0; k + 3 < n; k += 2) out.push(this.addSegR(pts[k], pts[k + 1], pts[k + 2], pts[k + 3], kind));
+  out.push(this.addSegR(pts[n - 2], pts[n - 1], pts[0], pts[1], kind));
+  return out;
+};
 
 // what the game calls (propsChunk.js and tiles.js, patched in tools/build-beta.mjs)
 export function makeSolids(W) {
@@ -87,7 +102,8 @@ export function makeSolids(W) {
     stall(s, C) {
       const P = W.proto, geo = P && (P['stall' + s[3]] || P.stall0);
       if (!geo) { C.addCircle(s[0]/100, s[1]/100, 0.9, 2); return; }
-      place(C, geo, s[0]/100, s[1]/100, Math.atan2(Math.cos(s[2]), Math.sin(s[2])));
+      const ry = Math.atan2(Math.cos(s[2]), Math.sin(s[2])), cols = place(C, geo, s[0]/100, s[1]/100, ry);
+      smash(W).reg('stall' + (P['stall' + s[3]] ? s[3] : 0), s[0]/100, s[1]/100, ry, { cols });
     },
     // a bus shelter [x, z, a] (cm), drawn at compose(x, 0.15, z, atan2(cos a, sin a))
     bus(b, C) {
@@ -143,7 +159,28 @@ Collision.prototype.addPoly = function (pts) {
     const k = this.key(i, j); let l = M.get(k); if (!l) M.set(k, l = []); l.push(q);
   }
 };
-const res0 = Collision.prototype.resolve;
+// (the game's own, but a wall or post that's been knocked down (.off) isn't there)
+function res0(x, z, r) {
+  const c = this.cell;
+  let best = null;
+  const i0 = Math.floor((x - r)/c), i1 = Math.floor((x + r)/c), j0 = Math.floor((z - r)/c), j1 = Math.floor((z + r)/c);
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+    const key = this.key(i, j), ls = this.segs.get(key), lc = this.circ.get(key);
+    if (ls) for (const s of ls) {
+      if (s.off) continue;
+      const dx = s.bx - s.ax, dz = s.bz - s.az, L2 = dx*dx + dz*dz || 1e-9;
+      let t = ((x - s.ax)*dx + (z - s.az)*dz)/L2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const ex = x - (s.ax + dx*t), ez = z - (s.az + dz*t), d = Math.hypot(ex, ez);
+      if (d < r && (!best || r - d > best.depth)) best = { nx: d > 1e-6 ? ex/d : 0, nz: d > 1e-6 ? ez/d : 1, depth: r - d, kind: s.kind };
+    }
+    if (lc) for (const q of lc) {
+      if (q.off) continue;
+      const ex = x - q.x, ez = z - q.z, d = Math.hypot(ex, ez), rr = r + q.r;
+      if (d < rr && (!best || rr - d > best.depth)) best = { nx: d > 1e-6 ? ex/d : 1, nz: d > 1e-6 ? ez/d : 0, depth: rr - d, kind: q.kind };
+    }
+  }
+  return best;
+}
 Collision.prototype.resolve = function (x, z, r, out) {
   const best = res0.call(this, x, z, r, out), M = this.polys;
   if (!M) return best;

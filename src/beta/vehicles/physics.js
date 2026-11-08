@@ -70,7 +70,7 @@ P.contact = function () {
   for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
     const key = C.key(i, j), ls = C.segs.get(key), lc = C.circ.get(key);
     if (ls) for (const s of ls) {
-      if (seen.has(s)) continue; seen.add(s);
+      if (s.off || seen.has(s)) continue; seen.add(s);
       const [x0, z0] = loc(s.ax, s.az), [x1, z1] = loc(s.bx, s.bz), m = boxSeg(a, b, x0, z0, x1, z1);
       if (m && (!best || m.d > best.d)) { const [lx, lz] = where(m.ux, m.uz, a, b, x0, x1, z0, z1); best = { ...m, kind: s.kind, lx, lz }; }
     }

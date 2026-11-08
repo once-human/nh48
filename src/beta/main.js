@@ -107,6 +107,7 @@ import './game/sfx.js';           // the small sounds of doing things: switches,
 import './game/garagefx.js';      // the garage at work: the wrench, the spray gun, the hammer, a test rev, the horn tried out
 import './game/eat.js';           // what you buy to eat or drink, in your hand: the cutting glass, the vada pav, the plate
 import './game/popless.js';       // out of a vehicle with no scene for it: eased from the seat, not a jump
+import './game/wreckage.js';         // everything in the street can be knocked down: by what you drive, a kick, a round
 import { PU } from './gfx/paint.js';
 import { PlayerAuto } from '@orig/vehicles/player.js';
 import { Traffic } from '@orig/traffic/traffic.js';

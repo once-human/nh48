@@ -319,7 +319,9 @@ Arms.prototype.use = function (...args) {
   for (const q of Pl.dropped || []) { const v = q.veh; if (!v || v.dead || !v.root || !v.root.visible) continue; const t = boxHit(_o, _d, v.x, v.y || 0, v.z, v.th, v.spec.L + 0.2, v.spec.W + 0.2, 3.2); if (t >= 0 && t < bt) { bt = t; best = { v }; } }
   const T = G.traffic;
   if (T) T.near(F.x, F.z, W.range + 4, (o) => { if (!o.alive || o.wreck || o.isPlayer || !o.T) return; const t = boxHit(_o, _d, o.x, o.y || 0, o.z, Math.atan2(o.hz ?? 0, o.hx ?? 1), o.T.L, o.T.W, tall(o)); if (t >= 0 && t < bt) { bt = t; best = { o }; } });
+  if (best && G._shotStop != null && bt > G._shotStop) best = null;     // (something in the street took it first: world/smash.js)
   if (!best) return use.apply(this, args);
+  G._shotHitT = bt;
   const hx = _o.x + _d.x*bt, hz = _o.z + _d.z*bt, dv = Math.hypot(hx - F.x, hz - F.z);
   if (dv > W.range) return use.apply(this, args);
   // whoever's behind it is safe: the vehicle takes the round (they're out of the line while the shot's worked out)

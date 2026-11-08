@@ -29,7 +29,9 @@ export class Lamps {
     const d = this.d, ls = this.G.W.lampPositions || [], night = GU.uNight.value; d.fill(0);
     this.x = cx; this.z = cz; this.count = ls.length;
     const x0 = cx - SIZE/2, z0 = cz - SIZE/2, k = N/SIZE, r = R*k, r2 = r*r;
+    this.G.W._lampsDirty = false;
     for (const l of ls) {
+      if (l.out) continue;                      // (knocked down or shot out: world/smash.js)
       const u = (l[0] - x0)*k, v = (l[1] - z0)*k; if (u < -r || v < -r || u > N + r || v > N + r) continue;
       // no two lamps quite the same, and they don't all come on together: one street's sooner than the next, and the odd
       // old tube can't make up its mind
@@ -95,6 +97,7 @@ export class Lamps {
     cam.getWorldDirection(p); const fl = Math.hypot(p.x, p.z) || 1, fx = p.x/fl, fz = p.z/fl;
     const near = [];
     for (const l of ls) {
+      if (l.out) continue;
       const dx = l[0] - cx, dz = l[1] - cz, d2 = dx*dx + dz*dz; if (d2 > 6400 || d2 < 25 || dx*fx + dz*fz < Math.sqrt(d2)*0.35) continue;
       const h1 = ((l[0]*7.3 + l[1]*3.1) % 1 + 1) % 1, h2 = ((l[0]*2.9 - l[1]*5.7) % 1 + 1) % 1;
       if (night < 0.03 + h2*0.5) continue;
@@ -116,7 +119,7 @@ export class Lamps {
     // (redrawn too as dusk comes on, lamp by lamp, and a few times a second if a tired tube's flickering near you)
     let flick = false;
     if (night > .3 && tick > (this.flT || 0)) { this.flT = tick + 120 + Math.random()*520; for (const l of G.W.lampPositions || []) if (Math.abs(l[0] - cx) < 50 && Math.abs(l[1] - cz) < 50 && ((l[0]*2.9 - l[1]*5.7) % 1 + 1) % 1 > 0.93) { flick = true; break; } }
-    if (night > .01 && (flick || step !== this.nStep || Math.hypot(cx - this.x, cz - this.z) > STEP || (G.W.lampPositions || []).length !== this.count || ((G.W.M && G.W.M.pins) || []).length !== this._pn || this.shopsMoved(night))) { this.nStep = step; this.draw(Math.round(cx/4)*4, Math.round(cz/4)*4); }
+    if (night > .01 && (flick || G.W._lampsDirty || step !== this.nStep || Math.hypot(cx - this.x, cz - this.z) > STEP || (G.W.lampPositions || []).length !== this.count || ((G.W.M && G.W.M.pins) || []).length !== this._pn || this.shopsMoved(night))) { this.nStep = step; this.draw(Math.round(cx/4)*4, Math.round(cz/4)*4); }
     C.w = (G.interiors && G.interiors.inside) ? 0 : night;
     PU.lampY.value = F.y || 0;
     if (night > .01 && GU.uWet.value > .02) this.wetLamps(night);
