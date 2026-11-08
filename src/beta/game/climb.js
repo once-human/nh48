@@ -73,6 +73,6 @@ Pilot.prototype.updateFoot = function (dt, input, ...rest) {
   if (!F || !F.air || F.climb || F.swim || this.downT > 0 || !input || !input.key || !input.key('Space') || F.vy < -2.5) return out;
   const fx = Math.cos(F.yaw), fz = Math.sin(F.yaw);
   const wall = this.W.collision.resolve(F.x + fx*0.5, F.z + fz*0.5, 0.32);
-  if (wall && wall.kind === 5 && (fx*-wall.nx + fz*-wall.nz) > 0.6) { F.air = false; F.vy = 0; this.startClimb(-wall.nx, -wall.nz); }
+  if (wall && wall.kind === 5 && (fx*-wall.nx + fz*-wall.nz) > 0.6) { F.air = false; F.vy = 0; this.startClimb(-wall.nx, -wall.nz, this.W.surf.height(F.x, F.z) + 1.8); }   // (the wall's top from the ground, not from where you are in the air)
   return out;
 };
