@@ -123,15 +123,35 @@ function wheelOf(v) {
   const piv = v.cockpit.group.children.find(o => o.type === 'Group' && o.children.length === 1 && o.children[0].type === 'Group' && o.children[0].children.some(c => c.isMesh));
   return (v._wheel = piv ? piv.children[0] : null);
 }
+// Push-pull, the way the driving school teaches it: each hand holds its own place on the rim and turns with it, but
+// only round its own side of the wheel (the hands never cross); at the end of its side the rim slides through it, the
+// fingers easing a little. Back near the middle the rim slides through both to ten and two again.
+const BASE = [-1.0, 1.0], LO = 0.18, HI = 2.55;
+function hands(H, th) {
+  const now = performance.now(), S = H._hw || (H._hw = { phi: BASE.slice(), t: now });
+  const dt = Math.min(0.05, Math.max(0, (now - S.t)/1000)); S.t = now;
+  const out = [];
+  for (const i of [0, 1]) {
+    const s = i ? 1 : -1, a = (S.phi[i] - th)*s;     // (how far round its own side the hand's got, the wheel's turn taken out)
+    const c = Math.min(HI, Math.max(LO, a)), slid = c !== a;
+    S.phi[i] = c*s + th;
+    // straight again: back to ten and two along the rim
+    if (Math.abs(th) < 0.4) { const d = BASE[i] - S.phi[i]; S.phi[i] += Math.sign(d)*Math.min(Math.abs(d), 2.2*dt); }
+    out.push({ ang: S.phi[i], r: 0.2, z: 0.055, g: slid ? 0.75 : 1 });
+  }
+  return out;
+}
 function atWheel(H, v) {
   const spin = wheelOf(v); if (!spin) return;
   const m = v.tilt.matrixWorld, R = H.root;
-  // the wrists just behind the rim (toward you), at ten and two on the wheel as it's turned
+  // the wrists just behind the rim (toward you), where each hand has hold of the wheel as it's turned
   spin.updateWorldMatrix(true, false);
-  for (const i of [0, 1]) _g[i].set((i ? 1 : -1)*0.2*Math.sin(1.0), 0.2*Math.cos(1.0), 0.055).applyMatrix4(spin.matrixWorld);
+  const hw = hands(H, spin.rotation.z);
+  for (const i of [0, 1]) _g[i].set(hw[i].r*Math.sin(hw[i].ang), hw[i].r*Math.cos(hw[i].ang), hw[i].z).applyMatrix4(spin.matrixWorld);
   _r.set(0, 0, 1).transformDirection(m);
-  // (which is your right hand's: the one further to the car's right, the wheel turned or not)
-  const rIs1 = _g[1].dot(_r) >= _g[0].dot(_r), wr = rIs1 ? [_g[0], _g[1]] : [_g[1], _g[0]];
+  // (which is your right hand's: the one that starts on the car's right side of the rim, wherever it's got to since,
+  // so the arms never swap when they cross over the top)
+  const th = spin.rotation.z, rIs1 = _sh.set(Math.sin(1 + th), Math.cos(1 + th), 0).applyMatrix4(spin.matrixWorld).dot(_r) >= _fw.set(Math.sin(th - 1), Math.cos(th - 1), 0).applyMatrix4(spin.matrixWorld).dot(_r), wr = rIs1 ? [_g[0], _g[1]] : [_g[1], _g[0]], gk = rIs1 ? [hw[0].g, hw[1].g] : [hw[1].g, hw[0].g];
   const u = R.getObjectByName('upperarm_l'), l = R.getObjectByName('lowerarm_l'), h = R.getObjectByName('hand_l'); if (!u || !l || !h) return;
   H.holder.updateMatrixWorld(true);
   _a.setFromMatrixPosition(u.matrixWorld); _b.setFromMatrixPosition(l.matrixWorld); _c.setFromMatrixPosition(h.matrixWorld);
@@ -148,7 +168,7 @@ function atWheel(H, v) {
     const s = sd === 'r' ? 1 : -1;
     _pole.set(-0.3, -1, s*0.6).transformDirection(m);
     ikArm(H, sd, wr[i], _pole, 1);
-    grip(H, sd, 1);
+    grip(H, sd, gk[i]);         // (eased a little while the rim slides through it)
   }
   H._fresh = false;
 }
