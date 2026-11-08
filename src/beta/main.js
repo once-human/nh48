@@ -72,6 +72,7 @@ import './draw/alive.js';
 import './people/bodies.js';        // people, cows and dogs take up room: round each other, vehicles, poles, you
 import './people/around.js';        // whatever's in the way, people go round it
 import './people/runover.js';        // being hit by what you're driving, and being driven over
+import './people/grudge.js';         // whoever you hit goes for the body that hit them (Vetal: not for you in someone else)
 import './people/doors.js';          // into a shop and out again through its door
 import './draw/falls.js';
 import './vehicles/throwoff.js';     // off your own two-wheeler in a crash, and it goes over on its side

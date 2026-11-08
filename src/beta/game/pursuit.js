@@ -42,6 +42,20 @@ Police.prototype.hostIn = function () {
     desc: L && L.desc, calls: new Set(L ? L.calls : []), sms: new Set(this.sms), dues: this.dues ? this.dues.length : 0, inc: new Set(G.brain ? G.brain.inc : []),
     pmem: ppl && ppl.mem ? new Map([...ppl.mem].map(([k, v]) => [k, { ...v }])) : null, karma: life ? life.karma : undefined, respect: life ? life.respect : undefined };
   if (G.rep) G.rep.deed = () => {};
+  // in this body nobody knows you: whatever the street had against you is your old body's, kept above and put back when
+  // you come out. Anyone fighting you or after you saw who did it, and it wasn't this one: off your own body, they saw you
+  // drop where you stood, and stand over it staring; off someone else, hostOut has already sent them after that one
+  if (ppl) {
+    const Pl = G.player, body = ppl.list.find(q => q && q._vetalBody);
+    for (const q of ppl.list) {
+      if (!q || q.cop || !(q.foe === Pl || q.chase === Pl)) continue;
+      if (q.foe === Pl) ppl.endFight(q);
+      q.chase = null; q.grudge = 0; q.angry = 0; q.youFirst = false; q.angryAtYou = false;
+      if (body) ppl.watch(q, body.x, body.z, 8 + Math.random()*8); else ppl.backToPath(q);
+    }
+    if (ppl.brawl) ppl.brawl.active = 0;
+    if (ppl.mem) ppl.mem = new Map();
+  }
 };
 Police.prototype.hostOut = function (p) {
   const B = this._host; if (!B) return;
