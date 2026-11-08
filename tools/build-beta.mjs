@@ -174,6 +174,8 @@ const PATCHES = {
   [S('ui/hud.js')]: [["else if (e.code === 'Enter') { e.preventDefault(); vis()[this.tSel || 0]?.click(); }", "else if (e.code === 'Enter' && !e.repeat && performance.now() - (this.game._titleAt || 0) > 500) { e.preventDefault(); vis()[this.tSel || 0]?.click(); }"], ["this.nerd = el('div', 'h nerd', 'E jhola · J diary · F3 stats');", "this.nerd = el('div', 'h nerd', 'Q jhola · I phone · J diary · F3 stats');"]],
   [S('game/guide.js')]: [["['F', 'Interact, enter, get in or out'], ['E', 'Jhola'],", "['F', 'Walk in, counters, pet'], ['E', 'Get in or out of a vehicle'], ['T', 'Talk to someone'], ['Q', 'Jhola'],"], ["['T', 'Phone'],", "['I', 'Phone'],"], ["['V', 'Camera (anytime)'],", "['C', 'First or third person'],"]],
   [S('game/pilot.js')]: [
+    // (which vehicle it was, for a hit and run: beta/game/wanted.js)
+    ["this.events.push({ type: 'gotHit', speed: o.v, who: o.type });", "this.events.push({ type: 'gotHit', speed: o.v, who: o.type, o });"],
     // the walk to a door: a long way round the car you jog (beta/vehicles/route.js)
     ["(pup && c[0] === 'AltLeft')", "(pup && !pup.jog && c[0] === 'AltLeft')"],
     // you go over with the auto when it goes over (and up with it on two wheels)
@@ -481,6 +483,8 @@ const PATCHES = {
   // instead of following politely; a vehicle counts as caught when you're slow beside one of them (or boxed in by two),
   // not only at a crawl; on foot they run as fast as a fit constable does, and keep it up longer
   [S('game/police.js')]: [
+    // (a unit sent after someone else: beta/game/wanted.js builds on the same rider and bike)
+    ["class Marshal {", "export class Marshal {"],
     // they look for you a good while longer before easing off, and there are more of them from the first star up
     ["const SEARCH = [0, 40, 60, 90, 120, 160];", "const SEARCH = [0, 70, 110, 170, 260, 400];"],
     ["wantBikes = [0, 1, 2, 2, 3, 4][H]", "wantBikes = [0, 2, 3, 3, 4, 5][H]"],

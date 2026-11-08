@@ -60,7 +60,8 @@ import './game/vault.js';          // Space at a car: a hand on the bonnet, the 
 import './game/crouch.js';
 import './game/mirror.js';
 import './world/mirrors.js';         // the shops' mirrors reflect          // a pose in a shop's mirror, a different one each time          // Ctrl standing still: crouch (on the move it's still the roll)
-import './game/pursuit.js';         // a cop who saw you go into a shop comes in after you
+import './game/pursuit.js';
+import './game/wanted.js';          // someone else wanted: a hit and run on you sends a marshal (and a jeep) after the vehicle         // a cop who saw you go into a shop comes in after you
 import './world/staff.js';
 import './world/walkin.js';
 import './world/busy.js';
