@@ -113,6 +113,8 @@ const PATCHES = {
     ["L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }", "if (!this._upSet) { this._upSet = true; L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; } }"],
   ],
   [S('vehicles/vehicle.js')]: [
+    // (the drive mode, for the cluster: beta/vehicles/brakes.js names it)
+    ["this.cockpit.update(this.steer, Math.abs(this.v) * 3.6, this.gear, this.rpm);", "this.cockpit.update(this.steer, Math.abs(this.v) * 3.6, this.gear, this.rpm, 0, this._modeName || '');"],
     // the moving bits of the body (wipers, the rear wing) by their vertices, for beta/vehicles/details.js
     ["this.wheels = m.wh || [];", "this.wheels = m.wh || []; this.moving = m.moving || null;"],
     // the nose goes down under brakes and up under power: a spring on the body now (beta/vehicles/details.js), so here
@@ -378,6 +380,12 @@ const PATCHES = {
   // the cabin inside /beta's bodies (they're not main's shapes): seats scaled under each roof, the rear bench under the
   // roof's back (none in the two-seaters), pillars and mirror under the roof's front edge
   [S('vehicles/cockpit.js')]: [
+    // the drive mode on the cluster, in its colour (a Huracan's STRADA green, SPORT amber, CORSA red; Eco green, and so on)
+    ["const draw = (kmh, gear, rpm, night) => {", "const draw = (kmh, gear, rpm, night, mode = '') => {"],
+    ["const key = k * 100 + gear * 10 + Math.round(rpm * 9);", "const key = k * 100 + gear * 10 + Math.round(rpm * 9) + '|' + mode;"],
+    ["    ctx.fillText(gear > 0 ? String(gear) : 'N', 22, 104);\n", "    ctx.fillText(gear > 0 ? String(gear) : 'N', 22, 104);\n    if (mode) { const M = String(mode).toUpperCase(), col = /CORSA|TRACK|RACE|ZOOM|POWER|SPORT\\+/.test(M) ? '#ff4a3d' : /SPORT|ANIMA|DYNAMIC/.test(M) ? '#ffb020' : /ECO|ZIP|RAIN|WET|4L/.test(M) ? '#3ddc84' : '#cfd8e3'; ctx.textAlign = 'right'; ctx.font = '700 15px ui-monospace, Menlo, Consolas, monospace'; ctx.fillStyle = col; ctx.fillText(M, 300, 22); ctx.fillRect(300 - ctx.measureText(M).width, 27, ctx.measureText(M).width, 2); }\n"],
+    ["    update(steer, kmh, gear, rpm, night) {", "    update(steer, kmh, gear, rpm, night, mode) {"],
+    ["      draw(kmh, gear, rpm, night);", "      draw(kmh, gear, rpm, night, mode);"],
     // the steering wheel's hub, so it turns with your hands in third person too (beta/vehicles/details.js)
     ["    group, eye: [xf0 - 1.25, belt + 0.19, DRIVER_Z],", "    group, spin, eye: [xf0 - 1.25, belt + 0.19, DRIVER_Z],"],
     // the cabin's there from the moment the car is (it only came on when the camera changed view, so a first time in had

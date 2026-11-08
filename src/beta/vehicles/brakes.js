@@ -56,7 +56,8 @@ V.update = function (dt, inp, traffic) {
   this._lockT = hard && !H.abs ? (this._lockT || 0) + dt : 0;
   const locked = this._lockT > 0.2 && sp > 2.5;
   this.absOn = H.abs && hard && sp > 5;
-  const mode = H.modes && H.modes[this.driveMode || 0], fx = mode && (FX[this.type] || FX[baseOf(this.type)] || {})[mode], tk = (fx && fx.thr) || 1;
+  const mode = H.modes && H.modes[this.driveMode || 0]; this._modeName = mode || '';
+  const fx = mode && (FX[this.type] || FX[baseOf(this.type)] || {})[mode], tk = (fx && fx.thr) || 1;
   this.tcsOn = H.tcs && !(fx && fx.tcs === false) && thr > 0.8 && sp < 15 && S.acc > 4 && !this.reverse;
   this.hbOn = !!inp.handbrake;
   this.modeEsc = fx ? fx.esc ?? 1 : 0.8; this.modePops = fx ? fx.pops ?? 0 : 1; this.modeLoose = fx ? fx.loose || 0 : 0; this.turnMul = fx ? fx.turn || 1 : 1;
