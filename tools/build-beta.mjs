@@ -276,6 +276,22 @@ const PATCHES = {
     ["if (!p.name || p.walkedOff || !(p.dateWith || D && D.eligible(p)) || (C.seat && !p.dateWith)) continue;", "if (!p.name || p.walkedOff || !p.dateWith) continue;"],
   ],
   [S('game/shops.js')]: [
+    // what a shop is, the same inside as its board says outside: a listing's own category decides it when that's a
+    // definite trade (a "Sagar Hair Cutting Salon" is a barber's, not a tapri for the cutting or an Udupi for the Sagar;
+    // "Samsung Service Centre" listed as mobiles isn't a garage, "Hero Mobiles" isn't a showroom, "Dental Fitness Clinic"
+    // isn't a gym, "Shivanjali Acupuncture" isn't a puncture shop). A few names say it better than the category: a hotel
+    // chain's rooms, a study library or a gaming café filed under books, a paan shop or a florist filed under grocery.
+    // A name that says salon is a salon whatever it's filed under (a food listing's "spa cuisine" isn't)
+    ["  if (cat === 'police') return 'chowki';\n", "  if (cat === 'police') return 'chowki';\n  if (/\\boyo\\b|collection o\\b|treebo|fabhotel/.test(n)) return 'lodge';\n  if (cat === 'books' && /library|abhyasika|अभ्यासिका|vachanalay|वाचनालय|reading room|study ?(?:room|centre|center|hall)/.test(n)) return 'library';\n  if (cat === 'books' && /gaming|game ?zone|arcade/.test(n)) return 'gaming';\n  if (cat in TRUST_CAT && !(cat === 'grocery' && /paan|\\bpan shop|pan house|tambakhu|flower|florist|phool/.test(n))) return TRUST_CAT[cat];\n  if (/\\bhair|salon|saloon|barber|unisex|beauty ?parlou?r|(?:men'?s|gents|ladies) ?parlou?r|nail (?:art|studio|bar)/.test(n) || (!/food|hotel|cafe/.test(cat || '') && /\\bspa\\b|massage/.test(n))) return 'barber';\n"],
+    ["export function kindOf(name, cat) {", "const TRUST_CAT = { salon: 'barber', clothes: 'clothes', shoes: 'shoes', pharmacy: 'pharmacy', clinic: 'clinic', mobile: 'mobile', electronics: 'electronics', jewellery: 'jeweller', bank: 'bank', atm: 'bank', books: 'books', optician: 'optician', travel: 'travel', gym: 'gym', garage: 'garage', grocery: 'kirana' };\nexport function kindOf(name, cat) {"],
+    ["|tyres?|puncture|mechanic|", "|tyres?|\\bpuncture|mechanic|"],
+    ["if (/mastani|juice|lassi|shake|falooda/.test(n)) return 'juice';", "if (/mastani|juice|\\blassi|shake|falooda/.test(n)) return 'juice';"],
+    // (and the names that said the wrong thing: cutting chai, not a haircut; a juice bar isn't a bar; Sagar is a name
+    // half Pune has, not only an Udupi; body builders are a gym)
+    ["if (/amruttulya|\\bchai\\b|\\btea\\b|tapri|cutting/.test(n)) return 'tapri';", "if (/amruttulya|\\bchai\\b|\\btea\\b|tapri|cutting (?:chai|tea)/.test(n)) return 'tapri';"],
+    ["if (/\\bpub\\b|brew|lounge|club|tavern|beer|bar\\b|bar &|bistro|taproom|social/.test(n) || cat === 'bar') return 'bar';", "if (!/juice|mastani|lassi|shake|falooda|salad|snack|chocolate/.test(n) && (/\\bpub\\b|brew|lounge|club|tavern|beer|bar\\b|bar &|bistro|taproom|social/.test(n) || cat === 'bar')) return 'bar';"],
+    ["if (/udupi|dosa|idli|madras|south indian|vaishali|rupali|sagar/.test(n)) return 'southindian';", "if (/udupi|dosa|idli|madras (?:cafe|café|hotel)|south indian|vaishali|rupali|sagar (?:hotel|restaurant|pure veg|veg|udupi|cafe)/.test(n)) return 'southindian';"],
+    ["if (/estate|propert|realt|developers?\\b|builders?\\b|housing\\b|homes\\b/.test(n)) return 'estate';", "if (/estate|propert|realt|developers?\\b|(?<!body ?)builders?\\b|housing\\b|homes\\b/.test(n)) return 'estate';"],
     ["name: 'Your ' + S.name.toLowerCase() });", "name: 'Your ' + (S.real || S.name) });"],
     // eat here or parcel: only where there's food (a chowki has a bench, not a kitchen)
     ["const dineIn = !!(ctx.inside && ctx.spot === 'counter'", "const dineIn = !!(MENUS[k] && ctx.inside && ctx.spot === 'counter'"],
