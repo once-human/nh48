@@ -81,6 +81,30 @@ People.prototype.update = function (dt, player, avoidView) {
       }
     }
   }
+  // ---- you and them: two bodies that can't be in one place. Each gives half (more of it yours if you're the one
+  // walking into them); someone stood at their spot is moved off it, not drawn back into you by it, and someone
+  // walking is moved there and then as well as along their way (it only eased back before, so you stood inside them)
+  const Pf = player.onFoot && player.foot;
+  if (Pf && !(player.downT > 0)) {
+    const D2 = R_PED*2 + 0.04;
+    for (const p of near) {
+      if (p.fallen > 0 || p._rag || p.rideOf || p._drag || p._wake) continue;
+      const dx = p.x - Pf.x, dz = p.z - Pf.z; if (Math.abs(dx) > D2 || Math.abs(dz) > D2) continue;
+      let d = Math.hypot(dx, dz), nx, nz;
+      if (d >= D2) continue;
+      if (d < 1e-4) { nx = Math.cos(Pf.yaw || 0); nz = Math.sin(Pf.yaw || 0); d = 0; } else { nx = dx/d; nz = dz/d; }
+      const over = D2 - d, mine = (Pf.v || 0) > 0.3 ? 0.65 : 0.5, theirs = 1 - mine;
+      Pf.x -= nx*over*mine; Pf.z -= nz*over*mine;
+      nudge(p, nx*over*theirs, nz*over*theirs);
+      if (p.mode === 'walk' || p.mode === 'cross') { p.x += nx*over*theirs; p.z += nz*over*theirs; }
+    }
+    // (and the ones who don't move for anyone, a vendor at their cart, someone at work: you go round them)
+    for (const p of this.list) {
+      if (!(p.fixed || p.duty) || p.hidden || p.seated || p.sit || p.fallen > 0 || p.rideOf) continue;
+      const dx = Pf.x - p.x, dz = Pf.z - p.z, d = Math.hypot(dx, dz);
+      if (d < D2 && d > 1e-4) { Pf.x += dx/d*(D2 - d); Pf.z += dz/d*(D2 - d); }
+    }
+  }
   // ---- the animals: against people, vehicles, poles and walls, each other, and you
   const T = this.traffic || (window.__nhAskG && window.__nhAskG.traffic), W = this.W, P = player.onFoot ? player : null;
   const an = this.animals.filter((a) => !a.dead && !a.gone && Math.abs(a.x - px) < RAD && Math.abs(a.z - pz) < RAD);
