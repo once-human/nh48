@@ -69,7 +69,7 @@ People.prototype.struck = function (p, V, S, player, sp, fx, fz, al, ac) {
   else { along = Math.min(0.62*cap, 15); lat = 0.07*cap*side; vy = Math.min(1.4, 0.5 + cap*0.04); spin = 2.2 + cap*0.1; }
   p._hit = { x0: p.x, z0: p.z, x: p.x, z: p.z, y: HIP, vy, vx: fx*along + sx*lat, vz: fz*along + sz*lat, nx: -fz, nz: fx, ang: 0, spin, fx, fz, t: 0, lt: -1, bounce: 1, tall, yaw0: p.yaw, yaw: Math.atan2(fz, fx), H: heightOf(V, S), V, S, two, axle: 0, kmh };
   // and from here the body's its own (beta/people/ragdoll.js): the car takes their legs and its outline carries them
-  startRag(p, { V, S, carH: p._hit.H, tall, top: (u) => topAt(u, p._hit.H, tall), vx: Math.cos(p._hit.yaw0 || 0)*(p._wv || 0), vz: Math.sin(p._hit.yaw0 || 0)*(p._wv || 0), kmh });
+  startRag(p, { V, S, M: (S.mass || (two ? 180 : 1200)) + (two ? 75 : 0), carH: p._hit.H, tall, top: (u) => topAt(u, p._hit.H, tall), vx: Math.cos(p._hit.yaw0 || 0)*(p._wv || 0), vz: Math.sin(p._hit.yaw0 || 0)*(p._wv || 0), kmh });
   // what it costs you: the weight of a person against yours
   const M = (S.mass || 1000) + (two ? 75 : 0), share = 75/(M + 75);
   const lost = Math.min(Math.abs(V.v)*share*1.2, Math.abs(V.v)); V.v -= Math.sign(V.v)*lost;
@@ -88,7 +88,7 @@ function flying(P, p, dt, V, S) {
   const h = p._hit, C = P.W && P.W.collision; h.t += dt;
   // a body of its own (ragdoll.js) goes where its physics takes it: this only says when it's over
   // (no body to be one yet, the moment it was hit: it's given one as soon as it has, going as it's going)
-  if (!p._rag && h.lt < 0 && p.body && p.body.H) startRag(p, { V: h.V, S: h.S, carH: h.H, tall: h.tall, top: (u) => topAt(u, h.H, h.tall), vx: h.vx, vy: h.vy, vz: h.vz, kmh: h.kmh });
+  if (!p._rag && h.lt < 0 && p.body && p.body.H) startRag(p, { V: h.V, S: h.S, M: (h.S.mass || (h.two ? 180 : 1200)) + (h.two ? 75 : 0), carH: h.H, tall: h.tall, top: (u) => topAt(u, h.H, h.tall), vx: h.vx*0.5, vy: Math.min(h.vy, 0.6), vz: h.vz*0.5, kmh: h.kmh });
   if (p._rag) {
     h.x = p.x; h.z = p.z; p.liftY = 0; h.draw = 0;
     if (p._rag.sleep || p._rag.out >= 0) { if (h.lt < 0) h.lt = 0; h.lt += dt; }
@@ -163,7 +163,7 @@ function overBody(P, p, V, S, player, sp, dt) {
       if (dead) P.events.push({ type: 'pedDied', p, x: p.x, z: p.z });
     }
     // dragged a little and rolled by it: a body of its own is shoved and turned by the tyre where it went over
-    if (p._rag) { const fx = hx*s, fz = hz*s, ax = V.x + hx*s*at, az = V.z + hz*s*at; kickRag(p, ax + (p.x - ax)*0.2, az + (p.z - az)*0.2, fx*Math.min(sp*0.25, 3), 1.2 + Math.min(1.5, sp*0.05), fz*Math.min(sp*0.25, 3), 0.9); }
+    if (p._rag) { const fx = hx*s, fz = hz*s, ax = V.x + hx*s*at, az = V.z + hz*s*at; kickRag(p, ax + (p.x - ax)*0.2, az + (p.z - az)*0.2, fx*Math.min(sp*0.12, 1.5), (S.two ? 0.25 : 0.4) + Math.min(0.5, sp*0.02), fz*Math.min(sp*0.12, 1.5), 0.7); }
     else if (!p._hit) { const fx = hx*s, fz = hz*s; p._hit = { x0: p.x, z0: p.z, x: p.x, z: p.z, y: FLAT, vy: 0, vx: fx*Math.min(sp*0.2, 2.5), vz: fz*Math.min(sp*0.2, 2.5), nx: -fz, nz: fx, ang: 0, spin: 0, fx, fz, t: 1, lt: 0.6, bounce: 0, yaw0: p.yaw, yaw: p.yaw, H: 1, V, S, axle: 1, show: 0 }; }
   };
   axle(0, wb); axle(1, -wb);

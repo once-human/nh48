@@ -35,6 +35,10 @@ const LINKS = [
 // [a, b, nearest they come]: the limbs don't pass through the body or each other
 const APART = [[6, 1, 0.1], [9, 1, 0.1], [6, 0, 0.12], [9, 0, 0.12], [5, 0, 0.15], [8, 0, 0.15], [6, 19, 0.08], [9, 19, 0.08], [6, 2, 0.12], [9, 2, 0.12],
   [11, 15, 0.14], [12, 16, 0.12], [13, 17, 0.1], [2, 10, 0.35], [2, 14, 0.35], [3, 0, 0.5], [11, 1, 0.22], [15, 1, 0.22], [12, 0, 0.2], [16, 0, 0.2]];
+// [a, b, furthest apart]: limp legs stay together (the muscle and the cloth between them, the trousers, the sari): the
+// knees and the feet go the same way, one a little behind or beside the other, never one off to each side. If they
+// went down mid-stride, the legs come together over the first half second, they don't snap
+const TOGETHER = [[11, 15, 0.3], [12, 16, 0.36], [13, 17, 0.4]];
 
 const V3 = THREE.Vector3, _a = new V3(), _b = new V3(), _c = new V3(), _X = new V3(), _Y = new V3(), _Z = new V3(), _f = new V3();
 const _M = new THREE.Matrix4(), _Mi = new THREE.Matrix4(), _q = new THREE.Quaternion(), _pq = new THREE.Quaternion(), _s = new V3();
@@ -106,6 +110,7 @@ function fronts(R) {
     P[at*3] = P[o*3] + _f.x*0.12; P[at*3 + 1] = P[o*3 + 1] + _f.y*0.12; P[at*3 + 2] = P[o*3 + 2] + _f.z*0.12;
   }
 }
+const togetherFrom = (R) => { const P = R.p; R.tog = TOGETHER.map(([a, b, m]) => Math.max(m, Math.hypot(P[a*3] - P[b*3], P[a*3 + 1] - P[b*3 + 1], P[a*3 + 2] - P[b*3 + 2]))); };
 const lengths = (R) => { const P = R.p; R.len = LINKS.map(([a, b]) => Math.hypot(P[a*3] - P[b*3], P[a*3 + 1] - P[b*3 + 1], P[a*3 + 2] - P[b*3 + 2])); };
 
 export function ragOn(p) { return !!(p && p._rag); }
@@ -122,7 +127,7 @@ export function startRag(p, o = {}) {
     else return null;
     R.p[i*3] = _a.x; R.p[i*3 + 1] = _a.y; R.p[i*3 + 2] = _a.z;
   }
-  fronts(R); lengths(R);
+  fronts(R); lengths(R); togetherFrom(R);
   // how each bone sits in its frame, so the body keeps its own shape as the points move
   const F = frames(R, {});
   for (const n of ORDER) { const b = bone(H, n); if (!b) continue; b.matrixWorld.decompose(_b, _q, _s); R.off[n] = F[n].clone().invert().multiply(_q); }
@@ -136,7 +141,12 @@ export function startRag(p, o = {}) {
   // the knees give a touch, so nobody goes over stiff as a post
   const fwd = _f.set(Math.cos(o.yaw ?? p.yaw ?? 0), 0, Math.sin(o.yaw ?? p.yaw ?? 0));
   for (const k of [11, 15]) { R.p[k*3] += fwd.x*0.03; R.p[k*3 + 2] += fwd.z*0.03; }
-  if (o.V) { const V = o.V; R.car = { V, S: o.S, H: o.carH || 1.4, tall: !!o.tall, top: o.top, x: V.x, z: V.z, th: V.th }; }
+  if (o.V) {
+    // how much of its speed it gives them: a car or a bus barely notices a person (it carries them at its own speed), a
+    // scooter with its rider is only three or four times their weight and gives them less of its own
+    const V = o.V, S = o.S || {}, M = o.M || S.mass || (S.two ? 260 : 1200);
+    R.car = { V, S, H: o.carH || 1.4, tall: !!o.tall, top: o.top, x: V.x, z: V.z, th: V.th, k: M/(M + 65) };
+  }
   p._rag = R; p._slide = null;
   return R;
 }
@@ -158,7 +168,7 @@ export function seatRag(R, x, z, yaw, y, vx, vy, vz) {
     set(h, Hx, Hy, Hz); set(k, Kx, Ky, Kz); set(an, Ax, Ay, Az); set(b, Ax + bo[0] - ao[0], Ay + bo[1] - ao[1], Az + bo[2] - ao[2]);
   }
   set(0, x, y, z);
-  fronts(R); lengths(R);
+  fronts(R); lengths(R); togetherFrom(R);
   for (let i = 0; i < N; i++) { R.q[i*3] = P[i*3] - vx*DT; R.q[i*3 + 1] = P[i*3 + 1] - vy*DT; R.q[i*3 + 2] = P[i*3 + 2] - vz*DT; }
   R.sleep = false; R.still = 0;
 }
@@ -244,9 +254,9 @@ function joints(R, k) {
   // the neck and the head on it
   cone(p, 1, 2, Xc, Yc, Zc, 1, false, -0.5, 0.7, -0.5, 0.5, k);
   cone(p, 2, 3, Xc, Yc, Zc, 1, false, -0.7, 1.0, -0.7, 0.7, k);
-  // hips: a thigh forward to 2.1 rad (knee to chest), back 0.4, out 0.85, across 0.3
-  cone(p, 10, 11, Xp, Yp, Zp, 1, true, -0.4, 2.1, -0.3, 0.85, k);
-  cone(p, 14, 15, Xp, Yp, Zp, -1, true, -0.4, 2.1, -0.3, 0.85, k);
+  // hips: a thigh forward to 2.1 rad (knee to chest), back 0.4, out 0.55 (limp, not a split), across 0.2
+  cone(p, 10, 11, Xp, Yp, Zp, 1, true, -0.4, 2.1, -0.2, 0.55, k);
+  cone(p, 14, 15, Xp, Yp, Zp, -1, true, -0.4, 2.1, -0.2, 0.55, k);
   // shoulders: up and forward nearly overhead, back 1 rad, out to the side and up, across the chest 0.4
   cone(p, 4, 5, Xc, Yc, Zc, 1, true, -1.0, 3.0, -0.4, 1.7, k);
   cone(p, 7, 8, Xc, Yc, Zc, -1, true, -1.0, 3.0, -0.4, 1.7, k);
@@ -267,6 +277,7 @@ function step(R) {
     const j = i*3;
     for (let c = 0; c < 3; c++) { const x = p[j + c], v = (x - q[j + c])*0.998; q[j + c] = x; p[j + c] = x + v + (c === 1 ? -G0*DT*DT : 0); }
   }
+  for (let k = 0; k < TOGETHER.length; k++) R.tog[k] = Math.max(TOGETHER[k][2], R.tog[k] - 0.7*DT);
   // what hit them, where it is this step
   const C = R.car;
   let cx, cz, th, hx, hz, fr, L2, W2, gy, cvx, cvz;
@@ -286,6 +297,12 @@ function step(R) {
       const wa = W_[a], wb = W_[b], e = (d - m)/d/(wa + wb);
       p[A] += dx*e*wa; p[A + 1] += dy*e*wa; p[A + 2] += dz*e*wa; p[B] -= dx*e*wb; p[B + 1] -= dy*e*wb; p[B + 2] -= dz*e*wb;
     }
+    for (let k = 0; k < TOGETHER.length; k++) {
+      const [a, b] = TOGETHER[k], A = a*3, B = b*3, dx = p[B] - p[A], dy = p[B + 1] - p[A + 1], dz = p[B + 2] - p[A + 2], d = Math.hypot(dx, dy, dz) || 1e-6;
+      if (d <= R.tog[k]) continue;
+      const wa = W_[a], wb = W_[b], e = (d - R.tog[k])/d/(wa + wb)*0.35;
+      p[A] += dx*e*wa; p[A + 1] += dy*e*wa; p[A + 2] += dz*e*wa; p[B] -= dx*e*wb; p[B + 1] -= dy*e*wb; p[B + 2] -= dz*e*wb;
+    }
     joints(R, 0.5);
     // the road, inside the solve, so the bones are never left holding a point under it
     for (let i = 0; i < N; i++) { const g = R.gy[i] + RAD[i]; if (p[i*3 + 1] < g) p[i*3 + 1] = g; }
@@ -293,25 +310,40 @@ function step(R) {
   let touching = 0;
   for (let i = 0; i < N; i++) {
     const j = i*3, r = RAD[i];
-    // the car: solid from the road to its outline (bonnet, glass, roof), pushed out the nearest way
+    // the car: solid from the road to its outline (bonnet, glass, roof). A point is put back outside it on the side it
+    // came in from, and it moves off that side no faster than that side is moving: being put back never throws
+    // anything (a body caught half inside the car's outline on the frame it was hit came out of it at tens of metres a
+    // second, which is what sent people flying sky-high off a touch)
     if (C && R.carOn) {
       const rx = p[j] - cx, rz = p[j + 2] - cz, la = rx*hx + rz*hz, lc = -rx*hz + rz*hx, l2 = L2 + r, w2 = W2 + r;
       if (Math.abs(la) < l2 && Math.abs(lc) < w2) {
         const top = gy + C.top(fr*la/L2) + r;
         if (p[j + 1] < top && p[j + 1] > gy - 0.2) {
-          const dTop = top - p[j + 1], dF = l2 - fr*la, dB = l2 + fr*la, dS = w2 - Math.abs(lc), m = Math.min(dTop, dF, dB, dS);
-          if (m === dTop) {
-            // the push it takes to keep them on top of it is all the grip there is: cloth on paint and glass slides
-            const vy0 = p[j + 1] - q[j + 1];
-            p[j + 1] = top;
-            let vx = p[j] - q[j], vz = p[j + 2] - q[j + 2], vy = p[j + 1] - q[j + 1];
-            if (vy < 0) vy = 0;
-            const jn = Math.max(0, vy - vy0), rx2 = vx - cvx, rz2 = vz - cvz, rl = Math.hypot(rx2, rz2);
-            if (rl > 1e-9) { const k = Math.min(rl, MU*jn)/rl; vx -= rx2*k; vz -= rz2*k; }
-            q[j] = p[j] - vx; q[j + 1] = p[j + 1] - vy; q[j + 2] = p[j + 2] - vz;
-          } else if (m === dF) { p[j] += hx*fr*dF; p[j + 2] += hz*fr*dF; }
-          else if (m === dB) { p[j] -= hx*fr*dB; p[j + 2] -= hz*fr*dB; }
-          else { const sg = Math.sign(lc) || 1; p[j] += -hz*sg*dS; p[j + 2] += hx*sg*dS; }
+          // where it was against the car a step ago
+          const qx = q[j] - cx + cvx, qz = q[j + 2] - cz + cvz, la0 = qx*hx + qz*hz, lc0 = -qx*hz + qz*hx, top0 = gy + C.top(clamp(fr*la0/L2, -1, 1)) + r;
+          const dTop = top - p[j + 1], dF = l2 - fr*la, dB = l2 + fr*la, dS = w2 - Math.abs(lc);
+          let face;
+          if (q[j + 1] >= top0 - 0.03 || dTop < 0.06) face = 0;                      // on the top (came down on it, or rode up it)
+          else if (fr*la0 >= l2 - 0.02) face = 1;                                     // in at the front
+          else if (Math.abs(lc0) >= w2 - 0.02) face = 3;                              // in at the side
+          else if (-fr*la0 >= l2 - 0.02) face = 2;
+          else { const m = Math.min(dF, dB, dS*1.6); face = m === dF ? 1 : m === dB ? 2 : 3; }
+          let vx = p[j] - q[j], vy = p[j + 1] - q[j + 1], vz = p[j + 2] - q[j + 2], nx = 0, ny = 0, nz = 0, d = 0, us = 0;
+          const ck = C.k, cs = Math.hypot(cvx, cvz);
+          if (face === 0) {
+            // carried up as the bonnet and the glass rise under them (the surface's own rise, not the distance it was put
+            // back), and the glass and the bonnet give as a body lands on them: less than all of it
+            ny = 1; d = dTop; us = Math.min(Math.max(0, top - top0)*0.6, (0.22*cs/DT + 0.4)*DT);
+          } else if (face === 1) { nx = hx*fr; nz = hz*fr; d = dF; us = cs*ck; }
+          else if (face === 2) { nx = -hx*fr; nz = -hz*fr; d = dB; us = 0; }
+          else { const sg = Math.sign(lc) || 1; nx = -hz*sg; nz = hx*sg; d = dS; us = 0; }
+          p[j] += nx*d; p[j + 1] += ny*d; p[j + 2] += nz*d;
+          const vn = vx*nx + vy*ny + vz*nz, jn = Math.max(0, us - vn);
+          vx += nx*jn; vy += ny*jn; vz += nz*jn;
+          // its grip on them along its surface: cloth on paint and glass, as much as the push it gives
+          const rx2 = vx - cvx*ck, rz2 = vz - cvz*ck, rn = rx2*nx + rz2*nz, tx = rx2 - rn*nx, tz = rz2 - rn*nz, tl = Math.hypot(tx, tz);
+          if (tl > 1e-9) { const k = Math.min(tl, MU*(jn + (face === 3 ? Math.min(d, cs)*0.3 : 0)))/tl; vx -= tx*k; vz -= tz*k; }
+          q[j] = p[j] - vx; q[j + 1] = p[j + 1] - vy; q[j + 2] = p[j + 2] - vz;
         }
       }
     }
@@ -333,6 +365,11 @@ function step(R) {
   let M = 0; vm[0] = vm[1] = vm[2] = 0;
   for (let i = 0; i < N; i++) { const j = i*3, m = MASS[i]; M += m; vm[0] += (p[j] - q[j])*m; vm[1] += (p[j + 1] - q[j + 1])*m; vm[2] += (p[j + 2] - q[j + 2])*m; }
   vm[0] /= M; vm[1] /= M; vm[2] /= M;
+  // the two legs go together: what one does, the other mostly follows
+  for (const [a, b] of TOGETHER) for (let c = 0; c < 3; c++) {
+    const A = a*3 + c, B = b*3 + c, va = p[A] - q[A], vb = p[B] - q[B], m = (va + vb)/2;
+    q[A] = p[A] - (m + (va - m)*0.95); q[B] = p[B] - (m + (vb - m)*0.95);
+  }
   const keep = touching >= 6 ? 0.965 : touching >= 2 ? 0.985 : 0.995;
   for (let i = 0; i < N; i++) {
     const j = i*3;
