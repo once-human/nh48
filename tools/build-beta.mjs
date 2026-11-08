@@ -176,6 +176,8 @@ const PATCHES = {
   [S('game/pilot.js')]: [
     // (which vehicle it was, for a hit and run: beta/game/wanted.js)
     ["this.events.push({ type: 'gotHit', speed: o.v, who: o.type });", "this.events.push({ type: 'gotHit', speed: o.v, who: o.type, o });"],
+    // knocked down by the traffic: down for as long as it was hard, and what hit you is known (beta/draw/falls.js throws you)
+    ["this.downT = 3.2;", "this.downT = 3.2 + Math.min(5, Math.abs(o.v || 0)*0.25); this._hitBy = o;"],
     // a jump as high as you can (about half a metre standing, a little more off a run), and a fall that hurts by its
     // height: under three metres you take it in your knees; above, you're down and hurt, the more the higher; from
     // ten metres or so on to the road it kills you (into the river it's a splash)

@@ -13,13 +13,13 @@ import { tickVoice } from '../game/voices.js';
 import { startRag, kickRag } from './ragdoll.js';
 
 const G0 = 9.81, HIP = 0.9, FLAT = 0.2, MARGIN = 0.3;
-const TALL = new Set(['bus', 'tempo', 'auto', 'bolero']);
+export const TALL = new Set(['bus', 'tempo', 'auto', 'bolero']);
 const out = (p) => p.hidden || p.pax || p.rideOf || p.lift || p.seat || p.seated || p.mode === 'inside' || p.ctl || p.fixed || p._vetalBody;
 const smooth = (t) => { t = Math.max(0, Math.min(1, t)); return t*t*(3 - 2*t); };
 const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 // the height of the vehicle's top at u (+1 its nose, -1 its tail): bonnet, glass, roof, down at the back
-function topAt(u, H, tall) {
+export function topAt(u, H, tall) {
   if (tall) return H;
   const hood = H*0.66, edge = H*0.56;
   if (u > 0.3) return edge + (hood - edge)*(1 - u)/0.7;

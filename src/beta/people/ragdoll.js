@@ -131,6 +131,11 @@ export function seatRag(R, x, z, yaw, y, vx, vy, vz) {
   for (let i = 0; i < N; i++) { R.q[i*3] = P[i*3] - vx*DT; R.q[i*3 + 1] = P[i*3 + 1] - vy*DT; R.q[i*3 + 2] = P[i*3 + 2] - vz*DT; }
   R.sleep = false; R.still = 0;
 }
+// every point given its own speed (f(i) -> [vx, vy, vz])
+export function velRag(R, f) {
+  for (let i = 0; i < N; i++) { const [vx, vy, vz] = f(i); R.q[i*3] = R.p[i*3] - vx*DT; R.q[i*3 + 1] = R.p[i*3 + 1] - vy*DT; R.q[i*3 + 2] = R.p[i*3 + 2] - vz*DT; }
+  R.sleep = false; R.still = 0;
+}
 // a wheel, a kick: a push on the points near (x, z)
 export function kickRag(p, x, z, vx, vy, vz, r = 0.8) {
   const R = p._rag; if (!R) return;

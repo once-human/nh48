@@ -3,7 +3,9 @@
 // throws them along its way. You too: knocked down while running you go over with your speed, not on the spot.
 import { People } from '@orig/people/peds.js';
 import { Pilot } from '@orig/game/pilot.js';
-import { startRag, seatRag, tick as ragTick, pose as ragPose } from '../people/ragdoll.js';
+import { startRag, seatRag, velRag, tick as ragTick, pose as ragPose } from '../people/ragdoll.js';
+import { topAt, TALL } from '../people/runover.js';
+import { baseOf } from '../vehicles/models.js';
 
 const upd = People.prototype.update;
 People.prototype.update = function (dt, player, ...a) {
@@ -75,8 +77,20 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
   // how it lands; as you come round it goes from where you lie into getting up
   const H = this.human;
   if (this.downT > 0 && !was && H && !this._rag) {
-    const v = Math.hypot(vx, vz);
-    if (startRag(this, { H, yaw: F.yaw, push: v > 0.5 ? [vx*0.5, vz*0.5, 0.3] : null, vy: v > 0.5 ? 0 : -0.6 })) this._fall = null;
+    const v = Math.hypot(vx, vz), o = this._hitBy; this._hitBy = null;
+    if (o && o.T && Math.abs(o.v || 0) > 1) {
+      // hit by the traffic: the same as anyone it hits (people/runover.js). Its front sweeps your legs at its own speed,
+      // your hips go less and your top hardly at all, so you fold onto it; its bonnet, glass and roof are solid under
+      // you, and what you do from there is the body's own
+      const tall = TALL.has(baseOf(o.type || 'car')) || TALL.has(o.type), cH = tall ? 2.4 : 1.45, ohx = o.hx ?? 1, ohz = o.hz ?? 0, ov = o.v || 0;
+      const V = { get x() { return o.x; }, get z() { return o.z; }, get th() { return Math.atan2(o.hz ?? 0, o.hx ?? 1); }, get v() { return o.v || 0; } };
+      const R = startRag(this, { H, yaw: F.yaw, V, S: { L: o.T.L || 4, W: o.T.W || 1.7 }, carH: cH, tall, top: (u) => topAt(u, cH, tall), kmh: Math.abs(ov)*3.6 });
+      if (R) {
+        this._fall = null;
+        const share = (i) => tall ? 0.9 : i >= 10 ? 0.85 : i === 0 ? 0.55 : i <= 3 ? 0.12 : 0.25;
+        velRag(R, (i) => [vx*0.3 + ohx*ov*share(i), tall ? 0.3 : i >= 10 ? 0.6 : 0.2, vz*0.3 + ohz*ov*share(i)]);
+      }
+    } else if (startRag(this, { H, yaw: F.yaw, push: v > 0.5 ? [vx*0.5, vz*0.5, 0.3] : null, vy: v > 0.5 ? 0 : -0.6 })) this._fall = null;
   }
   const R = this._rag;
   if (R) {
@@ -86,6 +100,8 @@ Pilot.prototype.updateFoot = function (dt, ...a) {
       else if (H) { H.holder.position.set(F.x, F.y, F.z); H.holder.rotation.set(0, -F.yaw, 0); ragPose(this, H); }
       return out;
     }
+    // (not up while you're still going: only once you've come to rest)
+    if (!R.sleep && R.t < 7) this.downT = Math.max(this.downT, 1.5);
     if (!R.sleep) ragTick(R, dt, this.W);
     F.x = R.p[0]; F.z = R.p[2];
     if (H) { H.holder.position.set(F.x, F.y, F.z); H.holder.rotation.set(0, -F.yaw, 0); ragPose(this, H); }
