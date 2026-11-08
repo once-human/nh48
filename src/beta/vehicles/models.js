@@ -835,7 +835,11 @@ function carBody(b, gl, spec, kind = 'sedan') {
     seamH(s, twoDoor ? xM : xE, xF, yd0);
     // handles: little pulls on stalks
     if (lk.flush) for (const x of [xb + .1, xE + .1]) onSide(s, x - .075, x + .075, beltY - .13, beltY - .1, [.42, .42, .44, 0], { nu: 3, nv: 1, off: .004 });
-    else for (const x of twoDoor ? [xM + .14] : [xb + .1, xE + .1]) { rbox(b, x - .065, beltY - .135, s*(zSide(x, beltY - .12) - .003), x + .065, beltY - .1, s*(zSide(x, beltY - .12) + .024), chrome ? CHROME : [1, 1, 1], chrome ? 0 : 1); onSide(s, x - .05, x + .05, beltY - .15, beltY - .09, [.02, .02, .02, 0, MATTE], { nu: 2, nv: 1, off: .002 }); }
+    else for (const x of twoDoor ? [xM + .14] : lk.cHandle ? [xb + .1] : [xb + .1, xE + .1]) { rbox(b, x - .065, beltY - .135, s*(zSide(x, beltY - .12) - .003), x + .065, beltY - .1, s*(zSide(x, beltY - .12) + .024), chrome ? CHROME : [1, 1, 1], chrome ? 0 : 1); onSide(s, x - .05, x + .05, beltY - .15, beltY - .09, [.02, .02, .02, 0, MATTE], { nu: 2, nv: 1, off: .002 }); }
+    // (the Swift's: up at the back corner of the rear door's window, black, standing upright)
+    if (lk.cHandle && !twoDoor) { const x = xE + .05, y0 = beltY + .06, y1 = beltY + .17, z = zSide(x, (y0 + y1)/2); rbox(b, x - .022, y0, s*(z - .004), x + .022, y1, s*(z + .016), [.03, .03, .035], 0, MATTE); onSide(s, x - .016, x + .016, y0 + .015, y1 - .015, [.005, .005, .006, 0, MATTE], { nu: 1, nv: 2, off: .018 }); }
+    // a chrome line along the foot of the windows
+    if (lk.beltChrome) onSide(s, xE + .03, xF - .03, beltY - .014, beltY + .002, [...CHROME, 0], { nu: 10, nv: 1, off: .006 });
     // the rubbing strip along the doors
     if (!low) onSide(s, Math.max(xE, -xw + Ra + .05), Math.min(xF, xw - Ra - .05), sill + .2, sill + .245, chrome ? [...CHROME, 0] : BLACKOUT, { nu: 8, nv: 1, off: .006 });
     // sills
@@ -869,7 +873,8 @@ function carBody(b, gl, spec, kind = 'sedan') {
     if (MOVING) (MOVING.wipers || (MOVING.wipers = [])).push({ v0, v1: b.c, at: [xf0 - .03, beltY + .035, zz], up: [roofF - xf0, H - beltY, 0] });
   }
   // an aerial on the roof, a roof seam
-  { const Ha = roofAt(roofR + .1); tube(b, [[roofR + .1, Ha, 0], [roofR + .02, Ha + .05, 0], [roofR - .1, Ha + .15, 0]], .004, TRIM, 4, 4);
+  if (lk.fin) { const xa = roofR + .14, Ha = roofAt(xa); b.addGeo(G.sph2, M(xa, Ha + .012, 0, .085, .05, .022), [.03, .03, .035], 0); b.addGeo(G.sph2, M(xa - .05, Ha + .03, 0, .04, .035, .016), [.03, .03, .035], 0); }
+  else { const Ha = roofAt(roofR + .1); tube(b, [[roofR + .1, Ha, 0], [roofR + .02, Ha + .05, 0], [roofR - .1, Ha + .15, 0]], .004, TRIM, 4, 4);
     rbox(b, roofR + .06, Ha - .01, -.022, roofR + .2, Ha + .035, .022, TRIM, 0, MATTE); }
   if (kind === 'lux' || kind === 'sedan') for (const s of [-1, 1]) patch(b, 6, 1, (u, v) => [lerp(roofR + .12, roofF - .1, u), H - .004 - (s*(.42 + v*.012))**2*.09, s*(.42 + v*.012)], SEAM, [0, 1, 0]);
   if (kind === 'lux') patch(b, 8, 4, (u, v) => { const z = lerp(-.42, .42, v); return [lerp(roofF - .85, roofF - .22, u), H + .002 - z*z*.09, z]; }, WINDOW, [0, 1, 0]);
@@ -903,6 +908,8 @@ function carBody(b, gl, spec, kind = 'sedan') {
       onEnd(1, s*nW*.47, s*nW*.74, 0, 0, [...HEAD, 0, 1], { yb: (u) => lerp(lampY0 + .03, lampY0 + .055, u), yt: (u) => lerp(lampY1 - .05, lampY1 - .025, u), off: .012, nu: 6, nv: 2, bulge: .008 });
       onEnd(1, s*nW*.75, s*nW*.96, 0, 0, [.72, .74, .76], { yb: (u) => lerp(lampY0 + .06, lampY0 + .085, u), yt: (u) => lerp(lampY1 - .03, lampY1 - .02, u), off: .01, nu: 4, nv: 2 });
       onEnd(1, s*nW*.44, s*nW*.98, 0, 0, [.95, .97, 1, 0, .5], { yb: (u) => lerp(lampY1 - .05, lampY1 - .022, sm(u*1.4)), yt: (u) => lerp(lampY1 - .04, lampY1 - .012, sm(u*1.4)), off: .014, nu: 8, nv: 1 });
+      // an LED "C" in the lamp, lit day and night: along its foot and up its inner edge
+      if (lk.lampC) { const L = [.95, .97, 1, 0, .85]; onEnd(1, s*nW*.47, s*nW*.9, 0, 0, L, { yb: (u) => lerp(lampY0 + .036, lampY0 + .068, sm(u)), yt: (u) => lerp(lampY0 + .046, lampY0 + .078, sm(u)), off: .016, nu: 6, nv: 1 }); onEnd(1, s*nW*.462, s*nW*.474, lampY0 + .04, lampY1 - .035, L, { off: .016, nu: 1, nv: 2 }); }
       // fog lamp and its bezel
       if (lk.split) continue;
       const fz = s*nW*.72, fy = yb0 + .07, fx = xEnd(1, fy, fz);
@@ -910,10 +917,11 @@ function carBody(b, gl, spec, kind = 'sedan') {
     }
     // grille: a chrome surround, black mesh, slats, a badge
     // grille: big (Creta, Fortuner, Innova) reaches down into the bumper; slats (Scorpio, Bolero) stand upright
-    const big = lk.grille === 'big' || lk.split, g0 = big ? Math.max(yb0 + .12, lampY0 - .1) : lampY0 + .02, g1 = lk.split ? lampY1 - .07 : lampY1 - .02, gz = nW*(big ? .5 : lk.grille === 'wide' ? .48 : .4), ch = chrome || lk.chrome;
+    const big = lk.grille === 'big' || lk.split, g0 = big ? Math.max(yb0 + .12, lampY0 - .1) : lampY0 + .02, g1 = lk.split ? lampY1 - .07 : lampY1 - .02, gz = nW*(big ? .5 : lk.grille === 'wide' || lk.grille === 'hex' ? .48 : .4), ch = chrome || lk.chrome;
     if (ch) onEnd(1, -gz - .02, gz + .02, g0 - .02, g1 + .015, [...CHROME, 0], { off: .007, nu: 8 });
     onEnd(1, -gz, gz, g0, g1, [...BLACK, 0, MATTE], { off: .011, nu: 8 });
     if (lk.grille === 'slats') for (let i = -3; i <= 3; i++) onEnd(1, i*gz/3.6 - .012, i*gz/3.6 + .012, g0 + .01, g1 - .01, [...CHROME, 0], { off: .017, nu: 1, nv: 3 });
+    else if (lk.grille === 'hex') { for (let r = 0; r < 4; r++) for (let i = -6; i <= 6; i++) { const y = lerp(g0 + .016, g1 - .016, r/3), z = (i + (r % 2)*.5)*gz/6.8; if (Math.abs(z) > gz - .02) continue; onEnd(1, z - .011, z + .011, y - .008, y + .008, [.13, .13, .14, 0, MATTE], { off: .016, nu: 1, nv: 1 }); } }
     else for (let i = 0; i < (big ? 7 : 5); i++) { const y = lerp(g0 + .012, g1 - .012, i/(big ? 6 : 4)); onEnd(1, -gz + .012, gz - .012, y - .005, y + .005, ch ? [...CHROME, 0] : [.14, .14, .15], { off: .017, nu: 6, nv: 1 }); }
     // a chrome wing across the grille into the lamps (City, Ertiga); a lit bar right across the nose (Creta)
     if (lk.wing) onEnd(1, -nW*.52, nW*.52, lampY1 - .055, lampY1 - .02, [...CHROME, 0], { off: .021, nu: 8, nv: 1 });
@@ -936,6 +944,9 @@ function carBody(b, gl, spec, kind = 'sedan') {
     onEnd(-1, s*nR*.53, s*nR*.74, tY0 + .012, tY0 + (rH - tY0)*.4, [.92, .92, .9, 0, .15], { off: .012, nu: 4, nv: 1 });
     onEnd(-1, s*nR*.76, s*nR*.98, tY0 + .012, tY0 + (rH - tY0)*.4, [...AMBER, 0, .5], { off: .012, nu: 4, nv: 1 });
     onSide(s, -hl + .03, -hl + .2, tY0 + .012, rH, [...TAIL, 0, .7], { off: .007, nu: 5, nv: 2 });
+    // the Swift's LED "C" in the tail lamp; the Dzire's three arrows pointing in
+    if (lk.tailC) { const C = [...TAIL, 0, 1], a = tY0 + (rH - tY0)*.3, c = rH - .02; onEnd(-1, s*nR*.6, s*nR*.62, a, c, C, { off: .016, nu: 1, nv: 2 }); for (const y of [a, c - .01]) onEnd(-1, s*nR*.6, s*nR*.9, y, y + .01, C, { off: .016, nu: 3, nv: 1 }); }
+    if (lk.tailY) { const C = [...TAIL, 0, 1], m = tY0 + (rH - tY0)*.62; onEnd(-1, s*nR*.54, s*nR*.66, m - .005, m + .005, C, { off: .016, nu: 2, nv: 1 }); for (const e of [rH - .018, tY0 + (rH - tY0)*.3]) onEnd(-1, s*nR*.66, s*nR*.95, 0, 0, C, { yb: (u) => lerp(m - .005, e - .005, u), yt: (u) => lerp(m + .005, e + .005, u), off: .016, nu: 4, nv: 1 }); }
     // the reflector in the bumper
     onEnd(-1, s*nR*.62, s*nR*.92, rY0 + .1, rY0 + .125, [.5, .03, .03, 0, .2], { off: .012, nu: 4, nv: 1 });
   }
@@ -1030,7 +1041,10 @@ export function addVariantSpecs(SPECS) {
 // bar across the nose or the tail (Creta), split lamps (Nexon), the grille (big, wide, upright slats), a chrome wing
 // (City), tail lamps up the D pillar (tailV: how far up), flush handles (XUV700), a spare on the back (Bolero)
 const LOOK = {
-  hatch: { pillars: true }, sedan: { grille: 'wide' }, taxi: { grille: 'wide' }, suv: { grille: 'big', drlBar: true, tailBar: true }, lux: { grille: 'wide', chrome: true },
+  // the Swift (hatch): the floating roof, the back doors' handles up in the black of the C pillar, a wide honeycomb grille,
+  // lamps with an LED "C" in them front and back. The Dzire (sedan, and the taxi's Dzire Tour): a chrome line under the
+  // windows, a shark-fin aerial (not on the taxi's older body), its tail lamps' three-arrow LED, the DRL in the headlamps
+  hatch: { pillars: true, cHandle: true, grille: 'hex', lampC: true, tailC: true }, sedan: { grille: 'wide', beltChrome: true, fin: true, tailY: true, lampC: true }, taxi: { grille: 'wide', beltChrome: true, tailY: true }, suv: { grille: 'big', drlBar: true, tailBar: true }, lux: { grille: 'wide', chrome: true },
   // and their own lines: box (0 round, 1 a brick), nose (how far the bonnet falls, 1 the family's), screen (the
   // windscreen's curve: under 1 flat and upright, over 1 swept), kick (the belt rising behind the front door, m),
   // slope (the roof falling to the back, m)
