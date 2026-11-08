@@ -564,7 +564,7 @@ const PATCHES = {
     // the models inside the types (beta/vehicles/models.js VARIANTS): their own spawn share, bodies and time-of-day mix
     ["import { buildAuto, buildScooter, buildBike, buildCar, buildBus, buildTempo, buildCycle, buildLow, PAINTS } from '../vehicles/models.js';", "import { buildAuto, buildScooter, buildBike, buildCar, buildBus, buildTempo, buildCycle, buildLow, PAINTS, VARIANTS, addVariantTypes, baseOf } from '../vehicles/models.js';"],
     ["const TYPE_NAMES = Object.keys(TYPES);", "addVariantTypes(TYPES); const TYPE_NAMES = Object.keys(TYPES);"],
-    ["tempo: buildTempo(), bus: buildBus(),", "tempo: buildTempo(), bus: buildBus(), ...Object.fromEntries(Object.keys(VARIANTS).map(k => [k, buildCar(k, { driver: true })])),"],
+    ["tempo: buildTempo(), bus: buildBus(),", "tempo: buildTempo({ driver: true }), bus: buildBus({ driver: true }), ...Object.fromEntries(Object.keys(VARIANTS).map(k => [k, buildCar(k, { driver: true })])),"],
     // every car on the road has someone driving it (beta/vehicles/models.js addDriver)
     ["hatch: buildCar('hatch'), sedan: buildCar('sedan'), suv: buildCar('suv'), taxi: buildCar('taxi'),\n      lux: buildCar('lux'), jeep: buildCar('jeep'), sports: buildCar('sports'), super: buildCar('super'),", "hatch: buildCar('hatch', { driver: true }), sedan: buildCar('sedan', { driver: true }), suv: buildCar('suv', { driver: true }), taxi: buildCar('taxi', { driver: true }),\n      lux: buildCar('lux', { driver: true }), jeep: buildCar('jeep', { driver: true }), sports: buildCar('sports', { driver: true }), super: buildCar('super', { driver: true }),"],
     // a car you're getting into: the one built for you stands in its place (beta/vehicles/cardoor.js)

@@ -123,12 +123,45 @@ export function addRider(b, x, y, z, opts = {}) {
 // someone at the wheel of a car, sat back in the driver's seat (on the right: these are right-hand drive), hands on
 // the wheel, feet down to the pedals. The traffic's cars all carry one (their shirt is the instance's own colour); the
 // car whose door you open has one too, till you haul them out (beta/vehicles/cardoor.js)
-export function addDriver(b, kind, inst, shirt) {
+function carSeat(kind) {
   const c = carSpec(kind), seat = kind === 'hatch' ? [-0.2, 0.57, 0.36] : kind === 'suv' ? [-0.3, 0.7, 0.38] : [c.L/2 - c.hood - 1.25, c.sill + 0.33, c.W*0.22];
-  const hx = seat[0] - 0.15, hy = seat[1] + 0.04, z = seat[2];
+  return [seat[0] - 0.15, seat[1] + 0.04, seat[2]];
+}
+export function addDriver(b, kind, inst, shirt) {
+  const c = carSpec(kind), [hx, hy, z] = carSeat(kind);
   addRider(b, hx, hy, z, { lean: -0.1, inst, fixedHead: true, shirt: shirt || [1, 1, 1], pants: [0.2, 0.2, 0.24], handX: hx + 0.5, handY: hy + 0.36, handW: 0.17, footX: hx + 0.86, footY: c.sill + 0.08 });
 }
 export function driverGeo(kind, shirt) { const b = newB(false); addDriver(b, kind, false, shirt); return b.build(); }
+// who sits in a city bus: the driver in the cab on the right, and the people on a third or so of the seats, two and two
+// down the aisle facing forward (the same seats the model has: buildBus)
+const BUS_L = 11.4, BUS_HW = 2.55/2, BUS_FL = 0.88;
+const BUS_DRV = [BUS_L/2 - 1.33, BUS_FL + 0.54, 0.75];
+const BUS_PAX = (() => {
+  const out = [], hl = BUS_L/2; let k = 0;
+  for (const s of [-1, 1]) for (let x = -hl + 0.95; x < hl - 1.75; x += 0.78) {
+    if (s < 0 && ((x > hl - 1.5) || (x > -0.85 && x < 0.65))) continue;
+    for (const z of [0.52, 0.98]) { k++; const h = ((k*2654435761) >>> 0)/4294967296; if (h < 0.38) out.push([x - 0.08, BUS_FL + 0.54, s*z, k]); }
+  }
+  return out;
+})();
+const PAX_SHIRTS = [[0.95, 0.95, 0.93], [0.4, 0.6, 0.85], [0.85, 0.3, 0.3], [0.2, 0.25, 0.35], [0.95, 0.85, 0.5], [0.3, 0.55, 0.35], [0.6, 0.2, 0.5], [0.95, 0.6, 0.2], [0.55, 0.55, 0.55], [0.75, 0.15, 0.35]];
+const PAX_PANTS = [[0.18, 0.2, 0.28], [0.25, 0.22, 0.2], [0.12, 0.12, 0.14], [0.55, 0.5, 0.42], [0.3, 0.3, 0.33]];
+const HAIRS = [[0.05, 0.04, 0.035], [0.08, 0.06, 0.05], [0.3, 0.3, 0.3], [0.04, 0.035, 0.03]];
+// a tempo's driver, in the cab on the right
+const TEMPO_DRV = [1.02, 0.98, 0.34];
+// where everyone in a vehicle sits (their hips, in its frame): what Munja shows through the walls
+export function occupantsOf(type) {
+  const t = type || '', b = baseOf(t);
+  if (/^scooter/.test(t)) return /P$/.test(t) ? [[-0.38, 0.8, 0], [-0.72, 0.82, 0]] : [[-0.38, 0.8, 0]];
+  if (/^(bike|bullet|superbike)/.test(t)) return /P$/.test(t) ? [[-0.32, 0.95, 0], [-0.62, 0.97, 0]] : [[-0.32, 0.95, 0]];
+  if (/^cycle/.test(t)) return [[-0.28, 0.92, 0]];
+  if (/^auto/.test(t)) return [[0.32, 0.8, 0]];
+  if (b === 'bus') return [BUS_DRV, ...BUS_PAX];
+  if (b === 'tempo') return [TEMPO_DRV];
+  try { return [carSeat(t)]; } catch (e) { return []; }
+}
+// someone sat, hands forward: the shape Munja lights where each of them sits
+export function seatedGeo() { const b = newB(false); addRider(b, 0, 0, 0, { lean: 0.05, handX: 0.42, handY: 0.3, handW: 0.2, footX: 0.45, footY: -0.42 }); return b.build(); }
 // pillion rider (women often sit side-saddle)
 function addPillion(b, x, y, z, sideSaddle, inst) {
   if (!sideSaddle) { addRider(b, x, y, z, { lean: 0.05, inst, handX: x + 0.3, handY: y + 0.3, handW: 0.25, footX: x + 0.25, footY: y - 0.38 }); return; }
@@ -1300,7 +1333,7 @@ function shell(b, xs, outline, at, colorOf, closeN = 6) {
   gridSurface(b, rows, colorOf, { closed: true });
 }
 // ---------------------------------------------------------------- city bus
-export function buildBus() {
+export function buildBus(opts = {}) {
   const b = newB(true), gl = newB(false);
   const L = 11.4, W = 2.55, H = 3.15, hl = L / 2, hw = W / 2;
   const red = [0.72, 0.12, 0.1], cream = [0.93, 0.88, 0.76], roofC = [0.84, 0.84, 0.8], band = [0.98, 0.7, 0.1], WX = [hl - 2.4, -hl + 3.0], AR = 0.64;
@@ -1424,11 +1457,15 @@ export function buildBus() {
   { const cx = hl - 0.85, cy = fl + 0.95, cz = 0.75, rr = 0.24, pts = [];
     for (let i = 0; i <= 16; i++) { const a = i/16*Math.PI*2; pts.push([cx + Math.sin(a)*rr*0.45, cy + Math.cos(a)*rr*0.9, cz + Math.sin(a)*rr]); }
     tube(b, pts, 0.016, [0.08, 0.08, 0.09], 16, 6); rod(b, [cx, cy, cz], [hl - 0.55, fl + 0.6, cz], 0.03, [0.1, 0.1, 0.11]); }
+  // the people in it: a third of the seats taken, sat back, hands in their laps; and in the traffic's, the driver at the
+  // wheel (yours is you)
+  for (const [x, y, z, k] of BUS_PAX) addRider(b, x, y, z, { lean: -0.06, fixedHead: true, shirt: PAX_SHIRTS[k % PAX_SHIRTS.length], pants: PAX_PANTS[(k*7) % PAX_PANTS.length], hair: HAIRS[(k*3) % HAIRS.length], handX: x + 0.36, handY: y + 0.1, handW: 0.12, footX: x + 0.46, footY: fl + 0.04 });
+  if (opts.driver) { const [x, y, z] = BUS_DRV; addRider(b, x, y, z, { lean: -0.04, fixedHead: true, shirt: [0.62, 0.66, 0.72], pants: [0.2, 0.22, 0.3], handX: hl - 0.92, handY: fl + 0.9, handW: 0.17, footX: x + 0.62, footY: fl + 0.06 }); }
   return { body: b.build(), glass: gl.build(), dims: { L, W, H, wb: 5.4 } };
 }
 
 // ---------------------------------------------------------------- tempo (mini truck)
-export function buildTempo() {
+export function buildTempo(opts = {}) {
   const b = newB(true), gl = newB(false);
   const L = 3.8, W = 1.55, hl = L / 2, hw = W / 2, cab = [1, 1, 1], R = 0.32, FX = 1.25, RX = -1.2, side = [0.9, 0.55, 0.1], wood = [0.42, 0.3, 0.2], AR = 0.4;
   // the cab, in one piece: nose, bonnet, raked windscreen, roof, a flat back; its wheel arch cut in
@@ -1494,6 +1531,8 @@ export function buildTempo() {
   for (const [x, z] of load) b.addGeo(RB, M(x, 0.76, z, 0.62, 0.32, 0.52), [0.85, 0.82, 0.72], 0, 3);
   for (const [x, z] of load.slice(0, 5)) b.addGeo(RB, M(x + 0.16, 1.03, z*.6, 0.6, 0.28, 0.5), [0.8, 0.77, 0.66], 0, 3);
   for (const x of [-1.25, -0.25]) tube(b, [[x, 1.1, -hw], [x, 1.26, -0.3], [x, 1.28, 0.3], [x, 1.1, hw]], 0.008, [0.72, 0.7, 0.6], 12, 4);
+  // the traffic's: someone driving it, in the cab on the right, hands on the wheel (yours is you)
+  if (opts.driver) { const [x, y, z] = TEMPO_DRV; addRider(b, x, y, z, { lean: -0.05, fixedHead: true, shirt: [0.9, 0.88, 0.8], pants: [0.25, 0.22, 0.2], handX: x + 0.46, handY: y + 0.3, handW: 0.17, footX: x + 0.68, footY: 0.5 }); }
   return { body: b.build(), glass: gl.build(), dims: { L, W, H: 1.95, wb: 2.45 } };
 }
 

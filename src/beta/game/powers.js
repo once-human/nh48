@@ -37,6 +37,7 @@ import { people } from './wake.js';
 import { acts } from './acts.js';
 import { hostBody } from './host.js';
 import { Vehicle } from '@orig/vehicles/vehicle.js';
+import { occupantsOf, seatedGeo } from '../vehicles/models.js';
 
 const STORE = 'puneri_powers', DAILY = 3;
 // how strong your powers are: level 1 is half of what they'll be once they've grown (levelling up raises LV toward 1).
@@ -647,22 +648,30 @@ export function powers(G) {
     }
     return pts;
   }
-  // a glow round the vehicles whose riders aren't real people up close (cars, the far two-wheelers): an ellipsoid of
-  // light their size, through walls like the rest
+  // the people in the vehicles whose riders aren't real people up close (everyone in a car, a bus, a tempo, the far
+  // two-wheelers and autos): each of them lit where they sit, the shape of someone sat there, through walls like the rest.
+  // (It was one ball of light the size of the vehicle: a car read as a blob, not as the person driving it)
   let vg = null;
+  const VG = 200, _tm = new THREE.Matrix4(), _one = new THREE.Vector3(1, 1, 1);
   function vGlow(k) {
     if (!vg) {
-      const g = new THREE.SphereGeometry(0.5, 18, 12), m = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, opacity: 0 });
-      vg = new THREE.InstancedMesh(g, m, 24); vg.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(72), 3); vg.frustumCulled = false; vg.renderOrder = 19; G.scene.add(vg);
+      const m = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, opacity: 0 });
+      vg = new THREE.InstancedMesh(seatedGeo(), m, VG); vg.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(VG*3), 3); vg.frustumCulled = false; vg.renderOrder = 19; G.scene.add(vg);
     }
-    vg.material.opacity = 0.22*k;
+    vg.material.opacity = 0.55*k;
     let n = 0;
     if (k > 0.01) for (const [v] of vehNear()) {
-      if (n >= 24) break;
+      if (n >= VG) break;
       if (v.rich && v._riders && v._riders.every(r => r.body)) { for (const r of v._riders) AU.light(r, vIntent(v), 0.9*k, true); continue; }
-      const T = v.T || {}, L = T.L || 2, W = T.W || 1, H = T.two ? 1.6 : T.L > 6 ? 3.2 : 1.6;
-      vm.compose(vp.set(v.rx ?? v.x, (v.y || 0) + H*0.5, v.rz ?? v.z), vq.setFromAxisAngle(vy, -(v.ryaw ?? v.yaw ?? 0)), vs.set(L*1.15, H*1.15, W*1.3));
-      vg.setMatrixAt(n, vm); col.set(vIntent(v)); vg.instanceColor.setXYZ(n, col.r, col.g, col.b); n++;
+      if (v._tp && v._tp.empty) continue;                                      // (knocked off it: they're on the road, lit there)
+      if (v._tp && v._tp.Q) { vp.set(v._tp.ox, v._tp.oy, v._tp.oz); vq.copy(v._tp.Q); }
+      else { vp.set(v.rx ?? v.x, v.y || 0, v.rz ?? v.z); vq.setFromAxisAngle(vy, -(v.ryaw ?? v.yaw ?? 0)); }
+      vm.compose(vp, vq, _one); col.set(vIntent(v));
+      for (const q of occupantsOf(v.type)) {
+        if (n >= VG) break;
+        _tm.makeTranslation(q[0], q[1], q[2]).premultiply(vm);
+        vg.setMatrixAt(n, _tm); vg.instanceColor.setXYZ(n, col.r, col.g, col.b); n++;
+      }
     }
     vg.count = n; vg.instanceMatrix.needsUpdate = true; vg.instanceColor.needsUpdate = true;
   }
