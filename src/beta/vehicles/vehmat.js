@@ -5,20 +5,23 @@
 import * as THREE from 'three';
 import { PU, LAMP, PCF, DITHER } from '../gfx/paint.js';
 
+// (aDis: a vehicle handing over from one of its versions to the next. Each pixel has its own number (DITHER); the one
+// going drops those under .x, the one coming keeps those under 1 - .y, so between them every pixel's drawn once.
+// Nothing set, it's (0, 0): all of it)
 const VS = `attribute float glow; attribute float paint;
 #ifdef USE_INSTANCING
-attribute vec3 aColB, aColC; attribute vec2 aLamp;
+attribute vec3 aColB, aColC; attribute vec2 aLamp, aDis;
 #endif
-uniform vec2 uLamp; varying vec2 vLp;
+uniform vec2 uLamp; varying vec2 vLp, vDs;
 #ifdef FADE
 varying float vFd;
 #endif
 varying vec3 vN, vW, vC, vL; varying float vG, vP, vZ;
 void main(){
 #ifdef USE_INSTANCING
-  vLp = aLamp + uLamp;
+  vLp = aLamp + uLamp; vDs = aDis;
 #else
-  vLp = uLamp;
+  vLp = uLamp; vDs = vec2(0.);
 #endif
   vec3 base = color;
 #ifdef USE_INSTANCING_COLOR
@@ -66,9 +69,11 @@ ${PCF}
 float shadowAt(vec3 w, vec3 n){ vec4 s = shadowMat*vec4(w + n*(.05 + .002*vZ), 1.); if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.;
   return shadowPCF(vec3(s.xy, s.z - .0006)); }
 `;
-const FS = CHUNK + `varying vec2 vLp; uniform vec3 uInd;
+const FS = CHUNK + `varying vec2 vLp, vDs; uniform vec3 uInd;
+${DITHER.replace('ditherH', 'disH')}
 void main(){
   FADE_OUT
+  if (vDs.x + vDs.y > 0.) { float h = disH(); if (h < vDs.x || h >= 1. - vDs.y) discard; }
   vec3 n = normalize(vN), V = normalize(cameraPosition - vW), b = vC; float matte = vG < -.5 ? 1. : 0., painted = abs(vP - 1.) < .5 ? 1. : 0.;
   float glassy = step(3.5, vP), e = (nz(gl_FragCoord.xy*.11) - .5)*(1. - uReal), ndl = dot(n, sunDir), lit = sunOn(ndl, e*.1, .0, .13), sh = (shadowOn > .5 && lit > 0.) ? shadeOf(shadowAt(vW, n), e*.3) : 1., L = lit*sh*dayK;
   // grime low down on the body, a little wear
