@@ -364,6 +364,12 @@ function frameRing(b, F, u0, u1, y0, y1, t, d) {
   F.box(b, u0 - t, u0, y0, y1, 0, d, 2 | 4 | 8 | 32);
   F.box(b, u1, u1 + t, y0, y1, 0, d, 2 | 4 | 8 | 16);
 }
+// the same, standing off a wall inside a room (between dA and dB)
+function ringAt(b, F, u0, u1, y0, y1, t, dA, dB) {
+  F.box(b, u0 - t, u1 + t, y1, y1 + t, dA, dB, 2 | 8);
+  F.box(b, u0 - t, u0, y0, y1, dA, dB, 2 | 4 | 8 | 32);
+  F.box(b, u1, u1 + t, y0, y1, dA, dB, 2 | 4 | 8 | 16);
+}
 // a half circle over a window (glass) and its trim
 function archTop(b, F, uc, r, y, d) {
   const seg = 6;
@@ -548,12 +554,13 @@ const GOODS = [
 // ---------------------------------------------------------------- a shop from its plan (world/shopplan.js)
 // The room is the plan's size; each piece stands exactly where the plan puts it (the game walks you round the same
 // pieces); what's on them, the colours and the stock, is only for looking at.
-const STOCK_GOODS = { kirana: 0, paan: 0, flowers: 0, pets: 0, medicine: 2, frames: 2, clothes: 4, laundry: 4, gold: 5, mobile: 6, tv: 6, books: 7, hardware: 8, sweets: 11, shoes: 12, bakery: 13 };
+const STOCK_GOODS = { food: 1, cafe: 1, chai: 1, fast: 1, juice: 11, icecream: 11, kirana: 0, paan: 0, flowers: 0, pets: 0, medicine: 2, frames: 2, clothes: 4, laundry: 4, gold: 5, mobile: 6, tv: 6, books: 7, hardware: 8, sweets: 11, shoes: 12, bakery: 13 };
 function drawShop(b, cb, G, F, a, P, lux) {
   const { R, L } = G, w = P.w, D = P.D, c = a + w, yb = BASE, yt = BASE + P.oh, st = P.stock;
   const U = (u) => a + u;
   // the room
-  const wallC = st === 'gold' ? [0xe8d8b8, 0x6a2a1e, 0xf0e6d0][(R() * 3) | 0] : st === 'frames' || st === 'pets' ? 0xeef0ee : st === 'clothes' || st === 'shoes' ? [0xf2eee6, 0xe0d4c0, 0x8a6a48, 0xd8dce0][(R() * 4) | 0] : st === 'books' ? [0xe8dcc0, 0x8a6a48][(R() * 2) | 0] : st === 'medicine' ? 0xeef0ea : st === 'mobile' || st === 'tv' ? 0xe6e6e2 : st === 'sweets' || st === 'bakery' ? [0xf2ead8, 0xe8dcc0, 0xdfe8e0][(R() * 3) | 0]
+  const wallC = st === 'food' ? [0xdfeee3, 0xe9e0c8, 0xf1e2c6, 0xe4d9be, 0xb98b5a][(R() * 5) | 0] : st === 'cafe' ? [0xefe6d6, 0x8a4a34, 0xf7f6f2, 0x2a2a30][(R() * 4) | 0]
+    : st === 'fast' ? [0xe63946, 0xf2c230, 0x1d4e89][(R() * 3) | 0] : st === 'chai' ? [0x9fd8cf, 0xe4d9be, 0x8a7a66][(R() * 3) | 0] : st === 'juice' || st === 'icecream' ? [0xf9d9e0, 0xf2c230, 0xbfe6dc][(R() * 3) | 0] : st === 'gold' ? [0xe8d8b8, 0x6a2a1e, 0xf0e6d0][(R() * 3) | 0] : st === 'frames' || st === 'pets' ? 0xeef0ee : st === 'clothes' || st === 'shoes' ? [0xf2eee6, 0xe0d4c0, 0x8a6a48, 0xd8dce0][(R() * 4) | 0] : st === 'books' ? [0xe8dcc0, 0x8a6a48][(R() * 2) | 0] : st === 'medicine' ? 0xeef0ea : st === 'mobile' || st === 'tv' ? 0xe6e6e2 : st === 'sweets' || st === 'bakery' ? [0xf2ead8, 0xe8dcc0, 0xdfe8e0][(R() * 3) | 0]
     : [0x8a6a48, 0x9a7a52, 0x7a6a58, 0xd8c8a8, 0xe0d8c8, 0xb8c8b8][(R() * 6) | 0];
   b.set(K.inside, wallC, 0.25, R());
   F.rect(b, c, a, yb, yt, -D, 1);
@@ -655,6 +662,15 @@ function drawPiece(b, cb, G, F, U, q, yb, yt, st, pc, lux) {
         b.set(K.metal, 0x2a2a2a, 0.3); F.box(b, q.flap[0] < 0.1 ? fu1 - 0.012 : fu0, q.flap[0] < 0.1 ? fu1 : fu0 + 0.012, yb + h - 0.05, yb + h + 0.002, d0, d1 + 0.02, 2);
       }
       // on top: the jars, the demo phones, the scale
+      if (st === 'chai' || st === 'food') {
+        // the stove and the big pot on it (the chai on the boil), steel vessels with their lids
+        const uu = q.flap && q.flap[0] < 0.1 ? u1 - 0.75 : u0 + 0.2;
+        b.set(K.metal, 0x2a2a2a, 0.4); F.box(b, uu, uu + 0.5, yb + h, yb + h + 0.1, d0 + 0.08, d0 + 0.42, 2);
+        const P0 = F.P(uu + 0.25, 0, d0 + 0.25); b.set(K.metal, 0xb8bcc0, 0.3); b.cyl(P0[0], yb + h + 0.1, P0[2], 0.13, 0.15, 0.22, 10);
+        for (let x = uu + 0.7; x < u1 - 0.3 && x > u0; x += 0.38) { if (q.flap && x > fu0 - 0.35 && x < fu1) continue; const P1 = F.P(x, 0, d0 + 0.25); b.set(K.metal, 0xc8ccd0, 0.2); b.cyl(P1[0], yb + h, P1[2], 0.14, 0.14, 0.16, 10); b.set(K.metal, 0x9aa0a6, 0.2); b.cyl(P1[0], yb + h + 0.16, P1[2], 0.15, 0.12, 0.03, 10); }
+      }
+      if (st === 'cafe' || st === 'fast') { const uu = q.flap && q.flap[0] < 0.1 ? u1 - 0.65 : u0 + 0.2; b.set(K.metal, st === 'cafe' ? 0x8a8e92 : 0x2a2a2e, 0.15); F.box(b, uu, uu + 0.45, yb + h, yb + h + 0.42, d0 + 0.06, d0 + 0.4, 2); b.set(K.plain, 0x1a1a1c, 0.1); F.box(b, uu + 0.6, uu + 0.9, yb + h, yb + h + 0.25, d0 + 0.1, d0 + 0.32, 2); }
+      if (st === 'juice') for (let uu = u0 + 0.2; uu < u1 - 0.35; uu += 0.34) { if (q.flap && uu > fu0 - 0.3 && uu < fu1) continue; const P0 = F.P(uu + 0.15, 0, (d0 + d1) / 2); b.set(K.leaf, [0xf08a24, 0xf2c230, 0x2f8a5a, 0xd83a2a][(R() * 4) | 0], 0); b.blob(P0[0], yb + h + 0.1, P0[2], 0.15, 0.1, 0.15, 5); }
       if (st === 'laundry') for (let s = 0; s < 3; s++) { const uu = u0 + 0.15 + s * (u1 - u0 - 0.3) / 3; if (q.flap && uu > fu0 - 0.4 && uu < fu1) continue; for (let l = 0; l < 4 + ((R() * 4) | 0); l++) { b.set(K.cloth, CLOTH[(R() * CLOTH.length) | 0], 0.2); F.box(b, uu, uu + 0.4, yb + h + l * 0.04, yb + h + l * 0.04 + 0.04, d0 + 0.08, d1 - 0.1, 2 | 8); } }
       if (st === 'kirana' || st === 'bakery' || st === 'paan') for (let uu = u0 + 0.2; uu < u1 - 0.3; uu += 0.26) { if (R() < 0.35 || (q.flap && uu > fu0 - 0.15 && uu < fu1)) continue; b.set(K.glass, 0xe8e2cc, 0, R()); F.box(b, uu, uu + 0.15, yb + h, yb + h + 0.24, d1 - 0.22, d1 - 0.08, 2 | 4 | 8); b.set(K.plain, [0xc8302a, 0xf2c230, 0x2f5fd0][(R() * 3) | 0], 0.1); F.box(b, uu - 0.005, uu + 0.155, yb + h + 0.24, yb + h + 0.28, d1 - 0.225, d1 - 0.075, 2); }
       if (st === 'mobile') for (let uu = u0 + 0.25; uu < u1 - 0.3; uu += 0.32 + R() * 0.15) {
@@ -696,6 +712,36 @@ function drawPiece(b, cb, G, F, U, q, yb, yt, st, pc, lux) {
     case 'stand': {
       b.set(K.plain, 0xe8e8e4, 0.1); F.box(b, u0, u1, yb, yb + q.h, d0, d1, 8);
       for (let y = yb + 0.3; y < yb + q.h - 0.1; y += 0.25) for (let uu = u0 + 0.04; uu < u1 - 0.08; uu += 0.1) { b.set(K.plain, pc(), 0.1); F.box(b, uu, uu + 0.07, y, y + 0.14, d1, d1 + 0.03, 2 | 8); }
+      break;
+    }
+    case 'kitchen': {
+      // the back wall: the hatch into the kitchen (dark, steel round it), the menu board over it, a door at one end
+      const hu0 = u0 + (u1 - u0) * 0.3, hu1 = u0 + (u1 - u0) * 0.7;
+      b.set(K.inside, 0x1a1816, 0.6); F.rect(b, hu1, hu0, yb + 1.0, yb + 1.75, d1 - 0.27, 1);
+      b.set(K.metal, 0xb8bcc0, 0.2); F.box(b, hu0 - 0.05, hu1 + 0.05, yb + 0.96, yb + 1.0, d1 - 0.28, d1 + 0.05, 2); ringAt(b, F, hu0, hu1, yb + 1.0, yb + 1.75, 0.05, d1 - 0.3, d1 - 0.22);
+      b.set(K.inside, 0x3a2a20, 0.5); F.rect(b, u1 - 0.1, u1 - 0.85, yb, yb + 2.05, d1 - 0.27, 1);
+      b.set(K.wood, 0x5a3a24, 0.4); ringAt(b, F, u1 - 0.85, u1 - 0.1, yb, yb + 2.05, 0.05, d1 - 0.3, d1 - 0.22);
+      if (yb + 2.35 < yt - 0.1) { b.set(K.ad, pc(), 0, R()); F.rect(b, hu1 + 0.2, hu0 - 0.2, yb + 1.95, Math.min(yt - 0.12, yb + 2.6), d1 - 0.26, 1); }
+      // (the wall between: a dado of tiles)
+      b.set(K.sqTiles, st === 'food' || st === 'chai' ? 0xdfeee3 : 0xe8e4dc, 0.3); F.rect(b, u1, u0, yb, yb + 0.95, d1 - 0.29, 1);
+      break;
+    }
+    case 'etable': {
+      const top = st === 'cafe' ? 0x7a5236 : st === 'fast' ? 0xf2f2f0 : [0xc8ccd2, 0xd8d8d0, 0x5a3a26, 0xe8e4dc][(R() * 4) | 0];
+      b.set(st === 'food' && top === 0xc8ccd2 ? K.metal : K.wood, top, 0.2); F.box(b, u0, u1, yb + q.h - 0.04, yb + q.h, d0, d1, 0);
+      b.set(K.metal, 0x8a8e92, 0.2); for (const [x, z] of [[u0 + 0.05, d0 + 0.05], [u1 - 0.08, d0 + 0.05], [u0 + 0.05, d1 - 0.08], [u1 - 0.08, d1 - 0.08]]) F.box(b, x, x + 0.03, yb, yb + q.h - 0.04, z, z + 0.03, 4 | 8);
+      break;
+    }
+    case 'chair': {
+      const col = st === 'fast' ? [0xe63946, 0xf2c230][(R() * 2) | 0] : st === 'cafe' ? 0x3a2a20 : [0xc8ccd2, 0x6b4a2e, 0xd83a2a, 0x2f5fd0][(R() * 4) | 0];
+      b.set(st === 'food' ? K.plain : K.wood, col, 0.25); F.box(b, u0, u1, yb + 0.43, yb + 0.47, d0, d1, 0);
+      const bk = q.face === 'in' ? [d1 - 0.04, d1] : [d0, d0 + 0.04]; F.box(b, u0, u1, yb + 0.47, yb + 0.9, bk[0], bk[1], 0);
+      b.set(K.metal, 0x8a8e92, 0.2); for (const [x, z] of [[u0 + 0.02, d0 + 0.02], [u1 - 0.05, d0 + 0.02], [u0 + 0.02, d1 - 0.05], [u1 - 0.05, d1 - 0.05]]) F.box(b, x, x + 0.03, yb, yb + 0.43, z, z + 0.03, 4 | 8);
+      break;
+    }
+    case 'ledge': {
+      b.set(K.wood, st === 'icecream' ? 0xf2f2f0 : 0x6a4a32, 0.2); F.box(b, u0, u1, yb + q.h - 0.04, yb + q.h, d0, d1, 0);
+      b.set(K.metal, 0x8a8e92, 0.2); for (let d = d0 + 0.1; d < d1; d += 1.2) F.box(b, (u0 + u1) / 2 - 0.02, (u0 + u1) / 2 + 0.02, yb, yb + q.h - 0.04, d, d + 0.04, 4 | 8);
       break;
     }
     case 'rail': {

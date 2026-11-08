@@ -125,27 +125,43 @@ function isOpen(S) {
   const inf = infoOf(S); return !inf || openNow(inf, G.hour).open;
 }
 const down = (p) => !p || p.corpse || p.dead || p.ko || p.fallen > 0 || p.mode === 'flee';
+function person(S, x, z, yaw, anim, female, rng) {
+  const ppl = G.people, kit = G.W.kit;
+  const p = ppl.make(G.W.graph.edges[0], 1, 1, { female, mode: 'fixed', adult: true });
+  p.fixed = true; p.mode = 'fixed'; p.interior = true; p.shopStaff = true; p.x = x; p.z = z; p.yaw = yaw; p.hx = Math.cos(yaw); p.hz = Math.sin(yaw);
+  p.anim = anim; p.idle = anim; p.onRoad = false;
+  p.persona = female ? (rng.chance(0.5) ? 'kaku' : ppl.pickPersona(true, x, z)) : rng.chance(0.4) ? 'kaka' : ppl.pickPersona(false, x, z);
+  if (kit) { const L = kit.randomLook(new RNG(rng.int(1, 1e9)), { female }); p.look = L; p.shirt = [L.top.r, L.top.g, L.top.b]; p.lower = [L.bottom.r, L.bottom.g, L.bottom.b]; p.skin = [L.skin.r, L.skin.g, L.skin.b]; }
+  return p;
+}
+// the people who work there, and in a place to eat a few people at the tables (who's in depends on the hour)
 function makeStaff(S) {
-  const ppl = G.people, kit = G.W.kit, inf = infoOf(S);
+  const ppl = G.people, inf = infoOf(S);
   if (!ppl || !inf) return;
-  const rng = new RNG((S.plan.kind.length * 7919 + Math.round(S.door.x * 13) * 31 + Math.round(S.door.z * 7)) >>> 0), keep = ppl.rng; ppl.rng = rng;
-  S.staff = [];
+  const rng = new RNG((S.plan.kind.length * 7919 + Math.round(S.door.x * 13) * 31 + Math.round(S.door.z * 7) + Math.floor((G.clock || 0) / 2) * 101) >>> 0), keep = ppl.rng; ppl.rng = rng;
+  S.staff = []; S.guests = [];
   try {
-    S.plan.keeper.forEach((k, n) => {
-      const [x, z] = at(S, k.u, k.d), yaw = yawOf(S, k.face), female = rng.chance(S.plan.stock === 'medicine' || S.plan.stock === 'bakery' ? 0.35 : 0.15);
-      const p = ppl.make(G.W.graph.edges[0], 1, 1, { female, mode: 'fixed', adult: true });
-      p.fixed = true; p.mode = 'fixed'; p.interior = true; p.shopStaff = true; p.x = x; p.z = z; p.yaw = yaw; p.hx = Math.cos(yaw); p.hz = Math.sin(yaw);
-      p.anim = k.anim; p.idle = k.anim; p.onRoad = false; p.role = k.role;
-      p.persona = female ? 'kaku' : rng.chance(0.5) ? 'kaka' : ppl.pickPersona(false, x, z);
-      if (kit) { const L = kit.randomLook(new RNG(rng.int(1, 1e9)), { female }); p.look = L; p.shirt = [L.top.r, L.top.g, L.top.b]; p.lower = [L.bottom.r, L.bottom.g, L.bottom.b]; p.skin = [L.skin.r, L.skin.g, L.skin.b]; }
+    for (const k of S.plan.keeper) {
+      const [x, z] = at(S, k.u, k.d), female = rng.chance(S.plan.stock === 'medicine' || S.plan.stock === 'bakery' || S.plan.stock === 'cafe' ? 0.35 : 0.15);
+      const p = person(S, x, z, yawOf(S, k.face), k.anim, female, rng); p.role = k.role;
       S.staff.push(p);
-    });
+    }
+    const R = roomOf(S), free = R.seats.filter(q => !q.wait);
+    if (S.plan.fam === 'eatery' && free.length) {
+      const h = G.hour || 12, busy = (h >= 12 && h < 14.5) || (h >= 19.5 && h < 22.5) ? 0.55 : h >= 8 && h < 11 ? 0.35 : 0.2;
+      for (const q of free) {
+        if (!rng.chance(busy)) continue;
+        q.used = true;
+        S.guests.push(person(S, q.x, q.z, q.yaw, rng.chance(0.5) ? 'sit_talk' : 'sit', rng.chance(0.4), rng));
+      }
+    }
   } finally { ppl.rng = keep; }
 }
 function dropStaff(S) {
   if (!S.staff) return;
-  for (const p of S.staff) if (!p.corpse && !p.dead && G && G.people) G.people.remove(p);
-  S.staff = null; S.info = null;
+  for (const p of S.staff.concat(S.guests || [])) if (!p.corpse && !p.dead && G && G.people) G.people.remove(p);
+  if (S.R) for (const q of S.R.seats) q.used = false;
+  S.staff = null; S.guests = null; S.info = null;
 }
 // every so often: each shop near you, open or shut; its gap; its people (they come while you can't see the shop,
 // and go when it's shut and out of sight, or you're far off)
@@ -167,6 +183,7 @@ function tend() {
 
 // ---------------------------------------------------------------- in and out
 const LABEL = { kirana: 'Buy something', shop: 'Buy something', paan: 'A paan, or something else', florist: 'Buy flowers', sweets: 'Buy sweets', bakery: 'Buy from the bakery',
+  tapri: 'Order a cutting chai', cafe: 'Order at the counter', juice: 'Order a juice', icecream: 'Order an ice cream',
   pharmacy: 'Ask for medicine', mobile: 'Phones, recharge, repairs', electronics: 'Look at what they have', laundry: 'Give in clothes, collect them ironed',
   books: 'Buy a book', clothes: 'Pay at the counter', shoes: 'Try on shoes', optician: 'Eye test and glasses', jeweller: 'Look at the gold', petshop: 'Buy for your pet' };
 function roomOf(S) {
@@ -185,7 +202,10 @@ function enter(S) {
   if (!I || I.cur || !inf) return;
   const R = roomOf(S);
   // the people who work here are the room's (the counter needs one of them on their feet)
-  R.people = S.plan.keeper.map(k => ({ role: k.role })); R.peds = S.staff ? S.staff.slice() : [];
+  R.people = S.plan.keeper.map(k => ({ role: k.role })); R.peds = S.staff ? S.staff.concat(S.guests || []) : [];
+  // someone who comes in to meet you (a date) sits down here like anyone else
+  I._make = (x, z, yaw, anim, female) => { const p = person(S, x, z, yaw, anim, female, new RNG((Math.random() * 1e9) | 0)); (S.guests || (S.guests = [])).push(p); R.peds.push(p); return p; };
+  I._ctx = inf;
   I.cur = { R, ctx: inf, door: { x: S.door.x, z: S.door.z, yaw: 0 }, plate: null, seat: null, dancing: false, talk: null, inPlace: true };
   here = { S };
   G.hud.enterPlace?.(inf);

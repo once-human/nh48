@@ -10,12 +10,14 @@ import { rng, hash2 } from './geom.js';
 const FAMILY = {
   kirana: 'counter', shop: 'counter', paan: 'counter', florist: 'counter', sweets: 'counter', bakery: 'counter',
   pharmacy: 'counter', mobile: 'counter', electronics: 'counter', laundry: 'counter',
+  tapri: 'eatery', misal: 'eatery', thali: 'eatery', biryani: 'eatery', southindian: 'eatery', chinese: 'eatery', fastfood: 'eatery', food: 'eatery',
+  cafe: 'eatery', juice: 'eatery', icecream: 'eatery',
   books: 'walls', clothes: 'walls', shoes: 'walls', optician: 'walls', jeweller: 'walls', petshop: 'walls',
 };
 // (a listed business the game has no kind for: a general store or a hardware shop if the map says so)
 export const familyOf = (kind, cat) => FAMILY[kind || ''] || (!kind && (cat === 'grocery' || cat === 'generic' || cat === 'hardware') ? 'counter' : null);
 // how deep each kind of shop goes, at most (the building has the last word)
-const CAP = { counter: 4.4, walls: 5.2 };
+const CAP = { counter: 4.4, walls: 5.2, eatery: 5.6 };
 
 // how far in from (x, z) the building goes, along -n
 export function depthAt(p, x, z, nx, nz) {
@@ -46,6 +48,7 @@ export function shopPlan(o) {
   const P = { fam, kind: o.kind || '', cat: o.cat, w, D, oh, glass: !!o.glass || o.kind === 'jeweller', door: null, pieces: [], solids: [], keeper: [], spot: null, spots: [], browse: [], seats: [], tpl: 'shop' };
   if (fam === 'counter') counterShop(P, R, o);
   else if (fam === 'walls') wallsShop(P, R, o);
+  else if (fam === 'eatery') eatery(P, R, o);
   if (P.spot && !P.spots.length) P.spots.push({ u: P.spot.u, d: P.spot.d, kind: 'counter' });
   // the way in: the whole open front, or the glass door in the middle of a glazed one
   if (!P.door) P.door = P.glass ? [Math.max(0.1, w / 2 - 0.5), Math.min(w - 0.1, w / 2 + 0.5)] : [0, w];
@@ -197,4 +200,56 @@ function wallsShop(P, R, o) {
     for (let u = u0 + 0.35; u < u1 - 0.2; u += 0.7) P.seats.push({ u, d: (d0 + d1) / 2, face: 'out', tu: u, td: d1 + 0.5, wait: true });
   }
   for (let i = 0; i < 2; i++) P.browse.push([w * (0.35 + 0.3 * i), Math.min(-0.5, (s0 + s1) / 2 + (i ? 0.4 : -0.4))]);
+}
+
+// A place to eat: the counter across the back where you order (the kitchen's hatch and the menu board behind it), and
+// the floor in front with its tables, two chairs to a table, in a column or two against one wall and a clear way down
+// the other from the door to the counter. A tapri has a bench down the wall instead and the chai on the boil; a
+// juice bar or an ice-cream parlour, too narrow for tables, has a ledge along the wall with stools.
+function eatery(P, R, o) {
+  const { w, D, oh } = P, k = P.kind;
+  const put = (q, solid = true) => { P.pieces.push(q); if (solid) P.solids.push([Math.min(q.u0, q.u1), Math.min(q.d0, q.d1), Math.max(q.u0, q.u1), Math.max(q.d0, q.d1)]); return q; };
+  const stock = k === 'cafe' ? 'cafe' : k === 'juice' ? 'juice' : k === 'icecream' ? 'icecream' : k === 'tapri' ? 'chai' : k === 'fastfood' ? 'fast' : 'food';
+  P.stock = stock; P.tpl = k === 'cafe' || k === 'juice' || k === 'icecream' ? 'cafe' : 'eatery';
+  // the counter and the kitchen behind it
+  const back = -D + 0.3, cb = back + 0.6, cf = cb + 0.6;
+  const fs = R() < 0.5 ? 0 : 1, fw = Math.min(0.75, w * 0.22), flap = fs ? [w - 0.05 - fw, w - 0.05] : [0.05, 0.05 + fw];
+  put({ t: 'kitchen', u0: 0.02, u1: w - 0.02, d0: -D, d1: back, h: oh - 0.05, stock });
+  put({ t: 'counter', u0: 0.05, u1: w - 0.05, d0: cb, d1: cf, h: 1.0, glass: stock === 'icecream' || stock === 'cafe' || stock === 'food' && R() < 0.4, stock, flap });
+  const kd = (back + cb) / 2;
+  P.keeper.push({ u: w / 2 + (fs ? -0.3 : 0.3), d: kd, face: 'out', role: 'keeper', anim: 'idle' });
+  if (w > 4) P.keeper.push({ u: fs ? w * 0.22 : w * 0.78, d: kd, face: 'out', role: 'helper', anim: 'idle' });
+  P.spot = { u: w / 2, d: cf + 0.5 };
+  P.spots.push({ u: w / 2, d: cf + 0.5, kind: 'counter', label: 'Order at the counter' });
+  P.tube = { u0: Math.max(0.3, w / 2 - 0.7), u1: Math.min(w - 0.3, w / 2 + 0.7), d: (cf - 0.35) / 2 };
+  // the floor: between the front and the space you order in
+  const f0 = -0.35, f1 = cf + 0.75, deep = f0 - f1;
+  const aisle = R() < 0.5 ? 0 : 1;                                    // which wall the way in runs along
+  const seat = (u, d, face, tu, td) => P.seats.push({ u, d, face, tu, td });
+  if (stock === 'chai' && deep > 0.9) {
+    // the bench down the wall, the chai drinkers on it facing across
+    const s = 1 - aisle, u0 = s ? w - 0.5 : 0.05, u1 = s ? w - 0.05 : 0.5;
+    put({ t: 'bench', u0, u1, d0: f1, d1: f0, h: 0.45 });
+    for (let d = f0 - 0.35; d > f1 + 0.2; d -= 0.6) seat(s ? w - 0.28 : 0.28, d, s ? 'left' : 'right', s ? w - 1.0 : 1.0, d);
+    P.browse.push([w / 2, f0 - 0.6]);
+    return;
+  }
+  const nc = Math.min(3, Math.floor((w - 1.05) / 0.85)), nr = Math.floor((deep + 0.1) / 1.5);
+  if (nc >= 1 && nr >= 1 && stock !== 'juice') {
+    for (let c = 0; c < nc; c++) {
+      const tu = aisle ? 0.45 + c * 0.85 : w - 0.45 - c * 0.85;       // columns from the far wall in
+      for (let r = 0; r < nr; r++) {
+        const td = f0 - 0.72 - r * 1.5;
+        put({ t: 'etable', u0: tu - 0.35, u1: tu + 0.35, d0: td - 0.28, d1: td + 0.28, h: 0.74, stock });
+        put({ t: 'chair', u0: tu - 0.19, u1: tu + 0.19, d0: td + 0.36, d1: td + 0.7, face: 'in', stock }, false); seat(tu, td + 0.53, 'in', tu, td);
+        put({ t: 'chair', u0: tu - 0.19, u1: tu + 0.19, d0: td - 0.7, d1: td - 0.36, face: 'out', stock }, false); seat(tu, td - 0.53, 'out', tu, td);
+      }
+    }
+  } else if (deep > 0.7) {
+    // a ledge along the wall, stools at it
+    const s = 1 - aisle, u0 = s ? w - 0.36 : 0.02, u1 = s ? w - 0.02 : 0.36;
+    put({ t: 'ledge', u0, u1, d0: f1, d1: f0, h: 1.05, stock });
+    for (let d = f0 - 0.3; d > f1 + 0.2; d -= 0.6) { const u = s ? w - 0.62 : 0.62; put({ t: 'stool', u0: u - 0.16, u1: u + 0.16, d0: d - 0.16, d1: d + 0.16, h: 0.72 }, false); seat(u, d, s ? 'right' : 'left', s ? w - 0.2 : 0.2, d); }
+  }
+  P.browse.push([aisle ? w - 0.5 : 0.5, f0 - 0.5]);
 }
