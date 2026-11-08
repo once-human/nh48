@@ -36,7 +36,7 @@ Pilot.prototype.updateFoot = function (dt, ...rest) {
   // ---- the lean: the body's up tips toward where it's being pushed (the turn's pull, speeding up, pulling up)
   const ax = (F.vx - vx0)/dt, az = (F.vz - vz0)/dt;
   S.ax = damp(S.ax, loco && !F.air ? ax : 0, 7, dt); S.az = damp(S.az, loco && !F.air ? az : 0, 7, dt);
-  const am = Math.hypot(S.ax, S.az), cap = 0.035 + 0.2*Math.min(1, F.v/5.6);
+  const am = Math.hypot(S.ax, S.az), cap = 0.03 + 0.11*Math.min(1, F.v/5.6);     // (an upright runner: a lean, never a hunch)
   let tx = 0, tz = 0;
   if (am > 0.05) { const th = Math.min(cap, Math.atan(am/9.8)*0.55); tx = S.ax/am*th; tz = S.az/am*th; }
   S.lx = damp(S.lx, tx, loco ? 9 : 14, dt); S.lz = damp(S.lz, tz, loco ? 9 : 14, dt);
@@ -66,7 +66,10 @@ Pilot.prototype.updateFoot = function (dt, ...rest) {
       if (Math.abs(off[i]) > 0.012) any = true;
     }
   } else S.o[0] = S.o[1] = 0;
-  S.dr = damp(S.dr, any ? Math.min(0, off[0], off[1]) : 0, 14, dt); drop = S.dr;
+  // (the hips sink only for a real step or kerb under one foot, and not much on the run: on rough ground a runner
+  // stays tall, they don't go along crouched)
+  const step = Math.abs(off[0] - off[1]) > 0.06, want = any && step ? Math.max(F.v > 2.2 ? -0.07 : -0.16, Math.min(0, off[0], off[1])) : 0;
+  S.dr = damp(S.dr, want, 14, dt); drop = S.dr;
   if (drop < -1e-3 && !any) { any = true; for (let i = 0; i < 2; i++) { const fb = bone(H, i ? 'foot_r' : 'foot_l'); if (fb) { fb.getWorldPosition(_ft[i]); fb.getWorldQuaternion(_fq[i]); } } }
   if (dip > 0 && !any) for (let i = 0; i < 2; i++) { const fb = bone(H, i ? 'foot_r' : 'foot_l'); if (fb) { fb.getWorldPosition(_ft[i]); fb.getWorldQuaternion(_fq[i]); } }
 

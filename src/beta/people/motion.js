@@ -7,7 +7,6 @@
 //  - everyone breathes (faster, deeper after running), and standing about they shift their weight from foot to foot
 //  - everyone walks their own way: the old stoop, some swing their arms and some hardly do, some sway at the hips,
 //    some bounce; someone hurt favours the bad leg
-//  - you, after a long run, stop bent over with your hands near your knees, getting your breath back
 // Nothing here is played: it's all worked out each frame from how they're really moving.
 import * as THREE from 'three';
 import { Crowd } from '@orig/people/crowd.js';
@@ -98,7 +97,7 @@ function weigh(o, H, dt, x, z, yaw, opt) {
   turn(hd, pAx, pAz, 0, clamp(M.hd.x, -0.25, 0.25));
   // you, out of breath after a long run, stopped: bent over, hands down near the knees, head up
   if (opt.you) {
-    const want = sp < 0.3 && M.ex > 0.55 ? 1 : 0;
+    const want = 0;                                  // (Onkar: it read as old, not winded. Off)
     M.bend += (want - M.bend)*Math.min(1, dt*(want ? 2.5 : 1.8));
     if (M.ex < 0.35) M.bend *= 0.9;
     if (M.bend > 0.01) {
