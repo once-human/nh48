@@ -84,17 +84,17 @@ ${DITHER}
 // The outline is the same sum of waves the wheels feel, so the floor and its walls meet the skin's edge exactly
 varying vec4 vPotA, vPotP, vPotB, vPotS; varying float vPotQ; uniform float uWet; uniform vec3 skyCol;
 // (its edge crumbles in: a few centimetres bitten out of it here and there, finer than the outline the wheels feel)
-float potE(vec2 l){ float a = atan(l.y, l.x); float bite = texture2D(tNoise, vec2(a*1.9 + vPotB.z*.37, vPotB.w*.29)).r*.6 + texture2D(tNoise, vec2(a*5.3 + vPotB.w*.11, vPotB.z*.17)).g*.4;
+float potE(vec2 l){ float a = atan(l.y, l.x + 1e-6); float bite = texture2D(tNoise, vec2(a*1.9 + vPotB.z*.37, vPotB.w*.29)).r*.6 + texture2D(tNoise, vec2(a*5.3 + vPotB.w*.11, vPotB.z*.17)).g*.4;
   return vPotS.x*(1. + vPotA.x*sin(2.*a + vPotP.x) + vPotA.y*sin(3.*a + vPotP.y) + vPotA.z*sin(4.*a + vPotP.z) + vPotA.w*sin(5.*a + vPotP.w) + vPotB.x*sin(7.*a + vPotB.y))*(1. - .09*bite); }
 vec2 potL(vec3 p){ vec2 d = p.xz - vPotB.zw; return vec2(d.x*vPotS.z + d.y*vPotS.w, (-d.x*vPotS.w + d.y*vPotS.z)/vPotQ); }
 float potF(vec3 p){ vec2 l = potL(p); return length(l)/potE(l); }
 float potStone(vec2 q){ vec2 i = floor(q), f = fract(q); float m = 0.; for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 g = vec2(float(x), float(y)), r = texture2D(tNoise, (i + g + .5)/16.).rg; float k = texture2D(tNoise, (i + g + 3.5)/16.).b, d = length(g + r - f); m = max(m, (.42 + .3*k - d)*step(.35, k)); } return max(m, 0.); }
 // broken pieces of the top layer lying in the bottom: flat-topped, a couple of centimetres thick, each its own
-float potChunk(vec2 q){ vec2 i = floor(q), f = fract(q); float best = 9., k = 0.; for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 g = vec2(float(x), float(y)), r = texture2D(tNoise, (i + g + 7.5)/16.).rg; float d = max(abs(g.x + r.x - f.x), abs(g.y + r.y - f.y)*1.3); if (d < best) { best = d; k = texture2D(tNoise, (i + g + 11.5)/16.).b; } } return step(.62, k)*smoothstep(.36, .3, best); }
+float potChunk(vec2 q){ vec2 i = floor(q), f = fract(q); float best = 9., k = 0.; for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 g = vec2(float(x), float(y)), r = texture2D(tNoise, (i + g + 7.5)/16.).rg; float d = max(abs(g.x + r.x - f.x), abs(g.y + r.y - f.y)*1.3); if (d < best) { best = d; k = texture2D(tNoise, (i + g + 11.5)/16.).b; } } return step(.62, k)*(1. - smoothstep(.3, .36, best)); }
 float potFloor(vec3 p){ float f = potF(p); if (f >= 1.) return .05;
   // a step down through the tar (3 cm, nearly sheer), then the brown base falling away to the floor, stones and slabs on it
-  float tar = min(.035, vPotS.y*.4), ledge = smoothstep(1., .955, f), g = f*f*f*f*f*f, base = (1. - g);
-  return -tar*ledge - (vPotS.y - tar)*base*smoothstep(.97, .82, f) + base*(.018*potStone(p.xz*34.) + .012*potStone(p.xz*13.) + .022*potChunk(p.xz*9.)); }
+  float tar = min(.035, vPotS.y*.4), ledge = 1. - smoothstep(.955, 1., f), g = f*f*f*f*f*f, base = (1. - g);
+  return -tar*ledge - (vPotS.y - tar)*base*(1. - smoothstep(.82, .97, f)) + base*(.018*potStone(p.xz*34.) + .012*potStone(p.xz*13.) + .022*potChunk(p.xz*9.)); }
 #endif
 void main(){
 #ifdef FADE
@@ -130,16 +130,17 @@ void main(){
   float stn = potStone(hit.xz*34.) + potStone(hit.xz*13.)*.7, grain = texture2D(tNoise, hit.xz*2.3).r*.6 + texture2D(tNoise, hit.xz*.71).g*.4, chk = potChunk(hit.xz*9.);
   // down the hole: the tar's broken edge, its black layer and the pale line under it, the brown base course, dirt and stones at the bottom
   float tarD = min(.035, vPotS.y*.4)/vPotS.y;
-  c = dp < .08 ? vec3(.34, .33, .31) : dp < tarD ? vec3(.11, .11, .115) : dp < tarD + .06 ? vec3(.38, .35, .3) : mix(vec3(.27, .22, .165), vec3(.17, .145, .12), smoothstep(tarD, .86, dp));
-  c *= .72 + .56*grain; c = mix(c, vec3(.42, .4, .37)*(.7 + .6*grain), smoothstep(.04, .16, stn)*smoothstep(.55, .85, dp));
-  c = mix(c, vec3(.1, .1, .105)*(.8 + .4*grain), chk*smoothstep(.6, .8, dp));     // (a broken slab of tar down there)
+  // (lighter than the road round it, as a real one is: the broken stone and the dust in it catch the light)
+  c = dp < .08 ? vec3(.44, .42, .39) : dp < tarD ? vec3(.2, .2, .2) : dp < tarD + .06 ? vec3(.47, .44, .39) : mix(vec3(.4, .35, .28), vec3(.36, .32, .27), smoothstep(tarD, .86, dp));
+  c *= .85 + .3*grain; c = mix(c, vec3(.5, .48, .44)*(.85 + .3*grain), smoothstep(.04, .16, stn)*smoothstep(.55, .85, dp)*.7);
+  c = mix(c, vec3(.2, .2, .2)*(.9 + .2*grain), chk*smoothstep(.6, .8, dp));     // (a broken slab of tar down there)
   // rain stands in it: a still pool across the bottom, the sky in it, darker round its edge
   float pool = clamp(uWet, 0., 1.)*vPotS.y*.55, lev = -vPotS.y + pool;
   if (pool > .004 && hit.y < lev) { float tw = (lev - vW.y)/rd.y; vec3 wp = vW + rd*tw; float fr = pow(1. - max(-rd.y, 0.), 4.);
     c = mix(vec3(.13, .12, .1), skyCol*.55, .25 + .6*fr)*(1. - .3*smoothstep(.4, 1., potF(wp))); hit = wp; n = vec3(0., 1., 0.); dp = clamp(-hit.y/vPotS.y, 0., 1.); }
   // the rim's shadow: from where the ray landed, does the way to the sun clear the outline?
   vec3 sq = hit + sunDir*(-hit.y/max(sunDir.y, .08)); float potSun = 1. - smoothstep(.97, 1.03, potF(sq));
-  c *= .3 + .7*(1. - dp)*(1. - dp) + .12*(1. - potSun);  // light doesn't reach far down
+  c *= .72 + .28*(1. - dp)*(1. - dp);  // (a shallow hole: the sky's light reaches the bottom, only a little less of it)
 #endif
   vec3 b = c;
   float e = texture2D(tNoise, gl_FragCoord.xy*.11/16.).r - .5;
@@ -160,6 +161,9 @@ void main(){
 #endif
     float h = smoothstep(.5, .72, fract((gl_FragCoord.x + gl_FragCoord.y)*.17 + e*.9))*(1. - L)*(1. - smoothstep(10., 34., vZ)); c = mix(c, c*.72, h*.55*(1. - uReal));
   }
+#ifdef POTHOLE
+  if (any(isnan(c)) || any(isinf(c))) c = vec3(.2);
+#endif
 #ifdef GLOW
   totalEmissiveRadiance *= vGlow;           // a shop's board goes dark with its shutter (world/shutters.js)
 #endif

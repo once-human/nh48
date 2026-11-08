@@ -40,6 +40,7 @@ import './game/cabin.js';          // in a car the world goes behind glass, horn
 import './game/pistol.js';         // a katta on the Z wheel from the start
 import './vehicles/lamps.js';         // brake and reverse lamps that answer the pedals, yours and everyone's
 import './vehicles/potholes.js';      // potholes jolt each kind of vehicle its own way
+import './gfx/blood.js';              // blood pools from the body, under the head and chest, and spreads as blood does
 import './people/stalls.js';          // stall keepers keep to their stalls
 import './people/walls.js';           // nobody walks through a building
 import './game/meow.js';              // a cat's meow

@@ -354,6 +354,9 @@ const PATCHES = {
     ["edge(3, 'KeyV');", "edge(3, 'KeyC');"],
   ],
   [S('game/game.js')]: [
+    // blood from the body where it comes to rest, not from where they were hit (beta/gfx/blood.js)
+    ["else if (ev.type === 'pedDied' && this.blood) this.blood.spill(ev.x, ev.z, 0.9, 30);", "else if (ev.type === 'pedDied' && this.blood) this.blood.spill(ev.x, ev.z, 0.9, 30, ev.p);"],
+    ["this.blood.spill(ev.p.x, ev.p.z, sev === 'dead' ? 1.1 : sev === 'critical' ? 0.85 : 0.35, sev === 'ko' ? 15 : 40);", "this.blood.spill(ev.p.x, ev.p.z, sev === 'dead' ? 1.1 : sev === 'critical' ? 0.85 : 0.35, sev === 'ko' ? 15 : 40, ev.p);"],
     // burning: no cry every half second (it was an 'ah, ah, ah' for as long as you stood in it): one, at the blast
     ["this.hud.hurt && this.hud.hurt(); this.vb && this.vb.you('hurt', n > 25);", "this.hud.hurt && this.hud.hurt(); if (n > 25) this.vb && this.vb.you('hurt', true);"],
     // the driver you hit stays in till the car's stopped, then gets out (it brakes along its lane: traffic.js patch)
