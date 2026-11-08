@@ -24,9 +24,11 @@
 import * as THREE from 'three';
 import { ColorBuilder, lin } from '@orig/world/geo.js';
 import { buildCarCockpit as plainCockpit } from '@orig/vehicles/cockpit.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
 import { carSpec, baseOf, doorOf } from './models.js';
+import { cabinGlass } from './vehmat.js';
 
-const MATTE = -1, CARBON = -2, QUILT = -3, WOOD = -4, BRUSHED = -5, SUEDE = -6, PERF = -7;
+const MATTE = -1, CARBON = -2, QUILT = -3, WOOD = -4, BRUSHED = -5, SUEDE = -6, PERF = -7, GRAIN = -8;
 const DZ = 0.36, I4 = new THREE.Matrix4(), ONE = new THREE.Vector3(1, 1, 1), Q0 = new THREE.Quaternion();
 const UP = new THREE.Vector3(0, 1, 0), ZZ = new THREE.Vector3(0, 0, 1);
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -157,6 +159,13 @@ function seat(B, o) {
   B.box(x - 0.31, fl + 0.28, z - sd*(W + 0.03), x - 0.275, fl + 0.4, z - sd*(W + 0.015), [.1, .1, .11]);
   B.box(x - 0.315, fl + 0.4, z - sd*(W + 0.035), x - 0.268, fl + 0.445, z - sd*(W + 0.01), [.13, .13, .14]);
   B.box(x - 0.303, fl + 0.44, z - sd*(W + 0.03), x - 0.28, fl + 0.447, z - sd*(W + 0.015), [.72, .08, .06]);
+  if (o.beads) {
+    // a wooden-bead seat cover, the kind sold at every signal
+    const Wd = (i, j) => { const h = hash(i + ':' + j); return [.5 + h*.15, .33 + h*.1, .16 + h*.06]; };
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 7; j++) B.sph(v3(x - 0.24 + i*0.062, fl + 0.372, z - 0.15 + j*0.05), 0.0135, Wd(i, j), 0, 0, 1, 0.8, 1, 5);
+    for (let i = 0; i < 9; i++) for (let j = 0; j < 7; j++) B.sph(at(0.05 + i*L*0.09, 0.018, -0.15 + j*0.05), 0.0135, Wd(i + 20, j), 0, 0, 0.8, 1, 1, 5);
+    for (const s2 of [-1, 1]) B.cyl(at(0.04, 0.015, s2*0.17), at(L*0.85, 0.015, s2*0.17), 0.003, 0.003, [.2, .12, .06], MATTE, 0, 4);
+  }
   if (o.towel) {
     // a white towel over the top of the back, the way every cabbie has one
     const T = [.9, .89, .86];
@@ -178,6 +187,7 @@ function dress(C, kind, mats) {
   const tier = k === 'super' ? 3 : k === 'sports' ? 2 : k === 'lux' ? 1 : 0, low = tier >= 2, rh = hash(kind);
   const kS = Math.min(1, (H - (low ? 0.24 : 0.15) - fl)/1.2), xs = xf0 - 1.35, xF = xf0 - 0.62, yC = fl + 0.27;
   const D = doorOf(kind), P = palette(kind, k), modes = MODES[kind] || MODES[k] || null;
+  if (tier === 0) { P.topP = GRAIN; P.faceP = GRAIN; }
   const AT = tier >= 1 || kind === 'xuv' || kind === 'fortuner', modern = tier >= 1 || /^(xuv|nexon|city|fortuner|scorpio|innova|ertiga|suv|sedan)$/.test(kind);
   const G = C.group, kids = G.children.slice(), trims = G.userData.trim || {}, tl = Object.values(trims);
   const solids = kids.filter(o => o.isMesh && o.material === mats.solid && !tl.includes(o));
@@ -200,15 +210,20 @@ function dress(C, kind, mats) {
   B.box(xf0 - 0.04, fl + 0.2, -(hw - 0.12), xf0 - 0.01, belt - 0.22, hw - 0.12, [.06, .06, .062]);
   B.box(xF, belt - 0.37, -(hw - 0.13), xF + 0.3, belt - 0.31, -0.16, P.face);                         // under the passenger's side
   const pedM = tier >= 2 ? [.72, .73, .75] : [.13, .13, .14], pedP = tier >= 2 ? BRUSHED : 0, pedG = tier >= 2 ? 0 : MATTE;
-  const pedal = (z, w, organ) => {
-    const pad = v3(xf0 - 0.49, fl + 0.15, z);
-    if (organ) B.obox(v3(xf0 - 0.46, fl + 0.11, z), 0.016, 0.2, w, Qz(Math.PI - 1.15), pedM, pedG, pedP);
-    else { B.cyl(v3(xf0 - 0.27, belt - 0.3, z), pad, 0.008, 0.008, [.15, .15, .16], 0, 0, 8); B.obox(pad, 0.014, 0.075, w, Qz(Math.PI - 0.95), pedM, pedG, pedP); }
-    if (tier >= 2) for (const dy of [-0.022, 0, 0.022]) B.obox(organ ? v3(xf0 - 0.468 - dy*0.4, fl + 0.11 + dy*2, z) : pad.clone().add(v3(-0.009 + dy*0.6, dy*0.75, 0)), 0.006, 0.008, w*0.8, Qz(Math.PI - (organ ? 1.15 : 0.95)), [.05, .05, .055]);
+  // the pedals, each on its own hinge, going down as you press them
+  const pedals = [];
+  const pedal = (z, w, organ, what) => {
+    const piv = organ ? v3(xf0 - 0.42, fl + 0.02, z) : v3(xf0 - 0.27, belt - 0.3, z), Kp = new K(), rel = (p) => p.clone().sub(piv);
+    const pad = rel(v3(xf0 - 0.49, fl + 0.15, z));
+    if (organ) Kp.obox(rel(v3(xf0 - 0.46, fl + 0.11, z)), 0.016, 0.2, w, Qz(Math.PI - 1.15), pedM, pedG, pedP);
+    else { Kp.cyl(v3(0, 0, 0), pad, 0.008, 0.008, [.15, .15, .16], 0, 0, 8); Kp.obox(pad, 0.014, 0.075, w, Qz(Math.PI - 0.95), pedM, pedG, pedP); }
+    if (tier >= 2) for (const dy of [-0.022, 0, 0.022]) Kp.obox(organ ? rel(v3(xf0 - 0.468 - dy*0.4, fl + 0.11 + dy*2, z)) : pad.clone().add(v3(-0.009 + dy*0.6, dy*0.75, 0)), 0.006, 0.008, w*0.8, Qz(Math.PI - (organ ? 1.15 : 0.95)), [.05, .05, .055]);
+    else for (const dy of [-0.02, 0, 0.02]) if (!organ) Kp.obox(pad.clone().add(v3(-0.008 + dy*0.6, dy*0.75, 0)), 0.004, 0.006, w*0.85, Qz(Math.PI - 0.95), [.06, .06, .065]);
+    const m = Kp.mesh(mats.solid); m.position.copy(piv); extra.push(m); pedals.push({ m, organ, what });
   };
-  pedal(DZ + 0.115, 0.06, tier >= 1);
-  pedal(DZ - (AT ? 0.04 : 0.03), AT ? 0.12 : 0.075, false);
-  if (!AT) pedal(DZ - 0.17, 0.07, false);
+  pedal(DZ + 0.115, 0.06, tier >= 1, 'thr');
+  pedal(DZ - (AT ? 0.04 : 0.03), AT ? 0.12 : 0.075, false, 'brk');
+  if (!AT) pedal(DZ - 0.17, 0.07, false, 'clu');
   B.obox(v3(xf0 - 0.47, fl + 0.12, DZ - (AT ? 0.21 : 0.3)), 0.014, 0.2, 0.075, Qz(Math.PI - 1.1), tier >= 2 ? pedM : [.09, .09, .095], pedG, pedP);   // the footrest
   for (const s of [-1, 1]) {                     // the mats, with a heel pad under the pedals
     B.box(xs + 0.05, fl + 0.001, s*DZ - 0.22, xf0 - 0.44, fl + 0.011, s*DZ + 0.22, tier === 1 ? [.12, .1, .08] : [.055, .053, .05], MATTE, SUEDE);
@@ -217,10 +232,16 @@ function dress(C, kind, mats) {
 
   // ------------------------------------------------------------ the column: shroud, stalks, key
   B.ext(rrect(0.11, 0.1, 0.035), 0.2, colM.clone().multiply(mT(0, -0.012, -0.28)), [.06, .06, .065], MATTE, 0, 0.004);
+  let stalk = null;
   if (tier < 3) for (const s of [-1, 1]) {
-    B.cyl(CF.at(s*0.055, 0.012, -0.11), CF.at(s*0.16, 0.024, -0.115), 0.008, 0.009, [.07, .07, .075], MATTE, 0, 8);
-    B.cyl(CF.at(s*0.15, 0.023, -0.115), CF.at(s*0.19, 0.027, -0.116), 0.011, 0.011, [.08, .08, .085], MATTE, 0, 10);
-    B.cyl(CF.at(s*0.168, 0.025, -0.115), CF.at(s*0.172, 0.0255, -0.115), 0.0115, 0.0115, tier === 1 ? P.metal : [.75, .75, .73], tier === 1 ? 0 : MATTE, tier === 1 ? BRUSHED : 0, 10);
+    // (built round where it comes out of the shroud, so the indicator's can flick up and down)
+    const Ks = new K(), r0 = v3(s*0.055, 0.012, -0.11), L0 = (u, v, w) => v3(u, v, w).sub(r0);
+    Ks.cyl(L0(s*0.055, 0.012, -0.11), L0(s*0.16, 0.024, -0.115), 0.008, 0.009, [.07, .07, .075], MATTE, 0, 8);
+    Ks.cyl(L0(s*0.15, 0.023, -0.115), L0(s*0.19, 0.027, -0.116), 0.011, 0.011, [.08, .08, .085], MATTE, 0, 10);
+    Ks.cyl(L0(s*0.168, 0.025, -0.115), L0(s*0.172, 0.0255, -0.115), 0.0115, 0.0115, tier === 1 ? P.metal : [.75, .75, .73], tier === 1 ? 0 : MATTE, tier === 1 ? BRUSHED : 0, 10);
+    for (let i = 0; i < 3; i++) Ks.box(s*(0.177 + i*0.004) - 0.0006 - r0.x, 0.035 - r0.y, -0.116 - r0.z - 0.004, s*(0.177 + i*0.004) + 0.0006 - r0.x, 0.0365 - r0.y, -0.116 - r0.z + 0.004, [.85, .85, .85], 0.3);
+    const m = Ks.mesh(mats.solid); m.position.copy(CF.at(r0.x, r0.y, r0.z)); m.quaternion.copy(qCol); extra.push(m);
+    if (s > 0) stalk = m;
   }
   if (!modern || k === 'jeep') {
     // the key in the barrel on the shroud, its ring and what hangs off it
@@ -322,13 +343,17 @@ function dress(C, kind, mats) {
       B.obox(v3(xg - 0.012, yC + 0.135, 0), 0.07, 0.06, 0.045, Qz(0.15), [.08, .08, .085]);
       B.obox(v3(xg - 0.012, yC + 0.168, 0), 0.06, 0.008, 0.035, Qz(0.15), P.decor, P.decorG, P.decorP);
     } else {
+      // (the boot stays; the lever and its knob go round the gate with the gear you're in)
       B.ring(v3(xg, yC + 0.008, 0), UP, 0.05, 0.006, P.decor, P.decorG, P.decorP, Math.PI*2, 0, 6, 24);
-      B.cyl(v3(xg, yC + 0.004, 0), v3(xg - 0.012, yC + 0.1, 0), 0.05, 0.016, [.06, .06, .062], MATTE, SUEDE, 14);
-      B.cyl(v3(xg - 0.012, yC + 0.1, 0), v3(xg - 0.02, yC + 0.2, 0), 0.008, 0.008, [.12, .12, .12], MATTE, 0, 8);
-      B.sph(v3(xg - 0.02, yC + 0.22, 0), 0.032, [.07, .07, .075], MATTE, 0, 1, 0.85, 1, 14);
-      const kt = v3(xg - 0.02, yC + 0.247, 0);
-      for (const dz of [-0.012, 0, 0.012]) B.box(kt.x - 0.011, kt.y, kt.z + dz - 0.0008, kt.x + 0.011, kt.y + 0.002, kt.z + dz + 0.0008, [.85, .85, .85]);
-      B.box(kt.x - 0.0008, kt.y, kt.z - 0.012, kt.x + 0.0008, kt.y + 0.002, kt.z + 0.012, [.85, .85, .85]);
+      B.cyl(v3(xg, yC + 0.004, 0), v3(xg, yC + 0.06, 0), 0.05, 0.03, [.06, .06, .062], MATTE, SUEDE, 14);
+      const Kg = new K();
+      Kg.cyl(v3(0, 0.03, 0), v3(0, 0.1, 0), 0.03, 0.016, [.06, .06, .062], MATTE, SUEDE, 12);
+      Kg.cyl(v3(0, 0.1, 0), v3(-0.008, 0.2, 0), 0.008, 0.008, [.12, .12, .12], MATTE, 0, 8);
+      Kg.sph(v3(-0.008, 0.22, 0), 0.032, [.07, .07, .075], MATTE, 0, 1, 0.85, 1, 14);
+      const kt = v3(-0.008, 0.247, 0);
+      for (const dz of [-0.012, 0, 0.012]) Kg.box(kt.x - 0.011, kt.y, kt.z + dz - 0.0008, kt.x + 0.011, kt.y + 0.002, kt.z + dz + 0.0008, [.85, .85, .85]);
+      Kg.box(kt.x - 0.0008, kt.y, kt.z - 0.012, kt.x + 0.0008, kt.y + 0.002, kt.z + 0.012, [.85, .85, .85]);
+      const gl = Kg.mesh(mats.solid); gl.position.set(xg, yC + 0.004, 0); extra.push(gl); C._gear = gl;
     }
     if (!AT || kind === 'xuv' || kind === 'fortuner') {
       const hp = v3(xf0 - 1.24, yC + 0.01, -0.0), he = v3(xf0 - 1.45, yC + 0.08, 0);
@@ -366,7 +391,7 @@ function dress(C, kind, mats) {
     const F = frame(v3(xf0 - 0.56, belt + 0.06, DZ), 0.25);
     const cl = screen(0.3, 0.1125, 512, F.m), vmax = /^(alto|wagonr)$/.test(kind) ? 160 : k === 'suv' ? 200 : 180;
     extra.push(cl.m);
-    C._draw = analog(cl, vmax, kind, AT, scr, kind === 'taxi', modes);
+    C._draw = analog(cl, vmax, kind, AT, scr, kind === 'taxi', modes); C._cl = cl; C._scr = [cl, scr];
   }
 
   // ------------------------------------------------------------ the E-Class-style
@@ -400,7 +425,7 @@ function dress(C, kind, mats) {
     B.cyl(CF.at(0.055, -0.01, -0.12), CF.at(0.13, -0.01, -0.14), 0.006, 0.008, P.metal, 0, BRUSHED, 8);
     B.box(xF - 0.004, belt - 0.33, -(hw - 0.24), xF + 0.002, belt - 0.22, -wS - 0.03, P.face);
     B.box(xF - 0.04, Math.max(fl + 0.3, belt - 0.44), DZ - 0.22, xF + 0.02, belt - 0.22, DZ + 0.24, P.face);
-    C._draw = luxScreen(ws, amb);
+    C._draw = luxScreen(ws, amb); C._cl = ws; C._scr = [ws];
     C._amb = amb; C._strip = strip;
   }
 
@@ -438,7 +463,7 @@ function dress(C, kind, mats) {
     B.box(xs - 0.95, fl + 0.2, -(hw - 0.2), xs - 0.5, fl + 0.36, hw - 0.2, P.carpet, MATTE, SUEDE);
     B.obox(v3(xs - 0.62, fl + 0.6, 0), 0.06, 0.5, 2*hw - 0.4, Qz(0.35), P.carpet, MATTE, SUEDE);
     for (const s of [-1, 1]) B.box(xs - 0.93, fl + 0.36, s*0.3 - 0.015, xs - 0.52, fl + 0.365, s*0.3 + 0.015, [.12, .12, .13]);
-    C._draw = fiveDial(cl, ts, ck);
+    C._draw = fiveDial(cl, ts, ck); C._cl = cl; C._scr = [cl, ts];
   }
 
   // ------------------------------------------------------------ the Huracán-style
@@ -493,14 +518,56 @@ function dress(C, kind, mats) {
     // behind the seats, the bulkhead to the engine
     B.box(xs - 0.66, fl, -(hw - 0.14), xs - 0.6, belt + 0.02, hw - 0.14, [.06, .06, .065], MATTE, SUEDE);
     B.box(xs - 0.61, belt - 0.12, -(hw - 0.2), xs - 0.6, belt - 0.1, hw - 0.2, [.07, .07, .075], 0, CARBON);
-    C._draw = superScreen(cl, ts);
+    C._draw = superScreen(cl, ts); C._cl = cl; C._scr = [cl, ts];
   }
 
   // the premium cabins: a contrast seam sewn along the dash's edge, and under the glovebox
   if (tier >= 1) for (const y of [belt - 0.083, belt - 0.315]) B.box(xF - 0.0035, y - 0.0015, -(hw - 0.15), xF - 0.0005, y + 0.0015, hw - 0.15, P.stitch);
+  // ------------------------------------------------------------ every car: the top of the dash and the windscreen
+  {
+    // the demister's slots along the foot of the windscreen, the speaker in the middle, the light sensor, the tweeters in
+    // the corners by the pillars
+    for (let i = 0; i < 4; i++) { const z0 = -(hw - 0.3) + i*(2*hw - 0.6)/4; B.box(xf0 - 0.15, belt + 0.03, z0 + 0.02, xf0 - 0.135, belt + 0.033, z0 + (2*hw - 0.6)/4 - 0.02, [.02, .02, .022]); }
+    B.box(xf0 - 0.36, belt + 0.032, -0.08, xf0 - 0.27, belt + 0.035, 0.08, tier === 3 ? [.03, .03, .035] : [.05, .05, .055], MATTE, PERF);
+    B.sph(v3(xf0 - 0.2, belt + 0.032, 0.14), 0.012, [.02, .02, .025], 0, 4, 1, 0.5, 1, 10);
+    for (const s of [-1, 1]) { const tp = v3(xf0 - 0.16, belt + 0.03, s*(hw - 0.2)); B.disc(tp.clone().add(v3(0, 0.004, 0)), v3(-0.5, 1, -s*0.6), 0.03, tier === 1 ? P.metal : [.04, .04, .045], tier === 1 ? 0 : MATTE, tier === 1 ? BRUSHED : PERF, 3); }
+    // what's stuck to the inside of the windscreen: the FASTag behind the mirror, the PUC and insurance discs in the corner
+    const Ax = xf0 - 0.04, Ay = belt + 0.03, Bx = S.roofF, By = H - 0.03, dl = Math.hypot(Bx - Ax, By - Ay), ang = Math.atan2(By - Ay, Bx - Ax);
+    const onGlass = (t, z) => v3(Ax + (Bx - Ax)*t + Math.sin(ang)*0.05, Ay + (By - Ay)*t + 0.03, z);
+    const gq = Qz(ang - Math.PI/2);
+    B.obox(onGlass(0.86, -0.13), 0.002, 0.045, 0.085, gq, [.93, .93, .9]);
+    B.obox(onGlass(0.86, -0.13).add(v3(0, 0.001, 0)), 0.0025, 0.022, 0.022, gq, [.7, .7, .7]);
+    if (tier <= 1) { B.add(new THREE.CylinderGeometry(0.03, 0.03, 0.002, 18), new THREE.Matrix4().compose(onGlass(0.12, -(hw - 0.32)), gq.clone().multiply(Qz(Math.PI/2)), ONE), [.95, .88, .55]); B.add(new THREE.CylinderGeometry(0.028, 0.028, 0.002, 18), new THREE.Matrix4().compose(onGlass(0.12, -(hw - 0.4)), gq.clone().multiply(Qz(Math.PI/2)), ONE), [.75, .85, .95]); }
+    void dl;
+    // the mirror: a proper housing round the glass (the glass itself, a real one: below)
+    const mx = Math.min(xf0 - 0.42, S.roofF - 0.12), mp = v3(mx - 0.035, H - 0.148, 0), E = v3(xf0 - 1.25, belt + 0.19, DZ);
+    const mn = E.clone().sub(mp).normalize().add(v3(-1, 0, 0)).normalize(), mX = UP.clone().cross(mn).normalize(), mY = mn.clone().cross(mX);
+    const mM = new THREE.Matrix4().makeBasis(mX, mY, mn).setPosition(mp);
+    B.ext(rrect(0.215, 0.064, 0.026), 0.028, mM.clone().multiply(mT(0, 0, -0.03)), tier === 3 ? [.07, .07, .075] : [.07, .07, .075], tier === 3 ? 0 : MATTE, tier === 3 ? CARBON : 0, 0.004);
+    B.ext(rrect(0.2, 0.052, 0.02), 0.002, mM.clone().multiply(mT(0, 0, 0.0005)), [.16, .18, .2], 0, 4);
+    C._irvm = { M: mM, w: 0.196, h: 0.05 };
+    if (tier >= 1) B.box(mx - 0.03, H - 0.105, -0.03, mx + 0.01, H - 0.085, 0.03, [.07, .07, .075]);    // the rain and light sensor's housing
+  }
+  // the ports at the foot of the stack, and what gets left plugged in or in the cupholder
+  if (tier <= 1) {
+    const Fp = FL(0.06); for (const u of [-0.06, -0.035]) B.fbox(Fp, u, 0, 0.004, 0.016, 0.008, 0.008, [.02, .02, .022]);
+    B.cyl(Fp.at(0.05, 0, 0), Fp.at(0.05, 0, 0.01), 0.013, 0.012, [.05, .05, .055], MATTE, 0, 14); B.disc(Fp.at(0.05, 0, 0.0105), Fp.Z, 0.009, [.01, .01, .012], MATTE, 0, 12);
+    if (tier === 0 && (rh > 0.45 || kind === 'taxi')) {
+      const a0 = Fp.at(-0.06, 0, 0.012);
+      B.tube([a0, a0.clone().add(v3(-0.03, -0.03, 0.01)), v3(xf0 - 0.85, yC + 0.01, 0.07), v3(xf0 - 1.0, yC + 0.012, 0.085), v3(xf0 - 1.12, yC + 0.03, 0.05)], 0.0022, [.9, .9, .88], MATTE, 0, false, 30, 4);
+    }
+    if (tier === 0 && /^(taxi|bolero|alto|jeep)$/.test(kind)) {
+      // a cutting chai, half drunk
+      const cp = v3(xf0 - 1.13, yC - 0.02, 0.045);
+      B.cyl(cp, cp.clone().add(v3(0, 0.08, 0)), 0.022, 0.028, [.75, .8, .8], 0, 4, 14);
+      B.disc(cp.clone().add(v3(0, 0.045, 0)), UP, 0.025, [.55, .36, .2], 0, 0, 14);
+    }
+  }
+  if (tier === 1) for (const [x0, y, z0, z1] of [[xF + 0.004, belt - 0.374, -(hw - 0.13), -0.16], [xF - 0.038, Math.max(fl + 0.3, belt - 0.44) - 0.003, DZ - 0.2, DZ + 0.22]]) C._strip(x0 - 0.003, y - 0.002, z0, x0, y, z1);
+
   // ------------------------------------------------------------ every car: the seats
   const st = [0, 1, 2, 3][tier];
-  for (const s of [-1, 1]) seat(B, { x: xs, z: s*DZ, fl, kS, P, st, towel: kind === 'taxi' && s > 0 });
+  for (const s of [-1, 1]) seat(B, { x: xs, z: s*DZ, fl, kS, P, st, towel: kind === 'taxi' && s > 0, beads: s > 0 && /^(bolero|wagonr|ertiga)$/.test(kind) });
   if (rear) {
     // the rear bench: three places, three headrests, the belts at its sides; the parcel shelf behind
     const xr = Math.max(xb, S.roofR - 0.45), yt = Math.min(fl + 0.95, H - 0.32), zw = hw - 0.15, a = 0.18;
@@ -625,10 +692,12 @@ function dress(C, kind, mats) {
     // the pull: a strap (Huracán), a bar (911)
     if (tier === 3) T.tube([v3(d0 + 0.26, belt - 0.12, zin(0.006)), v3(d0 + 0.33, belt - 0.175, zin(0.035)), v3(d0 + 0.42, belt - 0.12, zin(0.006))], 0.008, [.05, .05, .055], MATTE, SUEDE, false, 12, 6);
     if (tier === 2) T.cyl(v3(d0 + 0.22, belt - 0.2, zin(0.035)), v3(d0 + 0.5, belt - 0.2, zin(0.035)), 0.01, 0.01, P.top, MATTE, 0, 10);
-    // the window switches on the armrest; on the driver's, all four (two in a two-door)
-    const ax0 = Math.min(xf0 - 0.85, d1) - 0.15, nsw = s > 0 ? (four ? 4 : 2) : 1;
+    // the window switches on the armrest; on the driver's, all four (two in a two-door). Or the winder, in the cars that wind
+    const ax0 = Math.min(xf0 - 0.85, d1) - 0.15, nsw = s > 0 ? (four ? 4 : 2) : 1, wind = /^(alto|taxi|bolero|jeep)$/.test(kind);
+    const crank = (T2, x, y) => { const c0 = v3(x, y, zin(0.004)); T2.cyl(c0, c0.clone().add(v3(0, 0, -s*0.018)), 0.018, 0.016, [.1, .1, .11], MATTE, 0, 14); const e = c0.clone().add(v3(0.075, -0.035, -s*0.02)); T2.cyl(c0.clone().add(v3(0, 0, -s*0.018)), e, 0.006, 0.005, [.65, .66, .68], 0, BRUSHED, 6); T2.cyl(e, e.clone().add(v3(0, 0, -s*0.035)), 0.009, 0.008, [.08, .08, .085], MATTE, 0, 10); };
+    if (wind) crank(T, d0 + 0.32, belt - 0.2);
     T.box(ax0, belt - 0.262, zin(0.12), ax0 + 0.14, belt - 0.255, zin(0.045), tier >= 2 ? [.07, .07, .075] : P.piano, tier === 3 ? 0 : MATTE, tier === 3 ? CARBON : 0);
-    for (let i = 0; i < nsw; i++) T.box(ax0 + 0.02 + (i % 2)*0.05, belt - 0.255, zin(0.105 - Math.floor(i/2)*0.035), ax0 + 0.045 + (i % 2)*0.05, belt - 0.247, zin(0.08 - Math.floor(i/2)*0.035), [.1, .1, .11]);
+    if (!wind) for (let i = 0; i < nsw; i++) T.box(ax0 + 0.02 + (i % 2)*0.05, belt - 0.255, zin(0.105 - Math.floor(i/2)*0.035), ax0 + 0.045 + (i % 2)*0.05, belt - 0.247, zin(0.08 - Math.floor(i/2)*0.035), [.1, .1, .11]);
     // the lock pin on the sill, and on the E-Class the seat's own switch, shaped like a seat
     if (tier === 0) T.cyl(v3(d0 + 0.1, belt - 0.02, zin(0.03)), v3(d0 + 0.1, belt + 0.02, zin(0.03)), 0.005, 0.0045, [.15, .15, .16], MATTE, 0, 8);
     if (tier === 1) { const sp = v3(xf0 - 1.25, belt - 0.05, zin(0.012)); T.box(sp.x, sp.y, sp.z - 0.006, sp.x + 0.05, sp.y + 0.008, sp.z + 0.006, P.metal, 0, BRUSHED); T.obox(sp.clone().add(v3(-0.005, 0.025, 0)), 0.008, 0.045, 0.012, Qz(0.2), P.metal, 0, BRUSHED); T.box(sp.x - 0.015, sp.y + 0.048, sp.z - 0.006, sp.x - 0.005, sp.y + 0.06, sp.z + 0.006, P.metal, 0, BRUSHED); }
@@ -642,7 +711,7 @@ function dress(C, kind, mats) {
         B.disc(v3(xr0 + 0.16, fl + 0.19, zin(0.004)), n, 0.055, tier === 1 ? P.metal : [.05, .05, .055], tier === 1 ? 0 : MATTE, tier === 1 ? BRUSHED : PERF, 24);
         B.box(xr0 + 0.05, belt - 0.32, zin(0.11), xr1 - 0.1, belt - 0.26, zin(0.0), P.arm);
         B.box(xr1 - 0.25, belt - 0.12, zin(0.03), xr1 - 0.13, belt - 0.08, zin(0.0), [.5, .5, .52], 0, BRUSHED);
-        B.box(xr1 - 0.3, belt - 0.262, zin(0.1), xr1 - 0.25, belt - 0.255, zin(0.06), [.1, .1, .11]);
+        if (wind || kind === 'wagonr') crank(B, xr0 + 0.3, belt - 0.2); else B.box(xr1 - 0.3, belt - 0.262, zin(0.1), xr1 - 0.25, belt - 0.255, zin(0.06), [.1, .1, .11]);
         if (tier === 1) B.box(xr0 + 0.05, belt - 0.11, zin(0.006), xr1 - 0.05, belt - 0.07, zin(0), P.decor, 0, WOOD);
         if (tier === 0) B.cyl(v3(xr1 - 0.05, belt - 0.02, zin(0.03)), v3(xr1 - 0.05, belt + 0.02, zin(0.03)), 0.005, 0.0045, [.15, .15, .16], MATTE, 0, 8);
       }
@@ -759,7 +828,7 @@ function dress(C, kind, mats) {
 
   // ------------------------------------------------------------ live: the cluster, the mode
   let cur = null, last = performance.now();
-  const st0 = { dist: 0, odo: Math.round(12000 + rh*70000 + (kind === 'taxi' ? 190000 : 0)), corsaT: 0, prevK: 0, lat: 0, lon: 0 };
+  const st0 = { tag: '', dist: 0, odo: Math.round(12000 + rh*70000 + (kind === 'taxi' ? 190000 : 0)), corsaT: 0, prevK: 0, lat: 0, lon: 0 };
   C.mode = (name) => {
     name = name || (modes ? modes[0] : '');
     if (name === cur) return; cur = name;
@@ -769,7 +838,35 @@ function dress(C, kind, mats) {
     st0.corsaT = 0;
   };
   C.mode('');
+  // a layer of glass over each screen, catching the light like the real ones
+  const sg = cabinGlass({ side: THREE.FrontSide, tint: 0x0a0c0e });
+  // (in a group of their own: they share their screens' shape, which the cabin fitting already keeps under the roof)
+  const SG = new THREE.Group(); G.add(SG);
+  for (const S2 of C._scr || []) if (S2 && S2.m) { const o = new THREE.Mesh(S2.m.geometry, sg); o.position.copy(S2.m.position); o.quaternion.copy(S2.m.quaternion); o.scale.copy(S2.m.scale); o.translateZ(0.0015); o.renderOrder = 3; SG.add(o); }
+  // the mirrors: the one on the windscreen, and (once the body's measured) the two on the doors
+  const MG = new THREE.Group(); G.add(MG); C._mg = MG; MG.visible = false;
+  { const I = C._irvm, r = mirror(I.w, I.h, 384, 98, 0); r.matrixAutoUpdate = false; r.matrix.copy(I.M).multiply(mT(0, 0, 0.0035)); MG.add(r); }
+  const Eye = v3(xf0 - 1.25, belt + 0.19, DZ), glassM = cabinGlass({ wip: [belt + 0.02, -0.34*hw/0.875, 0.2*hw/0.875, 0.56*hw/0.875], band: [H - 0.22, H - 0.12, 1], tint: tier === 3 ? 0x161c1b : 0x1c2624 });
+  C.tick = (v) => {
+    C._v = v;
+    C.mode(v._modeName || '');
+    MG.visible = !!v.inCockpit;
+    if (!C._orvm && v.bodyMesh) { C._orvm = true; try { doorMirrors(v, MG, Eye, hw, belt, xf0); } catch (e) { /* (no glass found: no mirror) */ } }
+    // the windows' inside, kept to the body as it is (dents, a door hung open on its own hinge). Made the first time
+    // you're in this car (from outside the windows are their own outside, and nobody sees the inside of them)
+    if (!v.inCockpit && !C._glass) return;
+    C._glass = true;
+    v.tilt.traverse((m) => {
+      if (!m.isMesh || m.material !== v.bodyMesh.material || !m.geometry.attributes.paint) return;
+      let g = m.userData.cg;
+      if (!g) { g = m.userData.cg = { mesh: new THREE.Mesh(new THREE.BufferGeometry(), glassM), geo: null, ver: -1 }; g.mesh.frustumCulled = false; g.mesh.renderOrder = 2; m.add(g.mesh); }
+      const pv = m.geometry.attributes.position.version;
+      if (g.geo !== m.geometry || g.ver !== pv) { g.geo = m.geometry; g.ver = pv; g.mesh.geometry.dispose(); g.mesh.geometry = innerGlass(m.geometry, belt, hw, xf0); }
+    });
+  };
   const u0 = C.update;
+  let wasOff = true, sweep = 0;
+  const vTop = [190, 260, 330, 340][tier];
   C.update = function (steer, kmh, gear, rpm, night, mode) {
     u0.call(this, steer, kmh, gear, rpm, night, mode);
     const now = performance.now(), dt = Math.min(0.1, (now - last)/1000); last = now;
@@ -778,9 +875,95 @@ function dress(C, kind, mats) {
     st0.lon += ((kmh - st0.prevK)/3.6/Math.max(dt, 1e-3)/9.81 - st0.lon)*Math.min(1, dt*4); st0.prevK = kmh;
     st0.lat += (Math.max(-1.6, Math.min(1.6, (steer || 0)*(kmh/3.6)**2/9.81*0.09)) - st0.lat)*Math.min(1, dt*4);
     if (C._leds) { const on = [0.62, 0.72, 0.8, 0.87, 0.93], col = ['#2bd46a', '#2bd46a', '#ffc21a', '#ff3b30', '#ff3b30'], blink = rpm > 0.96 && (now % 200) < 100; C._leds.forEach((l, j) => l.material.color.set(blink ? '#3a7bff' : rpm >= on[j] ? col[j] : '#111111')); }
-    if (C._draw) C._draw(kmh, gear, rpm, cur || '', st0);
+    // the car itself: the engine off (a dark cluster), starting (the needles sweep round and back), the indicators, the
+    // pedals under your feet, the gear lever in its gate
+    const v = C._v, off = !!(v && (v._off || v._crank > 0)), I = v && v._ind;
+    if (wasOff && !off) sweep = 1.3;
+    wasOff = off;
+    let kD = kmh, rD = rpm;
+    if (sweep > 0) { sweep -= dt; const f = Math.sin(Math.max(0, Math.min(1, 1 - sweep/1.3))*Math.PI); kD = Math.max(kmh, vTop*f); rD = Math.max(rpm, f); }
+    const blink = I && (I.s || I.haz) && Math.floor((now - I.t0)/353) % 2 === 0, il = blink && (I.s < 0 || I.haz), ir = blink && (I.s > 0 || I.haz);
+    st0.tag = (off ? 'off' : 'on') + (il ? 'L' : '') + (ir ? 'R' : '');
+    if (stalk) { const a = I && I.s ? I.s*0.13 : 0; stalk.quaternion.copy(qCol).multiply(Qz(a)); }
+    if (v) for (const p of pedals) {
+      const f = p.what === 'thr' ? (v.throttle || 0) : p.what === 'brk' ? (v.brake || 0) : (v.shiftT > 0 ? 1 : 0);
+      p.f = (p.f || 0) + (f - (p.f || 0))*Math.min(1, dt*14);
+      p.m.rotation.z = p.organ ? -0.22*p.f : (p.what === 'clu' ? 0.4 : 0.3)*p.f;
+    }
+    if (C._gear) {
+      const g = gear | 0, col = g > 0 ? Math.min(2, Math.floor((g - 1)/2)) : 1, fw = g > 0 ? ((g - 1) % 2 === 0 ? -1 : 1) : 0, rev = v && v.reverse;
+      const tx = rev ? 0.2 : g > 0 ? (col - 1)*0.17 : 0, tz = rev ? 0.24 : fw*0.24;
+      C._gear.rotation.x += (tx - C._gear.rotation.x)*Math.min(1, dt*16); C._gear.rotation.z += (tz - C._gear.rotation.z)*Math.min(1, dt*16);
+    }
+    const cl = C._cl;
+    if (off) {
+      if (cl && cl._dark !== st0.tag) { cl._dark = st0.tag; const { ctx, W: w, H: h } = cl; ctx.fillStyle = '#030304'; ctx.fillRect(0, 0, w, h); if (il || ir) arrows(ctx, w, h, il, ir); cl.tex.needsUpdate = true; }
+      if (C._meter) meter(C._meter, st0);
+      return;
+    }
+    if (cl) cl._dark = null;
+    const v0 = cl ? cl.tex.version : 0;
+    if (C._draw) C._draw(kD, gear, rD, cur || '', st0);
+    if (cl && cl.tex.version !== v0 && (il || ir)) { arrows(cl.ctx, cl.W, cl.H, il, ir); cl.tex.needsUpdate = true; }
     if (C._meter) meter(C._meter, st0);
   };
+}
+
+// ---------------------------------------------------------------- the glass and the mirrors
+// the inside of a body's windows: its glass triangles (paint 4) above the waist, inside the body's width (not the door
+// mirrors' glass, not the lamps' lenses ahead of the windscreen), a hair in from the outside
+function innerGlass(src, belt, hw, xf0) {
+  const P = src.attributes.position, N = src.attributes.normal, Pt = src.attributes.paint, ix = src.index, n = ix ? ix.count : P.count, pos = [], nor = [];
+  const ok = (i) => { const p = Pt.getX(i); return p > 3.5 && p < 4.5 && P.getY(i) > belt - 0.12 && Math.abs(P.getZ(i)) < hw + 0.01 && P.getX(i) < xf0 + 0.15; };
+  for (let t = 0; t < n; t += 3) {
+    const a = ix ? ix.getX(t) : t, b = ix ? ix.getX(t + 1) : t + 1, c = ix ? ix.getX(t + 2) : t + 2;
+    if (!ok(a) || !ok(b) || !ok(c)) continue;
+    for (const i of [a, b, c]) { pos.push(P.getX(i) - N.getX(i)*0.003, P.getY(i) - N.getY(i)*0.003, P.getZ(i) - N.getZ(i)*0.003); nor.push(N.getX(i), N.getY(i), N.getZ(i)); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  return g;
+}
+// a mirror that really shows what's behind you. Each draws its picture every third frame, in turn with the others (so
+// together they cost one small extra look at the street), and never from inside another's picture or a shadow pass
+let MIRRORING = false;
+function mirror(w, h, tw, th, slot) {
+  const r = new Reflector(new THREE.PlaneGeometry(w, h), { clipBias: 0.003, textureWidth: tw, textureHeight: th, color: 0xb4babd });
+  const ob = r.onBeforeRender; let k = slot;
+  r.onBeforeRender = function (rd, sc, cam, ...a) {
+    if (MIRRORING || !cam || !cam.isPerspectiveCamera || (k++ % 3) !== 0) return;
+    MIRRORING = true; try { ob.call(this, rd, sc, cam, ...a); } finally { MIRRORING = false; }
+  };
+  r.castShadow = false; r.receiveShadow = false; r.frustumCulled = false;
+  return r;
+}
+// the door mirrors: found where the body has its mirror glass, out past the doors, each turned so you see the road
+// behind down your own side
+function doorMirrors(v, MG, Eye, hw, belt, xf0) {
+  const g = v.bodyMesh.geometry, P = g.attributes.position, Pt = g.attributes.paint, Cl = g.attributes.color; if (!Pt) return;
+  const bb = { '-1': null, 1: null };
+  // (the everyday cars' mirrors are window glass; the low cars' are a shaped lens of their own colour)
+  const lens = (i) => Cl && Math.abs(Cl.getX(i) - 0.214) < 0.004 && Math.abs(Cl.getY(i) - 0.264) < 0.004 && Math.abs(Cl.getZ(i) - 0.319) < 0.004;
+  for (const pass of [0, 1]) for (let i = 0; i < P.count; i++) {
+    const p = Pt.getX(i), x = P.getX(i), y = P.getY(i), z = P.getZ(i), s = z < 0 ? '-1' : 1;
+    if (pass && bb[s] && !bb[s].lens) continue;
+    if (pass ? !lens(i) || Math.abs(z) < hw - 0.15 || x < xf0 - 1.3 : !(p > 3.5 && p < 4.5) || Math.abs(z) < hw - 0.02 || x < xf0 - 1.0) continue;
+    if (y < belt - 0.15 || x > xf0 + 0.4) continue;
+    const b = bb[s] || (bb[s] = { x0: 9, x1: -9, y0: 9, y1: -9, z0: 9, z1: -9, lens: pass });
+    b.x0 = Math.min(b.x0, x); b.x1 = Math.max(b.x1, x); b.y0 = Math.min(b.y0, y); b.y1 = Math.max(b.y1, y); b.z0 = Math.min(b.z0, z); b.z1 = Math.max(b.z1, z);
+  }
+  let slot = 1;
+  for (const b of Object.values(bb)) {
+    if (!b || b.z1 - b.z0 < 0.04 || b.y1 - b.y0 < 0.03) continue;
+    const c = v3(b.x0, (b.y0 + b.y1)/2, (b.z0 + b.z1)/2), n = Eye.clone().sub(c).normalize().add(v3(-1, 0, 0)).normalize();
+    const X = UP.clone().cross(n).normalize(), Y = n.clone().cross(X), r = mirror((b.z1 - b.z0)*0.9, (b.y1 - b.y0)*0.86, 160, 128, slot++);
+    r.matrixAutoUpdate = false; r.matrix.makeBasis(X, Y, n).setPosition(c.addScaledVector(n, 0.004)); MG.add(r);
+  }
+}
+function arrows(c, w, h, l, r) {
+  c.fillStyle = '#2bd46a';
+  const a = (x, d) => { const s = h*0.09; c.beginPath(); c.moveTo(x + d*s*1.6, h*0.1); c.lineTo(x, h*0.1 - s); c.lineTo(x, h*0.1 - s*0.45); c.lineTo(x - d*s*1.2, h*0.1 - s*0.45); c.lineTo(x - d*s*1.2, h*0.1 + s*0.45); c.lineTo(x, h*0.1 + s*0.45); c.lineTo(x, h*0.1 + s); c.closePath(); c.fill(); };
+  if (l) a(w*0.06, -1); if (r) a(w*0.94, 1);
 }
 
 // ---------------------------------------------------------------- the clusters
@@ -820,7 +1003,7 @@ function analog(s, vmax, kind, AT, scr, taxi, modes) {
   const fuel = 0.35 + hash(kind + 'f')*0.6;
   return (kmh, gear, rpm, mode, st) => {
     const k2 = Math.round(kmh) + '|' + Math.round(rpm*60) + '|' + gear + '|' + mode + '|' + hhmm() + '|' + Math.floor(st.dist/100);
-    if (k2 === key) return; key = k2;
+    if (k2 + st.tag === key) return; key = k2 + st.tag;
     ctx.drawImage(bg, 0, 0);
     tach(ctx, Math.min(1, rpm*0.93)); spd(ctx, kmh/vmax);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -887,7 +1070,7 @@ function luxScreen(s, amb) {
   let key = '';
   return (kmh, gear, rpm, mode, st) => {
     const col = modeCol(mode), k2 = Math.round(kmh) + '|' + Math.round(rpm*60) + '|' + gear + '|' + mode + '|' + hhmm();
-    if (k2 === key) return; key = k2;
+    if (k2 + st.tag === key) return; key = k2 + st.tag;
     const { bg, dA, dB } = bgFor(col);
     ctx.drawImage(bg, 0, 0); dA(ctx, kmh/260, '#f4f6f8'); dB(ctx, Math.min(1, rpm*0.92), '#f4f6f8');
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -914,7 +1097,7 @@ function fiveDial(s, ts, ck) {
   let key = '';
   return (kmh, gear, rpm, mode, st) => {
     const col = modeCol(mode), k2 = Math.round(kmh) + '|' + Math.round(rpm*80) + '|' + gear + '|' + mode + '|' + hhmm();
-    if (k2 === key) return; key = k2;
+    if (k2 + st.tag === key) return; key = k2 + st.tag;
     ctx.drawImage(bg, 0, 0);
     tach(ctx, Math.min(1.01, rpm*0.98), '#e8edf2'); spd(ctx, kmh/330, '#e8edf2');
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -965,7 +1148,7 @@ function superScreen(s, ts) {
   let key = '';
   return (kmh, gear, rpm, mode, st) => {
     const M = String(mode).toUpperCase(), col = modeCol(mode), k2 = Math.round(kmh) + '|' + Math.round(rpm*90) + '|' + gear + '|' + M + '|' + (M === 'CORSA' ? Math.floor(st.corsaT*10) : hhmm()) + '|' + Math.round(st.lat*20) + Math.round(st.lon*20);
-    if (k2 === key) return; key = k2;
+    if (k2 + st.tag === key) return; key = k2 + st.tag;
     ctx.drawImage(bgFor(col), 0, 0);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const r8 = Math.min(1, rpm), gtx = gear > 0 ? String(gear) : 'N';

@@ -78,7 +78,8 @@ void main(){
   float glassy = step(3.5, vP), e = (nz(gl_FragCoord.xy*.11) - .5)*(1. - uReal), ndl = dot(n, sunDir), lit = sunOn(ndl, e*.1, .0, .13), sh = (shadowOn > .5 && lit > 0.) ? shadeOf(shadowAt(vW, n), e*.3) : 1., L = lit*sh*dayK;
   // the cabin's finishes (beta/vehicles/cockpit.js), laid on the face each part shows: carbon weave in a 2x2 twill, its
   // tows catching the light by which way they run (-2); quilted leather, diamonds sewn in with the seams sunk (-3);
-  // open-pore wood, the grain along the piece (-4); brushed aluminium (-5); suede (-6); perforated leather (-7)
+  // open-pore wood, the grain along the piece (-4); brushed aluminium (-5); suede (-6); perforated leather (-7); the fine
+  // grain moulded into a dashboard's plastic (-8)
   if (vP < -1.5) {
     vec3 an = abs(vNL); vec2 q = an.x > an.y && an.x > an.z ? vL.zy : an.y > an.z ? vL.xz : vL.xy;
     if (vP > -2.5) { vec2 u = q*150., cc = floor(u), ff = fract(u); float w = step(mod(cc.x + cc.y, 4.), 1.5), lk = abs(dot(normalize(cameraPosition - vW), vec3(.7, .2, .7)));
@@ -88,7 +89,8 @@ void main(){
     else if (vP > -4.5) { float g = sin(q.y*95. + q.x*6. + nz(q*vec2(2., 30.))*9.); b *= .72 + .34*smoothstep(-.6, 1., g) - .12*step(.82, nz(q*vec2(9., 260.))); }
     else if (vP > -5.5) b *= .82 + .32*nz(vec2(q.x*700., q.y*2.5));
     else if (vP > -6.5) b *= .8 + .35*nz(q*900.);
-    else { vec2 f = fract(q*190.) - .5; b *= .55 + .45*smoothstep(.14, .2, length(f)); }
+    else if (vP > -7.5) { vec2 f = fract(q*190.) - .5; b *= .55 + .45*smoothstep(.14, .2, length(f)); }
+    else b *= .86 + .2*nz(q*1500.) + .06*nz(q*240.);
   }
   // grime low down on the body, a little wear
   float grime = (1. - smoothstep(.15, .7, vW.y))*(.6 + .6*nz(vL.xz*9.))*(1. - matte)*step(-1.5, vP);
@@ -148,6 +150,39 @@ function mat(fs, vs, opts = {}) {
 }
 export function vehicleMaterials() {
   return { body: mat(FS, VS, { rough: .38, metal: .1 }), solid: mat(FS, VS, { rough: .6, metal: .05 }), glass: mat(GLASS_FS, GLASS_VS, { glass: true }), glassI: mat(GLASS_FS, GLASS_VS, { glass: true }) };
+}
+// A car's glass seen from inside (beta/vehicles/cockpit.js): from out there the windows are the body's own glossy panels,
+// from your seat they were holes. This is the inside of them: nearly clear, a green-grey tint, more of the sky and the
+// cabin in it the flatter you look across it; dust and smears that light up when the sun's in front of you; on the
+// windscreen the two arcs the wipers keep cleaner, with a streak at their edge, and the tinted band across its top; on
+// the rear glass the demister's lines. Drawn on the inside faces only, after everything solid, writing no depth.
+const CG_VS = `varying vec3 vN, vW, vL, vNL;
+void main(){ vL = position; vNL = normal; vec4 w = modelMatrix*vec4(position, 1.); vW = w.xyz; vN = mat3(modelMatrix)*normal; gl_Position = projectionMatrix*viewMatrix*w; }`;
+const CG_FS = `precision highp float;
+uniform sampler2D tNoise; uniform vec3 sunDir, sunCol, skyCol, uTint; uniform float dayK, uNight; uniform vec4 uWip; uniform vec3 uBand;
+varying vec3 vN, vW, vL, vNL;
+float nz(vec2 p){ return texture2D(tNoise, p/16.).r; }
+void main(){
+  vec3 n = normalize(vN), V = normalize(cameraPosition - vW); if (dot(n, V) < 0.) n = -n;
+  float c = max(dot(n, V), 0.), fres = pow(1. - c, 5.);
+  vec3 R = reflect(-V, n), an = abs(vNL); vec2 q = an.x > an.z ? vL.zy : vL.xy;
+  float wind = step(.35, vNL.x)*uBand.z, rearG = step(vNL.x, -.35)*uBand.z;
+  float d = nz(q*23.)*.55 + nz(q*71. + 3.1)*.3 + nz(q*190.)*.15, dust = smoothstep(.4, .95, d)*.9 + .1, wip = 0.;
+  if (wind > .5) for (int i = 0; i < 2; i++) {
+    float r = length(vec2(vL.z - (i == 0 ? uWip.y : uWip.z), (vL.y - uWip.x)*1.7));
+    if (r < uWip.w && vL.y > uWip.x) { dust *= .35; wip += step(.47, abs(fract(r*55.) - .5))*.2; }
+    wip += smoothstep(.014, 0., abs(r - uWip.w))*.7*step(uWip.x, vL.y);
+  }
+  float glare = pow(max(dot(-V, sunDir), 0.), 5.)*dayK;
+  vec3 env = mix(vec3(.04, .038, .035), skyCol*(.2 + .5*dayK), smoothstep(-.15, .5, R.y));
+  float a = .035 + .5*fres + (dust*.05 + wip*.06)*(1. + 7.*glare);
+  vec3 col = mix(uTint, env, .55) + sunCol*glare*(dust*.6 + wip)*.9;
+  if (wind > .5) { float b = smoothstep(uBand.x, uBand.y, vL.y); col = mix(col, vec3(.04, .15, .19), b*.85); a = max(a, b*.6); }
+  if (rearG > .5) { float l = step(fract(vL.y*30.), .05)*step(abs(vL.z), uWip.w*.9); col = mix(col, vec3(.3, .1, .04), l); a = max(a, l*.75); }
+  gl_FragColor = vec4(col, clamp(a, 0., .85)); }`;
+export function cabinGlass(o = {}) {
+  const uniforms = Object.assign({}, PU, { uTint: { value: new THREE.Color(o.tint ?? 0x1c2624).convertSRGBToLinear() }, uWip: { value: new THREE.Vector4(...(o.wip || [0, 0, 0, 0])) }, uBand: { value: new THREE.Vector3(...(o.band || [9, 10, 0])) } });
+  return new THREE.ShaderMaterial({ vertexShader: CG_VS, fragmentShader: CG_FS, uniforms, transparent: true, depthWrite: false, side: o.side ?? THREE.BackSide });
 }
 const FIN = new Map();
 export function finishMaterial(key, rough, metal) { if (!FIN.has(key)) FIN.set(key, mat(FS, VS, { rough, metal })); return FIN.get(key); }
