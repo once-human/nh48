@@ -73,6 +73,7 @@ import './people/runover.js';        // being hit by what you're driving, and be
 import './people/doors.js';          // into a shop and out again through its door
 import './draw/falls.js';
 import './people/motion.js';         // the body's own weight on every clip: arms swing behind, the trunk leans and catches itself, breathing, everyone's own gait
+import './people/inspect.js';        // someone lying in the street: a passer-by kneels, feels for a pulse, shakes their shoulder, rings for help
 import './draw/fauna.js';
 import './vehicles/mount.js';
 import './vehicles/cardoor.js';
