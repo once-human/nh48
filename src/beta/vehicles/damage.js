@@ -30,7 +30,7 @@ V.own = function () {
   let view = body;
   if (F) {
     const on = (src) => { const g = new THREE.BufferGeometry(); for (const k of Object.keys(body.attributes)) g.setAttribute(k, body.attributes[k]); g.setIndex(src.index); g.boundingSphere = body.boundingSphere; return g; };
-    view = on(B.geometry); F.mesh.geometry = on(F.mesh.geometry); if (F.stand) F.stand.geometry = on(F.stand.geometry);
+    view = on(B.geometry); F.mesh.geometry = on(F.mesh.geometry); if (F.stand) F.stand.geometry = on(F.stand.geometry); for (const w of F.wh || []) w.m.geometry = on(w.m.geometry);
   }
   // (a car's wheels are drawn the same way: beta/vehicles/wheels.js)
   if (W4) {

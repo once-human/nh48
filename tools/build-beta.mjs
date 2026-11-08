@@ -54,7 +54,7 @@ const SWAPS = [
 // a line in a game file swapped as it's bundled: only for what a module swap can't reach. Fails the build if the line has moved
 const PATCHES = {
   // the tyres' squeal is one continuous sound now (beta/game/dash.js), not a burst every few frames
-  [S('game/modfx.js')]: [["if ((this._sqT = (this._sqT || 0) - 1 / 60) <= 0) { this._sqT = 0.09; G.audio.noiseBurst?.(0.12, 2400 + Math.random() * 600, 6, Math.min(0.22, ev.amount * 0.03)); }", ""]],
+  [S('game/modfx.js')]: [["if (this.edge('KeyU') && v.dj) this.music(!this.djOn);", ""], ["if ((this._sqT = (this._sqT || 0) - 1 / 60) <= 0) { this._sqT = 0.09; G.audio.noiseBurst?.(0.12, 2400 + Math.random() * 600, 6, Math.min(0.22, ev.amount * 0.03)); }", ""]],
   // a postcard is a second full render and a stop-the-world read of its pixels: taken only when you're not moving fast, never mid-drive
   [S('game/postcards.js')]: [["if (G.state !== 'play' || !this.ok() || (G.jhola && G.jhola.on) || (G.phone && G.phone.on)) return;", "if (G.state !== 'play' || !this.ok() || (G.jhola && G.jhola.on) || (G.phone && G.phone.on) || (!G.player.onFoot && Math.abs(G.player.cur.v || 0) > 2.5)) return;"]],
   [S('game/garageui.js')]: [["[tog('xenon', cyc ? 'LED lamp' : 'Xenon headlights', 'Cold white, reaches further', $(2500)), ...(cyc ? [] : [", "[...(cyc ? [] : [tog('xenon', 'Xenon headlights', 'Cold white, reaches further', $(2500)), "], ["(this.mine ? 'Your ' : '') + here.spec.name.toLowerCase();", "(this.mine ? 'Your ' : '') + (here.spec.real || here.spec.name);"]],
@@ -141,7 +141,15 @@ const PATCHES = {
     ["if (inp.handbrake) a -= Math.sign(v) * (S.two ? 3.5 : 4.5);", "if (inp.handbrake && (S.two || !this.tyres)) a -= Math.sign(v) * (S.two ? 3.5 : 4.5);"],
   ],
   // C switches first and third person; rolling is Ctrl; the jhola is Q; vehicles are E
+  // the Fixed list: what isn't one key (launch control, the hazards both ways) and the keys that can't move
+  [S('game/settings.js')]: [
+    ['<div class="row"><div class="rl">Performance stats</div><div class="rc"><span class="kbd">F3</span></div></div></div>', '<div class="row"><div class="rl">Performance stats</div><div class="rc"><span class="kbd">F3</span></div></div><div class="row"><div class="rl">Launch control: from a stop, hold the brake or handbrake, floor it, let the brake go</div><div class="rc"><span class="kbd">S</span><span class="kbd">W</span></div></div><div class="row"><div class="rl">Hazard lights, the other way: both indicators at once</div><div class="rc"><span class="kbd">,</span><span class="kbd">.</span></div></div><div class="row"><div class="rl">Fly (on foot, free roam): double-tap</div><div class="rc"><span class="kbd">Space</span></div></div><div class="row"><div class="rl">Time of day (free roam)</div><div class="rc"><span class="kbd">[</span><span class="kbd">]</span></div></div><div class="row"><div class="rl">Terminal</div><div class="rc"><span class="kbd">&#96;</span><span class="kbd">/</span></div></div></div>'],
+  ],
   [S('game/keys.js')]: [
+    // everything the beta adds, in the list (Pause > Controls) and rebindable like the rest
+    ["{ id: 'lookback', label: 'Look back', group: 'Vehicle', def: 'KeyB' },", "{ id: 'lookback', label: 'Look back (on foot: Brahmarakshas, hold on someone)', group: 'Vehicle', def: 'KeyB' },"],
+    ["{ id: 'beacon', label: 'Roof lights (beacon, strobes)', group: 'Vehicle', def: 'KeyN' },", "{ id: 'beacon', label: 'Roof lights (on foot: Munja, hold to see everyone near)', group: 'Vehicle', def: 'KeyN' },"],
+    ["{ id: 'music', label: 'Music system', group: 'Vehicle', def: 'KeyU' },", "{ id: 'music', label: 'Radio: next station, then off', group: 'Vehicle', def: 'KeyU' }, { id: 'indl', label: 'Left indicator (cancels itself after the turn)', group: 'Vehicle', def: 'Comma' }, { id: 'indr', label: 'Right indicator', group: 'Vehicle', def: 'Period' }, { id: 'hazard', label: 'Hazard lights', group: 'Vehicle', def: 'Semicolon' }, { id: 'engine', label: 'Engine on or off (off a few minutes: a cold start)', group: 'Vehicle', def: 'Quote' }, { id: 'mode', label: 'Drive mode (cars that have them)', group: 'Vehicle', def: 'KeyO' }, { id: 'arms', label: 'Weapons wheel (hold); drag someone out cold', group: 'Do', def: 'KeyZ' }, { id: 'diary', label: 'Missions, diary', group: 'Menus', def: 'KeyJ' },"],
     ["{ id: 'bag', label: 'Jhola', group: 'Menus', def: 'KeyE' },", "{ id: 'bag', label: 'Jhola', group: 'Menus', def: 'KeyQ' },"],
     ["{ id: 'roll', label: 'Roll; camera when driving', group: 'Do', def: 'KeyC' }", "{ id: 'roll', label: 'Roll', group: 'Do', def: 'ControlLeft' }"],
     ["{ id: 'punch', label: 'Punch (click works too)',", "{ id: 'punch', label: 'Punch (click works too; hold right-click to block)',"],

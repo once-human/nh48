@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { Vehicle } from '@orig/vehicles/vehicle.js';
 import { baseOf } from './models.js';
+import { rolled, wheelMesh, turn, dropWheel, nearCam } from './wheelspin.js';
 
 const split = new WeakMap();
 const REAR_STEER = new Set(['super', 'sports']);
@@ -38,11 +39,8 @@ function setup(v) {
   const body = v.bodyMesh, wh = v.wheels, P = body && parts(body.geometry, wh);
   if (!P) return;
   const list = wh.map((W, i) => {
-    const m = new THREE.InstancedMesh(P.wheels[i], body.material, 1);
-    m.instanceColor = body.instanceColor; m.setMatrixAt(0, new THREE.Matrix4().makeTranslation(-W.x, -W.y, -W.z));
-    m.castShadow = body.castShadow; m.receiveShadow = body.receiveShadow; m.frustumCulled = false;
-    const steer = new THREE.Group(), spin = new THREE.Group(); steer.position.set(W.x, W.y, W.z); steer.add(spin); spin.add(m); body.parent.add(steer);
-    return { W, m, steer, spin, front: W.x > 0 };
+    const w = wheelMesh(P.wheels[i], body, W), steer = new THREE.Group(); steer.position.set(W.x, W.y, W.z); steer.add(w.spin); body.parent.add(steer);
+    return Object.assign(w, { steer, front: W.x > 0 });
   });
   body.geometry = P.rest;
   v._wh4 = { list, src: P.src, t: performance.now(), base: baseOf(v.type) };
@@ -54,17 +52,17 @@ Vehicle.prototype.sync = function (dt = 0) {
   if (S && !S.two && this._wh4 === undefined && this.bodyMesh && this.wheels && this.wheels.length) setup(this);
   const F = this._wh4;
   if (F) {
-    const now = performance.now(), d = Math.min(0.1, (now - F.t)/1000), v = this.v || 0, sp = Math.abs(v), sd = this.steer || 0, TW = S.W/2; F.t = now;
+    const now = performance.now(), d = Math.min(0.1, (now - F.t)/1000), dist = rolled(this, F), near = nearCam(this), v = this.v || 0, sp = Math.abs(v), sd = this.steer || 0, TW = S.W/2; F.t = now;
     const locked = this._lockT > 0.2 && sp > 1.5, hb = !!this.hbOn && sp > 0.5, base = F.base;
     // (driven wheels spinning up on a launch, if it has the power and nothing's holding it back)
     const thr = this._thrIn || 0, spare = this.tcsOn ? 0 : Math.max(0, (S.acc || 0)*(this.accMul || 1) - 5.5), launch = !this.reverse && thr > 0.8 && sp < 14 ? spare*(1 - sp/14)*3 : 0;
     const rear = REAR_STEER.has(base) ? Math.max(-0.05, Math.min(0.05, sd*(sp < 15 ? -0.14 : sp < 22 ? -0.14 + 0.28*(sp - 15)/7 : 0.14))*(sp < 0.5 ? 0 : 1)) : 0;
     for (const w of F.list) {
       const W = w.W, flat = this._flats && this._flats.has(W), driven = w.front ? !DRIVE_BACK.has(base) || base === 'super' : DRIVE_BACK.has(base);
-      let om = v/W.r;
-      if (locked || (hb && !w.front)) om = 0;
-      else if (driven && launch > 0) om += launch/W.r;
-      if (!flat) w.spin.rotation.z = (w.spin.rotation.z - om*d)%(Math.PI*2);
+      let da = -dist/W.r;                                 // (the road gone by, over the radius)
+      if (locked || (hb && !w.front)) da = 0;
+      else if (driven && launch > 0) da -= launch/W.r*d;
+      if (!flat) turn(w, da, near);
       if (w.front) { const inner = Math.sign(W.z)*Math.sign(sd) > 0 ? 1.1 : 0.92; w.steer.rotation.y = -sd*(Math.abs(W.z) < 0.15 ? 1 : inner); }
       else if (rear) w.steer.rotation.y = -rear;
     }
@@ -84,4 +82,4 @@ export function tyreOnRay(v, ray, far) {
   return best;
 }
 const disp = Vehicle.prototype.dispose;
-Vehicle.prototype.dispose = function () { const F = this._wh4; if (F) { for (const w of F.list) { w.steer.parent && w.steer.parent.remove(w.steer); w.m.dispose(); } this._wh4 = null; } return disp.call(this); };
+Vehicle.prototype.dispose = function () { const F = this._wh4; if (F) { for (const w of F.list) { w.steer.parent && w.steer.parent.remove(w.steer); dropWheel(w); } this._wh4 = null; } return disp.call(this); };

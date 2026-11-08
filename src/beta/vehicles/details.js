@@ -8,8 +8,10 @@
 //  - your head turns into a corner a little before the car does
 //  - the brake discs glow after hard stops from high speed, and cool over a few seconds
 //  - a car that's been standing breathes white vapour from its exhaust for the first half minute after you start it
-//  - indicators: , for left, . for right, both together for the hazards. A soft tick-tock, and they cancel themselves once you've
+//  - indicators: , for left, . for right, ; or both together for the hazards. A soft tick-tock, and they cancel themselves once you've
 //    turned the wheel that way and straightened up again
+//  - the engine on and off (' by default): the starter turns it over, longer when it's cold, and off a few minutes
+//    it's a cold start (the vapour, a high idle)
 //  - launch control: hold the brake or the handbrake, floor it, let the brake go
 //  - heat haze over the exhaust once you've worked the engine: it shows when you slow down or stop, and takes a few
 //    minutes to go. A sports car's shimmers a little even idling
@@ -21,6 +23,8 @@ import { Pilot } from '@orig/game/pilot.js';
 import { bendBone } from '@orig/people/humans.js';
 import { baseOf } from './models.js';
 import { HAZE } from '../gfx/post.js';
+import { Audio } from '@orig/game/audio.js';
+import { keyOf } from '@orig/game/keys.js';
 
 const G0 = () => window.__nhAskG;
 const mine = (v) => { const P = G0() && G0().player; return !!P && !P.onFoot && P.cur === v; };
@@ -118,7 +122,7 @@ function details(v, h, inp) {
     if (v.moving && v.moving.wing) wing(v, h);
     if (v.moving && v.moving.wipers) wipe(v, h);
     if (v._wh4) brakes(v, h, inp);
-    vapour(v, h);
+    if (!v._off) vapour(v, h);
   } catch (e) { if (!warned) { warned = true; console.warn('details', e); } }
 }
 
@@ -277,8 +281,10 @@ function indKeys(P, input) {
     I.last = { s, t, was: I.s };
     I.s = I.s === s ? 0 : s; I.peak = 0; if (!I.haz) { I.t0 = t; I.ph = -1; }
   };
-  if (input.took('Comma')) press(-1);
-  if (input.took('Period')) press(1);
+  if (input.took(keyOf('indl'))) press(-1);         // (whatever they're bound to in Controls)
+  if (input.took(keyOf('indr'))) press(1);
+  if (input.took(keyOf('hazard'))) { I.haz = !I.haz; I.t0 = t; I.ph = -1; }
+  if (input.took(keyOf('engine'))) engineKey(v);
 }
 function indTick(v) {
   const I = v._ind; if (!I || (!I.s && !I.haz)) return;
@@ -330,5 +336,37 @@ const pu3 = Pilot.prototype.update;
 Pilot.prototype.update = function (dt, ...a) {
   const r = pu3.call(this, dt, ...a), v = this.cur;
   if (!this.onFoot && v && v.tilt) { try { haze(v, Math.min(0.1, dt || 0.016)); } catch (e) { if (!warned) { warned = true; console.warn('details', e); } } }
+  return r;
+};
+
+// ---------------------------------------------------------------- the engine, on and off
+// Off: nothing from the engine and nothing to the wheels (it rolls, it brakes). On: the starter turns it over, a
+// little longer when it's cold, and it catches. Off for a few minutes and it starts cold (vapour, a high idle)
+function engineKey(v) {
+  const A = G0() && G0().audio;
+  if (!v._off && !(v._crank > 0)) { v._off = true; A && A.tone && A.tone('sine', [70, 40], 0.5, 0.03); return; }
+  if (v._crank > 0) return;
+  const cold = v._lastRun === undefined || now() - v._lastRun > COLD;
+  v._crank = cold ? 1.15 : 0.6; v._off = false;
+  if (A && A.noiseBurst) { const n = Math.round(v._crank/0.085); for (let i = 0; i < n; i++) A.noiseBurst(0.05, 150 + (i % 2)*30, 1.3, 0.16, A.ctx ? A.ctx.currentTime + i*0.085 : undefined); }
+  A && A.tone && A.tone('sawtooth', [48, 62], v._crank, 0.012);
+}
+const ue2 = Audio.prototype.updateEngine;
+Audio.prototype.updateEngine = function (rpm, thr, running, kind) {
+  const P = G0() && G0().player, v = P && !P.onFoot && P.cur;
+  if (v && (v._off || v._crank > 0)) return ue2.call(this, 0, 0, false, kind);
+  return ue2.call(this, rpm, thr, running, kind);
+};
+const eu = Vehicle.prototype.update, _ei = {};
+Vehicle.prototype.update = function (dt, inp, traffic) {
+  if (!(this._off || this._crank > 0) || !inp) {
+    const r = eu.call(this, dt, inp, traffic);
+    // cold: it idles high for a while
+    if (this._coldT > 0 && (this.throttle || 0) < 0.1 && mine(this)) this.rpm = Math.max(this.rpm, 0.2 + 0.12*Math.min(1, this._coldT/20));
+    return r;
+  }
+  if (this._crank > 0) { this._crank -= dt; if (this._crank <= 0) { this._crank = 0; this.rpm = 0.45; } }
+  const r = eu.call(this, dt, Object.assign(_ei, inp, { throttle: 0 }), traffic);
+  this.rpm = 0; this.throttle = 0;
   return r;
 };

@@ -72,7 +72,9 @@ function newB(paintable = true) { const b = new ColorBuilder(); if (paintable) b
 function front(b, fn) { const c0 = b.c; fn(); (b.front || (b.front = [])).push([c0, b.c]); }
 // the stand: drawn only while nobody's on it (beta/vehicles/steerfront.js shows it parked, folds it away ridden)
 function stand(b, fn) { const c0 = b.c; fn(); (b.stand || (b.stand = [])).push([c0, b.c]); }
-function withFront(m, b, ax) { if (b.front) m.body.userData.front = { r: b.front, ax }; if (b.stand) m.body.userData.stand = b.stand; return m; }
+function withFront(m, b, ax) { if (b.front) m.body.userData.front = { r: b.front, ax }; if (b.stand) m.body.userData.stand = b.stand;
+  if (WHEELS && WHEELS.some(w => w.v)) m.body.userData.wh2 = WHEELS.filter(w => w.v).map(w => ({ ...w }));     // (which vertices are each wheel: they go round, beta/vehicles/steerfront.js)
+  return m; }
 
 // ---------------------------------------------------------------- people
 // seated rider: hips at (x, y), facing +x. lean forward (rad). colours via channels when `inst`
@@ -359,7 +361,7 @@ function axle(x, y, z, sr, sw, side = 1) { return M(x, y, z, sr, sw, sr, side*Ma
 // a car's wheel: tyre, dished rim with spokes and nuts, the brake disc behind. `side` is which way it faces out
 const SPOKES = [5, 6, 7, 5, 10];
 function wheel(b, x, y, z, r, w, hub = RIM, style = 0) {
-  if (WHEELS) WHEELS.push({ x, y, z, r, w });
+  if (WHEELS) WHEELS.push({ x, y, z, r, w, n: SPOKES[style % SPOKES.length] });       // (n: its spokes, for the blur when it's going round fast)
   const side = z >= 0 ? 1 : -1;
   b.addGeo(TYRE_G, axle(x, y, z, r, w, side), TYRE, MATTE);
   b.addGeo(DISH_G, axle(x, y, z, r, w, side), hub);
@@ -375,7 +377,8 @@ function wheel(b, x, y, z, r, w, hub = RIM, style = 0) {
 }
 // a two-wheeler's wheel: thin round tyre, rim, spokes (or cast arms), hub, drum or disc
 function wheel2(b, x, y, z, r, w, opts = {}) {
-  if (WHEELS) WHEELS.push({ x, y, z, r, w });
+  const W = { x, y, z, r, w, n: opts.cast ? 5 : 16, v: null }, c0 = b.c;
+  if (WHEELS) WHEELS.push(W);
   b.addGeo(TYRE2_G, axle(x, y, z, r, w), TYRE, MATTE);
   b.addGeo(RIM2_G, axle(x, y, z, r, w), opts.cast ? BLACK : CHROME);
   b.addGeo(HUB_G, axle(x, y, z, r*.2, w*.9), GREY);
@@ -383,8 +386,9 @@ function wheel2(b, x, y, z, r, w, opts = {}) {
     b.addGeo(RB, _m.compose(_p.set(x + ca*r*.45, y + sa*r*.45, z), _q, _s.set(r*.6, r*.09, w*.34)), BLACK); }
   else for (let i = 0; i < 16; i++) { const a = i/16*Math.PI*2, ca = Math.cos(a), sa = Math.sin(a), a2 = a + (i % 2 ? .5 : -.5), sd = i % 2 ? 1 : -1;
     rod(b, [x + Math.cos(a2)*r*.16, y + Math.sin(a2)*r*.16, z + sd*w*.34], [x + ca*r*.74, y + sa*r*.74, z], .0035, CHROME); }
-  if (opts.disc) { b.addGeo(HUB_G, axle(x, y, z + w*.42, r*.36, .006), [.55, .55, .58]); rbox(b, x + r*.22, y + r*.08, z + w*.36, x + r*.42, y + r*.36, z + w*.5, BLACK); }
-  else b.addGeo(HUB_G, axle(x, y, z + w*.3, r*.36, w*.3), [.4, .4, .42]);
+  b.addGeo(HUB_G, opts.disc ? axle(x, y, z + w*.42, r*.36, .006) : axle(x, y, z + w*.3, r*.36, w*.3), opts.disc ? [.55, .55, .58] : [.4, .4, .42]);      // (disc or drum)
+  W.v = [c0, b.c];                                       // (all of that goes round with it; the caliper doesn't)
+  if (opts.disc) rbox(b, x + r*.22, y + r*.08, z + w*.36, x + r*.42, y + r*.36, z + w*.5, BLACK);
 }
 
 // A surface as a grid of points. outward = (along i) x (along k). Neighbouring quads of a colour share vertices, and the
