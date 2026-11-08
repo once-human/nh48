@@ -117,7 +117,7 @@ function cutGeo(geo, D, s) {
 // The body shows the opening, the panel hangs from a pivot at its front edge. Driven by the angle it's asked for
 // (a hand on it), it follows a beat behind with some weight; let go to shut, it swings to and lands with a thud.
 const IDENT = new THREE.Matrix4();
-function hang(P, veh, s) {
+export function hang(P, veh, s) {
   const D = doorOf(veh.type), B = veh.bodyMesh, Gm = veh.glassMesh;
   const body0 = B.geometry, glass0 = Gm ? Gm.geometry : null;
   const cb = cutGeo(body0, D, s), cg = glass0 && glass0.attributes.position.count ? cutGeo(glass0, D, s) : null;
@@ -139,7 +139,7 @@ function hang(P, veh, s) {
   (P.doors || (P.doors = [])).push(R);
   return R;
 }
-function unhang(P, R) {
+export function unhang(P, R) {
   const { veh } = R;
   if (veh.bodyMesh.geometry !== R.body0) veh.bodyMesh.geometry = R.body0;
   if (R.glass0 && veh.glassMesh) veh.glassMesh.geometry = R.glass0;
@@ -261,12 +261,12 @@ function smash(P, E) {
 
 // what pilot.js asks for (getting out of a car the old way): this car's own door, open, and shut a moment later
 Pilot.prototype.openDoor = function (src, kind, s = 1) {
-  if (this._noDoor || !src.bodyMesh || /^auto/.test(src.type || 'auto')) return { veh: null, closeAt: null, dud: true };     // (an auto has no doors)
+  if (this._noDoor || !src.bodyMesh || /^auto/.test(src.type || 'auto') || (src._sprung && src._sprung[s])) return { veh: null, closeAt: null, dud: true };     // (an auto has no doors)
   const R = hang(this, src, s); R.auto = true; return R;
 };
 Pilot.prototype.tickDoors = function (dt) {
   if (this.doors) for (const R of this.doors.slice()) {
-    if (R.dud) continue;
+    if (R.dud || R.sprung) continue;               // (a door a crash has sprung swings on its own: beta/vehicles/parts.js)
     R.t += dt;
     if (!R.veh.root.parent) { unhang(this, R); continue; }
     if (R.auto) { if (R.closeAt != null) { R.closeAt -= dt; if (R.closeAt <= 0) shut(R); } R.goal = 1.0; }
