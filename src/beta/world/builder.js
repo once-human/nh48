@@ -620,7 +620,10 @@ function shopInside(b, cb, G, F, a, c, oh, trade, lux, sh, famous) {
       b.set(K.glass, trade === 5 ? 0xd8c890 : 0xc8d8d8, 0, R()); F.box(b, a + 0.2, c - 0.2, yb, yb + 1.0, -D + 0.3, -D + 0.8, 2 | 8);
       b.set(K.wood, trade === 5 ? 0x5a2a1a : 0xe8e8e4, 0.1); F.box(b, a + 0.25, c - 0.25, yb + 0.95, yb + 1.0, -D + 0.3, -D + 0.85, 2);
       if (trade === 5) { b.set(K.glow, [1, 0.85, 0.5], 0, 0.95); for (let s = 0; s < 3; s++) F.box(b, a + 0.4 + s * (w - 0.8) / 3, a + 0.55 + s * (w - 0.8) / 3, yt - 0.05, yt - 0.01, -D * 0.5 - 0.07, -D * 0.5 + 0.07, 0); }
-      if (trade === 2 && sh) { b.set(K.glow, [0.2, 0.85, 0.35], 0, 0.95); F.box(b, c - 0.2, c + 0.1, yt + 0.12, yt + 0.42, 0.05, 0.12, 2); }
+      if (sh && sh[1] === 'optician') {                                    // the frames on the wall, rows of them
+        for (let y = yb + 1.15; y < yt - 0.3; y += 0.22) for (let uu = a + 0.25; uu < c - 0.35; uu += 0.24) { b.set(K.plain, [0x1a1a1c, 0x5a3a22, 0x8a8a8e, 0x2a3a6a][(R() * 4) | 0], 0.1); F.box(b, uu, uu + 0.16, y, y + 0.05, -D + 0.04, -D + 0.08, 2 | 8 | 16 | 32); }
+      }
+      else if (trade === 2 && sh) { b.set(K.glow, [0.2, 0.85, 0.35], 0, 0.95); F.box(b, c - 0.2, c + 0.1, yt + 0.12, yt + 0.42, 0.05, 0.12, 2); }
       if (lux > 0.6) { b.set(K.glass, 0x8aa0a8, 0, R()); F.rect(b, a, c, yb, yt, 0.0); }        // a glass front
       break;
     }
@@ -654,15 +657,41 @@ function shopInside(b, cb, G, F, a, c, oh, trade, lux, sh, famous) {
       if (w > 2.2 && D > 1.8) { b.set(K.glow, [1, 0.96, 0.88], 0, 0.85); F.box(b, c - 0.75, c - 0.15, yb, yb + 1.8, -D + 0.45, -D + 1.0, 2); }
       break;
     }
-    case 7: { b.set(K.wood, 0x5a4232, 0.3); F.box(b, a + 0.2, c - 0.2, yb, yb + 0.9, -0.9, -0.4, 2 | 8); break; }      // books: a table of them at the front
+    case 7: {                                                              // books: a table of them at the front, shelves to the ceiling
+      b.set(K.wood, 0x5a4232, 0.3); F.box(b, a + 0.2, c - 0.2, yb, yb + 0.85, -0.9, -0.4, 2 | 8);
+      for (let uu = a + 0.25; uu < c - 0.3; uu += 0.2 + R() * 0.1) { b.set(K.plain, pc(), 0.2); F.box(b, uu, uu + 0.16, yb + 0.85, yb + 0.88 + R() * 0.12, -0.85, -0.55, 2 | 8); }
+      if (D > 1.1) for (let y = yb + 0.3; y < yt - 0.3; y += 0.38) {
+        b.set(K.wood, 0x4a3426, 0.3); F.box(b, a + 0.05, c - 0.05, y, y + 0.03, -D + 0.03, -D + 0.3, 2);
+        for (let uu = a + 0.08; uu < c - 0.1; uu += 0.035 + R() * 0.03) { if (R() < 0.08) { uu += 0.12; continue; } b.set(K.plain, pc(), 0.3); F.box(b, uu, uu + 0.03, y + 0.03, y + 0.22 + R() * 0.08, -D + 0.05, -D + 0.25, 2 | 8 | 16 | 32); }
+      }
+      break;
+    }
     case 9: {                                                              // garage: tyres, an oily floor, a bike on its stand
       b.set(K.plain, 0x1a1a1a, 0.6); for (let s = 0; s < 4; s++) { const P0 = F.P(a + 0.3 + R() * (w - 0.6), 0, -D + 0.3 + R() * 0.3); b.cyl(P0[0], yb + s * 0.0, P0[2], 0.3, 0.3, 0.2 + (s % 2) * 0.2, 8); }
       b.set(K.stain, 0x1a1a1a, 0.8); F.box(b, a + 0.4, c - 0.4, yb + 0.012, yb + 0.014, -D + 0.2, -0.2, 2 | 8 | 16 | 32);
       break;
     }
-    case 10: {                                                             // salon, gym: mirrors and a chair
+    case 10: {
       b.set(K.glass, 0xc8d8e0, 0, R()); F.rect(b, c - 0.1, a + 0.1, yb + 0.9, yb + 2.0, -D + 0.04, 1);
-      b.set(K.plain, 0x1a1a1e, 0.1); F.box(b, a + w * 0.3, a + w * 0.3 + 0.55, yb, yb + 0.95, -D + 0.6, -D + 1.15, 2);
+      if (sh && sh[1] === 'gym') {
+        // a gym: the dumbbells on their rack along the mirror, a bench, a rubber floor, a plate stacked on its pin
+        b.set(K.plain, 0x1a1a1c, 0.5); F.box(b, a + 0.05, c - 0.05, yb + 0.012, yb + 0.02, -D + 0.05, -0.05, 2 | 8 | 16 | 32);
+        b.set(K.metal, 0x2a2a2e, 0.2); F.box(b, a + 0.2, c - 0.2, yb + 0.5, yb + 0.55, -D + 0.12, -D + 0.42, 2);
+        for (let uu = a + 0.3; uu < c - 0.35; uu += 0.24) { b.set(K.metal, 0x111113, 0.1); F.box(b, uu, uu + 0.16, yb + 0.55, yb + 0.66, -D + 0.17, -D + 0.37, 2 | 8); }
+        if (D > 1.5 && w > 1.6) { b.set(K.cloth, 0x1a1a1e, 0.2); F.box(b, a + w * 0.35, a + w * 0.35 + 0.3, yb + 0.38, yb + 0.45, -D + 0.6, -D + 1.5, 2); b.set(K.metal, 0x3a3a3e, 0.2); F.box(b, a + w * 0.35 + 0.1, a + w * 0.35 + 0.2, yb, yb + 0.38, -D + 0.7, -D + 1.4, 2 | 4 | 8); }
+        b.set(K.metal, 0x111113, 0.2); const P0 = F.P(c - 0.4, 0, -D + 0.45); for (let s = 0; s < 4; s++) b.cyl(P0[0], yb + s * 0.05, P0[2], 0.22 - s * 0.03, 0.22 - s * 0.03, 0.04, 10);
+      } else {
+        // a salon: the chairs at the mirror (one or two), the counter of bottles under it, a poster of a haircut
+        const nc = w > 2.2 ? 2 : 1;
+        for (let s = 0; s < nc; s++) {
+          const u = a + (s + 0.5) * w / nc;
+          b.set(K.plain, lux > 0.6 ? 0x2a2a2e : 0x6a1a1e, 0.2); F.box(b, u - 0.28, u + 0.28, yb + 0.45, yb + 0.6, -D + 0.7, -D + 1.2, 2); F.box(b, u - 0.28, u + 0.28, yb + 0.6, yb + 1.2, -D + 1.1, -D + 1.2, 2 | 8);
+          b.set(K.metal, 0x8a8a8e, 0.1); F.box(b, u - 0.06, u + 0.06, yb, yb + 0.45, -D + 0.9, -D + 1.0, 2 | 4 | 8);
+        }
+        b.set(K.wood, 0xe8e4dc, 0.1); F.box(b, a + 0.1, c - 0.1, yb + 0.8, yb + 0.85, -D + 0.04, -D + 0.32, 2);
+        for (let uu = a + 0.2; uu < c - 0.2; uu += 0.1 + R() * 0.08) { b.set(K.plain, pc(), 0.1); F.box(b, uu, uu + 0.05, yb + 0.85, yb + 0.95 + R() * 0.1, -D + 0.1, -D + 0.16, 2 | 8); }
+        if (w > 1.4) { b.set(K.ad, pc(), 0, R()); F.rect(b, a + 0.65, a + 0.15, yb + 2.05, Math.min(yt - 0.1, yb + 2.6), -D + 0.05, 1); }
+      }
       break;
     }
   }
