@@ -23,6 +23,43 @@ function shift(v, dx, dz) {
   v.s += dx*v.hx + dz*v.hz; if (e.len) v.s = clamp(v.s, 0.5, e.len - 0.5);
   const lim = Math.max(0.3, e.w/2 - (v.T.W || 0.8)/2 - 0.1); v.lat = clamp(v.lat + dx*v.hz - dz*v.hx, -lim, lim);
 }
+// a vehicle as circles down its length (a car three, a two-wheeler one)
+const circles = (x, z, hx, hz, L, W) => { const n = Math.max(1, Math.round(L/W)), r = W/2, out = []; for (let k = 0; k < n; k++) { const off = n === 1 ? 0 : -L/2 + r + (L - W)*k/(n - 1); out.push([x + hx*off, z + hz*off, r]); } return out; };
+// shoved or thrown into another vehicle in the traffic: it doesn't go into it. It's put back outside, its push along
+// the line between them shared with the one it met (about as heavy: each takes half), which is shoved on in turn. A
+// wall stops it the same way. (A shoved auto went straight through the car in front of it.)
+function solid(TR, v, me, q, y, move) {
+  let hit = false;
+  TR.near(v.x, v.z, 9, (o) => {
+    if (o === v || o.veh === v || !o.T || o.isPlayer || o.hideBody || o.parked || Math.abs((o.y || 0) - y) > 1.5) return;
+    let best = 0, nx = 0, nz = 0;
+    for (const [bx, bz, br] of circles(o.x, o.z, o.hx ?? 1, o.hz ?? 0, o.T.L, o.T.W)) for (const [ax, az, ar] of me) {
+      const dx = ax - bx, dz = az - bz, d = Math.hypot(dx, dz), dep = ar + br - d;
+      if (dep > best && d > 1e-4) { best = dep; nx = dx/d; nz = dz/d; }
+    }
+    if (best <= 0) return;
+    hit = true;
+    move(nx*best, nz*best);
+    for (const c of me) { c[0] += nx*best; c[1] += nz*best; }
+    const vn = q.vx*nx + q.vz*nz;
+    if (vn < 0) {
+      const mv = (v.T ? v.T.mass : v.spec && v.spec.mass) || 1100, mo = o.T.mass || 1100, k = mo/(mv + mo);
+      q.vx -= vn*nx*(0.5 + k*0.5); q.vz -= vn*nz*(0.5 + k*0.5);
+      const g = (1 - k)*1.0, s0 = o._sh || { vx: 0, vz: 0 };
+      if (o.T.two && !o.fallen && -vn > 2.5) { o._hit = { vx: vn*nx*g, vz: vn*nz*g }; o.fallen = 3.5; }
+      else { o.v = 0; o.angry = 6; o._sh = { vx: s0.vx + vn*nx*g, vz: s0.vz + vn*nz*g }; }
+    }
+  });
+  return hit;
+}
+function wall(W, me, q, move) {
+  for (const c of me) {
+    const r = W.collision && W.collision.resolve(c[0], c[1], c[2]);
+    if (!r || !(r.depth > 0) || r.kind === 3 || r.kind === 4) continue;
+    move(r.nx*r.depth, r.nz*r.depth); for (const k of me) { k[0] += r.nx*r.depth; k[1] += r.nz*r.depth; }
+    const vn = q.vx*r.nx + q.vz*r.nz; if (vn < 0) { q.vx -= vn*r.nx; q.vz -= vn*r.nz; }
+  }
+}
 // pushed sideways or back: the slide dies on the tyres, and it drives on from where it stopped
 const step = Traffic.prototype.step;
 Traffic.prototype.step = function (v, dt) {
@@ -31,6 +68,7 @@ Traffic.prototype.step = function (v, dt) {
     const sp = Math.hypot(q.vx, q.vz), k = Math.max(0, sp - SLIDE*dt)/(sp || 1);
     q.vx *= k; q.vz *= k; if (k <= 0) v._sh = null;
     shift(v, q.vx*dt, q.vz*dt);
+    if (v.T) { const me = circles(v.x, v.z, v.hx ?? 1, v.hz ?? 0, v.T.L, v.T.W), mv = (dx, dz) => shift(v, dx, dz); solid(this, v, me, q, v.y || 0, mv); if (this.W) wall(this.W, me, q, mv); }
   }
   return step.call(this, v, dt);
 };
@@ -63,6 +101,9 @@ function coast(TR, v, dt) {
     if (D && D.veh && D.st) { const s2 = (rp.x - v.x)*q.vz - (rp.z - v.z)*q.vx; throwCar(D.veh, D.st, q.vx*(two ? 0.85 : 0.55), q.vz*(two ? 0.85 : 0.55), clamp(-s2*0.25, -3, 3)); }
     q.vx *= two ? 0.85 : 0.55; q.vz *= two ? 0.85 : 0.55;
   }
+  // another vehicle in the traffic is as solid as a wall: it stops against it and shoves it on
+  { const me = circles(v.x, v.z, Math.cos(v.th), Math.sin(v.th), v.spec.L, v.spec.W), y = v.y || 0;
+    solid(TR, v, me, q, y, (dx, dz) => { v.x += dx; v.z += dz; }); }
   // what it's thrown into goes too
   if (sp > 4) TR.near(v.x, v.z, v.spec.L/2 + 1.5, (o) => {
     if (!o.T || o.isPlayer || o.parked || o._hitT > now() || Math.hypot(o.x - v.x, o.z - v.z) > (v.spec.L + o.T.L)/2*0.8) return;
