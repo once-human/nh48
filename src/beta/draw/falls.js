@@ -3,7 +3,7 @@
 // throws them along its way. You too: knocked down while running you go over with your speed, not on the spot.
 import { People } from '@orig/people/peds.js';
 import { Pilot } from '@orig/game/pilot.js';
-import { startRag, tick as ragTick, pose as ragPose } from '../people/ragdoll.js';
+import { startRag, seatRag, tick as ragTick, pose as ragPose } from '../people/ragdoll.js';
 
 const upd = People.prototype.update;
 People.prototype.update = function (dt, player, ...a) {
@@ -31,12 +31,22 @@ People.prototype.update = function (dt, player, ...a) {
       }
       // the body's own from here (people/ragdoll.js): pushed where it was hit, more at the chest than the feet, it goes
       // over as it goes; with nothing to push it (a shot, out cold) the knees just go and it folds where it stands
-      if (!p._rag && startRag(p, sp > 0 ? { push: [sx*sp*0.55, sz*sp*0.55, 0.4] } : { vy: -0.6 })) p._slide = null;
+      p._rq = p._throw ? null : sp > 0 ? { push: [sx*sp*0.55, sz*sp*0.55, 0.4] } : { vy: -0.6 }; p._rqT = 0.8;
     } else if (!down && p._down) {
       p._down = false;
       // up again after being knocked over: a hand to the head a moment, getting their bearings
       if (!p.corpse && !p.ko && !p.act && p.inj) p.act = { kind: 'hurt', clip: 'hit_head', speed: 1, t: 0, dur: 2.2 };
     }
+    // (started as soon as there's a body to start: someone who's only just been given one, a rider thrown off, gets it
+    // a frame or two late, never not at all)
+    if (down && !p._rag && (p._rq || p._throw) && (p._rqT -= dt) > 0) {
+      const T0 = p._throw;
+      if (T0 ? startRag(p, { yaw: T0.yaw }) : startRag(p, p._rq)) {
+        p._slide = null; p._rq = null;
+        if (T0) { seatRag(p._rag, T0.x, T0.z, T0.yaw, T0.y, T0.vx, T0.vy, T0.vz); p._throw = null; p.x = T0.x; p.z = T0.z; }
+      }
+    }
+    if (!down) { p._rq = null; p._throw = null; }
     const S = p._slide;
     if (S && down) {
       p.x += S.vx*dt; p.z += S.vz*dt;

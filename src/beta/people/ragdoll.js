@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { People } from '@orig/people/peds.js';
 import { Crowd } from '@orig/people/crowd.js';
 
-const DT = 1/120, ITER = 4, G0 = 9.81, OUT = 0.6;
+const DT = 1/120, ITER = 4, G0 = 9.81, OUT = 0.6, MU = 0.35;
 // the points, and the bone each one is (3 is the top of the head: no bone starts there)
 const NAMES = ['pelvis', 'spine_03', 'Head', null, 'upperarm_l', 'lowerarm_l', 'hand_l', 'upperarm_r', 'lowerarm_r', 'hand_r', 'thigh_l', 'calf_l', 'foot_l', 'ball_l', 'thigh_r', 'calf_r', 'foot_r', 'ball_r'];
 const N = NAMES.length;
@@ -79,7 +79,7 @@ function fistOf(H) {
 export function ragOn(p) { return !!(p && p._rag); }
 // start: the points where the body's bones are this moment, moving as the body was
 export function startRag(p, o = {}) {
-  const H = o.H || (p.body && p.body.H); if (!H || !H.root) return null;
+  const H = (o.H && o.H.root ? o.H : null) || (p.body && p.body.H); if (!H || !H.root) return null;
   H.holder.updateMatrixWorld(true);
   const R = { p: new Float64Array(N*3), q: new Float64Array(N*3), t: 0, acc: 0, still: 0, sleep: false, off: {}, car: null, gy: new Float64Array(N), out: -1, kmh: o.kmh || 0 };
   const hb = bone(H, 'Head');
@@ -104,9 +104,32 @@ export function startRag(p, o = {}) {
   // limp: the knees give a touch forward, so nobody stands there stiff as a post until something knocks them
   const fwd = _f.set(Math.cos(o.yaw ?? p.yaw ?? 0), 0, Math.sin(o.yaw ?? p.yaw ?? 0));
   for (const k of [11, 15]) { R.p[k*3] += fwd.x*0.03; R.p[k*3 + 2] += fwd.z*0.03; }
-  if (o.V) { const V = o.V; R.car = { V, S: o.S, H: o.H || 1.4, tall: !!o.tall, top: o.top, x: V.x, z: V.z, th: V.th }; }
+  if (o.V) { const V = o.V; R.car = { V, S: o.S, H: o.carH || 1.4, tall: !!o.tall, top: o.top, x: V.x, z: V.z, th: V.th }; }
   p._rag = R; p._slide = null;
   return R;
+}
+// sat astride something (a rider coming off): the hips at the seat, thighs forward, shins down to the pegs, leaning
+// into the bars, and every point moving at (vx, vy, vz)
+export function seatRag(R, x, z, yaw, y, vx, vy, vz) {
+  const P = R.p, f = [Math.cos(yaw), Math.sin(yaw)], px = P[0], py = P[1], pz = P[2];
+  // (the body as it stood may not face the machine's way yet: turned to it first, about the hips)
+  const bx = (P[39] + P[51] - P[36] - P[48])/2, bz = (P[41] + P[53] - P[38] - P[50])/2, d = Math.hypot(bx, bz) > 1e-4 ? yaw - Math.atan2(bz, bx) : 0, cd = Math.cos(d), sd = Math.sin(d);
+  const at = (i) => { const x0 = P[i*3] - px, z0 = P[i*3 + 2] - pz; return [x0*cd - z0*sd, P[i*3 + 1] - py, x0*sd + z0*cd]; };
+  const set = (i, a, b, c) => { P[i*3] = a; P[i*3 + 1] = b; P[i*3 + 2] = c; };
+  const lean = 0.3, cl = Math.cos(lean), sl = Math.sin(lean);
+  // the upper body: its own shape about the hips, tipped forward
+  for (let i = 1; i <= 9; i++) { const [dx, dy, dz] = at(i), a = dx*f[0] + dz*f[1], sx = dx - a*f[0], sz = dz - a*f[1]; const a2 = a*cl + dy*sl, y2 = dy*cl - a*sl; set(i, x + sx + a2*f[0], y + y2, z + sz + a2*f[1]); }
+  for (const [h, k, an, b] of [[10, 11, 12, 13], [14, 15, 16, 17]]) {
+    const [hx, hy, hz] = at(h), Lt = Math.hypot(P[k*3] - P[h*3], P[k*3 + 1] - P[h*3 + 1], P[k*3 + 2] - P[h*3 + 2]), Lc = Math.hypot(P[an*3] - P[k*3], P[an*3 + 1] - P[k*3 + 1], P[an*3 + 2] - P[k*3 + 2]);
+    const bo = at(b), ao = at(an), Hx = x + hx, Hy = y + hy, Hz = z + hz;
+    const Kx = Hx + f[0]*Lt*0.86, Ky = Hy - Lt*0.51, Kz = Hz + f[1]*Lt*0.86;
+    const Ax = Kx - f[0]*Lc*0.26, Ay = Ky - Lc*0.97, Az = Kz - f[1]*Lc*0.26;
+    set(h, Hx, Hy, Hz); set(k, Kx, Ky, Kz); set(an, Ax, Ay, Az); set(b, Ax + bo[0] - ao[0], Ay + bo[1] - ao[1], Az + bo[2] - ao[2]);
+  }
+  set(0, x, y, z);
+  R.len = LINKS.map(([a, b]) => Math.hypot(P[a*3] - P[b*3], P[a*3 + 1] - P[b*3 + 1], P[a*3 + 2] - P[b*3 + 2]));
+  for (let i = 0; i < N; i++) { R.q[i*3] = P[i*3] - vx*DT; R.q[i*3 + 1] = P[i*3 + 1] - vy*DT; R.q[i*3 + 2] = P[i*3 + 2] - vz*DT; }
+  R.sleep = false; R.still = 0;
 }
 // a wheel, a kick: a push on the points near (x, z)
 export function kickRag(p, x, z, vx, vy, vz, r = 0.8) {
@@ -170,9 +193,15 @@ function step(R, W) {
         if (p[j + 1] < top && p[j + 1] > gy - 0.2) {
           const dTop = top - p[j + 1], dF = l2 - fr*la, dB = l2 + fr*la, dS = w2 - Math.abs(lc), m = Math.min(dTop, dF, dB, dS);
           if (m === dTop) {
+            // the push it takes to keep them on top of it is all the grip there is: cloth on paint and glass slides
+            // (friction is a share of that push, never a hold), so a body the car's going faster than slides up the
+            // glass and over, and one on the bonnet when you brake goes on off the front
+            const vy0 = p[j + 1] - q[j + 1];
             p[j + 1] = top;
             let vx = p[j] - q[j], vz = p[j + 2] - q[j + 2], vy = p[j + 1] - q[j + 1];
-            vx += (cvx - vx)*0.06; vz += (cvz - vz)*0.06; if (vy < 0) vy = 0;
+            if (vy < 0) vy = 0;
+            const jn = Math.max(0, vy - vy0), rx = vx - cvx, rz = vz - cvz, rl = Math.hypot(rx, rz);
+            if (rl > 1e-9) { const k = Math.min(rl, MU*jn)/rl; vx -= rx*k; vz -= rz*k; }
             q[j] = p[j] - vx; q[j + 1] = p[j + 1] - vy; q[j + 2] = p[j + 2] - vz;
           } else if (m === dF) { p[j] += hx*fr*dF; p[j + 2] += hz*fr*dF; }
           else if (m === dB) { p[j] -= hx*fr*dB; p[j + 2] -= hz*fr*dB; }
@@ -254,7 +283,9 @@ People.prototype.update = function (dt, ...rest) {
     const R = p._rag; if (!R) continue;
     if (p.hidden || p._drag || p._wake || p.rideOf) { p._rag = null; continue; }
     if (R.out >= 0) { if (performance.now() - R.out > OUT*1000) p._rag = null; continue; }
-    // up again (not the dead or the out cold): from where they lie into the clip
+    // up again (not the dead or the out cold): from where they lie into the clip. Nobody gets up while they're still
+    // going (in the air, rolling, sliding): only once the body's come to rest
+    if (!R.sleep && R.t < 7 && !p.corpse && p.fallen > 0) p.fallen = Math.max(p.fallen, 1.4);
     if (!(p.fallen > 1.3) && !p.corpse) { letGo(p); continue; }
     if (!R.sleep) tick(R, dt, this.W);
     p.x = R.p[0]; p.z = R.p[2]; p.liftY = 0;

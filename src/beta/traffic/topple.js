@@ -33,20 +33,31 @@ function start(TR, v) {
     vx: v.hx*(v.v || 0)*0.6 + (H ? H.vx*push : hx*hv*push), vz: v.hz*(v.v || 0)*0.6 + (H ? H.vz*push : hz*hv*push),
     down: false, t: 0, rider: null, up: 0,
   };
+  const own = v.v || 0, bx = H ? H.vx : hx*hv, bz = H ? H.vz : hz*hv;
   v.v = 0;
-  throwRider(G, v, side);
+  throwRider(G, v, side, own, bx, bz);
 }
-// the rider off and onto the road on the side it's going over
-function throwRider(G, v, side) {
+// the rider off: they keep the speed they were riding at when the machine stops under them (over the bars, if it was
+// a front-on stop), and what hit them adds its own; from the seat, astride, a body of their own from there
+// (people/ragdoll.js). How badly they're hurt is how hard it was, the same as anyone hit (people/runover.js)
+function throwRider(G, v, side, own = 0, bx = 0, bz = 0) {
   const kit = G && G.W && G.W.kit, ppl = G && G.people; if (!kit || !ppl) return;
   const rng = { next: Math.random, chance: (q) => Math.random() < q, range: (a, b) => a + Math.random()*(b - a), pick: (a) => a[Math.floor(Math.random()*a.length)], int: (a, b) => a + Math.floor(Math.random()*(b - a + 1)) };
   const look = kit.randomLook(rng, { female: Math.random() < 0.15, helmet: v.type !== 'cycle' });
   if (v.colB) look.top = look.top.setRGB(v.colB[0], v.colB[1], v.colB[2]);
-  const rx = -v.hz*side, rz = v.hx*side, x = v.x + rx*0.7, z = v.z + rz*0.7;
+  const x = v.x - v.hx*0.15, z = v.z - v.hz*0.15;
   const p = ppl.spawnAt(look, x, z, ppl.pickPersona ? ppl.pickPersona(look.female, x, z) : 'dada');
   if (!p) return;
-  p.fallen = 2.2; p.yaw = Math.atan2(v.hz, v.hx); p.hx = v.hx; p.hz = v.hz;
-  v._tp.rider = p; v._tp.rx = v._tp.vx*0.85; v._tp.rz = v._tp.vz*0.85;     // (they go along the road with it, a bit short of it)
+  const yaw = Math.atan2(v.hz, v.hx), hit = Math.hypot(bx, bz), kmh = Math.max(hit, Math.abs(own)*0.6)*3.6;
+  // the blow goes into them about as much as into the machine (they're most of the weight on it), less at a glance
+  const vx = v.hx*own*0.9 + bx*0.75 - v.hz*side*0.6, vz = v.hz*own*0.9 + bz*0.75 + v.hx*side*0.6, vy = 0.6 + Math.min(2.2, kmh*0.03);
+  const surf = G.W && G.W.surf, gy = surf ? surf.height(x, z) : 0;
+  p._throw = { x, z, yaw, y: gy + (/^bike/.test(v.type) ? 0.92 : v.type === 'cycle' ? 0.95 : 0.85), vx, vy, vz };
+  const dead = kmh >= 75, ko = dead || kmh >= 40, crit = !dead && kmh >= 55;
+  p.fallen = dead || ko ? 1e6 : 4 + kmh*0.15; p.ko = ko; p.corpse = dead; p.unconscious = ko && !dead; p.v = 0;
+  p.inj = { sev: dead ? 'dead' : crit ? 'critical' : ko ? 'ko' : 'knock', t: 0 }; if (!ko) p.limp = 30 + kmh*2;
+  p.yaw = yaw; p.hx = v.hx; p.hz = v.hz;
+  v._tp.rider = p;
   v._tp.empty = true;              // drawn without its baked rider while it's down
 }
 function tick(TR, v, dt) {

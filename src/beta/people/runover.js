@@ -48,7 +48,7 @@ People.prototype.struck = function (p, V, S, player, sp, fx, fz, al, ac) {
   const [kD, kC, kK] = two ? [80, 55, 32] : tall ? [45, 32, 18] : [62, 45, 25];
   const dead = kmh >= kD, ko = dead || kmh >= kK, crit = !dead && kmh >= kC;
   p._wv = p.v || 0; p._down = true; p._slide = null;      // (draw/falls.js has nothing to add to this)
-  p.fallen = dead || ko ? 1e6 : 3 + kmh*0.12; p.ko = ko; p.corpse = dead; p.unconscious = ko && !dead; p.v = 0; p.dodge = 0; p.steerT = 0;
+  p.fallen = dead || ko ? 1e6 : 4.5 + kmh*0.25; p.ko = ko; p.corpse = dead; p.unconscious = ko && !dead; p.v = 0; p.dodge = 0; p.steerT = 0;
   p.inj = { sev: dead ? 'dead' : crit ? 'critical' : ko ? 'ko' : 'knock', t: 0 };
   if (!ko) p.limp = 40 + kmh*2;
   this.remember(p, dead ? 'dead' : 'hit');
@@ -67,9 +67,9 @@ People.prototype.struck = function (p, V, S, player, sp, fx, fz, al, ac) {
   else if (wide > 0.72) { along = 0.42*cap; lat = (0.22*cap + 0.8)*side; vy = Math.min(1.6, 0.5 + cap*0.05); spin = 3 + cap*0.2; }
   else if (kmh < 14) { along = 0.85*cap; lat = 0.1*cap*side; vy = 0.3; spin = 3; }
   else { along = Math.min(0.62*cap, 15); lat = 0.07*cap*side; vy = Math.min(1.4, 0.5 + cap*0.04); spin = 2.2 + cap*0.1; }
-  p._hit = { x0: p.x, z0: p.z, x: p.x, z: p.z, y: HIP, vy, vx: fx*along + sx*lat, vz: fz*along + sz*lat, nx: -fz, nz: fx, ang: 0, spin, fx, fz, t: 0, lt: -1, bounce: 1, tall, yaw0: p.yaw, yaw: Math.atan2(fz, fx), H: heightOf(V, S), V, S, two, axle: 0 };
+  p._hit = { x0: p.x, z0: p.z, x: p.x, z: p.z, y: HIP, vy, vx: fx*along + sx*lat, vz: fz*along + sz*lat, nx: -fz, nz: fx, ang: 0, spin, fx, fz, t: 0, lt: -1, bounce: 1, tall, yaw0: p.yaw, yaw: Math.atan2(fz, fx), H: heightOf(V, S), V, S, two, axle: 0, kmh };
   // and from here the body's its own (beta/people/ragdoll.js): the car takes their legs and its outline carries them
-  startRag(p, { V, S, H: p._hit.H, tall, top: (u) => topAt(u, p._hit.H, tall), vx: Math.cos(p._hit.yaw0 || 0)*(p._wv || 0), vz: Math.sin(p._hit.yaw0 || 0)*(p._wv || 0), kmh });
+  startRag(p, { V, S, carH: p._hit.H, tall, top: (u) => topAt(u, p._hit.H, tall), vx: Math.cos(p._hit.yaw0 || 0)*(p._wv || 0), vz: Math.sin(p._hit.yaw0 || 0)*(p._wv || 0), kmh });
   // what it costs you: the weight of a person against yours
   const M = (S.mass || 1000) + (two ? 75 : 0), share = 75/(M + 75);
   const lost = Math.min(Math.abs(V.v)*share*1.2, Math.abs(V.v)); V.v -= Math.sign(V.v)*lost;
@@ -87,6 +87,8 @@ function lieNow(p) {
 function flying(P, p, dt, V, S) {
   const h = p._hit, C = P.W && P.W.collision; h.t += dt;
   // a body of its own (ragdoll.js) goes where its physics takes it: this only says when it's over
+  // (no body to be one yet, the moment it was hit: it's given one as soon as it has, going as it's going)
+  if (!p._rag && h.lt < 0 && p.body && p.body.H) startRag(p, { V: h.V, S: h.S, carH: h.H, tall: h.tall, top: (u) => topAt(u, h.H, h.tall), vx: h.vx, vy: h.vy, vz: h.vz, kmh: h.kmh });
   if (p._rag) {
     h.x = p.x; h.z = p.z; p.liftY = 0; h.draw = 0;
     if (p._rag.sleep || p._rag.out >= 0) { if (h.lt < 0) h.lt = 0; h.lt += dt; }
