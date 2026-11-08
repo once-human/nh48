@@ -5,7 +5,7 @@ import { paintMaterial, paintNoise, U } from '@orig/experiment/paint.js';
 import { Crowd, NEAR, makeLook, B } from '@orig/experiment/people.js';
 import { rng } from '@orig/experiment/geo.js';
 import { PU, LAMP } from '../gfx/paint.js';
-import { Skin, visOf } from './skin.js';
+import { Skin } from './skin.js';
 
 // the stress test paints in screen colour; /beta's picture is linear until its last pass
 const linear = (m) => { for (const s of [m]) s.fragmentShader = s.fragmentShader.replace('fragColor = vec4(c, 1.);', 'fragColor = vec4(pow(max(c, vec3(0.)), vec3(2.2)), 1.);').replace('fragColor = vec4(mix(c, fogCol, smoothstep(fogR.x, fogR.y, vZ)*.9), 1.);', 'fragColor = vec4(pow(max(mix(c, fogCol, smoothstep(fogR.x, fogR.y, vZ)*.9), vec3(0.)), vec3(2.2)), 1.);'); return m; };
@@ -29,6 +29,19 @@ const handover = (m) => {
   return m;
 };
 const CAP = 500;
+// the simple figure dressed as the person really is (what the full body wears: beta/draw/wardrobe.js dress), so nobody
+// changes clothes, or from a man to a woman, as they come closer
+const hexOf = (c, d) => c && c.getHex ? c.getHex() : (typeof c === 'number' ? c : d);
+function lookOf(L) {
+  const cut = L.cut || { w: 0, y: 1 }, saree = cut.w > 1.5 && cut.w < 2.5, kurta = !saree && cut.y < .9;
+  let mask = 0;
+  if (L.female) mask |= saree ? B.SAREE | B.BUN : kurta ? B.KURTA | B.LONG : B.LONG;
+  else if (kurta) mask |= B.KURTA;
+  if (L.acc === 'helmet') mask |= B.HELMET; else if (L.acc === 'cap_police') mask |= B.CAP;
+  if (L.beard) mask |= B.BEARD;
+  const top = hexOf(L.top, 0xdddddd), acc = L.acc === 'helmet' ? hexOf(L.helmetCol, 0x222222) : top;
+  return { shirt: top, lower: hexOf(L.bottom, 0x2a2a30), skin: hexOf(L.skin, 0xa06a48), hair: hexOf(L.hair, 0x15100c), acc, acc2: acc, mask, h: Math.max(.62, Math.min(1.18, L.scale || 1)), girth: .5 };
+}
 
 export class Actors {
   constructor(G, scene) {
@@ -60,22 +73,23 @@ export class Actors {
     this.skin.update(camera, P.human);
     if (!on) return;
     const C = this.crowd, nA = C.near.geometry.attributes, fA = C.far.geometry.attributes, cx = camera.position.x, cz = camera.position.z;
-    let a = 0, b = 0;
-    const now = performance.now();
-    const put = (x, y, z, yaw, ph, amp, id, fd = 0) => { const dx = x - cx, dz = z - cz, d2 = dx*dx + dz*dz; if (d2 > 90000) return;
+    let a = 0, b = 0, dirty = false; if (!C._own) C._own = [];
+    const put = (x, y, z, yaw, ph, amp, id, fd = 0) => { const dx = x - cx, dz = z - cz, d2 = dx*dx + dz*dz; if (d2 > 122500) return;
       const near = d2 < NEAR*NEAR, A = near ? nA : fA, o = near ? a++ : b++; if (o >= CAP) return;
       A.iPos.array.set([x, y, z, Math.PI/2 - yaw], o*4); A.iAnim.array.set([ph, amp, id, fd], o*4); };
     for (const p of (G.people ? G.people.list : [])) {
       if (p.hidden || p.pax) continue;
       // (who has a real body close by is drawn by the skin; while it's coming in or going, this figure has the rest)
-      const fd = p.body && p.body.H ? visOf(p.body.H, now) : 0; if (fd >= 0.999) continue;
+      if (p.body && p.body.H) continue;
       if (!p._dk) { p._dk = this.next; this.next = this.next%(CAP - 1) + 1; p._dph = Math.random()*9; p._lx = p.x; p._lz = p.z; p._dv = 0; }
+      if (p._dkL !== p.look || C._own[p._dk] !== p) { p._dkL = p.look; C._own[p._dk] = p; if (p.look) { C.look(p._dk, lookOf(p.look)); dirty = true; } }
       // the legs go with how far they really moved this frame (not the speed they mean to walk at), so nobody glides:
       // a step is about 0.68 m, half a cycle
       const m = Math.hypot(p.x - p._lx, p.z - p._lz); p._lx = p.x; p._lz = p.z;
       if (m < 3 && dt > 0) { p._dv += (m/dt - p._dv)*Math.min(1, dt*6); p._dph += m/.68*Math.PI; }
-      put(p.x, p.y || 0, p.z, p.yaw || 0, p._dph, Math.min(1, p._dv/1.1), p._dk, fd);
+      put(p.x, p.y || 0, p.z, p.yaw || 0, p._dph, Math.min(1, p._dv/1.1), p._dk, 0);
     }
+    if (dirty) C.tex.needsUpdate = true;
     C.near.geometry.instanceCount = a; C.far.geometry.instanceCount = b; nA.iPos.needsUpdate = nA.iAnim.needsUpdate = fA.iPos.needsUpdate = fA.iAnim.needsUpdate = true;
   }
 }

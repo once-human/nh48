@@ -271,11 +271,6 @@ const PATCHES = {
     ["l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  R.updateMatrixWorld(true);\n}", "l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  u.updateMatrixWorld(true);\n}"],
   ],
   [S('people/crowd.js')]: [
-    // into full detail and back out of it over half a second (beta/draw/skin.js visOf, draw/actors.js): a body that's
-    // wanted fades in where the simple figure fades out; one that isn't wanted now stays half a second, fading, before
-    // it's given back (and someone who comes back into range takes it up again from where it had faded to)
-    ["    for (const s of this.pool) if (s.p && (!want.has(s.p) || s.p.hidden)) s.release();", "    const fdNow = performance.now();\n    for (const s of this.pool) if (s.p) {\n      const H = s.H;\n      if (s.p.hidden) { H._fdR = 0; s.release(); continue; }\n      if (want.has(s.p)) { if (H._fdR) { const v = Math.max(0, 1 - (fdNow - H._fdR) / 500) * Math.min(1, H._fdA ? (fdNow - H._fdA) / 500 : 1); H._fdA = fdNow - v * 500; H._fdR = 0; } continue; }\n      if (!H._fdR) H._fdR = fdNow;\n      else if (fdNow - H._fdR > 520) { H._fdR = 0; s.release(); }\n    }"],
-    ["      s.p = p; p.body = s;", "      s.p = p; p.body = s; s.H._fdA = performance.now(); s.H._fdR = 0;"],
     // someone getting out of a vehicle (people/fight.js bail): eased from the seat to where they stand
     ["H.holder.rotation.set(0, -p.yaw, 0);", "H.holder.rotation.set(0, -p.yaw, 0);\n      if (p._out) { const u = Math.min(1, (performance.now() - p._out.t0)/600), e = 1 - u*u*(3 - 2*u); if (u >= 1) p._out = null; else { H.holder.position.x += p._out.dx*e; H.holder.position.y += p._out.dy*e; H.holder.position.z += p._out.dz*e; } }"],
     // smooth up to 45 m, half rate to 100 m; a frame someone isn't animated, their bones go back to the clip's pose
@@ -400,6 +395,13 @@ const PATCHES = {
     ["if (far || (k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21)) {", "const seen = !far && G.crowd && G.crowd.inView && Math.hypot(k.p.x - P.x, k.p.z - P.z) < 60 && (G.crowd.inView(k.p.x, k.p.z) || Math.hypot(k.p.x - P.x, k.p.z - P.z) < 10);\n      if (far || !seen && ((k.kind === 'shop' && !open) || (k.kind === 'watch' && h > 6.5 && h < 21))) {"],
   ],
   [S('people/peds.js')]: [
+    // people are seen from far off and never come out of thin air: in view, they start out at 200-270 m (a figure in the
+    // crowd) and walk in; out of view, close by as before. They stay till nearly 300 m (340 while you can see them), and
+    // there are a few more of them, so the street round you is as busy as it was with the bigger ring
+    ["if ((far > 150 && !(avoidView && avoidView(p.x, p.z) && far < 230)) || p.dead)", "if ((far > 290 && !(avoidView && avoidView(p.x, p.z) && far < 340)) || p.dead)"],
+    ["avoidView(x, z) && Math.hypot(x - px, z - pz) < 110 : null;\n      const p = this.spawnOne(px, pz, urgent ? 30 : 40, this.rng.chance(0.65) ? 95 : 140, hidden);", "avoidView(x, z) && Math.hypot(x - px, z - pz) < 200 : null;\n      const p = !urgent && this.rng.chance(0.3) ? this.spawnOne(px, pz, 200, 270, null) : this.spawnOne(px, pz, urgent ? 30 : 40, this.rng.chance(0.65) ? 95 : 140, hidden);"],
+    ["this.target = Math.round(this.max * clamp(", "this.target = Math.round(this.max * 1.3 * clamp("],
+    ["this._near = [...this.g.gridQuery(px, pz, 160)]", "this._near = [...this.g.gridQuery(px, pz, 280)]"],
     // (a cow hit: beta/people/runover.js. She walks a good part of the time, and doesn't stand half a minute at a stretch)
     ["if (a.cow) { this.events.push({ type: 'cowHit', a, speed: pv, x: a.x, z: a.z }); a.rest = 20; a.moving = false; }", "if (a.cow) { /* */ }"],
     ["a.rest = a.moving ? this.rng.range(4, 15) : this.rng.range(10, 60); }", "a.rest = a.cow ? (a.moving ? this.rng.range(12, 40) : this.rng.range(4, 18)) : a.moving ? this.rng.range(4, 15) : this.rng.range(10, 60); }"],
