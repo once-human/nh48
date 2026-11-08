@@ -482,6 +482,7 @@ function shopFront(b, cb, G, F, i, len, shopEdge) {
       else W.rect(b, a, c, BASE + oh, yT, 0);
       drawShop(b, cb, G, F, a, plan, lux);
       if (plan.glass) glazedFront(b, G, F, a, plan, lux);
+      else if (plan.front === 'wall') walledFront(b, G, F, a, plan, lux);
       const t0 = k * cw + 0.15, t1 = (k + 1) * cw - 0.15, h = boardH(t1 - t0), y1 = BASE + gh - 0.07, y0 = y1 - h;
       b.set(K.metal, 0x1e1e20, 0.2);
       W.box(b, t0 - 0.03, t1 + 0.03, y1, y1 + 0.04, -0.05, 0.12, 2); W.box(b, t0 - 0.03, t1 + 0.03, y0 - 0.04, y0, -0.05, 0.12, 2);
@@ -559,7 +560,8 @@ function drawShop(b, cb, G, F, a, P, lux) {
   const { R, L } = G, w = P.w, D = P.D, c = a + w, yb = BASE, yt = BASE + P.oh, st = P.stock;
   const U = (u) => a + u;
   // the room
-  const wallC = st === 'salon' ? [0x9fd8cf, 0xf2f2ea, 0xe8d8e0, 0xdfe3e0][(R() * 4) | 0] : st === 'garage' ? [0x6a6e72, 0x7a7466, 0x5a6066][(R() * 3) | 0] : st === 'bank' || st === 'office' ? [0xf4f4f0, 0xe8ecef, 0xefe9de][(R() * 3) | 0]
+  const LOBBY = { lobby_bar: [0x1a1a1e, 0x2a1a24, 0x14181e], lobby_gaming: [0x14141e, 0x1e1430], lobby_cinema: [0x5a1a1e, 0x2a2a30, 0xe8dcc0], lobby_gym: [0x2a2a2c, 0xe8e8e4, 0x1e2a3a], lobby_clinic: [0xeef0ea, 0xe0ece8], lobby_lodge: [0xe8dcc0, 0xc8b898, 0x9fd8cf], lobby_dealer: [0xf4f4f0, 0xe8ecef], lobby_chowki: [0xe8dcb0, 0xd8d0a8] };
+  const wallC = LOBBY[st] ? LOBBY[st][(R() * LOBBY[st].length) | 0] : st === 'salon' ? [0x9fd8cf, 0xf2f2ea, 0xe8d8e0, 0xdfe3e0][(R() * 4) | 0] : st === 'garage' ? [0x6a6e72, 0x7a7466, 0x5a6066][(R() * 3) | 0] : st === 'bank' || st === 'office' ? [0xf4f4f0, 0xe8ecef, 0xefe9de][(R() * 3) | 0]
     : st === 'food' ? [0xdfeee3, 0xe9e0c8, 0xf1e2c6, 0xe4d9be, 0xb98b5a][(R() * 5) | 0] : st === 'cafe' ? [0xefe6d6, 0x8a4a34, 0xf7f6f2, 0x2a2a30][(R() * 4) | 0]
     : st === 'fast' ? [0xe63946, 0xf2c230, 0x1d4e89][(R() * 3) | 0] : st === 'chai' ? [0x9fd8cf, 0xe4d9be, 0x8a7a66][(R() * 3) | 0] : st === 'juice' || st === 'icecream' ? [0xf9d9e0, 0xf2c230, 0xbfe6dc][(R() * 3) | 0] : st === 'gold' ? [0xe8d8b8, 0x6a2a1e, 0xf0e6d0][(R() * 3) | 0] : st === 'frames' || st === 'pets' ? 0xeef0ee : st === 'clothes' || st === 'shoes' ? [0xf2eee6, 0xe0d4c0, 0x8a6a48, 0xd8dce0][(R() * 4) | 0] : st === 'books' ? [0xe8dcc0, 0x8a6a48][(R() * 2) | 0] : st === 'medicine' ? 0xeef0ea : st === 'mobile' || st === 'tv' ? 0xe6e6e2 : st === 'sweets' || st === 'bakery' ? [0xf2ead8, 0xe8dcc0, 0xdfe8e0][(R() * 3) | 0]
     : [0x8a6a48, 0x9a7a52, 0x7a6a58, 0xd8c8a8, 0xe0d8c8, 0xb8c8b8][(R() * 6) | 0];
@@ -575,6 +577,14 @@ function drawShop(b, cb, G, F, a, P, lux) {
   else if (P.tube) { b.set(K.glow, st === 'sweets' || st === 'bakery' ? [1, 0.94, 0.8] : [0.95, 0.98, 1], 0, 0.9); F.box(b, U(P.tube.u0), U(P.tube.u1), yt - 0.06, yt - 0.02, P.tube.d - 0.04, P.tube.d, 0); }
   const gc = GOODS[STOCK_GOODS[st] ?? 0] || GOODS[0], pc = () => gc[(R() * gc.length) | 0];
   for (const q of P.pieces) drawPiece(b, cb, G, F, U, q, yb, yt, st, pc, lux);
+  // a bar's or a games parlour's neon along the top of the walls; the film posters in a cinema's foyer, the gym's, the
+  // clinic's health poster, the showroom's new model, lit
+  if (P.neon) { b.set(K.glow, [[0.95, 0.2, 0.6], [0.2, 0.6, 1], [0.6, 0.25, 0.95]][(R() * 3) | 0], 0, 0.9); F.box(b, a + 0.02, a + 0.05, yt - 0.12, yt - 0.08, -D + 0.1, -0.1, 0); F.box(b, c - 0.05, c - 0.02, yt - 0.12, yt - 0.08, -D + 0.1, -0.1, 0); }
+  if (P.posters) for (let s2 = 0; s2 < P.posters; s2++) {
+    const left = s2 % 2 === 0, u = left ? a + 0.01 : c - 0.01, n = left ? [F.tx, 0, F.tz] : [-F.tx, 0, -F.tz], pd = -0.5 - Math.floor(s2 / 2) * 1.0 - 0.15, y0 = yb + 1.1, y1 = Math.min(yt - 0.15, yb + 2.1);
+    if (pd - 0.7 < -D + 0.2) break;
+    b.set(K.ad, pc(), 0, R()); b.quad(F.P(u, y0, pd - 0.7), F.P(u, y0, pd), F.P(u, y1, pd), F.P(u, y1, pd - 0.7), n);
+  }
   // the new phone's poster, lit, on a side wall
   if (P.poster) {
     const q = P.poster, u = q.wall === 'left' ? a + 0.01 : c - 0.01, n = q.wall === 'left' ? [F.tx, 0, F.tz] : [-F.tx, 0, -F.tz];
@@ -866,12 +876,65 @@ function drawPiece(b, cb, G, F, U, q, yb, yt, st, pc, lux) {
       b.set(K.glow, [[0.9, 0.3, 0.2], [0.2, 0.45, 0.9], [0.95, 0.55, 0.15]][(R() * 3) | 0], 0, 0.85); F.box(b, u0, u1, yb + 1.7, yb + 1.95, d0, d1, 0);
       break;
     }
+    case 'backdoor': {
+      // the door through to the place itself, shut, in its frame; a lit sign over it in a bar, a cinema, a parlour
+      const h = q.h, col = { bar: 0x1a1a1c, gaming: 0x1a1a1c, cinema: 0x6a1a1e, gym: 0x2a2a2c, clinic: 0xe8e8e4, lodge: 0x6b3a26, dealer: 0xd8d8d8, library: 0x5a3a24, chowki: 0x3a4a6a }[q.kind] ?? 0x5a3a24;
+      b.set(K.wood, col, 0.3); F.rect(b, u1, u0, yb, yb + h, d0 + 0.02, 1);
+      b.set(K.metal, 0xb8bcc0, 0.2); F.box(b, u1 - 0.14, u1 - 0.1, yb + 0.95, yb + 1.1, d0 + 0.02, d0 + 0.06, 0);
+      b.set(K.wood, q.kind === 'clinic' || q.kind === 'dealer' ? 0xb8bcc0 : 0x3a2a20, 0.3); ringAt(b, F, u0, u1, yb, yb + h, 0.06, d0, d0 + 0.06);
+      if ((q.kind === 'bar' || q.kind === 'cinema' || q.kind === 'gaming') && yb + h + 0.35 < yt) { b.set(K.glow, q.kind === 'cinema' ? [0.95, 0.2, 0.15] : [[0.95, 0.2, 0.6], [0.2, 0.6, 1]][(R() * 2) | 0], 0, 0.9); F.box(b, (u0 + u1) / 2 - 0.3, (u0 + u1) / 2 + 0.3, yb + h + 0.1, yb + h + 0.28, d0, d0 + 0.05, 2); }
+      break;
+    }
+    case 'cabinet': {
+      // game cabinets in a row, screens lit
+      const fw = q.face === 'right' ? 1 : -1, ff = fw > 0 ? u1 : u0;
+      for (let dd = d0; dd < d1 - 0.6; dd += 0.75) {
+        b.set(K.plain, [0x1a1a1c, 0x2a1a4a, 0x4a1a1e][(R() * 3) | 0], 0.2); F.box(b, u0, u1, yb, yb + 1.75, dd, dd + 0.65, 8);
+        b.set(K.glow, [[0.3, 0.8, 1], [1, 0.4, 0.2], [0.5, 1, 0.4], [1, 0.3, 0.8]][(R() * 4) | 0], 0, 0.8); F.box(b, Math.min(ff, ff + fw * 0.005), Math.max(ff, ff + fw * 0.005), yb + 1.1, yb + 1.5, dd + 0.08, dd + 0.57, 0);
+        b.set(K.plain, 0x2a2a2e, 0.2); F.box(b, Math.min(ff, ff + fw * 0.25), Math.max(ff, ff + fw * 0.25), yb + 0.85, yb + 0.95, dd + 0.05, dd + 0.6, 0);
+        b.set(K.glow, [1, 0.85, 0.3], 0, 0.8); F.box(b, u0, u1, yb + 1.75, yb + 1.9, dd, dd + 0.65, 0);
+      }
+      break;
+    }
+    case 'weights': {
+      // the rack of dumbbells, the mirror over it
+      b.set(K.metal, 0x2a2a2c, 0.3); F.box(b, u0, u1, yb, yb + 0.7, d0, d1, 8);
+      for (let dd = d0 + 0.08; dd < d1 - 0.1; dd += 0.22) for (const y of [yb + 0.35, yb + 0.72]) { b.set(K.metal, 0x111113, 0.2); const P0 = F.P((u0 + u1) / 2, 0, dd + 0.06); b.cyl(P0[0], y, P0[2], 0.06, 0.06, 0.1, 8); }
+      break;
+    }
+    case 'scooter': {
+      // the new model on the floor, on its stand, a ribbon on it
+      const um = (u0 + u1) / 2, col = POP[(R() * POP.length) | 0];
+      b.set(K.plain, 0x161616, 0.3); for (const dd of [d0 + 0.2, d1 - 0.2]) { const P0 = F.P(um, 0, dd); b.cyl(P0[0], yb, P0[2], 0.22, 0.22, 0.42, 10); }
+      b.set(K.metal, col, 0.05); F.box(b, um - 0.2, um + 0.2, yb + 0.25, yb + 0.6, d0 + 0.3, d1 - 0.2, 0); F.box(b, um - 0.22, um + 0.22, yb + 0.6, yb + 0.85, d1 - 0.75, d1 - 0.15, 0);
+      F.box(b, um - 0.18, um + 0.18, yb + 0.3, yb + 1.0, d0 + 0.15, d0 + 0.35, 0);
+      b.set(K.metal, 0x8a8e92, 0.2); F.box(b, um - 0.32, um + 0.32, yb + 1.0, yb + 1.04, d0 + 0.22, d0 + 0.27, 0);
+      break;
+    }
     case 'hang': {
       cb.set(K.laundry, 0xffffff, 0, R());
       for (let uu = u0; uu < u1 - 0.2; uu += 0.32 + R() * 0.2) { cb.col(st === 'paan' || st === 'kirana' ? pc() : POP[(R() * POP.length) | 0]); F.rect(cb, uu, uu + 0.2, yb + q.y0 + R() * 0.25, yt - 0.05, q.d); }
       break;
     }
   }
+}
+// a front of plain wall with a door in it (a bar, a lodge, the chowki, a games parlour), the door open
+function walledFront(b, G, F, a, P, lux) {
+  const { R, L } = G, w = P.w, yb = BASE, yt = BASE + P.oh, c = a + w, g0 = a + P.door[0], g1 = a + P.door[1], dh = Math.min(yt - 0.1, yb + 2.15);
+  b.set(L.wk === K.curtain ? K.cladding : L.wk, L.wall, L.wear);
+  if (g0 - a > 0.05) F.box(b, a, g0, yb, yt, -0.12, 0, 2 | 8);
+  if (c - g1 > 0.05) F.box(b, g1, c, yb, yt, -0.12, 0, 2 | 8);
+  F.box(b, g0, g1, dh, yt, -0.12, 0, 0);
+  const col = { bar: 0x1a1a1c, gaming: 0x2a1a4a, lodge: 0x6b3a26, chowki: 0x3a4a6a }[P.kind] ?? 0x5a3a24;
+  b.set(K.wood, col, 0.3);
+  ringAt(b, F, g0, g1, yb, dh, 0.06, -0.02, 0.04);
+  // the leaf, hinged on the left, standing open into the room
+  F.box(b, g0 + 0.01, g0 + 0.05, yb + 0.02, dh - 0.02, -(g1 - g0) - 0.1, -0.12, 0);
+  // a lodge's or the chowki's board by the door, a bar's small lit sign
+  if (P.kind === 'bar' || P.kind === 'gaming') { b.set(K.glow, [[0.95, 0.2, 0.6], [0.2, 0.6, 1], [0.95, 0.75, 0.2]][(R() * 3) | 0], 0, 0.9); F.box(b, g1 + 0.1, Math.min(c - 0.05, g1 + 0.6), yb + 1.5, yb + 1.85, 0, 0.04, 2); }
+  if (P.kind === 'chowki') { b.set(K.plain, 0x2a3a8a, 0.2); F.box(b, g1 + 0.1, Math.min(c - 0.05, g1 + 0.7), yb + 1.3, yb + 1.8, 0, 0.03, 2); }
+  void lux;
+  b.set(L.wk, L.wall, L.wear);
 }
 // a thin frame round a pane on a side wall (at u = wall, facing n)
 function ringAt2(b, F, wall, n, d0, d1, y0, y1) {

@@ -9,7 +9,7 @@
 //   the keeper's "nobody at the counter" all work as in any room; but `inside` stays false, so the street carries on
 //   round you: the traffic, the people, the light, the weather.
 import { Collision } from '@orig/world/mapdata.js';
-import { Interiors } from '@orig/world/interiors.js';
+import { Interiors, venueKey, nightOf } from '@orig/world/interiors.js';
 import { Shops, openNow } from '@orig/game/shops.js';
 import { Pilot } from '@orig/game/pilot.js';
 import { People } from '@orig/people/peds.js';
@@ -167,6 +167,8 @@ function dropStaff(S) {
 // and go when it's shut and out of sight, or you're far off)
 function tend() {
   const P = G.player, inView = G.inView;
+  // (through a place's back door into its room: the street round it stays as you left it)
+  if (G.interiors && G.interiors.inside) return;
   let staffed = 0; for (const S of cells) if (S.staff) staffed++;
   for (const S of cells) {
     const dx = S.door.x - P.x, dz = S.door.z - P.z, d = Math.hypot(dx, dz);
@@ -337,6 +339,18 @@ export function install() {
     this.scanT = 0.3;
     return true;
   };
+  // the door at the back of a bigger place's front room: walk to it and through, into the place itself
+  const use = Interiors.prototype.use;
+  Interiors.prototype.use = function (s) {
+    if (!s || s.kind !== 'backdoor' || !this.cur || !this.cur.inPlace) return use.call(this, s);
+    const S = here && here.S, P = G.player, ctx = S && infoOf(S);
+    if (!ctx || P._walk) return;
+    // a club at night wants its cover charge first (the menu at the door sells it)
+    const covers = (G.life && G.life.s.covers) || {};
+    if (ctx.kind === 'bar' && G.shops.isClub(ctx) && (G.hour >= 20.5 || G.hour < 1.5) && covers[venueKey(ctx)] !== nightOf(G)) { G.shops.show(ctx); return; }
+    const [tx, tz] = at(S, S.plan.back.u, S.plan.back.d);
+    walkTo(P, tx, tz); P._backTo = S;
+  };
   const label = Shops.prototype.label;
   Shops.prototype.label = function () {
     const n = this.near, S = n && n.door && n.door.cell;
@@ -348,6 +362,7 @@ export function install() {
   Pilot.prototype.updateFoot = function (dt, ...a) {
     const out = foot.call(this, dt, ...a);
     if (this._shopNext && !this._walk) { const [x, z] = this._shopNext; this._shopNext = null; walkTo(this, x, z); }
+    if (this._backTo && !this._walk) { const S = this._backTo; this._backTo = null; throughBack(S); }
     return out;
   };
   // the shops near you kept in step (the people's update runs every frame you're out in the city)
@@ -358,6 +373,15 @@ export function install() {
     if (G && G.player) { if ((this._shopT = (this._shopT || 0) - dt) <= 0) { this._shopT = 0.25; tend(); } track(); }
     return out;
   };
+}
+// through the back door: the place's own room (a cut, as through any door into one), and when you come out of it you
+// come out of this door, back into the front room
+function throughBack(S) {
+  const I = G.interiors, ctx = infoOf(S);
+  if (!I || !ctx || !here || here.S !== S) return;
+  leave();
+  const [x, z] = at(S, S.plan.back.u, S.plan.back.d);
+  if (I.enter(ctx)) { I.cur.door = { x, z, yaw: yawOf(S, 'in') }; if (G.date && G.date.onEnter) G.date.onEnter(I.cur.R, ctx); }
 }
 function walkTo(P, x, z) {
   const F = P.foot, d = Math.hypot(x - F.x, z - F.z);
