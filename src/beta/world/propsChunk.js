@@ -16,6 +16,7 @@ import { GB } from '@orig/world/groundChunk.js';
 import { FacadeB } from '@orig/world/buildingsChunk.js';
 import { buildLandmark } from './landmarks.js';
 import { stallSets } from './props.js';
+import { smash } from './smash.js';
 
 export function buildGlobalProps(W) { gameProps(W); stallSets(W); }
 
@@ -64,6 +65,10 @@ export function* buildPropsChunk(W, C, group) {
   const { M, mats, signs, index } = W;
   const P = W.proto;
   const cb = new ColorBuilder(), sb = new QuadBuilder(), gb = new GB(), fb = new FacadeB();
+  // what can be knocked down (bus shelters, street-name boards, banners) goes in a mesh of its own, each thing's triangles
+  // a known run of it, so one can be taken out without the chunk being built again (world/smash.js)
+  const kb = new ColorBuilder(), ks = new QuadBuilder(), knock = [];
+  const mark = (kind, x, z, ry, f) => { const i0 = kb.i.length, s0 = ks.i.length; f(); knock.push([kind, x, z, ry, i0, kb.i.length, s0, ks.i.length]); };
   const rng = new RNG(5000 + C.ci);
   const mm = new THREE.Matrix4();
 
@@ -73,11 +78,13 @@ export function* buildPropsChunk(W, C, group) {
     const x = b[0] / 100, z = b[1] / 100, a = b[2];
     const dx = Math.cos(a), dz = Math.sin(a);
     const ry = Math.atan2(dx, dz);
-    cb.addGeo(P.bus, compose(x, 0.15, z, ry, 1, 1, 1, 0, 0, mm), [1, 1, 1]);
-    const s = signs.bus[0];
-    const fx = Math.cos(ry), fz = -Math.sin(ry);
-    sb.quad([x - fx * 1.1, 2.75, z - fz * 1.1], [x + fx * 1.1, 2.75, z + fz * 1.1], [x + fx * 1.1, 3.3, z + fz * 1.1], [x - fx * 1.1, 3.3, z - fz * 1.1],
-      [Math.sin(ry), 0, Math.cos(ry)], s.u0, s.v0, s.u1, s.v1);
+    mark('bus', x, z, ry, () => {
+      kb.addGeo(P.bus, compose(x, 0.15, z, ry, 1, 1, 1, 0, 0, mm), [1, 1, 1]);
+      const s = signs.bus[0];
+      const fx = Math.cos(ry), fz = -Math.sin(ry);
+      ks.quad([x - fx * 1.1, 2.75, z - fz * 1.1], [x + fx * 1.1, 2.75, z + fz * 1.1], [x + fx * 1.1, 3.3, z + fz * 1.1], [x - fx * 1.1, 3.3, z - fz * 1.1],
+        [Math.sin(ry), 0, Math.cos(ry)], s.u0, s.v0, s.u1, s.v1);
+    });
   }
   for (const s of C.stalls) {
     yield;
@@ -100,19 +107,20 @@ export function* buildPropsChunk(W, C, group) {
       const ry = Math.atan2(-fx, -fz);
       const ux = Math.cos(ry), uz = -Math.sin(ry), nx = -fx, nz = -fz;
       const ltr = (ux * nz - uz * nx) > 0;
-      if (ex.kind === 'street') {
-        cb.addGeo(P.streetBoard, compose(x, 0.15, z, ry, 1, 1, 1, 0, 0, mm), [1, 1, 1]);
+      if (ex.kind === 'street') mark('board', x, z, ry, () => {
+        kb.addGeo(P.streetBoard, compose(x, 0.15, z, ry, 1, 1, 1, 0, 0, mm), [1, 1, 1]);
         const s = signs.streets[ex.s];
-        sb.quad([x - ux * 1.22, 2.23, z - uz * 1.22], [x + ux * 1.22, 2.23, z + uz * 1.22], [x + ux * 1.22, 2.87, z + uz * 1.22], [x - ux * 1.22, 2.87, z - uz * 1.22],
+        ks.quad([x - ux * 1.22, 2.23, z - uz * 1.22], [x + ux * 1.22, 2.23, z + uz * 1.22], [x + ux * 1.22, 2.87, z + uz * 1.22], [x - ux * 1.22, 2.87, z - uz * 1.22],
           [nx, 0, nz], ltr ? s.u0 : s.u1, s.v0, ltr ? s.u1 : s.u0, s.v1);
-      } else {
-        cb.addGeo(P.bannerFrame, compose(x, 0.15, z, ry, 1, 1, 1, 0, 0, mm), [1, 1, 1]);
+      });
+      else mark('banner', x, z, ry, () => {
+        kb.addGeo(P.bannerFrame, compose(x, 0.15, z, ry, 1, 1, 1, 0, 0, mm), [1, 1, 1]);
         const s = signs.banners[ex.s];
-        sb.quad([x - ux * 1.65, 1.9, z - uz * 1.65], [x + ux * 1.65, 1.9, z + uz * 1.65], [x + ux * 1.65, 2.9, z + uz * 1.65], [x - ux * 1.65, 2.9, z - uz * 1.65],
+        ks.quad([x - ux * 1.65, 1.9, z - uz * 1.65], [x + ux * 1.65, 1.9, z + uz * 1.65], [x + ux * 1.65, 2.9, z + uz * 1.65], [x - ux * 1.65, 2.9, z - uz * 1.65],
           [nx, 0, nz], ltr ? s.u0 : s.u1, s.v0, ltr ? s.u1 : s.u0, s.v1);
-        sb.quad([x - ux * 1.65, 1.9, z - uz * 1.65], [x + ux * 1.65, 1.9, z + uz * 1.65], [x + ux * 1.65, 2.9, z + uz * 1.65], [x - ux * 1.65, 2.9, z - uz * 1.65],
+        ks.quad([x - ux * 1.65, 1.9, z - uz * 1.65], [x + ux * 1.65, 1.9, z + uz * 1.65], [x + ux * 1.65, 2.9, z + uz * 1.65], [x - ux * 1.65, 2.9, z - uz * 1.65],
           [-nx, 0, -nz], s.u0, s.v0, s.u0 + 0.001, s.v0 + 0.001);
-      }
+      });
     } else if (ex.kind === 'landmark') {
       try { buildLandmark(W, ex.id, { fb, gb, cb, group, mm }); } catch (e) { console.warn('landmark', ex.id, e); }
     } else if (ex.kind === 'pier') {
@@ -284,9 +292,18 @@ export function* buildPropsChunk(W, C, group) {
   yield;
   W.sliceLabel = 'pEmitF';
   if (!fb.empty) { const m = new THREE.Mesh(yield* fb.buildSliced(), mats.facade); m.castShadow = true; m.receiveShadow = true; group.add(m); }
+  yield;
+  W.sliceLabel = 'pEmitK';
+  let km = null, kq = null;
+  if (!kb.empty) { km = new THREE.Mesh(yield* kb.buildSliced(), mats.prop); km.castShadow = true; km.receiveShadow = true; km.geometry.userData.shared = true; group.add(km); }
+  if (!ks.empty) { kq = new THREE.Mesh(yield* ks.buildSliced(), mats.oldSign); kq.receiveShadow = true; kq.geometry.userData.shared = true; group.add(kq); }
+  const X = smash(W);
+  for (const [kind, x, z, ry, i0, i1, s0, s1] of knock) X.reg(kind, x, z, ry, { draw: [km && i1 > i0 ? [km, i0, i1] : null, kq && s1 > s0 ? [kq, s0, s1] : null] });
   if (C.wires.length) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(C.wires, 3));
     group.add(new THREE.LineSegments(g, W.wireMat));
   }
+  // (kept by hand, so the runs can be taken out and put back: let go with the chunk)
+  return () => { X.unmesh(km, kq); for (const m of [km, kq]) if (m) m.geometry.dispose(); };
 }

@@ -138,7 +138,8 @@ Arms.prototype.use = function (...args) {
   let r;
   try { r = use.apply(this, args); } finally { for (const p of hid) p.hidden = false; G._shotStop = null; }
   if (first || (G._shotHitT != null && G._shotHitT < hit.t)) return r;
-  try { if (!(hit.head && X.darken(hit.r))) FX.hit(hit.mat, hx, hy, hz); } catch (e) { console.warn('smash', e); }
+  // (a round knocks over only what's light: a banner, a flower cart, the third or fourth into something a little more)
+  try { if (!(hit.head && X.darken(hit.r))) { FX.hit(hit.mat, hx, hy, hz); if (!hit.head) X.hit(hit.r, { E: 250, px: hx, py: hy, pz: hz, nx: ax, nz: az, u: 1.2, m: 60, by: 'shot' }); } } catch (e) { console.warn('smash', e); }
   return r;
 };
 

@@ -35,6 +35,15 @@ function step(P, dt) {
   const G = window.__nhAskG, M = G && G.W && G.W.M, scene = P.scene;
   if (!M || !scene) return;
   if (!list) list = (M.buses || []).filter(b => b.length > 3 && b[3]);
+  // a shelter knocked down takes its name board with it (world/smash.js)
+  const X = G.W.smash;
+  for (const B of boards) {
+    const r = X && B.stop && X.by.get('bus:' + Math.round(B.stop[0]/100*10) + ',' + Math.round(B.stop[1]/100*10)), top = r && r.st === 2 && r.top;
+    if (top) {
+      if (B.Lr !== top) { B.root.updateMatrix(); B.L = r.top0.clone().invert().multiply(B.root.matrix); B.Lr = top; B.root.matrixAutoUpdate = false; }
+      B.root.matrix.multiplyMatrices(top.mesh.matrix, B.L); B.root.matrixWorldNeedsUpdate = true;
+    } else if (B.Lr) { B.Lr = null; B.root.matrixAutoUpdate = true; }
+  }
   if ((tT -= dt) > 0) return;
   tT = 0.5;
   while (boards.length < POOL) { const B = makeBoard(); scene.add(B.root); boards.push(B); }

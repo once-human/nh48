@@ -28,6 +28,10 @@ export const SPEC = {
   stall2: { mass: 90, h: 2.3, mat: 'steel', tip: 1.2e3, brk: 9e3, absorb: 3e3, mode: 'cart', snd: 'tin', goods: 'glass' },          // vada pav
   stall3: { mass: 130, h: 1.4, mat: 'wood', tip: 1.2e3, brk: 6e3, absorb: 2.5e3, mode: 'cart', snd: 'wood', goods: 'fruit' },       // fruit
   stall4: { mass: 35, h: 2.1, mat: 'bamboo', tip: 300, brk: 900, absorb: 400, mode: 'cart', snd: 'bamboo', goods: 'cloth' },       // flowers
+  // drawn in with the street (world/propsChunk.js), so no lean: they stand or they go, free, over on their own weight
+  board: { mass: 40, h: 2.9, mat: 'steel', bend: 1e3, brk: 3e3, absorb: 1.5e3, mode: 'fold', free: true, base: -1, snd: 'steelFold' },   // a street-name board on its two posts
+  banner: { mass: 15, h: 2.9, mat: 'bamboo', bend: 60, brk: 160, absorb: 100, mode: 'fold', free: true, base: -1, snd: 'bamboo' },     // a banner on its bamboo frame: a kick has it over
+  bus: { mass: 300, h: 3.3, mat: 'steel', bend: 1e4, brk: 4e4, absorb: 2.5e4, mode: 'fold', free: true, base: -1, snd: 'steelFold' },   // a bus shelter
   stall5: { mass: 220, h: 2.5, mat: 'steel', tip: 3.5e3, brk: 12e3, absorb: 5e3, mode: 'cart', snd: 'tin', goods: 'wood' },         // ganna
 };
 const KEEP = 240, AWAY = 140, CELL = 8;
@@ -38,7 +42,7 @@ export function smash(W) { return W.smash || (W.smash = new Smash(W)); }
 
 class Smash {
   constructor(W) {
-    this.W = W; this.by = new Map(); this.grid = new Map(); this.down = new Set(); this.t = 0; this.chk = 0; this.nSnd = 0; this.sndT = 0;
+    this.W = W; this.byMesh = new Map(); this.by = new Map(); this.grid = new Map(); this.down = new Set(); this.t = 0; this.chk = 0; this.nSnd = 0; this.sndT = 0;
     this.debris = new Debris();
     this.debris.onLand = (b, v) => { if (this.nSnd++ < 6) FX.land(b.mat, b.p.x, b.p.y, b.p.z, v, b.m); };
   }
@@ -63,7 +67,28 @@ class Smash {
     if (o.cols) { for (const c of o.cols) if (c) { r.cols.push(c); if (r.st === 2) c.off = true; } if (r.cols.length > 96) r.cols.splice(0, r.cols.length - 96); }
     if (o.lamp) { r.lamp = o.lamp; if (r.dark || r.st === 2) o.lamp.out = true; }
     if (o.head) { r.head = o.head; if (r.st === 2) o.head.dead = true; }
+    // its run of triangles in its street's mesh: [mesh, first index, end]
+    if (o.draw) {
+      r.draw = (r.draw || []).filter(e => e.m.parent);
+      for (const d of o.draw) if (d) {
+        const e = { m: d[0], i0: d[1], i1: d[2], keep: null }; r.draw.push(e);
+        let l = this.byMesh.get(e.m); if (!l) this.byMesh.set(e.m, l = new Set()); l.add(r);
+        if (r.st === 2) this.cut(e, true);
+      }
+    }
     return r;
+  }
+  // a run taken out of its mesh (every index the same: nothing to draw) or put back
+  cut(e, out) {
+    const ix = e.m.geometry.index; if (!ix || !ix.array) return;
+    const a = ix.array;
+    if (out) { if (!e.keep) e.keep = a.slice(e.i0, e.i1); a.fill(0, e.i0, e.i1); }
+    else if (e.keep) { a.set(e.keep, e.i0); e.keep = null; } else return;
+    ix.needsUpdate = true;
+  }
+  // a street let go: what was drawn in it no longer is
+  unmesh(...ms) {
+    for (const m of ms) { if (!m) continue; const l = this.byMesh.get(m); if (!l) continue; for (const r of l) r.draw = r.draw.filter(e => e.m !== m); this.byMesh.delete(m); }
   }
   near(x, z, rad, fn) {
     const i0 = Math.floor((x - rad)/CELL), i1 = Math.floor((x + rad)/CELL), j0 = Math.floor((z - rad)/CELL), j1 = Math.floor((z + rad)/CELL);
@@ -101,9 +126,9 @@ class Smash {
     if (S.mode === 'cart') {
       if (tot >= S.brk) out = this.apart(r, o, false);
       else if (tot >= S.tip) out = this.apart(r, o, true);
-      else FX.knock(S.mat, o.px, o.py, o.pz, Math.min(1, 0.3 + o.E/S.tip));
+      else if (o.by !== 'shot') FX.knock(S.mat, o.px, o.py, o.pz, Math.min(1, 0.3 + o.E/S.tip));
     } else if (tot >= S.brk) out = this.fall(r, o, tot);
-    else if (o.E >= S.bend*0.6 && o.by === 'car') {
+    else if (o.E >= S.bend*0.6 && o.by === 'car' && r.items.length) {
       // it gives at its foot, by how much past giving the blow was
       const da = Math.min(0.3, Math.max(0, (o.E - S.bend*0.6)/(S.brk - S.bend*0.6))*0.32 + 0.02);
       r.tilt.x += o.nx*da; r.tilt.z += o.nz*da; if (r.tilt.length() > 0.42) r.tilt.setLength(0.42);
@@ -111,7 +136,7 @@ class Smash {
       for (const [, it] of r.items) this.lean(r, it);
       this.dirty();
       FX.brk(S.mat === 'rcc' ? 'rccSnap' : 'steelFold', r.x, r.y + 0.5, r.z, 0.35 + da*1.5);
-    } else FX.knock(S.mat, o.px, o.py, o.pz, Math.min(1, 0.25 + o.E/(S.bend || 1e3)));
+    } else if (o.by !== 'shot') FX.knock(S.mat, o.px, o.py, o.pz, Math.min(1, 0.25 + o.E/(S.bend || 1e3)));
     r.dmg += o.E*0.5;
     return out;
   }
@@ -122,6 +147,7 @@ class Smash {
     for (const c of r.cols) c.off = true;
     if (r.lamp) r.lamp.out = true;
     if (r.head) r.head.dead = true;
+    if (r.draw) for (const e of r.draw) this.cut(e, true);
     r.st = 2; r.tb = this.t; this.down.add(r);
     this.dirty();
   }
@@ -137,7 +163,22 @@ class Smash {
   // a push at a world point on a body
   push(b, px, py, pz, jx, jy, jz) { this.debris.iw(b); this.debris.impulse(b, new THREE.Vector3(px - b.p.x, py - b.p.y, pz - b.p.z), new THREE.Vector3(jx, jy, jz)); }
   stub(r, pc, F) { const m = this.mesh(pc.geo); m.matrix.copy(F).multiply(_m.makeTranslation(pc.c.x, pc.c.y, pc.c.z)); m.matrixWorld.copy(m.matrix); r.meshes.push(m); }
-  geoOf(r) { const P = this.W.proto; return r.kind === 'lamp' ? P.lampDead || P.lamp : P[r.kind]; }
+  geoOf(r) { const P = this.W.proto; return r.kind === 'lamp' ? P.lampDead || P.lamp : r.kind === 'board' ? P.streetBoard : r.kind === 'banner' ? P.bannerFrame : P[r.kind]; }
+  // the sign on it (its run of the street's sign quads), as part of the piece it's on
+  signOn(r, b) {
+    const e = r.draw && r.draw.find(q => q.m.material === this.W.mats.oldSign); if (!e) return;
+    const g0 = e.m.geometry, ix = e.keep || g0.index.array.slice(e.i0, e.i1), A = g0.attributes, n = ix.length;
+    const inv = b.mesh.matrix.clone().invert(), nm = new THREE.Matrix3().getNormalMatrix(inv);
+    const P = new Float32Array(n*3), N = new Float32Array(n*3), U = new Float32Array(n*2);
+    for (let k = 0; k < n; k++) {
+      const i = ix[k];
+      _v.fromBufferAttribute(A.position, i).applyMatrix4(inv); P.set([_v.x, _v.y, _v.z], k*3);
+      _v.fromBufferAttribute(A.normal, i).applyMatrix3(nm).normalize(); N.set([_v.x, _v.y, _v.z], k*3);
+      U[k*2] = A.uv.getX(i); U[k*2 + 1] = A.uv.getY(i);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.BufferAttribute(U, 2));
+    const m = new THREE.Mesh(g, e.m.material); m.receiveShadow = true; b.mesh.add(m); b.mesh.updateMatrixWorld();
+  }
 
   // ---- a post: folds over at its foot (steel) or snaps there (concrete)
   fall(r, o, tot) {
@@ -149,7 +190,8 @@ class Smash {
     if (!up.length) return { broke: true, absorb: S.absorb, carried: 0 };
     const pc = pieceOf(geo, up), snap = S.mode === 'snap', torn = !snap && tot > S.brk*3.2;
     const pinL = new THREE.Vector3(0, S.base + 0.02, 0).sub(pc.c);
-    const b = this.body(r, pc, F, S.mass, S.mat, snap || torn ? {} : { pin: new THREE.Vector3(0, S.base + 0.02, 0).applyMatrix4(F), pinLocal: pinL, stiff: 2.2 });
+    const b = this.body(r, pc, F, S.mass, S.mat, snap || torn || S.free ? {} : { pin: new THREE.Vector3(0, S.base + 0.02, 0).applyMatrix4(F), pinLocal: pinL, stiff: 2.2 });
+    if (r.draw) { this.signOn(r, b); r.top = b; r.top0 = b.mesh.matrix.clone(); }
     // the blow, where it struck, carried on by what struck it
     const u = Math.max(1, o.u ?? 2), J = S.mass*u*(snap ? 0.45 : 0.35);
     this.push(b, o.px, Math.max(r.y + S.base + 0.15, o.py), o.pz, o.nx*J, J*0.05, o.nz*J);
@@ -257,7 +299,9 @@ class Smash {
     }
   }
   restore(r) {
-    for (const b of r.bodies) { this.debris.remove(b); if (b.mesh) { b.mesh.parent && b.mesh.parent.remove(b.mesh); b.mesh.geometry.dispose(); } }
+    for (const b of r.bodies) { this.debris.remove(b); if (b.mesh) { b.mesh.parent && b.mesh.parent.remove(b.mesh); b.mesh.traverse(o => o.geometry && o.geometry.dispose()); } }
+    if (r.draw) { r.draw = r.draw.filter(e => e.m.parent); for (const e of r.draw) this.cut(e, false); }
+    r.top = null;
     for (const m of r.meshes) { m.parent && m.parent.remove(m); m.geometry.dispose(); }
     r.bodies = []; r.meshes = [];
     r.tilt.set(0, 0, 0);

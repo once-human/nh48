@@ -109,13 +109,15 @@ export function makeSolids(W) {
     bus(b, C) {
       const P = W.proto;
       if (!P || !P.bus) { C.addCircle(b[0]/100, b[1]/100, 0.9, 2); return; }
-      place(C, P.bus, b[0]/100, b[1]/100, Math.atan2(Math.cos(b[2]), Math.sin(b[2])));
+      const x = b[0]/100, z = b[1]/100, ry = Math.atan2(Math.cos(b[2]), Math.sin(b[2]));
+      smash(W).reg('bus', x, z, ry, { cols: place(C, P.bus, x, z, ry) });
     },
     // a street-name board or a banner frame at (x, z), its face to (fx, fz): drawn at ry = atan2(-fx, -fz)
     board(kind, x, z, fx, fz, C) {
       const P = W.proto, geo = P && (kind === 'banner' ? P.bannerFrame : P.streetBoard);
       if (!geo) { if (kind !== 'banner') C.addCircle(x, z, 0.12, 2); return; }
-      place(C, geo, x, z, Math.atan2(-fx, -fz));
+      const ry = Math.atan2(-fx, -fz);
+      smash(W).reg(kind === 'banner' ? 'banner' : 'board', x, z, ry, { cols: place(C, geo, x, z, ry) });
     },
   };
 }
