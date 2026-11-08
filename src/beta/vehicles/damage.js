@@ -373,10 +373,20 @@ export function promote(G, o) {
   v.reset(o.x, o.z, Math.atan2(o.hz ?? 0, o.hx ?? 1)); v.v = 0;
   v.plate = Pl.randomPlate ? Pl.randomPlate() : v.plate; v.dmg = o.dmg || 0;
   v.sync && v.sync(0);
-  const dr = Pl.spawnAngryDriver ? Pl.spawnAngryDriver(o, 'bump') : null;
+  // the driver stays in while it's thrown and spun, and gets out once it's come to rest, at its door wherever it ended
+  // up (the traffic one goes back to the pool, so what they need of it is kept here)
+  const who = { T: o.T, type: o.type, colB: o.colB && o.colB.slice(), colC: o.colC && o.colC.slice(), x: o.x, z: o.z, hx: o.hx ?? 1, hz: o.hz ?? 0 };
   const idx = G.traffic.list.indexOf(o); if (idx >= 0) G.traffic.despawn(idx);
   Pl.addDropped(v, G.traffic);
-  if (dr && G.people && G.people.flee) { dr.angry = 0; dr.grudge = 0; G.people.flee(dr, Pl.x, Pl.z, 35); }
+  let lx = v.x, lz = v.z, n = 0;
+  const out = () => {
+    const moved = Math.hypot(v.x - lx, v.z - lz); lx = v.x; lz = v.z;
+    if (moved > 0.04 && ++n < 60) { G.later(0.2, out); return; }
+    who.x = v.x; who.z = v.z; if (v.th !== undefined) { who.hx = Math.cos(v.th); who.hz = Math.sin(v.th); }
+    const dr = Pl.spawnAngryDriver ? Pl.spawnAngryDriver(who, 'bump') : null;
+    if (dr && G.people && G.people.flee) { dr.angry = 0; dr.grudge = 0; G.people.flee(dr, Pl.x, Pl.z, 35); }
+  };
+  if (G.later) G.later(0.4, out); else out();
   return v;
 }
 

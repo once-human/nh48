@@ -340,6 +340,9 @@ const PATCHES = {
     ["edge(3, 'KeyV');", "edge(3, 'KeyC');"],
   ],
   [S('game/game.js')]: [
+    // the driver you hit stays in till the car's stopped, then gets out (it brakes along its lane: traffic.js patch)
+    ["    o.argue = 22; o.v = 0;\n    this.later(1.4, () => {", "    o.argue = 22;\n    const go = () => {"],
+    ["        this.later(12, () => { if (o.argue > 0) { if (this.people.list.includes(p)) this.people.remove(p); o.argue = 0; } });\n      });\n    });\n  }", "        this.later(12, () => { if (o.argue > 0) { if (this.people.list.includes(p)) this.people.remove(p); o.argue = 0; } });\n      });\n    };\n    const wait = (n) => this.later(n ? 0.2 : 0.8, () => { if (Math.abs(o.v || 0) > 0.3 && n < 50) wait(n + 1); else go(); });\n    wait(0);\n  }"],
     // (the blow itself is beta/people/runover.js: not a wall any more)
     ["v.v = 0; v.vl = 0; this.rig.shake(Math.min(0.9, ev.speed * 0.08)); this.audio.crash(1);\n        knock(v, ev.speed + 2, 0.012);", "this.rig.shake(Math.min(0.9, ev.speed * 0.05)); this.audio.crash(Math.min(1, 0.3 + ev.speed * 0.03));"],
     ["kmh > 25 ? 'She\u2019s hurt, your vehicle\u2019s wrecked, and a crowd is forming fast' : 'She barely moved. Your bumper did. Everyone is staring'", "ev.how === 'dead' ? 'She\u2019s dead, your front\u2019s gone, and a crowd is forming fast' : ev.how === 'down' ? 'She\u2019s down, your front\u2019s gone, and a crowd is forming fast' : 'She\u2019s hurt. So is your bumper. Everyone is staring'"],
@@ -485,6 +488,10 @@ const PATCHES = {
     ["if (o.signals && !o.emergency && G.traffic.signals) {", "if (o.careful && !o.signals && G.traffic.signals) { const n = W.graph.nearest(v.x + hx * 14, v.z + hz * 14, 10), node = n && W.graph.nodes[n.s < n.e.len / 2 ? n.e.a : n.e.b]; if (node && node.signal && Math.hypot(node.x - v.x, node.z - v.z) < 24 && G.traffic.signals.stateForAngle(node.i, v.th) === 'r') target = Math.min(target, 6); }\n    if (o.signals && G.traffic.signals) {"],
   ],
   [S('traffic/traffic.js')]: [
+    // a car you've hit pulls up under its own brakes, along its lane (it used to stop dead on the spot), and only
+    // then is it standing there with its driver out (game.js fenderBender waits for it)
+    ["if (v.argue > 0) { v.argue -= dt; v.v = 0; return; }", "if (v.argue > 0 && !(v.v > 0.3)) { v.argue -= dt; v.v = 0; return; }"],
+    ["let vDes = SPEED_BY_RANK[e.rank] * v.vMul;", "let vDes = v.argue > 0 ? 0 : SPEED_BY_RANK[e.rank] * v.vMul;"],
     // a vehicle you can see appears no nearer than 220 m (it used to be 140: a car arriving out of nothing down the road)
     ["const hidden = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 140 : null;\n        this.spawn(px + hx * look", "const hidden = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 220 : null;\n        this.spawn(px + hx * look"],
     ["const hidden = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 140 : null;\n        this.spawn(px, pz,", "const hidden = avoidView ? (x, z) => avoidView(x, z) && Math.hypot(x - px, z - pz) < 220 : null;\n        this.spawn(px, pz,"],
