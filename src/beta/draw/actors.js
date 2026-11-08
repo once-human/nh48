@@ -81,6 +81,8 @@ export class Actors {
       if (p.hidden || p.pax) continue;
       // (who has a real body close by is drawn by the skin; while it's coming in or going, this figure has the rest)
       if (p.body && p.body.H) continue;
+      // (someone lying down has a real body out to 100 m, crowd.js: past that, nobody's drawn standing up in their place)
+      if (p.fallen > 0 || p.corpse) continue;
       if (!p._dk) { p._dk = this.next; this.next = this.next%(CAP - 1) + 1; p._dph = Math.random()*9; p._lx = p.x; p._lz = p.z; p._dv = 0; }
       if (p._dkL !== p.look || C._own[p._dk] !== p) { p._dkL = p.look; C._own[p._dk] = p; if (p.look) { C.look(p._dk, lookOf(p.look)); dirty = true; } }
       // the legs go with how far they really moved this frame (not the speed they mean to walk at), so nobody glides:

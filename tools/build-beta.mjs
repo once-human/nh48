@@ -290,14 +290,14 @@ const PATCHES = {
     ["helmet: two && i === 0 && o.type !== 'scooterP' });", "helmet: two && i === 0 && o.type !== 'scooterP' && !cyc });"],
     // someone a power is lit on (Vetal going into them, Brahmarakshas reading them) keeps a real body however far off:
     // the glow is on the body, and the crowd used to hand a far one's body to someone nearer a moment later
-    ["const R0 = this.range || RANGE, r = p.cop || p.ctl || p.story ? R0 + 14 : R0;", "const lit = p._lit > performance.now() - 600, R0 = this.range || RANGE, r = lit ? 1e9 : p.cop || p.ctl || p.story ? R0 + 14 : R0;"],
+    ["const R0 = this.range || RANGE, r = p.cop || p.ctl || p.story ? R0 + 14 : R0;", "const lit = p._lit > performance.now() - 600, R0 = this.range || RANGE, r = lit ? 1e9 : p.fallen > 0 || p._rag ? R0 + 45 : p.cop || p.ctl || p.story ? R0 + 14 : R0;"],
     ["if (d < r) cand.push([d - (p.cop || p.ctl ? 12 : 0) + (seen ? 0 : 15), p]);", "if (d < r) cand.push([d - (p.cop || p.ctl ? 12 : 0) - (lit ? 1e5 : 0) + (seen ? 0 : 15), p]);"],
     ["if (mv > 0.3 && !once && !LOCO.has(name)) {", "if (mv > 0.3 && (!once || UPPER.has(name)) && !LOCO.has(name)) {"],
     // after each person's clip: where they look (beta/draw/alive.js)
     // someone being dragged or waking up is posed every frame, seen or not (behind you, they were posed every few
     // frames and your hands, holding them, jumped between where they were and where they'd been)
     ["if (seen ? (dd < 30 || (dd < 70 ?", "if (p._drag || p._wake ? true : seen ? (dd < 45 || (dd < 100 ?"],
-    ["H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; }", "H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; } else H.mixer.rest && H.mixer.rest();\n    if (this.postPed && dd < 40) this.postPed(p, H, dt);"]],
+    ["H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; }", "H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; } else H.mixer.rest && H.mixer.rest();\n    if (this.postPed && (dd < 40 || p._rag)) this.postPed(p, H, dt);"]],
   // animals: the walk follows how far they really move (no gliding when the game moves them, no 2.6x cap when they run)
   [S('people/animals.js')]: [
     // (what's down lies down: beta/people/runover.js)

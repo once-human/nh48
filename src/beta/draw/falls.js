@@ -3,6 +3,7 @@
 // throws them along its way. You too: knocked down while running you go over with your speed, not on the spot.
 import { People } from '@orig/people/peds.js';
 import { Pilot } from '@orig/game/pilot.js';
+import { startRag } from '../people/ragdoll.js';
 
 const upd = People.prototype.update;
 People.prototype.update = function (dt, player, ...a) {
@@ -28,6 +29,9 @@ People.prototype.update = function (dt, player, ...a) {
         p.yaw = Math.atan2(-sz, -sx); p.hx = Math.cos(p.yaw); p.hz = Math.sin(p.yaw);
         p._slide = { vx: sx*sp, vz: sz*sp };
       }
+      // the body's own from here (people/ragdoll.js): pushed where it was hit, more at the chest than the feet, it goes
+      // over as it goes; with nothing to push it (a shot, out cold) the knees just go and it folds where it stands
+      if (!p._rag && startRag(p, sp > 0 ? { push: [sx*sp*0.55, sz*sp*0.55, 0.4] } : { vy: -0.6 })) p._slide = null;
     } else if (!down && p._down) {
       p._down = false;
       // up again after being knocked over: a hand to the head a moment, getting their bearings

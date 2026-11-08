@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { People } from '@orig/people/peds.js';
 import { baseOf } from '../vehicles/models.js';
 import { tickVoice } from '../game/voices.js';
+import { startRag, kickRag } from './ragdoll.js';
 
 const G0 = 9.81, HIP = 0.9, FLAT = 0.2, MARGIN = 0.3;
 const TALL = new Set(['bus', 'tempo', 'auto', 'bolero']);
@@ -46,7 +47,7 @@ People.prototype.struck = function (p, V, S, player, sp, fx, fz, al, ac) {
   // (km/h at which it kills, and at which it's critical: a tall flat front is worse than a bonnet, a two-wheeler far less)
   const [kD, kC, kK] = two ? [80, 55, 32] : tall ? [45, 32, 18] : [62, 45, 25];
   const dead = kmh >= kD, ko = dead || kmh >= kK, crit = !dead && kmh >= kC;
-  p._down = true; p._slide = null;      // (draw/falls.js has nothing to add to this)
+  p._wv = p.v || 0; p._down = true; p._slide = null;      // (draw/falls.js has nothing to add to this)
   p.fallen = dead || ko ? 1e6 : 3 + kmh*0.12; p.ko = ko; p.corpse = dead; p.unconscious = ko && !dead; p.v = 0; p.dodge = 0; p.steerT = 0;
   p.inj = { sev: dead ? 'dead' : crit ? 'critical' : ko ? 'ko' : 'knock', t: 0 };
   if (!ko) p.limp = 40 + kmh*2;
@@ -67,6 +68,8 @@ People.prototype.struck = function (p, V, S, player, sp, fx, fz, al, ac) {
   else if (kmh < 14) { along = 0.85*cap; lat = 0.1*cap*side; vy = 0.3; spin = 3; }
   else { along = Math.min(0.62*cap, 15); lat = 0.07*cap*side; vy = Math.min(1.4, 0.5 + cap*0.04); spin = 2.2 + cap*0.1; }
   p._hit = { x0: p.x, z0: p.z, x: p.x, z: p.z, y: HIP, vy, vx: fx*along + sx*lat, vz: fz*along + sz*lat, nx: -fz, nz: fx, ang: 0, spin, fx, fz, t: 0, lt: -1, bounce: 1, tall, yaw0: p.yaw, yaw: Math.atan2(fz, fx), H: heightOf(V, S), V, S, two, axle: 0 };
+  // and from here the body's its own (beta/people/ragdoll.js): the car takes their legs and its outline carries them
+  startRag(p, { V, S, H: p._hit.H, tall, top: (u) => topAt(u, p._hit.H, tall), vx: Math.cos(p._hit.yaw0 || 0)*(p._wv || 0), vz: Math.sin(p._hit.yaw0 || 0)*(p._wv || 0), kmh });
   // what it costs you: the weight of a person against yours
   const M = (S.mass || 1000) + (two ? 75 : 0), share = 75/(M + 75);
   const lost = Math.min(Math.abs(V.v)*share*1.2, Math.abs(V.v)); V.v -= Math.sign(V.v)*lost;
@@ -83,6 +86,13 @@ function lieNow(p) {
 }
 function flying(P, p, dt, V, S) {
   const h = p._hit, C = P.W && P.W.collision; h.t += dt;
+  // a body of its own (ragdoll.js) goes where its physics takes it: this only says when it's over
+  if (p._rag) {
+    h.x = p.x; h.z = p.z; p.liftY = 0; h.draw = 0;
+    if (p._rag.sleep || p._rag.out >= 0) { if (h.lt < 0) h.lt = 0; h.lt += dt; }
+    if (h.lt >= 0.55) { if (p.mode === 'walk' || p.mode === 'cross') { p.dodgeX = (p.dodgeX || 0) + h.x - h.x0; p.dodgeZ = (p.dodgeZ || 0) + h.z - h.z0; } else if (p.anchor) { p.anchor.x = h.x; p.anchor.z = h.z; } p._hit = null; }
+    return;
+  }
   if (h.lt < 0) {
     h.vy -= G0*dt; h.y += h.vy*dt; h.x += h.vx*dt; h.z += h.vz*dt;
     // turned about the hips by the blow, to flat at most: braced while in the air (crowd.js holds the clip), no somersaults
@@ -150,8 +160,9 @@ function overBody(P, p, V, S, player, sp, dt) {
       p.ko = true; p.unconscious = !dead; p.corpse = dead; p.fallen = 1e6; p.inj = { sev: dead ? 'dead' : 'critical', t: 0 };
       if (dead) P.events.push({ type: 'pedDied', p, x: p.x, z: p.z });
     }
-    // dragged a little and rolled by it
-    if (!p._hit) { const fx = hx*s, fz = hz*s; p._hit = { x0: p.x, z0: p.z, x: p.x, z: p.z, y: FLAT, vy: 0, vx: fx*Math.min(sp*0.2, 2.5), vz: fz*Math.min(sp*0.2, 2.5), nx: -fz, nz: fx, ang: 0, spin: 0, fx, fz, t: 1, lt: 0.6, bounce: 0, yaw0: p.yaw, yaw: p.yaw, H: 1, V, S, axle: 1, show: 0 }; }
+    // dragged a little and rolled by it: a body of its own is shoved and turned by the tyre where it went over
+    if (p._rag) { const fx = hx*s, fz = hz*s, ax = V.x + hx*s*at, az = V.z + hz*s*at; kickRag(p, ax + (p.x - ax)*0.2, az + (p.z - az)*0.2, fx*Math.min(sp*0.25, 3), 1.2 + Math.min(1.5, sp*0.05), fz*Math.min(sp*0.25, 3), 0.9); }
+    else if (!p._hit) { const fx = hx*s, fz = hz*s; p._hit = { x0: p.x, z0: p.z, x: p.x, z: p.z, y: FLAT, vy: 0, vx: fx*Math.min(sp*0.2, 2.5), vz: fz*Math.min(sp*0.2, 2.5), nx: -fz, nz: fx, ang: 0, spin: 0, fx, fz, t: 1, lt: 0.6, bounce: 0, yaw0: p.yaw, yaw: p.yaw, H: 1, V, S, axle: 1, show: 0 }; }
   };
   axle(0, wb); axle(1, -wb);
 }
