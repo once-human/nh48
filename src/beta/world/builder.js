@@ -768,6 +768,16 @@ function drawPiece(b, cb, G, F, U, q, yb, yt, st, pc, lux) {
       const top = st === 'cafe' ? 0x7a5236 : st === 'fast' ? 0xf2f2f0 : [0xc8ccd2, 0xd8d8d0, 0x5a3a26, 0xe8e4dc][(R() * 4) | 0];
       b.set(st === 'food' && top === 0xc8ccd2 ? K.metal : K.wood, top, 0.2); F.box(b, u0, u1, yb + q.h - 0.04, yb + q.h, d0, d1, 0);
       b.set(K.metal, 0x8a8e92, 0.2); for (const [x, z] of [[u0 + 0.05, d0 + 0.05], [u1 - 0.08, d0 + 0.05], [u0 + 0.05, d1 - 0.08], [u1 - 0.08, d1 - 0.08]]) F.box(b, x, x + 0.03, yb, yb + q.h - 0.04, z, z + 0.03, 4 | 8);
+      // what's always on the table: the steel jug of water and the glasses upside down by it, the steel stand of paper
+      // napkins (a café: the sugar and the menu card)
+      { const um = (u0 + u1) / 2, dm = (d0 + d1) / 2, y = yb + q.h;
+        if (st === 'cafe' || st === 'fast') { b.set(K.plain, 0xf2f2f0, 0.1); F.box(b, um - 0.04, um + 0.04, y, y + 0.09, dm - 0.04, dm + 0.04, 8); b.set(K.plain, pc(), 0.1); F.box(b, um + 0.08, um + 0.1, y, y + 0.16, dm - 0.06, dm + 0.06, 8); }
+        else {
+          // (in the middle line of the table, clear of where the plates go on either side)
+          b.set(K.metal, 0xc8ccd0, 0.15); const J = F.P(um - 0.14, 0, dm); b.cyl(J[0], y, J[2], 0.05, 0.06, 0.2, 8);
+          for (const o of [0.19, 0.27]) { const Q = F.P(um + o, 0, dm); b.cyl(Q[0], y, Q[2], 0.035, 0.028, 0.09, 6); }
+          b.set(K.metal, 0xb8bcc0, 0.2); F.box(b, um - 0.32, um - 0.25, y, y + 0.1, dm - 0.03, dm + 0.03, 8); b.set(K.plain, 0xf2f2ee, 0); F.box(b, um - 0.315, um - 0.255, y + 0.03, y + 0.13, dm - 0.025, dm + 0.025, 8);
+        } }
       break;
     }
     case 'chair': {

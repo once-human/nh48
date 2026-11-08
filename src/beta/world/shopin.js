@@ -14,6 +14,8 @@ import { Shops, openNow } from '@orig/game/shops.js';
 import { Pilot } from '@orig/game/pilot.js';
 import { People } from '@orig/people/peds.js';
 import { RNG } from '@orig/core/util.js';
+import * as THREE from 'three';
+import { Reflector } from 'three/addons/objects/Reflector.js';
 
 const CELL = 8, key = (i, j) => i * 100003 + j;
 const chunks = new Map();           // chunk -> its shop doors (each with .cell)
@@ -214,9 +216,35 @@ function roomOf(S) {
   // what F does where: the counter, a rail of clothes to try on, a wall of shoes or frames
   for (const q of P.spots) { if (q.kind === 'counter' && P.stock === 'clothes') continue; const [x, z] = at(S, q.u, q.d); R.spots.push({ x, z, r: q.kind === 'counter' ? 1.5 : 1.2, kind: q.kind, label: q.label || (inf && LABEL[inf.kind]) || 'Buy something', sub: q.sub }); }
   // the seats: a stool at the jeweller's counter, the bench in a shoe shop
-  for (const q of P.seats) { const [x, z] = at(S, q.u, q.d), [tx, tz] = at(S, q.tu, q.td); R.seats.push({ x, z, yaw: yawOf(S, q.face), table: { x: tx, z: tz }, used: false, wait: !!q.wait, salon: !!q.salon }); }
+  for (const q of P.seats) { const [x, z] = at(S, q.u, q.d), [tx, tz] = at(S, q.tu, q.td); R.seats.push({ x, z, yaw: yawOf(S, q.face), table: { x: tx, z: tz }, used: false, wait: !!q.wait, salon: !!q.salon, tableH: q.th }); }
   for (const [u, d] of P.browse) R.browse.push(at(S, u, d));
   return (S.R = R);
+}
+// a barber's mirror is a mirror while you're in the shop: the room back, you in the chair (one picture of the street
+// behind you is a lot to draw, so only then, at a modest size)
+let glass = [];
+function mirrorsOn(S) {
+  mirrorsOff();
+  const pcs = S.plan.pieces.filter(q => q.t === 'mirror');
+  if (!pcs.length || !G.scene) return;
+  const F = S.F, base = Math.min(640, Math.round(innerHeight * Math.min(2, window.devicePixelRatio || 1) * 0.4));
+  for (const q of pcs) {
+    const right = q.face === 'right', wall = right ? Math.min(q.u0, q.u1) - 0.02 + 0.012 : Math.max(q.u0, q.u1) + 0.02 - 0.012;
+    const y0 = S.y + q.h + 0.25, y1 = Math.min(S.y + S.plan.oh - 0.15, S.y + 2.2), d0 = Math.min(q.d0, q.d1), d1 = Math.max(q.d0, q.d1);
+    if (y1 - y0 < 0.3) continue;
+    const w = d1 - d0, h = y1 - y0, [x, z] = at(S, wall, (d0 + d1) / 2), nx = right ? F.tx : -F.tx, nz = right ? F.tz : -F.tz;
+    const g = new Reflector(new THREE.PlaneGeometry(w, h), { clipBias: 0.003, textureWidth: Math.max(64, Math.round(base * w / h)), textureHeight: base, color: 0xc4cacc });
+    g.position.set(x, (y0 + y1) / 2, z); g.rotation.y = Math.atan2(nx, nz); g.matrixAutoUpdate = false; g.updateMatrix(); g.userData.mirror = true;
+    G.scene.add(g); glass.push(g);
+  }
+}
+function mirrorsOff() { for (const g of glass) { g.parent && g.parent.remove(g); g.dispose && g.dispose(); g.geometry.dispose(); } glass = []; }
+// a free seat in a place to eat, for someone coming in off the street (theirs till they get up)
+export function takeSeat(S) {
+  if (!G || !S || !S.plan || S.plan.fam !== 'eatery' || !infoOf(S)) return null;
+  const free = roomOf(S).seats.filter(q => !q.used && !q.salon);
+  if (!free.length) return null;
+  const q = free[(Math.random() * free.length) | 0]; q.used = true; return q;
 }
 function enter(S) {
   const I = G.interiors, inf = infoOf(S);
@@ -227,8 +255,9 @@ function enter(S) {
   // someone who comes in to meet you (a date) sits down here like anyone else
   I._make = (x, z, yaw, anim, female) => { const p = person(S, x, z, yaw, anim, female, new RNG((Math.random() * 1e9) | 0)); (S.guests || (S.guests = [])).push(p); R.peds.push(p); return p; };
   I._ctx = inf;
-  I.cur = { R, ctx: inf, door: { x: S.door.x, z: S.door.z, yaw: 0 }, plate: null, seat: null, dancing: false, talk: null, inPlace: true };
+  I.cur = { R, ctx: inf, door: { x: S.door.x, z: S.door.z, yaw: 0 }, plate: null, seat: null, dancing: false, talk: null, inPlace: true, floorY: S.y };
   here = { S };
+  mirrorsOn(S);
   G.hud.enterPlace?.(inf);
   if (R.peds.some(p => !down(p))) G.shops.speak(inf.kind, 'hello');
   if (R.seats.length && G.date && G.date.onEnter) G.date.onEnter(R, inf);
@@ -237,6 +266,7 @@ function enter(S) {
 function leave(gone) {
   const I = G.interiors, C = I && I.cur;
   here = null;
+  mirrorsOff();
   if (!C || !C.inPlace) return;
   if (C.seat) I.stand();
   I.cur = null;

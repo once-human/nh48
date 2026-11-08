@@ -272,12 +272,12 @@ function eatery(P, R, o) {
   // the floor: between the front and the space you order in
   const f0 = -0.35, f1 = cf + 0.75, deep = f0 - f1;
   const aisle = R() < 0.5 ? 0 : 1;                                    // which wall the way in runs along
-  const seat = (u, d, face, tu, td) => P.seats.push({ u, d, face, tu, td });
+  const seat = (u, d, face, tu, td, th) => P.seats.push({ u, d, face, tu, td, th });
   if (stock === 'chai' && deep > 0.9) {
     // the bench down the wall, the chai drinkers on it facing across
     const s = 1 - aisle, u0 = s ? w - 0.5 : 0.05, u1 = s ? w - 0.05 : 0.5;
     put({ t: 'bench', u0, u1, d0: f1, d1: f0, h: 0.45 });
-    for (let d = f0 - 0.35; d > f1 + 0.2; d -= 0.6) seat(s ? w - 0.28 : 0.28, d, s ? 'left' : 'right', s ? w - 1.0 : 1.0, d);
+    for (let d = f0 - 0.35; d > f1 + 0.2; d -= 0.6) seat(s ? w - 0.28 : 0.28, d, s ? 'left' : 'right', s ? w - 1.0 : 1.0, d, 0.47);
     P.browse.push([w / 2, f0 - 0.6]);
     return;
   }
@@ -288,15 +288,15 @@ function eatery(P, R, o) {
       for (let r = 0; r < nr; r++) {
         const td = f0 - 0.72 - r * 1.5;
         put({ t: 'etable', u0: tu - 0.35, u1: tu + 0.35, d0: td - 0.28, d1: td + 0.28, h: 0.74, stock });
-        put({ t: 'chair', u0: tu - 0.19, u1: tu + 0.19, d0: td + 0.36, d1: td + 0.7, face: 'in', stock }, false); seat(tu, td + 0.53, 'in', tu, td);
-        put({ t: 'chair', u0: tu - 0.19, u1: tu + 0.19, d0: td - 0.7, d1: td - 0.36, face: 'out', stock }, false); seat(tu, td - 0.53, 'out', tu, td);
+        put({ t: 'chair', u0: tu - 0.19, u1: tu + 0.19, d0: td + 0.36, d1: td + 0.7, face: 'in', stock }, false); seat(tu, td + 0.53, 'in', tu, td, 0.74);
+        put({ t: 'chair', u0: tu - 0.19, u1: tu + 0.19, d0: td - 0.7, d1: td - 0.36, face: 'out', stock }, false); seat(tu, td - 0.53, 'out', tu, td, 0.74);
       }
     }
   } else if (deep > 0.7) {
     // a ledge along the wall, stools at it
     const s = 1 - aisle, u0 = s ? w - 0.36 : 0.02, u1 = s ? w - 0.02 : 0.36;
     put({ t: 'ledge', u0, u1, d0: f1, d1: f0, h: 1.05, stock });
-    for (let d = f0 - 0.3; d > f1 + 0.2; d -= 0.6) { const u = s ? w - 0.62 : 0.62; put({ t: 'stool', u0: u - 0.16, u1: u + 0.16, d0: d - 0.16, d1: d + 0.16, h: 0.72 }, false); seat(u, d, s ? 'right' : 'left', s ? w - 0.2 : 0.2, d); }
+    for (let d = f0 - 0.3; d > f1 + 0.2; d -= 0.6) { const u = s ? w - 0.62 : 0.62; put({ t: 'stool', u0: u - 0.16, u1: u + 0.16, d0: d - 0.16, d1: d + 0.16, h: 0.72 }, false); seat(u, d, s ? 'right' : 'left', s ? w - 0.2 : 0.2, d, 1.05); }
   }
   P.browse.push([aisle ? w - 0.5 : 0.5, f0 - 0.5]);
 }

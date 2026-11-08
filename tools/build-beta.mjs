@@ -235,6 +235,10 @@ const PATCHES = {
     ["  inBuilding(x, z) { return this.test(this.bld, x, z); }", "  inBuilding(x, z) { return this.test(this.bld, x, z); }\n  bldTop(x, z) { const l = this.bld.get(this.chunkOf(x, z)); let t = -1; if (l) for (const p of l) { if (x < p.bb[0] || x > p.bb[2] || z < p.bb[1] || z > p.bb[3]) continue; if (p.top > t && pointInRings(x, z, p.rings)) t = p.top; } return t; }"],
   ],
   [S('world/interiors.js')]: [
+    // the plate goes on the table you're at: its floor and its height (a shop where it stands is on its own floor, a
+    // juice bar's ledge is higher than a table; beta/world/shopin.js gives the seat its table's height)
+    ["m.position.set(tx, FLOOR + 0.79, tz); food.position.set(tx, FLOOR + 0.8, tz);", "const FY = C.floorY ?? FLOOR, TY = C.seat.tableH ?? 0.79; m.position.set(tx, FY + TY, tz); food.position.set(tx, FY + TY + 0.01, tz);"],
+    ["rest = new THREE.Vector3(tx, FLOOR + 0.86, tz)", "rest = new THREE.Vector3(tx, (C.floorY ?? FLOOR) + (C.seat.tableH ?? 0.79) + 0.07, tz)"],
     // a bank's counter has real glass over it: clear panes in a steel frame, the tellers seen through them
     ["      box(B, 0, 1.75, D - 2, W * 0.7, 1.4, 0.04, 0xcfe2ec);   // glass partition", "      { const np = Math.max(3, Math.floor(W * 0.7 / 2.4)); for (let i = 0; i <= np; i++) box(B, (i - np / 2) * (W * 0.7 / np), 1.75, D - 2, 0.05, 1.4, 0.05, 0x9aa0a6); box(B, 0, 2.47, D - 2, W * 0.7, 0.05, 0.06, 0x9aa0a6);\n        const gm = new THREE.Mesh(new THREE.BoxGeometry(W * 0.7, 1.36, 0.012), new THREE.MeshStandardMaterial({ color: 0xe4f1f6, transparent: true, opacity: 0.16, roughness: 0.04, metalness: 0, depthWrite: false })); gm.position.set(O.x, 1.75 + FLOOR, O.z + D - 2); gm.renderOrder = 2; R.dyn.push(gm); }"],
     // the mirrors are real (beta/world/mirrors.js): each one's glass, where it is, which way it faces
