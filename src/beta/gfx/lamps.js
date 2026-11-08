@@ -54,8 +54,30 @@ export class Lamps {
         const o = j*N + i, n = d[o] + a*q*q; d[o] = n > 255 ? 255 : n;
       }
     }
+    // a petrol pump floods its forecourt white all night; a temple's strings of bulbs throw a soft ring round it on
+    // the road
+    for (const q of this.places()) {
+      const u = (q.x - x0)*k, v = (q.z - z0)*k, rr = (q.r + q.out)*k; if (u < -rr || v < -rr || u > N + rr || v > N + rr) continue;
+      if (night < q.on) continue;
+      for (let j = Math.max(1, Math.ceil(v - rr)), je = Math.min(N - 2, Math.floor(v + rr)); j <= je; j++) for (let i = Math.max(1, Math.ceil(u - rr)), ie = Math.min(N - 2, Math.floor(u + rr)); i <= ie; i++) {
+        const dd = Math.hypot(i - u, j - v)/k, q2 = dd < q.r ? 1 : 1 - (dd - q.r)/q.out; if (q2 <= 0) continue;
+        const o = j*N + i, n = d[o] + q.a*q2*q2; d[o] = n > 255 ? 255 : n;
+      }
+    }
     this.tex.needsUpdate = true;
     PU.lampC.value.set(cx, cz, 1/SIZE, 0);
+  }
+  // every pump and temple the map has loaded so far (they're pins: they come and go with their tile)
+  places() {
+    const pins = (this.G.W.M && this.G.W.M.pins) || [];
+    if (pins === this._pp && pins.length === this._pn) return this._pl;
+    this._pp = pins; this._pn = pins.length;
+    const out = this._pl = [];
+    for (const q of pins) {
+      if (q[2] === 'fuel') out.push({ x: q[3]/100, z: q[4]/100, r: 7, out: 6, a: 230, on: 0.02 });
+      else if (q[2] === 'temple') { const h = ((q[3]*0.011 + q[4]*0.017) % 1 + 1) % 1; out.push({ x: q[3]/100, z: q[4]/100, r: 3 + h*3, out: 5, a: 80 + h*40, on: 0.1 + h*0.15 }); }
+    }
+    return out;
   }
   eachShop(fn) {
     const built = this.G.W.streamer?.built; let n = 0; if (!built) return n;
@@ -74,7 +96,7 @@ export class Lamps {
     // (redrawn too as dusk comes on, lamp by lamp, and a few times a second if a tired tube's flickering near you)
     let flick = false;
     if (night > .3 && tick > (this.flT || 0)) { this.flT = tick + 120 + Math.random()*520; for (const l of G.W.lampPositions || []) if (Math.abs(l[0] - cx) < 50 && Math.abs(l[1] - cz) < 50 && ((l[0]*2.9 - l[1]*5.7) % 1 + 1) % 1 > 0.93) { flick = true; break; } }
-    if (night > .01 && (flick || step !== this.nStep || Math.hypot(cx - this.x, cz - this.z) > STEP || (G.W.lampPositions || []).length !== this.count || this.shopsMoved(night))) { this.nStep = step; this.draw(Math.round(cx/4)*4, Math.round(cz/4)*4); }
+    if (night > .01 && (flick || step !== this.nStep || Math.hypot(cx - this.x, cz - this.z) > STEP || (G.W.lampPositions || []).length !== this.count || ((G.W.M && G.W.M.pins) || []).length !== this._pn || this.shopsMoved(night))) { this.nStep = step; this.draw(Math.round(cx/4)*4, Math.round(cz/4)*4); }
     C.w = (G.interiors && G.interiors.inside) ? 0 : night;
     PU.lampY.value = F.y || 0;
     // your own light: whichever of the two is on, as the game aims it

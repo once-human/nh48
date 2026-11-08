@@ -912,6 +912,23 @@ function shikhara(b, G) {
   b.set(K.glow, [0.95, 0.75, 0.2], 0, 0.2); b.blob(cx, y + 0.55, cz, 0.22, 0.3, 0.22, 5);
   b.set(K.wood, 0x3a2a1e, 0.3); b.tube([cx, y, cz], [cx, y + 2.4, cz], 0.03, 3);
   b.set(K.cloth, [1.0, 0.45, 0.05], 0); b.tri([cx, y + 2.4, cz], [cx, y + 1.9, cz], [cx + 0.9, y + 2.15, cz + 0.1], [0, 0, 1]); b.tri([cx, y + 2.4, cz], [cx, y + 1.9, cz], [cx + 0.9, y + 2.15, cz + 0.1], [0, 0, -1]);
+  // the way every temple's done up: strings of little bulbs from up the flagpole down to the corners of the roof,
+  // sagging between, and a line of them right round the parapet. Warm yellow and orange, the odd one dead (near only:
+  // far off it's the glow on the ground)
+  if (b.lod > 1) return;
+  // (deep ambers: a glow's boosted at night and a pale yellow clips to green)
+  const step = Math.max(1, Math.ceil(n / 8)), cols = [[0.72, 0.46, 0.1], [0.78, 0.32, 0.05], [0.7, 0.55, 0.22]], ey = top + 0.97;
+  const bulb = (x, yy, z, k) => { if (R() < 0.04) return; b.set(K.glow, cols[k % 3], 0, 0.95); b.ybox(x, yy - 0.06, z, 0.12, yy + 0.06, 0.12, 0, 8); };
+  const y0 = y + 2.1;
+  for (let i = 0; i < n; i += step) {
+    const ex = p[2 * i] + (p[2 * i] - cx) * 0.02, ez = p[2 * i + 1] + (p[2 * i + 1] - cz) * 0.02;
+    const len = Math.hypot(ex - cx, ey - y0, ez - cz), sag = 0.05 * len, m = Math.max(4, Math.round(len / 0.4));
+    for (let k = 1; k < m; k++) { const u = k / m; bulb(cx + (ex - cx) * u, y0 + (ey - y0) * u - sag * 4 * u * (1 - u), cz + (ez - cz) * u, k + i); }
+  }
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n, ax = p[2 * i], az = p[2 * i + 1], len = Math.hypot(p[2 * j] - ax, p[2 * j + 1] - az), m = Math.max(1, Math.round(len / 0.45));
+    for (let k = 0; k < m; k++) { const u = k / m; bulb(ax + (p[2 * j] - ax) * u + G.normals[2 * i] * 0.04, ey, az + (p[2 * j + 1] - az) * u + G.normals[2 * i + 1] * 0.04, k + i); }
+  }
 }
 function fortTop(b, G) {
   const { p, n, normals, wallTop, L } = G;

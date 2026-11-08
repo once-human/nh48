@@ -153,6 +153,34 @@ class Painter {
 const painter = new Painter();
 export { painter };
 
+// The map knows where the temples are only as pins. A pin that falls inside a small, low building is that temple:
+// it becomes one (style 8: the saffron or white walls, the shikhara, its strings of bulbs). A pin inside a big block
+// or a tower is a shrine in its compound, and that stays as it is. (Pins come in with their tile and the chunks are
+// rebuilt then, so a building that had no pin yet is asked again; once it's a temple it stays one.)
+// (the map's 'temple' is any place of worship, and a good few things that only have mandir in the name: it has to
+// say it's a temple, and not be a dargah, a masjid, a church, a gurudwara, a theatre, a gym, a school, a library)
+const MANDIR = /mandir|temple|ganpati|ganapati|maruti|devasthan|haveli|vithoba|jogeshwari|nilkantheshwar|swami narayan|मंदिर/i;
+const NOT_MANDIR = /dargah|masjid|mosque|church|gurudwara|synagogue|agiary|vihar|natya|chitra|vyayam|talim|balak|vachan|vidya|shikshan|seva|karyalaya|dry ?fruit|tours|house|cave|दर्गा|मशीद|मस्जिद|चर्च/i;
+let tGrid = null, tPins = null, tLen = -1;
+function templeOf(M, B) {
+  if (B[3] === 8 || B.notTemple) return;
+  const pins = M.pins || [];
+  if (pins !== tPins || pins.length !== tLen) {
+    tGrid = new Map(); tPins = pins; tLen = pins.length;
+    for (const q of pins) if (q[2] === 'temple' && MANDIR.test(q[0] + ' ' + q[1]) && !NOT_MANDIR.test(q[0] + ' ' + q[1])) { const k = Math.floor(q[3] / 5000) * 65536 + Math.floor(q[4] / 5000); (tGrid.get(k) || tGrid.set(k, []).get(k)).push(q); }
+  }
+  if ((B[2] | 0) > 2 || !(B[3] === 0 || B[3] === 2 || B[3] === 3 || B[3] === 4 || B[3] === 5)) { B.notTemple = true; return; }
+  if (!tGrid.size) return;
+  const r = B[1], n = r.length / 2; let x = 0, z = 0;
+  for (let i = 0; i < n; i++) { x += r[2 * i]; z += r[2 * i + 1]; }
+  x /= n; z /= n;
+  const gx = Math.floor(x / 5000), gz = Math.floor(z / 5000);
+  for (let a = -1; a <= 1; a++) for (let c = -1; c <= 1; c++) for (const q of tGrid.get((gx + a) * 65536 + gz + c) || []) if (insideRing(q[3], q[4], r)) {
+    if (Math.abs(signedArea(r)) / 1e4 <= 500) B[3] = 8; else B.notTemple = true;
+    return;
+  }
+}
+
 // what the builder needs to know about a chunk (all of it from the map, nothing from the game)
 function jobOf(W, C, kind) {
   const { M, index } = W;
@@ -160,6 +188,7 @@ function jobOf(W, C, kind) {
   for (const bi of C.bld) {
     const B = M.buildings[bi];
     if (!B) continue;
+    templeOf(M, B);
     const ringCm = B[1];
     const sh = index.shopsByBld.get(bi), shops = [];
     if (sh) for (const [key, s] of sh) { const nm = index.shopNames[s[3]]; shops.push([key, nm ? nm[2] : 'generic', nm ? nm[3] || '' : '']); }
@@ -261,6 +290,7 @@ export function* buildBuildingsChunk(W, C, group) {
     if ((++ops & 7) === 0) yield;
     const B = M.buildings[bi];
     if (!B) continue;
+    templeOf(M, B);
     const dy = B.y || 0;
     const [, ringCm, levels, styleId, roof, flags] = B;
     const p = cmRing(ringCm);

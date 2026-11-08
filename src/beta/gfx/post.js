@@ -118,14 +118,17 @@ void main(){
   if (sky) c *= 1. + (nR(rot(fp, .35)/vec2(18., 1.6)) - .5)*.07*paper;     // brushed on, side to side
   else if (inkS > 0.) {
     float z = z0;
-    float e = crease(uv + wob*.6, 1.*dpr), ec = 0.;
+    float e = crease(uv + wob*.6, 1.*dpr), ec = 0., nl = lum(c);
     if (inkQ >= 1. && z < 38.) {
       vec3 a = col(uv - vec2(px.x, 0.)*dpr), b = col(uv + vec2(px.x, 0.)*dpr), u2 = col(uv + vec2(0., px.y)*dpr), dd = col(uv - vec2(0., px.y)*dpr);
       ec = smoothstep(.13, .3, abs(lum(a) - lum(b)) + abs(lum(u2) - lum(dd)))*.5;
+      nl = max(nl, max(max(lum(a), lum(b)), max(lum(u2), lum(dd))));
     }
     float brk = smoothstep(.2, .45, nR(fp*.05 + 2.));
     vec3 ink = mix(c*.4, vec3(.14, .12, .13), .6);
-    float fade = 1. - smoothstep(35., inkQ >= 3. ? 220. : 140., z);
+    // (after dark a light and the pixels round it get no ink: a string of bulbs on a temple a street off would be all
+    // outline, dark dots, and a light shines over its edge anyway)
+    float fade = (1. - smoothstep(35., inkQ >= 3. ? 220. : 140., z))*(1. - smoothstep(.45, .75, nl)*(1. - dayK));
     c = mix(c, ink, max(e, ec*(1. - smoothstep(10., 38., z)))*(.5 + .4*brk)*fade*inkS);
     if (inkQ >= 2.) { vec2 w2 = (vec2(nR(fp*.035 + 20.), nR(fp*.035 + 31.)) - .5)*px*5.*dpr; float e2 = crease(uv + w2, .8*dpr); c = mix(c, ink, e2*.28*step(.5, nR(fp*.04 + 8.))*fade*inkS); }
   }
