@@ -13,7 +13,8 @@
 // the most for the least you'd notice, checks that helped, and gives steps back slowly when there's room. Frame rate first
 // and looks second: under 30 it comes down at once, past each setting's floor if it has to; from 30 to 45 it gives up only
 // what's above a floor, so the streets don't empty and the picture doesn't blur to hold a number you can't feel; about 60
-// is the aim, and from 51 up there's room to give something back.
+// is the aim, and from 51 up there's room to give something back. What's far off (how far the city's built and seen,
+// trees, stalls, vehicles, the crowds) is the last thing it gives up and the first it gives back.
 const NAMES = ['Lite', 'Low', 'Medium', 'High', 'Very High', 'Ultra'];
 const pct = (v) => Math.round(v*100) + '%';
 const onOff = (v, f) => (v ? f(v) : 'Off');
@@ -38,7 +39,7 @@ export const SETTINGS = [
   { group: 'Shadows' },
   { id: 'shadows', label: 'Shadow map', sub: 'Resolution', side: 'gpu', w: 1.5, floor: 1, val: [0, 1024, 2048, 3072, 4096, 8192], at: [0, 1, 2, 3, 4, 5], fmt: (v) => (v ? v + ' px' : 'Off'), apply: (G, v) => { const m = Math.min(v, G.renderer.capabilities.maxTextureSize); G.swapShadows(m > 0, m || 1024); } },
   { id: 'sfilter', label: 'Shadow filter', sub: 'PCF taps, and how soft the edge is', side: 'gpu', w: 3, val: [[2, 1], [4, 1.4], [8, 2], [16, 3], [32, 4.5]], at: [0, 0, 0, 1, 2, 4], fmt: (v) => v[0] + '-tap PCF', apply: (G, v, C) => { C.PU.uTaps.value = v[0]; C.PU.uSoft.value = v[1]; } },
-  { id: 'sdist', label: 'Shadow distance', sub: 'How far from you things cast one', side: 'gpu', w: 2.5, val: [70, 95, 130, 180, 260], at: [0, 1, 1, 2, 3, 4], fmt: M, apply: (G, v, C) => { if (C.post.shadows) C.post.shadows.reach(v); } },
+  { id: 'sdist', far: true, label: 'Shadow distance', sub: 'How far from you things cast one', side: 'gpu', w: 2.5, val: [70, 95, 130, 180, 260], at: [0, 1, 1, 2, 3, 4], fmt: M, apply: (G, v, C) => { if (C.post.shadows) C.post.shadows.reach(v); } },
   { group: 'Post-processing' },
   { id: 'ao', label: 'Ambient occlusion', sub: 'SSAO samples, at this share of the resolution', side: 'gpu', w: 3.5, val: [[0, .5], [8, .5], [16, .5], [32, .75], [64, 1]], at: [0, 0, 1, 2, 3, 4], fmt: (v) => (v[0] ? v[0] + ' spp · ' + pct(v[1]) : 'Off'), apply: (G, v, C) => fx(C, { ao: v[0], aoScale: v[1] }) },
   { id: 'gi', label: 'Bounce light', sub: 'SSGI rays per pixel: sunlit walls lighting what is near', side: 'gpu', w: 4, val: [0, 8, 16], at: [0, 0, 0, 0, 1, 2], fmt: (v) => onOff(v, x => x + ' rays'), apply: (G, v, C) => fx(C, { rays: v }) },
@@ -47,15 +48,18 @@ export const SETTINGS = [
   { id: 'shafts', label: 'Sun shafts', sub: 'Radial samples', side: 'gpu', w: 3, val: [0, 32, 64, 128], at: [0, 0, 0, 1, 2, 3], fmt: (v) => onOff(v, x => x + ' samples'), apply: (G, v, C) => fx(C, { shafts: v }) },
   { id: 'dof', label: 'Depth of field', sub: 'Bokeh samples, for what is far behind you', side: 'gpu', w: 3, val: [0, 8, 24], at: [0, 0, 0, 0, 1, 2], fmt: (v) => onOff(v, x => x + ' samples'), apply: (G, v, C) => fx(C, { dof: v }) },
   { group: 'World' },
-  { id: 'dist', label: 'View distance', sub: 'How much of the city is built around you', side: 'both', w: 2, floor: 1, val: [220, 360, 520, 720, 1000, 1400], at: [0, 1, 2, 3, 4, 5], fmt: M, apply: (G, v) => G.W.streamer.setRadius(v) },
+  { id: 'dist', far: true, label: 'View distance', sub: 'How much of the city is built around you', side: 'both', w: 2, floor: 1, val: [220, 360, 520, 720, 1000, 1400], at: [0, 1, 2, 3, 4, 5], fmt: M, apply: (G, v) => G.W.streamer.setRadius(v) },
+  // how far you see at all: past the built streets it's the far city, the river and the hills. Only Lite cuts it short;
+  // from High up whatever you look at is on screen, the far side of Pune included
+  { id: 'sight', far: true, label: 'Sight distance', sub: 'How far you can see the city, past what is built', side: 'gpu', w: 0.6, floor: 2, val: [1000, 1800, 2600, 6000, 9000, 14000], at: [0, 1, 2, 3, 4, 5], fmt: (v) => (v >= 1000 ? (v/1000) + ' km' : v + ' m'), apply: (G, v) => { const c = G.camera; if (c && c.far !== v) { c.far = v; c.updateProjectionMatrix(); } } },
   { id: 'geo', label: 'World geometry', sub: 'Walls, kerbs and roads close up. Applies to what gets built as you move', fixed: true, val: [0, 1, 2], at: [0, 0, 1, 1, 2, 2], fmt: (v) => ['Standard', 'Structured', 'Every window and stone'][v], apply: (G, v) => { if (G.W && G.W.painter) { G.W.painter.rich = v; G.W.painter.geoAt = (G.W.painter.geoAt || 0) + 1; } } },
-  { id: 'sdetail', label: 'Stall detail', sub: 'How far stalls get their full models', side: 'gpu', w: 3, val: [25, 60, 90, 140, 200, 300], at: [0, 1, 2, 3, 4, 5], fmt: M, apply: (G, v) => { if (G.W && G.W.stallNear) G.W.stallNear(v); } },
-  { id: 'vdist', label: 'Vehicle detail', sub: 'How far the full models go', side: 'gpu', w: 2.5, val: [15, 22, 30, 45, 70, 110], at: [0, 1, 2, 3, 4, 5], fmt: M, apply: (G, v) => G.setVehicleDetail(v) },
-  { id: 'trees', label: 'Trees', sub: 'Full trees to, then lighter trees to', side: 'gpu', w: 2.5, floor: 1, val: [[15, 180], [40, 400], [70, 520], [110, 900], [160, 1200], [240, 1600]], at: [0, 1, 2, 3, 4, 5], fmt: (v) => v[0] + ' m / ' + v[1] + ' m', apply: (G, v) => { const T = G.W.trees; if (T) { T.nearR = v[0]; T.midR = v[1]; T.R = 0; T.lastX = 1e9; } } },
-  { id: 'grass', label: 'Grass', sub: 'How far it is drawn', side: 'gpu', w: 2.5, val: [0, .35, .7, 1, 1.4, 2], at: [0, 1, 2, 3, 4, 5], fmt: (v) => (v ? Math.round(v*64) + ' m' : 'Off'), apply: (G, v) => { if (G.W.grass) G.W.grass.level = v; } },
-  { id: 'bodies', label: 'Skinned bodies', sub: 'How many, and how close the 50k-triangle ones are', side: 'both', w: 2.5, floor: 1, val: [[8, 0], [32, 6], [64, 12], [96, 22], [96, 40], [96, 70]], at: [0, 1, 2, 3, 4, 5], fmt: (v) => v[0] + ' · ' + v[1] + ' m', apply: (G, v) => { if (G.skin) { G.skin.max = v[0]; G.skin.hiR = v[1]; } } },
-  { id: 'people', label: 'Pedestrians', sub: 'On the streets', side: 'cpu', w: 1.5, floor: 1, val: [30, 90, 130, 170, 220, 280], at: [0, 1, 2, 3, 4, 5], fmt: (v) => String(v), apply: (G, v) => { if (G.people) G.people.max = Math.min(v, G.people.cap - 120); } },
-  { id: 'traffic', label: 'Traffic', sub: 'Vehicles on the roads', side: 'cpu', w: 1.5, floor: 1, val: [20, 70, 100, 130, 170, 220], at: [0, 1, 2, 3, 4, 5], fmt: (v) => String(v), apply: (G, v) => { if (G.traffic) G.traffic.max = v; } },
+  { id: 'sdetail', far: true, label: 'Stall detail', sub: 'How far stalls get their full models', side: 'gpu', w: 3, val: [25, 60, 90, 140, 200, 300], at: [0, 1, 2, 3, 4, 5], fmt: M, apply: (G, v) => { if (G.W && G.W.stallNear) G.W.stallNear(v); } },
+  { id: 'vdist', far: true, label: 'Vehicle detail', sub: 'How far the full models go', side: 'gpu', w: 2.5, val: [15, 22, 30, 45, 70, 110], at: [0, 1, 2, 3, 4, 5], fmt: M, apply: (G, v) => G.setVehicleDetail(v) },
+  { id: 'trees', far: true, label: 'Trees', sub: 'Full trees to, then lighter trees to', side: 'gpu', w: 2.5, floor: 1, val: [[15, 180], [40, 400], [70, 520], [110, 900], [160, 1200], [240, 1600]], at: [0, 1, 2, 3, 4, 5], fmt: (v) => v[0] + ' m / ' + v[1] + ' m', apply: (G, v) => { const T = G.W.trees; if (T) { T.nearR = v[0]; T.midR = v[1]; T.R = 0; T.lastX = 1e9; } } },
+  { id: 'grass', far: true, label: 'Grass', sub: 'How far it is drawn', side: 'gpu', w: 2.5, val: [0, .35, .7, 1, 1.4, 2], at: [0, 1, 2, 3, 4, 5], fmt: (v) => (v ? Math.round(v*64) + ' m' : 'Off'), apply: (G, v) => { if (G.W.grass) G.W.grass.level = v; } },
+  { id: 'bodies', far: true, label: 'Skinned bodies', sub: 'How many, and how close the 50k-triangle ones are', side: 'both', w: 2.5, floor: 1, val: [[8, 0], [32, 6], [64, 12], [96, 22], [96, 40], [96, 70]], at: [0, 1, 2, 3, 4, 5], fmt: (v) => v[0] + ' · ' + v[1] + ' m', apply: (G, v) => { if (G.skin) { G.skin.max = v[0]; G.skin.hiR = v[1]; } } },
+  { id: 'people', far: true, label: 'Pedestrians', sub: 'On the streets', side: 'cpu', w: 1.5, floor: 1, val: [30, 90, 130, 170, 220, 280], at: [0, 1, 2, 3, 4, 5], fmt: (v) => String(v), apply: (G, v) => { if (G.people) G.people.max = Math.min(v, G.people.cap - 120); } },
+  { id: 'traffic', far: true, label: 'Traffic', sub: 'Vehicles on the roads', side: 'cpu', w: 1.5, floor: 1, val: [20, 70, 100, 130, 170, 220], at: [0, 1, 2, 3, 4, 5], fmt: (v) => String(v), apply: (G, v) => { if (G.traffic) G.traffic.max = v; } },
 ];
 const ALL = SETTINGS.filter(s => s.id);
 const AUTO_TOP = 4;                                       // (Auto stops at Very High: Ultra is yours to ask for)
@@ -109,7 +113,11 @@ export class Graphics {
   stepDown(side, now, bad) {
     const score = (s) => s.w*this.auto[s.id]/Math.max(1, s.val.length - 1), mine = (q) => q.side === side || q.side === 'both', above = (q) => this.auto[q.id] > (q.floor || 0);
     const pick = (f) => ALL.filter(s => s.w && this.free(s, now) && this.auto[s.id] > 0 && f(s)).sort((a, b) => score(b) - score(a))[0];
-    const s = pick(q => mine(q) && above(q)) || pick(above) || (bad && (pick(mine) || pick(() => true))); if (!s) return null;
+    // seeing far is performance, not looks: everything near goes first (to its floor, then past it if it has to), and only
+    // when there's nothing else left does anything far off go, and that last of all
+    const near = (q) => !q.far;
+    const s = pick(q => near(q) && mine(q) && above(q)) || pick(q => near(q) && above(q)) || (bad && pick(near)) ||
+      pick(q => mine(q) && above(q)) || pick(above) || (bad && (pick(mine) || pick(() => true))); if (!s) return null;
     this.auto[s.id]--; this.applyOne(s); return s;
   }
   // a look each second at how it's going. Smooth comes first: down quickly when frames are short or stuttering, up slowly
@@ -144,7 +152,8 @@ export class Graphics {
     } else if (this.high >= 25) {
       this.high = 0;
       const after = (q) => q.w*(this.auto[q.id] + 1)/Math.max(1, q.val.length - 1);   // (the one that would be the last to go again)
-      const s = ALL.filter(q => q.w && this.free(q, now) && this.auto[q.id] < q.at[AUTO_TOP] && !(q.side === 'cpu' && share > .5)).sort((a, b) => after(a) - after(b))[0];
+      // (and back up, the far ones first: they were the last to go)
+      const s = ALL.filter(q => q.w && this.free(q, now) && this.auto[q.id] < q.at[AUTO_TOP] && !(q.side === 'cpu' && share > .5)).sort((a, b) => (b.far ? 1 : 0) - (a.far ? 1 : 0) || after(a) - after(b))[0];
       if (!s) return;
       this.auto[s.id]++; this.applyOne(s); this.trial = { s, fps, dir: 1, left: 5 }; this.wait = 2; this.sync();
     }

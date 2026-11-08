@@ -148,7 +148,9 @@ function hookStreamer(paint) {
     this.W.paintWait = false;
     while (performance.now() - t0 < this.budgetMs) {
       if (!this.job) {
-        const c = this.pickNext(x, z, viewDir);
+        // round you first; then, turn about, where you're headed (main.js sets lead when you're moving)
+        const L = this.lead; this._alt = !this._alt;
+        const c = L && this._alt ? this.pickNext(L.x, L.z, viewDir) || this.pickNext(x, z, viewDir) : this.pickNext(x, z, viewDir) || (L && this.pickNext(L.x, L.z, viewDir));
         if (!c) break;
         this.startJob(c);
       }
@@ -535,9 +537,19 @@ async function main() {
     frustum.setFromProjectionMatrix(pv);
     camera.getWorldDirection(fwd);
     const hold = game.peeking ? game.player.root.position : null;      // (the map looking somewhere else: you stay built)
-    W.tiles?.update(dt, focus.x, focus.z, hold);
-    W.streamer.base ??= W.streamer.budgetMs; W.streamer.budgetMs = hold ? Math.max(12, W.streamer.base) : W.streamer.base;      // (the menus are up: build faster)
-    W.streamer.update(focus.x, focus.z, fwd, hold);
+    // where you'll be in a few seconds: the map and the streets there are loaded ahead of you, so even a supercar at
+    // 350 km/h never sees one appear (from how fast the camera's really going, smoothed, up to 450 m out)
+    const LV = game._lead || (game._lead = { x: focus.x, z: focus.z, vx: 0, vz: 0, p: { x: 0, z: 0 } });
+    if (dt > 0 && dt < 0.25) { const k = Math.min(1, dt*2), jx = (focus.x - LV.x)/dt, jz = (focus.z - LV.z)/dt; if (Math.hypot(jx, jz) < 160) { LV.vx += (jx - LV.vx)*k; LV.vz += (jz - LV.vz)*k; } }
+    LV.x = focus.x; LV.z = focus.z;
+    const spd = Math.hypot(LV.vx, LV.vz), T = spd > 8 ? Math.min(4.5, 450/spd) : 0;
+    LV.p.x = focus.x + LV.vx*T; LV.p.z = focus.z + LV.vz*T;
+    const ahead = hold || (T > 0 ? LV.p : null);
+    W.streamer.lead = T > 0 ? LV.p : null;
+    W.tiles?.update(dt, focus.x, focus.z, ahead);
+    W.streamer.base ??= W.streamer.budgetMs;
+    W.streamer.budgetMs = hold ? Math.max(12, W.streamer.base) : W.streamer.base*(1 + Math.min(1.5, spd/60));      // (the menus are up, or you're going fast: build faster)
+    W.streamer.update(focus.x, focus.z, fwd, ahead);
     W.nearBoards.update(camera.position.x, camera.position.z, dt);
     W.trains?.update(dt, camera.position);
     propT -= dt;
