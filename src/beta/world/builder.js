@@ -548,12 +548,12 @@ const GOODS = [
 // ---------------------------------------------------------------- a shop from its plan (world/shopplan.js)
 // The room is the plan's size; each piece stands exactly where the plan puts it (the game walks you round the same
 // pieces); what's on them, the colours and the stock, is only for looking at.
-const STOCK_GOODS = { kirana: 0, paan: 0, flowers: 0, medicine: 2, mobile: 6, tv: 6, hardware: 8, sweets: 11, bakery: 13 };
+const STOCK_GOODS = { kirana: 0, paan: 0, flowers: 0, pets: 0, medicine: 2, frames: 2, clothes: 4, laundry: 4, gold: 5, mobile: 6, tv: 6, books: 7, hardware: 8, sweets: 11, shoes: 12, bakery: 13 };
 function drawShop(b, cb, G, F, a, P, lux) {
   const { R, L } = G, w = P.w, D = P.D, c = a + w, yb = BASE, yt = BASE + P.oh, st = P.stock;
   const U = (u) => a + u;
   // the room
-  const wallC = st === 'medicine' ? 0xeef0ea : st === 'mobile' || st === 'tv' ? 0xe6e6e2 : st === 'sweets' || st === 'bakery' ? [0xf2ead8, 0xe8dcc0, 0xdfe8e0][(R() * 3) | 0]
+  const wallC = st === 'gold' ? [0xe8d8b8, 0x6a2a1e, 0xf0e6d0][(R() * 3) | 0] : st === 'frames' || st === 'pets' ? 0xeef0ee : st === 'clothes' || st === 'shoes' ? [0xf2eee6, 0xe0d4c0, 0x8a6a48, 0xd8dce0][(R() * 4) | 0] : st === 'books' ? [0xe8dcc0, 0x8a6a48][(R() * 2) | 0] : st === 'medicine' ? 0xeef0ea : st === 'mobile' || st === 'tv' ? 0xe6e6e2 : st === 'sweets' || st === 'bakery' ? [0xf2ead8, 0xe8dcc0, 0xdfe8e0][(R() * 3) | 0]
     : [0x8a6a48, 0x9a7a52, 0x7a6a58, 0xd8c8a8, 0xe0d8c8, 0xb8c8b8][(R() * 6) | 0];
   b.set(K.inside, wallC, 0.25, R());
   F.rect(b, c, a, yb, yt, -D, 1);
@@ -563,7 +563,8 @@ function drawShop(b, cb, G, F, a, P, lux) {
   b.set(lux > 0.6 ? K.marble : K.sqTiles, lux > 0.6 ? 0xd8d0c4 : [0xb8b0a0, 0xc8c0b0, 0x8a8478, 0xd8d4cc][(R() * 4) | 0], 0.3);
   b.quad(F.P(a, yb + 0.01, 0), F.P(c, yb + 0.01, 0), F.P(c, yb + 0.01, -D), F.P(a, yb + 0.01, -D), [0, 1, 0]);
   // the tube light
-  if (P.tube) { b.set(K.glow, st === 'sweets' || st === 'bakery' ? [1, 0.94, 0.8] : [0.95, 0.98, 1], 0, 0.9); F.box(b, U(P.tube.u0), U(P.tube.u1), yt - 0.06, yt - 0.02, P.tube.d - 0.04, P.tube.d, 0); }
+  if (st === 'gold') { b.set(K.glow, [1, 0.85, 0.5], 0, 0.95); for (let s = 0; s < 3; s++) { const uu = a + w * (s + 0.5) / 3; F.box(b, uu - 0.07, uu + 0.07, yt - 0.05, yt - 0.01, -D * 0.5 - 0.07, -D * 0.5 + 0.07, 0); } }
+  else if (P.tube) { b.set(K.glow, st === 'sweets' || st === 'bakery' ? [1, 0.94, 0.8] : [0.95, 0.98, 1], 0, 0.9); F.box(b, U(P.tube.u0), U(P.tube.u1), yt - 0.06, yt - 0.02, P.tube.d - 0.04, P.tube.d, 0); }
   const gc = GOODS[STOCK_GOODS[st] ?? 0] || GOODS[0], pc = () => gc[(R() * gc.length) | 0];
   for (const q of P.pieces) drawPiece(b, cb, G, F, U, q, yb, yt, st, pc, lux);
   // the new phone's poster, lit, on a side wall
@@ -611,6 +612,17 @@ function drawPiece(b, cb, G, F, U, q, yb, yt, st, pc, lux) {
         cb.set(K.laundry, 0xffffff, 0, R());
         for (let y = yb + 1.05; y < yb + h - 0.4; y += 0.32) for (let uu = u0 + 0.1; uu < pm - 0.14; uu += 0.15 + R() * 0.04) { if (R() < 0.15) continue; cb.col(R() < 0.35 ? [0x2a2a2e, 0xe8e8ec][(R() * 2) | 0] : POP[(R() * POP.length) | 0]); F.rect(cb, uu, uu + 0.1, y, y + 0.2 + R() * 0.06, d0 + 0.06); }
         for (let y = yb + 0.13; y < yb + h - 0.25; y += step) for (let uu = pm + 0.05; uu < u1 - 0.12; uu += 0.12 + R() * 0.03) { if (y > yb + 0.9 && y < yb + 0.95) continue; b.set(K.plain, R() < 0.6 ? 0xf2f2f0 : 0x1a1a1c, 0.05); F.box(b, uu, uu + 0.09, y + 0.025, y + 0.2, d0 + 0.05, d1 - 0.05, 2 | 8); }
+      } else if (st === 'books' || st === 'shoes' || st === 'gold' || st === 'frames') {
+        // the things themselves, along each board: spines, pairs of shoes, gold under the light, frames in rows
+        const side = q.face !== 'out', len0 = side ? d0 : u0, len1 = side ? d1 : u1, dep0 = side ? u0 : d0, dep1 = side ? u1 : d1;
+        const item = (p0, p1, y0, y1, e0, e1) => side ? F.box(b, e0, e1, y0, y1, p0, p1, 2 | 8) : F.box(b, p0, p1, y0, y1, e0, e1, 2 | 8);
+        const inF = side ? (q.face === 'left' ? [dep0 + 0.02, dep0 + 0.08] : [dep1 - 0.08, dep1 - 0.02]) : [dep0 + 0.02, dep0 + 0.08];
+        for (let y = yb + 0.125; y < yb + h - 0.2; y += step) {
+          if (st === 'books') for (let pp = len0 + 0.03; pp < len1 - 0.05; pp += 0.035 + R() * 0.03) { if (R() < 0.08) { pp += 0.12; continue; } b.set(K.plain, pc(), 0.3); item(pp, pp + 0.03, y, y + 0.2 + R() * 0.1, dep0 + 0.04, dep1 - 0.04); }
+          else if (st === 'shoes') for (let pp = len0 + 0.05; pp < len1 - 0.3; pp += 0.32) { if (R() < 0.15) continue; b.set(K.plain, pc(), 0.2); item(pp, pp + 0.1, y, y + 0.1, dep0 + 0.05, dep1 - 0.05); item(pp + 0.13, pp + 0.23, y, y + 0.1, dep0 + 0.05, dep1 - 0.05); }
+          else if (st === 'gold') for (let pp = len0 + 0.08; pp < len1 - 0.12; pp += 0.18) { b.set(K.glow, [1, 0.78 + R() * 0.1, 0.35], 0, 0.55); item(pp, pp + 0.08, y + 0.03, y + 0.1, inF[0], inF[1]); }
+          else for (let pp = len0 + 0.06; pp < len1 - 0.18; pp += 0.22) { b.set(K.plain, [0x1a1a1c, 0x5a3a22, 0x8a8a8e, 0x2a3a6a, 0xc8302a][(R() * 5) | 0], 0.1); item(pp, pp + 0.15, y + 0.15, y + 0.2, inF[0], inF[1]); }
+        }
       } else {
         goodsFace(b, F, U, q, yb + 0.12, yb + h - 0.05, st, R);
         if (st === 'hardware' && q.face === 'out') { b.set(K.metal, 0x8a8e92, 0.4); for (let s = 0; s < 4; s++) { const P0 = F.P(u0 + 0.2 + R() * (u1 - u0 - 0.4), 0, d1 + 0.1); b.tube([P0[0], yb, P0[2]], [P0[0] + (R() - 0.5) * 0.2, yb + 1.5 + R() * 0.5, P0[2] - 0.05], 0.03, 4); } }
@@ -619,7 +631,7 @@ function drawPiece(b, cb, G, F, U, q, yb, yt, st, pc, lux) {
     }
     case 'counter': {
       const h = q.h, top = st === 'sweets' || st === 'bakery' ? 0xe8e4dc : 0x3b3b3e;
-      const body = st === 'medicine' || st === 'mobile' || st === 'tv' ? 0xe8e8e4 : [0x5a4232, 0x2f5a4a, 0x8a6a48, 0x6a3a26][(R() * 4) | 0];
+      const body = st === 'gold' ? 0x5a2a1a : st === 'medicine' || st === 'mobile' || st === 'tv' || st === 'frames' ? 0xe8e8e4 : [0x5a4232, 0x2f5a4a, 0x8a6a48, 0x6a3a26][(R() * 4) | 0];
       const fu0 = q.flap ? U(q.flap[0]) : u1, fu1 = q.flap ? U(q.flap[1]) : u1;
       const parts = q.flap ? [[u0, fu0], [fu1, u1]].filter(([x0, x1]) => x1 - x0 > 0.05) : [[u0, u1]];
       for (const [x0, x1] of parts) {
@@ -627,7 +639,8 @@ function drawPiece(b, cb, G, F, U, q, yb, yt, st, pc, lux) {
           b.set(K.wood, body, 0.15); F.box(b, x0, x1, yb, yb + 0.35, d0, d1, 8);
           b.set(K.glass, st === 'bakery' ? 0xd8e8e0 : 0xc8d8d8, 0, R()); F.box(b, x0, x1, yb + 0.35, yb + h - 0.04, d0 + 0.02, d1, 2 | 8 | 4);
           // what's under the glass
-          for (let uu = x0 + 0.08; uu < x1 - 0.18; uu += st === 'mobile' ? 0.2 + R() * 0.06 : 0.3) {
+          if (st === 'gold' || st === 'frames') { for (let dd = d0 + 0.08; dd < d1 - 0.12; dd += 0.18) for (let uu = x0 + 0.08; uu < x1 - 0.1; uu += 0.18) { b.set(st === 'gold' ? K.glow : K.plain, st === 'gold' ? [1, 0.8, 0.4] : pc(), 0, 0.5); F.box(b, uu, uu + 0.09, yb + 0.6, yb + 0.63, dd, dd + 0.08, 2 | 8); } }
+          else for (let uu = x0 + 0.08; uu < x1 - 0.18; uu += st === 'mobile' ? 0.2 + R() * 0.06 : 0.3) {
             b.set(K.plain, pc(), 0.1);
             if (st === 'mobile') F.box(b, uu, uu + 0.08, yb + 0.72, yb + 0.73, d1 - 0.35, d1 - 0.2, 2 | 8);
             else F.box(b, uu, uu + (st === 'medicine' ? 0.12 : 0.26), yb + 0.4, yb + (st === 'medicine' ? 0.55 : 0.46), d0 + 0.08, d1 - 0.08, 2);
@@ -642,6 +655,7 @@ function drawPiece(b, cb, G, F, U, q, yb, yt, st, pc, lux) {
         b.set(K.metal, 0x2a2a2a, 0.3); F.box(b, q.flap[0] < 0.1 ? fu1 - 0.012 : fu0, q.flap[0] < 0.1 ? fu1 : fu0 + 0.012, yb + h - 0.05, yb + h + 0.002, d0, d1 + 0.02, 2);
       }
       // on top: the jars, the demo phones, the scale
+      if (st === 'laundry') for (let s = 0; s < 3; s++) { const uu = u0 + 0.15 + s * (u1 - u0 - 0.3) / 3; if (q.flap && uu > fu0 - 0.4 && uu < fu1) continue; for (let l = 0; l < 4 + ((R() * 4) | 0); l++) { b.set(K.cloth, CLOTH[(R() * CLOTH.length) | 0], 0.2); F.box(b, uu, uu + 0.4, yb + h + l * 0.04, yb + h + l * 0.04 + 0.04, d0 + 0.08, d1 - 0.1, 2 | 8); } }
       if (st === 'kirana' || st === 'bakery' || st === 'paan') for (let uu = u0 + 0.2; uu < u1 - 0.3; uu += 0.26) { if (R() < 0.35 || (q.flap && uu > fu0 - 0.15 && uu < fu1)) continue; b.set(K.glass, 0xe8e2cc, 0, R()); F.box(b, uu, uu + 0.15, yb + h, yb + h + 0.24, d1 - 0.22, d1 - 0.08, 2 | 4 | 8); b.set(K.plain, [0xc8302a, 0xf2c230, 0x2f5fd0][(R() * 3) | 0], 0.1); F.box(b, uu - 0.005, uu + 0.155, yb + h + 0.24, yb + h + 0.28, d1 - 0.225, d1 - 0.075, 2); }
       if (st === 'mobile') for (let uu = u0 + 0.25; uu < u1 - 0.3; uu += 0.32 + R() * 0.15) {
         if (q.flap && uu > fu0 - 0.1 && uu < fu1) continue;
@@ -682,6 +696,56 @@ function drawPiece(b, cb, G, F, U, q, yb, yt, st, pc, lux) {
     case 'stand': {
       b.set(K.plain, 0xe8e8e4, 0.1); F.box(b, u0, u1, yb, yb + q.h, d0, d1, 8);
       for (let y = yb + 0.3; y < yb + q.h - 0.1; y += 0.25) for (let uu = u0 + 0.04; uu < u1 - 0.08; uu += 0.1) { b.set(K.plain, pc(), 0.1); F.box(b, uu, uu + 0.07, y, y + 0.14, d1, d1 + 0.03, 2 | 8); }
+      break;
+    }
+    case 'rail': {
+      // a clothes rail along the wall: the bar, its brackets, the garments on hangers sticking out into the shop
+      const wall = q.face === 'right' ? u0 + 0.02 : u1 - 0.02, out = q.face === 'right' ? 1 : -1;
+      b.set(K.metal, 0x8e9093, 0.2); const ur = wall + out * 0.28;
+      F.box(b, ur - 0.015, ur + 0.015, yb + 1.6, yb + 1.63, d0, d1, 0);
+      for (const dd of [d0 + 0.05, d1 - 0.05]) F.box(b, Math.min(wall, ur), Math.max(wall, ur), yb + 1.6, yb + 1.63, dd - 0.015, dd + 0.015, 0);
+      for (let dd = d0 + 0.12; dd < d1 - 0.1; dd += 0.09 + R() * 0.05) {
+        const col = CLOTH[(R() * CLOTH.length) | 0], long = q.label && /Kurta|Trouser/.test(q.label) ? 0.95 : 0.6;
+        b.set(K.cloth, col, 0.15); F.box(b, Math.min(wall + out * 0.06, wall + out * 0.5), Math.max(wall + out * 0.06, wall + out * 0.5), yb + 1.58 - long, yb + 1.56, dd, dd + 0.035, 0);
+      }
+      break;
+    }
+    case 'tanks': {
+      // the fish tanks on their stand, lit blue-green, the weed and the fish a blur
+      b.set(K.wood, 0x2a2a2e, 0.2); F.box(b, u0, u1, yb, yb + 0.8, d0, d1, 8);
+      for (let y = yb + 0.85; y < yb + q.h - 0.5; y += 0.6) for (let dd = d0 + 0.03; dd < d1 - 0.5; dd += 0.65) {
+        b.set(K.glow, [[0.35, 0.75, 0.85], [0.3, 0.6, 0.9], [0.4, 0.85, 0.6]][(R() * 3) | 0], 0, 0.5); F.box(b, u0 + 0.04, u1 - 0.04, y, y + 0.45, dd, dd + 0.6, 0);
+        b.set(K.metal, 0x1a1a1c, 0.2); F.box(b, u0 + 0.03, u1 - 0.03, y + 0.45, y + 0.5, dd, dd + 0.6, 0);
+      }
+      break;
+    }
+    case 'table': {
+      b.set(K.wood, 0x5a4232, 0.3); F.box(b, u0, u1, yb, yb + q.h, d0, d1, 8);
+      for (let uu = u0 + 0.06; uu < u1 - 0.22; uu += 0.24) for (let dd = d0 + 0.06; dd < d1 - 0.18; dd += 0.3) { b.set(K.plain, pc(), 0.2); F.box(b, uu, uu + 0.18, yb + q.h, yb + q.h + 0.03 + R() * 0.12, dd, dd + 0.24, 2 | 8); }
+      break;
+    }
+    case 'stool': {
+      const P0 = F.P((u0 + u1) / 2, 0, (d0 + d1) / 2);
+      b.set(K.metal, 0x8a8a8e, 0.2); b.cyl(P0[0], yb, P0[2], 0.03, 0.03, q.h, 6, 0);
+      b.set(K.cloth, st === 'gold' ? 0x6a1a1e : 0x2a2a2e, 0.2); b.cyl(P0[0], yb + q.h, P0[2], 0.17, 0.17, 0.06, 10);
+      break;
+    }
+    case 'bench': {
+      b.set(K.cloth, [0x2a2a2e, 0x6a1a1e, 0x3a4a6a][(R() * 3) | 0], 0.2); F.box(b, u0, u1, yb + q.h - 0.08, yb + q.h, d0, d1, 0);
+      b.set(K.metal, 0x5a5a5e, 0.2); F.box(b, u0 + 0.05, u1 - 0.05, yb, yb + q.h - 0.08, d0 + 0.08, d1 - 0.08, 4 | 8);
+      break;
+    }
+    case 'mannequin': {
+      const P0 = F.P((u0 + u1) / 2, 0, (d0 + d1) / 2);
+      b.set(K.metal, 0x5a5a5e, 0.2); b.cyl(P0[0], yb, P0[2], 0.15, 0.15, 0.03, 8); b.cyl(P0[0], yb + 0.03, P0[2], 0.02, 0.02, 0.85, 4, 0);
+      b.set(K.cloth, CLOTH[(R() * CLOTH.length) | 0], 0.1); b.cyl(P0[0], yb + 0.85, P0[2], 0.16, 0.2, 0.62, 8, 1);
+      b.set(K.plain, 0xe8d8c8, 0); b.blob(P0[0], yb + 1.62, P0[2], 0.09, 0.12, 0.1, 5);
+      break;
+    }
+    case 'ironing': {
+      b.set(K.wood, 0x6a4a32, 0.4); F.box(b, u0, u1, yb, yb + 0.85, d0, d1, 8);
+      b.set(K.cloth, 0xd8d0c0, 0.4); F.box(b, u0 - 0.01, u1 + 0.01, yb + 0.85, yb + 0.88, d0 - 0.01, d1 + 0.01, 2);
+      const P0 = F.P((u0 + u1) / 2, 0, (d0 + d1) / 2); b.set(K.metal, 0x2a2a2a, 0.4); b.blob(P0[0], yb + 0.95, P0[2], 0.12, 0.07, 0.08, 5);
       break;
     }
     case 'hang': {

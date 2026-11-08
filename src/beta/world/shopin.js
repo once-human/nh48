@@ -167,12 +167,16 @@ function tend() {
 
 // ---------------------------------------------------------------- in and out
 const LABEL = { kirana: 'Buy something', shop: 'Buy something', paan: 'A paan, or something else', florist: 'Buy flowers', sweets: 'Buy sweets', bakery: 'Buy from the bakery',
-  pharmacy: 'Ask for medicine', mobile: 'Phones, recharge, repairs', electronics: 'Look at what they have' };
+  pharmacy: 'Ask for medicine', mobile: 'Phones, recharge, repairs', electronics: 'Look at what they have', laundry: 'Give in clothes, collect them ironed',
+  books: 'Buy a book', clothes: 'Pay at the counter', shoes: 'Try on shoes', optician: 'Eye test and glasses', jeweller: 'Look at the gold', petshop: 'Buy for your pet' };
 function roomOf(S) {
   if (S.R) return S.R;
-  const P = S.plan, inf = infoOf(S), [ox, oz] = at(S, P.w / 2, 0), R = { tpl: 'shop', style: 'local', layout: P.fam, O: { x: ox, z: oz }, W: P.w, D: P.D, H: P.oh,
+  const P = S.plan, inf = infoOf(S), [ox, oz] = at(S, P.w / 2, 0), R = { tpl: P.tpl || 'shop', style: 'local', layout: P.fam, O: { x: ox, z: oz }, W: P.w, D: P.D, H: P.oh,
     spots: [], seats: [], people: [], dyn: [], props: [], browse: [], peds: [], hearts: [], customers: 0, inPlace: true, group: { visible: true } };
-  if (P.spot) { const [x, z] = at(S, P.spot.u, P.spot.d); R.spots.push({ x, z, r: 1.5, kind: 'counter', label: (inf && LABEL[inf.kind]) || 'Buy something' }); }
+  // what F does where: the counter, a rail of clothes to try on, a wall of shoes or frames
+  for (const q of P.spots) { if (q.kind === 'counter' && P.stock === 'clothes') continue; const [x, z] = at(S, q.u, q.d); R.spots.push({ x, z, r: q.kind === 'counter' ? 1.5 : 1.2, kind: q.kind, label: q.label || (inf && LABEL[inf.kind]) || 'Buy something', sub: q.sub }); }
+  // the seats: a stool at the jeweller's counter, the bench in a shoe shop
+  for (const q of P.seats) { const [x, z] = at(S, q.u, q.d), [tx, tz] = at(S, q.tu, q.td); R.seats.push({ x, z, yaw: yawOf(S, q.face), table: { x: tx, z: tz }, used: false, wait: !!q.wait }); }
   for (const [u, d] of P.browse) R.browse.push(at(S, u, d));
   return (S.R = R);
 }
