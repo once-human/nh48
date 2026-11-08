@@ -15,6 +15,7 @@ import { WB, Frame, rng, hash2, mixc, mulc, hex, signedArea, isConvex, offsetRin
 import { K, STYLE, BASE, SHOP_CELL, heightOf } from './kinds.js';
 import { KINDS, PALETTES, KIND_IDS as KI, blend, pick } from './areas.js';
 import { footpath } from './footpath.js';
+import { massing } from './massing.js';
 
 // what a kind of place builds like
 const TYPE = {};
@@ -133,7 +134,7 @@ function building(b, cb, B, ctx) {
   else if (st === 13) pyramid(b, G);
   else if (st !== 6) {
     if (L.hip && !B.noRoof && n <= 8 && isConvex(p) && A2 < 420) pitchedRoof(b, G, wallTop, 0.3, 2.6, L.tile);
-    else if (!L.uc) rooftop(b, cb, G);
+    else if (!L.uc) { G.convex = isConvex(p); const G2 = massing(b, G, flatRoof, cb); rooftop(b, cb, G2 || G); }
   }
 }
 
