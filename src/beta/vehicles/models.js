@@ -131,6 +131,40 @@ export function addDriver(b, kind, inst, shirt) {
   const c = carSpec(kind), [hx, hy, z] = carSeat(kind);
   addRider(b, hx, hy, z, { lean: -0.1, inst, fixedHead: true, shirt: shirt || [1, 1, 1], pants: [0.2, 0.2, 0.24], handX: hx + 0.5, handY: hy + 0.36, handW: 0.17, footX: hx + 0.86, footY: c.sill + 0.08 });
 }
+// the inside of a car you see through its windows (the traffic's, a parked one's): it used to be an empty shell with
+// the driver floating in it. A floor, the dash right across under the windscreen with its binnacle and the wheel in front
+// of the driver's seat (on the right), two front seats with their backs and headrests, the gear lever between them, and
+// a bench across the back with its own headrests (a two-seater has none); the door cards inside. Yours has its own cabin
+// (the cockpit), so this is only for the cars that don't
+const SEATC = [0.38, 0.34, 0.3], DASHC = [0.09, 0.09, 0.1], CARPET = [0.1, 0.1, 0.1], TRIMC = [0.24, 0.22, 0.2];
+export function addCabin(b, kind0) {
+  const c = carSpec(kind0), kind = baseOf(kind0), two = kind === 'sports' || kind === 'super';
+  const hl = c.L/2, hw = c.W/2, xf0 = hl - c.hood, xr0 = -hl + c.tail, [hx, hy, zd] = carSeat(kind0), sill = c.sill, belt = c.beltY;
+  const iw = hw - 0.1, top = (y) => Math.min(y, c.H - 0.12);
+  // floor and the door cards
+  box(b, Math.max(xr0 + 0.05, hx - 1.3), sill + 0.02, -iw, xf0 - 0.05, sill + 0.06, iw, CARPET, 0, MATTE);
+  for (const sd of [-1, 1]) rbox(b, Math.max(xr0 + 0.1, hx - 1.25), sill + 0.15, sd*(iw - 0.02), xf0 - 0.15, top(belt - 0.02), sd*(iw + 0.02), TRIMC, 0, MATTE);
+  // the dash under the screen, the binnacle, the wheel
+  rbox(b, xf0 - 0.42, belt - 0.24, -iw + 0.02, xf0 - 0.02, top(belt + 0.03), iw - 0.02, DASHC, 0, MATTE);
+  rbox(b, xf0 - 0.48, belt - 0.02, zd - 0.16, xf0 - 0.36, top(belt + 0.07), zd + 0.16, DASHC, 0, MATTE);
+  { const cx = hx + 0.52, cy = hy + 0.36, rr = 0.18, pts = [];
+    for (let i = 0; i <= 16; i++) { const a = i/16*Math.PI*2; pts.push([cx + Math.sin(a)*rr*0.35, cy + Math.cos(a)*rr*0.94, zd + Math.sin(a)*rr]); }
+    tube(b, pts, 0.014, [0.06, 0.06, 0.065], 16, 6); rod(b, [cx, cy, zd], [xf0 - 0.3, belt - 0.12, zd], 0.025, DASHC); }
+  // the front seats, the gear lever between them
+  for (const z of [zd, -zd]) {
+    rbox(b, hx - 0.12, hy - 0.14, z - 0.24, hx + 0.36, hy - 0.02, z + 0.24, SEATC, 0, MATTE);                    // cushion
+    rbox(b, hx - 0.24, hy - 0.1, z - 0.24, hx - 0.1, top(hy + 0.5), z + 0.24, SEATC, 0, MATTE);                  // back
+    rbox(b, hx - 0.23, top(hy + 0.53), z - 0.13, hx - 0.13, top(hy + 0.7), z + 0.13, SEATC, 0, MATTE);           // headrest
+  }
+  rbox(b, hx + 0.05, sill + 0.06, -0.1, hx + 0.6, hy - 0.06, 0.1, DASHC, 0, MATTE);                            // console
+  rod(b, [hx + 0.42, hy - 0.06, 0], [hx + 0.38, hy + 0.12, 0], 0.01, [0.2, 0.2, 0.2]);
+  if (two) return;
+  // the bench across the back
+  const rx = Math.max(xr0 + 0.42, hx - 0.86), bt = Math.min(top(hy + 0.42), belt + 0.22);
+  rbox(b, rx - 0.08, hy - 0.16, -iw + 0.04, rx + 0.4, hy - 0.04, iw - 0.04, SEATC, 0, MATTE);
+  rbox(b, rx - 0.2, hy - 0.12, -iw + 0.04, rx - 0.07, bt, iw - 0.04, SEATC, 0, MATTE);
+  for (const z of [zd, -zd]) rbox(b, rx - 0.19, bt + 0.02, z - 0.12, rx - 0.1, Math.min(bt + 0.16, top(belt + 0.36)), z + 0.12, SEATC, 0, MATTE);
+}
 export function driverGeo(kind, shirt) { const b = newB(false); addDriver(b, kind, false, shirt); return b.build(); }
 // who sits in a city bus: the driver in the cab on the right, and the people on a third or so of the seats, two and two
 // down the aisle facing forward (the same seats the model has: buildBus)
@@ -1311,6 +1345,7 @@ export function buildCar(kind0, opts = {}) {
   if (kind === 'taxi') {
     box(b, -0.15, spec.H, -0.25, 0.15, spec.H + 0.12, 0.25, [0.98, 0.85, 0.15], 0, 0.4);
   }
+  if (!opts.interior) addCabin(b, kind0);
   if (opts.driver) addDriver(b, kind0, true);
   if (V ? V.rails : kind === 'suv') {
     // roof rails, along the roof whatever its length
