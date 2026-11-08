@@ -6,6 +6,7 @@
 // (Which ones get a body, the seat, the grips, no helmet: patches on traffic.js and people/crowd.js in tools/build-beta.mjs.)
 import * as THREE from 'three';
 import { Crowd } from '@orig/people/crowd.js';
+import { Pilot } from '@orig/game/pilot.js';
 import { ikLeg } from '../game/fists.js';
 
 const CRANK = [-0.05, 0.33], ARM = 0.15, PZ = 0.14, PER_TURN = 4.6;
@@ -61,4 +62,31 @@ Crowd.prototype.drive = function (s, dt, cx, cz) {
     ikLeg(H, side, _t, _pole, 1);
   }
   mark(H);
+};
+
+// ---- you on a cycle: your own legs on the pedals the same way, the crank going round with the road you cover,
+// freewheeling as you slow, the left foot down on the road when you stop
+const prd = Pilot.prototype.placeRider;
+Pilot.prototype.placeRider = function () {
+  prd.call(this);
+  const v = this.riderShown, H = this.human;
+  if (!v || !H || !/^cycle/.test(v.type || '') || v === this.auto || !v.tilt) return;
+  const dt = Math.min(0.1, (performance.now() - (this._crT || performance.now()))/1000); this._crT = performance.now();
+  const C = this._cr || (this._cr = { a: 0, lx: v.x, lz: v.z, v: 0, down: 0 });
+  const m = Math.hypot(v.x - C.lx, v.z - C.lz), sp = Math.abs(v.v || 0); C.lx = v.x; C.lz = v.z;
+  const slowing = dt > 0 && (C.v - sp)/dt > 0.4 && !(this._inp && this._inp.throttle > 0.1); C.v = sp;
+  if (m < 3 && !slowing) C.a += m/PER_TURN*Math.PI*2*Math.sign(v.v || 1);
+  const want = sp < 0.4 ? 1 : sp > 1.2 ? 0 : C.down > 0.5 ? 1 : 0;
+  C.down += Math.sign(want - C.down)*Math.min(Math.abs(want - C.down), dt/0.4);
+  if (C.down > 0.02) { const goal = -Math.PI*0.25; C.a += Math.atan2(Math.sin(goal - C.a), Math.cos(goal - C.a))*Math.min(1, dt*4)*C.down; }
+  const w = sm(C.down), M = v.tilt.matrixWorld, fx = Math.cos(v.th), fz = Math.sin(v.th), gy = v.y || 0;
+  H.holder.updateMatrixWorld(true);
+  for (const [side, z, ph] of [['r', PZ, 0], ['l', -PZ, Math.PI]]) {
+    const a = C.a + ph;
+    _t.set(CRANK[0] + Math.sin(a)*ARM - 0.03, CRANK[1] + Math.cos(a)*ARM + 0.07, z).applyMatrix4(M);
+    if (side === 'l' && w > 0) { const gx = v.x + fx*0.05 + fz*0.38, gz = v.z + fz*0.05 - fx*0.38; _t.set(_t.x + (gx - _t.x)*w, _t.y + (gy + 0.1 - _t.y)*w + Math.sin(Math.PI*w)*0.06, _t.z + (gz - _t.z)*w); }
+    const out = z > 0 ? 0.15 : -0.15;
+    _pole.set(fx - fz*out, 0.35, fz + fx*out);
+    ikLeg(H, side, _t, _pole, 1);
+  }
 };
