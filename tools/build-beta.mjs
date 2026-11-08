@@ -343,6 +343,8 @@ const PATCHES = {
     ["edge(3, 'KeyV');", "edge(3, 'KeyC');"],
   ],
   [S('game/game.js')]: [
+    // burning: no cry every half second (it was an 'ah, ah, ah' for as long as you stood in it): one, at the blast
+    ["this.hud.hurt && this.hud.hurt(); this.vb && this.vb.you('hurt', n > 25);", "this.hud.hurt && this.hud.hurt(); if (n > 25) this.vb && this.vb.you('hurt', true);"],
     // the driver you hit stays in till the car's stopped, then gets out (it brakes along its lane: traffic.js patch)
     ["    o.argue = 22; o.v = 0;\n    this.later(1.4, () => {", "    o.argue = 22;\n    const go = () => {"],
     ["        this.later(12, () => { if (o.argue > 0) { if (this.people.list.includes(p)) this.people.remove(p); o.argue = 0; } });\n      });\n    });\n  }", "        this.later(12, () => { if (o.argue > 0) { if (this.people.list.includes(p)) this.people.remove(p); o.argue = 0; } });\n      });\n    };\n    const wait = (n) => this.later(n ? 0.2 : 0.8, () => { if (Math.abs(o.v || 0) > 0.3 && n < 50) wait(n + 1); else go(); });\n    wait(0);\n  }"],
