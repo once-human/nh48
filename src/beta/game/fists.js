@@ -1,7 +1,8 @@
 // A street fight, the whole of it. Click punches (jab, cross, hook, then an uppercut and one to the body if you keep
 // going); hold the right button and your guard comes up: most of a blow lands on your arms, and one blocked just as
 // you raised it is a parry (they stagger, and your next one lands harder). Right button and a click together is a
-// shove if they're on top of you, a front kick if they're a step away. Someone on the ground gets a kick or a stamp,
+// shove if they're on top of you, a front kick if they're a step away; again and it's a roundhouse into the ribs, and a
+// third a low kick to the thigh that takes their leg. Someone on the ground gets a kick or a stamp,
 // and a body gets moved. Running into a punch puts your weight behind it. Punching tires you: a few too many and
 // they're slower and softer, and a guard that takes too much breaks.
 // Hands: with the torch (or anything that isn't for hitting) in your right hand, the left does all the work, jab,
@@ -26,9 +27,11 @@ const PROC = {
   kick: { dur: 0.72, hit: 0.36, dmg: 14, reach: 1.6, push: 0.4, down: 1, leg: true },
   stomp: { dur: 0.78, hit: 0.44, dmg: 18, reach: 1.3, push: 0.1, down: 1, leg: true },
   front: { dur: 0.72, hit: 0.33, dmg: 15, reach: 1.75, push: 1.3, down: 0.3, leg: true },
+  round: { dur: 0.8, hit: 0.38, dmg: 19, reach: 1.55, push: 0.9, down: 0.45, leg: true },
+  low: { dur: 0.6, hit: 0.28, dmg: 11, reach: 1.45, push: 0.2, down: 0.6, leg: true },
 };
 const LUNGE = { clip: 'cross', speed: 1.15, dur: 0.72, hit: 0.34, dmg: 21, reach: 1.7, push: 1.1, down: 0.55 };
-const COST = { jab: 0.1, punch: 0.1, cross: 0.12, hook: 0.16, hookP: 0.16, upper: 0.17, body: 0.12, kick: 0.18, stomp: 0.2, front: 0.2, lunge: 0.22, shove: 0.1 };
+const COST = { round: 0.22, low: 0.14, jab: 0.1, punch: 0.1, cross: 0.12, hook: 0.16, hookP: 0.16, upper: 0.17, body: 0.12, kick: 0.18, stomp: 0.2, front: 0.2, lunge: 0.22, shove: 0.1 };
 
 // which arm each clip throws, read off the clip (how far each arm's bones swing)
 const swing = (clip, side) => {
@@ -90,7 +93,11 @@ Brawl.prototype.attack = function (special) {
   if (tg && !tg.veh && tg.fallen > 0) name = this.rng.next() < 0.5 ? 'stomp' : 'kick', side = 'r';
   else if (special) {
     const d = tg && !tg.veh ? Math.hypot(tg.x - F.x, tg.z - F.z) : 9;
-    name = d < 1.05 ? 'shove' : 'front'; side = 'r';
+    if (this.kcomboT <= 0) this.kcombo = 0;
+    // kicks one after another: the front kick, the roundhouse, the low one to the thigh
+    if (d < 1.05 && !this.kcombo) name = 'shove';
+    else { name = ['front', 'round', 'low'][(this.kcombo || 0)%3]; this.kcombo = ((this.kcombo || 0) + 1)%3; this.kcomboT = 1.1; }
+    side = 'r';
   } else if (F.v > 4.2 && !busy && !tired && !(G.arms && G.arms.held)) name = 'lunge';
   else if (busy) {
     // one hand free: the left throws everything
@@ -187,7 +194,7 @@ Brawl.prototype.update = function (dt, input) {
   this.restT = (this.restT || 0) + dt;
   this.stam = Math.min(1, (this.stam ?? 1) + dt*(this.restT > 0.6 ? 0.35 : 0.06));
   this.guardHp = Math.min(GUARD, (this.guardHp ?? GUARD) + dt*((P.hurtT || 0) > 1 ? 12 : 0));
-  this.counterT = (this.counterT || 0) - dt; this.breakT = (this.breakT || 0) - dt; this.blockT = (this.blockT || 0) - dt;
+  this.kcomboT = (this.kcomboT || 0) - dt; this.counterT = (this.counterT || 0) - dt; this.breakT = (this.breakT || 0) - dt; this.blockT = (this.blockT || 0) - dt;
   const free = P.onFoot && !P.ko && !(P.downT > 0) && F && !F.climb && !F.air && !F.swim && G.state === 'play';
   const was = this.guarding;
   this.guarding = free && RMB && !(this.breakT > 0) && !P.act;
@@ -273,7 +280,10 @@ function pose(G, H, dt) {
     if (sp) bendBone(sp, Y_UP, (A.side === 'l' ? -1 : 1)*0.32*e);
     if (s1) bendBone(s1, _ax.copy(_r), -(A.name === 'body' ? 0.22 : 0.1)*e);
   } else if (A && A.leg) {
-    const s1 = bone(H, 'spine_01'); if (s1) bendBone(s1, _ax.copy(_r), (A.name === 'stomp' ? 0.06 : 0.16)*e);
+    const s1 = bone(H, 'spine_01'); if (s1) bendBone(s1, _ax.copy(_r), (A.name === 'stomp' ? 0.06 : A.name === 'round' ? 0.1 : 0.16)*e);
+    // the roundhouse turns the hips over and leans away from the leg; the low kick turns them a little
+    const pv = bone(H, 'pelvis'); if (pv && (A.name === 'round' || A.name === 'low')) bendBone(pv, Y_UP, -(A.name === 'round' ? 0.75 : 0.35)*e);
+    if (s1 && A.name === 'round') bendBone(s1, _ax.copy(_f), -0.28*e);
   }
   // a blow on the guard knocks the hands back an instant
   const jolt = B.blockT > 0 ? B.blockT/0.18*0.06 : 0;
@@ -322,6 +332,19 @@ function pose(G, H, dt) {
       _S2.copy(_s).addScaledVector(_f, 0.85); _S2.y = _s.y + 0.05;
       _M2.copy(_s).addScaledVector(_f, 0.32); _M2.y = _s.y - 0.28;
       _pole.copy(_f).setY(0.4);
+    } else if (A.name === 'round') {
+      // out to the side and round, the shin across into their ribs, the knee turned over
+      if (q) _S2.set(q.x, _s.y + 0.15, q.z); else _S2.copy(_s).addScaledVector(_f, 0.75).setY(_s.y + 0.15);
+      const fl = _g.copy(_S2).sub(_s).setY(0), dd = fl.length(); if (dd > 0.8) _S2.addScaledVector(fl, (0.8 - dd)/dd);
+      _S2.addScaledVector(_r, -0.12);
+      _M2.copy(_s).addScaledVector(_r, 0.7).addScaledVector(_f, 0.15); _M2.y = _s.y - 0.05;
+      _pole.copy(_r).setY(0.5);
+    } else if (A.name === 'low') {
+      // a short chop, the shin into the side of their thigh
+      if (q) _S2.set(q.x, gy + 0.5, q.z); else _S2.copy(_s).addScaledVector(_f, 0.6).setY(gy + 0.5);
+      const fl = _g.copy(_S2).sub(_s).setY(0), dd = fl.length(); if (dd > 0.7) _S2.addScaledVector(fl, (0.7 - dd)/dd);
+      _M2.copy(_s).addScaledVector(_r, 0.45).addScaledVector(_f, 0.1); _M2.y = gy + 0.55;
+      _pole.copy(_r).setY(0.3).addScaledVector(_f, 0.4);
     } else {
       // at their body on the ground
       if (q) _S2.set(q.x, gy + 0.16, q.z); else _S2.copy(_s).addScaledVector(_f, 0.6).setY(gy + 0.16);

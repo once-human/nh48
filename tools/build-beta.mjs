@@ -176,6 +176,11 @@ const PATCHES = {
   [S('game/pilot.js')]: [
     // (which vehicle it was, for a hit and run: beta/game/wanted.js)
     ["this.events.push({ type: 'gotHit', speed: o.v, who: o.type });", "this.events.push({ type: 'gotHit', speed: o.v, who: o.type, o });"],
+    // a jump as high as you can (about half a metre standing, a little more off a run), and a fall that hurts by its
+    // height: under three metres you take it in your knees; above, you're down and hurt, the more the higher; from
+    // ten metres or so on to the road it kills you (into the river it's a splash)
+    ["else { F.air = true; F.vy = 3.4;", "else { F.air = true; F.vy = 3.0 + Math.min(0.9, (F.v || 0)*0.13);"],
+    ["if (F.vy < -7.5 && !wet) { this.downT = 2.2;", "if (F.vy < -7.5 && !wet) { const fh = F.vy*F.vy/19.6; if (fh > 7) this.hp = (this.hp ?? 100) - (fh - 7)*14; this.downT = 2.2 + Math.min(4, (fh - 2.9)*0.5);"],
     // the walk to a door: a long way round the car you jog (beta/vehicles/route.js)
     ["(pup && c[0] === 'AltLeft')", "(pup && !pup.jog && c[0] === 'AltLeft')"],
     // you go over with the auto when it goes over (and up with it on two wheels)
