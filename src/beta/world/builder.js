@@ -166,7 +166,8 @@ function look(R, A, KD, type, st, levels, pal, B) {
     arched: (type === 'peth' && (st === 2 || st === 5) && ch(0.5)) || (type === 'colonial' && ch(0.6)) || st === 10 || st === 12 || st === 14,
     ac: A.ac, laundry: A.laundry, plants: A.plants, tanks: A.tanks, solar: A.solar, dish: A.dish, tin: A.tin, terrace: A.terrace, clutter: A.clutter,
     wires: A.wires, flex: A.flex, rangoli: A.rangoli, awning: A.awning, kandil: ch(0.22),
-    uc: !(B.shops && B.shops.length) && levels >= 3 && ch(A.uc * (type === 'tower' || type === 'office' ? 2.2 : 1)),
+    // (nothing left half built: Onkar read it as construction everywhere. The roll is kept so the rest stays as it was)
+    uc: (!(B.shops && B.shops.length) && levels >= 3 && ch(A.uc * (type === 'tower' || type === 'office' ? 2.2 : 1)), false),
     hip: (type === 'bung' || type === 'colonial' || type === 'village') && levels <= 2 && ch(type === 'village' ? 0.4 : 0.55),
     tile: pickc([0xb8573e, 0xa84c36, 0xc06040, 0x9a4a34]),
     winCol: type === 'office' || type === 'posh' ? pickc([0x3a5a6a, 0x2a4a5a, 0x4a6a78, 0x5a6a70]) : pickc([0x2e5a5c, 0x2a4e58, 0x35625e, 0x3a4a52, 0x4a5a5a]),
@@ -188,14 +189,15 @@ function massWall(b, G, F, len) {
 }
 function edge(b, cb, G, F, i, len, fl, ctx) {
   const { L, gh, fh, wallTop, levels, st, R, type } = G;
-  const front = fl !== '0', shop = fl === '3' && len > 2.6;
+  // (a temple has no shop let into it: no shutters, no boards)
+  const front = fl !== '0', shop = st !== 8 && fl === '3' && len > 2.6;
   const wseed = (st * 16 + (G.B.seed & 7)) / 255;            // the shader's painted windows: style, grilles, a variation
   // blank: short walls and many back walls (they touch the next building)
   const blank = !front && (len < 3 || R() < 0.45);
   b.set(L.wk, L.wall, L.wear, (G.B.seed % 251) / 255);
   // the ground floor
   let y0 = BASE;
-  const shopsHere = !shop && front && len > 2.6 && hasShops(G, i, len);
+  const shopsHere = !shop && st !== 8 && front && len > 2.6 && hasShops(G, i, len);
   if (shop || shopsHere) { shopFront(b, cb, G, F, i, len, shop); y0 = BASE + gh; }
   else if (front && L.stilt && fl !== '0' && len > 5) { stilt(b, G, F, len); y0 = BASE + gh; }
   else if (front && L.arcade && len > 5 && levels <= 3) { arcade(b, G, F, len); y0 = BASE + gh; }

@@ -137,52 +137,18 @@ function thing(b, R, x, z, tx, tz, nx, nz, onPath, broken, mess, A, Y) {
   const r = R();
   const at = (d) => [x + nx * d, z + nz * d];
   const yaw = Math.atan2(tz, tx);
-  // broken paving, gone to mud (more of it the worse the area keeps its footpaths)
-  if (r < 0.22 * broken + 0.02) {
-    const [px, pz] = at(0.5 + R() * 1.8); const P = onPath(px, pz); if (!P || P.bridge) return 2;
-    const w = 0.4 + R() * 1.4 * (0.5 + broken), d = 0.3 + R() * 0.9;
-    b.set(K.soil, R() < 0.5 ? 0x7a6450 : 0x6a5a48, 0.7, R());
-    blobPatch(b, px, Y + 0.003, pz, w, d, yaw, R, 7);
-    // the pavers round it, loose and tipped
-    b.set(K.paver, 0x9a8a78, 0.6, R());
-    for (let i = 0; i < 2 + R() * 4; i++) { const a = R() * 6.28, rr = w * 0.5 + R() * 0.3; b.ybox(px + Math.cos(a) * rr, Y - 0.02, pz + Math.sin(a) * rr, 0.22, Y + 0.04 + R() * 0.05, 0.11, R() * 3, 8); }
-    return 3 + R() * 10 / (0.3 + broken);
-  }
-  // a slab sunk, one tipped up by a root
-  if (r < 0.3 * broken + 0.05) {
-    const [px, pz] = at(0.6 + R() * 1.6); const P = onPath(px, pz); if (!P) return 2;
-    if (R() < 0.5) { b.set(K.concrete, 0x8a8478, 0.6, R()); b.ybox(px, Y - 0.06, pz, 0.6, Y - 0.025, 0.6, yaw + (R() - 0.5) * 0.2, 8); }
-    else {
-      b.set(K.concrete, 0x9a948a, 0.5, R());
-      const tilt = 0.08 + R() * 0.1, c = Math.cos(yaw), s = Math.sin(yaw);
-      const P0 = [px - c * 0.3 - s * 0.3, Y, pz - s * 0.3 + c * 0.3], P1 = [px + c * 0.3 - s * 0.3, Y, pz + s * 0.3 + c * 0.3];
-      const P2 = [px + c * 0.3 + s * 0.3, Y + tilt, pz + s * 0.3 - c * 0.3], P3 = [px - c * 0.3 + s * 0.3, Y + tilt, pz - s * 0.3 - c * 0.3];
-      b.quad(P0, P1, P2, P3, [0, 1, 0]);
-      b.set(K.wood, 0x5a4232, 0.5); b.tube([px - s * 0.4, Y + 0.02, pz + c * 0.4], [px + s * 0.6 + c * 0.2, Y + 0.03, pz - c * 0.6 + s * 0.2], 0.05, 4);
-    }
-    return 4 + R() * 12;
-  }
+  // (no broken paving gone to mud, no sunk or tipped slabs, no trench, no mud by the kerb: Onkar's call, it read as
+  // roadworks and cheap shapes. Their share of the footpath is left clean)
+  if (r < 0.22 * broken + 0.02) return 3 + R() * 6;
+  if (r < 0.3 * broken + 0.05) return 4 + R() * 8;
   // a manhole: the round iron lid, or a square chamber cover (some of them cracked, one or two open with a stick in)
   if (r < 0.38) {
     const [px, pz] = at(0.7 + R() * 1.2); const P = onPath(px, pz); if (!P) return 2;
     if (R() < 0.55) { b.set(K.metal, 0x3a3a3c, 0.6, R()); b.cyl(px, Y - 0.01, pz, 0.32, 0.32, 0.025, 10); b.set(K.concrete, 0x7a766e, 0.6); b.cyl(px, Y - 0.012, pz, 0.42, 0.42, 0.02, 10); }
     else { b.set(K.concrete, 0x8a857c, 0.6, R()); b.ybox(px, Y - 0.01, pz, 0.7, Y + 0.015, 0.7, yaw, 8); b.set(K.metal, 0x2a2a2a, 0.6); b.ybox(px, Y + 0.015, pz, 0.08, Y + 0.03, 0.4, yaw, 8); }
-    if (R() < 0.15 * broken) { b.set(K.wood, 0x6a5a42, 0.6); b.tube([px, Y, pz], [px + 0.2, Y + 1.0, pz + 0.1], 0.025, 3); post(px + 0.05, pz + 0.03, 0.05); b.set(K.cloth, 0xd83a2a, 0); b.blob(px + 0.2, Y + 1.0, pz + 0.1, 0.08, 0.06, 0.08, 4); }
     return 6 + R() * 14;
   }
-  // a trench for a cable, dug and left: the cut, a pipe in it, the earth heaped beside, a tape across
-  if (r < 0.43 + 0.05 * broken) {
-    const len = 3 + R() * 8, off = 0.6 + R() * 1.0;
-    const [px, pz] = at(off), [ex, ez] = [px + tx * len, pz + tz * len];
-    if (!onPath(px, pz) || !onPath(ex, ez)) return 3;
-    b.set(K.soil, 0x4a3a2c, 0.9, R());
-    b.quad([px - nx * 0.25, Y + 0.004, pz - nz * 0.25], [ex - nx * 0.25, Y + 0.004, ez - nz * 0.25], [ex + nx * 0.25, Y + 0.004, ez + nz * 0.25], [px + nx * 0.25, Y + 0.004, pz + nz * 0.25], [0, 1, 0]);
-    b.set(K.paint, R() < 0.5 ? 0x2a5ab8 : 0xd87a2a, 0.3); b.tube([px, Y + 0.05, pz], [ex, Y + 0.05, ez], 0.06, 5);
-    b.set(K.soil, 0x8a6a4c, 0.8, R());
-    for (let t = 0.3; t < len; t += 0.8 + R()) b.blob(px + tx * t + nx * 0.6, Y + 0.05, pz + tz * t + nz * 0.6, 0.4, 0.18, 0.3, 5);
-    if (R() < 0.5) { b.set(K.cloth, 0xf2c230, 0.2); b.tube([px + nx * 0.4, Y + 0.8, pz + nz * 0.4], [ex + nx * 0.4, Y + 0.8, ez + nz * 0.4], 0.01, 3); b.set(K.metal, 0xd83a2a, 0.3); b.tube([px + nx * 0.4, Y, pz + nz * 0.4], [px + nx * 0.4, Y + 0.85, pz + nz * 0.4], 0.02, 3); b.tube([ex + nx * 0.4, Y, ez + nz * 0.4], [ex + nx * 0.4, Y + 0.85, ez + nz * 0.4], 0.02, 3); post(px + nx * 0.4, pz + nz * 0.4, 0.04); post(ex + nx * 0.4, ez + nz * 0.4, 0.04); }
-    return len + 5 + R() * 20;
-  }
+  if (r < 0.43 + 0.05 * broken) return 5 + R() * 10;
   // paan spat at the foot of a wall, oil, a damp patch
   if (r < 0.52 + 0.1 * mess) {
     const [px, pz] = at(0.3 + R() * 2.4); if (!onPath(px, pz)) return 2;
@@ -197,13 +163,7 @@ function thing(b, R, x, z, tx, tz, nx, nz, onPath, broken, mess, A, Y) {
     blobPatch(b, px, Y + 0.004, pz, 0.5 + R() * 1.2, 0.4 + R() * 0.8, R() * 6, R, 8);
     return 4 + R() * 10;
   }
-  // mud washed up against the kerb
-  if (r < 0.64 + 0.05 * broken) {
-    const len = 1 + R() * 4; const [px, pz] = at(0.15); if (!onPath(px, pz)) return 2;
-    b.set(K.soil, 0x8a7458, 0.8, R());
-    b.quad([px, Y + 0.003, pz], [px + tx * len, Y + 0.003, pz + tz * len], [px + tx * len + nx * 0.35, Y + 0.003, pz + tz * len + nz * 0.35], [px + nx * 0.2, Y + 0.003, pz + nz * 0.2], [0, 1, 0]);
-    return len + 2 + R() * 6;
-  }
+  if (r < 0.64 + 0.05 * broken) { R(); return 3 + R() * 6; }
   // (two-wheelers on the footpath are the game's own parked ones now, real and rideable: none drawn in here)
   if (r < 0.78 + 0.08 * mess) return 3 + R() * 10;
   // a handcart of fruit, an umbrella over it

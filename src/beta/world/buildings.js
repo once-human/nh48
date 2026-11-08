@@ -191,7 +191,7 @@ function jobOf(W, C, kind) {
     templeOf(M, B);
     const ringCm = B[1];
     const sh = index.shopsByBld.get(bi), shops = [];
-    if (sh) for (const [key, s] of sh) { const nm = index.shopNames[s[3]]; shops.push([key, nm ? nm[2] : 'generic', nm ? nm[3] || '' : '']); }
+    if (sh && B[3] !== 8) for (const [key, s] of sh) { const nm = index.shopNames[s[3]]; shops.push([key, nm ? nm[2] : 'generic', nm ? nm[3] || '' : '']); }
     blds.push({ bi, ring: cmRing(ringCm), levels: B[2], style: B[3], roof: B[4], flags: B[5], y: B.y || 0, seed: hash2(ringCm[0] * 31 + ringCm[1] * 17, bi) | 0, shops });
   }
   return { cx: C.cx, cz: C.cz, blds, rich: painter.rich ?? 1, foot: kind === 'near' ? footJob(C) : null };
@@ -308,7 +308,7 @@ export function* buildBuildingsChunk(W, C, group) {
     const parapet = styleId === 11 ? 1.4 : pitched ? 0 : styleId === 6 ? 0.15 : 0.95;
     const wallTop = BASE + heightOf(levels, styleId).H + parapet;
     footprints.push({ bi, p, h: wallTop + dy });
-    const shopsHere = index.shopsByBld.get(bi);
+    const shopsHere = styleId === 8 ? null : index.shopsByBld.get(bi);        // (a temple has no shops let into it)
     const slotDoor = new Map();
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
@@ -318,7 +318,7 @@ export function* buildBuildingsChunk(W, C, group) {
       if (L < 0.05) continue;
       const tx = (bx - ax) / L, tz = (bz - az) / L;
       const fl = flags[i] || '0';
-      const shop = fl === '3' && L > 2.6;
+      const shop = styleId !== 8 && fl === '3' && L > 2.6;
       if (shop) {
         const ns = Math.max(1, Math.floor(L / SHOP_CELL)), cw = L / ns, oh = gh - 0.85;
         for (let k = 0; k < ns; k++) {
