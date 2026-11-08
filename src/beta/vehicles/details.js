@@ -26,6 +26,7 @@ import { HAZE } from '../gfx/post.js';
 import { Audio } from '@orig/game/audio.js';
 import { keyOf } from '@orig/game/keys.js';
 import { startSound, stopSound, flareOf } from './starter.js';
+import { kickable, kickStart } from './kick.js';
 
 const G0 = () => window.__nhAskG;
 const mine = (v) => { const P = G0() && G0().player; return !!P && !P.onFoot && P.cur === v; };
@@ -348,6 +349,8 @@ function engineKey(v) {
   if (!v._off && !(v._crank > 0)) { v._off = true; stopSound(A, v); return; }
   if (v._crank > 0) return;
   const cold = v._lastRun === undefined || now() - v._lastRun > COLD;
+  // a Splendor or a Bullet: kicked (beta/vehicles/kick.js)
+  if (kickable(v)) { kickStart(v, cold); return; }
   // (how long it takes to catch: longer cold, and never quite the same)
   v._crank = (cold ? 1.0 : 0.45) + Math.random()*0.35; v._off = false;
   startSound(A, v, v._crank);
