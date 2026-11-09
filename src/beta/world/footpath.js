@@ -4,9 +4,11 @@
 // handcart, a cobbler under his umbrella. How much of it depends on where you are (the area's footpath and mess
 // settings, world/areas.js): Koregaon Park's are kept, Budhwar Peth's are not. It's laid along the game's own kerbs
 // and inside its own footpaths (world/groundChunk.js), none of it is in the way of anything (the game's collision is
-// its own) and nothing here decides anything, except that what stands up off it is solid: the handcarts, the cobbler's
-// box and stool, the umbrella poles, the posts of a trench's tape go out as F.solids (rings and posts, world/buildings.js
-// puts them into the collision while the close-up drawing's in).
+// its own) and nothing here decides anything, except that what stands up off it is solid: the posts of a trench's tape
+// go out as F.solids (rings and posts, world/buildings.js puts them into the collision while the close-up drawing's
+// in). The handcarts, the cobblers and their umbrellas aren't drawn here at all: they go out as F.vend, where each
+// stands and how it looks, and are made on the main thread as things of their own that can be knocked over
+// (world/vendors.js).
 import { rng, insideRing } from './geom.js';
 import { K } from './kinds.js';
 import { blend } from './areas.js';
@@ -16,7 +18,6 @@ import { bike } from './builder.js';
 export const KERB_H = 0.15;
 
 const BIKES = [0x1c1c1e, 0x1c1c1e, 0x6a6a6e, 0xeeeeea, 0xb81e1e, 0x1e3a8a, 0x2f6a3a, 0x8a8a8e, 0xd8c8a0, 0x3a2a5a];
-const FRUIT = [0xf2c230, 0xe8742a, 0x3a8a2a, 0xd83a2a, 0x8a3a6a, 0x9ac83a];
 
 // what the worker needs of a chunk's ground: where it is, its kerbs, its footpaths
 export function footJob(C) {
@@ -49,7 +50,7 @@ export function footpath(F, area, b) {
     return null;
   };
   const R = rng(F.ci * 7919 + 17);
-  SOL = F.solids = [];
+  SOL = F.solids = []; VEND = F.vend = [];
   const A = blend(area.at(F.cx, F.cz));
   const broken = 1 - A.fp, mess = A.mess, Y = KERB_H + 0.012;
   // walk the kerbs: the footpath is on their south side (the road's on the north, world/groundChunk.js)
@@ -169,25 +170,14 @@ function thing(b, R, x, z, tx, tz, nx, nz, onPath, broken, mess, A, Y) {
   // a handcart of fruit, an umbrella over it
   if (r < 0.86 + 0.04 * mess && A.wealth < 0.8) {
     const [px, pz] = at(0.9); if (!onPath(px, pz)) return 3;
-    const c = Math.cos(yaw), s = Math.sin(yaw);
-    b.set(K.wood, 0x6a4a32, 0.6, R()); b.ybox(px, Y + 0.6, pz, 1.8, Y + 0.72, 0.9, yaw, 0);
-    box(px, pz, 1.8, 0.9, yaw); box(px - c * 1.15, pz - s * 1.15, 0.5, 0.06, yaw);      // (the bed, the handle)
-    b.set(K.plain, 0x1a1a1a, 0.5);
-    for (const sx of [-0.6, 0.6]) for (const sz of [-0.48, 0.48]) b.cyl(px + c * sx - s * sz, Y, pz + s * sx + c * sz, 0.03, 0.03, 0.6, 4, 0);
-    b.set(K.metal, 0x2a2a2a, 0.5); b.tube([px - c * 0.9, Y + 0.65, pz - s * 0.9], [px - c * 1.4, Y + 0.85, pz - s * 1.4], 0.025, 3);
-    for (let i = 0; i < 14; i++) { b.set(K.leaf, FRUIT[(R() * FRUIT.length) | 0], 0.2); const u = (R() - 0.5) * 1.6, v = (R() - 0.5) * 0.75; b.blob(px + c * u - s * v, Y + 0.8, pz + s * u + c * v, 0.13, 0.09, 0.13, 4); }
-    if (R() < 0.7) umbrella(b, px, Y + 0.72, pz, R);
+    const v = (R() * 5) | 0, u = R() < 0.7 ? (R() * 5) | 0 : -1;
+    VEND.push({ k: 'cart', x: px, y: Y, z: pz, ry: -yaw, v, u });
     return 12 + R() * 25;
   }
   // a cobbler: his box, a low stool, shoes laid out, a faded umbrella
   if (r < 0.9) {
     const [px, pz] = at(1.2); if (!onPath(px, pz)) return 3;
-    b.set(K.wood, 0x5a3a24, 0.7, R()); b.ybox(px, Y, pz, 0.6, Y + 0.4, 0.4, yaw, 8);
-    box(px, pz, 0.6, 0.4, yaw); box(px + nx * 0.6, pz + nz * 0.6, 0.35, 0.3, yaw);
-    b.set(K.plain, 0x3a3a3a, 0.6); b.ybox(px + nx * 0.6, Y, pz + nz * 0.6, 0.35, Y + 0.25, 0.3, yaw, 8);
-    b.set(K.tarp, 0x2a5ab8, 0.4); b.quad([px - tx * 0.9 - nx * 0.4, Y + 0.004, pz - tz * 0.9 - nz * 0.4], [px + tx * 0.9 - nx * 0.4, Y + 0.004, pz + tz * 0.9 - nz * 0.4], [px + tx * 0.9 + nx * 0.9, Y + 0.004, pz + tz * 0.9 + nz * 0.9], [px - tx * 0.9 + nx * 0.9, Y + 0.004, pz - tz * 0.9 + nz * 0.9], [0, 1, 0]);
-    b.set(K.plain, 0x2a1a12, 0.5); for (let i = 0; i < 5; i++) { const u = (i - 2) * 0.28; b.ybox(px + tx * u - nx * 0.3, Y, pz + tz * u - nz * 0.3, 0.1, Y + 0.08, 0.26, yaw + Math.PI / 2, 8); }
-    umbrella(b, px + nx * 0.3, Y, pz + nz * 0.3, R, 0x1a1a1e);
+    VEND.push({ k: 'cob', x: px, y: Y, z: pz, ry: -yaw, v: (R() * 4) | 0, u: R() < 0.6 ? 4 : (R() * 5) | 0, ux: px + nx * 0.3 + tx * 0.35, uz: pz + nz * 0.3 + tz * 0.35 });
     return 30 + R() * 40;
   }
   return 2 + R() * 6;
@@ -199,20 +189,8 @@ function blobPatch(b, x, y, z, w, d, yaw, R, n) {
   for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, rr = 0.7 + R() * 0.45; const u = Math.cos(a) * w * 0.5 * rr, v = Math.sin(a) * d * 0.5 * rr; pts.push([x + c * u - s * v, y, z + s * u + c * v]); }
   for (let i = 0; i < n; i++) b.tri([x, y, z], pts[i], pts[(i + 1) % n], [0, 1, 0], [0, 0], [pts[i][0] - x, pts[i][2] - z], [pts[(i + 1) % n][0] - x, pts[(i + 1) % n][2] - z]);
 }
-function umbrella(b, x, y, z, R, col) {
-  const h = 1.9, r = 1.1, c = col ?? [0x2a5ab8, 0xd83a2a, 0xf2c230, 0x2f8a5a, 0x1a1a1e][(R() * 5) | 0];
-  b.set(K.metal, 0x3a3a3a, 0.4); b.tube([x, y, z], [x, y + h, z], 0.02, 3); post(x, z, 0.04);
-  b.set(K.cloth, c, 0.4, R());
-  const n = 8;
-  for (let i = 0; i < n; i++) {
-    const a0 = i / n * 6.283, a1 = (i + 1) / n * 6.283;
-    const p0 = [x + Math.cos(a0) * r, y + h - 0.35, z + Math.sin(a0) * r], p1 = [x + Math.cos(a1) * r, y + h - 0.35, z + Math.sin(a1) * r];
-    b.tri([x, y + h + 0.05, z], p0, p1, [0, 1, 0]); b.tri([x, y + h + 0.05, z], p0, p1, [0, -1, 0]);
-  }
-}
-
 // what's solid of it: a box w x d (w along yaw) round (x, z) as its four corners, or a post
-let SOL = null;
+let SOL = null, VEND = null;
 function box(x, z, w, d, yaw) {
   if (!SOL) return;
   const c = Math.cos(yaw), s = Math.sin(yaw), u = w / 2, v = d / 2;

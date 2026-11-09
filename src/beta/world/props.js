@@ -667,3 +667,82 @@ export function stallSets(W) {
   for (const s of [W.lampSet, W.poleSet, W.sigSet]) s.mesh.shadowStill = true;
   W.stallNear = (d) => { for (const s of near) s.range = d; for (const s of far) s.minRange = d; W._propX = undefined; };
 }
+
+// ---------------------------------------------------------------- the footpath's own (world/footpath.js says where)
+// A fruit seller's handcart: planks on two rails, two cycle wheels under the middle and two legs at the handle end,
+// its fruit heaped on it. A cobbler's pitch: his wooden box with its lid up and the tools in it, the iron last, a low
+// stool, a tarpaulin on the paving with the shoes laid out on it. And an umbrella over either: a pole and eight panels
+// of cloth on their ribs, its foot in a bucket of stones (or tied to the cart). Each its own model, local to where it
+// stands (x along the kerb, z into the footpath), made once for each of a few looks
+const UMB = [[0.16, 0.35, 0.72], [0.85, 0.23, 0.16], [0.95, 0.76, 0.19], [0.18, 0.54, 0.35], [0.1, 0.1, 0.12]];
+const FRUIT = [[[0.95, 0.6, 0.1], [0.92, 0.52, 0.08]], [[0.8, 0.12, 0.1], [0.62, 0.1, 0.1]], [[0.95, 0.82, 0.2], [0.9, 0.75, 0.15]], [[0.4, 0.62, 0.15], [0.32, 0.55, 0.12]], [[0.45, 0.2, 0.35], [0.35, 0.15, 0.3]]];
+const VG = new Map();
+export function vendorGeo(kind, v) {
+  const key = kind + ':' + v; let g = VG.get(key);
+  if (!g) { g = kind === 'cart' ? handcart(v) : kind === 'cob' ? cobbler(v) : umbrella(v, kind === 'umbS'); g.userData.shared = true; VG.set(key, g); }
+  return g;
+}
+function handcart(v) {
+  start(301 + v*17);
+  const deck = jit([0.42, 0.29, 0.18], 0.1), dk = [deck[0]*0.7, deck[1]*0.7, deck[2]*0.7];
+  for (let k = 0; k < 6; k++) box(1.8, 0.03, 0.145, 0, 0.72, -0.375 + k*0.15, jit(deck, 0.12));
+  for (const s of [-1, 1]) { box(1.84, 0.08, 0.03, 0, 0.77, s*0.455, dk); box(1.7, 0.06, 0.05, 0, 0.675, s*0.36, DARKST); }
+  for (const s of [-1, 1]) box(0.03, 0.08, 0.94, s*0.92, 0.77, 0, dk);
+  // the wheels on their axle, and the stand
+  rod([0.1, 0.33, -0.5], [0.1, 0.33, 0.5], 0.015, DARKST);
+  for (const z of [-0.5, 0.5]) { wheel(0.1, 0.33, z, 0.33); box(0.05, 0.32, 0.04, 0.1, 0.5, z*0.8, DARKST); }
+  for (const z of [-0.34, 0.34]) box(0.04, 0.66, 0.04, -0.82, 0.33, z, DARKST);
+  for (const z of [-0.36, 0.36]) tube([[-0.9, 0.7, z], [-1.2, 0.74, z], [-1.38, 0.86, z]], 0.016, [0.28, 0.28, 0.3], 5, 6);
+  rod([-1.38, 0.86, -0.38], [-1.38, 0.86, 0.38], 0.018, [0.2, 0.2, 0.22]);
+  // a sack laid under the fruit, and the fruit heaped up in the middle, the odd one rolled to the edge
+  sheet(8, 4, (u, w) => [-0.85 + u*1.7, 0.74 + Math.sin(u*25)*Math.sin(w*18)*0.003, -0.4 + w*0.8], [0.66, 0.55, 0.36]);
+  const C = FRUIT[v % FRUIT.length], R0 = 0.05;
+  for (let l = 0; l < 4; l++) {
+    const nx = 13 - l*3, nz = 6 - l, y = 0.745 + R0 + l*R0*1.55;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+      if (rnd() < 0.12 + l*0.1) continue;
+      const x = (i - (nx - 1)/2)*R0*2.15 + (rnd() - 0.5)*0.02, z = (j - (nz - 1)/2)*R0*2.15 + (l % 2)*R0*0.5 + (rnd() - 0.5)*0.02;
+      ball(R0*(0.85 + rnd()*0.25), x, y, z, jit(C[(i + j) % 2], 0.1), { det: 1 });
+    }
+  }
+  // the scale hanging off the handle end, and a bowl of the weights
+  rod([-0.85, 0.79, 0], [-0.85, 1.1, 0], 0.006, ROPE, 3);
+  cyl(0.11, 0.09, 0.03, -0.85, 0.95, 0, [0.7, 0.68, 0.62], { seg: 12 });
+  return finish();
+}
+function cobbler(v) {
+  start(401 + v*13);
+  const W0 = jit([0.36, 0.23, 0.14], 0.1);
+  // the box: four sides, a shelf, its lid propped up behind; awls, a hammer and the thread in it
+  box(0.6, 0.38, 0.02, 0, 0.2, 0.19, W0); box(0.6, 0.38, 0.02, 0, 0.2, -0.19, W0); box(0.02, 0.38, 0.36, 0.29, 0.2, 0, W0); box(0.02, 0.38, 0.36, -0.29, 0.2, 0, W0);
+  box(0.58, 0.02, 0.36, 0, 0.02, 0, [0.3, 0.2, 0.12]); box(0.56, 0.015, 0.34, 0, 0.3, 0, [0.32, 0.22, 0.13]);
+  box(0.6, 0.02, 0.38, 0, 0.55, -0.32, W0, { rx: -1.2 });
+  for (let k = 0; k < 4; k++) { cyl(0.012, 0.012, 0.09, -0.2 + k*0.05, 0.36, 0.05, [0.6, 0.45, 0.25], { seg: 6 }); cyl(0.003, 0.003, 0.06, -0.2 + k*0.05, 0.43, 0.05, [0.7, 0.7, 0.72], { seg: 4 }); }
+  cyl(0.02, 0.02, 0.02, 0.15, 0.33, -0.05, [0.85, 0.82, 0.7], { seg: 8 });
+  rbox(0.18, 0.03, 0.03, 0.12, 0.33, 0.08, [0.25, 0.18, 0.12], {}, 0.01); box(0.03, 0.04, 0.05, 0.2, 0.33, 0.08, [0.3, 0.3, 0.32]);
+  // the iron last on the paving, polish tins, a brush
+  cyl(0.03, 0.04, 0.22, 0.45, 0.11, 0.25, [0.18, 0.18, 0.2], { seg: 8 }); rbox(0.18, 0.05, 0.07, 0.48, 0.245, 0.25, [0.2, 0.2, 0.22], {}, 0.02);
+  for (let k = 0; k < 3; k++) cyl(0.035, 0.035, 0.025, 0.4 + k*0.08, 0.0125, -0.05, [[0.12, 0.1, 0.08], [0.45, 0.25, 0.1], [0.75, 0.7, 0.6]][k], { seg: 10 });
+  rbox(0.14, 0.04, 0.06, 0.62, 0.02, 0.05, [0.5, 0.35, 0.18], {}, 0.015);
+  // his stool
+  box(0.32, 0.03, 0.28, 0, 0.24, 0.6, [0.32, 0.32, 0.34]); for (const [x, z] of [[-0.13, 0.48], [0.13, 0.48], [-0.13, 0.72], [0.13, 0.72]]) box(0.025, 0.23, 0.025, x, 0.115, z, [0.22, 0.22, 0.24]);
+  // the tarpaulin and the shoes on it, toes to the road
+  sheet(6, 4, (u, w) => [-0.9 + u*1.8, 0.004 + Math.sin(u*14 + w*9)*0.003, -0.4 + w*1.3], [0.16, 0.33, 0.68]);
+  for (let i = 0; i < 6; i++) {
+    const x = -0.75 + i*0.28, c = [[0.1, 0.08, 0.07], [0.35, 0.2, 0.1], [0.55, 0.35, 0.18], [0.1, 0.08, 0.07], [0.6, 0.15, 0.12], [0.25, 0.25, 0.28]][(i + v) % 6];
+    for (const s of [-0.055, 0.055]) { rbox(0.09, 0.07, 0.25, x + s, 0.04, -0.28, c, {}, 0.03); box(0.095, 0.015, 0.26, x + s, 0.012, -0.28, [0.12, 0.1, 0.08]); }
+  }
+  return finish();
+}
+// the umbrella: its pole down to y = 0 (in a bucket of stones on the paving, or, on a cart, from the deck)
+function umbrella(v, standing) {
+  start(501 + v*7);
+  const c = UMB[v % UMB.length], h = standing ? 2.05 : 1.85, y0 = standing ? 0.26 : 0, R = 1.1, n = 8;
+  if (standing) { cyl(0.13, 0.11, 0.26, 0, 0.13, 0, [0.35, 0.36, 0.38], { seg: 12, open: true }); cyl(0.12, 0.12, 0.01, 0, 0.22, 0, [0.5, 0.48, 0.44], { seg: 12 }); }
+  rod([0, y0 - (standing ? 0.2 : 0), 0], [0, h + 0.05, 0], 0.018, [0.3, 0.3, 0.32], 6);
+  // the canopy: eight panels sagging a little between the ribs, the ribs under them
+  sheet(n*2, 4, (u, w) => { const a = u*6.2832, r = w*R, sag = Math.sin(u*n*Math.PI)**2*0.04*w; return [Math.cos(a)*r, h + 0.05 - w*0.38 - sag + w*w*0.05, Math.sin(a)*r]; }, jit(c, 0.05));
+  for (let k = 0; k < n; k++) { const a = k/n*6.2832; rod([0, h + 0.04, 0], [Math.cos(a)*R, h + 0.05 - 0.33, Math.sin(a)*R], 0.005, [0.25, 0.25, 0.27], 3); rod([0, h - 0.5, 0], [Math.cos(a)*R*0.45, h - 0.12, Math.sin(a)*R*0.45], 0.004, [0.25, 0.25, 0.27], 3); }
+  cyl(0.02, 0.012, 0.06, 0, h + 0.09, 0, [0.2, 0.2, 0.22], { seg: 6 });
+  return finish();
+}

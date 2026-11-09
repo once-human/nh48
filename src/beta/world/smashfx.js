@@ -61,10 +61,33 @@ const SOUND = {
   fruit: (A, o, t, k) => { let c = t; for (let i = 0; i < 7; i++) { tone(A, o, c, J(90, 160), 0.08, 0.1*k*J(0.5, 1), 'sine', 60); hiss(A, o, c, 0.04, 600, 0.8, 0.05*k, 'lowpass'); c += J(0.04, 0.16); } },
   bamboo: (A, o, t, k) => { tone(A, o, t, J(380, 520), 0.12, 0.2*k, 'triangle', 250); crackle(A, o, t, 10, 0.25, 1200, 3600, 0.15*k); },
   cloth: (A, o, t, k) => hiss(A, o, t, 0.35, 700, 0.5, 0.08*k, 'lowpass', 250),
+  // something heavy going over onto the road: the ground takes it, a dull whump more felt than heard
+  thud: (A, o, t, k) => { tone(A, o, t + 0.02, J(44, 58), 0.4, 0.42*k, 'sine', 30); tone(A, o, t + 0.02, J(90, 120), 0.16, 0.14*k, 'triangle', 60); hiss(A, o, t, 0.3, 260, 0.7, 0.22*k, 'lowpass', 90); },
+  // a big tree shaken: the whole crown hissing at once, twigs cracking in it, then it settling in waves
+  rustle: (A, o, t, k) => { hiss(A, o, t, 1.6, 2600, 0.5, 0.16*k, 'bandpass', 1400); hiss(A, o, t + 0.25, 1.2, 3400, 0.6, 0.08*k, 'bandpass', 2000); crackle(A, o, t + 0.05, 8, 0.9, 1800, 4200, 0.07*k); },
+  // the trunk struck: a deep knock through the wood, and the bark tearing
+  trunk: (A, o, t, k) => { tone(A, o, t, J(70, 95), 0.35, 0.4*k, 'sine', 45); tone(A, o, t, J(180, 240), 0.12, 0.18*k, 'triangle', 110); crackle(A, o, t + 0.01, 6, 0.12, 900, 2600, 0.12*k); },
+  // a big trunk splitting: a long loud tearing crack, the fibres going one after another
+  split: (A, o, t, k) => { hiss(A, o, t, 0.08, 1800, 0.6, 0.7*k, 'highpass'); crackle(A, o, t + 0.04, 40, 1.4, 500, 3000, 0.22*k); tone(A, o, t + 0.05, J(55, 70), 1.0, 0.3*k, 'sawtooth', 35); },
+  // plate glass: the crack running across it, a sharp tick and a zip
+  crackGlass: (A, o, t, k) => { hiss(A, o, t, 0.02, 6000, 1.5, 0.35*k, 'highpass'); hiss(A, o, t + 0.01, 0.12, 4200, 2, 0.12*k, 'bandpass', 2600); ring(A, o, t, J(2400, 3200), 0.25, 0.04*k, [1, 2.2, 3.7]); },
+  // a whole pane going: the burst, then the shower of it coming down onto the step and the road
+  shatter: (A, o, t, k) => {
+    hiss(A, o, t, 0.2, 5000, 0.5, 0.6*k, 'highpass');
+    let c = t + 0.05; for (let i = 0; i < 26; i++) { ring(A, o, c, J(2600, 8200), J(0.05, 0.22), 0.05*k*J(0.3, 1), [1, 1.61, 2.5]); hiss(A, o, c, 0.03, J(3000, 7000), 2, 0.04*k*J(0.3, 1)); c += J(0.01, 0.07)*(1 + i*0.06); }
+  },
+  // a wall struck: the crump of it, plaster cracking and pattering down, grit
+  plaster: (A, o, t, k) => { tone(A, o, t, J(55, 75), 0.3, 0.45*k, 'sine', 38); hiss(A, o, t, 0.25, 700, 0.6, 0.28*k, 'lowpass', 200); crackle(A, o, t + 0.03, 16, 0.6, 1200, 3600, 0.1*k); },
+  // bricks coming out of it: the wall giving with a grinding crunch, the bricks knocking down after
+  bricks: (A, o, t, k) => { tone(A, o, t, J(42, 55), 0.5, 0.5*k, 'sine', 30); hiss(A, o, t, 0.6, 500, 0.5, 0.35*k, 'lowpass', 140); crackle(A, o, t + 0.02, 30, 0.8, 600, 2600, 0.16*k); },
+  // a rolling shutter dented: the slats booming and rattling in their guides
+  shutter: (A, o, t, k) => { ring(A, o, t, J(140, 190), 0.9, 0.22*k, [1, 1.47, 2.09, 2.8, 3.6]); hiss(A, o, t, 0.4, 1600, 0.8, 0.2*k, 'bandpass', 600); let c = t + 0.06; for (let i = 0; i < 8; i++) { hiss(A, o, c, 0.03, J(1500, 2600), 3, 0.08*k*(1 - i/9)); c += J(0.04, 0.09); } },
 };
 // a piece landing, by what it is and how hard (v, m/s) and how heavy (kg)
 function land(A, o, t, mat, v, m) {
   const k = Math.min(1.2, v/6)*Math.min(1.3, 0.35 + Math.log10(1 + m)*0.35);
+  // (something heavy: the ground takes the weight of it under whatever it sounds of)
+  if (m > 40) { const h = Math.min(1, (m - 40)/260)*Math.min(1, v/4); tone(A, o, t, J(42, 60), 0.3, 0.45*h, 'sine', 30); hiss(A, o, t, 0.2, 220, 0.7, 0.2*h, 'lowpass', 80); }
   switch (mat) {
     case 'steel': ring(A, o, t, J(160, 260)/Math.max(1, Math.log10(m)), 1.4, 0.2*k, [1, 2.32, 3.7, 5.9, 8.1]); hiss(A, o, t, 0.15, 1400, 0.8, 0.2*k); tone(A, o, t, 55, 0.3, 0.2*k, 'sine', 40); break;
     case 'rcc': tone(A, o, t, J(45, 60), 0.35, 0.35*k, 'sine', 32); hiss(A, o, t, 0.5, 400, 0.6, 0.3*k, 'lowpass', 120); crackle(A, o, t, 12, 0.5, 600, 2400, 0.1*k); break;

@@ -6,7 +6,10 @@
 // its material has, it rolls and turns only as its weight and the ground make it, walls stop it, and your vehicle is
 // solid to it (it's shoved by the bumper, it lies on the roof). Still for a moment, it's asleep and costs nothing until
 // something touches it. A steel post that folds over stays fixed at its foot (a pin, with the steel's stiffness
-// against it), so it lies in the road from where it stood.
+// against it), so it lies in the road from where it stood. A heavy thing carries its weight low (a stall's counter,
+// its stove and its cylinder; not its tin roof), so it's slow to go over and settles where it lands. What's laid on
+// a counter rides on it as long as the counter holds it (it tips past what the thing's grip on it can hold, or it
+// lands hard, or it's struck out from under it), then it's off with the speed it had on it; what's round rolls.
 import * as THREE from 'three';
 
 const DT = 1/120, ITER = 6, G0 = 9.81, SLOP = 0.004;
@@ -75,6 +78,13 @@ export function pieceOf(geo, parts) {
   return { geo: g, c, half, pts, vol: 8*half.x*half.y*half.z };
 }
 
+// a piece with its weight carried low: its middle of mass f of its half height below the middle of its box
+export function lower(pc, f) {
+  const d = pc.half.y*f; if (!d) return pc;
+  pc.geo.translate(0, d, 0); pc.geo.computeBoundingSphere(); for (const p of pc.pts) p.y += d; pc.c.y -= d;
+  return pc;
+}
+
 // ---------------------------------------------------------------- the bodies
 export class Debris {
   constructor() { this.list = []; this.acc = 0; this.t = 0; this.onLand = null; }
@@ -107,6 +117,16 @@ export class Debris {
   }
   sync(b) { if (b.mesh) { b.mesh.position.copy(b.p); b.mesh.quaternion.copy(b.q); b.mesh.updateMatrix(); b.mesh.updateMatrixWorld(); } }
   tick(b, W, cars) {
+    // carried on something: where it is on it, until it can't be held there
+    if (b.ride) {
+      const R = b.ride, P = R.on;
+      _q.copy(P.q); b.p.copy(R.lp).applyQuaternion(_q).add(P.p); b.q.copy(_q).multiply(R.lq);
+      const upY = 1 - 2*(P.q.x*P.q.x + P.q.z*P.q.z);           // (how upright the thing under it still is)
+      if (upY < R.cos || (P.jolt || 0) > R.jolt || this.list.indexOf(P) < 0) {
+        this.velAt(P, _r.subVectors(b.p, P.p), b.v); b.w.copy(P.w).multiplyScalar(0.6);
+        b.ride = null; b.sleep = false; b.still = 0;
+      } else { b.sleep = P.sleep; b._dirty = !P.sleep; return; }
+    }
     // something on the move touching it wakes it
     if (b.sleep) {
       let near = false;
@@ -122,7 +142,12 @@ export class Debris {
     // what it's touching: the ground under each of its points, and any vehicle it's in
     const S = W.surf, cs = b._cs || (b._cs = []); cs.length = 0;
     let deep = 0, touch = false;
-    for (let i = 0; i < b.pts.length; i++) {
+    if (b.ball) {
+      // a round thing touches the road at one point, under its middle
+      const g = S ? S.height(b.p.x, b.p.z) : 0, pen = g - (b.p.y - b.ball);
+      if (pen > -SLOP) { cs.push({ r: new V3(0, -b.ball, 0), n: UP, sv: null, pen, j: 0, i: 0, fresh: b.jn[0] === 0 }); deep = pen; touch = true; }
+      else b.jn[0] = 0;
+    } else for (let i = 0; i < b.pts.length; i++) {
       const pw = _b.copy(b.pts[i]).applyQuaternion(b.q).add(b.p), g = S ? S.height(pw.x, pw.z) : 0, pen = g - pw.y;
       if (pen > -SLOP) {
         const r = pw.sub(b.p).clone();
@@ -146,7 +171,7 @@ export class Debris {
       }
     }
     // a landing: how fast it came down, for its sound
-    if (this.onLand) for (const c of cs) if (c.fresh && c.n === UP) { const vn = -this.velAt(b, c.r, _a).y; if (vn > 1.2 && this.t - b.sndT > 0.22) { b.sndT = this.t; this.onLand(b, vn); } break; }
+    if (this.onLand) for (const c of cs) if (c.fresh && c.n === UP) { const vn = -this.velAt(b, c.r, _a).y; if (vn > 1.2) b.jolt = Math.max(b.jolt || 0, vn); if (vn > 1.2 && this.t - b.sndT > 0.22) { b.sndT = this.t; this.onLand(b, vn); } break; }
     // the solve: the contacts push only, never pull; the pin holds its point where it is
     for (let it = 0; it < ITER; it++) {
       for (const c of cs) {
@@ -180,7 +205,10 @@ export class Debris {
     const C = W.collision;
     if (C) { const r = C.resolve(b.p.x, b.p.z, Math.max(0.05, Math.min(b.half.x, b.half.z, 0.5))); if (r && r.depth > 0 && r.kind !== 3 && r.kind !== 4) { b.p.x += r.nx*r.depth; b.p.z += r.nz*r.depth; const vn = b.v.x*r.nx + b.v.z*r.nz; if (vn < 0) { b.v.x -= vn*r.nx; b.v.z -= vn*r.nz; } } }
     // a little air, and its spin dies a little faster on the ground
-    b.v.multiplyScalar(1 - 0.02*DT); b.w.multiplyScalar(1 - (touch ? 0.6 : 0.05)*DT);
+    if (b.jolt) b.jolt = Math.max(0, b.jolt - 30*DT);
+    // (what rolls loses its roll slowly, to the road's roughness; what lies on it, fast)
+    b.v.multiplyScalar(1 - 0.02*DT); b.w.multiplyScalar(1 - (touch ? (b.ball ? 0.35 : 0.6) : 0.05)*DT);
+    if (b.ball && touch) { const h = Math.hypot(b.v.x, b.v.z), dv = Math.min(h, (b.roll ?? 0.06)*G0*DT); if (h > 1e-5) { b.v.x -= b.v.x/h*dv; b.v.z -= b.v.z/h*dv; } }
     if (touch && b.v.lengthSq() < 0.012 && b.w.lengthSq() < 0.03) { if ((b.still += DT) > 0.6) { b.sleep = true; b.v.set(0, 0, 0); b.w.set(0, 0, 0); b._dirty = true; } }
     else b.still = 0;
     if (b.p.y < -50) { b.sleep = true; b._dirty = true; }

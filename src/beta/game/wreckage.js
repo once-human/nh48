@@ -13,6 +13,7 @@ import { SPEC } from '../world/smash.js';
 import { FX } from '../world/smashfx.js';
 import { toughOf } from '../vehicles/damage.js';
 import { baseOf } from '../vehicles/models.js';
+import { hitWall, stepWalls } from '../world/walls.js';
 
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 // what each weighs (as vehicles/physics.js), with whoever's on it
@@ -66,9 +67,24 @@ function drive(v) {
     }
   });
 }
+// into a building: the strongest knock against a wall this step, and what it does to it (world/walls.js)
+function wall(v, ev, n0) {
+  const W = v.W, X = W && W.smash; if (!X || v.dead || (W.fly && v.deck >= 0)) return;
+  let e = null; for (let k = n0; k < ev.length; k++) { const q = ev[k]; if (q.type === 'crash' && (q.kind === 0 || q.kind === 5) && (!e || q.speed > e.speed)) e = q; }
+  if (!e || e.speed < 1.5) return;
+  if (X.t - (v._wt ?? -9) < 0.35 && Math.hypot(e.x - v._wx, e.z - v._wz) < 1.2) return;
+  v._wt = X.t; v._wx = e.x; v._wz = e.z;
+  const m = massOf(v), y = v.y || 0, tall = tallOf(v), [, b] = half(v);
+  hitWall(W, { x: e.x, z: e.z, sx: v.x, sz: v.z, y0: y + 0.25, y1: y + Math.min(1.1, tall*0.55), E: 0.5*m*e.speed*e.speed*m/(m + 500), w: b*2 });
+}
 for (const K of [Vehicle, PlayerAuto]) {
   const cs = K.prototype.collideStatic;
-  K.prototype.collideStatic = function (...a) { try { drive(this); } catch (e) { console.warn('smash', e); } return cs.apply(this, a); };
+  K.prototype.collideStatic = function (...a) {
+    try { drive(this); } catch (e) { console.warn('smash', e); }
+    const ev = this.events, n0 = ev ? ev.length : 0, r = cs.apply(this, a);
+    if (ev && ev.length > n0) try { wall(this, ev, n0); } catch (e) { console.warn('smash', e); }
+    return r;
+  };
 }
 
 // ---- every step: the pieces, and what they can meet (you, and any car left in the street that's moving)
@@ -86,7 +102,7 @@ const fixed = Game.prototype.fixed;
 Game.prototype.fixed = function (dt) {
   const r = fixed.call(this, dt);
   const X = this.W && this.W.smash;
-  if (X && this.state === 'play' && dt > 0) try { X.tick(dt, cars(this)); } catch (e) { console.warn('smash', e); }
+  if (X && this.state === 'play' && dt > 0) try { X.tick(dt, cars(this)); stepWalls(); } catch (e) { console.warn('smash', e); }
   return r;
 };
 

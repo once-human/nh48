@@ -9,6 +9,7 @@ import { hash1 } from '@orig/core/util.js';
 import { PU, LAMP, PCF, DITHER } from '../gfx/paint.js';
 import { seenOnly } from './view.js';
 import { smash } from './smash.js';
+import { tilt } from './treehit.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // near trees hand over to the mid ones, and the mid ones to the far crowns, over a band of distance (from the camera,
@@ -147,6 +148,9 @@ export class TreeField extends GameTrees {
     const moved = Math.hypot(cx - this.lastX, cz - this.lastZ), sw = on ? (vx*(this._vx || 0) + vz*(this._vz || 0)) : -2;
     if (!force && moved < 3 && sw > 0.9976 && this._on === on) return;
     this._vx = vx; this._vz = vz; this._on = on;
+    // (a tree struck and swaying, or left leaning, keeps that: world/treehit.js)
+    const SW = this.sway && this.sway.size ? this.sway : null;
+    if (SW) for (const q of SW.values()) q.slot = null;
     if (this.lastX === 1e9) this._cx = 1e9;
     this.lastX = cx; this.lastZ = cz;
     const { nearR, midR, cell } = this, M = 4, nOut = nearR + M, mIn = Math.max(0, nearR - Bn - M), mOut = midR + M;
@@ -171,14 +175,16 @@ export class TreeField extends GameTrees {
       const k = K[t], s = SC[t], set = sets[k], c = cnt[k], r = RO[t], cr = Math.cos(r), sr = Math.sin(r);
       const sx = s*(0.92 + hash1(t*3.3)*0.16), sy = s*(0.9 + hash1(t*5.1)*0.2), y = 0.12 + Y[t];
       if (near && on && d > 22 && (dx*vx + dz*vz)/d < cosK - 22/d) behind.push(t);
-      else if (near && c[0] < set.nb.instanceMatrix.count) { put(set.nb.instanceMatrix.array, c[0]*16, cr, sr, sx, sy, X[t], y, Z[t]); c[0]++; }
-      if (mid && d < mTop && c[1] < set.mb.instanceMatrix.count) { put(set.mb.instanceMatrix.array, c[1]*16, cr, sr, sx, sy, X[t], y, Z[t]); c[1]++; }
-      if (mid && d > fIn && c[2] < set.fb.instanceMatrix.count) { put(set.fb.instanceMatrix.array, c[2]*16, cr, sr, sx, sy, X[t], y, Z[t]); c[2]++; }
+      else if (near && c[0] < set.nb.instanceMatrix.count) { put(set.nb.instanceMatrix.array, c[0]*16, cr, sr, sx, sy, X[t], y, Z[t]); if (SW && SW.has(t)) { const sq = SW.get(t); sq.slot = [k, c[0]]; tilt(set.nb.instanceMatrix.array, c[0]*16, sq, true); } c[0]++; }
+      if (mid && d < mTop && c[1] < set.mb.instanceMatrix.count) { put(set.mb.instanceMatrix.array, c[1]*16, cr, sr, sx, sy, X[t], y, Z[t]); if (SW && SW.has(t)) tilt(set.mb.instanceMatrix.array, c[1]*16, SW.get(t), false); c[1]++; }
+      if (mid && d > fIn && c[2] < set.fb.instanceMatrix.count) { put(set.fb.instanceMatrix.array, c[2]*16, cr, sr, sx, sy, X[t], y, Z[t]); if (SW && SW.has(t)) tilt(set.fb.instanceMatrix.array, c[2]*16, SW.get(t), false); c[2]++; }
     }
     for (let k = 0; k < sets.length; k++) sets[k].nb.seen = sets[k].nl.seen = cnt[k][0];
     for (let q = 0; q < behind.length; q++) {
       const t = behind[q], k = K[t], s = SC[t], set = sets[k], c = cnt[k], r = RO[t]; if (c[0] >= set.nb.instanceMatrix.count) continue;
-      put(set.nb.instanceMatrix.array, c[0]*16, Math.cos(r), Math.sin(r), s*(0.92 + hash1(t*3.3)*0.16), s*(0.9 + hash1(t*5.1)*0.2), X[t], 0.12 + Y[t], Z[t]); c[0]++;
+      put(set.nb.instanceMatrix.array, c[0]*16, Math.cos(r), Math.sin(r), s*(0.92 + hash1(t*3.3)*0.16), s*(0.9 + hash1(t*5.1)*0.2), X[t], 0.12 + Y[t], Z[t]);
+      if (SW && SW.has(t)) { const sq = SW.get(t); sq.slot = [k, c[0]]; tilt(set.nb.instanceMatrix.array, c[0]*16, sq, true); }
+      c[0]++;
     }
     for (let k = 0; k < sets.length; k++) {
       const set = sets[k], c = cnt[k];
@@ -191,7 +197,8 @@ export class TreeField extends GameTrees {
       const f = set.fb.instanceMatrix; f.clearUpdateRanges(); f.addUpdateRange(0, c[2]*16); f.needsUpdate = true;
     }
   }
-  // a young tree, its trunk thin enough, can be knocked down (world/smash.js): what it's down to is a trunk's solid, the
+  // every tree feels a blow (world/treehit.js), and a young one, its trunk thin enough, can be knocked down by an
+  // ordinary one; an old one only by something enormous (world/smash.js): what it's down to is a trunk's solid, the
   // one the collision hands back as it goes in
   addTile(T, tag) {
     const C = this.W.collision, add = C.addCircle, got = [], i0 = this.x.length;
@@ -201,8 +208,14 @@ export class TreeField extends GameTrees {
     const X = smash(this.W);
     for (let i = i0; i < this.x.length; i++) {
       const A = this.arch[this.k[i]], tr = A.trunkR*this.s[i];
-      if (tr < 0.21 && got[i - i0]) X.reg('tree', this.x[i], this.z[i], this.r[i], { cols: [got[i - i0]], tree: i, tr: Math.max(0.06, tr), h: (A.H || 10)*this.s[i] });
+      if (got[i - i0]) X.reg('tree', this.x[i], this.z[i], this.r[i], { cols: [got[i - i0]], tree: i, tr: Math.max(0.06, tr), h: (A.H || 10)*this.s[i] });
     }
+  }
+  // a swaying tree's matrix where it's laid out: upright, then turned about its foot
+  tiltAt(a, o, t, q) {
+    const s = this.s[t], r = this.r[t];
+    put(a, o, Math.cos(r), Math.sin(r), s*(0.92 + hash1(t*3.3)*0.16), s*(0.9 + hash1(t*5.1)*0.2), this.x[t], 0.12 + this.y[t], this.z[t]);
+    tilt(a, o, q, true);
   }
   sharpenLeaves() { super.sharpenLeaves(); this.paintLeaf.uniforms.tMap.value = this.leafMat.map; }
   update(cx, cz, force = false) {

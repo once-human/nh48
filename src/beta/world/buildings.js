@@ -20,6 +20,7 @@ import { kindOf } from '@orig/game/shops.js';
 import { Frame } from './geom.js';
 import { familyOf, cellDepth, shopPlan, planSeed, roomSpan } from './shopplan.js';
 import { cellsIn, cellsOut } from './shopin.js';
+import { vendIn } from './vendors.js';
 
 export { setShutters, BASE };
 // a sign material whose boards each carry their own light (aGlow): its own program, not a plain sign's
@@ -252,13 +253,16 @@ function gotNear(L, out) {
   }
   L.near = 2;
   solidsIn(L, out.solids);
+  // the footpath's sellers, things of their own (world/vendors.js)
+  try { L.vend = vendIn(L, out.vend, tagOf(L)); if (L.vend) L.solids = true; } catch (e) { console.warn('vendors', e); }
   setLod(L, lastX, lastZ, true);
 }
 // the footpath's carts, boxes and posts into the collision while they're drawn (world/footpath.js), out again after
 const tagOf = (L) => 'fp' + L.C.ci, rectOf = (L) => { const h = L.W.index.size/2 + 4; return [L.cx - h, L.cz - h, L.cx + h, L.cz + h]; };
 function solidsIn(L, sol) {
-  const C = L.W.collision; if (!C || !sol || !sol.length) return;
+  const C = L.W.collision; if (!C) return;
   C.removeTag(tagOf(L), rectOf(L));
+  if (!sol || !sol.length) return;
   const t0 = C.tag; C.tag = tagOf(L);
   try { for (const q of sol) { if (q[0] === 'r') C.addRing(q[1], 2); else C.addCircle(q[1], q[2], q[3], 2); } } finally { C.tag = t0; }
   L.solids = true;
@@ -266,6 +270,7 @@ function solidsIn(L, sol) {
 function solidsOut(L) { if (L.solids) { L.W.collision?.removeTag(tagOf(L), rectOf(L)); L.solids = false; } }
 function letGo(L) {
   if (L.near === 1) painter.drop(L.C, 'near');
+  if (L.vend) { L.vend.kill(); L.vend = null; }
   for (const c of L.cells) for (const k of ['main', 'cut']) { const m = c[k]; if (m) { L.g.remove(m); m.geometry.dispose(); c[k] = null; } }
   solidsOut(L);
   L.near = 0;
@@ -429,6 +434,7 @@ export function* buildBuildingsChunk(W, C, group) {
   return () => {
     L.dead = true;
     lods.delete(L);
+    if (L.vend) { L.vend.kill(); L.vend = null; }
     solidsOut(L);
     if (L.near === 1) painter.drop(C, 'near');
     if (shutMesh) { shutMesh.dispose(); C.shutters = null; }
