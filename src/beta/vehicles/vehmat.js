@@ -137,7 +137,8 @@ const GLASS_FS = CHUNK + `void main(){
 function mat(fs, vs, opts = {}) {
   const uniforms = Object.assign({}, PU, { uTint: { value: new THREE.Color(opts.tint ?? 0x15191d).convertSRGBToLinear() }, uRough: { value: opts.rough ?? .38 }, uMetal: { value: opts.metal ?? .1 } });
   uniforms.uLamp = { value: new THREE.Vector2() }; uniforms.uInd = { value: new THREE.Vector3() };
-  const m = new THREE.ShaderMaterial({ vertexShader: vs, fragmentShader: fs, uniforms, vertexColors: !opts.glass, side: opts.glass ? THREE.DoubleSide : THREE.FrontSide });
+  // (glass you see through: a supercar's engine lid, an auto's screen)
+  const m = new THREE.ShaderMaterial({ vertexShader: vs, fragmentShader: fs, uniforms, vertexColors: !opts.glass, side: opts.glass ? THREE.DoubleSide : THREE.FrontSide, transparent: !!opts.glass, depthWrite: !opts.glass });
   // every instanced body drawn with this needs its lamps' per-instance state: a model that came without (a parked
   // row, a door cut out of a body, a copy) gets one that's all zero (its tail lamps as any car's at night)
   if (!opts.glass) m.onBeforeRender = (r, sc, cam, geo, obj) => {

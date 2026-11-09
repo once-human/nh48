@@ -1342,6 +1342,12 @@ export function buildCar(kind0, opts = {}) {
   spec.interior = !!opts.interior;
   if (kind === 'sports' || kind === 'super') exotic(b, spec, kind);
   else carBody(b, gl, spec, kind);
+  if (kind === 'super') {
+    // its engine where it is, behind the seats, and the lid over it real glass you see it through (louvres and all)
+    const i0 = b.p.length; superBay(b, spec);
+    const f = skinOf(spec, kind); for (let i = i0; i < b.p.length; i += 3) { const q = f(b.p[i], b.p[i + 1], b.p[i + 2]); b.p[i] = q[0]; b.p[i + 1] = q[1]; b.p[i + 2] = q[2]; }
+    lidToGlass(b, gl, -1.75, -0.58);
+  }
   if (kind === 'taxi') {
     box(b, -0.15, spec.H, -0.25, 0.15, spec.H + 0.12, 0.25, [0.98, 0.85, 0.15], 0, 0.4);
   }
@@ -1353,6 +1359,53 @@ export function buildCar(kind0, opts = {}) {
     for (const s of [-1, 1]) box(b, r0, spec.H - 0.04, s * (zr + 0.05), r1, spec.H + 0.02, s * zr, [0.2, 0.2, 0.2]);
   }
   return { body: b.build(), glass: gl.build(), dims: { L: spec.L, W: spec.W, H: spec.H, wb: spec.L - 2 * spec.overhang } };
+}
+
+// ---------------------------------------------------------------- a mid-engined supercar's engine
+// The V10 behind the seats, as it sits under the glass: the bay (its floor, the bulkhead behind the cabin, the walls in
+// the body's colour between it and the rear wheels), the block with the gearbox behind it, the two banks of five in a V
+// with their black cam covers and a red stripe down each, the coils along them, the brushed plenum between them with
+// its two throttle bodies fed by carbon ducts from the side intakes, the struts' tops and a carbon brace across, the
+// headers running back to the silencers, the coolant and oil with their yellow caps
+function superBay(b, spec) {
+  const DK = [.05, .05, .055], AL = [.4, .4, .42], CF = [.09, .09, .1], RED = [.72, .06, .05], BR = [.62, .62, .64], PNT = [1, 1, 1], HOT = [.42, .32, .26], YEL = [.85, .65, .1];
+  const CARB = -2, BRUSH = -5, hl = spec.L/2, xw = hl - spec.overhang, x0 = -1.95, x1 = -0.62, zw = .66;
+  box(b, x0, .2, -zw, x1, .23, zw, DK, 0, MATTE);
+  box(b, x1, .2, -(zw + .1), x1 + .04, 1.05, zw + .1, DK, 0, MATTE);
+  box(b, x0 - .03, .2, -zw, x0, .8, zw, DK, 0, MATTE);
+  for (const s of [-1, 1]) box(b, x0, .2, s*zw, x1, .86, s*(zw + .03), PNT, 1);
+  rbox(b, -1.5, .26, -.22, -.7, .56, .22, AL);
+  rbox(b, -1.92, .24, -.2, -1.48, .52, .2, [.3, .3, .32]);
+  for (const s of [-1, 1]) {
+    const a = s*.5, uy = Math.cos(.5), uz = s*Math.sin(.5), at = (x, k, w = 0) => [x, .62 + uy*k, s*(.2 + w) + uz*k];
+    b.addGeo(G.box, M(-1.11, .62, s*.2, .78, .16, .2, a), AL);
+    let c = at(-1.11, .09); b.addGeo(G.box, M(c[0], c[1], c[2], .74, .03, .17, a), DK, MATTE);
+    c = at(-1.11, .108); b.addGeo(G.box, M(c[0], c[1], c[2], .62, .006, .035, a), RED);
+    for (let i = 0; i < 5; i++) { const x = -1.39 + i*.14; c = at(x, .13, -.03); b.addGeo(G.cyl12, M(c[0], c[1], c[2], .02, .05, .02, a), DK, MATTE); c = at(x, .158, -.03); b.addGeo(G.cyl12, M(c[0], c[1], c[2], .016, .006, .016, a), RED); }
+    // the headers: one from each cylinder, down and back to the collector, on to the silencer
+    for (let i = 0; i < 5; i++) { const x = -1.38 + i*.14; tube(b, [[x, .5, s*.31], [x - .05, .42, s*.4], [-1.7, .36, s*.36], [-2.05, .34, s*.33]], .016, HOT, 8, 5); }
+    // the strut's top, the duct from the side intake to the throttle body
+    b.addGeo(G.cyl12, M(-xw, .72, s*(zw - .08), .06, .1, .06), AL);
+    tube(b, [[-.66, .62, s*.6], [-.72, .74, s*.4], [-.77, .76, s*.12]], .045, CF, 10, 8, CARB);
+    b.addGeo(G.cyl12, M(-.79, .76, s*.08, .045, .07, .045, 0, 0, Math.PI/2), AL);
+  }
+  rbox(b, -1.42, .7, -.09, -.8, .8, .09, BR, BRUSH);
+  rod(b, [-1.48, .82, -(zw - .06)], [-1.48, .82, zw - .06], .02, CF, HUB_G, CARB);
+  rod(b, [-xw, .8, -(zw - .08)], [-xw, .8, zw - .08], .018, CF, HUB_G, CARB);
+  box(b, -.78, .5, .42, -.66, .66, .56, [.82, .8, .74]); b.addGeo(G.cyl12, M(-.72, .675, .49, .025, .03, .025), YEL);
+  b.addGeo(G.cyl12, M(-1.36, .76, -.25, .022, .03, .022), YEL);
+}
+// the triangles of a car's glass between x0 and x1 taken off the body into its glass (drawn as glass: seen through)
+function lidToGlass(b, gl, x0, x1) {
+  const I = b.i, P = b.p, Pt = b.paint, keep = [];
+  if (!Pt) return;
+  const isG = (v) => Pt[v] > 3.5 && Pt[v] < 4.5 && P[v*3] > x0 && P[v*3] < x1;
+  for (let t = 0; t + 2 < I.length; t += 3) {
+    const a = I[t], c = I[t + 1], d = I[t + 2];
+    if (!(isG(a) && isG(c) && isG(d))) { keep.push(a, c, d); continue; }
+    for (const v of [a, c, d]) { gl.p.push(P[v*3], P[v*3 + 1], P[v*3 + 2]); gl.n.push(b.n[v*3], b.n[v*3 + 1], b.n[v*3 + 2]); gl.col.push(b.col[v*3], b.col[v*3 + 1], b.col[v*3 + 2]); gl.g.push(0); if (gl.paint) gl.paint.push(4); gl.i.push(gl.c++); }
+  }
+  b.i = keep;
 }
 
 // ---------------------------------------------------------------- what's under the panels
