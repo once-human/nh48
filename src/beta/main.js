@@ -15,6 +15,7 @@ import { buildWorld, updateWorldMaterials } from '@orig/world/world.js';
 import { updateProps } from '@orig/world/propsChunk.js';
 import { Sky } from '@orig/gfx/sky.js';
 import { Post } from './gfx/post.js';
+import { cpuLaps } from './gfx/gpuclock.js';
 import { Paint } from './gfx/paint.js';
 import { painter, paintLod } from './world/buildings.js';
 import { betaGame, betaTitle } from './game/beta.js';
@@ -480,6 +481,7 @@ async function main() {
   const pf = { t: 0, n: 0, worst: 0, cpu: 0, gpuish: 0, hitch: 0 };
   const fwd = new THREE.Vector3();
   const perf = window.__perf = { n: 0, upd: 0, rnd: 0, worst: 0 };
+  const laps = cpuLaps([['traffic', traffic, 'update'], ['people', game.people, 'update'], ['police', game.police, 'update'], ['player', player, 'update'], ['streamer', W.streamer, 'update'], ['tiles', W.tiles, 'update'], ['trains', W.trains, 'update'], ['trees', W.trees, 'update'], ['boards', W.nearBoards, 'update'], ['hud', game.hud, 'update'], ['crowd', game.crowd, 'update']]);
   // watchdog: a frame that throws must not stop the game (the screen would freeze or go black). A run of
   // failures, or a camera/player gone to NaN, or a city that never comes back: reload where you were
   let bad = 0, lastGood = null, emptyT = 0;
@@ -578,14 +580,15 @@ async function main() {
     perf.n++; perf.upd += t1 - t0; perf.rnd += t2 - t1; perf.worst = Math.max(perf.worst, t1 - t0);
     if (!perfBox.hidden) {
       const ft = dt * 1000;
-      pf.t += dt; pf.n++; pf.worst = Math.max(pf.worst, ft); pf.cpu += t2 - t0; if (ft > 33) pf.hitch++;
+      pf.t += dt; pf.n++; pf.worst = Math.max(pf.worst, ft); pf.cpu += t2 - t0; pf.upd = (pf.upd || 0) + t1 - t0; pf.rnd = (pf.rnd || 0) + t2 - t1; if (ft > 33) pf.hitch++;
       if (pf.t >= 0.5) {
         const i = renderer.info, st = W.streamer.stats;
         perfBox.textContent = `${(pf.n / pf.t).toFixed(0)} fps · worst ${pf.worst.toFixed(0)} ms · hitches ${pf.hitch}\n` +
+          `${post.clock.text()}\ncpu game ${(pf.upd / pf.n).toFixed(1)} · draw calls ${(pf.rnd / pf.n).toFixed(1)} ms: ${laps.text(pf.n)}\n` +
           `cpu ${(pf.cpu / pf.n).toFixed(1)} ms/frame · ${quality.name} · ${GPU} · res ${renderer.getPixelRatio().toFixed(2)}x\n` +
           `${i.render.calls} draws · ${(i.render.triangles / 1e6).toFixed(2)}M tris · ${i.memory.geometries} geos · ${i.memory.textures} tex\n` +
           `stream: ${W.streamer.built.size} chunks · last ${st.ms.toFixed(0)} ms (sliced) · peak/frame ${st.worst.toFixed(1)} ms`;
-        pf.t = 0; pf.n = 0; pf.worst = 0; pf.cpu = 0; pf.hitch = 0;
+        pf.t = 0; pf.n = 0; pf.worst = 0; pf.cpu = 0; pf.upd = 0; pf.rnd = 0; pf.hitch = 0;
       }
     }
     game.afterRender(dt, now);

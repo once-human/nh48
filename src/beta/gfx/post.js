@@ -8,6 +8,7 @@
 // switch, which /beta doesn't need: it's always painted).
 import * as THREE from 'three';
 import { hideUnseen, showAll } from '../world/view.js';
+import { GpuClock } from './gpuclock.js';
 import { PU } from './paint.js';
 
 // heat haze: up to two hot spots a frame (beta/vehicles/details.js fills it: your exhaust after it's been worked)
@@ -190,6 +191,7 @@ export class Post {
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.mat); this.quad.frustumCulled = false;
     this.qs = new THREE.Scene(); this.qs.add(this.quad); this.qc = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     this.rts = {}; this.prevVP = new THREE.Matrix4(); this.vp = new THREE.Matrix4();
+    this.clock = new GpuClock(renderer.getContext());
   }
   setSize(w, h) { this.renderer.setSize(w, h, false); if (this.rt) { this.rt.depthTexture.dispose(); this.rt.dispose(); this.rt = null; } this.freeFx(); }
   freeFx() { for (const k in this.rts) { const r = this.rts[k]; if (Array.isArray(r)) r.forEach(x => x.dispose()); else r.dispose(); } this.rts = {}; }
@@ -224,12 +226,15 @@ export class Post {
     return chain[0].texture;
   }
   render(dt = 0.016) {
-    const R = this.renderer, cam = this.camera, U = this.U, F = this.fx;
+    const R = this.renderer, cam = this.camera, U = this.U, F = this.fx, C = this.clock;
+    C.frame();
     if (this.beforeDraw) this.beforeDraw(dt || 0.016, cam);
     this.paintLook.update(this.sky, cam, this.scene);
+    C.lap('shadows');
     if (this.shadows) this.shadows.render(this.shadowFocus(), cam.getWorldDirection(this._f || (this._f = new THREE.Vector3())));
     const rt = this.target();
     const St = this.streamer; if (St) hideUnseen(cam, St.built, St.W.index.size);
+    C.lap('scene');
     R.setRenderTarget(rt); R.render(this.scene, cam);
     if (St) showAll();
     this.t += dt || 0.016;
@@ -242,6 +247,7 @@ export class Post {
     this.proj.value.copy(cam.projectionMatrix); this.invProj.value.copy(cam.projectionMatrixInverse);
     const indoors = this.indoors && this.indoors();
     // ambient occlusion and bounced light
+    C.lap('ao');
     U.useAO.value = F.ao > 0 ? 1 : 0;
     if (F.ao > 0) {
       const a = this.fxTarget('ao', F.aoScale), b = this.fxTarget('aoB', F.aoScale); this.aoM.uniforms.samples.value = F.ao; this.aoM.uniforms.rays.value = F.rays; this.pass(this.aoM, a);
@@ -251,10 +257,13 @@ export class Post {
       U.giK.value = F.rays > 0 ? 1 : 0;
       U.tAO.value = a.texture;
     }
+    C.lap('reflections');
     U.useSSR.value = F.ssr > 0 ? 1 : 0;
     if (F.ssr > 0) { const s = this.fxTarget('ssr', F.ssrScale); this.ssrM.uniforms.steps.value = F.ssr; this.ssrM.uniforms.camWorld.value.copy(cam.matrixWorld); this.pass(this.ssrM, s); U.tSSR.value = s.texture; }
+    C.lap('bloom');
     U.bloomK.value = F.bloom > 0 ? (this.bloomK ?? .5) : 0;
     if (F.bloom > 0) U.tBloom.value = this.bloomChain(F.bloom);
+    C.lap('shafts');
     U.shaftK.value = 0;
     if (F.shafts > 0 && !indoors) {
       const S = this._sv || (this._sv = new THREE.Vector3()), dy = PU.dayK.value; S.copy(PU.sunDir.value).multiplyScalar(cam.far*.5).add(cam.position).project(cam);
@@ -282,6 +291,8 @@ export class Post {
       this.prevVP.compose(this._mbL, this._mbQ, this._mbS || (this._mbS = new THREE.Vector3(1, 1, 1))).invert().premultiply(cam.projectionMatrix);
       U.reproj.value.copy(this.prevVP); this._mbL.copy(this._mbP);
     }
+    C.lap('final');
     this.pass(this.mat, null);
+    C.stop();
   }
 }

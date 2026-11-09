@@ -127,7 +127,7 @@ export class Graphics {
     if (G.state !== 'play' || dt > .5 || typeof this.preset === 'number') return;
     this.acc += dt; this.n++; this.cpu += cpuMs; if (dt > .05) this.spikes++;
     if (this.acc < 1) return;
-    const fps = this.n/this.acc, cpu = this.cpu/this.n, share = cpu/(1000/fps), now = performance.now(), spikes = this.spikes;
+    const fps = this.n/this.acc, cpu = this.cpu/this.n, gpu = this.C.post.clock?.total || 0, share = gpu ? (cpu > gpu ? .7 : .3) : cpu/(1000/fps), now = performance.now(), spikes = this.spikes;
     const want = this.cap > 0 ? Math.min(60, this.cap) : 60;
     this.acc = 0; this.n = 0; this.cpu = 0; this.spikes = 0;
     if ((this.wait -= 1) > 0) return;
@@ -177,7 +177,7 @@ export class Graphics {
     if (this.fT < .5) return;
     const R = this.G.renderer, i = R.info, fps = this.fN/this.fT, ms = this.fT/this.fN*1000, l = [`${fps.toFixed(0)} FPS`];
     if (this.counter >= 2) l.push(`${ms.toFixed(1)} ms · worst ${(this.fW*1000).toFixed(0)} ms`);
-    if (this.counter >= 3) { const v = R.getDrawingBufferSize(this._v || (this._v = new (this.C.Vector2)())); l.push(`CPU ${(this.fC/this.fN).toFixed(1)} ms · ${v.x}x${v.y}`, `${i.render.calls} draws · ${(i.render.triangles/1e6).toFixed(2)}M tris`, this.preset === 'auto' ? 'Auto' : this.preset === 'custom' ? 'Custom' : NAMES[this.preset]); }
+    if (this.counter >= 3) { const v = R.getDrawingBufferSize(this._v || (this._v = new (this.C.Vector2)())); l.push(`CPU ${(this.fC/this.fN).toFixed(1)} ms · ${v.x}x${v.y}`, `${i.render.calls} draws · ${(i.render.triangles/1e6).toFixed(2)}M tris`, this.C.post.clock?.text() || '', this.preset === 'auto' ? 'Auto' : this.preset === 'custom' ? 'Custom' : NAMES[this.preset]); }
     this.fpsEl.textContent = l.join('\n'); this.fN = 0; this.fT = 0; this.fW = 0; this.fC = 0;
   }
   // the Settings page: sections of its own (Graphics, Audio, Game), the same rows the rest of the menu uses
