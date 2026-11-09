@@ -11,7 +11,6 @@ import { RNG } from '@orig/core/util.js';
 import { Wardrobe, buildCloth, dress } from './wardrobe.js';
 
 const TEX_W = 256, LOOK = 200, SLOTS = 96, CAST2 = 45*45;
-const NEAR2 = 30*30, HI_MIN = 10;
 // how much of a body is drawn in full detail as it takes over from the simple figure or hands back to it (people/crowd.js
 // stamps when), over half a second; anyone who isn't a street body (you, a preview) is always whole
 export const FD = 500;
@@ -375,10 +374,7 @@ export class Skin {
     }
     near.sort((a, b) => a._d2 - b._d2);
     for (const M of this.parts.m.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; if (M.sh) M.sh.fill = 0; } for (const M of this.parts.f.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; if (M.sh) M.sh.fill = 0; } for (const r of this.rigid.values()) r.fill = 0;
-    // everyone near you is a whole person whatever the setting says: all within 30 m drawn as full bodies, all within 10 m
-    // in the finest one (the setting only decides how far past that it goes)
-    let nf = 0; for (const H of near) { if (H._d2 > NEAR2) break; nf++; }
-    const D = this.data, n = Math.min(near.length, Math.max(this.max, nf), SLOTS), hi2 = Math.max(this.hiR, HI_MIN)**2, now = performance.now(); this.drawnAt = now;
+    const D = this.data, n = Math.min(near.length, this.max, SLOTS), hi2 = this.hiR*this.hiR, now = performance.now(); this.drawnAt = now;
     for (let s = 0; s < n; s++) {
       const H = near[s], k = H.look && H.look.female ? 'f' : 'm', row = s*TEX_W*4;
       H.holder.updateWorldMatrix(true, true);
