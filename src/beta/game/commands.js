@@ -1,7 +1,9 @@
 // Free roam's terminal, on / or `. Nothing it does can reach your own game: saves are shut for as long as free roam runs,
 // and rates, spawns and the rest all go back when you leave it.
 import { Shell, Terminal, plain } from './console.js';
-import { Vehicle, SPECS, specOf, defaultPaint } from '@orig/vehicles/vehicle.js';
+import { Vehicle, SPECS, specOf, defaultPaint, makeService } from '@orig/vehicles/vehicle.js';
+import { buildAmbulance, buildPoliceJeep } from '@orig/vehicles/emodels.js';
+import { serviceCabin } from '../vehicles/servicecab.js';
 import { TYPES } from '@orig/traffic/traffic.js';
 import { WEATHERS } from '@orig/gfx/weather.js';
 import { ITEMS } from '@orig/game/life.js';
@@ -15,9 +17,13 @@ const MODEL = {
   swift: 'hatch', wagonr: 'wagonr', alto: 'alto', dzire: 'sedan', city: 'city', eclass: 'lux', creta: 'suv', nexon: 'nexon', xuv700: 'xuv',
   scorpio: 'scorpio', fortuner: 'fortuner', bolero: 'bolero', thar: 'jeep', innova: 'innova', ertiga: 'ertiga', '911': 'sports', huracan: 'super',
   cab: 'taxi', activa: 'scooter', commuter: 'bike', classic350: 'bullet', zx10r: 'superbike', roadster: 'cycle', rickshaw: 'auto', ace: 'tempo', pmpml: 'bus',
+  police: 'police', ambulance: 'ambulance',
 };
+// the service vehicles: the police jeep and the 108 ambulance, built on a stock one the way the depots build them
+// (game.js), with their own body (emodels.js) and cabin (beta/vehicles/servicecab.js); H for the siren and lights
+const SVC = { police: { kind: 'pol', base: 'suv', model: 'Pune Police jeep (Bolero)' }, ambulance: { kind: 'amb', base: 'tempo', model: '108 ambulance' } };
 // other words for the same models
-const ALSO = { porsche: '911', carrera: '911', lamborghini: 'huracan', lambo: 'huracan', mercedes: 'eclass', merc: 'eclass', benz: 'eclass', xuv: 'xuv700', mahindra: 'xuv700', honda: 'city', tata: 'nexon', toyota: 'fortuner', crysta: 'innova', ninja: 'zx10r', enfield: 'classic350', re: 'classic350', hero: 'roadster', tuktuk: 'rickshaw', taxi: 'cab' };
+const ALSO = { porsche: '911', carrera: '911', lamborghini: 'huracan', lambo: 'huracan', mercedes: 'eclass', merc: 'eclass', benz: 'eclass', xuv: 'xuv700', mahindra: 'xuv700', honda: 'city', tata: 'nexon', toyota: 'fortuner', crysta: 'innova', ninja: 'zx10r', enfield: 'classic350', re: 'classic350', hero: 'roadster', tuktuk: 'rickshaw', taxi: 'cab', policejeep: 'police', cop: 'police', cops: 'police', 'bolero-police': 'police', jeep108: 'ambulance', '108': 'ambulance', amb: 'ambulance' };
 // the types: "spawn type suv" is any one of these, as often as traffic has each
 const KIND = {
   hatch: ['hatch', 'wagonr', 'alto'], sedan: ['sedan', 'city', 'lux'], suv: ['suv', 'nexon', 'xuv', 'scorpio', 'fortuner', 'bolero', 'jeep'], mpv: ['innova', 'ertiga'],
@@ -27,6 +33,7 @@ const KIND = {
 };
 KIND.car = [...new Set([...KIND.hatch, ...KIND.sedan, ...KIND.suv, ...KIND.mpv, ...KIND.sports])];
 KIND.any = [...new Set(Object.values(KIND).flat())];
+KIND.service = ['police', 'ambulance'];
 const NICK = { ...MODEL }; for (const k in ALSO) NICK[k] = MODEL[ALSO[k]];
 const modelOf = (t) => Object.keys(MODEL).find(k => MODEL[k] === t) || t;
 const COLOURS = { red: '#c8181a', white: '#eeeeea', black: '#101216', silver: '#a9acb0', grey: '#60646a', blue: '#1c3f9e', navy: '#0e1c44', green: '#14613a', yellow: '#f0c414', orange: '#e8650e', lime: '#8fd11c', purple: '#4c2178', pink: '#d84f8c', gt: '#b7bcc2', verde: '#7bbf1a', arancio: '#ef6a10', rosso: '#b30e12', teal: '#0f7f80' };
@@ -87,7 +94,7 @@ export function freeTerminal(G) {
   };
   const vehType = (s) => { const k = String(s).toLowerCase(), t = NICK[k] || k; if (!SPECS[t]) throw new Error(`no vehicle "${s}". See: roster`); return t; };
   // one of a type, as often as traffic has each
-  const anyOf = (kind) => { const f = KIND[kind].filter(k => SPECS[k]); let tot = 0; for (const k of f) tot += TYPES[k]?.w || 0.5; let r = Math.random()*tot; for (const k of f) { r -= TYPES[k]?.w || 0.5; if (r <= 0) return k; } return f[0]; };
+  const anyOf = (kind) => { const f = KIND[kind].filter(k => SPECS[k] || SVC[k]); let tot = 0; for (const k of f) tot += TYPES[k]?.w || 0.5; let r = Math.random()*tot; for (const k of f) { r -= TYPES[k]?.w || 0.5; if (r <= 0) return k; } return f[0]; };
   const nearest = (type) => { let best = null, bd = 1e18; for (const o of T().list) { if (type && o.type !== type) continue; const d = (o.x - P().x)**2 + (o.z - P().z)**2; if (d < bd) { bd = d; best = o; } } return best; };
   // a point from words: x z, ~dx ~dz (from you), ^right ^forward (the way you face), @type (the nearest of them), @wp, or a name
   let found = [];
@@ -123,8 +130,17 @@ export function freeTerminal(G) {
   // ------------------------------------------------------------ vehicles
   function make(type, paint, ahead = 7, side = 0) {
     const Pl = P(), c = Math.cos(Pl.th), n = Math.sin(Pl.th), x = Pl.x + c*ahead - n*side, z = Pl.z + n*ahead + c*side;
-    const col = paint || defaultPaint(type, { next: Math.random });
-    const v = new Vehicle(W(), G.scene, G.vmats, type, col);
+    const sv = SVC[type], col = sv ? [0.95, 0.95, 0.93] : paint || defaultPaint(type, { next: Math.random });
+    const v = new Vehicle(W(), G.scene, G.vmats, sv ? sv.base : type, col);
+    if (sv) {
+      for (const c of v.tilt.children) c.visible = false;
+      const md = sv.kind === 'amb' ? buildAmbulance() : buildPoliceJeep(); v.tilt.add(md.group); v.md = md;
+      for (const L2 of ['red', 'blue', 'red2']) if (md.lights[L2]) md.lights[L2].visible = false;
+      v.spec = { ...specOf(sv.base), L: md.dims.L, W: md.dims.W }; makeService(v);
+      v.serviceKind = sv.kind; v.service = true; v.legit = true; v.agent.isPlayer = true;
+      v.seatOverride = md.seats[0].slice(0, 3);
+      serviceCabin(v, sv.kind, G.vmats);
+    }
     v.reset(x, z, Pl.th); v.y = W().surf.height(x, z); v.plate = Pl.randomPlate(); v.helmet = true; v.fuel = 1;
     v.owned = { id: 'test' + St.spawned.length, rental: true, until: 1e12 };    // (kept: the game only tidies away what isn't yours)
     Pl.addDropped(v, T());
@@ -178,8 +194,8 @@ export function freeTerminal(G) {
   const lit = (s) => { if (s === 'true') return true; if (s === 'false') return false; if (s === 'null') return null; if (s !== '' && Number.isFinite(+s)) return +s; return s; };
 
   // ------------------------------------------------------------ what completes what
-  sh.type('model', () => Object.keys(MODEL).filter(k => SPECS[MODEL[k]]).map(v => ({ v, note: `${SPECS[MODEL[v]].model} · ${Math.round(SPECS[MODEL[v]].vTop*3.6)} km/h` })).concat(Object.keys(ALSO).map(v => ({ v, note: '→ ' + ALSO[v] }))));
-  sh.type('kind', () => Object.keys(KIND).map(v => ({ v, note: KIND[v].filter(k => SPECS[k]).map(modelOf).join(', ') })));
+  sh.type('model', () => Object.keys(MODEL).filter(k => SPECS[MODEL[k]]).map(v => ({ v, note: `${SPECS[MODEL[v]].model} · ${Math.round(SPECS[MODEL[v]].vTop*3.6)} km/h` })).concat(Object.keys(SVC).map(v => ({ v, note: SVC[v].model + ' · H for the siren' }))).concat(Object.keys(ALSO).map(v => ({ v, note: '→ ' + ALSO[v] }))));
+  sh.type('kind', () => Object.keys(KIND).map(v => ({ v, note: KIND[v].filter(k => SPECS[k] || SVC[k]).map(modelOf).join(', ') })));
   sh.type('vehicle', () => [...Object.keys(SPECS).filter(k => !SPECS[k].alias).map(v => ({ v, note: `${SPECS[v].model} · ${Math.round(SPECS[v].vTop*3.6)} km/h` })), ...Object.keys(NICK).map(v => ({ v, note: '→ ' + NICK[v] }))]);
   sh.type('rate', () => ['*', ...Object.keys(TYPES)].map(v => ({ v, note: v === '*' ? 'everything' : `now ${(St.rates[v] ?? 1)}×` })).concat(Object.keys(NICK).map(v => ({ v, note: '→ ' + NICK[v] }))));
   const placeT = (cur) => /^[~^@#\d-]/.test(cur) ? [] : (cur ? search(cur, 400) : allPlaces().filter(p => p.c === 'area').sort((a, b) => a.l < b.l ? -1 : 1)).map(p => ({ v: p.n, note: p.c + ' · ' + Math.round(Math.hypot(p.x - P().x, p.z - P().z)) + ' m' }));
@@ -264,7 +280,7 @@ export function freeTerminal(G) {
   function put(pick, n, f) {
     const count = Math.min(Math.max(1, +n || 1), 24), paint = f.paint ? paintOf(f.paint) : null; let v; const got = {};
     for (let i = 0; i < count; i++) { const type = pick(i); got[type] = (got[type] || 0) + 1; v = make(type, paint, 7 + Math.floor(i/4)*7, (i % 4 - 1.5)*(count > 1 ? 3.2 : 0)); }
-    say(Object.entries(got).map(([k, c]) => `${c} × ${modelOf(k)}: ${SPECS[k].model}`).join(', '), 'ok');
+    say(Object.entries(got).map(([k, c]) => `${c} × ${modelOf(k)}: ${(SPECS[k] || SVC[k]).model}`).join(', '), 'ok');
     if (f.drive) { const d = P().dropped.find(q => q.veh === v); if (!P().onFoot) P().exit(T(), true); P().enter({ kind: 'dropped', d, now: true }, T()); if (G.rig) G.rig.inited = false; }
   }
   const kindOf = (k) => { k = String(k).toLowerCase().replace(/[-_ ]/g, ''); if (k === 'twowheelers' || k === '2w') k = 'twowheeler'; if (!KIND[k]) throw new Error(`no type "${k}". Types: ${Object.keys(KIND).join(', ')}`); return k; };

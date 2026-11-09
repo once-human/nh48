@@ -13,9 +13,11 @@ function shellTop(v) {
   const top = new Map(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), M = new THREE.Matrix4();
   const mark = (x, z, y) => { const k = key(Math.round(x/CELL), Math.round(z/CELL)); if (y > (top.get(k) ?? -9)) top.set(k, y); };
   const edge = (p, q) => { const n = Math.ceil(Math.hypot(q.x - p.x, q.z - p.z)/(CELL*0.5)); for (let t = 0; t <= n; t++) { const k = n ? t/n : 0; mark(p.x + (q.x - p.x)*k, p.z + (q.z - p.z)*k, p.y + (q.y - p.y)*k); } };
-  for (const mesh of [v.bodyMesh, v.glassMesh]) {
+  // (a police jeep or an ambulance: its own body, not the stock one hidden under it. beta/vehicles/servicecab.js)
+  for (const mesh of v.shellMeshes || [v.bodyMesh, v.glassMesh]) {
     if (!mesh || !mesh.geometry) continue;
     mesh.updateMatrix(); M.copy(mesh.matrix);
+    if (mesh.parent && mesh.parent !== v.tilt) { mesh.parent.updateMatrix(); M.premultiply(mesh.parent.matrix); }
     if (mesh.isInstancedMesh) { const I = new THREE.Matrix4(); mesh.getMatrixAt(0, I); M.multiply(I); }
     const pos = mesh.geometry.attributes.position, ix = mesh.geometry.index, nt = (ix ? ix.count : pos.count)/3;
     // the whole of every triangle laid over the grid, not just its corners (a roof is a few big triangles with nothing
@@ -40,15 +42,17 @@ function fit(v) {
   const C = v.cockpit; if (!C || C._fit) return;
   C._fit = true;
   const topAt = shellTop(v), p = new THREE.Vector3(), inv = new THREE.Matrix4();
+  // (the cabin as a whole can sit moved in the car: the jeep's Bolero cabin is)
+  C.group.updateMatrix(); const gm = C.group.matrix.clone(), gi = gm.clone().invert();
   // (the wheel on its pivot turns, and sits well inside: only the fixed pieces)
   for (const o of C.group.children) {
     if (!o.isMesh || !o.geometry) continue;
     o.updateMatrix(); inv.copy(o.matrix).invert();
     const g = o.geometry, pos = g.attributes.position; let moved = false;
     for (let i = 0; i < pos.count; i++) {
-      p.fromBufferAttribute(pos, i).applyMatrix4(o.matrix);
+      p.fromBufferAttribute(pos, i).applyMatrix4(o.matrix).applyMatrix4(gm);
       const t = topAt(p.x, p.z), lim = t === null ? 0.3 : t - GAP;
-      if (p.y > lim) { p.y = lim; p.applyMatrix4(inv); pos.setXYZ(i, p.x, p.y, p.z); moved = true; }
+      if (p.y > lim) { p.y = lim; p.applyMatrix4(gi).applyMatrix4(inv); pos.setXYZ(i, p.x, p.y, p.z); moved = true; }
     }
     if (moved) { pos.needsUpdate = true; g.computeBoundingSphere(); }
   }
