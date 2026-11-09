@@ -41,8 +41,9 @@ export const SPEC = {
   banner: { mass: 15, h: 2.9, mat: 'bamboo', bend: 60, brk: 160, absorb: 100, mode: 'fold', free: true, base: -1, snd: 'bamboo' },     // a banner on its bamboo frame: a kick has it over
   bus: { mass: 300, h: 3.3, mat: 'steel', bend: 1e4, brk: 4e4, absorb: 2.5e4, mode: 'fold', free: true, base: -1, snd: 'steelFold' },   // a bus shelter
   // a young tree, a trunk 0.15 m across the middle: a thicker one by the cube of how much thicker, and an old one
-  // (past 0.21 m) far more than that: its wood's set hard and its roots go down as far as it's high (Smash.reg)
-  tree: { mass: 150, h: 6, mat: 'wood', bend: 3e3, brk: 1e4, absorb: 5e3, mode: 'tree', snd: 'wood' },
+  // (past 0.21 m) far more than that: its wood's set hard and its roots go down as far as it's high (Smash.reg). Green
+  // wood bends a long way before it goes: a hatchback has to be doing 55 to snap a young one, a sapling 40
+  tree: { mass: 150, h: 6, mat: 'wood', bend: 3e3, brk: 8e4, absorb: 2e4, mode: 'tree', snd: 'wood' },
   // the footpath's own (world/vendors.js): a fruit handcart and what's on it, a cobbler's box and stool and shoes, an umbrella
   // in a cart or standing in its bucket of stones
   cart: { mass: 130, h: 1.2, mat: 'wood', tip: 1.4e3, brk: 6e3, absorb: 2e3, mode: 'cart', snd: 'wood', goods: 'fruit', low: 0.25, grip: 0.5, round: true },
@@ -63,6 +64,7 @@ class Smash {
     this.W = W; this.byMesh = new Map(); this.lines = new Set(); this.moving = new Set(); this.wst = new Map(); this.lineGen = 0; this.lineN = 0; this.by = new Map(); this.grid = new Map(); this.down = new Set(); this.t = 0; this.chk = 0; this.nSnd = 0; this.sndT = 0;
     this.debris = new Debris(); this.leaves = new Leaves(W);
     this.debris.onLand = (b, v) => { if (this.nSnd++ < 6) FX.land(b.mat, b.p.x, b.p.y, b.p.z, v, b.m); };
+    this.flick = new Set();
   }
   spec(r) { return r.S || SPEC[r.kind]; }
   shake(r, o, tot) { shakeTree(this, r, o, tot); }
@@ -92,7 +94,7 @@ class Smash {
     if (o.lamp && r.lamp0 && r.st === 1) { o.lamp[0] = r.lamp[0]; o.lamp[1] = r.lamp[1]; }
     if (o.tree != null) {
       r.ti = o.tree; r.tr = o.tr; const f = o.tr/0.15, B = SPEC.tree, old = 1 + 2.5*Math.min(1, Math.max(0, (o.tr - 0.17)/0.09)), f3 = f*f*f*old;
-      r.S = Object.assign({}, B, { mass: B.mass*Math.pow(f, 2.5), bend: B.bend*f3, brk: B.brk*f3, crk: B.brk*f3*0.45, absorb: B.absorb*f3, h: o.h || B.h });
+      r.S = Object.assign({}, B, { mass: B.mass*Math.pow(f, 2.5), bend: B.bend*f3, brk: Math.max(4e4, B.brk*f3), crk: B.brk*f3*0.45, absorb: B.absorb*f3, h: o.h || B.h });
       const T = this.W.trees;
       if (r.st === 2) { if (T) (T.dead || (T.dead = new Set())).add(o.tree); }
     }
@@ -178,7 +180,40 @@ class Smash {
       if (o.by !== 'shot') FX.knock(S.mat, o.px, o.py, o.pz, Math.min(1, 0.25 + o.E/(S.bend || 1e3)));
     }
     r.dmg += o.E*0.5;
+    if (r.lamp && r.st !== 2 && !r.dark) this.flicker(r, o.E, S);
     return out;
+  }
+  // ---- a lamp knocked: its tube stutters, off and on, longer the harder it was hit, and settles back on
+  flicker(r, E, S) {
+    r.fl = Math.max(r.fl || 0, Math.min(3, 0.6 + 2.4*E/(S.brk || 4e4))); r.flN = 0; this.flick.add(r);
+  }
+  flickStep(dt) {
+    for (const r of this.flick) {
+      r.fl -= dt; r.flN -= dt;
+      const end = r.fl <= 0 || r.st === 2 || r.dark || !r.lamp;
+      if (!end && r.flN > 0) continue;
+      const was = r.lamp && r.lamp.out;
+      if (end) { this.flick.delete(r); if (r.lamp) r.lamp.out = r.st === 2 || r.dark; }
+      else {
+        // mostly off at first, catching more and more as it settles
+        const on = Math.random() < 0.25 + 0.6*Math.max(0, 1 - r.fl/1.5);
+        r.lamp.out = !on; r.flN = on ? 0.04 + Math.random()*0.18 : 0.03 + Math.random()*0.12;
+      }
+      if (r.lamp && r.lamp.out !== was) { this.W._lampsDirty = true; this.pool(r); }
+    }
+  }
+  // the game's own soft patch of light under each lamp (game.js buildLightPools), laid down once when the city's
+  // built: put out with the lamp, and moved with it when it's left leaning
+  pool(r) {
+    const G = window.__nhAskG, P = G && G.lightPools, l = r.lamp; if (!P || !l) return;
+    const im = P.mesh, a = im.instanceMatrix.array;
+    if (r._pool === undefined) {
+      const l0 = r.lamp0 || l; r._pool = -1;
+      for (let i = 0; i < im.count; i++) if (Math.abs(a[i*16 + 12] - l0[0]) < 0.05 && Math.abs(a[i*16 + 14] - l0[1]) < 0.05) { r._pool = i; break; }
+    }
+    const o = r._pool*16; if (o < 0) return;
+    const s = l.out ? 0 : 11; a[o] = a[o + 10] = s; a[o + 5] = l.out ? 0 : 1; a[o + 12] = l[0]; a[o + 14] = l[1];
+    im.instanceMatrix.needsUpdate = true;
   }
   // gone from the street: not drawn, not solid, its light off
   gone(r) {
@@ -186,7 +221,7 @@ class Smash {
     for (const [, it] of r.items) it.off = true;
     if (r.deadIt) r.deadIt.off = true;
     for (const c of r.cols) c.off = true;
-    if (r.lamp) r.lamp.out = true;
+    if (r.lamp) { r.lamp.out = true; this.pool(r); }
     if (r.head) r.head.dead = true;
     if (r.draw) for (const e of r.draw) this.cut(e, true);
     r.st = 2; r.tb = this.t; this.down.add(r);
@@ -286,11 +321,40 @@ class Smash {
     const b = this.debris.add(Object.assign({ mesh: g, p, q: new THREE.Quaternion(), m: S.mass, half: new THREE.Vector3(Math.max(0.3, hx*0.6), H/2, Math.max(0.3, hz*0.6)), pts, mat: 'wood', keepGeo: true },
       big ? { pin: new THREE.Vector3(T.x[t], y0 + 0.4, T.z[t]), pinLocal: new THREE.Vector3(0, 0.4 - cm.y, 0), stiff: 0.8 } : {}));
     this.debris.iw(b); r.bodies.push(b);
+    if (!big) this.stump(r, T.x[t], y0, T.z[t], tr, o);
     const J = S.mass*Math.max(1, o.u ?? 2)*(big ? 0.25 : 0.45);
     this.push(b, o.px, Math.max(y0 + 1.2, o.py), o.pz, o.nx*J, 0, o.nz*J);
     FX.brk(big ? 'split' : 'wood', r.x, y0 + 0.5, r.z, 1); FX.brk('rustle', r.x, y0 + H*0.6, r.z, 1.5);
     this.leaves.drop(r, { x: r.x, z: r.z, y0: y0 + H*0.4, y1: y0 + H, hx: hx*0.8, hz: hz*0.8 }, big ? 120 : 50, o.nx, o.nz, k);
     return { broke: true, absorb: S.absorb, carried: S.mass*0.3 };
+  }
+  // what a snapped young tree leaves in the ground: a knee-high stump, its bark on, broken off on a slant (lower on the
+  // side it was struck from, where the wood went first), the pale wood split into long splinters standing up from it
+  // and a few torn strips of bark. It stays put, rooted, until the tree's put back
+  stump(r, x, y0, z, tr, o) {
+    const cb = new ColorBuilder(), R = Math.max(0.05, tr*1.02), bark = [0.3, 0.24, 0.18], wood = [0.78, 0.66, 0.47], dk = [0.55, 0.44, 0.3], N = 10;
+    const a0 = Math.atan2(o.nz, o.nx), hb = 0.42 + hsh(r.x)*0.25, sl = 0.1 + hsh(r.z)*0.08;
+    const top = (a) => hb + Math.cos(a - a0)*sl + (hsh(a*7.3 + r.x) - 0.5)*0.06;
+    const tri = (p, q, w, c, n) => { const i0 = cb.v(...p, ...n, ...c); cb.v(...q, ...n, ...c); cb.v(...w, ...n, ...c); cb.i.push(i0, i0 + 1, i0 + 2); };
+    for (let i = 0; i < N; i++) {
+      const a = i/N*6.283, b = (i + 1)/N*6.283, ca = Math.cos(a), sa = Math.sin(a), cb2 = Math.cos(b), sb = Math.sin(b), fl = 1.25;     // (a root flare at the foot)
+      const p0 = [x + ca*R*fl, y0 - 0.05, z + sa*R*fl], p1 = [x + cb2*R*fl, y0 - 0.05, z + sb*R*fl], p2 = [x + cb2*R, y0 + top(b), z + sb*R], p3 = [x + ca*R, y0 + top(a), z + sa*R];
+      const nm = [Math.cos((a + b)/2), 0.15, Math.sin((a + b)/2)], c = bark.map(v => v*(0.85 + hsh(i + r.x)*0.3));
+      tri(p0, p2, p1, c, nm); tri(p0, p3, p2, c, nm);
+      // the break: the wood, and a splinter up off every other edge
+      tri([x, y0 + hb - 0.02, z], [x + cb2*R*0.97, y0 + top(b), z + sb*R*0.97], [x + ca*R*0.97, y0 + top(a), z + sa*R*0.97], i % 3 ? wood : dk, [0, 1, 0]);
+      if (i % 2 === 0) {
+        const m = (a + b)/2, rr = R*(0.35 + hsh(i*3 + r.z)*0.5), L = 0.08 + hsh(i*5 + r.x)*0.2, w = R*0.22, cx = x + Math.cos(m)*rr, cz = z + Math.sin(m)*rr, yb = y0 + top(m) - 0.02;
+        const tx = -Math.sin(m)*w, tz = Math.cos(m)*w, tip = [cx + Math.cos(m)*0.02 + o.nx*L*0.25, yb + L, cz + Math.sin(m)*0.02 + o.nz*L*0.25];
+        tri([cx - tx, yb, cz - tz], [cx + tx, yb, cz + tz], tip, wood, [Math.cos(m), 0.3, Math.sin(m)]);
+        tri([cx + tx, yb, cz + tz], [cx - tx, yb, cz - tz], tip, dk, [-Math.cos(m), 0.3, -Math.sin(m)]);
+      }
+    }
+    for (let i = 0; i < 3; i++) {
+      const a = a0 + Math.PI + (hsh(i + r.x*2) - 0.5)*2.4, ca = Math.cos(a), sa = Math.sin(a), yt = y0 + top(a), L = 0.12 + hsh(i*9)*0.18, d = R + 0.012;
+      tri([x + ca*d - sa*0.03, yt, z + sa*d + ca*0.03], [x + ca*d + sa*0.03, yt, z + sa*d - ca*0.03], [x + ca*(d + 0.06), yt + L, z + sa*(d + 0.06)], bark, [ca, 0, sa]);
+    }
+    const m = new THREE.Mesh(cb.build(), this.W.mats.prop); m.castShadow = m.receiveShadow = true; m.matrixAutoUpdate = false; this.W.scene.add(m); r.meshes.push(m);
   }
   // ---- a stall: over as one (tip), or into its pieces
   apart(r, o, tip) {
@@ -367,7 +431,7 @@ class Smash {
       const e = r.items.find(q => q[0] === W.lampSet);
       if (e) { e[1].off = true; const mm = new THREE.Matrix4().fromArray(e[1].m); r.deadIt = W.lampDeadSet.add(r.x, r.z, mm); r.m0.set(r.deadIt, r.m0.get(e[1])); if (r.live) { r.deadIt.off = true; r.live.geometry = P.lampDead; } }
     }
-    if (r.lamp) r.lamp.out = true;
+    if (r.lamp) { r.lamp.out = true; this.pool(r); }
     // the head's glass in bits, off the head and down
     const F = this.frame(r, new THREE.Matrix4()), hp = new THREE.Vector3(1.75, 8.05, 0).applyMatrix4(F);
     for (let k = 0; k < 7; k++) {
@@ -387,8 +451,11 @@ class Smash {
     if (this.debris.list.length) this.debris.step(dt, this.W, cars);
     if (this.moving.size || this.wst.size) Sway.step(this, dt);
     treeStep(this, dt); this.leaves.step(dt);
+    if (this.flick.size) this.flickStep(dt);
     if ((this.chk -= dt) > 0) return;
     this.chk = 0.5;
+    // a lamp left leaning: its patch of light goes where its head now is
+    for (const r of this.down) if (r.lamp && r.st === 1 && !this.flick.has(r)) this.pool(r);
     const G = window.__nhAskG, cam = G && G.camera, W = this.W;
     // a broken signal stays dark (its bulbs are laid out again whenever a tile comes or goes)
     const B = W.signalBulbs;
@@ -417,7 +484,7 @@ class Smash {
     for (const [, it] of r.items) { it.off = false; const m0 = r.m0.get(it); if (m0) it.m.set(m0); }
     if (r.deadIt) { r.deadIt.off = true; const S = this.W.lampDeadSet; if (S) S.items = S.items.filter(q => q !== r.deadIt); r.deadIt = null; }
     for (const c of r.cols) c.off = false;
-    if (r.lamp) r.lamp.out = false;
+    if (r.lamp) { r.lamp.out = false; this.pool(r); }
     if (r.head) r.head.dead = false;
     r.st = 0; r.dmg = 0; r.dark = false;
     if (r.kind === 'pole') { Sway.spansOf(this, r); Sway.unhang(this, r); }

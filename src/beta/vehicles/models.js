@@ -862,6 +862,7 @@ function carBody(b, gl, spec, kind = 'sedan') {
   gridSurface(b, gP, (q) => {
     const r = rowOf(q.k), x = q.x;
     if (q.inside) {
+      if (spec.sun && r >= side && x > roofF - .85 && x < roofF - .22 && Math.abs(q.z) < .42) return null;      // (the sunroof's opening)
       if (r >= side) return x < roofF && x > roofR ? HEADLINER : (r < side + 1 ? INSIDE : null);
       if (x < xC || x > xf0 - .04 || Math.abs(x - xb) < .05) return INSIDE;
       return r === 0 || r >= 6 ? HEADLINER : null;
@@ -953,7 +954,12 @@ function carBody(b, gl, spec, kind = 'sedan') {
   else { const Ha = roofAt(roofR + .1); tube(b, [[roofR + .1, Ha, 0], [roofR + .02, Ha + .05, 0], [roofR - .1, Ha + .15, 0]], .004, TRIM, 4, 4);
     rbox(b, roofR + .06, Ha - .01, -.022, roofR + .2, Ha + .035, .022, TRIM, 0, MATTE); }
   if (kind === 'lux' || kind === 'sedan') for (const s of [-1, 1]) patch(b, 6, 1, (u, v) => [lerp(roofR + .12, roofF - .1, u), H - .004 - (s*(.42 + v*.012))**2*.09, s*(.42 + v*.012)], SEAM, [0, 1, 0]);
-  if (kind === 'lux') patch(b, 8, 4, (u, v) => { const z = lerp(-.42, .42, v); return [lerp(roofF - .85, roofF - .22, u), H + .002 - z*z*.09, z]; }, WINDOW, [0, 1, 0]);
+  // the sunroof: its glass lying in the roof, a black frame round it
+  if (spec.sun) {
+    onTop(roofF - .85, roofF - .22, -.42, .42, WINDOW, { nu: 8, nv: 4, off: .003 });
+    onTop(roofF - .88, roofF - .85, -.45, .45, BLACKOUT, { nu: 1, nv: 6, off: .004 }); onTop(roofF - .22, roofF - .19, -.45, .45, BLACKOUT, { nu: 1, nv: 6, off: .004 });
+    for (const s of [-1, 1]) onTop(roofF - .85, roofF - .22, s*.42, s*.45, BLACKOUT, { nu: 6, nv: 1, off: .004 });
+  }
 
   // ------------------------------------- the nose
   const yb0 = sill + .14, yt0 = beltY - .27*nose, yM = (yb0 + yt0)/2, nW = tableAt(T, hl - .06, 1);
@@ -1080,6 +1086,8 @@ export const VARIANTS = {
   ertiga: { base: 'suv', w: 0.9, spec: { L: 4.4, W: 1.74, H: 1.69, hood: 0.95, roofF: 1.0, roofR: -2.0, beltY: 0.98, sill: 0.3, R: 0.31, tail: 0.08, overhang: 0.75 }, phys: { name: 'MPV', real: 'Ertiga', model: 'Maruti Ertiga 1.5 CNG, seven seats', vTop: 44, acc: 2.8, mass: 1250 } },
 };
 export const baseOf = (k) => (VARIANTS[k] ? VARIANTS[k].base : k);
+// the ones that come with a sunroof, as they're sold here: the big Mercedes, the Creta, the XUV, the Nexon, the City
+export const hasSun = (k) => /^(lux|suv|xuv|nexon|city)$/.test(k);
 
 // A front door as the body draws its shut lines (carBody, exotic), so the real panel can be cut out of the body and
 // hung on its hinge (vehicles/cardoor.js): its back edge (the B-pillar seam; the window's back edge just ahead of the
@@ -1234,6 +1242,8 @@ function exotic(b, spec, kind) {
   const GLOW = (c, g) => [c[0], c[1], c[2], 0, g];
   // common to both: shut lines, handles, mirrors, wipers
   const doorF = por ? .42 : .72, doorR = por ? -.92 : -.46, sillS = spec.sill + .12;
+  // and the header across the top of the screen, where the roof starts
+  { const x = WIN.wind[0] + .02, zr = at(x, 6)*.95, pts = []; for (let i = 0; i <= 8; i++) { const z = lerp(-zr, zr, i/8); pts.push([x, yTop(x, z) - .012, z]); } tube(b, pts, .02, [.05, .05, .055], 10, 6, 0, MATTE); }
   for (const s of [-1, 1]) {
     for (const x of [doorF, doorR]) onSide(s, x - .004, x + .004, sillS, at(x, 3) + .01, SEAM, { nu: 1, nv: 5, off: .004 });
     onSide(s, doorR, doorF, sillS - .01, sillS - .002, SEAM, { nu: 6, off: .004 });
@@ -1242,6 +1252,9 @@ function exotic(b, spec, kind) {
     const glassPatch = (grow, off, c) => patch(b, 44, 1, (u, v) => { const x = lerp(xr - grow, xf + grow*.5, u), lo = Math.max(0, tBot(x) - grow*1.2), hi = Math.min(1, .86 + grow*1.2); return onGlass(s, x, lerp(lo, hi, v), off); }, c, [0, .4, s]);
     glassPatch(.035, .003, por ? [.62, .62, .64] : BLACKED); glassPatch(0, .006, WINDOW);
     if (WIN.pillar < 1e8) patch(b, 1, 3, (u, v) => onGlass(s, WIN.pillar - .025 + u*.05, lerp(.05, .88, v), .008), BLACKED, [0, .4, s]);
+    // the windscreen's pillar: a post up the screen's edge between it and the door glass, so they're two panes and not
+    // one, and it's there from inside too (the body's skin is only seen from outside)
+    { const pts = []; for (let i = 0; i <= 12; i++) pts.push(onGlass(s, lerp(WIN.wind[0] + .03, Math.min(WIN.side[1], xc) + .03, i/12), .93, .006)); tube(b, pts, .028, [.05, .05, .055], 16, 6, 0, MATTE); }
     const hx = doorR + .14; const beltH = at(hx, 3); rb(hx, beltH - .075, s*(zSide(hx, beltH - .07) - .005), hx + .13, beltH - .05, s*(zSide(hx, beltH - .07) + .012), por ? [...CHROME] : TRIM);
     const mx = xc - .2, my = at(mx, 4) + .1, mz = s*(at(mx, 1)*GW + .1);
     rod(b, [mx + .02, at(mx, 4) + .02, s*at(mx, 1)*GW*.97], [mx, my - .012, mz - s*.04], .014, TRIM, TUBE6);
@@ -1314,7 +1327,10 @@ function exotic(b, spec, kind) {
     onTop(1.1, 1.13, -.5, .5, SEAM, { nu: 1, nv: 8, off: .003 });
     onTop(1.98, 2.02, -.42, .42, SEAM, { nu: 1, nv: 6, off: .003 });
     // the engine lid: louvres down the glass in three rows
-    for (let i = 0; i < 9; i++) { const x = -1.66 + i*.115; for (const z of [-.26, 0, .26]) onTop(x, x + .05, z - .1, z + .1, [.2, .2, .21], { nu: 1, nv: 2, off: .007 }); }
+    for (let i = 0; i < 9; i++) { const x = -1.66 + i*.115; for (const z of [-.26, 0, .26]) onTop(x, x + .03, z - .1, z + .1, [.2, .2, .21], { nu: 1, nv: 2, off: .007 }); }
+    // and a black frame round the glass, so it reads as the lid it is
+    onTop(-1.74, -1.7, -.47, .47, BLACKED, { nu: 1, nv: 8, off: .006 }); onTop(-.63, -.59, -.47, .47, BLACKED, { nu: 1, nv: 8, off: .006 });
+    for (const s of [-1, 1]) onTop(-1.72, -.61, 0, 0, BLACKED, { z0: () => s*.43, z1: () => s*.47, nu: 10, nv: 1, off: .006 });
     // the tail: a black mesh across, thin lamps in a Y, four fins and a pipe each side
     onEnd(-1, -.74, .74, .5, .78, DARK, { nu: 12, nv: 2, off: .006 });
     for (let i = -5; i <= 5; i++) onEnd(-1, i*.13 - .004, i*.13 + .004, .52, .76, [.13, .13, .14], { nu: 1, nv: 1, off: .012 });
@@ -1339,7 +1355,7 @@ function exotic(b, spec, kind) {
 export function buildCar(kind0, opts = {}) {
   const b = newB(true), gl = newB(false), kind = baseOf(kind0), V = VARIANTS[kind0];
   const spec = carSpec(kind0);
-  spec.interior = !!opts.interior;
+  spec.interior = !!opts.interior; spec.sun = hasSun(kind0);
   if (kind === 'sports' || kind === 'super') exotic(b, spec, kind);
   else carBody(b, gl, spec, kind);
   if (kind === 'super') {
@@ -1370,8 +1386,9 @@ export function buildCar(kind0, opts = {}) {
 function superBay(b, spec) {
   const DK = [.05, .05, .055], AL = [.4, .4, .42], CF = [.09, .09, .1], RED = [.72, .06, .05], BR = [.62, .62, .64], PNT = [1, 1, 1], HOT = [.42, .32, .26], YEL = [.85, .65, .1];
   const CARB = -2, BRUSH = -5, hl = spec.L/2, xw = hl - spec.overhang, x0 = -1.95, x1 = -0.62, zw = .66;
-  box(b, x0, .2, -zw, x1, .23, zw, DK, 0, MATTE);
+  box(b, x0, .2, -zw, x1, .23, zw, CF, CARB);
   box(b, x1, .2, -(zw + .1), x1 + .04, 1.05, zw + .1, DK, 0, MATTE);
+  box(b, x1 - .006, .26, -(zw - .03), x1, .74, zw - .03, [.8, .62, .26], BRUSH, .06);          // (gold foil on the bulkhead, against the heat)
   box(b, x0 - .03, .2, -zw, x0, .8, zw, DK, 0, MATTE);
   for (const s of [-1, 1]) box(b, x0, .2, s*zw, x1, .86, s*(zw + .03), PNT, 1);
   rbox(b, -1.5, .26, -.22, -.7, .56, .22, AL);
@@ -1380,7 +1397,8 @@ function superBay(b, spec) {
     const a = s*.5, uy = Math.cos(.5), uz = s*Math.sin(.5), at = (x, k, w = 0) => [x, .62 + uy*k, s*(.2 + w) + uz*k];
     b.addGeo(G.box, M(-1.11, .62, s*.2, .78, .16, .2, a), AL);
     let c = at(-1.11, .09); b.addGeo(G.box, M(c[0], c[1], c[2], .74, .03, .17, a), DK, MATTE);
-    c = at(-1.11, .108); b.addGeo(G.box, M(c[0], c[1], c[2], .62, .006, .035, a), RED);
+    c = at(-1.11, .108); b.addGeo(G.box, M(c[0], c[1], c[2], .62, .006, .035, a), RED, .12);
+    c = at(-1.11, .1, .085); b.addGeo(G.box, M(c[0], c[1], c[2], .7, .01, .03, a), CF, 0, CARB);
     for (let i = 0; i < 5; i++) { const x = -1.39 + i*.14; c = at(x, .13, -.03); b.addGeo(G.cyl12, M(c[0], c[1], c[2], .02, .05, .02, a), DK, MATTE); c = at(x, .158, -.03); b.addGeo(G.cyl12, M(c[0], c[1], c[2], .016, .006, .016, a), RED); }
     // the headers: one from each cylinder, down and back to the collector, on to the silencer
     for (let i = 0; i < 5; i++) { const x = -1.38 + i*.14; tube(b, [[x, .5, s*.31], [x - .05, .42, s*.4], [-1.7, .36, s*.36], [-2.05, .34, s*.33]], .016, HOT, 8, 5); }
@@ -1390,6 +1408,12 @@ function superBay(b, spec) {
     b.addGeo(G.cyl12, M(-.79, .76, s*.08, .045, .07, .045, 0, 0, Math.PI/2), AL);
   }
   rbox(b, -1.42, .7, -.09, -.8, .8, .09, BR, BRUSH);
+  // ten polished runners arching up out of the plenum and down into the heads, a red badge plate on top with its
+  // silver bar, the oil filler and the dipstick's yellow loop
+  const POL = [.88, .88, .9];
+  for (const s of [-1, 1]) for (let i = 0; i < 5; i++) { const x = -1.39 + i*.14; tube(b, [[x, .78, s*.07], [x, .86, s*.12], [x, .82, s*.18], [x, .73, s*.22]], .021, POL, 8, 6, 0, .05); b.addGeo(G.cyl12, M(x, .73, s*.225, .028, .014, .028, s*.5), AL); }
+  rbox(b, -1.26, .8, -.055, -.94, .816, .055, RED, 0, .12); rbox(b, -1.22, .816, -.016, -.98, .822, .016, POL, 0, .08);
+  b.addGeo(G.cyl12, M(-.9, .82, .2, .03, .025, .03), DK, MATTE); tube(b, [[-1.5, .7, -.3], [-1.52, .78, -.3], [-1.49, .8, -.3]], .012, YEL, 6, 4);
   rod(b, [-1.48, .82, -(zw - .06)], [-1.48, .82, zw - .06], .02, CF, HUB_G, CARB);
   rod(b, [-xw, .8, -(zw - .08)], [-xw, .8, zw - .08], .018, CF, HUB_G, CARB);
   box(b, -.78, .5, .42, -.66, .66, .56, [.82, .8, .74]); b.addGeo(G.cyl12, M(-.72, .675, .49, .025, .03, .025), YEL);
@@ -1475,7 +1499,7 @@ export function buildUnder(kind0, which) {
     }
     if (exo) {
       // the luggage tub: floor and four walls, carpeted; a radiator in each front corner with its duct
-      const x0 = xf0 + .05, x1 = hl - .38, zt = hw - .38, y0 = sill + .1, y1 = belt - .06, C = [.1, .1, .1];
+      const x0 = xf0 + .3, x1 = hl - .38, zt = hw - .38, y0 = sill + .1, y1 = belt - .06, C = [.1, .1, .1];
       bx(x0, y0 - .03, -zt, x1, y0, zt, C, MT);
       bx(x0 - .02, y0, -zt, x0, y1, zt, C, MT); bx(x1, y0, -zt, x1 + .02, y1, zt, C, MT);
       for (const s of [-1, 1]) {
@@ -1484,6 +1508,26 @@ export function buildUnder(kind0, which) {
         for (let k = 0; k < 4; k++) bx(x1 + k*.04, y0 + .02, s*(zt + .02), x1 + k*.04 + .008, y1 - .06, s*(hw - .15), ALU);
       }
       bx(xf0 - .02, sill, -(hw - .1), xf0, belt - .02, hw - .1, PLA, MT);
+      // between the tub and the screen, the service deck under its black cover: the brake fluid's bottle with its black
+      // cap, the washer's filler with its blue one, the coolant's header tank with its yellow one, the battery under its
+      // lid and the red cap on its jump post, the fuse box, the nose lift's little pump, the strut tops in the corners,
+      // and the loom of wiring running across, taped and clipped, branching off to each
+      const xs = xf0 + .02, xe = x0 - .02, ys = belt - .2, Y = [.85, .72, .32], BLU = [.1, .3, .75], RED = [.75, .07, .05], WHT = [.82, .8, .74], CF = [.09, .09, .1];
+      bx(xs, ys - .02, -(zt + .02), xe, ys, zt + .02, PLA, MT);
+      b.addGeo(G.cyl12, M(xs + .09, ys + .05, -.34, .045, .1, .045), [.8, .7, .42], .02); b.addGeo(G.cyl12, M(xs + .09, ys + .11, -.34, .035, .025, .035), PLA, MT);
+      b.addGeo(G.cyl12, M(xs + .08, ys + .03, .4, .035, .06, .035), BLU);
+      rbox(b, xs + .14, ys, .05, xs + .27, ys + .1, .26, WHT); b.addGeo(G.cyl12, M(xs + .2, ys + .115, .2, .03, .025, .03), [.9, .7, .1]);
+      rbox(b, xs + .02, ys, -.22, xs + .2, ys + .14, .0, [.06, .06, .065], 0, MT); bx(xs + .03, ys + .14, -.21, xs + .19, ys + .15, -.01, [.12, .12, .13]);
+      b.addGeo(G.cyl12, M(xs + .05, ys + .17, -.04, .018, .03, .018), RED);
+      rbox(b, xs + .17, ys, -.48, xs + .27, ys + .08, -.32, PLA, 0, MT); for (let k = 0; k < 4; k++) bx(xs + .19 + k*.018, ys + .08, -.46, xs + .2 + k*.018, ys + .085, -.34, [.2, .2, .22]);
+      b.addGeo(G.cyl12, M(xs + .22, ys + .05, .45, .03, .09, .03, 0, 0, Math.PI/2), ALU, .03); tube(b, [[xs + .17, ys + .05, .45], [xs + .12, ys + .02, .5], [xs + .1, ys - .02, .58]], .007, PLA, 6, 4);
+      for (const s2 of [-1, 1]) { b.addGeo(G.cyl12, M(xw, ys + .04, s2*(hw - .2), .06, .08, .06), ALU, .03); b.addGeo(G.cyl12, M(xw, ys + .085, s2*(hw - .2), .025, .02, .025), [.75, .65, .2]); }
+      tube(b, [[xs + .12, ys + .02, -(zt - .02)], [xs + .13, ys + .025, -.2], [xs + .1, ys + .025, .1], [xs + .12, ys + .02, zt - .02]], .014, [.05, .05, .05], 16, 6, 0, MT);
+      for (const z of [-.42, -.1, .22, .5]) bx(xs + .115, ys + .005, z - .008, xs + .135, ys + .04, z + .008, z > 0 ? BLU : [.15, .15, .16]);
+      tube(b, [[xs + .12, ys + .02, -.1], [xs + .09, ys + .06, -.12], [xs + .06, ys + .14, -.1]], .006, [.05, .05, .05], 6, 4);
+      tube(b, [[xs + .12, ys + .02, .22], [xs + .16, ys + .06, .2], [xs + .19, ys + .1, .17]], .006, [.05, .05, .05], 6, 4);
+      // a soft bag in the tub
+      rbox(b, x0 + .08, y0, -.25, x0 + .42, y0 + .2, .18, [.24, .17, .11], 0, MT); tube(b, [[x0 + .15, y0 + .2, -.05], [x0 + .25, y0 + .27, -.04], [x0 + .35, y0 + .2, -.05]], .01, [.15, .1, .07], 8, 4);
       return b.build();
     }
     // the bay's floor (between the aprons), the bulkhead and the scuttle under the screen

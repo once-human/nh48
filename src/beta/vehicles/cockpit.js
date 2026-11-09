@@ -25,7 +25,7 @@ import * as THREE from 'three';
 import { ColorBuilder, lin } from '@orig/world/geo.js';
 import { buildCarCockpit as plainCockpit } from '@orig/vehicles/cockpit.js';
 import { Reflector } from 'three/addons/objects/Reflector.js';
-import { carSpec, baseOf, doorOf } from './models.js';
+import { carSpec, baseOf, doorOf, hasSun } from './models.js';
 import { cabinGlass } from './vehmat.js';
 
 const MATTE = -1, CARBON = -2, QUILT = -3, WOOD = -4, BRUSHED = -5, SUEDE = -6, PERF = -7, GRAIN = -8;
@@ -608,7 +608,7 @@ function dress(C, kind, mats) {
   {
     const x0 = S.roofR + 0.08, x1 = S.roofF - 0.03, zr = Math.min(hw - 0.28, low ? 0.42 : 0.5), yr = H - 0.04, rf = tier >= 2 ? P.roof : P.roof, rp = tier >= 2 ? SUEDE : SUEDE;
     const pane = (a0, a1, b0, b1) => { if (a1 - a0 < 0.02 || b1 - b0 < 0.02) return; const g = new THREE.BoxGeometry(a1 - a0, 0.012, b1 - b0, 8, 1, 4); g.translate((a0 + a1)/2, yr, (b0 + b1)/2); B.add(g, null, rf, MATTE, rp); };
-    if (tier === 1) { const s0 = S.roofF - 0.87, s1 = S.roofF - 0.2; pane(x0, s0, -zr, zr); pane(s1, x1, -zr, zr); pane(s0, s1, -zr, -0.44); pane(s0, s1, 0.44, zr); }
+    if (tier === 1 || hasSun(kind)) { const s0 = S.roofF - 0.87, s1 = S.roofF - 0.2; pane(x0, s0, -zr, zr); pane(s1, x1, -zr, zr); pane(s0, s1, -zr, -0.44); pane(s0, s1, 0.44, zr); }
     else pane(x0, x1, -zr, zr);
     // the dome lamp, the map lamps up by the mirror
     const dc = (x0 + x1)/2;
@@ -845,7 +845,7 @@ function dress(C, kind, mats) {
   for (const S2 of C._scr || []) if (S2 && S2.m) { const o = new THREE.Mesh(S2.m.geometry, sg); o.position.copy(S2.m.position); o.quaternion.copy(S2.m.quaternion); o.scale.copy(S2.m.scale); o.translateZ(0.0015); o.renderOrder = 3; SG.add(o); }
   // the mirrors: the one on the windscreen, and (once the body's measured) the two on the doors
   const MG = new THREE.Group(); G.add(MG); C._mg = MG; MG.visible = false;
-  { const I = C._irvm, r = mirror(I.w, I.h, 384, 98, 0); r.matrixAutoUpdate = false; r.matrix.copy(I.M).multiply(mT(0, 0, 0.0035)); MG.add(r); }
+  { const I = C._irvm, r = mirror(I.w, I.h, tier >= 2 ? 1024 : 768, tier >= 2 ? 256 : 196, 0, 'rect', tier >= 2 ? 2 : 3); r.matrixAutoUpdate = false; r.matrix.copy(I.M).multiply(mT(0, 0, 0.0035)); MG.add(r); }
   const Eye = v3(xf0 - 1.25, belt + 0.19, DZ), glassM = cabinGlass({ wip: [belt + 0.02, -0.34*hw/0.875, 0.2*hw/0.875, 0.56*hw/0.875], band: [H - 0.22, H - 0.12, 1], tint: tier === 3 ? 0x161c1b : 0x1c2624 });
   C.tick = (v) => {
     C._v = v;
@@ -927,11 +927,15 @@ function innerGlass(src, belt, hw, xf0) {
 // a mirror that really shows what's behind you. Each draws its picture every third frame, in turn with the others (so
 // together they cost one small extra look at the street), and never from inside another's picture or a shadow pass
 let MIRRORING = false;
-function mirror(w, h, tw, th, slot) {
-  const r = new Reflector(new THREE.PlaneGeometry(w, h), { clipBias: 0.003, textureWidth: tw, textureHeight: th, color: 0xb4babd });
+// shape: 'oval' (a low car's lens), 'round' (a door mirror's glass: a rectangle with well rounded corners), or a plain
+// rectangle with small ones (the one on the screen), so the picture is the glass's own shape and not a block in it
+function mirror(w, h, tw, th, slot, shape, every = 3) {
+  const geo = shape === 'oval' ? new THREE.CircleGeometry(0.5, 48).scale(w, h, 1) : new THREE.ShapeGeometry(rrect(w, h, shape === 'round' ? Math.min(w, h)*0.42 : Math.min(w, h)*0.22), 12);
+  // (ShapeGeometry's uv is its own x and y: the reflection's drawn by where it is on the screen, not by uv)
+  const r = new Reflector(geo, { clipBias: 0.003, textureWidth: tw, textureHeight: th, color: 0xc4c9cc, multisample: 4 });
   const ob = r.onBeforeRender; let k = slot;
   r.onBeforeRender = function (rd, sc, cam, ...a) {
-    if (MIRRORING || !cam || !cam.isPerspectiveCamera || (k++ % 3) !== 0) return;
+    if (MIRRORING || !cam || !cam.isPerspectiveCamera || (k++ % every) !== 0) return;
     MIRRORING = true; try { ob.call(this, rd, sc, cam, ...a); } finally { MIRRORING = false; }
   };
   r.castShadow = false; r.receiveShadow = false; r.frustumCulled = false;
@@ -956,7 +960,8 @@ function doorMirrors(v, MG, Eye, hw, belt, xf0) {
   for (const b of Object.values(bb)) {
     if (!b || b.z1 - b.z0 < 0.04 || b.y1 - b.y0 < 0.03) continue;
     const c = v3(b.x0, (b.y0 + b.y1)/2, (b.z0 + b.z1)/2), n = Eye.clone().sub(c).normalize().add(v3(-1, 0, 0)).normalize();
-    const X = UP.clone().cross(n).normalize(), Y = n.clone().cross(X), r = mirror((b.z1 - b.z0)*0.9, (b.y1 - b.y0)*0.86, 160, 128, slot++);
+    const w = (b.z1 - b.z0)*0.92, h = (b.y1 - b.y0)*0.9, sup = b.lens, tw = sup ? 512 : 384;
+    const X = UP.clone().cross(n).normalize(), Y = n.clone().cross(X), r = mirror(w, h, tw, Math.max(96, Math.round(tw*h/w)), slot++, b.lens ? 'oval' : 'round', sup ? 2 : 3);
     r.matrixAutoUpdate = false; r.matrix.makeBasis(X, Y, n).setPosition(c.addScaledVector(n, 0.004)); MG.add(r);
   }
 }

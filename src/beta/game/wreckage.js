@@ -44,12 +44,12 @@ function touch(r, x, z, hx, hz, a, b, ux, uz) {
 function drive(v) {
   const W = v.W, X = W && W.smash; if (!X || v.dead || (W.fly && v.deck >= 0)) return;      // (up on a flyover there's nothing of the street's)
   const hx = Math.cos(v.th), hz = Math.sin(v.th), vl = v.vl || 0, vx = hx*v.v - hz*vl, vz = hz*v.v + hx*vl, sp = Math.hypot(vx, vz);
-  if (sp < 1) return;
+  if (sp < 0.4) return;
   const [a, b] = half(v), m = massOf(v), ux = vx/sp, uz = vz/sp;
   X.near(v.x, v.z, Math.hypot(a, b) + 2, (r) => {
     if (r.st === 2 || X.t - (r._ht ?? -9) < 0.3 || Math.abs((v.y || 0) - r.y) > 2.5) return;
     const c = touch(r, v.x, v.z, hx, hz, a, b, ux, uz); if (!c) return;
-    const vn = vx*c.nx + vz*c.nz; if (vn < 1) return;
+    const vn = vx*c.nx + vz*c.nz; if (vn < 0.4) return;
     r._ht = X.t;
     const E = 0.5*m*vn*vn*m/(m + 500);
     const res = X.hit(r, { E, px: c.px, py: (v.y || 0) + Math.min(0.55, tallOf(v)*0.4), pz: c.pz, nx: c.nx, nz: c.nz, u: vn*0.85, m, by: 'car' });
@@ -102,9 +102,27 @@ const fixed = Game.prototype.fixed;
 Game.prototype.fixed = function (dt) {
   const r = fixed.call(this, dt);
   const X = this.W && this.W.smash;
-  if (X && this.state === 'play' && dt > 0) try { X.tick(dt, cars(this)); stepWalls(); } catch (e) { console.warn('smash', e); }
+  if (X && this.state === 'play' && dt > 0) try { X.tick(dt, cars(this)); stepWalls(); brush(this, X); } catch (e) { console.warn('smash', e); }
   return r;
 };
+// ---- on foot: walking or running into a tree shakes a few leaves down out of it; into a lamp post, its tube stutters
+function brush(G, X) {
+  const P = G.player, F = P && P.onFoot && P.foot; if (!F) { G._brush = null; return; }
+  const o = G._brush || (G._brush = { x: F.x, z: F.z });
+  const dx = F.x - o.x, dz = F.z - o.z; o.x = F.x; o.z = F.z;
+  const d = Math.hypot(dx, dz); if (d < 1e-4 || d > 1) return;
+  X.near(F.x, F.z, 1.5, (r) => {
+    if (r.st === 2 || (r.kind !== 'tree' && r.kind !== 'lamp' && r.kind !== 'signal' && r.kind !== 'pole') || X.t - (r._ht ?? -9) < 1.2) return;
+    for (const c of r.cols) {
+      if (c.off || c.r === undefined) continue;
+      const ex = c.x - F.x, ez = c.z - F.z, e = Math.hypot(ex, ez); if (e > c.r + 0.42 || e < 1e-3) continue;
+      if ((dx*ex + dz*ez)/(d*e) < 0.3) continue;                   // (going past it, not into it)
+      r._ht = X.t;
+      X.hit(r, { E: 25, px: c.x - ex/e*c.r, py: (r.y || 0) + 1.2, pz: c.z - ez/e*c.r, nx: ex/e, nz: ez/e, u: 1, m: 75, by: 'kick' });
+      return;
+    }
+  });
+}
 
 // ---- a round from the gun: what it meets first along the line from the camera
 const _o = new THREE.Vector3(), _d = new THREE.Vector3(), _h = new THREE.Vector3();

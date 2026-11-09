@@ -55,7 +55,7 @@ void main(){
   vL = position; vC = vec3(1.); vG = 0.; vP = 0.; vec4 w = M*vec4(position, 1.); vW = w.xyz; vN = mat3(M)*normal; vec4 v = viewMatrix*w; vZ = -v.z; gl_Position = projectionMatrix*v; }`;
 const CHUNK = `precision highp float; precision highp sampler2DShadow;
 varying vec3 vN, vW, vC, vL; varying float vG, vP, vZ;
-uniform sampler2D tNoise; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, skyCol, fogCol, uTint; uniform float shadowTexel, shadowOn, fogDensity, dayK, uNight, uRough, uMetal;
+uniform sampler2D tNoise; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, skyCol, fogCol, uTint; uniform float shadowTexel, shadowOn, fogDensity, dayK, uNight, uRough, uMetal, uClear;
 float nz(vec2 p){ return texture2D(tNoise, p/16.).r; }
 #ifdef FADE
 uniform vec4 uFade; varying float vFd;
@@ -132,11 +132,13 @@ const GLASS_FS = CHUNK + `void main(){
   vec3 R = reflect(-V, n); float e = nz(gl_FragCoord.xy*.09) - .5, hz = smoothstep(-.05, .12, R.y + e*.1), fres = .25 + .75*pow(1. - max(dot(n, V), 0.), 2.5);
   vec3 env = mix(vec3(.1, .1, .1)*(.3 + .7*dayK), skyCol*(.25 + .75*dayK)*1.1, hz), c = mix(uTint, env, clamp(fres*(.75 + .25*step(.2, fract(vW.x*1.3 + vW.z*1.1 + vW.y*2.1 + e))), 0., .9));
   float s = pow(max(dot(R, sunDir), 0.), 90.)*dayK; c += sunCol*smoothstep(.3, .7, s);
-  float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), .4); }`;
+  // clear glass is clear looked down through, and a mirror of the sky looked across; a film's dark whichever way
+  float k = clamp((fres - .25)/.75, 0., 1.), al = mix(.4, mix(.1, .72, k), uClear);
+  float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), al); }`;
 
 function mat(fs, vs, opts = {}) {
   const uniforms = Object.assign({}, PU, { uTint: { value: new THREE.Color(opts.tint ?? 0x15191d).convertSRGBToLinear() }, uRough: { value: opts.rough ?? .38 }, uMetal: { value: opts.metal ?? .1 } });
-  uniforms.uLamp = { value: new THREE.Vector2() }; uniforms.uInd = { value: new THREE.Vector3() };
+  uniforms.uLamp = { value: new THREE.Vector2() }; uniforms.uInd = { value: new THREE.Vector3() }; uniforms.uClear = { value: opts.clear ? 1 : 0 };
   // (glass you see through: a supercar's engine lid, an auto's screen)
   const m = new THREE.ShaderMaterial({ vertexShader: vs, fragmentShader: fs, uniforms, vertexColors: !opts.glass, side: opts.glass ? THREE.DoubleSide : THREE.FrontSide, transparent: !!opts.glass, depthWrite: !opts.glass });
   // every instanced body drawn with this needs its lamps' per-instance state: a model that came without (a parked
@@ -150,7 +152,7 @@ function mat(fs, vs, opts = {}) {
   return m;
 }
 export function vehicleMaterials() {
-  return { body: mat(FS, VS, { rough: .38, metal: .1 }), solid: mat(FS, VS, { rough: .6, metal: .05 }), glass: mat(GLASS_FS, GLASS_VS, { glass: true }), glassI: mat(GLASS_FS, GLASS_VS, { glass: true }) };
+  return { body: mat(FS, VS, { rough: .38, metal: .1 }), solid: mat(FS, VS, { rough: .6, metal: .05 }), glass: mat(GLASS_FS, GLASS_VS, { glass: true, clear: true }), glassI: mat(GLASS_FS, GLASS_VS, { glass: true, clear: true }) };
 }
 // A car's glass seen from inside (beta/vehicles/cockpit.js): from out there the windows are the body's own glossy panels,
 // from your seat they were holes. This is the inside of them: nearly clear, a green-grey tint, more of the sky and the
