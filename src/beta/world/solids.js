@@ -6,7 +6,7 @@
 // bench) as the few rectangles that cover it, and those go into the collision as walls round them.
 import * as THREE from 'three';
 import { signedArea, offsetRing } from './geom.js';
-import { Collision } from '@orig/world/mapdata.js';
+import { Collision, Surfaces } from '@orig/world/mapdata.js';
 import { smash } from './smash.js';
 
 const CELL = 0.06, Y0 = 0.05, Y1 = 1.7;
@@ -204,6 +204,13 @@ Collision.prototype.resolve = function (x, z, r, out) {
   }
   return best;
 };
+// Collision.rev counts every time something solid can have appeared: a new wall or post, one put back, a shop's front
+// shut, a building's outline arriving. (One going can't put anyone inside it, so that doesn't count.) Someone found clear
+// who hasn't moved since is still clear as long as this hasn't changed: people/walls.js, people/around.js
+Collision.rev = 0;
+for (const m of ['addSeg', 'addCircle', 'addPoly']) { const f = Collision.prototype[m]; Collision.prototype[m] = function (...a) { Collision.rev++; return f.apply(this, a); }; }
+const sa0 = Surfaces.prototype.addTile;
+Surfaces.prototype.addTile = function (...a) { Collision.rev++; return sa0.apply(this, a); };
 const rm0 = Collision.prototype.removeTag;
 Collision.prototype.removeTag = function (tag, rect) {
   rm0.call(this, tag, rect);

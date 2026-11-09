@@ -7,6 +7,7 @@
 // animation: people, you and the animals, against every building, vehicle, stall, pole and tree. (The two ways through are
 // a shop's open door and a seat.) This runs last, after everything else has moved anybody, so what's drawn is what was checked.
 import { People } from '@orig/people/peds.js';
+import { Collision } from '@orig/world/mapdata.js';
 
 const NEAR = 60, FAR = 160, BODY = 0.27, LOOK = 1.25, PROBE = 0.36, SIDE = 1.15, TURN_BACK = 1.3;
 // (not on the street at all: indoors, carried, riding, sitting in something. Everyone else is held to this, whatever they're doing)
@@ -42,7 +43,7 @@ People.prototype.update = function (dt, player, ...rest) {
   const mine = []; const cur = player.cur;
   if (cur && !player.onFoot && player.spec) mine.push([cur, player.spec]);
   if (player.dropped) for (const d of player.dropped) if (d.veh && d.veh.spec && !(d.veh === cur && !player.onFoot)) mine.push([d.veh, d.veh.spec]);
-  const frame = this._arF = ((this._arF || 0) + 1) & 3, px = player.x, pz = player.z;
+  const frame = this._arF = ((this._arF || 0) + 1) & 3, px = player.x, pz = player.z, rev = Collision.rev;
   for (const p of this.list) {
     if (away(p)) { p.steerT = 0; continue; }
     const ax0 = Math.abs(p.x - px), az0 = Math.abs(p.z - pz); if (ax0 > FAR || az0 > FAR) continue;
@@ -77,9 +78,11 @@ People.prototype.update = function (dt, player, ...rest) {
     // ---- at its surface: stopped there, sliding along it
     let pressed = false;
     const hx = p.hx ?? Math.cos(p.yaw), hz = p.hz ?? Math.sin(p.yaw);
-    if (!p._thru) for (let it = 0; it < 3; it++) {
+    // (exactly where they were last found clear, with nothing new put there since: still clear. The vehicles below do move)
+    if (!p._thru && !(p._aX === p.x && p._aZ === p.z && p._aV === rev)) for (let it = 0; it < 3; it++) {
       const r = C.resolve(p.x, p.z, BODY);
-      if (!r || !blocks(r.kind)) break;
+      if (!r) { p._aX = p.x; p._aZ = p.z; p._aV = rev; break; }
+      if (!blocks(r.kind)) break;
       move(p, r.nx*r.depth, r.nz*r.depth); if (r.nx*hx + r.nz*hz < -.6) pressed = true;
     }
     // (someone lying in the road is under what you're driving, not in its way. Getting up from under it they crawl out, not jump)

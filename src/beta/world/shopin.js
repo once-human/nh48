@@ -25,6 +25,8 @@ const cells = new Set();            // every shop cell built
 const holes = new Map();            // grid key -> [hole]
 const extra = new Map();            // grid key -> [seg] (the rooms' walls and furniture)
 let V = 1;                          // bumped whenever holes come or go (segments re-match theirs)
+const DOOR = 16, doorGrid = new Map(); let doorN = 0;   // 16 m grid key -> the shops with their door in that square (in the order they came)
+const doorKey = (S) => key(Math.floor(S.door.x / DOOR), Math.floor(S.door.z / DOOR));
 
 // ---------------------------------------------------------------- the cells
 function gridAdd(map, o, ax, az, bx, bz) {
@@ -51,6 +53,7 @@ export function cellsIn(ci, doors, wins) {
   for (const door of doors) {
     const S = door.cell, P = S.plan;
     S.door = door; S.segs = []; cells.add(S);
+    { S.doorN = ++doorN; const k = doorKey(S); let l = doorGrid.get(k); if (!l) doorGrid.set(k, l = []); l.push(S); }
     fanIn(S);
     // the gap in the front (a shop served over the counter from the footpath has none)
     if (P.door[1] - P.door[0] > 0.3) {
@@ -63,7 +66,7 @@ export function cellsIn(ci, doors, wins) {
     seg(0, 0, 0, -P.D, 0); seg(P.w, 0, P.w, -P.D, 0); seg(0, -P.D, P.w, -P.D, 0);
     for (const [u0, d0, u1, d1] of P.solids) { seg(u0, d0, u1, d0, 2); seg(u1, d0, u1, d1, 2); seg(u1, d1, u0, d1, 2); seg(u0, d1, u0, d0, 2); }
   }
-  V++;
+  V++; Collision.rev++;
 }
 export function cellsOut(ci) {
   const wins = windows.get(ci);
@@ -75,11 +78,12 @@ export function cellsOut(ci) {
     if (S.hole) gridDel(holes, S.hole);
     for (const s of S.segs || []) gridDel(extra, s);
     S.segs = []; cells.delete(S);
+    { const k = doorKey(S), l = doorGrid.get(k), i = l ? l.indexOf(S) : -1; if (i >= 0) { l.splice(i, 1); if (!l.length) doorGrid.delete(k); } }
     fanOut(S);
     dropStaff(S);
     if (here && here.S === S) leave(true);
   }
-  V++;
+  V++; Collision.rev++;              // (a shop's front gone with it is a wall again)
 }
 
 // ---------------------------------------------------------------- the ceiling fans
@@ -241,6 +245,8 @@ function dropStaff(S) {
 }
 // every so often: each shop near you, open or shut; its gap; its people (they come while you can't see the shop,
 // and go when it's shut and out of sight, or you're far off)
+// (a front going shut puts a wall back where it wasn't)
+function front(S, on) { if (S.hole.on && !on) Collision.rev++; S.hole.on = on; }
 function tend() {
   const P = G.player, inView = G.inView;
   // (through a place's back door into its room: the street round it stays as you left it)
@@ -249,9 +255,9 @@ function tend() {
   let staffed = 0; for (const S of cells) if (S.staff) staffed++;
   for (const S of cells) {
     const dx = S.door.x - P.x, dz = S.door.z - P.z, d = Math.hypot(dx, dz);
-    if (d > 140) { if (S.hole) S.hole.on = false; if (S.staff && !(inView && inView(S.door.x, S.door.z) && d < 220)) dropStaff(S); continue; }
+    if (d > 140) { if (S.hole) front(S, false); if (S.staff && !(inView && inView(S.door.x, S.door.z) && d < 220)) dropStaff(S); continue; }
     const open = isOpen(S), inside = here && here.S === S;
-    if (S.hole) S.hole.on = open || inside;
+    if (S.hole) front(S, open || inside);
     const seen = inView && inView(S.door.x, S.door.z), sh = S.door._sh, shut = S.shutter && sh ? (sh.k ?? 0) < 0.03 : !open;
     // (they come while the shop's out of sight, or too far off to make out a face; they go once the shutter's down,
     // or when a glazed shop's shut and you can't see it, or you're far off)
@@ -411,11 +417,17 @@ function track() {
     return;
   }
   if (!P.onFoot || !I || I.cur) return;
-  for (const S of cells) {
-    if (Math.abs(S.door.x - P.x) > 8 || Math.abs(S.door.z - P.z) > 8) continue;
-    const [u, d] = local(S, P.x, P.z);
-    if (u > 0 && u < S.plan.w && d < -0.3 && d > -S.plan.D) { enter(S); return; }
+  // (only the squares that can hold a door within 8 m. Of the shops you're inside of, the one that came first)
+  const px = P.x, pz = P.z; let best = null;
+  for (let i = Math.floor((px - 8) / DOOR); i <= Math.floor((px + 8) / DOOR); i++) for (let j = Math.floor((pz - 8) / DOOR); j <= Math.floor((pz + 8) / DOOR); j++) {
+    const l = doorGrid.get(key(i, j)); if (!l) continue;
+    for (const S of l) {
+      if (Math.abs(S.door.x - px) > 8 || Math.abs(S.door.z - pz) > 8 || (best && S.doorN > best.doorN)) continue;
+      const [u, d] = local(S, px, pz);
+      if (u > 0 && u < S.plan.w && d < -0.3 && d > -S.plan.D) best = S;
+    }
   }
+  if (best) enter(best);
 }
 
 // ---------------------------------------------------------------- the game's side

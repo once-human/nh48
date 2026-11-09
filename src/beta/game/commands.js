@@ -8,6 +8,7 @@ import { TYPES } from '@orig/traffic/traffic.js';
 import { WEATHERS } from '@orig/gfx/weather.js';
 import { ITEMS } from '@orig/game/life.js';
 import { lin } from '@orig/world/geo.js';
+import { Collision } from '@orig/world/mapdata.js';
 import { SETTINGS } from './graphics.js';
 import { registry } from './registry.js';
 
@@ -570,7 +571,7 @@ export function freeTerminal(G) {
     G.frame = (dt) => { if (!armed) return frame(dt); const r = frame(dt*St.scale); try { tick(dt*St.scale, dt); } catch (e) { console.warn('terminal', e); } return r; };
     G.fixed = (h) => fixed(armed ? h*St.scale : h);
     const C = W().collision, res = C.resolve.bind(C);
-    C.resolve = (...a) => armed && St.noclip ? null : res(...a);
+    C.resolve = (...a) => armed && St.noclip ? (Collision.rev++, null) : res(...a);    // (nothing's clear for real while it's on)
     const Pl = P(), uf = Pl.updateFoot.bind(Pl);
     Pl.updateFoot = (dt, input, tr, camYaw) => armed && St.flight ? flyFoot(dt, input, camYaw) : uf(dt, input, tr, camYaw);
     const R = G.rig;

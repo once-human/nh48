@@ -14,6 +14,7 @@
 // you've been well away for a few minutes and it's out of sight, nothing seen going back. Nothing fades.
 // (What's heavy and solid, a Metro pier, a column, a wall, doesn't break: it stops you and dents you, as before.)
 import * as THREE from 'three';
+import { Collision } from '@orig/world/mapdata.js';
 import { ColorBuilder } from '@orig/world/geo.js';
 import { InstancedSet } from '@orig/world/props.js';
 import { Debris, partsOf, pieceOf, lower } from './debris.js';
@@ -462,7 +463,7 @@ class Smash {
       if (r.stubAt == null || r.st !== 2) continue;
       const b = r.bodies[0], rc = r.cols.reduce((m, c) => Math.max(m, c.r || 0), 0.2);
       const clear = !b || Math.hypot(b.p.x - r.x, b.p.z - r.z) > rc + Math.max(0.05, Math.min(b.half.x, b.half.z, 0.5)) + 0.25;
-      if (clear || this.t - r.stubAt > 4) { for (const c of r.cols) c.off = false; r.stubAt = null; }
+      if (clear || this.t - r.stubAt > 4) { for (const c of r.cols) c.off = false; Collision.rev++; r.stubAt = null; }
     }
     // a lamp left leaning: its patch of light goes where its head now is
     for (const r of this.down) if (r.lamp && r.st === 1 && !this.flick.has(r)) this.pool(r);
@@ -494,6 +495,7 @@ class Smash {
     for (const [, it] of r.items) { it.off = false; const m0 = r.m0.get(it); if (m0) it.m.set(m0); }
     if (r.deadIt) { r.deadIt.off = true; const S = this.W.lampDeadSet; if (S) S.items = S.items.filter(q => q !== r.deadIt); r.deadIt = null; }
     for (const c of r.cols) c.off = false;
+    Collision.rev++;
     if (r.lamp) { r.lamp.out = false; this.pool(r); }
     if (r.head) r.head.dead = false;
     r.st = 0; r.dmg = 0; r.dark = false; r.stubAt = null;
