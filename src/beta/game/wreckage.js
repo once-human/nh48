@@ -88,21 +88,81 @@ for (const K of [Vehicle, PlayerAuto]) {
 }
 
 // ---- every step: the pieces, and what they can meet (you, and any car left in the street that's moving)
+// (each with what it weighs, so a piece pushes back on it by its own weight: a fallen pole stops a scooter, a car shoves
+// a plank aside and hardly feels it. What it's pushed by comes back to it after: wreckage's step below)
 function cars(G) {
   const P = G.player, out = [], at = P.onFoot ? P.foot : P.cur;
   const put = (v) => {
-    const [a, b] = half(v), hx = Math.cos(v.th), hz = Math.sin(v.th), vl = v.vl || 0, y = v.y || 0;
-    out.push({ x: v.x, z: v.z, hx, hz, a, b, y0: y + 0.18, y1: y + tallOf(v), vx: hx*v.v - hz*vl, vz: hz*v.v + hx*vl });
+    const [a, b] = half(v), hx = Math.cos(v.th), hz = Math.sin(v.th), vl = v.vl || 0, y = v.y || 0, m = massOf(v), vx = hx*v.v - hz*vl, vz = hz*v.v + hx*vl;
+    out.push({ x: v.x, z: v.z, hx, hz, a, b, y0: y + 0.18, y1: y + tallOf(v), vx, vz, vx0: vx, vz0: vz, m, im: 1/m, px: 0, pz: 0, veh: v });
   };
   if (!P.onFoot && P.cur) put(P.cur);
   for (const q of P.dropped || []) { const v = q.veh; if (v && v !== P.cur && v.root && v.root.parent && Math.abs(v.x - at.x) < 80 && Math.abs(v.z - at.z) < 80) put(v); }
+  // you on foot: a body that walks into what's lying there and is held by it, or kicks it on if it's light
+  if (P.onFoot && P.foot) {
+    const F = P.foot, o = G._dbf || (G._dbf = { x: F.x, z: F.z }), dt = G._dbDt || 1/60, vx = (F.x - o.x)/dt, vz = (F.z - o.z)/dt; o.x = F.x; o.z = F.z;
+    const sv = Math.hypot(vx, vz) > 12 ? 0 : 1, y = F.y || 0;
+    out.push({ x: F.x, z: F.z, hx: 1, hz: 0, a: 0.22, b: 0.22, y0: y + 0.05, y1: y + 1.7, vx: vx*sv, vz: vz*sv, vx0: vx*sv, vz0: vz*sv, m: 75, im: 1/75, px: 0, pz: 0, foot: F, side: true });
+  } else G._dbf = null;
+  // the traffic close by: it drives into what's down and is stopped by it, and waits behind it
+  const T = G.traffic;
+  if (T && G.W.smash && G.W.smash.debris.list.length) for (const o of T.list) {
+    if (!o.alive || o.isPlayer || o.parked || o.wreck || !o.T || Math.abs(o.x - at.x) > 70 || Math.abs(o.z - at.z) > 70) continue;
+    const hx = o.hx ?? Math.cos(o.yaw || 0), hz = o.hz ?? Math.sin(o.yaw || 0), m = o.T.mass || 1000, y = o.y || 0, vx = hx*(o.v || 0), vz = hz*(o.v || 0);
+    out.push({ x: o.x, z: o.z, hx, hz, a: o.T.L/2, b: o.T.W/2, y0: y + 0.18, y1: y + (o.T.two ? 1.25 : 1.5), vx, vz, vx0: vx, vz0: vz, m, im: 1/m, px: 0, pz: 0, ag: o });
+  }
+  // and the people walking about near any of it: held by a fallen pole or a shelter lying across the footpath, and kicking
+  // the light things (a plank, a glass, an orange) on as they go, the same as you on foot. (Only those beside some piece:
+  // the pieces' spots on a 2 m grid, so the crowd isn't run past every piece every step)
+  const PL = G.people && G.people.list, D = G.W.smash && G.W.smash.debris.list;
+  if (PL && D && D.length) {
+    const cells = G._dbCells || (G._dbCells = new Set()); cells.clear();
+    for (const b of D) {
+      if (b.ride) continue;
+      const r = (b.r0 ?? b.half.length()) + 0.5, i0 = Math.floor((b.p.x - r)/2), i1 = Math.floor((b.p.x + r)/2), j0 = Math.floor((b.p.z - r)/2), j1 = Math.floor((b.p.z + r)/2);
+      if ((i1 - i0 + 1)*(j1 - j0 + 1) > 64) continue;
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) cells.add(i*65536 + j);
+    }
+    const dt = G._dbDt || 1/60; let n = 0;
+    for (const p of PL) {
+      if (n >= 40) break;
+      if (p.hidden || p.pax || p.rideOf || p._drv || p.fallen > 0 || p.corpse || p.liftY > 0 || p._rag || Math.abs(p.x - at.x) > 70 || Math.abs(p.z - at.z) > 70) { p._dbx = undefined; continue; }
+      if (!cells.has(Math.floor(p.x/2)*65536 + Math.floor(p.z/2))) { p._dbx = undefined; continue; }
+      let vx = p._dbx === undefined ? 0 : (p.x - p._dbx)/dt, vz = p._dbx === undefined ? 0 : (p.z - p._dbz)/dt; const sp = Math.hypot(vx, vz);
+      if (sp > 4) { vx *= 4/sp; vz *= 4/sp; }
+      const y = p.y || 0;
+      out.push({ x: p.x, z: p.z, hx: 1, hz: 0, a: 0.21, b: 0.21, y0: y + 0.05, y1: y + 1.65, vx, vz, vx0: vx, vz0: vz, m: 65, im: 1/65, px: 0, pz: 0, ped: p, side: true });
+      n++;
+    }
+  }
   return out;
+}
+// what the pieces did back to whatever pressed into them: its speed, and where it is (never more than a step's worth)
+function pushedBack(G, list) {
+  for (const c of list) {
+    const dvx = c.vx - c.vx0, dvz = c.vz - c.vz0, pl = Math.hypot(c.px, c.pz), k = pl > 0.25 ? 0.25/pl : 1, px = c.px*k, pz = c.pz*k;
+    if (c.ped && !pl) { c.ped._dbx = c.ped.x; c.ped._dbz = c.ped.z; }
+    if (!dvx && !dvz && !pl) continue;
+    if (c.veh) {
+      const v = c.veh, hx = Math.cos(v.th), hz = Math.sin(v.th);
+      v.v += dvx*hx + dvz*hz; if (v.vl !== undefined) v.vl += -dvx*hz + dvz*hx;
+      v.x += px; v.z += pz;
+    } else if (c.foot) { c.foot.x += px; c.foot.z += pz; if (G._dbf) { G._dbf.x = c.foot.x; G._dbf.z = c.foot.z; } }
+    // (and where they are now is where they were pushed to: the push isn't them walking)
+    else if (c.ped) { const p = c.ped; p.x += px; p.z += pz; p._dbx = p.x; p._dbz = p.z; }
+    else if (c.ag) {
+      const o = c.ag, hx = o.hx ?? Math.cos(o.yaw || 0), hz = o.hz ?? Math.sin(o.yaw || 0);
+      o.v = Math.max(0, (o.v || 0) + dvx*hx + dvz*hz);
+      // held up by something heavy in the road: it waits there (and goes the way a stuck one goes if it's never cleared)
+      if ((c.hit || 0) > 60 && (px*hx + pz*hz) < 0) { o._hold = Math.max(o._hold || 0, 0.6); o._cap = 0; }
+    }
+  }
 }
 const fixed = Game.prototype.fixed;
 Game.prototype.fixed = function (dt) {
   const r = fixed.call(this, dt);
   const X = this.W && this.W.smash;
-  if (X && this.state === 'play' && dt > 0) try { X.tick(dt, cars(this)); stepWalls(); brush(this, X); } catch (e) { console.warn('smash', e); }
+  if (X && this.state === 'play' && dt > 0) try { this._dbDt = dt; const L = cars(this); X.tick(dt, L); pushedBack(this, L); stepWalls(); brush(this, X); } catch (e) { console.warn('smash', e); }
   return r;
 };
 // ---- on foot: walking or running into a tree shakes a few leaves down out of it; into a lamp post, its tube stutters

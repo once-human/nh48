@@ -264,6 +264,8 @@ class Smash {
     this.gone(r);
     if (low.length) this.stub(r, pieceOf(geo, low), F);
     if (!up.length) return { broke: true, absorb: S.absorb, carried: 0 };
+    // what's left standing at its foot stays solid (a concrete pole's stump, knee-high and up), once what fell is clear of it
+    if (low.length && S.base >= 0.5) r.stubAt = this.t;
     const pc = pieceOf(geo, up), snap = S.mode === 'snap', torn = !snap && tot > S.brk*3.2;
     const pinL = new THREE.Vector3(0, S.base + 0.02, 0).sub(pc.c);
     const b = this.body(r, pc, F, S.mass, S.mat, snap || torn || S.free ? {} : { pin: new THREE.Vector3(0, S.base + 0.02, 0).applyMatrix4(F), pinLocal: pinL, stiff: 2.2 });
@@ -290,7 +292,7 @@ class Smash {
   // with nothing of the near-to-far handover, so it's there whatever the distance until it's put back
   fell(r, o) {
     const S = r.S || SPEC.tree, T = this.W.trees, t = r.ti;
-    this.gone(r);
+    this.gone(r); r.stubAt = this.t;           // (its stump, or the foot an old one goes over about, is still in the ground: solid again once the trunk's clear)
     if (!T || t == null || !T.arch || !T.sets) return { broke: true, absorb: S.absorb, carried: 0 };
     (T.dead || (T.dead = new Set())).add(t); T.lastX = 1e9;
     const k = T.k[t], A = T.arch[k], set = T.sets[k], s = T.s[t], ro = T.r[t];
@@ -454,6 +456,14 @@ class Smash {
     if (this.flick.size) this.flickStep(dt);
     if ((this.chk -= dt) > 0) return;
     this.chk = 0.5;
+    // a stump left in the ground: solid again as soon as what came off it has fallen clear (straight away it would shove the
+    // trunk or the pole sideways as it starts to go), or after a few seconds whatever happens
+    for (const r of this.down) {
+      if (r.stubAt == null || r.st !== 2) continue;
+      const b = r.bodies[0], rc = r.cols.reduce((m, c) => Math.max(m, c.r || 0), 0.2);
+      const clear = !b || Math.hypot(b.p.x - r.x, b.p.z - r.z) > rc + Math.max(0.05, Math.min(b.half.x, b.half.z, 0.5)) + 0.25;
+      if (clear || this.t - r.stubAt > 4) { for (const c of r.cols) c.off = false; r.stubAt = null; }
+    }
     // a lamp left leaning: its patch of light goes where its head now is
     for (const r of this.down) if (r.lamp && r.st === 1 && !this.flick.has(r)) this.pool(r);
     const G = window.__nhAskG, cam = G && G.camera, W = this.W;
@@ -486,7 +496,7 @@ class Smash {
     for (const c of r.cols) c.off = false;
     if (r.lamp) { r.lamp.out = false; this.pool(r); }
     if (r.head) r.head.dead = false;
-    r.st = 0; r.dmg = 0; r.dark = false;
+    r.st = 0; r.dmg = 0; r.dark = false; r.stubAt = null;
     if (r.kind === 'pole') { Sway.spansOf(this, r); Sway.unhang(this, r); }
     if (r.head) Sway.bulbs(this, r);
     this.down.delete(r);
