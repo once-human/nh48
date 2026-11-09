@@ -6,6 +6,7 @@ import { Crowd, NEAR, makeLook, B } from '@orig/experiment/people.js';
 import { rng } from '@orig/experiment/geo.js';
 import { PU, LAMP } from '../gfx/paint.js';
 import { Skin, visOf } from './skin.js';
+import { view } from '../world/view.js';
 
 // the stress test paints in screen colour; /beta's picture is linear until its last pass
 const linear = (m) => { for (const s of [m]) s.fragmentShader = s.fragmentShader.replace('fragColor = vec4(c, 1.);', 'fragColor = vec4(pow(max(c, vec3(0.)), vec3(2.2)), 1.);').replace('fragColor = vec4(mix(c, fogCol, smoothstep(fogR.x, fogR.y, vZ)*.9), 1.);', 'fragColor = vec4(pow(max(mix(c, fogCol, smoothstep(fogR.x, fogR.y, vZ)*.9), vec3(0.)), vec3(2.2)), 1.);'); return m; };
@@ -74,7 +75,7 @@ export class Actors {
     if (!on) return;
     const C = this.crowd, nA = C.near.geometry.attributes, fA = C.far.geometry.attributes, cx = camera.position.x, cz = camera.position.z;
     let a = 0, b = 0, dirty = false; if (!C._own) C._own = [];
-    const put = (x, y, z, yaw, ph, amp, id, fd = 0) => { const dx = x - cx, dz = z - cz, d2 = dx*dx + dz*dz; if (d2 > 122500) return;
+    const put = (x, y, z, yaw, ph, amp, id, fd = 0) => { const dx = x - cx, dz = z - cz, d2 = dx*dx + dz*dz; if (d2 > 122500 || !view.sees(x, z)) return;
       const near = d2 < NEAR*NEAR, A = near ? nA : fA, o = near ? a++ : b++; if (o >= CAP) return;
       A.iPos.array.set([x, y, z, Math.PI/2 - yaw], o*4); A.iAnim.array.set([ph, amp, id, fd], o*4); };
     for (const p of (G.people ? G.people.list : [])) {

@@ -118,6 +118,7 @@ export class Graphics {
     const near = (q) => !q.far;
     const s = pick(q => near(q) && mine(q) && above(q)) || pick(q => near(q) && above(q)) || (bad && pick(near)) ||
       pick(q => mine(q) && above(q)) || pick(above) || (bad && (pick(mine) || pick(() => true))); if (!s) return null;
+    if (s.id === 'res' && !this.resProbe) this.resProbe = { gpu: this.C.post.clock?.total || 0, at: this.auto.res, left: 4 };
     this.auto[s.id]--; this.applyOne(s); return s;
   }
   // a look each second at how it's going. Smooth comes first: down quickly when frames are short or stuttering, up slowly
@@ -127,10 +128,13 @@ export class Graphics {
     if (G.state !== 'play' || dt > .5 || typeof this.preset === 'number') return;
     this.acc += dt; this.n++; this.cpu += cpuMs; if (dt > .05) this.spikes++;
     if (this.acc < 1) return;
-    const fps = this.n/this.acc, cpu = this.cpu/this.n, gpu = this.C.post.clock?.total || 0, share = gpu ? (cpu > gpu ? .7 : .3) : cpu/(1000/fps), now = performance.now(), spikes = this.spikes;
+    const fps = this.n/this.acc, cpu = this.cpu/this.n, gpu = this.C.post.clock?.total || 0, share = gpu ? (cpu > gpu ? .9 : .3) : cpu/(1000/fps), now = performance.now(), spikes = this.spikes;
     const want = this.cap > 0 ? Math.min(60, this.cap) : 60;
     this.acc = 0; this.n = 0; this.cpu = 0; this.spikes = 0;
     if ((this.wait -= 1) > 0) return;
+    // the picture got smaller and the graphics card is hardly any quicker: pixels weren't what it was short of, so have them back
+    const Pb = this.resProbe;
+    if (Pb && --Pb.left <= 0) { this.resProbe = null; if (Pb.gpu && gpu > Pb.gpu*.88) { this.auto.res = Pb.at; this.blocked.res = now + 600000; this.applyOne(ALL.find(q => q.id === 'res')); this.wait = 2; this.sync(); return; } }
     const T = this.trial;
     if (T && --T.left <= 0) {
       this.trial = null;

@@ -8,6 +8,7 @@
 //   Inside, the game's Interiors has the shop as its current place (cur.inPlace), so the counter, the menu, the seats,
 //   the keeper's "nobody at the counter" all work as in any room; but `inside` stays false, so the street carries on
 //   round you: the traffic, the people, the light, the weather.
+import { ranged } from './view.js';
 import { Collision } from '@orig/world/mapdata.js';
 import { Interiors, venueKey, nightOf } from '@orig/world/interiors.js';
 import { Shops, openNow } from '@orig/game/shops.js';
@@ -85,7 +86,7 @@ export function cellsOut(ci) {
 // Every shop has its fan, turning over the floor while it's open (slowing to a stop when it shuts, starting up again in
 // the morning). One instanced mesh for all of them; only the ones near you are turned each frame (further off you
 // can't tell).
-const FANS = 768, fanFree = [];
+const FANS = 768, FAN_R2 = 150 * 150, fanFree = [];
 let fanMesh = null, fanPend = [];
 const fm = new THREE.Matrix4(), fq = new THREE.Quaternion(), fv = new THREE.Vector3(), fs = new THREE.Vector3(), fy = new THREE.Vector3(0, 1, 0);
 function fanGeo() {
@@ -112,38 +113,39 @@ function fanIn(S) {
 function fanSet(S) {
   const f = S.fan; if (!f || f.i !== undefined) return;
   if (!fanFree.length) return;
-  f.i = fanFree.pop(); fanPose(f);
-}
-function fanPose(f) {
-  fq.setFromAxisAngle(fy, f.a); fv.set(f.x, f.y, f.z); fs.set(f.r / 0.6, 1, f.r / 0.6);
-  fm.compose(fv, fq, fs); fanMesh.setMatrixAt(f.i, fm); fanMesh.instanceMatrix.needsUpdate = true;
+  f.i = fanFree.pop();
 }
 function fanOut(S) {
   const f = S.fan; S.fan = null;
   const k = fanPend.indexOf(S); if (k >= 0) fanPend.splice(k, 1);
   if (!f || f.i === undefined || !fanMesh) return;
-  fm.makeScale(0, 0, 0); fanMesh.setMatrixAt(f.i, fm); fanMesh.instanceMatrix.needsUpdate = true; fanFree.push(f.i);
+  fanFree.push(f.i);
 }
 function fans(dt) {
   if (!fanMesh) {
     if (!G.scene) return;
     fanMesh = new THREE.InstancedMesh(fanGeo(), new THREE.MeshLambertMaterial({ color: 0xe8e4da }), FANS);
     fanMesh.frustumCulled = false; fanMesh.name = 'shopFans';
-    fm.makeScale(0, 0, 0); for (let i = 0; i < FANS; i++) fanMesh.setMatrixAt(i, fm);
+    fanMesh.count = 0;
     for (let i = FANS - 1; i >= 0; i--) fanFree.push(i);
     G.scene.add(fanMesh);
     for (const S of fanPend) fanSet(S); fanPend = [];
   }
-  const P = G.player;
+  // only the fans close enough to make out go to the graphics card: all 768 places were being drawn, used or not, wherever they were
+  const P = G.player, C = G.camera.position; let n = 0;
   for (const S of cells) {
     const f = S.fan; if (!f || f.i === undefined) continue;
-    if (Math.abs(f.x - P.x) > 35 || Math.abs(f.z - P.z) > 35) continue;
-    // up to speed in a few seconds, down slower (it coasts)
-    const on = S.hole && S.hole.on, want = on ? 9 : 0;
-    f.v += Math.max(-dt * 1.2, Math.min(dt * 3, want - f.v));
-    if (f.v < 0.01) continue;
-    f.a = (f.a + f.v * dt) % 6.2832; fanPose(f);
+    if (Math.abs(f.x - P.x) <= 35 && Math.abs(f.z - P.z) <= 35) {
+      // up to speed in a few seconds, down slower (it coasts)
+      const on = S.hole && S.hole.on, want = on ? 9 : 0;
+      f.v += Math.max(-dt * 1.2, Math.min(dt * 3, want - f.v));
+      if (f.v >= 0.01) f.a = (f.a + f.v * dt) % 6.2832;
+    }
+    const dx = f.x - C.x, dz = f.z - C.z; if (dx * dx + dz * dz > FAN_R2 || n >= FANS) continue;
+    fq.setFromAxisAngle(fy, f.a); fv.set(f.x, f.y, f.z); fs.set(f.r / 0.6, 1, f.r / 0.6);
+    fm.compose(fv, fq, fs); fanMesh.setMatrixAt(n++, fm);
   }
+  fanMesh.count = n; ranged(fanMesh.instanceMatrix, n);
 }
 
 // ---------------------------------------------------------------- the collision, with the gaps and the rooms
