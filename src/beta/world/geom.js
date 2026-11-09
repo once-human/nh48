@@ -178,7 +178,7 @@ export class WB {
     const idx = n > 65535 ? this.I.slice(0, ni) : Uint16Array.from(this.I.subarray(0, ni));
     let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
     for (let i = 0; i < pos.length; i += 3) { const x = pos[i], y = pos[i + 1], z = pos[i + 2]; if (x < x0) x0 = x; if (y < y0) y0 = y; if (z < z0) z0 = z; if (x > x1) x1 = x; if (y > y1) y1 = y; if (z > z1) z1 = z; }
-    return { n, pos, nor, col, kind, aux, uv, idx, box: [x0, y0, z0, x1, y1, z1] };
+    return { n, pos, nor, col, kind, aux, uv, idx, box: [x0, y0, z0, x1, y1, z1], panes: this.panes && this.panes.length ? this.panes : null };
   }
 }
 const Z4 = [0, 0, 0, 0, 0, 0, 0, 0];

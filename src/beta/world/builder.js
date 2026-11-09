@@ -56,14 +56,14 @@ export function buildChunk(job, area, kind = 'base') {
   const cells = [];
   if (kind === 'near') {
     const bs = [0, 1, 2, 3].map(() => new WB(2048)), cbs = [0, 1, 2, 3].map(() => new WB(256));
-    for (const w of bs) w.rich = job.rich ?? 1;
+    for (const w of bs) { w.rich = job.rich ?? 1; w.panes = []; }
     blds(job, area, bs, cbs);
     if (job.foot) { try { footpath(job.foot, area, (x, z) => bs[cellOf(job, x, z)]); } catch (e) { if (globalThis.BETA_THROW) throw e; } }
     for (let c = 0; c < 4; c++) cells.push({ main: pk(bs[c]), cut: pk(cbs[c]) });
   } else {
     const fs = [0, 1, 2, 3].map(() => new WB(1024)), ms = [0, 1, 2, 3].map(() => new WB(512)), x = new WB(4), xs = [x, x, x, x];
     x.lod = 3;
-    for (const f of fs) f.lod = 1;
+    for (const f of fs) { f.lod = 1; f.panes = []; }
     for (const m of ms) m.lod = 2;
     blds(job, area, fs, xs);
     blds(job, area, ms, xs);
@@ -508,7 +508,7 @@ function shopFront(b, cb, G, F, i, len, shopEdge) {
       if (lux > 0.75) { b.set(K.cladding, R() < 0.5 ? [0.2, 0.2, 0.22] : [0.86, 0.85, 0.82], 0.05); W.box(b, a - 0.18, c + 0.18, BASE + oh, yT, 0, 0.06, 2); b.set(L.wk, L.wall, L.wear); }
       else W.rect(b, a, c, BASE + oh, yT, 0);
       drawShop(b, cb, G, F, a, plan, lux);
-      if (plan.glass) glazedFront(b, G, F, a, plan, lux);
+      if (plan.glass) glazedFront(b, G, F, a, plan, lux, i * 4096 + k);
       else if (plan.front === 'wall') walledFront(b, G, F, a, plan, lux);
       const t0 = k * cw + 0.15, t1 = (k + 1) * cw - 0.15, h = boardH(t1 - t0), y1 = BASE + gh - 0.07, y0 = y1 - h;
       b.set(K.metal, 0x1e1e20, 0.2);
@@ -979,13 +979,16 @@ function ringAt2(b, F, wall, n, d0, d1, y0, y1) {
   F.box(b, ua, ub, y0 - 0.04, y0, d0 - 0.04, d1 + 0.04, 0); F.box(b, ua, ub, y1, y1 + 0.04, d0 - 0.04, d1 + 0.04, 0);
   F.box(b, ua, ub, y0, y1, d0 - 0.04, d0, 0); F.box(b, ua, ub, y0, y1, d1, d1 + 0.04, 0);
 }
-// a glazed front: plate glass either side of the door, a steel frame, the door itself standing open into the shop
-function glazedFront(b, G, F, a, P, lux) {
+// a glazed front: plate glass either side of the door, a steel frame, the door itself standing open into the shop.
+// Each pane's run of indices is handed back with the drawing ([building, slot, side, first, end]: b.panes), so one
+// that's shattered can be taken out of it (world/walls.js)
+function glazedFront(b, G, F, a, P, lux, slot) {
   const { R, L } = G, w = P.w, yb = BASE, yt = BASE + P.oh, c = a + w, g0 = a + P.door[0], g1 = a + P.door[1];
   const frame = lux > 0.6 ? 0x2a2a2c : L.frame;
   b.set(K.glass, lux > 0.6 ? 0x6a8088 : 0x4a5a5e, L.wear * 0.5, R());
-  if (g0 - a > 0.1) F.box(b, a, g0, yb + 0.05, yt, -0.01, 0.01, 0);
-  if (c - g1 > 0.1) F.box(b, g1, c, yb + 0.05, yt, -0.01, 0.01, 0);
+  const pane = (side, u0, u1) => { const i0 = b.ni; F.box(b, u0, u1, yb + 0.05, yt, -0.01, 0.01, 0); if (b.panes && b.ni > i0) b.panes.push(G.B.bi, slot, side, i0, b.ni); };
+  if (g0 - a > 0.1) pane(0, a, g0);
+  if (c - g1 > 0.1) pane(1, g1, c);
   F.box(b, g0, g1, yb + 2.15, yt, -0.01, 0.01, 0);
   // the open leaf, hinged on the left of the doorway, swung in against the glass
   F.box(b, g0 + 0.02, g0 + 0.05, yb + 0.03, yb + 2.12, -(g1 - g0) + 0.04, -0.04, 0);

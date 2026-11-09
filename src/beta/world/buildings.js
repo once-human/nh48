@@ -21,6 +21,7 @@ import { Frame } from './geom.js';
 import { familyOf, cellDepth, shopPlan, planSeed, roomSpan } from './shopplan.js';
 import { cellsIn, cellsOut } from './shopin.js';
 import { vendIn } from './vendors.js';
+import { paneDrawn } from './walls.js';
 
 export { setShutters, BASE };
 // a sign material whose boards each carry their own light (aGlow): its own program, not a plain sign's
@@ -236,6 +237,18 @@ const mesh = (L, pk, mat, cast, name) => {
   const m = new THREE.Mesh(packGeo(pk), mat); m.castShadow = cast; m.receiveShadow = true; m.matrixAutoUpdate = false; m.visible = false; m.name = name;
   L.g.add(m); return m;
 };
+// a glazed front's panes as this drawing has them, kept on their door's cell ([[mesh, first, end]...] a side), so a
+// shattered one can be taken out of it (world/walls.js), and is out again if it's drawn anew while it's still gone
+function panesIn(L, m, pk) {
+  const P = pk && pk.panes; if (!m || !P) return;
+  const by = new Map(); for (const d of L.C.doors || []) if (d.cell && d.cell.bi != null) by.set(d.cell.bi + ':' + d.cell.slot, d.cell);
+  for (let i = 0; i + 4 < P.length; i += 5) {
+    const S = by.get(P[i] + ':' + P[i + 1]); if (!S) continue;
+    const l = S.draw || (S.draw = [[], []]), side = P[i + 2], e = { m, i0: P[i + 3], i1: P[i + 4] };
+    l[side] = l[side].filter(q => q.m.parent); l[side].push(e);
+    paneDrawn(L.W, S, side, e);
+  }
+}
 function askNear(L) {
   L.near = 1;
   const job = painter.ok ? painter.want(L.C, 'near', 1) : null;
@@ -250,6 +263,7 @@ function gotNear(L, out) {
     const c = L.cells[k], o = out.cells[k];
     if (!o) continue;
     c.main = mesh(L, o.main, paint.world, true, 'near'); c.cut = mesh(L, o.cut, paint.cut, false, 'cut');
+    panesIn(L, c.main, o.main);
   }
   L.near = 2;
   solidsIn(L, out.solids);
@@ -360,7 +374,7 @@ export function* buildBuildingsChunk(W, C, group) {
           else if (span) {
             const a = span.a, c = span.c, Fr = new Frame(ax, az, tx, tz, nx, nz), oh = gh - 0.85;
             const plan = shopPlan({ kind, cat, brand: nm ? nm[3] || '' : '', w: c - a, D: span.D, oh, seed: planSeed(bi, i * 4096 + k), glass: !shop || (nm && nm[3]) === 'brand' });
-            if (plan) C.doors[C.doors.length - 1].cell = { F: Fr, a, plan, y: BASE + dy, shutter: shop };
+            if (plan) C.doors[C.doors.length - 1].cell = { F: Fr, a, plan, y: BASE + dy, shutter: shop, bi, slot: i * 4096 + k };
           }
         }
         slotDoor.set(i * 4096 + k, C.doors[C.doors.length - 1]);
@@ -396,7 +410,7 @@ export function* buildBuildingsChunk(W, C, group) {
     if (!out) out = drawHere(W, C, 'base');
     for (let k = 0; k < 4; k++) {
       const c = L.cells[k], o = out.cells[k];
-      if (o) { c.far = mesh(L, o.far, paint.world, true, 'far'); c.mass = mesh(L, o.mass, paint.world, true, 'mass'); }
+      if (o) { c.far = mesh(L, o.far, paint.world, true, 'far'); c.mass = mesh(L, o.mass, paint.world, true, 'mass'); panesIn(L, c.far, o.far); }
     }
     group.add(L.g);
     lods.add(L);

@@ -243,9 +243,18 @@ function glassAt(W, x, z, F) {
     if (u > g0 && u < g1) return null;
     const pane = u <= g0 ? [a, g0] : [g1, a + w];
     if (pane[1] - pane[0] < 0.1) return null;
-    return { S, Fr, pane, u, y0: S.y + 0.05, y1: S.y + P0.oh, key: 'gl:' + Math.round(Fr.ax*10 + pane[0]*7) + ',' + Math.round(Fr.az*10) };
+    return { S, Fr, pane, side: u <= g0 ? 0 : 1, u, y0: S.y + 0.05, y1: S.y + P0.oh, key: paneKey(Fr, pane[0]) };
   }
   return null;
+}
+const paneKey = (Fr, p0) => 'gl:' + Math.round(Fr.ax*10 + p0*7) + ',' + Math.round(Fr.az*10);
+// the pane taken out of the street's drawing (its run of the near and far meshes, world/buildings.js), into the
+// spot's record so it's put back with the spot
+function paneOut(X, r, e) { const q = { m: e.m, i0: e.i0, i1: e.i1, keep: null }; X.cut(q, true); (r.draw || (r.draw = [])).push(q); }
+// a pane drawn anew (you've come back near it, or its street's been made again) while it's still lying in the road
+export function paneDrawn(W, S, side, e) {
+  const s = spots.get(paneKey(S.F, side ? S.a + S.plan.door[1] : S.a));
+  if (s && s.stage >= 2 && s.r.st !== 0) paneOut(smash(W), s.r, e);
 }
 function glass(X, W, F, g, o) {
   const s = rec(X, g.key, F.ax + F.tx*F.u, F.az + F.tz*F.u);
@@ -286,6 +295,9 @@ function glass(X, W, F, g, o) {
     const b = X.body(s.r, pc, _m.makeTranslation(p[0], p[1], p[2]), 0.12, 'glass', {});
     b.v.set(G.nx*J(0.2, 1.2), J(-0.5, 0.3), G.nz*J(0.2, 1.2)); b.w.set(J(-6, 6), J(-6, 6), J(-6, 6));
   }
+  // and the pane itself is gone, only its edges left in the frame
+  const pl = g.S.draw && g.S.draw[g.side];
+  if (pl) for (const e of pl) if (e.m.parent) paneOut(X, s.r, e);
   s.stage = 2; s.r.meshes.push(D.mesh(W));
   FX.brk('shatter', F.ax + F.tx*F.u, yc, F.az + F.tz*F.u, Math.min(1.2, 0.6 + E/1e4));
 }
