@@ -470,7 +470,8 @@ async function main() {
   const inView = (x, z) => { sphere.center.set(x, 4, z); return frustum.intersectsSphere(sphere); };
   game.inView = inView;
   let last = performance.now(), acc = 0, propT = 0, frames = 0, dtS = 1 / 60;
-  const STEP = 1 / 60;
+  // (half a sixtieth: at 100 km/h a car goes 23 cm a step, not 46, so what it meets is found before it's half inside it)
+  const STEP = 1 / 120;
   // F3: performance overlay
   const perfBox = document.createElement('div');
   perfBox.className = 'dev'; perfBox.hidden = !params.has('perf');
@@ -524,7 +525,7 @@ async function main() {
       // simulate exactly this frame's time, in equal sub-steps no longer than 1/60 s: a fixed 1/60 step
       // against a display that doesn't tick at exactly 60 Hz gives some frames no step and some two,
       // which reads as jitter at speed
-      const nsub = Math.min(6, Math.max(1, Math.ceil(dt / STEP - 1e-3))), h = dt / nsub;
+      const nsub = Math.min(10, Math.max(1, Math.ceil(dt / STEP - 1e-3))), h = dt / nsub;
       for (let s = 0; s < nsub; s++) game.fixed(h);
       game.frame(dt);
       if (k < simx - 1) { frames++; if (game.testDone(frames)) { simDone = true; break; } }

@@ -5,7 +5,7 @@ import { paintMaterial, paintNoise, U } from '@orig/experiment/paint.js';
 import { Crowd, NEAR, makeLook, B } from '@orig/experiment/people.js';
 import { rng } from '@orig/experiment/geo.js';
 import { PU, LAMP } from '../gfx/paint.js';
-import { Skin } from './skin.js';
+import { Skin, visOf } from './skin.js';
 
 // the stress test paints in screen colour; /beta's picture is linear until its last pass
 const linear = (m) => { for (const s of [m]) s.fragmentShader = s.fragmentShader.replace('fragColor = vec4(c, 1.);', 'fragColor = vec4(pow(max(c, vec3(0.)), vec3(2.2)), 1.);').replace('fragColor = vec4(mix(c, fogCol, smoothstep(fogR.x, fogR.y, vZ)*.9), 1.);', 'fragColor = vec4(pow(max(mix(c, fogCol, smoothstep(fogR.x, fogR.y, vZ)*.9), vec3(0.)), vec3(2.2)), 1.);'); return m; };
@@ -28,7 +28,7 @@ const handover = (m) => {
   m.vertexShader = vs;
   return m;
 };
-const CAP = 500;
+const CAP = 1024;                     // (more than the most people the street ever has: peds.js caps them at 1.6x the setting + 120)
 // the simple figure dressed as the person really is (what the full body wears: beta/draw/wardrobe.js dress), so nobody
 // changes clothes, or from a man to a woman, as they come closer
 const hexOf = (c, d) => c && c.getHex ? c.getHex() : (typeof c === 'number' ? c : d);
@@ -83,9 +83,13 @@ export class Actors {
       // But only if the skin really drew it this frame: the crowd hands out up to 150 bodies and the skin draws as many
       // as the graphics setting allows, nearest first, so the ones past that had a body nobody drew and no figure
       // either, and went missing in the street while Munja still showed them there)
-      if (p.body && p.body.H && (p.body.H._drawnT === this.skin.drawnAt || p.fallen > 0 || p.corpse)) continue;
-      // (someone lying down has a real body out to 100 m, crowd.js: past that, nobody's drawn standing up in their place)
+      // And while the body's still coming in (or going), half a second drawn pixel by pixel, this figure keeps the
+      // pixels it hasn't got: it was dropped the moment the body was, so someone walking up to you flickered half
+      // there or vanished for that half second
+      let fd = 0;
+      if (p.body && p.body.H && p.body.H._drawnT === this.skin.drawnAt) { fd = visOf(p.body.H, this.skin.drawnAt); if (fd > 0.999) continue; }
       if (p.fallen > 0 || p.corpse) continue;
+      // (someone lying down has a real body out to 100 m, crowd.js: past that, nobody's drawn standing up in their place)
       if (!p._dk) { p._dk = this.next; this.next = this.next%(CAP - 1) + 1; p._dph = Math.random()*9; p._lx = p.x; p._lz = p.z; p._dv = 0; }
       if (p._dkL !== p.look || C._own[p._dk] !== p) { p._dkL = p.look; C._own[p._dk] = p; if (p.look) { C.look(p._dk, lookOf(p.look)); dirty = true; } }
       // the legs go with how far they really moved this frame (not the speed they mean to walk at), so nobody glides:
@@ -98,7 +102,7 @@ export class Actors {
       if (dt > 0) { p._dv += (m/dt - p._dv)*Math.min(1, dt*6); p._dph += m/.68*Math.PI; }
       const want = p._dv > 0.3 && m > 1e-4 ? Math.atan2(p._sz - oz, p._sx - ox) : (p.yaw || 0);
       let dy = want - p._sy; dy -= Math.round(dy/(Math.PI*2))*Math.PI*2; p._sy += dy*Math.min(1, dt*7);
-      put(p._sx, p.y || 0, p._sz, p._sy, p._dph, Math.min(1, p._dv/1.1), p._dk, 0);
+      put(p._sx, p.y || 0, p._sz, p._sy, p._dph, Math.min(1, p._dv/1.1), p._dk, fd);
     }
     if (dirty) C.tex.needsUpdate = true;
     C.near.geometry.instanceCount = a; C.far.geometry.instanceCount = b; nA.iPos.needsUpdate = nA.iAnim.needsUpdate = fA.iPos.needsUpdate = fA.iAnim.needsUpdate = true;

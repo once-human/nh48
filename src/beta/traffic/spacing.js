@@ -74,13 +74,14 @@ Traffic.prototype.update = function (dt, px, pz, avoidView) {
       if (pc < pa) {
         // across: each moves its share of the way out, sideways in its own lane (a light one more than a heavy one)
         const sg = Math.sign(ac) || (i % 2 ? 1 : -1), ma = a.T.mass || 500, mb = b.T.mass || 500, wa = mb/(ma + mb), nx = -ahz*sg, nz = ahx*sg;
-        const max = 1.2*dt, st = Math.min(pc*k, max), got = aside(a, -nx, -nz, st*wa) + aside(b, nx, nz, st*(1 - wa));
+        // (and a real overlap, past a few centimetres, is put right at once: two cars are never inside each other)
+        const max = 1.2*dt + Math.max(0, pc - 0.04), st = Math.min(Math.max(pc*k, pc - 0.04), max), got = aside(a, -nx, -nz, st*wa) + aside(b, nx, nz, st*(1 - wa));
         if (got >= st*0.5) continue;
       }
       // along: the one behind drops back, if that's away from the other. If it isn't, it only waits
       const fx = back === a ? b : a, bhx2 = back === a ? ahx : bhx, bhz2 = back === a ? ahz : bhz, ox = back.x - fx.x, oz = back.z - fx.z, od = Math.hypot(ox, oz) || 1;
       const away = -(ox*bhx2 + oz*bhz2)/od;
-      if (away < -0.2) dropBack(back, Math.min(pa, 0.9*dt + Math.max(0, back._cap)*dt*0.6)*Math.min(1, -away*1.5));   // (never so fast it reverses what it's doing)
+      if (away < -0.2) dropBack(back, Math.min(pa, 0.9*dt + Math.max(0, back._cap)*dt*0.6 + Math.max(0, pa - 0.04))*Math.min(1, -away*1.5));   // (never so fast it reverses what it's doing)
     }
   }
 };
