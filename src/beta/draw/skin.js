@@ -9,6 +9,7 @@ const HEAD = { value: new THREE.Vector4() };
 import { PU, LAMP, PCF } from '../gfx/paint.js';
 import { RNG } from '@orig/core/util.js';
 import { Wardrobe, buildCloth, dress } from './wardrobe.js';
+import { view } from '../world/view.js';
 
 const TEX_W = 256, LOOK = 200, SLOTS = 96, CAST2 = 45*45;
 // how much of a body is drawn in full detail as it takes over from the simple figure or hands back to it (people/crowd.js
@@ -182,6 +183,10 @@ const HAIR2 = COMMON + `void main(){ if (seatClip()) discard; vec3 p = vB, n = N
 const SOFT = COMMON + `void main(){ if (seatClip()) discard; vec3 p = vB; float f = nz(vec2(p.x*9. + p.z*5., p.y*7.))*.6 + nz(vec2(p.x*27., p.y*19.))*.4, near = 1. - smoothstep(3., 14., vZ); o = vec4(paint(vC*(.86 + .26*f), bump(N(), vW, f*.012*near), vW, 0.), 1.); }`;
 
 const v3 = new THREE.Vector3(), n3 = new THREE.Matrix3(), _m1 = new THREE.Matrix4();
+// Bodies outside your view are last in every batch, and your own picture stops before them: they were drawn in full
+// off the side of the screen. Any other camera (the sun's for their shadows, a mirror, the phone's) draws them all
+const _fr = new THREE.Frustum(), _ball = new THREE.Sphere(), _inv = new THREE.Matrix4();
+const seenFirst = function (r, sc, cam) { this.geometry.instanceCount = cam === view.cam ? this.seen : this.all; };
 
 // one smoothing split: each triangle into four, the new points lifted onto the curve the normals describe
 function subdivide(A) {
@@ -276,7 +281,7 @@ export class Skin {
     g.setAttribute('iSlot', new THREE.InstancedBufferAttribute(new Float32Array(SLOTS), 1).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('iCol', new THREE.InstancedBufferAttribute(new Float32Array(SLOTS*3), 3).setUsage(THREE.DynamicDrawUsage));
     g.instanceCount = 0;
-    const m = new THREE.Mesh(g, this.material(M.userData.type, M.userData.map)); m.frustumCulled = false; m.visible = false; m.renderOrder = -2; m.fill = 0; this.scene.add(m);
+    const m = new THREE.Mesh(g, this.material(M.userData.type, M.userData.map)); m.frustumCulled = false; m.visible = false; m.renderOrder = -2; m.fill = 0; m.seen = m.all = 0; m.onBeforeRender = seenFirst; this.scene.add(m);
     return m;
   }
   // called as any scene but the game's starts to draw: if it has bodies, its view draws them
@@ -325,7 +330,7 @@ export class Skin {
     g.setAttribute('iSlot', new THREE.InstancedBufferAttribute(new Float32Array(SLOTS), 1).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('iCol', new THREE.InstancedBufferAttribute(new Float32Array(SLOTS*3), 3).setUsage(THREE.DynamicDrawUsage));
     g.instanceCount = 0;
-    const m = new THREE.Mesh(g, this.material(type, map)); m.frustumCulled = false; m.visible = false; m.renderOrder = -2; m.fill = 0; this.scene.add(m);
+    const m = new THREE.Mesh(g, this.material(type, map)); m.frustumCulled = false; m.visible = false; m.renderOrder = -2; m.fill = 0; m.seen = m.all = 0; m.onBeforeRender = seenFirst; this.scene.add(m);
     m.userData.type = type; m.userData.map = map;
     return m;
   }
@@ -346,7 +351,7 @@ export class Skin {
     if (!this.rigidMats) { this.rigidMats = {}; for (const [kn, fs] of [['plain', PLAIN], ['hair', HAIR2], ['cloth', SOFT]]) { const un = Object.assign({}, PU, this.uOver, { tSkin: { value: this.tex }, tMap: { value: null }, uHead: HEAD }); this.rigidMats[kn] = new THREE.RawShaderMaterial({ vertexShader: RIGID_VS, fragmentShader: this.fsOf(fs), uniforms: un, glslVersion: THREE.GLSL3, side: THREE.DoubleSide }); } this.rigidMat = this.rigidMats.plain; }
     if (false) { const un = {}; this.rigidMat = new THREE.RawShaderMaterial({ vertexShader: RIGID_VS, fragmentShader: PLAIN, uniforms: un, glslVersion: THREE.GLSL3, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -8 }); }
     if (geo.attributes.sway) g.setAttribute('sway', geo.attributes.sway);
-    const m = new THREE.Mesh(g, this.rigidMats[geo.userData.kind] || this.rigidMat); m.frustumCulled = false; m.visible = false; m.renderOrder = -2; m.cap = cap; m.fill = 0; this.scene.add(m);
+    const m = new THREE.Mesh(g, this.rigidMats[geo.userData.kind] || this.rigidMat); m.frustumCulled = false; m.visible = false; m.renderOrder = -2; m.cap = cap; m.fill = 0; m.seen = m.all = 0; m.onBeforeRender = seenFirst; this.scene.add(m);
     m.castShadow = true; m.customDepthMaterial = this.rigidShadow || (this.rigidShadow = new THREE.RawShaderMaterial({ vertexShader: SHADOW_RIGID, fragmentShader: SHADOW_FS, glslVersion: THREE.GLSL3, side: THREE.DoubleSide, colorWrite: false }));
     this.rigid.set(geo.uuid, m); return m;
   }
@@ -373,9 +378,17 @@ export class Skin {
       H._d2 = H === playerH ? -1 : H._ride ? d2*0.02 : d2; near.push(H);
     }
     near.sort((a, b) => a._d2 - b._d2);
+    // the same people as ever (the nearest), with whoever's in the picture put first
+    near.length = Math.min(near.length, this.max, SLOTS);
+    camera.updateWorldMatrix(true, false); _fr.setFromProjectionMatrix(_inv.copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix)); _ball.radius = 3.5;
+    let seenN = 0;
+    for (const H of near) { const p = H.holder.position; _ball.center.set(p.x, p.y + 1, p.z); H._seen = H === playerH || !!H._ride || H._d2 < 16 || _fr.intersectsSphere(_ball); if (H._seen) seenN++; }
+    if (seenN < near.length) near.sort((a, b) => (b._seen - a._seen) || (a._d2 - b._d2));
+    const mark = () => { for (const M of [this.parts.m, this.parts.f]) for (const R of M.values()) { R.lo.seen = R.lo.fill; if (R.hi) R.hi.seen = R.hi.fill; } for (const r of this.rigid.values()) r.seen = r.fill; };
     for (const M of this.parts.m.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; if (M.sh) M.sh.fill = 0; } for (const M of this.parts.f.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; if (M.sh) M.sh.fill = 0; } for (const r of this.rigid.values()) r.fill = 0;
     const D = this.data, n = Math.min(near.length, this.max, SLOTS), hi2 = this.hiR*this.hiR, now = performance.now(); this.drawnAt = now;
     for (let s = 0; s < n; s++) {
+      if (s === seenN) mark();
       const H = near[s], k = H.look && H.look.female ? 'f' : 'm', row = s*TEX_W*4;
       H.holder.updateWorldMatrix(true, true);
       const sk = H.body.skeleton; sk.update(); const m = sk.boneMatrices, nb = Math.min(sk.bones.length, Math.floor(LOOK/3));
@@ -413,10 +426,11 @@ export class Skin {
         A.iCol.array[j*3] = c.r; A.iCol.array[j*3 + 1] = c.g; A.iCol.array[j*3 + 2] = c.b;
       }
     }
+    if (seenN >= n) mark();
     this.n = n; this.tex.needsUpdate = n > 0;
-    const done = (P) => { const c = Math.min(P.fill, P.cap || SLOTS); P.visible = c > 0; if (!c) return; P.geometry.instanceCount = c; const A = P.geometry.attributes; if (A.iCol) A.iCol.needsUpdate = true; if (A.iF) A.iF.needsUpdate = true; if (A.iSlot) A.iSlot.needsUpdate = true; else for (let i = 0; i < 4; i++) A['iM' + i].needsUpdate = true; };
+    const done = (P) => { const c = Math.min(P.fill, P.cap || SLOTS); P.visible = c > 0; P.all = c; P.seen = Math.min(P.seen || 0, c); if (!c) return; P.geometry.instanceCount = c; const A = P.geometry.attributes; if (A.iCol) A.iCol.needsUpdate = true; if (A.iF) A.iF.needsUpdate = true; if (A.iSlot) A.iSlot.needsUpdate = true; else for (let i = 0; i < 4; i++) A['iM' + i].needsUpdate = true; };
     for (const M of [this.parts.m, this.parts.f]) for (const R of M.values()) { done(R.lo); if (R.hi) done(R.hi); if (R.sh) done(R.sh); }
     for (const r of this.rigid.values()) done(r);
-    return near.slice(0, n);
+    return near;
   }
 }
