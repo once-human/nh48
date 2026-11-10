@@ -4,8 +4,9 @@ import { StaticDrawUsage, Object3D, Matrix4, Frustum, Sphere } from 'three';
 // (its shadow can still fall in front of you); past that it has to be inside the view, with room to spare for its own
 // size and for the view swinging round before the lists are next filled.
 export const view = {
-  on: false, vx: 0, vz: 0, c: -2, x: 0, z: 0, swung: 0, reach: 150,
+  on: false, vx: 0, vz: 0, c: -2, x: 0, z: 0, swung: 0, reach: 150, cam: null,
   set(cam) {
+    this.cam = cam;
     const e = cam.matrixWorld.elements, h = Math.hypot(e[8], e[10]), wasX = this.vx, wasZ = this.vz;
     this.x = e[12]; this.z = e[14];
     // (looking steeply down or up, the sides of the view open right out: everything stays)
@@ -23,8 +24,10 @@ export const view = {
   },
 };
 // a list with what's in view first and what's behind after it: three reads the count after this, so the sun's camera
-// (which only draws the still things when you've moved on, whichever way you're looking by then) gets the lot, yours the front
-export const seenOnly = function (r, sc, cam) { this.count = cam.isOrthographicCamera ? this.all : this.seen; };
+// (which only draws the still things when you've moved on, whichever way you're looking by then) gets the lot, yours the front.
+// Any other camera gets the lot too: a mirror looks behind you, the phone's camera and the map's live view look where
+// they like, and the front of your view is no use to them
+export const seenOnly = function (r, sc, cam) { this.count = cam === view.cam ? this.seen : this.all; };
 // only the part of a list that's in use goes to the graphics card (each whole list, every time, was most of the uploads)
 export function ranged(a, n) { a.clearUpdateRanges(); a.addUpdateRange(0, n*a.itemSize); a.needsUpdate = true; }
 // the graphics card has it now: a street's geometry doesn't need a second copy in JS, all it did was fill the heap

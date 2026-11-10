@@ -57,6 +57,8 @@ export class Actors {
     const cast = new THREE.RawShaderMaterial({ vertexShader: pm.vertexShader, fragmentShader: 'precision highp float; out vec4 o; void main(){ o = vec4(0.); }', uniforms: pm.uniforms, defines: pm.defines, glslVersion: pm.glslVersion, side: THREE.DoubleSide, colorWrite: false });
     for (const m of this.all) { m.renderOrder = -1; m.castShadow = true; m.customDepthMaterial = cast; scene.add(m); }
     this.next = 1; this.t = 0; this.hidOld = false;
+    this.back = [];
+    for (const m of [this.crowd.near, this.crowd.far]) { m.seen = m.all = 0; m.onBeforeRender = function (r, sc, cam) { this.geometry.instanceCount = cam === view.cam || cam.isOrthographicCamera ? this.seen : this.all; }; }
     this.skin = new Skin(G.W.kit, scene); G.skin = this.skin;
   }
   hideOld() {
@@ -75,9 +77,14 @@ export class Actors {
     if (!on) return;
     const C = this.crowd, nA = C.near.geometry.attributes, fA = C.far.geometry.attributes, cx = camera.position.x, cz = camera.position.z;
     let a = 0, b = 0, dirty = false; if (!C._own) C._own = [];
-    const put = (x, y, z, yaw, ph, amp, id, fd = 0) => { const dx = x - cx, dz = z - cz, d2 = dx*dx + dz*dz; if (d2 > 122500 || !view.sees(x, z)) return;
-      const near = d2 < NEAR*NEAR, A = near ? nA : fA, o = near ? a++ : b++; if (o >= CAP) return;
-      A.iPos.array.set([x, y, z, Math.PI/2 - yaw], o*4); A.iAnim.array.set([ph, amp, id, fd], o*4); };
+    // who's in your view goes first in each list, who's behind you after them: your own picture draws only the first
+    // part, and any other camera (a mirror, the phone's, the map's live view) draws everyone (the count is switched
+    // as each starts to draw, below)
+    const back = this.back; back.length = 0;
+    const write = (near, x, y, z, yaw, ph, amp, id, fd) => { const A = near ? nA : fA, o = near ? a : b; if (o >= CAP) return; if (near) a++; else b++;
+      const P = A.iPos.array, Q = A.iAnim.array, i = o*4; P[i] = x; P[i + 1] = y; P[i + 2] = z; P[i + 3] = Math.PI/2 - yaw; Q[i] = ph; Q[i + 1] = amp; Q[i + 2] = id; Q[i + 3] = fd; };
+    const put = (x, y, z, yaw, ph, amp, id, fd = 0) => { const dx = x - cx, dz = z - cz, d2 = dx*dx + dz*dz; if (d2 > 122500) return;
+      if (view.sees(x, z)) write(d2 < NEAR*NEAR, x, y, z, yaw, ph, amp, id, fd); else back.push(d2 < NEAR*NEAR ? 1 : 0, x, y, z, yaw, ph, amp, id, fd); };
     for (const p of (G.people ? G.people.list : [])) {
       if (p.hidden || p.pax) continue;
       // (who has a real body close by is drawn by the skin; while it's coming in or going, this figure has the rest.
@@ -106,6 +113,9 @@ export class Actors {
       put(p._sx, p.y || 0, p._sz, p._sy, p._dph, Math.min(1, p._dv/1.1), p._dk, fd);
     }
     if (dirty) C.tex.needsUpdate = true;
-    C.near.geometry.instanceCount = a; C.far.geometry.instanceCount = b; nA.iPos.needsUpdate = nA.iAnim.needsUpdate = fA.iPos.needsUpdate = fA.iAnim.needsUpdate = true;
+    C.near.seen = a; C.far.seen = b;
+    for (let i = 0; i < back.length; i += 9) write(back[i] === 1, back[i + 1], back[i + 2], back[i + 3], back[i + 4], back[i + 5], back[i + 6], back[i + 7], back[i + 8]);
+    C.near.all = a; C.far.all = b;
+    C.near.geometry.instanceCount = C.near.seen; C.far.geometry.instanceCount = C.far.seen; nA.iPos.needsUpdate = nA.iAnim.needsUpdate = fA.iPos.needsUpdate = fA.iAnim.needsUpdate = true;
   }
 }

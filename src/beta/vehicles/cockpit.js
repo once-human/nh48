@@ -27,6 +27,7 @@ import { buildCarCockpit as plainCockpit } from '@orig/vehicles/cockpit.js';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { carSpec, baseOf, doorOf, hasSun } from './models.js';
 import { cabinGlass } from './vehmat.js';
+import { showAll } from '../world/view.js';
 
 const MATTE = -1, CARBON = -2, QUILT = -3, WOOD = -4, BRUSHED = -5, SUEDE = -6, PERF = -7, GRAIN = -8;
 const DZ = 0.36, I4 = new THREE.Matrix4(), ONE = new THREE.Vector3(1, 1, 1), Q0 = new THREE.Quaternion();
@@ -936,7 +937,9 @@ function mirror(w, h, tw, th, slot, shape, every = 3) {
   const ob = r.onBeforeRender; let k = slot;
   r.onBeforeRender = function (rd, sc, cam, ...a) {
     if (MIRRORING || !cam || !cam.isPerspectiveCamera || (k++ % every) !== 0) return;
-    MIRRORING = true; try { ob.call(this, rd, sc, cam, ...a); } finally { MIRRORING = false; }
+    // (the streets behind you were left out of your own picture, world/view.js: the mirror looks exactly there, so they're
+    // back before it draws. Your picture's list is already made by now, so nothing's added to it)
+    MIRRORING = true; showAll(); try { ob.call(this, rd, sc, cam, ...a); } finally { MIRRORING = false; }
   };
   r.castShadow = false; r.receiveShadow = false; r.frustumCulled = false;
   return r;
