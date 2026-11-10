@@ -390,7 +390,7 @@ export class Skin {
     for (let s = 0; s < n; s++) {
       if (s === seenN) mark();
       const H = near[s], k = H.look && H.look.female ? 'f' : 'm', row = s*TEX_W*4;
-      H.holder.updateWorldMatrix(true, true);
+      H.holder.updateWorldMatrix(true, true); H.holder.placedAt = view.tick;
       const sk = H.body.skeleton; sk.update(); const m = sk.boneMatrices, nb = Math.min(sk.bones.length, Math.floor(LOOK/3));
       // who they are (never you as yourself: you chose your own look; in someone else (Vetal) you're dressed as they are)
       const W_ = this.ward[k]; let D_ = null;

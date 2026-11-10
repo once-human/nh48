@@ -5,6 +5,7 @@ import { StaticDrawUsage, Object3D, Matrix4, Frustum, Sphere } from 'three';
 // size and for the view swinging round before the lists are next filled.
 export const view = {
   on: false, vx: 0, vz: 0, c: -2, x: 0, z: 0, swung: 0, reach: 150, cam: null,
+  tick: 0,                                              // (the frame being drawn: whoever was posed in it carries its number)
   set(cam) {
     this.cam = cam;
     const e = cam.matrixWorld.elements, h = Math.hypot(e[8], e[10]), wasX = this.vx, wasZ = this.vz;

@@ -65,7 +65,8 @@ export class Shadows {
   render(focus, forward) {
     // (a list of instances is drawn where its instances say: its own place never changes, and with 300 of them it adds up)
     if (this.scene.children.length !== this.kids) { this.kids = this.scene.children.length; for (const c of this.scene.children) if (c.isInstancedMesh && c.matrixAutoUpdate && !c.position.x && !c.position.y && !c.position.z) { c.updateMatrix(); c.matrixAutoUpdate = false; } }
-    this.scene.updateMatrixWorld();
+    // (whoever the people's renderer posed this frame is up to date already, every bone: not gone through a second time)
+    const tick = view.tick++, all = this.scene.children; for (let i = 0; i < all.length; i++) { const c = all[i]; if (c.placedAt !== tick) c.updateMatrixWorld(true); }
     if (!this.on || !this.sky.state) { PU.shadowOn.value = 0; return; }
     const R = this.R, S = this.scene, kids = S.children, ld = this.sky.state.lightDir;
     if (!this.a) { this.a = target(this.size, false); this.b = target(this.size, true); this.dirty = true; R.initRenderTarget(this.a); R.initRenderTarget(this.b); }
