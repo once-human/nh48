@@ -31,7 +31,19 @@ Hills.prototype.mesh = function (x0, z0, S, nx, nz, h, yOff) {
     if (H[k] > 0.05 || H[k + 1] > 0.05 || H[k + mx] > 0.05 || H[k + mx + 1] > 0.05) cells.push(k);
   }
   if (!cells.length) return null;
-  const P = [], N = [], UV = [], SH = [], idx = [];
+  // the far field is one sheet 50 km across: cut it into squares 4 km a side, so only the ones in view are drawn
+  // (every point's height, slope and shade come from the heights, not from its square, so the joins don't show)
+  if (R === 1) {
+    const B = 64, by = new Map();
+    for (const k of cells) { const i = k % mx, key = Math.floor(i / B) + Math.floor((k - i) / mx / B)*4096; let l = by.get(key); if (!l) by.set(key, l = []); l.push(k); }
+    const grp = new THREE.Group();
+    for (const l of by.values()) grp.add(this.sheet(l, used, H, mx, mz, x0, z0, s, R, yOff));
+    return grp;
+  }
+  return this.sheet(cells, used, H, mx, mz, x0, z0, s, R, yOff);
+};
+Hills.prototype.sheet = function (cells, used, H, mx, mz, x0, z0, s, R, yOff) {
+  const P = [], N = [], UV = [], SH = [], idx = [], mine = [];
   let c = 0;
   const hv = (i, j) => H[Math.max(0, Math.min(mz - 1, j))*mx + Math.max(0, Math.min(mx - 1, i))];
   const vert = (k) => {
@@ -46,6 +58,7 @@ Hills.prototype.mesh = function (x0, z0, S, nx, nz, h, yOff) {
     // shade from the shape: below the average of its neighbours is a gully, above is a ridge
     const curv = (hl + hr + hu + hd)*0.25 - y0;
     SH.push(Math.max(120, Math.min(255, Math.round(200*(1 - Math.max(-0.18, Math.min(0.18, curv*0.12)) + rock*0.2)))));
+    mine.push(k);
     return (used[k] = c++);
   };
   for (const k of cells) { const a = vert(k), b = vert(k + 1), d = vert(k + mx), e = vert(k + mx + 1); idx.push(a, d, b, b, d, e); }
@@ -59,5 +72,6 @@ Hills.prototype.mesh = function (x0, z0, S, nx, nz, h, yOff) {
   g.computeBoundingSphere(); g.computeBoundingBox();
   const m = new THREE.Mesh(g, this.W.mats.ground);
   m.receiveShadow = true; m.castShadow = false; m.matrixAutoUpdate = false;
+  for (const k of mine) used[k] = -1;
   return m;
 };
