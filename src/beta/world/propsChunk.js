@@ -16,6 +16,7 @@ import { GB } from '@orig/world/groundChunk.js';
 import { FacadeB } from '@orig/world/buildingsChunk.js';
 import { buildLandmark } from './landmarks.js';
 import { stallSets } from './props.js';
+import { byFacing } from './facing.js';
 import { smash } from './smash.js';
 
 export function buildGlobalProps(W) { gameProps(W); stallSets(W); }
@@ -291,7 +292,7 @@ export function* buildPropsChunk(W, C, group) {
   if (!gb.empty) { const m = new THREE.Mesh(gb.build(), mats.ground); m.castShadow = true; m.receiveShadow = true; group.add(m); }
   yield;
   W.sliceLabel = 'pEmitF';
-  if (!fb.empty) { const m = new THREE.Mesh(yield* fb.buildSliced(), mats.facade); m.castShadow = true; m.receiveShadow = true; group.add(m); }
+  if (!fb.empty) { const m = new THREE.Mesh(yield* fb.buildSliced(), mats.facade); m.castShadow = true; m.receiveShadow = true; group.add(m); for (const x of yield* byFacing(m)) group.add(x); }
   yield;
   W.sliceLabel = 'pEmitK';
   let km = null, kq = null;
