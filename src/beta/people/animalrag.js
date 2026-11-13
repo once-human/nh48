@@ -190,7 +190,9 @@ export function tickAnimalRag(R, dt, W) {
     R.carOn = R.t < 3 && (R.t < 0.25 || p[r0*3 + 1] - R.gy[r0] > 0.42*(R.kind === 'cow' ? 2.2 : 1));
     if (R.t >= 3) R.car = null;
   }
-  R.acc = Math.min(R.acc + dt, DT*8);
+  // (a whole frame's worth of time, however long the frame: held to 66 ms, a fall on a PC drawing ten or twelve frames a
+  // second ran at two-thirds speed, in slow motion)
+  R.acc = Math.min(R.acc + dt, 0.1);
   const n = Math.floor(R.acc/DT);
   for (let s = 0; s < n; s++) { R.sub = (s + 1)/n; step(R); }
   R.acc -= n*DT; R.t += n*DT;

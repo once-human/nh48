@@ -15,7 +15,7 @@ import * as THREE from 'three';
 import { carSpec, baseOf } from './models.js';
 
 const DT = 1/120, G = 9.8;
-const MU_SIDE = 0.5, MU_ROLL = 0.03, MU_TYRE = 0.95;
+const MU_SIDE = 0.58, MU_ROLL = 0.03, MU_TYRE = 0.95;
 
 // [x forward, y up, z right, weight, 1 for the bottoms of the tyres]
 function rim(out, x, R, side, m) {
@@ -203,10 +203,14 @@ function match(B) {
 // the road: nothing goes through it; what's on it rubs (rolls along on a tyre that's under it, grinds otherwise)
 function road(B, gy, rub) {
   const { n, p, q, tyre } = B, gh = B.gh;
-  let fx = 0, fz = 0, up = 0;
+  let fx = 0, fz = 0, up = 0, down = 0;
+  // (the road rubs with the whole machine's weight on whatever part of it is down: a bar end and a footpeg carry what
+  // the rest doesn't. Each point braked only for itself, one lying on two or three of them slid three times too far)
+  const share = B.down > 0 ? Math.min(3.5, n/B.down) : 1;
   if (rub) { _v.set(1, 0, 0).applyQuaternion(B.Q); fx = _v.x; fz = _v.z; const h = Math.hypot(fx, fz) || 1; fx /= h; fz /= h; up = _w.set(0, 1, 0).applyQuaternion(B.Q).y; }
   for (let i = 0; i < n; i++) {
     const g = gh ? gh[i] : gy, pen = g - p[i*3 + 1]; if (pen <= 0) continue;
+    down++;
     const vy = p[i*3 + 1] - q[i*3 + 1];
     if (-vy/DT > B.imp) { B.imp = -vy/DT; B.impI = i; }        // (how hard it came down, and where on it)
     p[i*3 + 1] = g;
@@ -218,17 +222,18 @@ function road(B, gy, rub) {
       const a = dx*fx + dz*fz, sx = dx - a*fx, sz = dz - a*fz, ka = Math.max(0, 1 - MU_ROLL*pen/(Math.abs(a) + 1e-9)), sl = Math.hypot(sx, sz), ks = Math.max(0, 1 - MU_TYRE*pen/(sl + 1e-9));
       q[i*3] = p[i*3] - (a*ka*fx + sx*ks); q[i*3 + 2] = p[i*3 + 2] - (a*ka*fz + sz*ks);
     } else {
-      const d = Math.hypot(dx, dz), k = Math.max(0, 1 - MU_SIDE*pen/(d + 1e-9));
+      const d = Math.hypot(dx, dz), k = Math.max(0, 1 - MU_SIDE*share*pen/(d + 1e-9));
       q[i*3] = p[i*3] - dx*k; q[i*3 + 2] = p[i*3 + 2] - dz*k;
     }
   }
+  if (rub) B.down = down;
 }
 
 // on by dt. gy: the road under it (a height, or the height at (x, z) under each of its points); wall(x, z): how far
 // to push it out of a wall, or null
 export function stepBody(B, dt, gy, wall) {
   if (B.rest) return;
-  B.acc = Math.min(B.acc + dt, DT*8);
+  B.acc = Math.min(B.acc + dt, 0.1);                    // (real time at any frame rate: 66 ms a frame at most was slow motion on a slow PC)
   const { n, p, q } = B;
   B.imp = 0; B.impI = -1; B.wallHit = 0;
   if (typeof gy === 'function') { const gh = B.gh || (B.gh = new Float64Array(n)); for (let i = 0; i < n; i++) gh[i] = gy(p[i*3], p[i*3 + 2]); }
