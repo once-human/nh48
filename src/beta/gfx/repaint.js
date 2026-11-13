@@ -166,6 +166,8 @@ void main(){
 #endif
 #ifdef GLOW
   totalEmissiveRadiance *= vGlow;           // a shop's board goes dark with its shutter (world/shutters.js)
+  // (a white board at full strength burnt out the lettering on it: what's brightest is held back, colours stay as they were)
+  { float y = dot(totalEmissiveRadiance, vec3(.2126, .7152, .0722)); if (y > .45) totalEmissiveRadiance *= (.45 + (y - .45)*.3)/y; }
 #endif
   c += totalEmissiveRadiance;
 #endif
