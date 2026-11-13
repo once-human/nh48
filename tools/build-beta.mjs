@@ -352,6 +352,10 @@ const PATCHES = {
     ["l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  R.updateMatrixWorld(true);\n}", "l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  u.updateMatrixWorld(true);\n}"],
   ],
   [S('people/crowd.js')]: [
+    // (a street you drive into fills with real people at once: bodies are handed out four a tick, eight for those right by
+    // you. At two a tick the ones in front of your car were still the far-off figures for seconds)
+    ["if (!s && this.pool.length < this.cap + 8 && (made < 2 || (urgent && made < 4)))", "if (!s && this.pool.length < this.cap + 8 && (made < 4 || (urgent && made < 8)))"],
+    ["if (this.t <= 0) { this.t = 0.25; this.assign(cx, cz); }", "if (this.t <= 0) { this.t = 0.12; this.assign(cx, cz); }"],
     // a Bullet's rider sits it as a motorbike's does (it was given a scooter's seat, so it was never made a real rider)
     ["const bike = /^bike/.test(o.type);", "const bike = /^(bike|bullet)/.test(o.type);"],
     // thrown by a vehicle: braced while in the air (the hit turns them about the hips: beta/people/runover.js), and the
@@ -594,7 +598,7 @@ const PATCHES = {
     // the riders drawn as real people are the nearest ones, not the first 14 in the list: in thick traffic a scooter
     // right beside you lost its place to one 40 m off and went by with its baked, low-detail rider on it
     ["    let nr = 0;\n    for (const v of this.list) {\n      // every two-wheeler and auto within the radius (no speed or count limit; 14 at most, a safety net)\n      const R = this.richR || 28;\n      const near = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz) < R * R && /^(scooter|bike|auto)/.test(v.type) && !(v.fallen > 0);\n      v.rich = near && nr < 14 ? (nr++, true) : false;\n    }",
-     "    { const R = this.richR || 28, cand = this._rc || (this._rc = []); cand.length = 0;\n      for (const v of this.list) { v.rich = false; const d2 = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz); if (d2 < R * R && /^(scooter|bike|bullet|auto|cycle)/.test(v.type) && !(v.fallen > 0)) { v._rd = d2; cand.push(v); } }\n      cand.sort((a, b) => a._rd - b._rd); for (let i = 0; i < cand.length && i < 14; i++) cand[i].rich = true; }"],
+     "    { const R = this.richR || 28, cand = this._rc || (this._rc = []); cand.length = 0;\n      for (const v of this.list) { v.rich = false; const d2 = (v.x - cx) * (v.x - cx) + (v.z - cz) * (v.z - cz); if (d2 < R * R && /^(scooter|bike|bullet|auto|cycle)/.test(v.type) && !(v.fallen > 0)) { v._rd = d2; cand.push(v); } }\n      cand.sort((a, b) => a._rd - b._rd); for (let i = 0; i < cand.length && i < (this.richN || 14); i++) cand[i].rich = true; }"],
     // a car you've hit pulls up under its own brakes, along its lane (it used to stop dead on the spot), and only
     // then is it standing there with its driver out (game.js fenderBender waits for it)
     ["if (v.argue > 0) { v.argue -= dt; v.v = 0; return; }", "if (v.argue > 0 && !(v.v > 0.3)) { v.argue -= dt; v.v = 0; return; }"],

@@ -11,7 +11,7 @@ import { RNG } from '@orig/core/util.js';
 import { Wardrobe, buildCloth, dress } from './wardrobe.js';
 import { view } from '../world/view.js';
 
-const TEX_W = 256, LOOK = 200, SLOTS = 96, CAST2 = 45*45;
+const TEX_W = 256, LOOK = 200, SLOTS = 160, CAST2 = 45*45;
 // how much of a body is drawn in full detail as it takes over from the simple figure or hands back to it (people/crowd.js
 // stamps when), over half a second; anyone who isn't a street body (you, a preview) is always whole
 export const FD = 500;
