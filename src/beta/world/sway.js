@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { compose } from '@orig/world/props.js';
 
 // f: Hz, z: how much each swing loses (a share of critical)
-const MODE = { lamp: { f: 1.3, z: 0.035 }, signal: { f: 2.1, z: 0.05 }, pole: { f: 1.6, z: 0.12 } };
+const MODE = { lamp: { f: 1.3, z: 0.09 }, signal: { f: 2.1, z: 0.11 }, pole: { f: 1.6, z: 0.2 } };
 const G0 = 9.81, _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _q = new THREE.Quaternion();
 const sm = (k) => k <= 0 ? 0 : k >= 1 ? 1 : k*k*(3 - 2*k);
 
@@ -182,8 +182,12 @@ function stepWires(X, dt) {
     const L = s/1.25, n = Math.max(1, Math.ceil(dt*wv/0.4)), h = dt/n;
     aLat = Math.max(-60, Math.min(60, aLat)); aAl = Math.max(-60, Math.min(60, aAl));
     for (let k = 0; k < n; k++) {
-      q.thv += (-w*w*Math.sin(q.th) - 2*0.03*w*q.thv - aLat*Math.cos(q.th)/L)*h; q.th += q.thv*h;
-      q.dv += (-wv*wv*q.d - 2*0.06*wv*q.dv + aAl/Math.max(0.3, s)*0.5)*h; q.d = Math.max(-0.6, Math.min(1.5, q.d + q.dv*h));
+      // (a cable is heavy and stiff and the air's against it: it loses a good part of each swing, more the faster it's
+      // going, and is hanging still again in three or four. It lost three parts in a hundred, and went on for most of a
+      // minute; and a hard knock could send it right over the top, which no wire tied at both ends can do)
+      q.thv += (-w*w*Math.sin(q.th) - 2*0.13*w*q.thv - 0.8*q.thv*Math.abs(q.thv) - aLat*Math.cos(q.th)/L)*h; q.th += q.thv*h;
+      if (q.th > 1.15) { q.th = 1.15; if (q.thv > 0) q.thv *= -0.2; } else if (q.th < -1.15) { q.th = -1.15; if (q.thv < 0) q.thv *= -0.2; }
+      q.dv += (-wv*wv*q.d - 2*0.22*wv*q.dv + aAl/Math.max(0.3, s)*0.5)*h; q.d = Math.max(-0.6, Math.min(1.5, q.d + q.dv*h));
     }
     up.add(q.w.a);
     if (!moving && Math.abs(q.th) < 2e-3 && Math.abs(q.thv) < 4e-3 && Math.abs(q.d) < 2e-3 && Math.abs(q.dv) < 5e-3) {
