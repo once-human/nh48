@@ -15,7 +15,7 @@ import * as THREE from 'three';
 import { People } from '@orig/people/peds.js';
 import { Crowd } from '@orig/people/crowd.js';
 
-const DT = 1/120, ITER = 8, G0 = 9.81, OUT = 0.6, MU = 0.35, GRIP = 0.7;
+const DT = 1/120, ITER = 8, G0 = 9.81, OUT = 0.6, MU = 0.35, GRIP = 0.78;
 // the points: the bones' own joints, and (18, 19) one in front of the hips and one on the breastbone, which make the
 // pelvis and the ribcage solid pieces with a front and a back
 const NAMES = ['pelvis', 'spine_03', 'Head', null, 'upperarm_l', 'lowerarm_l', 'hand_l', 'upperarm_r', 'lowerarm_r', 'hand_r', 'thigh_l', 'calf_l', 'foot_l', 'ball_l', 'thigh_r', 'calf_r', 'foot_r', 'ball_r', null, null];
@@ -24,6 +24,7 @@ const N = NAMES.length;
 const MASS = [10, 12, 5, 1, 2, 1.3, 0.5, 2, 1.3, 0.5, 7, 3.5, 1, 0.3, 7, 3.5, 1, 0.3, 3, 3];
 const RAD = [0.11, 0.13, 0.1, 0.08, 0.06, 0.045, 0.04, 0.06, 0.045, 0.04, 0.08, 0.06, 0.05, 0.03, 0.08, 0.06, 0.05, 0.03, 0.08, 0.09];
 const W_ = MASS.map(m => 1/m);
+const MTOT = MASS.reduce((a, b) => a + b, 0);
 // [a, b, how stiff]: bones (and the solid pieces' braces)
 const LINKS = [
   [0, 10, 1], [0, 14, 1], [10, 14, 1], [0, 18, 1], [10, 18, 1], [14, 18, 1],          // the pelvis
@@ -319,7 +320,7 @@ function step(R) {
     gy = C.gy; cvx = (C.V.v || 0)*hx*DT; cvz = (C.V.v || 0)*hz*DT;
   }
   solve(R, ITER);
-  let touching = 0;
+  let touching = 0, onRoad = 0;
   for (let i = 0; i < N; i++) {
     const j = i*3, r = RAD[i];
     // the car: solid from the road to its outline (bonnet, glass, roof). A point is put back outside it on the side it
@@ -363,11 +364,14 @@ function step(R) {
     // grip cloth has on tar till it stops
     const g = R.gy[i] + r;
     if (p[j + 1] <= g + 0.004) {
-      touching++;
+      touching++; onRoad += MASS[i];
       if (p[j + 1] < g) p[j + 1] = g;
       let vx = p[j] - q[j], vz = p[j + 2] - q[j + 2], vy = p[j + 1] - q[j + 1];
       if (vy > 0) vy = 0;
-      const v = Math.hypot(vx, vz), dv = GRIP*G0*DT*DT;
+      // (the road holds a body back by the whole of its weight, whichever parts of it are down: a shoulder and a hip
+      // carry what the rest isn't. Each part was only braked for its own, so someone sliding on two or three of them
+      // went on down the road for five or six seconds, as if on ice)
+      const v = Math.hypot(vx, vz), dv = GRIP*G0*DT*DT*(R.onRoad > 0 ? Math.min(3.2, MTOT/R.onRoad) : 1);
       if (v > dv) { vx -= vx/v*dv; vz -= vz/v*dv; } else { vx = 0; vz = 0; }
       q[j] = p[j] - vx; q[j + 1] = p[j + 1] - vy; q[j + 2] = p[j + 2] - vz;
     }
@@ -387,6 +391,7 @@ function step(R) {
     const A = a*3 + c, B = b*3 + c, va = p[A] - q[A], vb = p[B] - q[B], m = (va + vb)/2;
     q[A] = p[A] - (m + (va - m)*0.95); q[B] = p[B] - (m + (vb - m)*0.95);
   }
+  R.onRoad = onRoad;
   const keep = touching >= 6 ? 0.93 : touching >= 2 ? 0.965 : 0.988;
   // lying on the road and hardly moving: it stops (the joints and the road nudging each other a hair every step was a
   // body that twitched for seconds)

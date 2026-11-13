@@ -33,7 +33,7 @@ People.prototype.update = function (dt, player, ...a) {
       }
       // the body's own from here (people/ragdoll.js): pushed where it was hit, more at the chest than the feet, it goes
       // over as it goes; with nothing to push it (a shot, out cold) the knees just go and it folds where it stands
-      p._rq = p._throw ? null : sp > 0 ? { push: [sx*sp*0.55, sz*sp*0.55, 0.4] } : { vy: -0.6 }; p._rqT = 0.8;
+      p._rq = p._throw ? null : sp > 0 ? { push: [sx*sp*0.55, sz*sp*0.55, 0] } : { vy: -0.6 }; p._rqT = 0.8;
     } else if (!down && p._down) {
       p._down = false;
       // up again after being knocked over: a hand to the head a moment, getting their bearings

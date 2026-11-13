@@ -24,6 +24,9 @@ function start(TR, v) {
   // what hit it: your vehicle if it's right there, else whatever's closest and moving
   let hx = 0, hz = 0, hv = 0, hitX = v.x, hitZ = v.z;
   if (P && !P.onFoot && P.cur && Math.hypot(P.cur.x - v.x, P.cur.z - v.z) < 6) { hx = Math.cos(P.cur.th); hz = Math.sin(P.cur.th); hv = Math.abs(P.cur.v || 0); hitX = P.cur.x; hitZ = P.cur.z; }
+  // (you, on foot, right beside it: it was your shove, and it goes over the way you shoved it. It used to take the
+  // nearest moving vehicle for what hit it, and fell whichever way that happened to be going)
+  else if (P && P.onFoot && P.foot && Math.hypot(P.foot.x - v.x, P.foot.z - v.z) < 3.2) { const F = P.foot, d = Math.hypot(v.x - F.x, v.z - F.z) || 1; hx = (v.x - F.x)/d; hz = (v.z - F.z)/d; hv = 2.6; hitX = F.x; hitZ = F.z; }
   else TR.near(v.x, v.z, 6, (o) => { if (o === v || !(Math.abs(o.v || 0) > hv)) return; hx = o.hx ?? 1; hz = o.hz ?? 0; hv = Math.abs(o.v); hitX = o.x; hitZ = o.z; });
   // it falls away from the hit: the side of it the hit came from (+roll tips it to its right, (-hz, hx))
   const rel = (hitX - v.x)*(-v.hz) + (hitZ - v.z)*v.hx; let side = rel > 0 ? -1 : 1;
