@@ -28,7 +28,7 @@ function poolOf(G) {
   const m = new THREE.MeshBasicMaterial({ map: flameTex(), color: 0xffffff, toneMapped: false, transparent: true, depthWrite: false, side: THREE.DoubleSide,
     blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor });
   const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), m, N); mesh.frustumCulled = false; mesh.count = 0;
-  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(N*3), 3); G.scene.add(mesh);
+  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(N*3), 3); mesh.renderOrder = 6;
   return (pool = { mesh, p: [], k: 0, m4: new THREE.Matrix4(), s: new THREE.Vector3(), v: new THREE.Vector3(), q: new THREE.Quaternion(), live: 0 });
 }
 // a small blue root at the lip, then yellow, orange, a deep red, going out. (Many puffs lie over one another and add up:
@@ -38,29 +38,29 @@ function ramp(t, o, i, a) {
   const u = Math.min(3.999, Math.max(0, t)*4), k = Math.floor(u), f = u - k, A = RAMP[k], B = RAMP[k + 1];
   o[i] = (A[0] + (B[0] - A[0])*f)*a; o[i + 1] = (A[1] + (B[1] - A[1])*f)*a; o[i + 2] = (A[2] + (B[2] - A[2])*f)*a;
 }
-const _w = new THREE.Vector3();
+const _pq = new THREE.Quaternion();
+// The fire belongs to the pipe. Every puff lives in the car's own space (the mesh rides on the car's body, where the
+// pipes are), so it comes out of the pipe and stays on it at any speed, drawn exactly where the car is drawn. Worked
+// out in the road's space it trailed a frame behind the car: a metre or two back at speed.
 function puff(Pl, v, P, s, big, hot) {
-  v.tilt.updateWorldMatrix(true, false);
-  _w.set(P[2], P[1], s*P[0]).applyMatrix4(v.tilt.matrixWorld);
-  // (that matrix is from when it was last drawn: at 300 km/h the pipe's a metre or more on from there)
-  if (v.root) { _w.x += v.x - v.root.position.x; _w.z += v.z - v.root.position.z; }
-  const hx = Math.cos(v.th), hz = Math.sin(v.th);
+  if (Pl.mesh.parent !== v.tilt) { v.tilt.add(Pl.mesh); for (const q of Pl.p) if (q) q.life = q.max; }
   const q = Pl.p[Pl.k] || (Pl.p[Pl.k] = {}); Pl.k = (Pl.k + 1)%N;
   // (out along the pipe at a jet's pace and stopped by the air in a couple of hand's lengths; hot: how blue its root is)
-  const out = (5 + Math.random()*6)*(0.7 + big*0.45), a = (Math.random() - 0.5)*0.16, up = Math.random()*0.08 - 0.03, bx = -(hx - hz*a), bz = -(hz + hx*a);
-  Object.assign(q, { x: _w.x, y: _w.y, z: _w.z, vx: bx*out, vy: up*out, vz: bz*out, v, x0: v.x, z0: v.z, life: 0, max: (0.035 + Math.random()*0.05)*(0.75 + big*0.35), sz: (0.05 + Math.random()*0.035)*(0.8 + big*0.3), ph: Math.random()*6.283, fr: 40 + Math.random()*60, hot });
+  const out = (5 + Math.random()*6)*(0.7 + big*0.45), a = (Math.random() - 0.5)*0.16, up = Math.random()*0.08 - 0.03;
+  Object.assign(q, { x: P[2] + 0.02, y: P[1], z: s*P[0], vx: -out, vy: up*out, vz: a*out, life: 0, max: (0.035 + Math.random()*0.05)*(0.75 + big*0.35), sz: (0.05 + Math.random()*0.035)*(0.8 + big*0.3), ph: Math.random()*6.283, fr: 40 + Math.random()*60, hot });
 }
 function tickPool(dt) {
-  const S = pool, G = window.__nhAskG, cam = G && G.camera; if (!S || !cam) return;
-  S.q.copy(cam.quaternion);
+  const S = pool, G = window.__nhAskG, cam = G && G.camera; if (!S || !cam || !S.mesh.parent) return;
+  // (facing you, from inside the car's own turn and lean)
+  S.mesh.parent.getWorldQuaternion(_pq); S.q.copy(_pq).invert().multiply(cam.quaternion);
   const col = S.mesh.instanceColor.array; let n = 0;
+  const V = G.player && G.player.cur, wind = V && S.mesh.parent === V.tilt ? Math.abs(V.v || 0) : 0;
   for (const q of S.p) {
     if (!q || q.life >= q.max) continue;
     q.life += dt; if (q.life >= q.max) continue;
-    // (it goes with the car, as the pipe does: what moves is the gas along the pipe, quickly, and the air stops it)
-    const dr = Math.max(0, 1 - 16*dt), V = q.v;
-    q.vx *= dr; q.vz *= dr; q.vy = q.vy*dr + 0.6*dt;
-    if (V) { q.x += V.x - q.x0; q.z += V.z - q.z0; q.x0 = V.x; q.z0 = V.z; }
+    // (the gas leaves fast and the air stops it; the wind of the car's own speed leans the tip back a little)
+    const dr = Math.max(0, 1 - 16*dt);
+    q.vx = q.vx*dr - wind*0.9*dt; q.vz *= dr; q.vy = q.vy*dr + 0.6*dt;
     q.x += q.vx*dt; q.y += q.vy*dt; q.z += q.vz*dt;
     const t = q.life/q.max, fl = 0.78 + 0.22*Math.sin(q.ph + q.life*q.fr), sc = q.sz*(0.75 + t*1.5)*fl;
     S.s.set(sc, sc, sc); S.m4.compose(S.v.set(q.x, q.y, q.z), S.q, S.s); S.mesh.setMatrixAt(n, S.m4);
