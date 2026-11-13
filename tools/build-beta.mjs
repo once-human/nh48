@@ -143,7 +143,11 @@ const PATCHES = {
     ["const pitch = (p.inAuto ? -0.17 : -0.035)", "const pitch = (p.inAnyAuto ? -0.17 : -0.035)"],
     ["this.setFov(dt, (p.inAuto ? 78 : 70) + speed * 0.3);", "this.setFov(dt, (p.inAnyAuto ? 78 : 70) + Math.min(speed, 27.8) * 0.3);"],
     // (the view widens with speed up to 100 km/h and no further: past that it was all fisheye)
-    ["this.setFov(dt, 60 + speed * 0.65);", "this.setFov(dt, 60 + Math.min(speed, 27.8) * 0.65);"],
+    // (the view from behind a vehicle sits closer, and going fast it draws back a little and widens a little, then no more:
+    // it used to go back 7 cm and open two-thirds of a degree for every metre a second, without end to the first)
+    ["this.setFov(dt, 60 + speed * 0.65);", "this.setFov(dt, 60 + 9 * (1 - Math.exp(-speed / 24)));"],
+    ["const dist = (far ? 8.6 : 6.2) + speed * 0.07 + big;", "const dist = (far ? 8.6 : 5.3) + 1.1 * (1 - Math.exp(-speed / 20)) + big;"],
+    ["const height = (far ? 3.3 : 2.45) + speed * 0.015 + this.pitchOff * 4 + big * 0.35;", "const height = (far ? 3.3 : 2.2) + 0.22 * (1 - Math.exp(-speed / 20)) + this.pitchOff * 4 + big * 0.35;"],
     ["this.setFov(dt, 58 + Math.abs(p.v) * 0.8);", "this.setFov(dt, 58 + Math.min(Math.abs(p.v), 27.8) * 0.8);"]],
   [S('game/audio.js')]: [
     // (nobody in particular: a good bit quieter, and a longer breath before the next. Someone you've just done something to: a little quieter)
