@@ -452,7 +452,7 @@ const PATCHES = {
     // V is Vetal now (C is the camera)
     ["if (this.input.took('KeyV')) this.rig.setMode(this.rig.mode + 1);", ""],
     // back on the road: hold R for 3 s (a tap was too easy to hit by mistake); the HUD shows it filling
-    ["if (this.input.took('KeyR') && P.tipped === 0 && !P.onFoot) this.backOnRoad();", "this.input.took('KeyR'); if (this.input.key('KeyR') && P.tipped === 0 && !P.onFoot && this.state === 'play') { this._rHold = (this._rHold || 0) + dt; this.hud.prompt2 && this.hud.prompt2('R', `Back on the road… ${Math.max(0, 3 - this._rHold).toFixed(1)} s`, 0.15); if (this._rHold >= 3) { this._rHold = -1e9; this.backOnRoad(); } } else this._rHold = 0;"],
+    ["if (this.input.took('KeyR') && P.tipped === 0 && !P.onFoot) this.backOnRoad();", "this.input.took('KeyR'); if (this.input.key('KeyR') && P.tipped === 0 && !P.onFoot && this.state === 'play') { this._rHold = (this._rHold || 0) + dt; this.hud.prompt2 && this.hud.prompt2('R', `Back on the road… ${Math.max(0, 2 - this._rHold).toFixed(1)} s`, 0.15); if (this._rHold >= 2) { this._rHold = -1e9; this.backOnRoad(); } } else this._rHold = 0;"],
     // B looks back from a vehicle; on foot it's Brahmarakshas
     ["this.rig.lookBack = this.input.key('KeyB');", "this.rig.lookBack = !this.player.onFoot && this.input.key('KeyB');"],
     // the jhola on Q (E is vehicles now)

@@ -399,10 +399,11 @@ class Smash {
         b.w.set((hsh(seq + 1) - 0.5)*3*f*lt, (hsh(seq + 2) - 0.5)*2*f*lt, (hsh(seq + 3) - 0.5)*3*f*lt);
       }
     }
-    // what's on it: each thing its own (bunched up past forty). Set down on the counter, it stays there while the
+    // what's on it: each thing its own, every mango and every apple (a cart's hundred and more used to go in clumps of
+    // three and four). Set down on the counter, it stays there while the
     // counter holds it; struck out from under it, it's left behind and drops
     let gs = goods;
-    if (gs.length > 40) { const cells = new Map(); for (const p of gs) { const k = Math.floor(p.c.x/0.3) + ',' + Math.floor(p.c.y/0.3) + ',' + Math.floor(p.c.z/0.3); let l = cells.get(k); if (!l) cells.set(k, l = []); l.push(p); } gs = [...cells.values()]; }
+    if (gs.length > 220) { const cells = new Map(); for (const p of gs) { const k = Math.floor(p.c.x/0.12) + ',' + Math.floor(p.c.y/0.12) + ',' + Math.floor(p.c.z/0.12); let l = cells.get(k); if (!l) cells.set(k, l = []); l.push(p); } gs = [...cells.values()]; }
     else gs = gs.map(p => [p]);
     const held = carrier && w < (MU_GOODS[S.goods] ?? 0.5)*9.81*0.12;      // (as fast as the grip on them can bring them along at once)
     for (const g of gs) {
