@@ -7,7 +7,7 @@
 // it isn't counted.
 export class Pace {
   constructor() {
-    this.on = false; this.r = 1000/60; this.n = 1; this.lo = 1;
+    this.on = true; this.r = 1000/60; this.n = 1; this.lo = 1;
     this.raf = 0; this.shown = 0; this.d = []; this.big = 0;
     this.w = 0; this.late = 0; this.over = 0; this.calm = 0; this.need = 4; this.trial = 0; this.failWork = 0;
   }

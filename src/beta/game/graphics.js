@@ -64,6 +64,8 @@ export const SETTINGS = [
 const ALL = SETTINGS.filter(s => s.id);
 const AUTO_TOP = 4;                                       // (Auto stops at Very High: Ultra is yours to ask for)
 const CAPS = [30, 60, 90, 120, 144, 165, 240, 0], COUNTERS = ['Off', 'FPS', 'FPS and frame time', 'Full'];
+const PACE_ON = 'Steady: every picture stays on screen the same length of time, at the quickest even rate your PC holds (60, 30, 20), so motion is smooth. Off would show more frames a second on the counter, each as soon as it is ready, but unevenly: that is the judder you see when turning or driving',
+  PACE_OFF = 'Off: each picture is shown the moment it is ready. More frames a second on the counter, but some stay up longer than others, which shows as judder when turning or driving. Steady would hold an even rate (60, 30, 20) for smooth motion, with fewer frames';
 const KEY = 'nh48_beta_gfx3', OLD = 'nh48_beta_gfx2';
 const saved = () => { try { const j = JSON.parse(localStorage.getItem(KEY) || 'null'); if (j) return j; const o = JSON.parse(localStorage.getItem(OLD) || 'null'); if (o) return { preset: o.preset, cap: o.cap, counter: o.counter }; } catch (e) { /* no storage */ } return {}; };
 // where Auto starts on this PC: by its graphics, its memory and its processor (the browser reports memory up to 8 GB)
@@ -81,8 +83,8 @@ export class Graphics {
   constructor(G, C) {
     this.G = G; this.C = C; this.base = hardwareTier(C.gpu);
     this.auto = {}; for (const s of ALL) this.auto[s.id] = s.at[this.base];
-    this.preset = 'auto'; this.pin = {}; this.cap = 144; this.counter = 0; this.pace = 0;
-    const j = saved(); if (j.preset !== undefined) this.preset = j.preset; if (j.pin) this.pin = j.pin; if (j.cap !== undefined) this.cap = j.cap; if (j.counter !== undefined) this.counter = j.counter; if (j.pace !== undefined) this.pace = j.pace;
+    this.preset = 'auto'; this.pin = {}; this.cap = 144; this.counter = 0; this.pace = 1;
+    const j = saved(); if (j.preset !== undefined) this.preset = j.preset; if (j.pin) this.pin = j.pin; if (j.cap !== undefined) this.cap = j.cap; if (j.counter !== undefined) this.counter = j.counter; if (j.steady !== undefined) this.pace = j.steady;
     G.fpsCap = this.cap; this.fN = 0; this.fT = 0; this.fW = 0;
     this.acc = 0; this.n = 0; this.cpu = 0; this.spikes = 0; this.low = 0; this.high = 0; this.wait = 8; this.blocked = {}; this.trial = null; this.was = {};
     G.afterRender = () => {};                            // (the game's own adaptive resolution: this replaces it)
@@ -94,7 +96,7 @@ export class Graphics {
   applyOne(s) { const v = s.val[this.level(s.id)]; if (this.was[s.id] === v) return; this.was[s.id] = v; try { s.apply(this.G, v, this.C); } catch (e) { console.warn('graphics', s.id, e); } }
   tier() { return typeof this.preset === 'number' ? this.preset : this.preset === 'custom' ? Math.round(this.level('people')*5/6) : this.base; }
   applyAll() { for (const s of ALL) this.applyOne(s); this.G.qualityName = ['lite', 'low', 'med', 'high', 'high', 'high'][this.tier()]; this.sync(); }
-  save() { try { localStorage.setItem(KEY, JSON.stringify({ preset: this.preset, pin: this.pin, cap: this.cap, counter: this.counter, pace: this.pace })); } catch (e) { /* private window */ } }
+  save() { try { localStorage.setItem(KEY, JSON.stringify({ preset: this.preset, pin: this.pin, cap: this.cap, counter: this.counter, steady: this.pace })); } catch (e) { /* private window */ } }
   choose(id, v) {
     if (id === 'cap') { this.cap = this.G.fpsCap = +v; this.save(); this.sync(); return; }
     if (id === 'counter') { this.counter = +v; this.save(); this.sync(); return; }
@@ -174,6 +176,7 @@ export class Graphics {
       r.querySelector(`[data-now="${s.id}"]`).textContent = s.sub + ' · now ' + s.fmt(s.val[this.level(s.id)]);
     }
     on(r.querySelector('[data-g="cap"]'), this.cap); on(r.querySelector('[data-g="counter"]'), this.counter); on(r.querySelector('[data-g="pace"]'), this.pace);
+    r.querySelector('[data-now="pace"]').textContent = this.pace ? PACE_ON : PACE_OFF;
   }
   // the frame counter, in a corner. Runs whatever the preset
   counterTick(dt, cpu) {
@@ -196,7 +199,7 @@ export class Graphics {
     g.innerHTML = row('Graphics', 'The whole picture. Auto fits it to your PC and what else is running, smooth first. Change anything below and it\'s Custom', seg('all', NAMES).replace('</div>', '<button data-v="custom">Custom</button></div>')) +
       '<div class="g-head">Display</div>' +
       row('Frame rate limit', 'Your screen\'s refresh rate is the most any browser will show', list('cap', CAPS.map(v => [v, v ? v + ' FPS' : 'No limit']))) +
-      row('Frame pacing', 'Off shows each picture as soon as it is ready. Steady keeps every one on screen the same length of time, at the quickest even rate your PC holds (60, 30...): more even, fewer frames', list('pace', [[0, 'Off'], [1, 'Steady']])) +
+      row('Frame pacing', PACE_ON, list('pace', [[1, 'Steady'], [0, 'Off']]), 'pace') +
       row('Frame counter', 'In the corner of the screen', list('counter', COUNTERS.map((n, i) => [i, n]))) +
       SETTINGS.map(s => s.group ? `<div class="g-head">${s.group}</div>` : row(s.label, s.sub, seg(s.id, s.val.map(s.fmt)), s.id)).join('');
     this.root = g;
