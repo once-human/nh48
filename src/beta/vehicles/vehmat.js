@@ -183,7 +183,8 @@ void main(){
   vec3 env = mix(vec3(.04, .038, .035), skyCol*(.2 + .5*dayK), smoothstep(-.15, .5, R.y));
   float a = .035 + .5*fres + (dust*.05 + wip*.06)*(1. + 7.*glare);
   vec3 col = mix(uTint, env, .55) + sunCol*glare*(dust*.6 + wip)*.9;
-  if (wind > .5) { float b = smoothstep(uBand.x, uBand.y, vL.y); col = mix(col, vec3(.04, .15, .19), b*.85); a = max(a, b*.6); }
+  // (the shade band across the top of the windscreen: a faint grey-green, as the real ones are. It was a dark blue bar)
+  if (wind > .5) { float b = smoothstep(uBand.x, uBand.y, vL.y); col = mix(col, vec3(.07, .1, .1), b*.5); a = max(a, b*.16); }
   if (rearG > .5) { float l = step(fract(vL.y*30.), .05)*step(abs(vL.z), uWip.w*.9); col = mix(col, vec3(.3, .1, .04), l); a = max(a, l*.75); }
   gl_FragColor = vec4(col, clamp(a, 0., .85)); }`;
 export function cabinGlass(o = {}) {
