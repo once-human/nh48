@@ -104,7 +104,36 @@ function wheel(x, y, z, R, c = [0.09, 0.09, 0.09], spokes = 8) {
     rod([x, y, z], [x + ex, y + ey, z], 0.004, [0.55, 0.55, 0.57], 3);
   }
 }
-const finish = () => b.build();
+// each corner of a model kept once. The builder gives a corner again for every face that meets at it, and a round thing
+// (a fruit: eighty faces on forty-two corners) came out as two hundred and forty: a seller's cart of fruit was thirty
+// thousand corners, and the carts round one street weighed more than the street. Only corners alike in every number
+// (place, facing, colour, glow) are made one, so nothing looks any different
+function weld(g) {
+  const I = g.index && g.index.array, names = Object.keys(g.attributes), n = g.attributes.position.count;
+  if (!I || names.some(k => !(g.attributes[k].array instanceof Float32Array))) return g;
+  const A = names.map(k => { const a = g.attributes[k]; return { k, s: a.itemSize, f: a.array, u: new Uint32Array(a.array.buffer, a.array.byteOffset, a.array.length) }; });
+  let size = 1; while (size < n*2) size <<= 1;
+  const tab = new Int32Array(size).fill(-1), to = new Uint32Array(n), keep = [];
+  for (let v = 0; v < n; v++) {
+    let h = 2166136261;
+    for (const a of A) for (let j = v*a.s, e = j + a.s; j < e; j++) h = Math.imul(h ^ a.u[j], 16777619);
+    for (let s = (h >>> 0) & (size - 1); ; s = (s + 1) & (size - 1)) {
+      const o = tab[s];
+      if (o < 0) { tab[s] = to[v] = keep.length; keep.push(v); break; }
+      const w = keep[o]; let same = true;
+      for (const a of A) { for (let j = 0; j < a.s; j++) if (a.u[v*a.s + j] !== a.u[w*a.s + j]) { same = false; break; } if (!same) break; }
+      if (same) { to[v] = o; break; }
+    }
+  }
+  const m = keep.length; if (m === n) return g;
+  const out = new THREE.BufferGeometry();
+  for (const a of A) { const f = new Float32Array(m*a.s); for (let i = 0; i < m; i++) for (let j = 0; j < a.s; j++) f[i*a.s + j] = a.f[keep[i]*a.s + j]; out.setAttribute(a.k, new THREE.BufferAttribute(f, a.s)); }
+  const J = new (m > 65535 ? Uint32Array : Uint16Array)(I.length); for (let i = 0; i < I.length; i++) J[i] = to[I[i]];
+  out.setIndex(new THREE.BufferAttribute(J, 1));
+  out.boundingBox = g.boundingBox; out.boundingSphere = g.boundingSphere; Object.assign(out.userData, g.userData);
+  return out;
+}
+const finish = () => weld(b.build());
 const start = (s) => { b = new ColorBuilder(); seed = s; };
 
 const STEEL = [0.62, 0.63, 0.66], DARKST = [0.22, 0.22, 0.24], RUST = [0.4, 0.26, 0.17], ROPE = [0.62, 0.52, 0.35], BLACK = [0.06, 0.06, 0.07], WOOD = [0.5, 0.34, 0.2];
