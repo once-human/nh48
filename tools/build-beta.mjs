@@ -60,6 +60,10 @@ const PATCHES = {
   // the gun fires the Rounds in your jhola too (they were a separate count it never looked at): any there are
   // loaded into it the moment the loaded ones run out
   [S('game/arms.js')]: [["const s = this.life.s; if (!(s.ammo > 0)) {", "const s = this.life.s; if (!(s.ammo > 0) && s.inv && s.inv.ammo > 0) { s.ammo = (s.ammo || 0) + s.inv.ammo; s.inv.ammo = 0; }\n      if (!(s.ammo > 0)) {"]],
+  // headlights come up and die away as a filament does (a quarter of a second on, half a second off), never a snap.
+  // How far along they are (hk, 0 to 1) is what the beam on the road and the lamp's own glass go by (beta/gfx/lamps.js,
+  // beta/vehicles/lamps.js)
+  [S('game/lights.js')]: [["if (hl) hl.intensity = !P.onFoot && this.headOn(night) ? 24 * Math.max(night, 0.35) : 0;", "if (hl) { const w = !P.onFoot && this.headOn(night) ? 1 : 0, k0 = this.hk || 0; let k = k0 + (w - k0) * Math.min(1, dt * (w ? 9 : 4.5)); if (k < 0.004) k = 0; else if (k > 0.996) k = 1; this.hk = k; hl.intensity = 24 * Math.max(night, 0.35) * k; }"]],
   [S('game/postcards.js')]: [["if (G.state !== 'play' || !this.ok() || (G.jhola && G.jhola.on) || (G.phone && G.phone.on)) return;", "if (G.state !== 'play' || !this.ok() || (G.jhola && G.jhola.on) || (G.phone && G.phone.on) || (!G.player.onFoot && Math.abs(G.player.cur.v || 0) > 2.5)) return;"],
     // while you play, a postcard no longer holds the game while it's taken (a third of a second to a whole second, each new
     // neighbourhood and landmark you walked into): the shaders its view needs are got ready in the background the first

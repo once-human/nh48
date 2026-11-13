@@ -55,7 +55,7 @@ void main(){
   vL = position; vC = vec3(1.); vG = 0.; vP = 0.; vec4 w = M*vec4(position, 1.); vW = w.xyz; vN = mat3(M)*normal; vec4 v = viewMatrix*w; vZ = -v.z; gl_Position = projectionMatrix*v; }`;
 const CHUNK = `precision highp float; precision highp sampler2DShadow;
 varying vec3 vN, vW, vC, vL; varying float vG, vP, vZ;
-uniform sampler2D tNoise; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, skyCol, fogCol, uTint; uniform float shadowTexel, shadowOn, fogDensity, dayK, uNight, uRough, uMetal, uClear;
+uniform sampler2D tNoise; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, skyCol, fogCol, uTint; uniform float shadowTexel, shadowOn, fogDensity, dayK, uNight, uRough, uMetal, uClear; uniform vec2 uHd;
 float nz(vec2 p){ return texture2D(tNoise, p/16.).r; }
 #ifdef FADE
 uniform vec4 uFade; varying float vFd;
@@ -122,6 +122,9 @@ void main(){
     float ti = vLp.y < -1.95 ? 2. : vLp.y < -.5 ? 1. : 0., tph = ti > 1.5 ? (-vLp.y - 2.)/.9 : (-vLp.y - 1.)/.9;
     if (amber && ti > .5 && ((ti < 1.5) == (vL.z < 0.))) { float bl = step(.5, fract(uTime*1.4 + tph)); k = bl*(4.5 + uNight*5.); c *= mix(.45, 1., bl); }
     if (amber && (vL.z < 0. ? uInd.x : uInd.y) > .5) { k = uInd.z*(4.5 + uNight*5.); c *= mix(.45, 1., uInd.z); }      // (between blinks the lens is dull plastic)
+    // the lamps at the front are on when the driver has them on (uHd.x, 0 to 1 as they come up; nobody in it: dark). The
+    // one you're driving (uHd.y) shows lit by day too when you've switched it on, as a real lamp does
+    if (!rear && !amber) k = vLp.x < -.5 ? 0. : mix(k, max(k, 2.2), uHd.y)*uHd.x;
     c += vC*vG*k;
   }
   float f = fogDensity*vZ, mir = matte > .5 ? 0. : (glassy*.72 + painted*(.3 - .22*grime) + (1. - painted)*(1. - glassy)*.18); gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1. - clamp(mir, 0., .95)); }`;
@@ -138,7 +141,7 @@ const GLASS_FS = CHUNK + `void main(){
 
 function mat(fs, vs, opts = {}) {
   const uniforms = Object.assign({}, PU, { uTint: { value: new THREE.Color(opts.tint ?? 0x15191d).convertSRGBToLinear() }, uRough: { value: opts.rough ?? .38 }, uMetal: { value: opts.metal ?? .1 } });
-  uniforms.uLamp = { value: new THREE.Vector2() }; uniforms.uInd = { value: new THREE.Vector3() }; uniforms.uClear = { value: opts.clear ? 1 : 0 };
+  uniforms.uLamp = { value: new THREE.Vector2() }; uniforms.uHd = { value: new THREE.Vector2(1, 0) }; uniforms.uInd = { value: new THREE.Vector3() }; uniforms.uClear = { value: opts.clear ? 1 : 0 };
   // (glass you see through: a supercar's engine lid, an auto's screen)
   const m = new THREE.ShaderMaterial({ vertexShader: vs, fragmentShader: fs, uniforms, vertexColors: !opts.glass, side: opts.glass ? THREE.DoubleSide : THREE.FrontSide, transparent: !!opts.glass, depthWrite: !opts.glass });
   // every instanced body drawn with this needs its lamps' per-instance state: a model that came without (a parked

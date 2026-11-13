@@ -27,11 +27,14 @@ function hook(mesh, v) {
     b0 && b0.call(this, r, sc, cam, geo, m, g);
     const u = m && m.uniforms && m.uniforms.uLamp; if (!u) return;
     const L = stateOf(v); u.value.set(L[0], L[1]); m.uniformsNeedUpdate = true;
+    // (its headlamps: yours go by your switch, coming up and dying away with it)
+    const G = G0(), P = G && G.player, h = m.uniforms.uHd; if (h) { if (P && !P.onFoot && P.cur === v) h.value.set(G.lights ? G.lights.hk ?? 1 : 1, 1); else h.value.set(1, 0); }
   };
   mesh.onAfterRender = function (r, sc, cam, geo, m, g) {
     a0 && a0.call(this, r, sc, cam, geo, m, g);
     const u = m && m.uniforms && m.uniforms.uLamp; if (!u) return;
     u.value.set(0, 0); m.uniformsNeedUpdate = true;
+    if (m.uniforms.uHd) m.uniforms.uHd.value.set(1, 0);
   };
 }
 const vs = Vehicle.prototype.sync;
