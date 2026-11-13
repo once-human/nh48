@@ -60,7 +60,36 @@ const PATCHES = {
   // the gun fires the Rounds in your jhola too (they were a separate count it never looked at): any there are
   // loaded into it the moment the loaded ones run out
   [S('game/arms.js')]: [["const s = this.life.s; if (!(s.ammo > 0)) {", "const s = this.life.s; if (!(s.ammo > 0) && s.inv && s.inv.ammo > 0) { s.ammo = (s.ammo || 0) + s.inv.ammo; s.inv.ammo = 0; }\n      if (!(s.ammo > 0)) {"]],
-  [S('game/postcards.js')]: [["if (G.state !== 'play' || !this.ok() || (G.jhola && G.jhola.on) || (G.phone && G.phone.on)) return;", "if (G.state !== 'play' || !this.ok() || (G.jhola && G.jhola.on) || (G.phone && G.phone.on) || (!G.player.onFoot && Math.abs(G.player.cur.v || 0) > 2.5)) return;"]],
+  [S('game/postcards.js')]: [["if (G.state !== 'play' || !this.ok() || (G.jhola && G.jhola.on) || (G.phone && G.phone.on)) return;", "if (G.state !== 'play' || !this.ok() || (G.jhola && G.jhola.on) || (G.phone && G.phone.on) || (!G.player.onFoot && Math.abs(G.player.cur.v || 0) > 2.5)) return;"],
+    // while you play, a postcard no longer holds the game while it's taken (a third of a second to a whole second, each new
+    // neighbourhood and landmark you walked into): the shaders its view needs are got ready in the background the first
+    // time, the picture comes back when the graphics card has it instead of everything waiting on it, and it's packed as
+    // a JPEG off the frame. With the map open it's taken at once, as before
+    ["const prev = R.getRenderTarget();", "if (G.state === 'play') { this.quiet(key); return null; }\n      this.gen = (this.gen || 0) + 1;\n      const prev = R.getRenderTarget();"],
+    ["  road(x, z, r = 80) {", `  quiet(key) {
+    if (this.busy) return; this.busy = true;
+    const G = this.g, R = G.renderer, C = this.cam, gen = this.gen = (this.gen || 0) + 1;
+    const into = (f) => { const prev = R.getRenderTarget(); R.setRenderTarget(this.rt); try { return f(); } finally { R.setRenderTarget(prev); } };
+    const still = () => gen === this.gen && G.state === 'play' && this.ok() && this.near(C.position.x, C.position.z);
+    (async () => {
+      // (again whenever something of a new kind has turned up in the city since: its shader for this view isn't made yet)
+      if (this.warm !== R.info.programs.length) { await into(() => R.compileAsync(G.scene, C)); this.warm = R.info.programs.length; }
+      if (!still()) return;
+      into(() => R.render(G.scene, C));
+      await R.readRenderTargetPixelsAsync(this.rt, 0, 0, W_, H_, this.buf);
+      if (gen !== this.gen) return;
+      const D = this.img.data, W4 = W_ * 4;
+      for (let y = 0; y < H_; y++) D.set(this.buf.subarray((H_ - 1 - y) * W4, (H_ - y) * W4), y * W4);
+      for (let i = 3; i < D.length; i += 4) D[i] = 255;
+      this.cx.putImageData(this.img, 0, 0);
+      const g = this.cx.createRadialGradient(W_ / 2, H_ / 2, H_ * 0.35, W_ / 2, H_ / 2, W_ * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.35)');
+      this.cx.fillStyle = g; this.cx.fillRect(0, 0, W_, H_);
+      const blob = await new Promise((res) => this.cv.toBlob(res, 'image/jpeg', 0.8));
+      const url = blob && await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(null); fr.readAsDataURL(blob); });
+      if (url) this.put(key, url);
+    })().catch(() => {}).finally(() => { this.busy = false; });
+  }
+  road(x, z, r = 80) {`]],
   [S('game/garageui.js')]: [["[tog('xenon', cyc ? 'LED lamp' : 'Xenon headlights', 'Cold white, reaches further', $(2500)), ...(cyc ? [] : [", "[...(cyc ? [] : [tog('xenon', 'Xenon headlights', 'Cold white, reaches further', $(2500)), "], ["(this.mine ? 'Your ' : '') + here.spec.name.toLowerCase();", "(this.mine ? 'Your ' : '') + (here.spec.real || here.spec.name);"]],
   [S('ui/jhola.js')]: [["if (this.queue.length && G.state === 'play') this.renderOne();", "if (this.queue.length && G.state === 'play' && (G.player.onFoot || Math.abs(G.player.cur.v || 0) < 2.5)) this.renderOne();"], ["name: 'Your ' + (v.spec && v.spec.name ? v.spec.name.toLowerCase() : 'vehicle') }", "name: 'Your ' + (v.spec ? v.spec.real || v.spec.name || 'vehicle' : 'vehicle') }"]],
   // compound walls along the roads: not Pune, Onkar wants them gone. Neither drawn nor solid (the city's edge wall is separate)
@@ -71,6 +100,9 @@ const PATCHES = {
     ["for (const B of M.buildings) W.collision.addRing(cmRing(B[1]), 0);", "for (const B of M.buildings) buildingSolid(B, cmRing(B[1]), W.collision);"],
     ["import { cmRing", "import { buildingSolid } from '../beta/world/solids.js';\nimport { cmRing"]],
   [S('world/tiles.js')]: [["for (let j = 0; j < D.walls.length; j += 60) {", "for (let j = 0; j < 0; j += 60) {"],
+    // leaving a district behind, its walls and kerbs are taken out of the collision a strip at a time. All at once it was
+    // twenty thousand cells gone through in one frame: a tenth of a second and more, every couple of kilometres you travelled
+    ["W.collision.removeTag(tag, T.rect);\n    yield 'd4';", "{ const r = T.rect, x1 = r[2] + 60; for (let x = r[0] - 60; x <= x1; x += 40) { W.collision.removeTag(tag, [x + 60, r[1], Math.min(x + 39, x1) - 60, r[3]]); yield 'd3'; } }\n    yield 'd4';"],
     // a petrol pump's canopy is a roof on columns: you go in under it (beta/world/solids.js buildingSolid)
     ["for (const B of D.buildings.slice(k, k + 160)) C.addRing(cmRing(B[1]), 0);", "for (const B of D.buildings.slice(k, k + 160)) buildingSolid(B, cmRing(B[1]), C);"],
     // stalls solid in their own shape, not a 0.9 m circle (beta/world/solids.js)
