@@ -57,6 +57,7 @@ const fmt = (v) => {
 
 export function freeTerminal(G) {
   const sh = new Shell(), STORE = 'nh48_console', keep = (() => { try { return JSON.parse(localStorage.getItem(STORE) || '{}'); } catch (e) { return {}; } })();
+  G.sh = sh;                                             // (the same commands from a script: G.sh.exec('drive creta'))
   sh.userAlias = keep.alias || {};
   const binds = keep.bind || {}, autoexec = keep.autoexec || [];
   const persist = () => { try { localStorage.setItem(STORE, JSON.stringify({ alias: sh.userAlias, bind: binds, autoexec })); } catch (e) { /* private window */ } };
