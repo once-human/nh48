@@ -5,9 +5,13 @@ import * as THREE from 'three';
 import { Vehicle } from '@orig/vehicles/vehicle.js';
 
 const PORTS = { super: [0.4, 0.5, -2.31], sports: [0.14, 0.42, -2.3] };
-// The flames are fire, not a picture of one: each bang throws out a stream of little burning puffs from the pipe that leave at
-// speed, slow, swell and rise as they burn: blue-white at the lip, yellow, orange, then a dull red going out, each flickering
-// on its own, with a few sparks going further. They're left in the air behind the car, the way a real one is.
+// The flames are what a real car's are: afterfire. Fuel that didn't burn in the engine lights in the hot pipe when you
+// lift off at high revs, on a shift, off the line. It's a short tongue from the pipe, a hand to a forearm long, that
+// stays ON the pipe (it's gas leaving at speed and burnt out within a tenth of a second, not smoke left hanging in the
+// road behind), orange and yellow from the soot in it with only a small blue root at the lip when it's burning hot and
+// clean, and gone in two or three frames. On the overrun they come as a crackle: a run of bangs close together, each
+// smaller than the last as the pipe clears, and only some of them show fire at all (most in the track mode, few in the
+// road one). Each crack sounds with its own flash.
 const N = 220;
 let tex = null, pool = null;
 function flameTex() {
@@ -27,22 +31,24 @@ function poolOf(G) {
   mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(N*3), 3); G.scene.add(mesh);
   return (pool = { mesh, p: [], k: 0, m4: new THREE.Matrix4(), s: new THREE.Vector3(), v: new THREE.Vector3(), q: new THREE.Quaternion(), live: 0 });
 }
-// white-blue at the lip, then yellow, orange, a deep red, going out
-const RAMP = [[2.2, 2.6, 3.4], [3.2, 2.5, 1.2], [3, 1.3, 0.25], [1.7, 0.4, 0.05], [0.5, 0.08, 0.01]];
+// a small blue root at the lip, then yellow, orange, a deep red, going out. (Many puffs lie over one another and add up:
+// each is dim, so the middle of the flame comes to a bright yellow and its edge stays orange, never a white ball)
+const RAMP = [[0.5, 0.75, 1.7], [1.5, 1.05, 0.32], [1.35, 0.6, 0.1], [0.8, 0.2, 0.03], [0.22, 0.04, 0.005]];
 function ramp(t, o, i, a) {
   const u = Math.min(3.999, Math.max(0, t)*4), k = Math.floor(u), f = u - k, A = RAMP[k], B = RAMP[k + 1];
   o[i] = (A[0] + (B[0] - A[0])*f)*a; o[i + 1] = (A[1] + (B[1] - A[1])*f)*a; o[i + 2] = (A[2] + (B[2] - A[2])*f)*a;
 }
 const _w = new THREE.Vector3();
-function puff(Pl, v, P, s, big) {
+function puff(Pl, v, P, s, big, hot) {
   v.tilt.updateWorldMatrix(true, false);
   _w.set(P[2], P[1], s*P[0]).applyMatrix4(v.tilt.matrixWorld);
   // (that matrix is from when it was last drawn: at 300 km/h the pipe's a metre or more on from there)
   if (v.root) { _w.x += v.x - v.root.position.x; _w.z += v.z - v.root.position.z; }
-  const hx = Math.cos(v.th), hz = Math.sin(v.th), fv = v.v || 0, lv = v.vl || 0, cx = hx*fv - hz*lv, cz = hz*fv + hx*lv;
+  const hx = Math.cos(v.th), hz = Math.sin(v.th);
   const q = Pl.p[Pl.k] || (Pl.p[Pl.k] = {}); Pl.k = (Pl.k + 1)%N;
-  const out = (5 + Math.random()*11)*big, a = (Math.random() - 0.5)*0.24, up = Math.random()*0.16 - 0.03, bx = -(hx - hz*a), bz = -(hz + hx*a);
-  Object.assign(q, { x: _w.x, y: _w.y, z: _w.z, vx: cx + bx*out, vy: up*out + 0.25, vz: cz + bz*out, cx, cz, life: 0, max: (0.07 + Math.random()*0.16)*(0.8 + big*0.4), sz: (0.07 + Math.random()*0.08)*(0.8 + big*0.35), ph: Math.random()*6.283, fr: 30 + Math.random()*50 });
+  // (out along the pipe at a jet's pace and stopped by the air in a couple of hand's lengths; hot: how blue its root is)
+  const out = (5 + Math.random()*6)*(0.7 + big*0.45), a = (Math.random() - 0.5)*0.16, up = Math.random()*0.08 - 0.03, bx = -(hx - hz*a), bz = -(hz + hx*a);
+  Object.assign(q, { x: _w.x, y: _w.y, z: _w.z, vx: bx*out, vy: up*out, vz: bz*out, v, x0: v.x, z0: v.z, life: 0, max: (0.035 + Math.random()*0.05)*(0.75 + big*0.35), sz: (0.05 + Math.random()*0.035)*(0.8 + big*0.3), ph: Math.random()*6.283, fr: 40 + Math.random()*60, hot });
 }
 function tickPool(dt) {
   const S = pool, G = window.__nhAskG, cam = G && G.camera; if (!S || !cam) return;
@@ -51,20 +57,24 @@ function tickPool(dt) {
   for (const q of S.p) {
     if (!q || q.life >= q.max) continue;
     q.life += dt; if (q.life >= q.max) continue;
-    const dr = Math.max(0, 1 - 7*dt);                        // (it leaves fast and the air stops it; what's left is carried with the car for a moment)
-    q.vx = (q.vx - q.cx)*dr + q.cx*(1 - 2.5*dt); q.vz = (q.vz - q.cz)*dr + q.cz*(1 - 2.5*dt); q.cx *= 1 - 2.5*dt; q.cz *= 1 - 2.5*dt; q.vy += 2.2*dt;
+    // (it goes with the car, as the pipe does: what moves is the gas along the pipe, quickly, and the air stops it)
+    const dr = Math.max(0, 1 - 16*dt), V = q.v;
+    q.vx *= dr; q.vz *= dr; q.vy = q.vy*dr + 0.6*dt;
+    if (V) { q.x += V.x - q.x0; q.z += V.z - q.z0; q.x0 = V.x; q.z0 = V.z; }
     q.x += q.vx*dt; q.y += q.vy*dt; q.z += q.vz*dt;
-    const t = q.life/q.max, fl = 0.72 + 0.28*Math.sin(q.ph + q.life*q.fr), sc = q.sz*(0.55 + t*2.2)*fl;
+    const t = q.life/q.max, fl = 0.78 + 0.22*Math.sin(q.ph + q.life*q.fr), sc = q.sz*(0.75 + t*1.5)*fl;
     S.s.set(sc, sc, sc); S.m4.compose(S.v.set(q.x, q.y, q.z), S.q, S.s); S.mesh.setMatrixAt(n, S.m4);
-    ramp(t*0.95, col, n*3, (1 - t*t)*fl); n++;
+    // (the blue root only on a hot, clean one, and only in the first moment of it)
+    ramp(q.hot > 0.5 ? t*0.95 : 0.2 + t*0.75, col, n*3, (1 - t*t)*fl*0.55); n++;
   }
   S.mesh.count = n; S.live = n; S.mesh.instanceMatrix.needsUpdate = true; S.mesh.instanceColor.needsUpdate = true;
 }
-function rig(G) { poolOf(G); return { t: 0, q: [], on: 0, big: 1, held: 0, launched: false, em: 0, gear0: 0 }; }
-function fire(v, F, A) {
-  // a bang: a stream for a moment, one pipe often a beat ahead of the other
-  const z = F.size ?? 1; F.on = (0.05 + Math.random()*0.08)*(0.7 + z*0.3); F.big = (0.7 + Math.random()*0.8)*z; F.lag = Math.random()*0.03;
-  if (A && A.noiseBurst) { A.noiseBurst(0.05, 480 + Math.random()*520, 0.8, 0.14 + Math.random()*0.1); A.noiseBurst(0.018, 2300 + Math.random()*900, 1.4, 0.05); }
+function rig(G) { poolOf(G); return { t: 0, q: [], on: 0, big: 1, held: 0, launched: false, em: 0, gear0: 0, hot: 0 }; }
+// one bang: its crack (always), and its flash at the pipes if this one shows (z: how big, 0 to about 1.4)
+function fire(v, F, A, B) {
+  const z = B.z;
+  if (B.flame) { F.on = 0.028 + Math.random()*0.03 + z*0.012; F.big = z; F.lag = Math.random() < 0.35 ? 0.012 + Math.random()*0.02 : 0; F.hot = B.hot; }
+  if (A && A.noiseBurst) { const k = 0.45 + z*0.5; A.noiseBurst(0.04 + z*0.02, 420 + Math.random()*480, 0.8, (0.09 + Math.random()*0.06)*k); A.noiseBurst(0.014, 2300 + Math.random()*900, 1.4, 0.04*k); }
 }
 const upd = Vehicle.prototype.update;
 Vehicle.prototype.update = function (dt, inp, traffic) {
@@ -93,26 +103,30 @@ Vehicle.prototype.update = function (dt, inp, traffic) {
   F.work = Math.max(0, Math.min(1, (F.work || 0) + (thr > 0.7 ? dt*(0.25 + rpm)*(calm ? 0.55 : wild ? 1.8 : 1) : -dt*0.5)));
   F.size = (calm ? 0.65 : wild ? 1.3 : 1)*(0.7 + F.work*0.5);
   const lift = (this._thr0 ?? 0) > 0.7 && thr < 0.15;
-  const go = (t, n, p) => { for (; n > 0; n--) { if (Math.random() < p) F.q.push(t); t += 0.07 + Math.random()*0.12; } };
-  if (lift) {
-    if (calm) { if (sp > 30 && rpm > 0.42 && F.work > 0.55) go(F.t + 0.05, 1 + Math.floor(Math.random()*2), 0.75); }
-    else if (wild) { if (rpm > 0.35 || F.held > 0.06) go(F.t + 0.03, 2 + Math.floor(Math.random()*5), 1); }
-    else if (sp > 13 && rpm > 0.55 && F.work > 0.25) go(F.t + 0.03, 1 + Math.floor(Math.random()*3), 0.85);
+  // a run of bangs: close together, each smaller than the one before; show: how many of them show fire; a 911 does it
+  // a good deal less than a Lamborghini
+  const tame = this.type === 'sports' ? 0.55 : 1;
+  const go = (t, n, show, z0 = 1) => { let z = z0*F.size*tame*(0.85 + Math.random()*0.3); for (; n > 0; n--) { F.q.push({ t, z, flame: Math.random() < show*tame, hot: Math.random() < (wild ? 0.5 : 0.2)*F.work ? 1 : 0 }); t += 0.045 + Math.random()*0.1; z *= 0.72 + Math.random()*0.2; } };
+  if (lift && !F.q.length) {
+    F.over = true;
+    if (calm) { if (sp > 30 && rpm > 0.5 && F.work > 0.55) go(F.t + 0.06, 1 + Math.floor(Math.random()*2), 0.25, 0.6); }
+    else if (wild) { if (rpm > 0.4 || F.held > 0.3) go(F.t + 0.04, 4 + Math.floor(rpm*5 + Math.random()*3), 0.8, 0.8 + rpm*0.4); }
+    else if (sp > 10 && rpm > 0.5 && F.work > 0.2) go(F.t + 0.05, 2 + Math.floor(rpm*3 + Math.random()*2), 0.45, 0.6 + rpm*0.3);
   }
   // pulling away flat out, in anything but the calmest
-  if (!calm && thr > 0.9 && sp < 4 && !this.reverse && !F.launched && F.held > (wild ? 0.12 : 0.35)) { F.launched = true; go(F.t, wild ? 3 : 1, 1); }
-  // an upshift under power
-  if (this.gear > F.gear0 && thr > 0.7) { if (wild) go(F.t, 2 + Math.floor(Math.random()*2), 1); else if (!calm && rpm > 0.6 && F.work > 0.5) go(F.t, 1, 0.5); else if (calm && sp > 34 && F.work > 0.7) go(F.t, 1, 0.2); }
+  if (!calm && thr > 0.9 && sp < 4 && !this.reverse && !F.launched && F.held > (wild ? 0.15 : 0.4)) { F.launched = true; go(F.t, wild ? 2 : 1, wild ? 0.9 : 0.5, 0.9); }
+  // an upshift under power: the one crack as the spark's cut
+  if (this.gear > F.gear0 && thr > 0.7) { if (wild) go(F.t, 1, 0.9, 0.7 + rpm*0.4); else if (!calm && rpm > 0.6 && F.work > 0.5) go(F.t, 1, 0.35, 0.6); }
   F.gear0 = this.gear;
-  // the wildest, foot flat and high up the revs: it can't burn it all
-  if (wild && thr > 0.9 && rpm > 0.72 && Math.random() < dt*0.9) go(F.t, 1, 1);
   if (thr < 0.2) { F.launched = false; F.held = 0; }
+  // (your foot back in it: the fuel's burning in the engine again, and the crackle stops)
+  if (thr > 0.4 && F.over) { F.over = false; F.q.length = 0; }
   this._thr0 = thr;
-  while (F.q.length && F.q[0] <= F.t) { F.q.shift(); fire(this, F, G?.audio); }
+  while (F.q.length && F.q[0].t <= F.t) fire(this, F, G?.audio, F.q.shift());
   if (F.on > 0) {
-    F.on -= dt; F.em += dt*420;
+    F.on -= dt; F.em += dt*(260 + F.big*160);
     const Pl = poolOf(G);
-    while (F.em >= 1) { F.em -= 1; for (const s of [-1, 1]) if (s < 0 || F.on > (F.lag || 0)*0.5) puff(Pl, this, P, s, F.big); }
+    while (F.em >= 1) { F.em -= 1; for (const s2 of [-1, 1]) if (s2 < 0 || F.on > (F.lag || 0)) puff(Pl, this, P, s2, F.big, F.hot); }
     Pl.live = Math.max(Pl.live, 1);
   }
   return r;
