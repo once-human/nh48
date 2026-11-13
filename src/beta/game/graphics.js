@@ -81,8 +81,8 @@ export class Graphics {
   constructor(G, C) {
     this.G = G; this.C = C; this.base = hardwareTier(C.gpu);
     this.auto = {}; for (const s of ALL) this.auto[s.id] = s.at[this.base];
-    this.preset = 'auto'; this.pin = {}; this.cap = 144; this.counter = 0;
-    const j = saved(); if (j.preset !== undefined) this.preset = j.preset; if (j.pin) this.pin = j.pin; if (j.cap !== undefined) this.cap = j.cap; if (j.counter !== undefined) this.counter = j.counter;
+    this.preset = 'auto'; this.pin = {}; this.cap = 144; this.counter = 0; this.pace = 0;
+    const j = saved(); if (j.preset !== undefined) this.preset = j.preset; if (j.pin) this.pin = j.pin; if (j.cap !== undefined) this.cap = j.cap; if (j.counter !== undefined) this.counter = j.counter; if (j.pace !== undefined) this.pace = j.pace;
     G.fpsCap = this.cap; this.fN = 0; this.fT = 0; this.fW = 0;
     this.acc = 0; this.n = 0; this.cpu = 0; this.spikes = 0; this.low = 0; this.high = 0; this.wait = 8; this.blocked = {}; this.trial = null; this.was = {};
     G.afterRender = () => {};                            // (the game's own adaptive resolution: this replaces it)
@@ -94,10 +94,11 @@ export class Graphics {
   applyOne(s) { const v = s.val[this.level(s.id)]; if (this.was[s.id] === v) return; this.was[s.id] = v; try { s.apply(this.G, v, this.C); } catch (e) { console.warn('graphics', s.id, e); } }
   tier() { return typeof this.preset === 'number' ? this.preset : this.preset === 'custom' ? Math.round(this.level('people')*5/6) : this.base; }
   applyAll() { for (const s of ALL) this.applyOne(s); this.G.qualityName = ['lite', 'low', 'med', 'high', 'high', 'high'][this.tier()]; this.sync(); }
-  save() { try { localStorage.setItem(KEY, JSON.stringify({ preset: this.preset, pin: this.pin, cap: this.cap, counter: this.counter })); } catch (e) { /* private window */ } }
+  save() { try { localStorage.setItem(KEY, JSON.stringify({ preset: this.preset, pin: this.pin, cap: this.cap, counter: this.counter, pace: this.pace })); } catch (e) { /* private window */ } }
   choose(id, v) {
     if (id === 'cap') { this.cap = this.G.fpsCap = +v; this.save(); this.sync(); return; }
     if (id === 'counter') { this.counter = +v; this.save(); this.sync(); return; }
+    if (id === 'pace') { this.pace = +v; if (this.G.pace) this.G.pace.on = !!this.pace; this.save(); this.sync(); return; }
     if (id === 'all') {
       if (v === 'custom') { if (this.preset !== 'custom') { const now = {}; for (const s of ALL) now[s.id] = this.level(s.id); this.pin = now; this.preset = 'custom'; } }
       else { this.preset = v === 'auto' ? 'auto' : +v; this.pin = {}; }
@@ -143,7 +144,8 @@ export class Graphics {
     }
     // under 30 isn't playable: down at once and hard. Between 30 and 45 it can wait a few seconds and go gently. About 60 is the aim
     // (one bad second is a hitch, the city loading say, not the settings: it has to stay bad)
-    const hard = Math.min(30, want*.9), bad = fps < hard; this.under = bad ? (this.under || 0) + 1 : 0;
+    // (held to an even 30 by game/pace.js reads as 29.9 some seconds: that's a steady rate, not one under 30)
+    const P = G.pace, even = P && P.on && P.n > 1, hard = Math.min(30, want*.9), bad = fps < hard - (even ? 1.5 : 0); this.under = bad ? (this.under || 0) + 1 : 0;
     const down = this.under >= 2;
     this.low = fps < want*.75 || spikes >= 4 ? this.low + 1 : 0;
     this.high = fps >= want*.85 && !spikes ? this.high + 1 : 0;
@@ -171,7 +173,7 @@ export class Graphics {
       on(r.querySelector(`[data-g="${s.id}"]`), shown);
       r.querySelector(`[data-now="${s.id}"]`).textContent = s.sub + ' · now ' + s.fmt(s.val[this.level(s.id)]);
     }
-    on(r.querySelector('[data-g="cap"]'), this.cap); on(r.querySelector('[data-g="counter"]'), this.counter);
+    on(r.querySelector('[data-g="cap"]'), this.cap); on(r.querySelector('[data-g="counter"]'), this.counter); on(r.querySelector('[data-g="pace"]'), this.pace);
   }
   // the frame counter, in a corner. Runs whatever the preset
   counterTick(dt, cpu) {
@@ -194,6 +196,7 @@ export class Graphics {
     g.innerHTML = row('Graphics', 'The whole picture. Auto fits it to your PC and what else is running, smooth first. Change anything below and it\'s Custom', seg('all', NAMES).replace('</div>', '<button data-v="custom">Custom</button></div>')) +
       '<div class="g-head">Display</div>' +
       row('Frame rate limit', 'Your screen\'s refresh rate is the most any browser will show', list('cap', CAPS.map(v => [v, v ? v + ' FPS' : 'No limit']))) +
+      row('Frame pacing', 'Off shows each picture as soon as it is ready. Steady keeps every one on screen the same length of time, at the quickest even rate your PC holds (60, 30...): more even, fewer frames', list('pace', [[0, 'Off'], [1, 'Steady']])) +
       row('Frame counter', 'In the corner of the screen', list('counter', COUNTERS.map((n, i) => [i, n]))) +
       SETTINGS.map(s => s.group ? `<div class="g-head">${s.group}</div>` : row(s.label, s.sub, seg(s.id, s.val.map(s.fmt)), s.id)).join('');
     this.root = g;

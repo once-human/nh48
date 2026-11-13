@@ -132,6 +132,7 @@ import { Lamps } from './gfx/lamps.js';
 import { trackBodies } from './draw/skin.js';
 import { Graphics, bootTier } from './game/graphics.js';
 import { view } from './world/view.js';
+import { Pace } from './game/pace.js';
 
 // The streamer, taught two things about the painted city (when it builds, never what):
 //  - when it builds everything at once (loading screens, arriving somewhere) the buildings are drawn right there,
@@ -470,7 +471,7 @@ async function main() {
   const sphere = new THREE.Sphere(new THREE.Vector3(), 12);
   const inView = (x, z) => { sphere.center.set(x, 4, z); return frustum.intersectsSphere(sphere); };
   game.inView = inView;
-  let last = performance.now(), acc = 0, propT = 0, frames = 0, dtS = 1 / 60;
+  let last = performance.now(), acc = 0, propT = 0, frames = 0, dtI = 0; const dtH = [1/60, 1/60, 1/60, 1/60, 1/60, 1/60];
   // (half a sixtieth: at 100 km/h a car goes 23 cm a step, not 46, so what it meets is found before it's half inside it)
   const STEP = 1 / 120;
   // F3: performance overlay
@@ -485,9 +486,11 @@ async function main() {
   // watchdog: a frame that throws must not stop the game (the screen would freeze or go black). A run of
   // failures, or a camera/player gone to NaN, or a city that never comes back: reload where you were
   let bad = 0, lastGood = null, emptyT = 0;
-  let capT = 0;
+  const pace = game.pace = new Pace(); let workMs = 8;
+  if (game.gfx && game.gfx.pace !== undefined) pace.on = !!game.gfx.pace;
   function frame(now) {
-    if (game.fpsCap > 0) { const need = 1000/game.fpsCap; if (now - capT < need - 1.5) { requestAnimationFrame(frame); return; } capT = now - ((now - capT)%need > 4 ? 0 : (now - capT)%need); }
+    // (every picture up for the same number of the screen's ticks: game/pace.js. Your frame limit is the least of them)
+    if (!pace.tick(now, game.fpsCap, Math.max(workMs, post.clock?.total || 0), game.state === 'play')) { requestAnimationFrame(frame); return; }
     try { frame1(now); bad = 0; } catch (err) {
       console.warn('frame', err);
       if (++bad < 90) requestAnimationFrame(frame);
@@ -511,10 +514,12 @@ async function main() {
     const t0 = performance.now();
     let dt = Math.min(0.1, (now - last) / 1000);
     last = now;
-    // frame pacing: small wobbles in frame time (16, 17, 15, 18 ms) are smoothed so motion doesn't judder;
-    // a real hitch still counts in full so nothing drifts from the clock
-    dtS = Math.abs(dt - dtS) < 0.012 ? dtS + (dt - dtS) * 0.2 : dt;
-    dt = dtS;
+    // the step of time each frame is the average of the last six frames' real lengths. A frame's own length is only
+    // known once it's over, so stepping by the one before went wrong exactly when frames come short, long, short, long
+    // (a PC between 30 and 60 a second on a 60 Hz screen): the picture that stayed up long had moved by the short
+    // one's time, and the other way round, which is twice the judder there need be. And after a freeze the catching up
+    // is spread over six frames, not thrown into one. Every millisecond is still counted once: nothing drifts from the clock
+    dtH[dtI = (dtI + 1)%6] = dt; dt = (dtH[0] + dtH[1] + dtH[2] + dtH[3] + dtH[4] + dtH[5])/6;
     // the world in slow motion (the phone out: 1/60th speed, everything still moving); UI keeps real time
     game.realDt = dt;
     if (game.timeWarp && game.timeWarp !== 1) dt *= game.timeWarp;
@@ -577,6 +582,7 @@ async function main() {
     if (compiled && game.state !== 'map' && !(game.state === 'pause' && !game.livePause && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2) && !(game.menuFreeze && game.state === 'shop' && (game.pauseFrames = (game.pauseFrames || 0) + 1) > 2)) post.render(dt);
     const t2 = performance.now();
     if (game.gfxTick) game.gfxTick(dt, t2 - t0);
+    workMs += (t2 - t0 - workMs)*.1;
     perf.n++; perf.upd += t1 - t0; perf.rnd += t2 - t1; perf.worst = Math.max(perf.worst, t1 - t0);
     if (!perfBox.hidden) {
       const ft = dt * 1000;
