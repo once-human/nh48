@@ -61,21 +61,33 @@ function start(TR, v) {
 function throwRider(G, v, side, own = 0, bx = 0, bz = 0) {
   const kit = G && G.W && G.W.kit, ppl = G && G.people; if (!kit || !ppl) return;
   const rng = { next: Math.random, chance: (q) => Math.random() < q, range: (a, b) => a + Math.random()*(b - a), pick: (a) => a[Math.floor(Math.random()*a.length)], int: (a, b) => a + Math.floor(Math.random()*(b - a + 1)) };
-  const look = kit.randomLook(rng, { female: Math.random() < 0.15, helmet: v.type !== 'cycle' });
-  if (v.colB) look.top = look.top.setRGB(v.colB[0], v.colB[1], v.colB[2]);
-  const x = v.x - v.hx*0.15, z = v.z - v.hz*0.15;
-  const p = ppl.spawnAt(look, x, z, ppl.pickPersona ? ppl.pickPersona(look.female, x, z) : 'dada');
-  if (!p) return;
   const yaw = Math.atan2(v.hz, v.hx), hit = Math.hypot(bx, bz), kmh = Math.max(hit, Math.abs(own)*0.6)*3.6;
-  // the blow goes into them about as much as into the machine (they're most of the weight on it), less at a glance
-  const vx = v.hx*own*0.85 + bx*0.6 - v.hz*side*0.5, vz = v.hz*own*0.85 + bz*0.6 + v.hx*side*0.5, vy = 0.25 + Math.min(0.7, kmh*0.01);
-  const surf = G.W && G.W.surf, gy = surf ? surf.height(x, z) : 0;
-  p._throw = { x, z, yaw, y: gy + (/^bike/.test(v.type) ? 0.92 : v.type === 'cycle' ? 0.95 : 0.85), vx, vy, vz };
-  const dead = kmh >= 75, ko = dead || kmh >= 40, crit = !dead && kmh >= 55;
-  p.fallen = dead || ko ? 1e6 : 4 + kmh*0.15; p.ko = ko; p.corpse = dead; p.unconscious = ko && !dead; p.v = 0;
-  p.inj = { sev: dead ? 'dead' : crit ? 'critical' : ko ? 'ko' : 'knock', t: 0 }; if (!ko) p.limp = 30 + kmh*2;
-  p.yaw = yaw; p.hx = v.hx; p.hz = v.hz;
-  v._tp.rider = p;
+  const surf = G.W && G.W.surf, crowd = G.crowd, seats = v._riders && v._riders.length ? v._riders : [null];
+  // whoever was on it comes off it: the very body you were looking at on the seat (the same clothes, from the pose it
+  // was riding in, that same frame), the pillion with the rider. The rider used to vanish off the seat and somebody
+  // new turn up beside the machine up to a quarter of a second later, which is what made the fall look late
+  seats.forEach((R0, i) => {
+    let look = R0 && R0.look;
+    if (!look) { look = kit.randomLook(rng, { female: Math.random() < 0.15, helmet: v.type !== 'cycle' }); if (v.colB) look.top = look.top.setRGB(v.colB[0], v.colB[1], v.colB[2]); }
+    const back = i ? 0.42 : 0, x = v.x - v.hx*(0.15 + back), z = v.z - v.hz*(0.15 + back);
+    const p = ppl.spawnAt(look, x, z, ppl.pickPersona ? ppl.pickPersona(look.female, x, z) : 'dada');
+    if (!p) return;
+    const slot = R0 && R0.body;
+    if (slot && slot.p === R0) { slot.p = p; p.body = slot; R0.body = null; slot.cur = null; slot.lx = undefined; slot.vel = 0; }
+    else if (crowd) crowd.t = 0;                         // (a body for them now, not at the next quarter second)
+    // the blow goes into them about as much as into the machine (they're most of the weight on it), less at a glance.
+    // The one behind comes off a touch slower and a touch further out
+    const out = i ? 0.9 : 0.5, keep = i ? 0.8 : 0.85;
+    const vx = v.hx*own*keep + bx*0.6 - v.hz*side*out, vz = v.hz*own*keep + bz*0.6 + v.hx*side*out, vy = 0.2 + Math.min(0.6, kmh*0.008);
+    const gy = surf ? surf.height(x, z) : 0;
+    p._throw = { x, z, yaw, y: gy + (/^bike/.test(v.type) ? 0.92 : v.type === 'cycle' ? 0.95 : 0.85) + (i ? 0.03 : 0), vx, vy, vz };
+    const dead = kmh >= 75, ko = dead || kmh >= 40, crit = !dead && kmh >= 55;
+    // (down as long as the knock deserves: a shove off a standing scooter is a couple of seconds, not five)
+    p.fallen = dead || ko ? 1e6 : 1.8 + kmh*0.12; p.ko = ko; p.corpse = dead; p.unconscious = ko && !dead; p.v = 0;
+    p.inj = { sev: dead ? 'dead' : crit ? 'critical' : ko ? 'ko' : 'knock', t: 0 }; if (!ko) p.limp = 30 + kmh*2;
+    p.yaw = yaw; p.hx = v.hx; p.hz = v.hz;
+    if (!i) v._tp.rider = p;
+  });
   v._tp.empty = true;              // drawn without its baked rider while it's down
 }
 function tick(TR, v, dt) {
