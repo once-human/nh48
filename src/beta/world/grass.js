@@ -13,7 +13,7 @@ void main(){ vec3 iP = (modelMatrix*instanceMatrix*vec4(0., 0., 0., 1.)).xyz; fl
 const FS = `precision highp float; varying vec3 vC, vW; varying vec2 vU; varying float vZ, vH, vS; uniform sampler2D tMap, tNoise; uniform vec3 sunCol, shadeCol, fogCol; uniform float fogDensity, dayK;
 ${LAMP}
 void main(){ vec4 t = texture2D(tMap, vU); if (t.a < .5) discard; float e = texture2D(tNoise, vW.xz*.07).r;
-  vec3 b = t.rgb*vC*(.8 + .45*e), c = mix(b*shadeCol*.85, b*sunCol*vec3(1.08, 1.05, .86), smoothstep(.1, .8, vH + (e - .5)*.5)*vS*dayK) + b*lampAt(vW, vec3(0., 1., 0.));
+  vec3 b = t.rgb*vC*(.8 + .45*e), c = mix(b*shadeCol*.85, b*sunCol*vec3(1.08, 1.05, .86), smoothstep(.1, .8, vH + (e - .5)*.5)*vS*dayK) + lampOn(b, vW, vec3(0., 1., 0.));
   float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1.); }`;
 
 export class GrassField extends GameGrass {

@@ -97,7 +97,7 @@ void main(){
   float grime = (1. - smoothstep(.15, .7, vW.y))*(.6 + .6*nz(vL.xz*9.))*(1. - matte)*step(-1.5, vP);
   b = mix(b, b*vec3(.62, .56, .48), grime*.4);
   if (matte > .5) b *= .9 + .2*nz(vL.xy*60.);
-  vec3 c = mix(b*shadeCol*(.92 + .16*max(n.y, 0.)) + vec3(.022)*dayK, b*sunCol, L) + b*lampAt(vW, n);
+  vec3 c = mix(b*shadeCol*(.92 + .16*max(n.y, 0.)) + vec3(.022)*dayK, b*sunCol, L) + lampOn(b, vW, n);
   if (matte < .5) {
     // the world along the body: sky above a hard horizon, the road below, brushed on
     vec3 R = reflect(-V, n); float hz = smoothstep(-.02, .06, R.y + e*.08), fres = pow(1. - max(dot(n, V), 0.), 3.);

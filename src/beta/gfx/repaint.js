@@ -152,7 +152,7 @@ void main(){
 #ifdef POTHOLE
     L *= potSun;
 #endif
-    c = mix(b*shadeCol*(.92 + .16*max(n.y, 0.)) + b*.04*dayK, sunRoll(b*sunCol), L) + b*lampAt(vW, n);
+    c = mix(b*shadeCol*(.92 + .16*max(n.y, 0.)) + b*.04*dayK, sunRoll(b*sunCol), L) + lampOn(b, vW, n);
 #ifdef STANDARD
     // what shines catches the sky at a glance; metal is mostly that
     vec3 V = normalize(cameraPosition - vW); float g = 1. - roughness, fr = pow(1. - max(dot(n, V), 0.), 3.), sky = smoothstep(-.2, .7, reflect(-V, n).y);

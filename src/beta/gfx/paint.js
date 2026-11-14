@@ -62,6 +62,9 @@ vec3 lampAt(vec3 w, vec3 n){ vec3 c = vec3(0.); if (lampC.w > 0.) { vec2 q = (w.
       else beam = smoothstep(headD.w, headD.w + .1, dot(d, a));
       c += vec3(1., .93, .78)*headP.w*(both > .5 ? 1.9 : 3.)*beam*max(dot(n, -d), .2)/(1. + r*r*fall); } }
   return c; }
+// what a lamp does to a thing is light it, by its own colour: a white head of hair or a yellow fruit a metre from a
+// headlamp is bright, but it is not a lamp itself. Past bright it flattens off, so nothing lit ever glows back at you
+vec3 lampOn(vec3 b, vec3 w, vec3 n){ vec3 x = b*lampAt(w, n); float l = dot(x, vec3(.3, .55, .15)); return l > .5 ? x*((.5 + .36*(1. - exp(-(l - .5)/.36)))/l) : x; }
 // sunlight on something pale: the sun can go up to 1.25, so white went past the top and lost its carving. Bright colours are
 // eased into what's left instead, keeping their hue; everything darker than the knee is untouched
 vec3 sunRoll(vec3 c){ float m = max(c.r, max(c.g, c.b)); if (m <= .72) return c; float t = min((m - .72)/.6, 1.); return c*(.72 + .24*(1. - pow(1. - t, 1.5)))/m; }
@@ -433,7 +436,7 @@ void main(){
   vec3 cl = sunRoll(base*sunCol);
   vec3 cs = base*shadeCol*mix(.92 + .16*max(n.y, 0.), .74 + .42*max(n.y, 0.) + .12*max(-n.y, 0.), uReal) + vec3(.025, .03, .045)*dayK;
   vec3 c = mix(cs, cl, L);
-  c += base*lampAt(w, n);
+  c += lampOn(base, w, n);
   // glass takes the sky by day
   c = mix(c, mix(c, skyCol*.85, .25), gGlass*(1. - uNight)*(1. - L*.5));
   // wet: the ground darkens, takes the sky in its puddles

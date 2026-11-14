@@ -12,8 +12,8 @@ import { view } from '../world/view.js';
 const linear = (m) => { for (const s of [m]) s.fragmentShader = s.fragmentShader.replace('fragColor = vec4(c, 1.);', 'fragColor = vec4(pow(max(c, vec3(0.)), vec3(2.2)), 1.);').replace('fragColor = vec4(mix(c, fogCol, smoothstep(fogR.x, fogR.y, vZ)*.9), 1.);', 'fragColor = vec4(pow(max(mix(c, fogCol, smoothstep(fogR.x, fogR.y, vZ)*.9), vec3(0.)), vec3(2.2)), 1.);'); return m; };
 // and it reads the same sun, shade, lamps and sun curve as everything else, so it goes dark at night and lights up under a lamp
 const lit = (m) => {
-  const fs = m.fragmentShader.replace('out vec4 fragColor;', `uniform float dayK;\n${LAMP}\nout vec4 fragColor;`).replace('float L = lit*sh;', 'float L = lit*sh*dayK;').replace('+ vec3(.025, .03, .045);', '+ vec3(.025, .03, .045)*dayK;').replace('vec3 cl = base*sunCol;', 'vec3 cl = sunRoll(base*sunCol);').replace('if (k == 13) c = mix(c, base*1.05, .7);', 'c += base*lampAt(w, n);\n  if (k == 13) c = mix(c, base*1.05, .7);');
-  if (!fs.includes('lampAt(w, n)') || !fs.includes('sunRoll(base') || !fs.includes('lit*sh*dayK')) throw new Error('far crowd: the light lines have moved');
+  const fs = m.fragmentShader.replace('out vec4 fragColor;', `uniform float dayK;\n${LAMP}\nout vec4 fragColor;`).replace('float L = lit*sh;', 'float L = lit*sh*dayK;').replace('+ vec3(.025, .03, .045);', '+ vec3(.025, .03, .045)*dayK;').replace('vec3 cl = base*sunCol;', 'vec3 cl = sunRoll(base*sunCol);').replace('if (k == 13) c = mix(c, base*1.05, .7);', 'c += lampOn(base, w, n);\n  if (k == 13) c = mix(c, base*1.05, .7);');
+  if (!fs.includes('lampOn(base, w, n)') || !fs.includes('sunRoll(base') || !fs.includes('lit*sh*dayK')) throw new Error('far crowd: the light lines have moved');
   m.fragmentShader = fs; for (const k of ['tLamp', 'lampC', 'headP', 'headD', 'headS', 'headK', 'lampY', 'dayK', 'shadeCol', 'sunCol']) m.uniforms[k] = PU[k];
   return m;
 };

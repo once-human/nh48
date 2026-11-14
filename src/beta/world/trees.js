@@ -49,14 +49,14 @@ const LEAF_FS = CHUNK + `void main(){
   float sh = 1.; if (shadowOn > .5 && lit > 0.) { float s0 = shadowAt(vW, n); sh = mix(smoothstep(.25, .7, s0 + e*.35), s0, uReal); } float L = lit*sh*dayK;
   // dabs of paint: a dark hollow under the crown, warm top, each clump a little its own colour
   b *= .78 + .5*nz(vW.xz*.23 + vW.y*.17);
-  vec3 c = mix(b*shadeCol*vec3(.7, .85, .8)*(.75 + .25*smoothstep(0., 8., vH)) + vec3(.008, .016, .01)*dayK, b*sunCol*vec3(1.1, 1.04, .84), L) + b*lampAt(vW, n)*.8;
+  vec3 c = mix(b*shadeCol*vec3(.7, .85, .8)*(.75 + .25*smoothstep(0., 8., vH)) + vec3(.008, .016, .01)*dayK, b*sunCol*vec3(1.1, 1.04, .84), L) + lampOn(b, vW, n)*.8;
   float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1.); }`;
 const BARK_FS = CHUNK + `void main(){
   LOD_OUT
   vec3 n = normalize(vN), b = texture2D(tMap, vU*vec2(1., 1.)).rgb*uTint*1.25; float e = (nz(gl_FragCoord.xy*.1) - .5)*(1. - uReal), ndl = dot(n, sunDir), lit = sunOn(ndl, e*.14, .0, .14);
   float sh = (shadowOn > .5 && lit > 0.) ? shadeOf(shadowAt(vW, n), e*.3) : 1., L = lit*sh*dayK;
   b *= .84 + .32*nz(vec2(vU.x*18., vU.y*2.));          // long furrows
-  vec3 c = mix(b*shadeCol + vec3(.015)*dayK, b*sunCol, L) + b*lampAt(vW, n);
+  vec3 c = mix(b*shadeCol + vec3(.015)*dayK, b*sunCol, L) + lampOn(b, vW, n);
   float h = smoothstep(.5, .72, fract((gl_FragCoord.x + gl_FragCoord.y)*.17 + e*.9))*(1. - L)*(1. - smoothstep(12., 45., vZ)); c = mix(c, c*.68, h*.65*(1. - uReal));
   float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1.); }`;
 const LEAF_SHADOW_VS = `varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix*viewMatrix*modelMatrix*instanceMatrix*vec4(position, 1.); }`;
