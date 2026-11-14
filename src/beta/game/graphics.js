@@ -17,6 +17,12 @@
 // trees, stalls, vehicles, the crowds) is the last thing it gives up and the first it gives back.
 const NAMES = ['Lite', 'Low', 'Medium', 'High', 'Very High', 'Ultra'];
 const pct = (v) => Math.round(v*100) + '%';
+// the screen's own height in pixels (the window's, times the screen's scaling), and the pixel ratio that draws h rows
+const screenH = () => Math.round((window.innerHeight || 720)*(window.devicePixelRatio || 1));
+const prFor = (h) => Math.max(0.2, Math.min(4, h/Math.max(1, window.innerHeight || 720)));
+// (a window resized or moved to another screen: the same number of rows as before)
+let _resG = null;
+window.addEventListener('resize', () => { const G = _resG; if (G && G.resH && G.renderer) { const pr = prFor(G.resH); if (Math.abs(pr - G.renderer.getPixelRatio()) > 0.005) { G.perf.pr = pr; G.applyPixelRatio(pr); } } });
 const onOff = (v, f) => (v ? f(v) : 'Off');
 const M = (v) => v + ' m';
 const fx = (C, o) => { Object.assign(C.post.fx, o); };
@@ -26,7 +32,9 @@ const fx = (C, o) => { Object.assign(C.post.fx, o); };
 // from the PC and leaves them alone while you play.
 export const SETTINGS = [
   { group: 'Image' },
-  { id: 'res', label: 'Render scale', sub: 'Pixels drawn, against your screen', side: 'gpu', w: 2.2, floor: 2, val: [.5, .6, .75, .85, 1, 1.25, 1.5, 2], at: [1, 2, 3, 4, 5, 6], fmt: pct, apply: (G, v) => { G.perf.pr = v; G.applyPixelRatio(v); } },
+  // the picture's own height in pixels, whatever the window or the screen's scaling (720p is 720 rows drawn, stretched to
+  // fill the window), the way games set it: below your screen's own it's softer and quicker, above it's sharper and slower
+  { id: 'res', label: 'Resolution', sub: 'Pixels drawn, top to bottom. Your screen is ' + screenH() + 'p', side: 'gpu', w: 2.2, floor: 2, val: [360, 480, 540, 720, 900, 1080, 1440, 2160], at: [2, 3, 4, 5, 6, 7], fmt: (v) => (v === 2160 ? '4K' : v === 1440 ? '1440p (2K)' : v + 'p') + (Math.abs(v - screenH()) < 2 ? ' · native' : ''), apply: (G, v) => { G.resH = v; const pr = prFor(v); G.perf.pr = pr; G.applyPixelRatio(pr); } },
   { id: 'msaa', label: 'Anti-aliasing', sub: 'MSAA. Auto goes by your PC, not your frame rate', fixed: true, val: [0, 2, 4, 8, 16], at: [0, 0, 0, 2, 3, 4], fmt: (v) => (v ? 'MSAA ' + v + 'x' : 'Off'), apply: (G, v, C) => { const m = Math.min(v, G.renderer.capabilities.maxSamples); if (C.post.q.samples !== m) { C.post.q.samples = m; C.post.setSize(window.innerWidth, window.innerHeight); } } },
   { id: 'aniso', label: 'Texture filtering', sub: 'Anisotropic, for surfaces at a low angle', fixed: true, val: [1, 2, 4, 8, 16], at: [0, 1, 2, 3, 4, 4], fmt: (v) => (v > 1 ? v + 'x AF' : 'Trilinear'), apply: (G, v) => G.setAniso(v) },
   { group: 'Look' },
@@ -81,7 +89,7 @@ export function bootTier(gpu) { const p = saved().preset; return typeof p === 'n
 
 export class Graphics {
   constructor(G, C) {
-    this.G = G; this.C = C; this.base = hardwareTier(C.gpu);
+    this.G = G; this.C = C; this.base = hardwareTier(C.gpu); _resG = G;
     this.auto = {}; for (const s of ALL) this.auto[s.id] = s.at[this.base];
     this.preset = 'auto'; this.pin = {}; this.cap = 144; this.counter = 0; this.pace = 1;
     const j = saved(); if (j.preset !== undefined) this.preset = j.preset; if (j.pin) this.pin = j.pin; if (j.cap !== undefined) this.cap = j.cap; if (j.counter !== undefined) this.counter = j.counter; if (j.steady !== undefined) this.pace = j.steady;
