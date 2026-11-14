@@ -182,9 +182,12 @@ export class Graphics {
   counterTick(dt, cpu) {
     if (!this.counter) { if (this.fpsEl) this.fpsEl.hidden = true; return; }
     if (!this.fpsEl) { const e = this.fpsEl = document.createElement('div'); e.id = 'fps-counter'; document.body.appendChild(e); }
+    // (by the clock on the wall, from one picture to the next: the game's own step of time is evened out over six frames,
+    // never counts a frame as longer than 0.4 s and slows with slow motion, so a bad stretch read better than it was)
+    { const t = performance.now(), was = this._ct; this._ct = t; if (was) dt = (t - was)/1000; if (dt > 5) { this.fN = 0; this.fT = 0; this.fW = 0; this.fC = 0; return; } }
     this.fpsEl.hidden = false; this.fN++; this.fT += dt; this.fW = Math.max(this.fW, dt); this.fC = (this.fC || 0) + cpu;
     if (this.fT < .5) return;
-    const R = this.G.renderer, i = R.info, fps = this.fN/this.fT, ms = this.fT/this.fN*1000, l = [`${fps.toFixed(0)} FPS`];
+    const R = this.G.renderer, i = R.info, fps = this.fN/this.fT, ms = this.fT/this.fN*1000, l = [`${fps < 10 ? fps.toFixed(1) : fps.toFixed(0)} FPS`];
     if (this.counter >= 2) l.push(`${ms.toFixed(1)} ms · worst ${(this.fW*1000).toFixed(0)} ms`);
     if (this.counter >= 3) { const v = R.getDrawingBufferSize(this._v || (this._v = new (this.C.Vector2)())); l.push(`CPU ${(this.fC/this.fN).toFixed(1)} ms · ${v.x}x${v.y}`, `${i.render.calls} draws · ${(i.render.triangles/1e6).toFixed(2)}M tris`, this.C.post.clock?.text() || '', this.preset === 'auto' ? 'Auto' : this.preset === 'custom' ? 'Custom' : NAMES[this.preset]); }
     this.fpsEl.textContent = l.join('\n'); this.fN = 0; this.fT = 0; this.fW = 0; this.fC = 0;
