@@ -100,12 +100,11 @@ export class Graphics {
     this.applyAll();
   }
   // which of a setting's values is in use. A name's own; yours in Custom; Auto's otherwise
-  // Low isn't a fixed layout: it holds its frame rate (60, or 90 on a 120 Hz screen) by giving up what it has to, never
-  // going above Low's own levels. Its levels are kept apart from Auto's
-  levels() { return this.preset === 1 ? (this.l1 || (this.l1 = Object.fromEntries(ALL.map(s => [s.id, s.at[1]])))) : this.auto; }
-  topOf(q) { return this.preset === 1 ? q.at[1] : q.at[AUTO_TOP]; }
-  adapts() { return this.preset === 'auto' || this.preset === 'custom' || this.preset === 1; }
-  level(id) { if (this.preset === 1) { const s = ALL.find(q => q.id === id); return s.style || s.fixed ? s.at[1] : this.levels()[id]; } const n = typeof this.preset === 'number' ? this.preset : -1; if (n >= 0) return ALL.find(s => s.id === id).at[n]; const p = this.pin[id]; return p !== undefined ? p : this.auto[id]; }
+  // (only Auto adapts: every name is a fixed layout)
+  levels() { return this.auto; }
+  topOf(q) { return q.at[AUTO_TOP]; }
+  adapts() { return this.preset === 'auto' || this.preset === 'custom'; }
+  level(id) { const n = typeof this.preset === 'number' ? this.preset : -1; if (n >= 0) return ALL.find(s => s.id === id).at[n]; const p = this.pin[id]; return p !== undefined ? p : this.auto[id]; }
   applyOne(s) { const v = s.val[this.level(s.id)]; if (this.was[s.id] === v) return; this.was[s.id] = v; try { s.apply(this.G, v, this.C); } catch (e) { console.warn('graphics', s.id, e); } }
   tier() { return typeof this.preset === 'number' ? this.preset : this.preset === 'custom' ? Math.round(this.level('people')*5/6) : this.base; }
   applyAll() { for (const s of ALL) this.applyOne(s); this.G.qualityName = ['lite', 'low', 'med', 'high', 'high', 'high'][this.tier()]; this.sync(); }
@@ -116,7 +115,7 @@ export class Graphics {
     if (id === 'pace') { this.pace = +v; if (this.G.pace) this.G.pace.on = !!this.pace; this.save(); this.sync(); return; }
     if (id === 'all') {
       if (v === 'custom') { if (this.preset !== 'custom') { const now = {}; for (const s of ALL) now[s.id] = this.level(s.id); this.pin = now; this.preset = 'custom'; } }
-      else { this.preset = v === 'auto' ? 'auto' : +v; this.pin = {}; this.l1 = null; }
+      else { this.preset = v === 'auto' ? 'auto' : +v; this.pin = {}; }
     } else {
       // any one row changed: it isn't a set layout now. Everything stays where it was, and this row changes
       if (this.preset !== 'custom') { const now = {}; for (const s of ALL) now[s.id] = this.level(s.id); this.pin = now; this.preset = 'custom'; }
@@ -162,7 +161,7 @@ export class Graphics {
     // under 30 isn't playable: down at once and hard. Between 30 and 45 it can wait a few seconds and go gently. About 60 is the aim
     // (one bad second is a hitch, the city loading say, not the settings: it has to stay bad)
     // (held to an even 30 by game/pace.js reads as 29.9 some seconds: that's a steady rate, not one under 30)
-    const P = G.pace, even = P && P.on && P.n > 1, hard = this.preset === 1 ? want*.9 : Math.min(45, want*.9), bad = fps < hard - (even ? 1.5 : 0); this.under = bad ? (this.under || 0) + 1 : 0;
+    const P = G.pace, even = P && P.on && P.n > 1, hard = Math.min(45, want*.9), bad = fps < hard - (even ? 1.5 : 0); this.under = bad ? (this.under || 0) + 1 : 0;
     const down = this.under >= 1;
     this.low = fps < want*.75 || spikes >= 4 ? this.low + 1 : 0;
     this.high = fps >= want*.85 && !spikes ? this.high + 1 : 0;
