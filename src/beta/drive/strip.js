@@ -13,13 +13,15 @@ const GAME = ['people', 'police', 'emergency', 'fauna', 'strays', 'transit', 'sh
 const WORLD = ['nearBoards', 'trains', 'parked', 'grass', 'farCity', 'farGround', 'landmarks', 'activity', 'cityMap', 'lampSet', 'lampDeadSet'];
 const STEPS = ['update', 'step', 'tick', 'think', 'render', 'spawn', 'prebuild', 'prewarm', 'populate', 'refill', 'warm'];
 const NOOP = () => {};
+let SHARED = new Set();
 
 // every 3D thing an object holds (in its fields, and in lists, maps and sets of them), two levels down
+// (never into what's shared: the game itself, the world, the sky, you, the camera and the rest that stays)
 function things(o, out, depth = 0, seen = new Set()) {
   if (!o || typeof o !== 'object' || seen.has(o) || depth > 2) return out;
   seen.add(o);
   if (o.isObject3D) { out.add(o); return out; }
-  const each = (v) => { if (v && typeof v === 'object') { if (v.isObject3D) out.add(v); else if (depth < 2 && !v.isMaterial && !v.isTexture && !v.isBufferGeometry && !ArrayBuffer.isView(v)) things(v, out, depth + 1, seen); } };
+  const each = (v) => { if (v && typeof v === 'object' && !SHARED.has(v)) { if (v.isObject3D) out.add(v); else if (depth < 2 && !v.isMaterial && !v.isTexture && !v.isBufferGeometry && !ArrayBuffer.isView(v)) things(v, out, depth + 1, seen); } };
   if (Array.isArray(o) || o instanceof Set) { for (const v of o) each(v); return out; }
   if (o instanceof Map) { for (const v of o.values()) each(v); return out; }
   for (const k of Object.keys(o)) { if (k === 'game' || k === 'G' || k === 'W' || k === 'scene' || k === 'renderer' || k === 'camera' || k === 'player' || k === 'parent') continue; each(o[k]); }
@@ -34,6 +36,8 @@ export function quiet(G) {
 
 export function strip(G) {
   const W = G.W, scene = G.scene, gone = new Set(), keep = new Set();
+  SHARED = new Set([G, W, G.sky, W.sky, G.player, G.rig, G.camera, G.renderer, G.post, G.audio, G.hud, G.weather, G.lights, G.smoke, G.traffic, G.input,
+    G.scene, W.country, W.trees, W.surf, W.collision, W.mats, W.hills, G.puddles, G.modfx, G.photo, G.cut, G.phone, G.menubar, G.life, G.gfx, G.crowd].filter(Boolean));
   // what must stay, whoever holds it: you, your body, what you drive, the sky, the country
   const P = G.player;
   for (const o of [P && P.root, P && P.auto && P.auto.root, W.country && W.country.group, W.sky && W.sky.dome, W.trees && W.trees.group, G.smoke && G.smoke.group]) if (o) keep.add(o);
@@ -42,6 +46,8 @@ export function strip(G) {
     for (const o of things(sys, new Set())) {
       let k = o, safe = false; while (k) { if (keep.has(k)) { safe = true; break; } k = k.parent; }
       if (safe || o === scene || o.isCamera) continue;
+      // (and never a light, or anything with one in it: the sun and the sky's light are shared by everything)
+      let lit = false; o.traverse((q) => { if (q.isLight) lit = true; }); if (lit) continue;
       gone.add(o);
     }
     // its work each frame: nothing
