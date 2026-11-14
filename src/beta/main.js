@@ -53,6 +53,7 @@ import './traffic/steer.js';
 import './traffic/topple.js';
 import './traffic/temper.js';
 import './traffic/brain.js';            // every driver their own person: how close, how fast, where across the road, signals, junctions
+import './game/inputfix.js';           // Alt no longer steals the keyboard; double-tap forward to sprint, leaving Space free
 import './traffic/pool.js';           // a vehicle the traffic lets go is wiped before it's handed out again
 import './game/prompt2.js';
 import './game/ask.js';           // what people tell you: the way, food, where you are, a lift
