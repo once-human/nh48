@@ -180,7 +180,7 @@ void main(){
 function paint(m, sh) {
   const lit = m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial, head = (lit ? '#define PAINT_LIT\n' : '') + (sh.uniforms.tMask ? '#define MASK\n' : '') + (m.userData.glow ? '#define GLOW\n' : '') + (m._fadeU ? '#define FADE\n' : '') + (m.userData.pothole ? '#define POTHOLE\n' : '');
   sh.vertexShader = head + VS; sh.fragmentShader = head + FS;
-  Object.assign(sh.uniforms, { uReal: PU.uReal, uTaps: PU.uTaps, uSoft: PU.uSoft, sunDir: PU.sunDir, sunCol: PU.sunCol, shadeCol: PU.shadeCol, fogCol: PU.fogCol, fogDensity: PU.fogDensity, tNoise: PU.tNoise, shadowTex: PU.shadowTex, shadowMat: PU.shadowMat, shadowTexel: PU.shadowTexel, shadowOn: PU.shadowOn, dayK: PU.dayK, uInside: inside, tLamp: PU.tLamp, lampC: PU.lampC, lampY: PU.lampY, headP: PU.headP, headD: PU.headD, headS: PU.headS, uWet: PU.uWet, skyCol: PU.skyCol });
+  Object.assign(sh.uniforms, { uReal: PU.uReal, uTaps: PU.uTaps, uSoft: PU.uSoft, sunDir: PU.sunDir, sunCol: PU.sunCol, shadeCol: PU.shadeCol, fogCol: PU.fogCol, fogDensity: PU.fogDensity, tNoise: PU.tNoise, shadowTex: PU.shadowTex, shadowMat: PU.shadowMat, shadowTexel: PU.shadowTexel, shadowOn: PU.shadowOn, dayK: PU.dayK, uInside: inside, tLamp: PU.tLamp, lampC: PU.lampC, lampY: PU.lampY, headP: PU.headP, headD: PU.headD, headS: PU.headS, headK: PU.headK, uWet: PU.uWet, skyCol: PU.skyCol });
   if (m._fadeU) sh.uniforms.uFade = m._fadeU;
 }
 const stock = (m) => m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial || m.isMeshBasicMaterial || m.isLineBasicMaterial;

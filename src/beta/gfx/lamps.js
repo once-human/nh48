@@ -107,6 +107,29 @@ export class Lamps {
     const surf = this.G.W.surf;
     for (let i = 0; i < out.length; i++) { const q = near[i]; if (q) out[i].set(q[1], (surf ? surf.height(q[1], q[2]) : 0) + 7.5, q[2], q[3]); else out[i].w = 0; }
   }
+  // the beams themselves, in the air: after dark a headlamp's light shows as a faint cone ahead of the lamp, where the
+  // dust and the damp catch it (more of it in rain or mist), fading out along its length and soft at its edges. Faint:
+  // you see the road through it
+  shafts(k, p, t, S, pair) {
+    if (!this.cones) {
+      if (!(k > 0)) return;
+      const N = 28, pos = [], nor = [], u = [], idx = [], Z0 = 0.15, Z1 = 15, R0 = 0.07, R1 = 2.9;
+      for (let i = 0; i <= N; i++) { const a = i/N*Math.PI*2, c = Math.cos(a), s = Math.sin(a); pos.push(c*R0, s*R0, Z0, c*R1, s*R1, Z1); nor.push(c, s, -0.18, c, s, -0.18); u.push(0, 1); }
+      for (let i = 0; i < N; i++) { const a = i*2; idx.push(a, a + 1, a + 3, a, a + 3, a + 2); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('aU', new THREE.Float32BufferAttribute(u, 1)); g.setIndex(idx);
+      const m = this.coneM = new THREE.ShaderMaterial({ uniforms: { uK: { value: 0 } }, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, toneMapped: false,
+        vertexShader: 'attribute float aU; varying float vU, vF; void main(){ vec4 w = modelMatrix*vec4(position, 1.); vU = aU; vF = abs(dot(normalize(mat3(modelMatrix)*normal), normalize(cameraPosition - w.xyz))); gl_Position = projectionMatrix*viewMatrix*w; }',
+        fragmentShader: 'uniform float uK; varying float vU, vF; void main(){ float a = uK*pow(1. - vU, 1.7)*smoothstep(0., .75, vF)*smoothstep(0., .06, vU); gl_FragColor = vec4(vec3(1., .93, .8)*a, a); }' });
+      this.cones = [0, 1].map(() => { const c = new THREE.Mesh(g, m); c.frustumCulled = false; c.renderOrder = 4; c.visible = false; this.G.scene.add(c); return c; });
+    }
+    const wet = GU.uWet ? GU.uWet.value : 0, on = k > 0.004 && !(this.G.interiors && this.G.interiors.inside);
+    this.coneM.uniforms.uK.value = on ? Math.min(0.2, k*(0.075 + wet*0.11)) : 0;
+    for (let i = 0; i < 2; i++) {
+      const c = this.cones[i]; c.visible = on && (i === 0 || pair); if (!c.visible) continue;
+      const sg = pair ? (i ? 1 : -1) : 0;
+      c.position.set(p.x + S.x*sg, p.y + S.y*sg, p.z + S.z*sg); c.lookAt(c.position.x + t.x, c.position.y + t.y - 0.04, c.position.z + t.z);
+    }
+  }
   // shops open and shut with the clock, and new streets load in: look every couple of seconds
   shopsMoved(night) {
     const t = performance.now(); if (night <= .01 || t < this.shopT) return false;
@@ -132,6 +155,8 @@ export class Lamps {
       PU.headP.value.set(p.x, p.y, p.z, L === P.headlight ? 1.5*(G.lights.hk ?? 1) : 1); PU.headD.value.set(t.x, t.y, t.z, Math.cos(L.angle));
       const pair = L === P.headlight && S && !S.two && S.name !== 'Auto rickshaw', h = pair ? S.W*.36 : 0, l = Math.hypot(t.x, t.z) || 1;
       PU.headS.value.set(-t.z/l*h, 0, t.x/l*h, pair ? 1 : 0);
-    } else PU.headP.value.w = 0;
+      PU.headK.value = L === P.headlight ? 1 : 0;
+      this.shafts(L === P.headlight ? (G.lights.hk ?? 1)*Math.max(night, 0.12) : 0, p, t, PU.headS.value, pair);
+    } else { PU.headP.value.w = 0; this.shafts(0); }
   }
 }
