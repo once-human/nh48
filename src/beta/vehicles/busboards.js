@@ -6,6 +6,7 @@
 // The buses close to you get the boards (as many as the door sets, beta/vehicles/busdoors.js, the same way).
 import * as THREE from 'three';
 import { Pilot } from '@orig/game/pilot.js';
+import { Traffic } from '@orig/traffic/traffic.js';
 import T from '@orig/game/transit.json';
 
 const POOL = 8, NEAR = 140, FLIP = 4.5;
@@ -92,16 +93,25 @@ function step(P, dt) {
     if (S.R.mr && (S.t += dt) > FLIP) { S.t = 0; S.mr = !S.mr; for (const B of S.boards) paint(B, S.R, S.mr); }
     if (n.traffic) {
       _e.set(o.fallen > 0 ? 1.3 : (o.roll || 0), -(o.ryaw ?? o.yaw), (o.pitch || 0) + (o.slope || 0), 'YXZ'); _q.setFromEuler(_e);
-      _p.set(o.rx ?? o.x, o.y || 0, o.rz ?? o.z);
+      _p.set(o.rx ?? o.x, (o.y || 0) + (o.fallen > 0 ? 0.3 : 0), o.rz ?? o.z);
       S.root.matrix.compose(_p, _q, _s);
     } else if (o.tilt) { o.tilt.updateWorldMatrix(true, false); S.root.matrix.copy(o.tilt.matrixWorld); }
     S.root.matrixWorldNeedsUpdate = true;
   }
   for (const S of sets) S.root.visible = !!S.bus;
 }
+// (set on the bus once the traffic has been placed for this frame, not before: placed from the player's own step, which
+// comes first, they were always where the bus had been a frame ago, and stood off it as it drove)
+let pend = null;
 const upd = Pilot.prototype.update;
 Pilot.prototype.update = function (dt, ...a) {
   const out = upd.call(this, dt, ...a);
-  try { step(this, dt); } catch (e) { /* (never stop the game over a sign) */ }
+  pend = [this, (pend ? pend[1] : 0) + dt];
+  return out;
+};
+const ren = Traffic.prototype.render;
+Traffic.prototype.render = function (...a) {
+  const out = ren.apply(this, a);
+  if (pend) { try { step(pend[0], pend[1]); } catch (e) { /* (never stop the game over a sign) */ } pend[1] = 0; }
   return out;
 };
