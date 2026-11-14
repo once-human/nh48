@@ -100,12 +100,20 @@ function third(R_, dt, p, k) {
   // in towards you quickly, back out gently, and behind a vehicle UP as it comes in, over the roof, so what's close
   // behind you is in the picture and not in the way of it
   const fx = q[0] - cy*q[3], fz = q[2] - sy*q[3], tw = W.collision.ray(q[0], q[2], fx, fz), tv = R_.vehicleRay(q[0], q[2], fx, fz), t = Math.min(tw, tv);
-  let want = t < 1 ? Math.max(veh ? 0.12 : 0.15, t*0.9) : 1;
-  { const r = W.collision.resolve(q[0] - cy*q[3]*S.pull, q[2] - sy*q[3]*S.pull, 0.3); if (r && r.depth > 0 && r.kind !== 3 && r.kind !== 4) want = Math.min(want, Math.max(veh ? 0.12 : 0.15, S.pull - 0.1)); }
+  // (the camera has a size of its own. How far out it fits is worked out afresh from the street every frame: it used
+  // to creep in while it was inside something and spring back out the moment it wasn't, over and over, which was the
+  // shaking against a wall)
+  let want = t < 1 ? t*0.9 : 1;
+  { const C = W.collision, bx = -cy*q[3], bz = -sy*q[3], hit = (f) => { const r = C.resolve(q[0] + bx*f, q[2] + bz*f, 0.24); return !!r && r.depth > 0.03 && r.kind !== 3 && r.kind !== 4; };
+    if (hit(want)) { let hi = want, lo = 0; for (let i = 1; i <= 10; i++) { const f = want*(1 - i/10); if (!hit(f)) { lo = f; break; } hi = f; } for (let i = 0; i < 5; i++) { const m = (lo + hi)/2; if (hit(m)) hi = m; else lo = m; } want = lo; } }
+  want = Math.max(veh ? 0.12 : 0.15, want);
   S.pull = dmp(S.pull, want, want < S.pull ? 30 : 3.5, dt);
   const cx = q[0] - cy*q[3]*S.pull, cz = q[2] - sy*q[3]*S.pull;
   const camY = q[1] + q[4]*(veh ? 1 : Math.max(0.4, S.pull)) + (veh ? 2.5*(1 - S.pull)*(1 - S.pull) + 0.9*(1 - S.pull) : 0);
-  cam.position.set(cx, camY, cz); cam.up.set(0, 1, 0);
+  const K = knock(R_, dt, p);
+  cam.position.set(cx + K.x, camY + K.y, cz + K.z); cam.up.set(0, 1, 0);
+  // (right up against you it can't show you without being inside you: you thin out of the picture as it closes in)
+  if (p.human) p.human._nearK = veh ? 1 : cl((q[3]*S.pull - 0.42)/0.45, 0, 1);
   R_.pos.copy(cam.position);
   R_.look.set(q[0] + cy*q[6]*S.pull - sy*q[5], q[1] + q[7], q[2] + sy*q[6]*S.pull + cy*q[5]);
   cam.lookAt(R_.look);
@@ -127,14 +135,36 @@ function third(R_, dt, p, k) {
 // a shake is a blow rolling through the camera and dying away, not a rattle: it moves smoothly, a little each way and a
 // little round, harder the harder the knock
 const shake0 = R.shake;
-R.shake = function (a) { this._punch = Math.min(1, (this._punch || 0) + a*1.6); return shake0.call(this, a); };
+R.shake = function (a) { this._punch = Math.min(1, (this._punch || 0) + a*1.6); this._trauma = Math.min(1.8, (this._trauma || 0) + a*0.5); return shake0.call(this, a); };
+// a real blow, by how much speed it took off you (metres a second) and where it landed. The camera is a thing with
+// weight: what it's following stops and it carries on towards what was hit, dips, and is hauled back, overshooting
+// once; and it rattles, hard at first and dying away over a second. A tap is a tap; a wall at speed throws the view.
+R.impact = function (dv, x, z) {
+  const k = Math.min(1.8, dv/10), Kn = this._kn || (this._kn = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, sx: 0, sz: 0 });
+  this._trauma = Math.min(1.8, (this._trauma || 0) + k);
+  this._punch = Math.min(1.4, (this._punch || 0) + k);
+  let dx = Math.cos(this.yaw || 0), dz = Math.sin(this.yaw || 0);
+  if (x !== undefined && z !== undefined) { const ex = x - Kn.sx, ez = z - Kn.sz, e = Math.hypot(ex, ez); if (e > 0.05 && e < 12) { dx = ex/e; dz = ez/e; } }
+  const j = Math.min(dv, 30)*0.3;
+  Kn.vx += dx*j; Kn.vz += dz*j; Kn.vy -= Math.min(dv, 30)*0.09;
+};
+const K0 = { x: 0, y: 0, z: 0 };
+function knock(R_, dt, p) {
+  const Kn = R_._kn; if (!Kn) { R_._kn = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, sx: p.x, sz: p.z }; return K0; }
+  Kn.sx = p.x; Kn.sz = p.z;
+  if (Math.abs(Kn.x) + Math.abs(Kn.y) + Math.abs(Kn.z) + Math.abs(Kn.vx) + Math.abs(Kn.vy) + Math.abs(Kn.vz) < 1e-4) return K0;
+  const w = 12, z = 0.42, n = Math.max(1, Math.ceil(dt/0.008)), h = dt/n;
+  for (let i = 0; i < n; i++) { Kn.vx += (-w*w*Kn.x - 2*z*w*Kn.vx)*h; Kn.vy += (-w*w*Kn.y - 2*z*w*Kn.vy)*h; Kn.vz += (-w*w*Kn.z - 2*z*w*Kn.vz)*h; Kn.x += Kn.vx*h; Kn.y += Kn.vy*h; Kn.z += Kn.vz*h; }
+  return Kn;
+}
 R.applyShake = function (dt) {
-  const cam = this.cam, a = this.shakeAmp;
+  const cam = this.cam, tr = this._trauma || 0, a = this.shakeAmp + tr;
   if (a > 0.001) {
-    const t = this._st = (this._st || 0) + dt, n = (f, o) => Math.sin(t*f + o)*0.6 + Math.sin(t*f*2.3 + o*1.7)*0.4;
-    cam.position.x += n(31, 0)*a*0.11; cam.position.y += n(37, 2)*a*0.11;
-    cam.rotateZ(n(27, 4)*a*0.03); cam.rotateX(n(23, 5)*a*0.012);
-    this.shakeAmp *= Math.exp(-dt*5);
+    // (the rattle is quick and tight straight after the blow and loosens as it dies)
+    const t = this._st = (this._st || 0) + dt*(1 + Math.min(1, tr)*0.6), n = (f, o) => Math.sin(t*f + o)*0.6 + Math.sin(t*f*2.3 + o*1.7)*0.4, e = a*(0.55 + 0.45*Math.min(1.8, a));
+    cam.position.x += n(31, 0)*e*0.1; cam.position.y += n(37, 2)*e*0.1; cam.position.z += n(29, 1)*e*0.06;
+    cam.rotateZ(n(27, 4)*e*0.034); cam.rotateX(n(23, 5)*e*0.018); cam.rotateY(n(19, 3)*e*0.012);
+    this.shakeAmp *= Math.exp(-dt*5); this._trauma = tr*Math.exp(-dt*3.4);
   }
   // a few drinks in: the world sways gently
   if (this.drunk > 0.05) {
@@ -149,7 +179,7 @@ R.update = function (dt, p) {
   if (!this._pl) { this._pl = true; const v = load(); this.mode = v.drive === 2 ? 2 : 0; this.footFP = !!v.foot; }
   const k = kind(this, p), cam = this.cam;
   let r;
-  if (own(k)) { r = upd.call(this, dt, p); if (this._tp) this._tp.live = false; }
+  if (own(k)) { r = upd.call(this, dt, p); if (this._tp) this._tp.live = false; if (p.human) p.human._nearK = 1; }
   else { if (p.human && p.onFoot) p.human._fp = false; if (this._fpWas) { this._fpWas = false; this.footPitch = clamp(this.footPitch, -0.25, 0.9); } r = third(this, dt, p, k); }
   // to your own eyes or the driver's seat and back, the camera travels there (a short, quick move in and out)
   const B = this._bl || (this._bl = { t: 1, dur: 1, has: false, kind: '', p: new THREE.Vector3(), q: new THREE.Quaternion(), f: 60, lp: new THREE.Vector3(), lq: new THREE.Quaternion(), lf: 60 });
@@ -196,6 +226,8 @@ R.updateFoot = function (dt, p) {
   const e = this._eo, fw = 0.11;
   const ex = e ? p.x + e.x + cy*fw : p.x + cy*0.16, ez = e ? p.z + e.z + sy*fw : p.z + sy*0.16, ey = e ? hy + e.y + 0.08 : (p.y || 0) + (p.crouch ? 1.05 : 1.62) + bob;
   this.pos.set(ex, ey, ez); cam.position.copy(this.pos); cam.up.set(0, 1, 0);
+  if (H) H._nearK = 1;
+  { const Kn = knock(this, dt, p); cam.position.y += Kn.y*0.5; }
   const cp = Math.cos(pitch);
   this.look.set(ex + cy*cp, ey - Math.sin(pitch), ez + sy*cp); cam.lookAt(this.look);
   this.setFov(dt, 66 + Math.min(Math.abs(p.v), 27.8)*0.6);

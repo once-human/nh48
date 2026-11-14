@@ -429,6 +429,9 @@ const PATCHES = {
     ["edge(3, 'KeyV');", "edge(3, 'KeyC');"],
   ],
   [S('game/game.js')]: [
+    ["this.rig.shake(Math.min(0.5, ev.speed * 0.06));", "this.rig.impact(ev.speed, ev.x, ev.z);"],
+    ["this.audio.thud(0.6); this.rig.shake(0.4); this.hud.toast('Knocked down'", "this.audio.thud(0.6); this.rig.impact(Math.max(5, (ev.speed || 4) * 1.4)); this.hud.toast('Knocked down'"],
+    ["this.rig.shake(ev.sev === 'knock' ? 0.15 : 0.35);", "this.rig.impact(ev.sev === 'knock' ? 2.5 : 6);"],
     // Everyone else runs in real time too. The traffic, the people and the animals were moved on by a twentieth of a
     // second a frame at most, while what you drive never was: under twenty frames a second the whole street slowed
     // down and you went through it like the only thing at full speed. A long frame is worked out in as many steps of
@@ -445,7 +448,7 @@ const PATCHES = {
     ["    o.argue = 22; o.v = 0;\n    this.later(1.4, () => {", "    o.argue = 22;\n    const go = () => {"],
     ["        this.later(12, () => { if (o.argue > 0) { if (this.people.list.includes(p)) this.people.remove(p); o.argue = 0; } });\n      });\n    });\n  }", "        this.later(12, () => { if (o.argue > 0) { if (this.people.list.includes(p)) this.people.remove(p); o.argue = 0; } });\n      });\n    };\n    const wait = (n) => this.later(n ? 0.2 : 0.8, () => { if (Math.abs(o.v || 0) > 0.3 && n < 50) wait(n + 1); else go(); });\n    wait(0);\n  }"],
     // (the blow itself is beta/people/runover.js: not a wall any more)
-    ["v.v = 0; v.vl = 0; this.rig.shake(Math.min(0.9, ev.speed * 0.08)); this.audio.crash(1);\n        knock(v, ev.speed + 2, 0.012);", "this.rig.shake(Math.min(0.9, ev.speed * 0.05)); this.audio.crash(Math.min(1, 0.3 + ev.speed * 0.03));"],
+    ["v.v = 0; v.vl = 0; this.rig.shake(Math.min(0.9, ev.speed * 0.08)); this.audio.crash(1);\n        knock(v, ev.speed + 2, 0.012);", "this.rig.impact(ev.speed * 1.15, ev.x, ev.z); this.audio.crash(Math.min(1, 0.3 + ev.speed * 0.03));"],
     ["kmh > 25 ? 'She\u2019s hurt, your vehicle\u2019s wrecked, and a crowd is forming fast' : 'She barely moved. Your bumper did. Everyone is staring'", "ev.how === 'dead' ? 'She\u2019s dead, your front\u2019s gone, and a crowd is forming fast' : ev.how === 'down' ? 'She\u2019s down, your front\u2019s gone, and a crowd is forming fast' : 'She\u2019s hurt. So is your bumper. Everyone is staring'"],
     // Enter on "Quit to title" is one key press, and it went on to the title screen, where Enter starts the story: you left
     // free roam and were straight into story mode. The title only listens to a fresh press, a moment after it's up.
