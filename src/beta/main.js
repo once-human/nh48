@@ -512,7 +512,12 @@ async function main() {
   }
   function frame1(now) {
     const t0 = performance.now();
-    let dt = Math.min(0.1, (now - last) / 1000);
+    // The world runs in real time whatever the frame rate. A frame that took a fifth of a second moves everything on by a
+    // fifth of a second (worked out in pieces of a tenth at most, below, so nothing takes one great stride). It used to
+    // count for a tenth and no more: on a PC drawing five or eight frames a second the whole city ran at half speed,
+    // people, traffic, fire and falls, which is a slower game for a slower PC. Fewer frames, never a slower world.
+    // (Past 0.4 s it's a freeze, a street arriving: that isn't caught up)
+    let dt = Math.min(0.4, (now - last) / 1000);
     last = now;
     // the step of time each frame is the average of the last six frames' real lengths. A frame's own length is only
     // known once it's over, so stepping by the one before went wrong exactly when frames come short, long, short, long
@@ -521,21 +526,24 @@ async function main() {
     // is spread over six frames, not thrown into one. Every millisecond is still counted once: nothing drifts from the clock
     dtH[dtI = (dtI + 1)%6] = dt; dt = (dtH[0] + dtH[1] + dtH[2] + dtH[3] + dtH[4] + dtH[5])/6;
     // the world in slow motion (the phone out: 1/60th speed, everything still moving); UI keeps real time
-    game.realDt = dt;
+    const real = dt;
     if (game.timeWarp && game.timeWarp !== 1) dt *= game.timeWarp;
     if (TEST) dt = 1 / 30;
     renderer.info.reset();
-    // tests can simulate several frames per rendered frame (?simx=4), software GL is slow
-    const simx = TEST ? Math.max(1, parseInt(params.get('simx') || '1')) : 1;
+    // tests can simulate several frames per rendered frame (?simx=4), software GL is slow.
+    // A long frame is the game worked out more than once, a tenth of a second or less each time
+    const simx = TEST ? Math.max(1, parseInt(params.get('simx') || '1')) : Math.max(1, Math.ceil(real / 0.1 - 1e-6));
+    const dp = TEST ? dt : dt / simx;
+    game.realDt = TEST ? real : real / simx;
     let simDone = false;
     for (let k = 0; k < simx; k++) {
       // simulate exactly this frame's time, in equal sub-steps no longer than 1/60 s: a fixed 1/60 step
       // against a display that doesn't tick at exactly 60 Hz gives some frames no step and some two,
       // which reads as jitter at speed
-      const nsub = Math.min(10, Math.max(1, Math.ceil(dt / STEP - 1e-3))), h = dt / nsub;
+      const nsub = Math.min(10, Math.max(1, Math.ceil(dp / STEP - 1e-3))), h = dp / nsub;
       for (let s = 0; s < nsub; s++) game.fixed(h);
-      game.frame(dt);
-      if (k < simx - 1) { frames++; if (game.testDone(frames)) { simDone = true; break; } }
+      game.frame(dp);
+      if (TEST && k < simx - 1) { frames++; if (game.testDone(frames)) { simDone = true; break; } }
     }
     U.uTime.value += dt;
     const focus = game.focus();
