@@ -9,6 +9,7 @@
 import { Audio } from '@orig/game/audio.js';
 import { specOf } from '@orig/vehicles/vehicle.js';
 import { baseOf } from '../vehicles/models.js';
+import { modsOf } from '@orig/vehicles/mods.js';
 // The audio thread has to read every sound's settings, and it can't wait: if the game's in the middle of changing one, it plays
 // that moment of the sound with the setting's default instead, which is a click or a hole in the sound. Every engine, tyre and
 // wind sound was changing a handful of settings on every frame, and more at high speed, with less time to spare. So a setting
@@ -113,6 +114,7 @@ const PROC = `class NhEngine extends AudioWorkletProcessor {
         const idle = Math.max(0, 1 - (rpm - c.idle)/(c.idle*1.5)), irr = c.irr*(0.35 + 0.65*idle) + 0.012;
         let a = c.amp[this.k % c.amp.length]*(1 + (this.rnd() - 0.5)*2*irr)*(0.55 + 0.45*load + 0.2*rpm/c.red);
         if (c.miss && this.rnd() < c.miss*(0.25 + 0.75*idle)) a *= 0.2;     // (a tired one that doesn't quite catch)
+        if (c.lim && rpm > c.red*0.985 && load > 0.4 && this.rnd() < 0.55) { a *= 0.08; if (c.crk) this.ck = Math.max(this.ck, 0.4*(c.pop || 1)); }     // (the limiter cutting the fuel: it stutters on the redline, and a loud pipe pops)
         this.rt += a; if (this.k === 0) this.tk = 1;
         this.env += a; this.kn += c.knock*a*(0.5 + 0.5*load);
         this.k++; if (this.k >= n) { this.k = 0; this.ph -= 1; this.nx -= 1; }
@@ -130,7 +132,7 @@ const PROC = `class NhEngine extends AudioWorkletProcessor {
       if (c.rattle) { if (--this.hc <= 0) { this.hc = sr/(560 + this.rnd()*420); this.hn = this.rnd()*2 - 1; } ex += c.rattle*this.res*Math.min(1.5, this.rt)*this.hn; this.rt *= 0.9965; }
       if (c.whine) { this.wh += rpm/60*c.whR/sr; if (this.wh > 1) this.wh -= 1; ex += c.whine*(0.2 + 0.8*load)*Math.min(1, rr*1.6)*Math.sin(6.2832*this.wh); }
       if (c.roar) { const f = 6.2832*c.roarF/sr; this.rl += ((this.rnd()*2 - 1) - this.rl)*f; this.rb += (this.rl - this.rb)*f*0.45; ex += c.roar*load*load*(0.25 + 0.75*rr)*(this.rl - this.rb)*(0.55 + 0.45*Math.min(1, this.env)); }
-      if (c.crk) { if (load < 0.08 && rr > 0.45 && this.rnd() < c.crk/sr) this.ck = 0.6 + this.rnd()*0.8; if (this.ck > 0.001) { ex += this.ck*(this.rnd()*2 - 1)*0.5; this.ck *= 0.992; } }
+      if (c.crk) { if (load < 0.08 && rr > 0.45 && this.rnd() < c.crk/sr) this.ck = (0.6 + this.rnd()*0.8)*(c.pop || 1); if (this.ck > 0.001) { ex += this.ck*(this.rnd()*2 - 1)*0.5; this.ck *= 0.992; } }
       o[i] = out*c.g/(0.4 + rpm/120*n*c.dec*1.6) + ex;
     }
     return true;
@@ -206,11 +208,25 @@ function wvoice(A, dest) {
   eng.connect(pre).connect(shaper).connect(lp).connect(f1).connect(f2).connect(out).connect(dest);
   return { w: true, eng, pre, rpm: eng.parameters.get('rpm'), load: eng.parameters.get('load'), shaper, lp, f1, f2, out, cls: null };
 }
-function tune(A, V, k, seed = 0) {
+// the pipe that's fitted (the garage's exhaust): vol and lp scale the loudness and the muffler's cut-off, the rest the
+// firing itself. A sports pipe is freer, louder and brighter and crackles when you lift; a dhak-dhak silencer is all but
+// open, a deep hollow thump on every firing and pops on the overrun; a flame-spitter is tuned rich, so it bangs and
+// crackles every time you come off the throttle
+const EXH = {
+  sport: { vol: 1.4, lp: 1.3, g: 1.1, fb: 1.06, damp: 0.85, nz: 1.15, crk: 5, pop: 0.8 },
+  dhak: { vol: 2.1, lp: 0.72, g: 1.35, fb: 1.18, damp: 0.6, pipe: 1.45, dec: 1.35, nz: 0.8, crk: 7, pop: 1.3 },
+  flame: { vol: 1.8, lp: 1.45, g: 1.15, fb: 1.08, damp: 0.8, nz: 1.25, crk: 24, pop: 1.7 },
+};
+function piped(P, e) {
+  const X = EXH[e]; if (!X) return P;
+  const fb = Math.min(0.85, P.fb*X.fb);
+  return { ...P, g: P.g*X.g, fb, damp: P.damp*X.damp, nz: Math.min(0.5, P.nz*X.nz), pipe: P.pipe*(X.pipe || 1), dec: P.dec*(X.dec || 1), crk: Math.max(P.crk || 0, X.crk), pop: X.pop };
+}
+function tune(A, V, k, seed = 0, ex = '') {
   const Q = self(k, seed);
-  if (V.cls === Q.key) return Q;
-  V.cls = Q.key; const C = CLS[k], t = A.ctx.currentTime;
-  if (V.w) V.eng.port.postMessage({ ...Q.pulse, idle: C.idle*Q.idle, red: C.red });
+  if (V.cls === Q.key + ex) return Q;
+  V.cls = Q.key + ex; const C = CLS[k], t = A.ctx.currentTime;
+  if (V.w) V.eng.port.postMessage({ ...piped(Q.pulse, ex), idle: C.idle*Q.idle, red: C.red, lim: C.cvt || /^diesel/.test(k) ? 0 : 1 });
   else V.osc.setPeriodicWave(waveFor(A.ctx, C));
   const dr = V.w ? 1 + (C.drive - 1)*0.5 : C.drive;
   const c = new Float32Array(512); for (let i = 0; i < 512; i++) { const x = i/256 - 1; c[i] = Math.tanh(x*dr)/Math.tanh(dr); }
@@ -221,15 +237,15 @@ function tune(A, V, k, seed = 0) {
   return Q;
 }
 // set a voice going: r 0..1 of the way from idle to redline, load 0..1 (the throttle, how hard it's pulling), gain
-function drive(A, V, k, r, load, gain, seed = 0) {
-  const C = CLS[k], t = A.ctx.currentTime, rate = A.rateMul || 1, loud = (A.engLoud || 1)*(A.modeVol || 1);
+function drive(A, V, k, r, load, gain, seed = 0, ex = '') {
+  const C = CLS[k], t = A.ctx.currentTime, rate = A.rateMul || 1, X = EXH[ex], loud = (A.engLoud || 1)*(A.modeVol || 1)*(X ? X.vol : 1), lpX = X ? X.lp : 1;
   if (V.w && V.idle) { V.idle = false; clearTimeout(V.napT); V.eng.port.postMessage({ z: 0 }); }
-  const Q = tune(A, V, k, seed) || self(k, seed), idle = C.idle*Q.idle;
+  const Q = tune(A, V, k, seed, ex) || self(k, seed), idle = C.idle*Q.idle;
   const rpm = idle + (C.red - idle)*Math.max(0, Math.min(1.08, r));
   if (V.w) {
     // (the worklet smooths both itself; here only where they're headed)
     V.rpm.setTargetAtTime(rpm*rate, t, 0.04); V.load.setTargetAtTime(load, t, 0.08);
-    V.lp.frequency.setTargetAtTime((C.lp[0] + C.lp[1]*(0.35*r + 0.65*load*(0.4 + r)))*(loud > 1 ? 0.8 : 1), t, 0.12);
+    V.lp.frequency.setTargetAtTime((C.lp[0] + C.lp[1]*(0.35*r + 0.65*load*(0.4 + r)))*((A.engLoud || 1)*(A.modeVol || 1) > 1 ? 0.8 : 1)*lpX, t, 0.12);
     V.out.gain.setTargetAtTime(gain*C.vol*1.25*(0.6 + 0.25*r + 0.3*load)*(C.swell ? 0.55 + C.swell*load*(0.5 + r) : 1)*loud, t, 0.12);
     return;
   }
@@ -299,7 +315,8 @@ Audio.prototype.updateEngine = function (rpm, throttle, running, kind = 'auto') 
   // a scooter's belt: open the throttle and the revs go up and stay there while the speed catches up
   let r = Math.max(0, Math.min(1.1, rpm || 0));
   if (C.cvt) { const sp = Math.min(1, Math.abs(v.v || 0)/((v.spec && v.spec.vTop) || 20)); r = throttle > 0.1 ? Math.max(r, 0.45 + 0.4*sp + 0.1*throttle) : Math.min(r, 0.1 + sp*0.5); }
-  drive(this, this._pe, k, r, Math.max(0, Math.min(1, throttle)), 1.6, seedOf(v));
+  let ex = ''; try { ex = (modsOf(G, v) || {}).exhaust || ''; } catch (e) { /* stock */ }
+  drive(this, this._pe, k, r, Math.max(0, Math.min(1, throttle)), 1.6, seedOf(v), ex);
 };
 
 // ---------------------------------------------------------------- everyone else's: the nearest few, each where it is
