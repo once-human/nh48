@@ -16,7 +16,8 @@ function stateOf(v) {
   // a police jeep, an ambulance: someone's driving it, and it brakes like the traffic does
   if (!driven && v.service) return v._lampSvc || (v._lampSvc = [0, 0]);
   if (!driven) return v._lampHeld || (v._lampHeld = [-1, 0]);
-  const brk = (v.brake || 0) > 0.1 && !v.reverse || (Math.abs(v.v || 0) < 0.3 && (v.brake || 0) > 0.05) ? 1 : 0;
+  // (the brakes: your foot on them going forward; rolling backward, the pedal that stops you; stood still with a foot on it)
+  const brk = (v.brake || 0) > 0.1 && !v.reverse || ((v.throttle || 0) > 0.1 && (v.v || 0) < -0.4) || (Math.abs(v.v || 0) < 0.3 && (v.brake || 0) > 0.05) ? 1 : 0;
   return [brk, v.reverse ? 1 : 0];
 }
 function hook(mesh, v) {

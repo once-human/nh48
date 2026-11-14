@@ -112,9 +112,10 @@ void main(){
     float k = .25 + uNight*3.;
     bool rear = vL.x < 0.;
     bool amber = vC.r > .8 && vC.g > .1 && vC.g < .6 && vC.b < .12;      // (the models' amber is (1, .26, 0), the bus's a touch redder; red's green is ~0)
-    if (rear && vG > .45 && vC.r > .5 && vC.g < .3 && vC.b < .3) k = vLp.x < -.5 ? 0. : uNight*.3 + max(vLp.x, 0.)*(2.2 + uNight*2.4) + max(vLp.y, 0.)*(.5 + uNight*.6);
+    bool rd = rear && vG > .45 && vC.r > .5 && vC.g < .3 && vC.b < .3;
+    if (rd) k = vLp.x < -.5 ? 0. : uNight*.45 + max(vLp.x, 0.)*(1.5 + uNight*1.1);
     else if (rear && vG > .1 && vG < .2 && vC.r > .8 && vC.g > .8 && vC.b > .75) k = max(vLp.y, 0.)*(9. + uNight*12.);
-    else if (rear && amber) k = vLp.x < -.5 ? 0. : uNight*1.3;     // (amber at the back: on with the lights, steady, and the brakes have nothing to do with it)
+    else if (amber) k = 0.;     // (amber is the indicators, front and back: dark until they blink. They used to burn steadily with the lights)
     // the indicators (yours: beta/vehicles/details.js): every amber lamp on that side, front, back and the repeater on
     // the wing, on with the blink and dark between, whatever it was doing before (uInd: left, right, the blink)
     // the traffic's own indicators (beta/vehicles/lamps.js: aLamp.y -1 left, -2 right)
@@ -125,7 +126,8 @@ void main(){
     // the lamps at the front are on when the driver has them on (uHd.x, 0 to 1 as they come up; nobody in it: dark). The
     // one you're driving (uHd.y) shows lit by day too when you've switched it on, as a real lamp does
     if (!rear && !amber) k = vLp.x < -.5 ? 0. : mix(k, max(k, 2.2), uHd.y)*uHd.x;
-    c += vC*vG*k;
+    // (a tail lamp is a deep red however bright: its own tint scaled up went pink)
+    c += (rd ? vec3(1., .015, .008) : vC)*vG*k;
   }
   float f = fogDensity*vZ, mir = matte > .5 ? 0. : (glassy*.72 + painted*(.3 - .22*grime) + (1. - painted)*(1. - glassy)*.18); gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1. - clamp(mir, 0., .95)); }`;
 // glass: dark with the sky across it, a brushed streak, someone's shape behind it left to the imagination
