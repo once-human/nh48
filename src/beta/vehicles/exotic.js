@@ -4,7 +4,12 @@
 import * as THREE from 'three';
 import { Vehicle } from '@orig/vehicles/vehicle.js';
 
-const PORTS = { super: [0.4, 0.5, -2.31], sports: [0.14, 0.42, -2.3] };
+// each pipe's mouth in the vehicle's own space ([across, up, along]); a fourth value: one pipe, on that side, not a pair.
+// The two big bikes as well: the superbike's short can on the right, the Bullet's long silencer. A stock Bullet mostly
+// pops on the overrun, and only now and then shows a little flame; a superbike in its Sport mode crackles, in Road hardly,
+// in Rain never
+const PORTS = { super: [0.4, 0.5, -2.31], sports: [0.14, 0.42, -2.3], superbike: [0.2, 0.563, -0.64, 1], bullet: [0.21, 0.465, -0.87, 1] };
+const TAME = { sports: 0.55, superbike: 0.7, bullet: 0.22 };
 // The flames are what a real car's are: afterfire. Fuel that didn't burn in the engine lights in the hot pipe when you
 // lift off at high revs, on a shift, off the line. It's a short tongue from the pipe, a hand to a forearm long, that
 // stays ON the pipe (it's gas leaving at speed and burnt out within a tenth of a second, not smoke left hanging in the
@@ -117,7 +122,8 @@ Vehicle.prototype.update = function (dt, inp, traffic) {
   const lift = (this._thr0 ?? 0) > 0.7 && thr < 0.15;
   // a run of bangs: close together, each smaller than the one before; show: how many of them show fire; a 911 does it
   // a good deal less than a Lamborghini
-  const tame = this.type === 'sports' ? 0.55 : 1;
+  const tame = TAME[this.type] ?? 1;
+  if (this.modePops === 0) { this._thr0 = thr; return r; }
   const go = (t, n, show, z0 = 1) => { let z = z0*F.size*tame*(0.85 + Math.random()*0.3); for (; n > 0; n--) { F.q.push({ t, z, flame: Math.random() < show*tame, hot: Math.random() < (wild ? 0.5 : 0.2)*F.work ? 1 : 0 }); t += 0.045 + Math.random()*0.1; z *= 0.72 + Math.random()*0.2; } };
   if (lift && !F.q.length) {
     F.over = true;
@@ -138,8 +144,8 @@ Vehicle.prototype.update = function (dt, inp, traffic) {
   if (F.on > 0) {
     F.on -= dt; F.em += dt*(300 + F.big*200);
     const Pl = poolOf(G);
-    while (F.em >= 1) { F.em -= 1; for (const s2 of [-1, 1]) if (s2 < 0 || F.on > (F.lag || 0)) puff(Pl, this, P, s2, F.big, F.hot); }
-    for (; F.spk > 0; F.spk--) puff(Pl, this, P, Math.random() < 0.5 ? -1 : 1, F.big, 0, true);
+    while (F.em >= 1) { F.em -= 1; for (const s2 of P[3] ? [P[3]] : [-1, 1]) if (s2 < 0 || P[3] || F.on > (F.lag || 0)) puff(Pl, this, P, s2, F.big, F.hot); }
+    for (; F.spk > 0; F.spk--) puff(Pl, this, P, P[3] || (Math.random() < 0.5 ? -1 : 1), F.big, 0, true);
     Pl.live = Math.max(Pl.live, 1);
   }
   return r;
