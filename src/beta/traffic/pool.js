@@ -23,6 +23,6 @@ Traffic.prototype.despawn = function (i) {
   if (!v) return;
   unGrid(this, v);
   for (const k of Object.keys(v)) if (k[0] === '_') delete v[k];
-  v.hideBody = false; v._sh = null; v._hit = null; v._hitT = 0; v.argue = 0; v.wreck = false; v.dmg = 0; v.fallen = 0; v.roll = 0; v.pitch = 0; v.angry = 0;
+  v.hideBody = false; v._sh = null; v._hit = null; v._hitT = 0; v.argue = 0; v.wreck = false; v.dmg = 0; v.fallen = 0; v.roll = 0; v.pitch = 0; v.angry = 0; v.ire = 0; v.temper = null; v.temperGo = 0; v.backT = 0;
   v.drv = null; v.pre = null;
 };

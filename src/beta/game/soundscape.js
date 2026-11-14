@@ -86,24 +86,25 @@ export function soundscape(G) {
     }, 7);
   }
 
-  // ---------------------------------------------------------------- horns: only where the traffic's stuck
+  // ---------------------------------------------------------------- horns: this is Pune. Held up, they hoot
   function honks() {
     const T = G.traffic, A_ = A(), Pl = G.player; if (!T || !A_ || !Pl) return;
-    const now = performance.now();
-    for (const h of T.honks) {
-      const d = Math.hypot(h.x - Pl.x, h.z - Pl.z); if (d > 70) continue;
-      // a jam is a lot of vehicles close together, barely moving
-      // (a red light isn't a jam: it takes a lot of vehicles, packed and crawling)
-      let slow = 0; for (const o of T.list) if (Math.abs(o.x - h.x) < 20 && Math.abs(o.z - h.z) < 20 && Math.abs(o.v || 0) < 2) slow++;
-      const jam = slow >= 9;
-      // in a jam, a horn every few seconds somewhere near; on a moving road, now and then (about one a minute)
-      if (now - (G._hornT || 0) < (jam ? 3500 : 25000)) continue;
-      if (Math.random() > (jam ? 0.5 : 0.25)) continue;
+    const now = performance.now(), L = T.honks;
+    for (const h of L) h.d = Math.hypot(h.x - Pl.x, h.z - Pl.z);
+    if (L.length > 1) L.sort((a, b) => a.d - b.d);                  // (the horn right behind you is the one you hear)
+    for (const h of L) {
+      if (h.d > 90) continue;
+      // how soon after the last horn the next may sound. Hooting at you: at once. Made to brake: at once. A jam: horn
+      // after horn, a beat apart (many horns, not one wall of noise), fewer the further off. Waiting at a red light or
+      // rolling along: now and then
+      const why = h.why || 'idle', gap = why === 'you' ? 150 : why === 'brake' ? 320 : why === 'jam' ? 420 + h.d*7 : why === 'red' ? 2600 : 9000;
+      if (now - (G._hornT || 0) < gap) continue;
+      if (why === 'idle' && Math.random() > 0.35) continue;
       G._hornT = now;
-      A_.at(h.x, h.z, () => A_.horn(h.kind, jam ? 0.5 : 0.4, 0, Math.min(h.n || 1, jam ? 2 : 1)));
+      A_.at(h.x, h.z, () => A_.horn(h.kind, why === 'you' ? 0.62 : why === 'brake' ? 0.55 : 0.46, 0, Math.min(h.n || 1, 6)));
       break;
     }
-    T.honks.length = 0;
+    L.length = 0;
   }
   // ---------------------------------------------------------------- the mix: easier on the ears for hours
   function mix(a) {

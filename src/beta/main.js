@@ -51,6 +51,7 @@ import './traffic/rates.js';
 import './traffic/spacing.js';
 import './traffic/steer.js';
 import './traffic/topple.js';
+import './traffic/temper.js';
 import './traffic/pool.js';           // a vehicle the traffic lets go is wiped before it's handed out again
 import './game/prompt2.js';
 import './game/ask.js';           // what people tell you: the way, food, where you are, a lift
