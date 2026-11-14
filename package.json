@@ -1,9 +1,9 @@
 {
   "name": "nh48",
-  "version": "1.0.0",
+  "version": "2.15.2",
   "private": true,
   "type": "module",
-  "description": "NH48: Pune — open-world driving game",
+  "description": "NH48: Pune \u2014 open-world driving game",
   "dependencies": {
     "@dgreenheck/ez-tree": "^1.1.0",
     "@fontsource-variable/archivo": "^5.3.0",
@@ -21,5 +21,10 @@
     "postprocessing": "^6.39.5",
     "puppeteer-core": "^25.14.0",
     "three": "^0.186.1"
+  },
+  "changes": {
+    "at": "fcda26e19200128ea2a7fdbe098ba6d66b828e25",
+    "version": "2.15.2",
+    "count": 705
   }
 }

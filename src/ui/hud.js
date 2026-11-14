@@ -480,7 +480,7 @@ export class HUD {
     p.querySelector('#p-ch-pay').onclick = () => { if (this.game.police) this.game.police.payDues(); this.syncPause(); };
     // which build this is, and whether there's a newer one up
     const mf = (() => { try { return JSON.parse(document.getElementById('manifest').textContent); } catch (e) { return {}; } })(), built = mf.__built || '';
-    const ver = 'v' + (mf.__ver || '0') + (mf.__sha ? ' (' + mf.__sha + ')' : '');
+    const ver = 'v' + (mf.__ver || '0') + (mf.__num ? ' · change ' + mf.__num : '') + (mf.__sha ? ' (' + mf.__sha + ')' : '');
     p.querySelector('#p-ver').textContent = !built ? ver + ' · local build' : ver + ' · ' + new Date(built).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
     p.querySelector('#p-upd').onclick = async (e) => {
       const b = e.currentTarget; if (b.dataset.ready) { location.reload(); return; }
