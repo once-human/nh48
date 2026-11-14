@@ -112,6 +112,13 @@ function third(R_, dt, p, k) {
   S.roll = dmp(S.roll, veh ? cl(-S.yr*sp*0.0013, -0.035, 0.035) : 0, 3, dt);
   if (Math.abs(S.roll) > 1e-4) cam.rotateZ(S.roll);
   if (veh && sp > 24) { S.ph += dt*(26 + sp*0.35); const a = Math.min(0.011, (sp - 24)*0.0004); cam.position.y += Math.sin(S.ph)*Math.sin(S.ph*0.37 + 1)*a; cam.position.x += Math.sin(S.ph*0.71 + 2)*a*0.5*sy; cam.position.z -= Math.sin(S.ph*0.71 + 2)*a*0.5*cy; }
+  // the engine comes through the car to the camera: a faint tremble at idle that grows as it's worked (revs with your
+  // foot in it), and in a knock the view nods forward and comes back
+  if (veh) {
+    const V = p.cur, rpm = (V && V.rpm) || 0, thr = (V && V.throttle) || 0;
+    if (rpm > 0.03) { S.ev = (S.ev || 0) + dt*(55 + rpm*95); const a = 0.0011 + 0.0042*thr*rpm; cam.position.y += Math.sin(S.ev)*a; cam.position.x += Math.sin(S.ev*1.31 + 1)*a*0.6*sy; cam.position.z -= Math.sin(S.ev*1.31 + 1)*a*0.6*cy; cam.rotateZ(Math.sin(S.ev*0.83 + 2)*a*0.22); }
+  }
+  if (R_._punch > 0.004) cam.rotateX(-R_._punch*0.03);
   // on foot and standing, the camera is in someone's hands: it's never quite dead still
   if (!veh && sp < 1.5) { S.hh += dt; const a = 1 - sp/1.5; cam.rotateY(Math.sin(S.hh*1.45)*0.0022*a); cam.rotateX(Math.sin(S.hh*1.93 + 1)*0.0016*a); }
   R_.setFov(dt, q[8]);
