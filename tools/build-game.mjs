@@ -50,6 +50,11 @@ const SWAPS = [
 ];
 // a line in a game file swapped as it's bundled: only for what a module swap can't reach. Fails the build if the line has moved
 const PATCHES = {
+  // (a map with no flyovers has no piers either: the lookup was only made when there were decks to build, and anything
+  // driving on such a map asked it for piers and failed)
+  [S('world/flyover.js')]: [
+    ["    this.piers = [];\n    if (this.decks.length) this.build(scene, W.mats);", "    this.piers = []; this.pgrid = new Map();\n    if (this.decks.length) this.build(scene, W.mats);"],
+  ],
   // the tyres' squeal is one continuous sound now (beta/game/dash.js), not a burst every few frames
   [S('game/modfx.js')]: [["if (this.edge('KeyU') && v.dj) this.music(!this.djOn);", ""], ["if ((this._sqT = (this._sqT || 0) - 1 / 60) <= 0) { this._sqT = 0.09; G.audio.noiseBurst?.(0.12, 2400 + Math.random() * 600, 6, Math.min(0.22, ev.amount * 0.03)); }", ""]],
   // a postcard is a second full render and a stop-the-world read of its pixels: taken only when you're not moving fast, never mid-drive

@@ -591,6 +591,7 @@ export function freeTerminal(G) {
     if (term.open) { if (e.target !== term.input) { term.input.focus(); } return; }
     if (e.repeat) return;
     if (e.code === 'Space' && P().onFoot && !St.fly) { const t = performance.now(); if (t - (St.spaceT || 0) < 300) { St.spaceT = 0; setFlight(!St.flight || St.flight.landing); } else St.spaceT = t; }
+    if (G.driveMode) return;                                 // (Long Drive has no terminal: the car's changed from the menu)
     if (e.code === 'Slash' || e.code === 'Backquote') { e.preventDefault(); e.stopImmediatePropagation(); term.show(); return; }
     if (binds[e.code]) { e.preventDefault(); e.stopImmediatePropagation(); sh.exec(binds[e.code], true); }
   }, true);

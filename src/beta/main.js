@@ -138,6 +138,9 @@ import { trackBodies } from './draw/skin.js';
 import { Graphics, bootTier } from './game/graphics.js';
 import { view } from './world/view.js';
 import { Pace } from './game/pace.js';
+import { DRIVE, longDrive, driveButton } from './drive/longdrive.js';
+import { emptyMap, countryWorld } from './drive/country.js';
+import { quiet } from './drive/strip.js';
 
 // The streamer, taught two things about the painted city (when it builds, never what):
 //  - when it builds everything at once (loading screens, arriving somewhere) the buildings are drawn right there,
@@ -303,7 +306,9 @@ async function main() {
   let manifest = {};
   try { manifest = JSON.parse(document.getElementById('manifest').textContent); } catch (e) { /* dev */ }
   const loader = new Loader((f) => { shownF = Math.max(shownF, f * 0.6); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
-  if (!params.has('city') && manifest['assets/pune/base.json.gz']) PUNE = true;
+  // (Long Drive: none of Pune, and no animals)
+  if (DRIVE) { delete ASSETS.map; ASSETS.animals = {}; }
+  else if (!params.has('city') && manifest['assets/pune/base.json.gz']) PUNE = true;
   if (PUNE) ASSETS.map = 'assets/pune/base.json.gz';
   for (const v of Object.values(ASSETS)) for (const u of typeof v === 'string' ? [v] : Object.values(v)) loader.expect(u, manifest[u] || 1e6);
   const sndUrl = (n) => `assets/snd/${n}.mp3`;
@@ -325,7 +330,7 @@ async function main() {
     const [w, h] = new Uint32Array(u.buffer, 0, 2); return { w, h, data: u.subarray(8) };
   }).catch(() => null);
   const [M, bark, barkN, palm] = await Promise.all([
-    PUNE ? loader.bytes(ASSETS.map).then(async (b) => cityFromBase(JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text()))) : loader.json(ASSETS.map),
+    DRIVE ? Promise.resolve(emptyMap()) : PUNE ? loader.bytes(ASSETS.map).then(async (b) => cityFromBase(JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text()))) : loader.json(ASSETS.map),
     loader.bitmap(ASSETS.bark), loader.bitmap(ASSETS.barkN), loader.bitmap(ASSETS.palm)]);
   await sndJob;
   let kit = null;
@@ -348,6 +353,7 @@ async function main() {
   window.__paint = paint;
   hookStreamer(paint);
   const W = await buildWorld(M, T, renderer, scene, quality, (t, f) => progress(t, 0.62 + f * 0.2));
+  if (DRIVE) countryWorld(W, scene);
   const sky = new Sky(renderer, scene);
   W.sky = sky;
   paintSky(sky);
@@ -374,7 +380,7 @@ async function main() {
   if (params.has('fly')) return runFly({ W, renderer, scene, camera, sky, post, quality, progress });
 
   // ---- gameplay
-  try { W.trains = new MetroTrains(W, scene, M); } catch (e) { console.warn('metro trains', e); }
+  if (!DRIVE) try { W.trains = new MetroTrains(W, scene, M); } catch (e) { console.warn('metro trains', e); }
   const vmats = vehicleMaterials();
   for (const m of Object.values(vmats)) sky.reflective(m);
   const auto = new PlayerAuto(W, scene, vmats);
@@ -412,8 +418,11 @@ async function main() {
     // time someone says it (a ranged read from its pack), so the game stays light in memory
     game.voiceRemote = { idx, urls: [VOICE_BIN, 'assets/voices_k.mp3', 'assets/voices_d.mp3', 'assets/voices_pk.mp3', 'assets/voices_vb.mp3', 'assets/voices_vb2.mp3'] }; void pack;
   }
-  await game.init(progress);
+  // (Long Drive: each of the street's systems silenced the moment it exists, at every step of the setting up)
+  if (DRIVE) quiet(game);
+  await game.init(DRIVE ? async (t, f) => { quiet(game); return progress(t, f); } : progress);
   betaTitle(game);
+  if (DRIVE) longDrive(game); else driveButton(game);
   { const actors = new Actors(game, scene); const lamps = new Lamps(game); post.beforeDraw = (dt, cam) => { actors.update(dt, cam); lamps.update(); inside.value = game.interiors && game.interiors.inside ? 1 : 0; }; post.streamer = W.streamer; post.shadows = new Shadows(renderer, scene, sky, 2048); post.focusAt = () => { const f = post.shadowFocus(); return Math.max(2, camera.position.distanceTo(f.position || (f.root && f.root.position) || f)); }; post.indoors = () => inside.value > .5; post.shadowFocus = () => (game.player.onFoot ? game.player.foot : game.player); game.swapShadows = (on, size) => post.shadows.set(on, size); game.shadowsOn = () => post.shadows.on; }
   // (not a texture whose picture has been let go once it reached the card, like the shop boards' atlases: sent again, it'd
   // send one blank pixel, and every board went black with no name on it)
@@ -427,6 +436,7 @@ async function main() {
   // warm the chunks around the start before the first frame
   await progress('Building the streets', 0.86);
   const sx = player.x, sz = player.z;
+  if (W.country) W.country.warm(sx, sz);
   W.streamer.warm(sx, sz, Math.min(170, quality.streamRadius), (k, n) => { shownF = Math.max(shownF, 0.86 + 0.06 * k / n); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
   // and their drawings, made on the workers meanwhile
   await painter.settle((k, n) => { shownF = Math.max(shownF, 0.92 + 0.04 * k / n); if (fill) fill.style.width = Math.round(shownF * 100) + '%'; });
@@ -443,8 +453,8 @@ async function main() {
     game.texUpgraded = true;
     try { W.trees.sharpenLeaves(); } catch (e) { /* keep the soft ones */ }
     await progress('Getting the people ready', 0.975);
-    if (game.crowd && game.crowd.prebuild) game.crowd.prebuild();
-    try { game.emergency && game.emergency.prewarm && game.emergency.prewarm(); } catch (e) { /* not critical */ }
+    if (!DRIVE && game.crowd && game.crowd.prebuild) game.crowd.prebuild();
+    if (!DRIVE) try { game.emergency && game.emergency.prewarm && game.emergency.prewarm(); } catch (e) { /* not critical */ }
     await Promise.all(game.preloads || []);
     await progress('Compiling the graphics', 0.985);
     await compileJob;
@@ -509,7 +519,7 @@ async function main() {
       if (!Number.isFinite(p.x + p.z)) { try { game.saveResume(); } catch (e2) { /* ignore */ } location.reload(); }
     } else if ((frames & 63) === 0) lastGood = { x: p.x, z: p.z, th: p.th || 0 };
     // the city around you gone (a tile failed to load, chunks dropped): fetch it again; still nothing: reload
-    if (game.state === 'play' && W.streamer && W.streamer.built.size === 0) {
+    if (game.state === 'play' && !DRIVE && W.streamer && W.streamer.built.size === 0) {
       emptyT += 1 / 60;
       if (emptyT > 4 && emptyT < 4.02 && W.tiles) { W.tiles.ensure?.(p.x, p.z, 650).catch?.(() => {}); }
       if (emptyT > 20) { try { game.saveResume(); } catch (e2) { /* ignore */ } location.reload(); }
@@ -584,6 +594,7 @@ async function main() {
     W.streamer.base ??= W.streamer.budgetMs;
     W.streamer.budgetMs = hold ? Math.max(12, W.streamer.base) : W.streamer.base*(1 + Math.min(1.5, spd/60));      // (the menus are up, or you're going fast: build faster)
     W.streamer.update(focus.x, focus.z, fwd, ahead);
+    if (W.country) W.country.update(focus.x, focus.z);
     W.nearBoards.update(camera.position.x, camera.position.z, dt);
     W.trains?.update(dt, camera.position);
     propT -= dt;
