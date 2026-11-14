@@ -39,8 +39,8 @@ export const SETTINGS = [
   { id: 'aniso', label: 'Texture filtering', sub: 'Anisotropic, for surfaces at a low angle', fixed: true, val: [1, 2, 4, 8, 16], at: [0, 1, 2, 3, 4, 4], fmt: (v) => (v > 1 ? v + 'x AF' : 'Trilinear'), apply: (G, v) => G.setAniso(v) },
   { group: 'Look' },
   { id: 'shade', label: 'Lighting model', sub: 'From two painted tones to physically based light', style: true, val: [[0, 0], [0, 1], [.22, 1], [.5, 1], [.8, 1], [1, 1]], at: [0, 1, 2, 3, 4, 5], fmt: (v) => (!v[1] ? 'Flat cel' : ['Two-tone', 'Soft paint', 'Paint + PBR', 'PBR', 'Full PBR'][[0, .22, .5, .8, 1].indexOf(v[0])]), apply: (G, v, C) => { C.PU.uReal.value = v[0]; C.PU.uMarks.value = v[1]; } },
-  { id: 'ink', label: 'Ink lines', sub: 'Depth and colour edges, drawn over the frame', style: true, val: [[0, 0], [0, 1], [1, .22], [1, .85], [1, 1], [2, .5], [2, .85]], at: [1, 4, 3, 5, 2, 0], fmt: (v) => (v[1] === 0 ? 'Off' : ['1 pass', '2 passes', '3 passes'][v[0]] + ' · ' + pct(v[1])), apply: (G, v, C) => { C.post.U.inkQ.value = v[0]; C.post.U.inkS.value = v[1]; } },
-  { id: 'paper', label: 'Paper finish', sub: 'Grain, specks, brush strokes and the torn edge', style: true, val: [0, .2, .55, 1], at: [3, 3, 3, 2, 1, 0], fmt: (v) => onOff(v, pct), apply: (G, v, C) => { C.post.U.paper.value = v; } },
+  { id: 'ink', label: 'Ink lines', sub: 'Depth and colour edges, drawn over the frame', style: true, val: [[0, 0], [0, 1], [1, .22], [1, .85], [1, 1], [2, .5], [2, .85]], at: [0, 4, 3, 5, 2, 0], fmt: (v) => (v[1] === 0 ? 'Off' : ['1 pass', '2 passes', '3 passes'][v[0]] + ' · ' + pct(v[1])), apply: (G, v, C) => { C.post.U.inkQ.value = v[0]; C.post.U.inkS.value = v[1]; } },
+  { id: 'paper', label: 'Paper finish', sub: 'Grain, specks, brush strokes and the torn edge', style: true, val: [0, .2, .55, 1], at: [0, 3, 3, 2, 1, 0], fmt: (v) => onOff(v, pct), apply: (G, v, C) => { C.post.U.paper.value = v; } },
   { id: 'tear', label: 'Torn paper edge', sub: 'A decoration round the screen. Yours to turn on', style: true, val: [0, 1], at: [0, 0, 0, 0, 0, 0], fmt: (v) => (v ? 'On' : 'Off'), apply: (G, v, C) => { C.post.U.tear.value = v; } },
   { id: 'grade', label: 'Tone mapping', sub: 'From poster colour to a film curve', style: true, val: [0, .12, .45, .8, 1], at: [0, 0, 1, 2, 3, 4], fmt: (v) => (v === 0 ? 'Poster' : v === 1 ? 'ACES filmic' : 'Filmic ' + pct(v)), apply: (G, v, C) => { C.post.U.film.value = v; } },
   { id: 'aerial', label: 'Aerial perspective', sub: 'The air between you and what is far off', side: 'gpu', w: 0.5, val: [0, .35, .7, 1, 1.25], at: [0, 0, 1, 2, 3, 4], fmt: (v) => onOff(v, pct), apply: (G, v, C) => { C.post.U.aerial.value = v; } },
@@ -100,7 +100,12 @@ export class Graphics {
     this.applyAll();
   }
   // which of a setting's values is in use. A name's own; yours in Custom; Auto's otherwise
-  level(id) { const n = typeof this.preset === 'number' ? this.preset : -1; if (n >= 0) return ALL.find(s => s.id === id).at[n]; const p = this.pin[id]; return p !== undefined ? p : this.auto[id]; }
+  // Low isn't a fixed layout: it holds its frame rate (60, or 90 on a 120 Hz screen) by giving up what it has to, never
+  // going above Low's own levels. Its levels are kept apart from Auto's
+  levels() { return this.preset === 1 ? (this.l1 || (this.l1 = Object.fromEntries(ALL.map(s => [s.id, s.at[1]])))) : this.auto; }
+  topOf(q) { return this.preset === 1 ? q.at[1] : q.at[AUTO_TOP]; }
+  adapts() { return this.preset === 'auto' || this.preset === 'custom' || this.preset === 1; }
+  level(id) { if (this.preset === 1) { const s = ALL.find(q => q.id === id); return s.style || s.fixed ? s.at[1] : this.levels()[id]; } const n = typeof this.preset === 'number' ? this.preset : -1; if (n >= 0) return ALL.find(s => s.id === id).at[n]; const p = this.pin[id]; return p !== undefined ? p : this.auto[id]; }
   applyOne(s) { const v = s.val[this.level(s.id)]; if (this.was[s.id] === v) return; this.was[s.id] = v; try { s.apply(this.G, v, this.C); } catch (e) { console.warn('graphics', s.id, e); } }
   tier() { return typeof this.preset === 'number' ? this.preset : this.preset === 'custom' ? Math.round(this.level('people')*5/6) : this.base; }
   applyAll() { for (const s of ALL) this.applyOne(s); this.G.qualityName = ['lite', 'low', 'med', 'high', 'high', 'high'][this.tier()]; this.sync(); }
@@ -111,7 +116,7 @@ export class Graphics {
     if (id === 'pace') { this.pace = +v; if (this.G.pace) this.G.pace.on = !!this.pace; this.save(); this.sync(); return; }
     if (id === 'all') {
       if (v === 'custom') { if (this.preset !== 'custom') { const now = {}; for (const s of ALL) now[s.id] = this.level(s.id); this.pin = now; this.preset = 'custom'; } }
-      else { this.preset = v === 'auto' ? 'auto' : +v; this.pin = {}; }
+      else { this.preset = v === 'auto' ? 'auto' : +v; this.pin = {}; this.l1 = null; }
     } else {
       // any one row changed: it isn't a set layout now. Everything stays where it was, and this row changes
       if (this.preset !== 'custom') { const now = {}; for (const s of ALL) now[s.id] = this.level(s.id); this.pin = now; this.preset = 'custom'; }
@@ -122,41 +127,43 @@ export class Graphics {
   free(s, now) { return !s.fixed && !s.style && this.pin[s.id] === undefined && !(this.blocked[s.id] > now); }
   // a step off what gives the most back for the least you'd notice, on the side that's short. Returns the setting, or nothing left to take
   stepDown(side, now, bad) {
-    const score = (s) => s.w*this.auto[s.id]/Math.max(1, s.val.length - 1), mine = (q) => q.side === side || q.side === 'both', above = (q) => this.auto[q.id] > (q.floor || 0);
-    const pick = (f) => ALL.filter(s => s.w && this.free(s, now) && this.auto[s.id] > 0 && f(s)).sort((a, b) => score(b) - score(a))[0];
+    const A = this.levels();
+    const score = (s) => s.w*A[s.id]/Math.max(1, s.val.length - 1), mine = (q) => q.side === side || q.side === 'both', above = (q) => A[q.id] > (q.floor || 0);
+    const pick = (f) => ALL.filter(s => s.w && this.free(s, now) && A[s.id] > 0 && f(s)).sort((a, b) => score(b) - score(a))[0];
     // seeing far is performance, not looks: everything near goes first (to its floor, then past it if it has to), and only
     // when there's nothing else left does anything far off go, and that last of all
     const near = (q) => !q.far;
     const s = pick(q => near(q) && mine(q) && above(q)) || pick(q => near(q) && above(q)) || (bad && pick(near)) ||
       pick(q => mine(q) && above(q)) || pick(above) || (bad && (pick(mine) || pick(() => true))); if (!s) return null;
     if (s.id === 'res' && !this.resProbe) this.resProbe = { gpu: this.C.post.clock?.total || 0, at: this.auto.res, left: 4 };
-    this.auto[s.id]--; this.applyOne(s); return s;
+    A[s.id]--; this.applyOne(s); return s;
   }
   // a look each second at how it's going. Smooth comes first: down quickly when frames are short or stuttering, up slowly
   tick(dt, cpuMs) {
     const G = this.G;
     this.counterTick(dt, cpuMs);
-    if (G.state !== 'play' || dt > .5 || typeof this.preset === 'number') return;
+    if (G.state !== 'play' || dt > .5 || !this.adapts()) return;
+    const A = this.levels();
     this.acc += dt; this.n++; this.cpu += cpuMs; if (dt > .05) this.spikes++;
     if (this.acc < 1) return;
     const fps = this.n/this.acc, cpu = this.cpu/this.n, gpu = this.C.post.clock?.total || 0, share = gpu ? (cpu > gpu ? .9 : .3) : cpu/(1000/fps), now = performance.now(), spikes = this.spikes;
-    const want = this.cap > 0 ? Math.min(60, this.cap) : 60;
+    const hz = G.pace && G.pace.r ? 1000/G.pace.r : 60, aim = hz >= 100 ? 90 : 60, want = this.cap > 0 ? Math.min(aim, this.cap) : aim;
     this.acc = 0; this.n = 0; this.cpu = 0; this.spikes = 0;
     if ((this.wait -= 1) > 0) return;
     // the picture got smaller and the graphics card is hardly any quicker: pixels weren't what it was short of, so have them back
     const Pb = this.resProbe;
-    if (Pb && --Pb.left <= 0) { this.resProbe = null; if (Pb.gpu && gpu > Pb.gpu*.88) { this.auto.res = Pb.at; this.blocked.res = now + 600000; this.applyOne(ALL.find(q => q.id === 'res')); this.wait = 2; this.sync(); return; } }
+    if (Pb && --Pb.left <= 0) { this.resProbe = null; if (Pb.gpu && gpu > Pb.gpu*.88) { A.res = Pb.at; this.blocked.res = now + 600000; this.applyOne(ALL.find(q => q.id === 'res')); this.wait = 2; this.sync(); return; } }
     const T = this.trial;
     if (T && --T.left <= 0) {
       this.trial = null;
-      if (T.dir < 0 && fps < T.fps*1.05 && fps >= Math.min(30, want*.9) && fps < want*.75) { this.auto[T.s.id]++; this.blocked[T.s.id] = now + 120000; this.applyOne(T.s); this.wait = 2; this.sync(); return; }   // didn't help: it wasn't this
-      if (T.dir > 0 && (fps < want*.75 || spikes >= 3)) { this.auto[T.s.id]--; this.blocked[T.s.id] = now + 300000; this.applyOne(T.s); this.wait = 3; this.sync(); return; }           // too much: back, and leave it a while
+      if (T.dir < 0 && fps < T.fps*1.05 && fps >= Math.min(30, want*.9) && fps < want*.75) { A[T.s.id]++; this.blocked[T.s.id] = now + 120000; this.applyOne(T.s); this.wait = 2; this.sync(); return; }   // didn't help: it wasn't this
+      if (T.dir > 0 && (fps < want*.75 || spikes >= 3)) { A[T.s.id]--; this.blocked[T.s.id] = now + 300000; this.applyOne(T.s); this.wait = 3; this.sync(); return; }           // too much: back, and leave it a while
     }
     // under 30 isn't playable: down at once and hard. Between 30 and 45 it can wait a few seconds and go gently. About 60 is the aim
     // (one bad second is a hitch, the city loading say, not the settings: it has to stay bad)
     // (held to an even 30 by game/pace.js reads as 29.9 some seconds: that's a steady rate, not one under 30)
-    const P = G.pace, even = P && P.on && P.n > 1, hard = Math.min(30, want*.9), bad = fps < hard - (even ? 1.5 : 0); this.under = bad ? (this.under || 0) + 1 : 0;
-    const down = this.under >= 2;
+    const P = G.pace, even = P && P.on && P.n > 1, hard = this.preset === 1 ? want*.9 : Math.min(45, want*.9), bad = fps < hard - (even ? 1.5 : 0); this.under = bad ? (this.under || 0) + 1 : 0;
+    const down = this.under >= 1;
     this.low = fps < want*.75 || spikes >= 4 ? this.low + 1 : 0;
     this.high = fps >= want*.85 && !spikes ? this.high + 1 : 0;
     if (down || (this.low >= 5 && !bad)) {
@@ -167,11 +174,11 @@ export class Graphics {
       this.trial = steps === 1 ? { s, fps, dir: -1, left: 3 } : null; this.wait = down ? 2 : 3; this.sync();
     } else if (this.high >= 25) {
       this.high = 0;
-      const after = (q) => q.w*(this.auto[q.id] + 1)/Math.max(1, q.val.length - 1);   // (the one that would be the last to go again)
+      const after = (q) => q.w*(A[q.id] + 1)/Math.max(1, q.val.length - 1);   // (the one that would be the last to go again)
       // (and back up, the far ones first: they were the last to go)
-      const s = ALL.filter(q => q.w && this.free(q, now) && this.auto[q.id] < q.at[AUTO_TOP] && !(q.side === 'cpu' && share > .5)).sort((a, b) => (b.far ? 1 : 0) - (a.far ? 1 : 0) || after(a) - after(b))[0];
+      const s = ALL.filter(q => q.w && this.free(q, now) && A[q.id] < this.topOf(q) && !(q.side === 'cpu' && share > .5)).sort((a, b) => (b.far ? 1 : 0) - (a.far ? 1 : 0) || after(a) - after(b))[0];
       if (!s) return;
-      this.auto[s.id]++; this.applyOne(s); this.trial = { s, fps, dir: 1, left: 5 }; this.wait = 2; this.sync();
+      A[s.id]++; this.applyOne(s); this.trial = { s, fps, dir: 1, left: 5 }; this.wait = 2; this.sync();
     }
   }
   sync() {
