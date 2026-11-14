@@ -47,6 +47,8 @@ const SWAPS = [
   [S('world/world.js'), S('world/grass.js'), S('beta/world/grass.js')],
   ['*', S('vehicles/vehmat.js'), S('beta/vehicles/vehmat.js')],
   ['*', S('vehicles/models.js'), S('beta/vehicles/models.js')],
+  ['*', S('vehicles/driver.js'), S('beta/vehicles/driver.js')],            // the police's and the ambulance's driving
+  ['*', S('vehicles/emodels.js'), S('beta/vehicles/emodels.js')],
   [S('vehicles/vehicle.js'), S('vehicles/cockpit.js'), S('beta/vehicles/cockpit.js')],
   ['*', S('game/story.js'), S('beta/game/story.js')],
   ['*', S('game/tutorial.js'), S('beta/game/tutorial.js')],
@@ -344,6 +346,8 @@ const PATCHES = {
   // a one-off gesture (a wave as they pass) is upper body too: the legs keep walking under it
   // an arm reached for its target by going back up the whole body from each bone, several times over; the body's up to date
   // by then, so it's read off instead, and only the arm brought up to date after
+  // (and whoever lost theirs walks on without it)
+  [S('people/umbrella.js')]: [["export function hasUmbrella(p) { return !p.cop", "export function hasUmbrella(p) { return p._noUmb !== p.id && !p.cop"]],
   [S('people/humans.js')]: [
     ["bone.getWorldQuaternion(_wq); bone.parent.getWorldQuaternion(_pq);", "bone.matrixWorld.decompose(_ikV, _wq, _ikS); bone.parent.matrixWorld.decompose(_ikV, _pq, _ikS);"],
     ["function aim(bone, from, to) {", "const _ikV = new THREE.Vector3(), _ikS = new THREE.Vector3();\nfunction aim(bone, from, to) {"],
@@ -352,6 +356,8 @@ const PATCHES = {
     ["l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  R.updateMatrixWorld(true);\n}", "l.quaternion.slerpQuaternions(_q1, l.quaternion.clone(), w); }\n  u.updateMatrixWorld(true);\n}"],
   ],
   [S('people/crowd.js')]: [
+    // knocked down under an umbrella: it's out of their hand, its cloth torn off and away if it was a car that did it (beta/world/cloth.js)
+    ["} else if (s.umb) s.umb.visible = false;", "} else if (s.umb) { if (s.umb.visible && s.umbFor === p && p.fallen > 0 && window.__nhUmbDrop) window.__nhUmbDrop(this, p, s.umb); s.umb.visible = false; }"],
     // (a street you drive into fills with real people at once: bodies are handed out four a tick, eight for those right by
     // you. At two a tick the ones in front of your car were still the far-off figures for seconds)
     // (and someone riding always gets one, the pillion as much as the rider: with every spare body of her kind in use she
@@ -595,16 +601,10 @@ const PATCHES = {
     ["r = (this.heat <= 1 ? 55 : 85) + this.rng.next() * (this.heat <= 1 ? 45 : 70);", "r = (this.heat <= 1 ? 40 : 70) + this.rng.next() * (this.heat <= 1 ? 40 : 60);"],
     ["this._spT = 4;", "this._spT = this.marshals.length ? 3.5 : 1.5;"],
   ],
-  // anyone driving by vehicles/driver.js (the police, the ambulance): keeps up with what's in front instead of
-  // dropping back to a gap as if it were standing still; passes slow traffic (not only stopped) when on an emergency,
-  // a two-wheeler through the gaps between lanes; red lights obeyed unless chasing hard, crossed slowly at low heat
-  [S('vehicles/driver.js')]: [
-    ["let gap = 99, still = false, person = false;", "let gap = 99, still = false, person = false, ov = 0, isPlayer = false;"],
-    ["if (al > 0.5 && al < look && Math.abs(ac - lat) < wHalf + ow && al < gap) { gap = al; still = Math.abs(o.v || 0) < 0.6; }", "if (al > 0.5 && al < look && Math.abs(ac - lat) < wHalf + ow && al < gap) { gap = al; still = Math.abs(o.v || 0) < 0.6; ov = (o.v || 0) * ((o.hx ?? 1) * hx + (o.hz ?? 0) * hz); isPlayer = !!o.isPlayer; }"],
-    ["return { gap, still, person };", "return { gap, still, person, ov: person ? 0 : ov, isPlayer };"],
-    ["target = Math.min(target, Math.max(0, (H.gap - 3.2) * 0.9));", "target = Math.min(target, Math.max(0, Math.max(0, H.ov || 0) + (H.gap - 3.2) * 0.9));"],
-    ["if (H.still && !H.person && this.waitT > (o.emergency ? 0.8 : 2.5) && this.shiftT <= 0) for (const s of [2.6, -2.6]) {", "if (!H.person && !H.isPlayer && this.shiftT <= 0 && ((H.still && this.waitT > (o.emergency ? 0.3 : 2.5)) || (o.emergency && H.gap < 14 && (H.ov || 0) < want - 2))) for (const s of (v.spec.two ? [1.4, -1.4, 2.6, -2.6] : [2.6, -2.6])) {"],
-    ["if (o.signals && !o.emergency && G.traffic.signals) {", "if (o.careful && !o.signals && G.traffic.signals) { const n = W.graph.nearest(v.x + hx * 14, v.z + hz * 14, 10), node = n && W.graph.nodes[n.s < n.e.len / 2 ? n.e.a : n.e.b]; if (node && node.signal && Math.hypot(node.x - v.x, node.z - v.z) < 24 && G.traffic.signals.stateForAngle(node.i, v.th) === 'r') target = Math.min(target, 6); }\n    if (o.signals && G.traffic.signals) {"],
+  // the 108 ambulance's driver (beta/vehicles/driver.js): on a call it crawls through a red after a look both ways,
+  // pulls in to the kerb at the scene, and drives away gently with someone on the stretcher
+  [S('game/emergency.js')]: [
+    ["R.drv.o.emergency = R.state === 'go';", "R.drv.o.emergency = R.state === 'go'; R.drv.o.signals = R.state !== 'go'; R.drv.o.creep = 4.5; R.drv.o.kerb = R.state === 'go'; R.drv.o.gentle = R.state === 'leave' && R.type !== 'police';"],
   ],
   [S('traffic/traffic.js')]: [
     // tempers: held up, a driver hoots more and harder the longer it goes on, and blasts at once when made to brake;
@@ -672,6 +672,11 @@ const PATCHES = {
     ["if (far) I.nl++;\n      else { if (I.glass) I.glass.setMatrixAt(i, m); I.n++; }", "if (I.glass && dB === 0 && !Ix) I.glass.setMatrixAt(I.ng++, m);\n      if (lv === 2) I.nl++; else if (lv === 1) I.nm++; else I.n++;\n      }"],
     ["this.inst[k].nl = 0;", "this.inst[k].nl = 0; this.inst[k].nm = 0; this.inst[k].ng = 0;"],
     ["x -= t.w * (mix[k] ?? 1);", "x -= t.w * (mix[k] ?? mix[baseOf(k)] ?? 1);"],
+    // every driver their own person (beta/traffic/brain.js): what they want to do, asked at four points in the step
+    ["    // --- obstacles\n    const look = 7 + v.v * 2.4;", "    vDes = this.brainSpeed(v, vDes, dt);\n    // --- obstacles\n    const look = 7 + v.v * 2.4;"],
+    ["    if (ob) { gap = ob.gap; vo = ob.v; agent = ob.agent; }", "    if (ob) { gap = ob.gap; vo = ob.v; agent = ob.agent; vo = this.brainSee(v, ob, vo); gap = this._bGap; v._bLead = agent; v._bLg = gap; }"],
+    ["const st = this.signals.state(endNode.i, v.l);\n        const stopAt = e.len - Math.min(endNode.jr, e.len * 0.45) - 3.5;", "const st = this.brainSig(v, this.signals.state(endNode.i, v.l), endNode, ob, dt);\n        const stopAt = e.len - Math.min(endNode.jr, e.len * 0.45) - 3.5 + (v._bCreep || 0);"],
+    ["const pref = e.oneway ? lerp(lo, hi, T.two ? 0.75 : 0.45) : lerp(lo, hi, T.two ? 0.7 : 0.35);\n      v.latT = lerp(v.latT, pref, dt * 0.08);", "const pref = lerp(lo, hi, v._bPref ?? (T.two ? 0.7 : 0.4));\n      v.latT = lerp(v.latT, pref, dt * 0.12);"],
   ],
 };
 const swapPlugin = {

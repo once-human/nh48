@@ -23,6 +23,7 @@ import { shake as shakeTree, treeStep, Leaves } from './treehit.js';
 import { FX } from './smashfx.js';
 import { view } from './view.js';
 import { hash1 } from '@orig/core/util.js';
+import { tearCloth, dropCloth, clothStep } from './cloth.js';
 
 // kg; h: how tall (for shots); J: bend / lean, break, what breaking it takes out of the striker; tip: a stall goes over
 export const SPEC = {
@@ -363,6 +364,22 @@ class Smash {
   apart(r, o, tip) {
     const S = r.S || SPEC[r.kind], geo = this.geoOf(r); if (!geo) { this.gone(r); return { broke: true, absorb: S.absorb, carried: S.mass }; }
     const parts = partsOf(geo), F = this.frame(r, new THREE.Matrix4()), Fi = F.clone().invert();
+    // an umbrella hit hard: its cloth comes off the ribs and goes on the air (world/cloth.js); the bare frame, pole and
+    // ribs (and its bucket of stones), goes over as one thing
+    if (!tip && (r.kind === 'umbC' || r.kind === 'umbS') && parts.length > 1) {
+      let cn = parts[0]; for (const p of parts) if (p.size.x*p.size.z > cn.size.x*cn.size.z) cn = p;
+      const pc = pieceOf(geo, parts.filter(p => p !== cn)), cp = pieceOf(geo, [cn]), ca = cp.geo.attributes.color;
+      const col = ca ? [ca.array[0], ca.array[1], ca.array[2]] : [0.3, 0.3, 0.3]; cp.geo.dispose();
+      this.gone(r);
+      const u = Math.max(0.4, o.u ?? 1.5), m = o.m || 1000, w = u*m/(m + S.mass), mass = S.mass*0.8;
+      const b = this.body(r, pc, F, mass, 'bamboo', {});
+      this.push(b, o.px, Math.max(r.y + 0.15, o.py), o.pz, o.nx*mass*w, mass*w*0.08, o.nz*mass*w);
+      const top = new THREE.Vector3(cn.c.x, cn.max.y, cn.c.z).applyMatrix4(F), q = new THREE.Quaternion().setFromRotationMatrix(_m.extractRotation(F));
+      r.cloth = tearCloth({ scene: this.W.scene, mat: this.W.mats.prop, top, q, R: Math.max(cn.size.x, cn.size.z)/2, drop: cn.size.y, col, keep: true,
+        vel: new THREE.Vector3(o.nx*w*0.85, 1.5 + Math.min(4, w*0.35), o.nz*w*0.85) });
+      FX.brk(S.snd, r.x, r.y + 1.6, r.z, 1); FX.brk('bamboo', r.x, r.y + 0.6, r.z, 0.6);
+      return { broke: true, absorb: S.absorb, carried: S.mass*0.5 };
+    }
     const big = (p) => Math.max(p.size.x, p.size.y, p.size.z);
     // (what's laid on it, small and up off its foot; small bits of its own frame, a wheel's spokes, a brick, go with the frame)
     const dk = S.deck ?? 0.6, goods = parts.filter(p => big(p) < 0.3 && p.min.y > dk), frame = parts.filter(p => !(big(p) < 0.3 && p.min.y > dk));
@@ -453,6 +470,7 @@ class Smash {
   tick(dt, cars) {
     this.t += dt; this.sndT -= dt; if (this.sndT <= 0) { this.sndT = 0.1; this.nSnd = 0; }
     if (this.debris.list.length) this.debris.step(dt, this.W, cars);
+    clothStep(dt, cars);
     if (this.moving.size || this.wst.size) Sway.step(this, dt);
     treeStep(this, dt); this.leaves.step(dt);
     if (this.flick.size) this.flickStep(dt);
@@ -486,6 +504,7 @@ class Smash {
     for (const b of r.bodies) { this.debris.remove(b); if (b.mesh) { b.mesh.parent && b.mesh.parent.remove(b.mesh); b.mesh.traverse(o => { if (o.isInstancedMesh) o.dispose(); else if (o.geometry && !b.keepGeo) o.geometry.dispose(); }); } }
     if (r.ti != null && this.W.trees) { const T = this.W.trees; if (T.dead) T.dead.delete(r.ti); if (T.sway) T.sway.delete(r.ti); T.lastX = 1e9; this.leaves.remove(r); r.cracked = false; }
     if (r.draw) { r.draw = r.draw.filter(e => e.m.parent); for (const e of r.draw) this.cut(e, false); }
+    if (r.cloth) { dropCloth(r.cloth); r.cloth = null; }
     r.top = null;
     if (r.live) { r.live.parent && r.live.parent.remove(r.live); r.live = null; } this.moving.delete(r);
     r.topB = null; r.rest = null; r.bend = null; r.marks = null;
