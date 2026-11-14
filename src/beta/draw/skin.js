@@ -379,7 +379,9 @@ export class Skin {
       if (d2 > 25 && dx*fx + dz*fz < -3) continue;       // behind you
       // (whoever's riding a two-wheeler or an auto comes first after you: the vehicle's drawn empty for them, so a rider
       // left without a place in the batch was a scooter going by with nobody on it)
-      H._d2 = H === playerH ? -1 : H._ride ? d2*0.02 : d2; near.push(H);
+      // (and both people on one are ranked as one, by where the vehicle is: the cut never falls between a rider and the pillion)
+      if (H._ride && H._rideO) { const ox = H._rideO.x - cx, oz = H._rideO.z - cz; H._d2 = (ox*ox + oz*oz)*0.02; } else H._d2 = H === playerH ? -1 : H._ride ? d2*0.02 : d2;
+      near.push(H);
     }
     near.sort((a, b) => a._d2 - b._d2);
     // the same people as ever (the nearest), with whoever's in the picture put first
