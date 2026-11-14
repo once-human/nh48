@@ -1,25 +1,38 @@
-// The game's version, worked out from its history. Nobody sets it by hand, and it doesn't matter how the work was cut
-// into commits: one huge commit and the same work in fifty small ones give the same number.
+// The game's version, worked out from its history. Nobody sets it by hand.
 //
-// Two numbers, the way Apple ships: a marketing version and a build.   Version 3.4.12 (706)
+// Two numbers, the way Apple ships: a marketing version and a build.   Version 5.6.12 (710)
 //
-//   BUILD   (706)   every change ever made, counted from the first. Only ever goes up; tells any two builds apart.
+//   BUILD   (710)   every change ever made, counted from the first. Only ever goes up; tells any two builds apart.
 //
-//   VERSION 3.4.12  GENERATION.RELEASE.FIX, measured on the game's own code (src/: .js, .css, .html) by comparing
-//                   whole snapshots, never single commits:
-//     GENERATION  goes up when the code that is new or rewritten since the last generation's snapshot is as much as
-//                 the entire game was at that snapshot: more new game than old game. RELEASE and FIX go back to 0.
-//     RELEASE     goes up when the code new or rewritten since the last release's snapshot reaches 5% of the game as
-//                 it was then: a real addition, whatever it took to build. FIX goes back to 0.
-//     FIX         every other change: fixes, tuning, small additions, map and asset updates.
-//   "New or rewritten since the snapshot" is the lines git reports as added between that snapshot's tree and this
-//   one's: code written and then taken out again counts for nothing, and neither does how often it was touched.
+//   VERSION 5.6.12  GENERATION.RELEASE.FIX. What a change IS decides which number moves, not how big it was or how
+//                   the work was cut into commits:
+//     GENERATION  a new way to play: a new mode (story, free roam, live, ...), or the game rebuilt.
+//     RELEASE     something new in the game: a story chapter or part, a mechanic, a system, a vehicle, a power,
+//                 a district, a screen.
+//     FIX         everything else: fixes, tuning, polish, map and asset updates, tooling.
+//
+// Where that judgement comes from, in order:
+//   1. The change says so itself. Whoever writes the commit (see CLAUDE.md: every session does) ends the message
+//      with a line   Change: generation | release | fix   and a few words on why. That line is the answer.
+//   2. The changes from before that line existed: the generations are written down below (HISTORY), by what they were.
+//   3. Nothing said: the code is measured. If what is new or rewritten since the last release's snapshot has reached
+//      5% of the game as it stood then, it is a release whether or not anyone called it one (a feature built quietly
+//      across fifty small commits still counts, once). Never a generation: size alone doesn't make a new way to play.
 //
 // The whole history is needed. A shallow checkout (Vercel without VERCEL_DEEP_CLONE=true) is deepened here; if that
 // can't be done the version is carried on, fixes only, from the last one written down in package.json ("changes").
 import { execSync } from 'node:child_process';
 
-const GENERATION = 1.0, RELEASE = 0.05;
+const RELEASE = 0.05;
+// the generations before commits said what they were
+const HISTORY = {
+  '42af50046a3c2be496a4c30ff56cbc3b6af13663': 'generation',   // the first Puneri
+  '6a343097e30a8f56e2fea3cdeeab4e99ad6cdfef': 'generation',   // free roam, a mode
+  'e05008c78adfc73edbe8c6e61f0abefce9452f28': 'generation',   // story, a mode
+  'fcfc48cb1536528747cc5f012a06c43f4c555d48': 'generation',   // the pencil-and-ink Pune: the game rebuilt
+  'ee3a59539d9df8c1f77da8cbfba2169f1b03fc16': 'generation',   // live, a mode
+};
+const SAID = /^Change:\s*(generation|release|fix)\b/mi;
 const CODE = /^(\d+)\t(\d+)\t(src\/.*\.(?:js|css|html))$/;
 
 export function gameVersion(root, known = {}) {
@@ -32,11 +45,11 @@ export function gameVersion(root, known = {}) {
     const v = known.version.split('.').map(Number); v[2] += more;
     return { version: v.join('.'), build: (known.build || 0) + more, how: 'shallow history, carried on from package.json' };
   }
-  // every change, oldest first: its hash, and what it added to and took from the code
+  // every change, oldest first: its hash, what it says it is, and what it added to and took from the code
   const commits = [];
-  for (const part of sh('git log --first-parent --diff-merges=first-parent --reverse --format=@%H --numstat HEAD').split(/^@/m).slice(1)) {
-    const lines = part.split('\n'), c = { h: lines[0].trim(), add: 0, del: 0 };
-    for (const l of lines) { const m = CODE.exec(l); if (m) { c.add += +m[1]; c.del += +m[2]; } }
+  for (const part of sh('git log --first-parent --diff-merges=first-parent --reverse --format=@%H%n%B%x00 --numstat HEAD').split(/^@(?=[0-9a-f]{40}$)/m).slice(1)) {
+    const [msg, stat = ''] = part.split('\0'), h = msg.slice(0, 40), c = { h, add: 0, del: 0, said: (SAID.exec(msg) || [])[1]?.toLowerCase() || HISTORY[h] };
+    for (const l of stat.split('\n')) { const m = CODE.exec(l); if (m) { c.add += +m[1]; c.del += +m[2]; } }
     commits.push(c);
   }
   // lines added between two snapshots (new or rewritten code that is still there)
@@ -49,15 +62,13 @@ export function gameVersion(root, known = {}) {
     const n = fresh(A.h, c.h); if (n >= A.need) return true;
     A.at = A.churn + (A.need - n); return false;
   };
-  let v = [0, 0, 0], size = 0, gen = null, rel = null;
+  let v = [0, 0, 0], size = 0, rel = null;
   for (const c of commits) {
     size += c.add - c.del;
-    if (!gen) { v = [1, 0, 0]; gen = mark(c.h, size, GENERATION); rel = mark(c.h, size, RELEASE); gen.at = gen.need; rel.at = rel.need; continue; }
-    const g = reached(gen, c), r = g || reached(rel, c);
-    if (g) { v = [v[0] + 1, 0, 0]; gen = mark(c.h, size, GENERATION); gen.at = gen.need; }
-    else if (r) v = [v[0], v[1] + 1, 0];
-    else v[2]++;
-    if (r) { rel = mark(c.h, size, RELEASE); rel.at = rel.need; }
+    const grown = rel ? reached(rel, c) : false;
+    const kind = c.said || (grown ? 'release' : 'fix');
+    if (kind === 'generation') v = [v[0] + 1, 0, 0]; else if (kind === 'release') v = [v[0], v[1] + 1, 0]; else v[2]++;
+    if (kind !== 'fix' || grown || !rel) { rel = mark(c.h, size, RELEASE); rel.at = rel.need; }
   }
   return { version: v.join('.'), build: commits.length, how: 'full history', at: commits.at(-1)?.h };
 }

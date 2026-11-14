@@ -1,6 +1,6 @@
 {
   "name": "nh48",
-  "version": "3.7.4",
+  "version": "5.7.5",
   "private": true,
   "type": "module",
   "description": "NH48: Pune \u2014 open-world driving game",
@@ -23,8 +23,8 @@
     "three": "^0.186.1"
   },
   "changes": {
-    "at": "43f9be6091b13305fe3a005c568dbfad1a5af03d",
-    "version": "3.7.4",
-    "build": 708
+    "at": "114e92db4a9872f468981b4e052167d88d4ac9ab",
+    "version": "5.7.5",
+    "build": 709
   }
 }
