@@ -6,11 +6,11 @@
 //
 //   VERSION 5.6.12  GENERATION.RELEASE.FIX. What a change IS decides which number moves, not how big it was or how
 //                   the work was cut into commits:
-//     GENERATION  a new way to play: a new mode (story, free roam, live, ...), the game rebuilt, or a new map.
-//                 (a new city, or the whole map remade)
-//     RELEASE     something new in the game: a story chapter or part, a mechanic, a system, a vehicle, a power,
-//                 a district, a screen.
-//     FIX         everything else: fixes, tuning, polish, map and asset updates, tooling.
+//     GENERATION  a player would say "this is a different game now" or "there's a whole new way to play it".
+//     RELEASE     a player would say "there's something new": something to do, see, hear, reach or own that
+//                 wasn't there before.
+//     FIX         a player would say "it's better", or wouldn't see it at all.
+//   No list of cases: whatever was touched (code, map, art, sound, story, rules), it is judged by that question.
 //
 // Where that judgement comes from, in order:
 //   1. The change says so itself. Whoever writes the commit (see CLAUDE.md: every session does) ends the message
