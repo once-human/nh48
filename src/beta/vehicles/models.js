@@ -1380,7 +1380,8 @@ export function buildCar(kind0, opts = {}) {
   // the body (where they were dark glossy panels of it) into the car's glass, which is drawn as glass. What's behind
   // them is the cabin that's built into every car, and whoever's driving it. (Not a door mirror's glass, out past the
   // body's side, nor a lamp's lens, below the waist.)
-  { const y0 = spec.beltY - 0.12, zm = spec.W/2 + 0.01; lidToGlass(b, gl, 0, 0, (x, y, z) => y > y0 && Math.abs(z) < zm); }
+  // (nor anything glossy lying flat inside the cabin, a screen, the top of the dash: only what faces out, and a glass roof)
+  { const y0 = spec.beltY - 0.12, zm = spec.W/2 + 0.01, yr = spec.H - 0.25; lidToGlass(b, gl, 0, 0, (x, y, z, v) => y > y0 && Math.abs(z) < zm && !(b.n[v*3 + 1] > 0.95 && y < yr)); }
   if (kind === 'taxi') {
     box(b, -0.15, spec.H, -0.25, 0.15, spec.H + 0.12, 0.25, [0.98, 0.85, 0.15], 0, 0.4);
   }
@@ -1441,7 +1442,7 @@ function superBay(b, spec) {
 function lidToGlass(b, gl, x0, x1, ok) {
   const I = b.i, P = b.p, Pt = b.paint, keep = [];
   if (!Pt) return;
-  const isG = (v) => Pt[v] > 3.5 && Pt[v] < 4.5 && (ok ? ok(P[v*3], P[v*3 + 1], P[v*3 + 2]) : P[v*3] > x0 && P[v*3] < x1);
+  const isG = (v) => Pt[v] > 3.5 && Pt[v] < 4.5 && (ok ? ok(P[v*3], P[v*3 + 1], P[v*3 + 2], v) : P[v*3] > x0 && P[v*3] < x1);
   for (let t = 0; t + 2 < I.length; t += 3) {
     const a = I[t], c = I[t + 1], d = I[t + 2];
     if (!(isG(a) && isG(c) && isG(d))) { keep.push(a, c, d); continue; }

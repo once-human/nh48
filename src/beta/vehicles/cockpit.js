@@ -921,7 +921,8 @@ function dress(C, kind, mats) {
 // mirrors' glass, not the lamps' lenses ahead of the windscreen), a hair in from the outside
 function innerGlass(src, belt, hw, xf0) {
   const P = src.attributes.position, N = src.attributes.normal, Pt = src.attributes.paint, ix = src.index, n = ix ? ix.count : P.count, pos = [], nor = [];
-  const ok = (i) => { const p = Pt.getX(i); return p > 3.5 && p < 4.5 && P.getY(i) > belt - 0.12 && Math.abs(P.getZ(i)) < hw + 0.01 && P.getX(i) < xf0 + 0.15; };
+  const Gn = src.attributes.aGone;           // (a pane that's been broken out has no inside either: beta/vehicles/glassbreak.js)
+  const ok = (i) => { const p = Pt.getX(i); return p > 3.5 && p < 4.5 && P.getY(i) > belt - 0.12 && Math.abs(P.getZ(i)) < hw + 0.01 && P.getX(i) < xf0 + 0.15 && !(Gn && Gn.getX(i) > 0.5); };
   for (let t = 0; t < n; t += 3) {
     const a = ix ? ix.getX(t) : t, b = ix ? ix.getX(t + 1) : t + 1, c = ix ? ix.getX(t + 2) : t + 2;
     if (!ok(a) || !ok(b) || !ok(c)) continue;

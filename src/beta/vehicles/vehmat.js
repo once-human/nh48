@@ -39,7 +39,7 @@ void main(){
   vC = base; vG = glow; vP = paint; vL = position; vNL = normal;
   vec4 w = M*vec4(position, 1.); vW = w.xyz; vN = mat3(M)*normal;
   vec4 v = viewMatrix*w; vZ = -v.z; gl_Position = projectionMatrix*v; }`;
-const GLASS_VS = `varying vec3 vN, vW, vC, vL; varying float vG, vP, vZ;
+const GLASS_VS = `varying vec3 vN, vW, vC, vL; varying float vG, vP, vZ; attribute float aGone;
 #ifdef FADE
 varying float vFd;
 #endif
@@ -52,7 +52,8 @@ void main(){
 #else
   mat4 M = modelMatrix;
 #endif
-  vL = position; vC = vec3(1.); vG = 0.; vP = 0.; vec4 w = M*vec4(position, 1.); vW = w.xyz; vN = mat3(M)*normal; vec4 v = viewMatrix*w; vZ = -v.z; gl_Position = projectionMatrix*v; }`;
+  vL = position; vC = vec3(1.); vG = 0.; vP = 0.; vec4 w = M*vec4(position, 1.); vW = w.xyz; vN = mat3(M)*normal; vec4 v = viewMatrix*w; vZ = -v.z; gl_Position = projectionMatrix*v;
+  if (aGone > .5) gl_Position = vec4(2., 2., 2., 1.); }`;      // (a pane that's been broken out: beta/vehicles/glassbreak.js)
 const CHUNK = `precision highp float; precision highp sampler2DShadow;
 varying vec3 vN, vW, vC, vL; varying float vG, vP, vZ;
 uniform sampler2D tNoise; uniform highp sampler2DShadow shadowTex; uniform mat4 shadowMat; uniform vec3 sunDir, sunCol, shadeCol, skyCol, fogCol, uTint; uniform float shadowTexel, shadowOn, fogDensity, dayK, uNight, uRough, uMetal, uClear; uniform vec2 uHd;
@@ -131,7 +132,8 @@ void main(){
   }
   float f = fogDensity*vZ, mir = matte > .5 ? 0. : (glassy*.72 + painted*(.3 - .22*grime) + (1. - painted)*(1. - glassy)*.18); gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1. - clamp(mir, 0., .95)); }`;
 // glass: dark with the sky across it, a brushed streak, someone's shape behind it left to the imagination
-const GLASS_FS = CHUNK + `void main(){
+const GLASS_FS = CHUNK + `uniform vec4 uCrk[3];
+void main(){
   FADE_OUT
   vec3 n = normalize(vN), V = normalize(cameraPosition - vW); if (!gl_FrontFacing) n = -n;
   vec3 R = reflect(-V, n); float e = nz(gl_FragCoord.xy*.09) - .5, hz = smoothstep(-.05, .12, R.y + e*.1), fres = .25 + .75*pow(1. - max(dot(n, V), 0.), 2.5);
@@ -141,11 +143,23 @@ const GLASS_FS = CHUNK + `void main(){
   // (a car's glass: lightly tinted looked straight through, so you see who's in it and the cabin, and more and more a
   // mirror of the sky the more it's looked along; a film from the garage is dark whichever way)
   float k = clamp((fres - .25)/.75, 0., 1.), al = mix(mix(.62, .9, k), mix(.3, .86, k), uClear);
+  // a cracked windscreen (beta/vehicles/glassbreak.js): from each place it was struck, lines running out and broken rings
+  // round it, white where the glass has let go of itself, crushed to frost at the very spot
+  float ck = 0.;
+  for (int i = 0; i < 3; i++) {
+    vec4 q = uCrk[i]; if (q.w <= 0.) continue;
+    vec3 d = vL - q.xyz; float r = length(d); if (r > q.w) continue;
+    float a = atan(d.y, d.z), n1 = nz(vec2(a*7. + float(i)*3.1, 1.7)), fall = 1. - r/q.w;
+    float rad = 1. - smoothstep(0., min(.5, .011/max(r, .012)), abs(fract(a*2.864 + n1*.6) - .5));
+    float ring = (1. - smoothstep(0., .05, abs(fract(r*(8. + n1*5.) - n1) - .5)))*step(.45, nz(vec2(a*2.5, r*6. + float(i))));
+    ck = max(ck, max(rad, ring*.8)*smoothstep(0., .25, fall) + (1. - smoothstep(0., .05, r)));
+  }
+  ck = clamp(ck, 0., 1.); c = mix(c, vec3(.8, .87, .9)*(.45 + .55*dayK), ck*.85); al = max(al, ck*.9);
   float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), al); }`;
 
 function mat(fs, vs, opts = {}) {
   const uniforms = Object.assign({}, PU, { uTint: { value: new THREE.Color(opts.tint ?? 0x15191d).convertSRGBToLinear() }, uRough: { value: opts.rough ?? .38 }, uMetal: { value: opts.metal ?? .1 } });
-  uniforms.uLamp = { value: new THREE.Vector2() }; uniforms.uHd = { value: new THREE.Vector2(1, 0) }; uniforms.uInd = { value: new THREE.Vector3() }; uniforms.uClear = { value: opts.clear ? 1 : 0 };
+  uniforms.uLamp = { value: new THREE.Vector2() }; uniforms.uHd = { value: new THREE.Vector2(1, 0) }; uniforms.uInd = { value: new THREE.Vector3() }; uniforms.uClear = { value: opts.clear ? 1 : 0 }; if (opts.glass) uniforms.uCrk = { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] };
   // (glass you see through: a supercar's engine lid, an auto's screen)
   const m = new THREE.ShaderMaterial({ vertexShader: vs, fragmentShader: fs, uniforms, vertexColors: !opts.glass, side: opts.glass ? THREE.DoubleSide : THREE.FrontSide, transparent: !!opts.glass, depthWrite: !opts.glass });
   // every instanced body drawn with this needs its lamps' per-instance state: a model that came without (a parked
