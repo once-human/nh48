@@ -852,6 +852,10 @@ function dress(C, kind, mats) {
     C._v = v;
     C.mode(v._modeName || '');
     MG.visible = !!v.inCockpit;
+    // the mirrors come on a moment after you're in the seat, one after another: each is a second look at the street behind
+    // you, and the first of those has everything back there to hand to the graphics card. All three at once, in the very
+    // frame the cabin came up, was the long wait on the first switch to the seat
+    if (v.inCockpit) { if (!C._in) { C._in = true; C._inT = performance.now(); } const t = performance.now() - C._inT; for (let i = 0; i < MG.children.length; i++) MG.children[i].visible = t > 500 + i*450; } else C._in = false;
     if (!C._orvm && v.bodyMesh) { C._orvm = true; try { doorMirrors(v, MG, Eye, hw, belt, xf0); } catch (e) { /* (no glass found: no mirror) */ } }
     // the windows' inside, kept to the body as it is (dents, a door hung open on its own hinge). Made the first time
     // you're in this car (from outside the windows are their own outside, and nobody sees the inside of them)
