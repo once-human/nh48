@@ -13,8 +13,9 @@
 import * as THREE from 'three';
 
 const DT = 1/120, ITER = 6, G0 = 9.81, SLOP = 0.004;
-const V3 = THREE.Vector3, _a = new V3(), _b = new V3(), _r = new V3(), _j = new V3(), _t = new V3(), _w = new V3(), _u = new V3(), _u2 = new V3();
+const V3 = THREE.Vector3; const _a = new V3(), _b = new V3(), _r = new V3(), _j = new V3(), _t = new V3(), _w = new V3(), _u = new V3(), _u2 = new V3();
 const _m3 = new THREE.Matrix3(), _k = new THREE.Matrix3(), _q = new THREE.Quaternion(), _mq = new THREE.Matrix4();
+const _r1 = new V3(), _r2 = new V3(), _MEM = [new Int8Array(26), new Int8Array(26)], _qr = new THREE.Quaternion(), _mr = new THREE.Matrix4();
 const UP = new V3(0, 1, 0), _qi = new THREE.Quaternion(), _l = new V3(), _u3 = new V3(), _pv = new V3(), _dv = new V3();
 // a world point in a body's own box: the face it's nearest to (out of the box, in the world) and how deep it's in, or null
 // (flat: only by its sides, never its top or bottom, for something on wheels that shoves it along the road)
@@ -123,7 +124,8 @@ export class Debris {
   // o: { mesh, p, q, v, w, m, half, pts, mat, pin (world point of its local pinLocal), pinLocal, stiff }
   add(o) {
     const h = o.half, m = o.m, ix = m*(h.y*h.y + h.z*h.z)/3, iy = m*(h.x*h.x + h.z*h.z)/3, iz = m*(h.x*h.x + h.y*h.y)/3;
-    const b = Object.assign({ v: new V3(), w: new V3(), mu: MU[o.mat] ?? 0.5, still: 0, sleep: false, air: 1, sndT: -9, jn: null }, o);
+    const b = Object.assign({ mesh: null, p: null, q: null, m: 1, half: null, pts: null, mat: null, ball: 0, roll: undefined, pin: null, pinLocal: null, stiff: 0, keepGeo: false, v: new V3(), w: new V3(), mu: MU[o.mat] ?? 0.5, still: 0, sleep: false, air: 1, sndT: -9, jn: null,
+      iI: null, im: 0, born: 0, ign: null, bp: null, r0: h.length(), _cs: [], cm: null, _Iw: new THREE.Matrix3(), jolt: 0, _dirty: false, ride: null, _gone: false, _at: null, _lf: -1 }, o);
     b.iI = new V3(1/ix, 1/iy, 1/iz); b.im = 1/m; b.born = this.t; b.ign = null;
     b.jn = new Float32Array(b.pts.length);
     // (against another piece, its box is felt at its corners, the middles of its edges and of its faces: by corners alone, two
@@ -132,7 +134,7 @@ export class Debris {
     this.list.push(b); this.sync(b);
     return b;
   }
-  remove(b) { const i = this.list.indexOf(b); if (i >= 0) this.list.splice(i, 1); }
+  remove(b) { b._gone = true; const i = this.list.indexOf(b); if (i >= 0) this.list.splice(i, 1); }
   // world inverse inertia from the body's turn
   iw(b) {
     _mq.makeRotationFromQuaternion(b.q); _m3.setFromMatrix4(_mq);
@@ -147,7 +149,15 @@ export class Debris {
   // vehicles: [{ x, z, hx, hz, a, b, y0, y1, vx, vz }]
   step(dt, W, cars) {
     this.acc = Math.min(this.acc + dt, 0.1);
-    while (this.acc >= DT) { this.acc -= DT; this.t += DT; for (let i = 0; i < this.list.length; i++) { this.bi = i; this.tick(this.list[i], W, cars); } }
+    const L = this.list;
+    if (!this._X || this._X.length < L.length*4) { this._X = new Float64Array(L.length*4 + 256); this._F = new Uint8Array(L.length + 64); }
+    const X = this._X, F = this._F, mv = this._mv || (this._mv = []); mv.length = 0;
+    for (const c of cars) if (Math.abs(c.vx) + Math.abs(c.vz) > 0.3) mv.push(c);
+    while (this.acc >= DT) {
+      this.acc -= DT; this.t += DT; const n = this.n = Math.min(L.length, F.length);
+      for (let i = 0; i < n; i++) { const b = L[i], k = i*4; X[k] = b.p.x; X[k + 1] = b.p.y; X[k + 2] = b.p.z; X[k + 3] = b.r0; F[i] = b.sleep ? 1 : 0; }
+      for (let i = 0; i < n; i++) { const b = L[i]; if (!b) break; this.bi = i; this.tick(b, W, cars); const k = i*4; X[k] = b.p.x; X[k + 1] = b.p.y; X[k + 2] = b.p.z; F[i] = b.sleep ? 1 : 0; }
+    }
     for (const b of this.list) if (!b.sleep || b._dirty) { this.sync(b); b._dirty = false; }
   }
   sync(b) { if (b.mesh) { b.mesh.position.copy(b.p); b.mesh.quaternion.copy(b.q); b.mesh.updateMatrix(); b.mesh.updateMatrixWorld(); } }
@@ -157,7 +167,7 @@ export class Debris {
       const R = b.ride, P = R.on;
       _q.copy(P.q); b.p.copy(R.lp).applyQuaternion(_q).add(P.p); b.q.copy(_q).multiply(R.lq);
       const upY = 1 - 2*(P.q.x*P.q.x + P.q.z*P.q.z);           // (how upright the thing under it still is)
-      if (upY < R.cos || (P.jolt || 0) > R.jolt || this.list.indexOf(P) < 0) {
+      if (upY < R.cos || (P.jolt || 0) > R.jolt || P._gone) {
         this.velAt(P, _r.subVectors(b.p, P.p), b.v); b.w.copy(P.w).multiplyScalar(0.6);
         b.ride = null; b.sleep = false; b.still = 0;
       } else { b.sleep = P.sleep; b._dirty = !P.sleep; return; }
@@ -165,8 +175,8 @@ export class Debris {
     // something on the move touching it wakes it
     if (b.sleep) {
       let near = false;
-      for (const c of cars) if (Math.abs(c.vx) + Math.abs(c.vz) > 0.3 && Math.abs(c.x - b.p.x) < c.a + b.r0 + 0.5 && Math.abs(c.z - b.p.z) < c.a + b.r0 + 0.5) near = true;
-      if (!near) return;
+      for (const c of this._mv) if (Math.abs(c.x - b.p.x) < c.a + b.r0 + 0.5 && Math.abs(c.z - b.p.z) < c.a + b.r0 + 0.5) near = true;
+      if (!near) { b._lf = -1; return; }
       b.sleep = false; b.still = 0;
     }
     if (b.r0 === undefined) b.r0 = b.half.length();
@@ -218,29 +228,47 @@ export class Debris {
     // (each pair once a step, after both have moved, and both ways: this one's corners in that one's box and that one's in
     // this one's. Solved from one side only, a crate landing square on another was caught by its own two corners on the
     // one side and none on the other, spun, and thrown off)
-    for (let oi = 0; oi < this.list.length; oi++) {
+    const X = this._X, FL = this._F, bi = this.bi, bx = b.p.x, by = b.p.y, bz = b.p.z, br = b.r0 + 0.05, nL = Math.min(this.n, this.list.length);
+    for (let oi = 0; oi < nL; oi++) {
+      // (first by the flat list of where each one is: nearly all are too far off to matter)
+      if (oi === bi || (oi > bi && !FL[oi])) continue;
+      const k4 = oi*4, ex = bx - X[k4], ey = by - X[k4 + 1], ez = bz - X[k4 + 2], er = br + X[k4 + 3]; if (ex*ex + ey*ey + ez*ez > er*er) continue;
       const o = this.list[oi];
       if (o === b || (oi > this.bi && !o.sleep) || (b.ride && b.ride.on === o) || (o.ride && o.ride.on === b)) continue;
       if (o.r0 === undefined) o.r0 = o.half.length();
       const dx = b.p.x - o.p.x, dy = b.p.y - o.p.y, dz = b.p.z - o.p.z, rr = b.r0 + o.r0; if (dx*dx + dy*dy + dz*dz > rr*rr) continue;
       // (pieces of the one thing, born into each other's boxes as it broke, leave each other be until they've come apart)
+      // (only the side that can reach: this one's points can be in that one's box only if its middle is within its own reach of it)
+      // (this one's turn and place as that one sees them, once for the pair: each point is then a few sums to rule out, and
+      // only the ones really inside go on to the full test)
+      _qr.copy(o.q).invert(); _l.set(dx, dy, dz).applyQuaternion(_qr); const tx = _l.x, ty = _l.y, tz = _l.z;
+      const E = _mr.makeRotationFromQuaternion(_qr.multiply(b.q)).elements, H = o.half, K = b.half, sk = SLOP + 1e-5;
+      const ux = -(E[0]*tx + E[1]*ty + E[2]*tz), uy = -(E[4]*tx + E[5]*ty + E[6]*tz), uz = -(E[8]*tx + E[9]*ty + E[10]*tz);
+      const t1 = Math.abs(tx) < H.x + b.r0 + sk && Math.abs(ty) < H.y + b.r0 + sk && Math.abs(tz) < H.z + b.r0 + sk;
+      const t2 = Math.abs(ux) < K.x + o.r0 + sk && Math.abs(uy) < K.y + o.r0 + sk && Math.abs(uz) < K.z + o.r0 + sk;
       const ig = b.ign && b.ign.has(o), n0 = cs.length, cm = b.cm || (b.cm = new Map());
-      const mem = cm.get(o) || [new Int8Array(26), new Int8Array(26)];
-      for (let i = 0; i < 26; i++) {
-        const pw = _b.copy(b.bp[i]).applyQuaternion(b.q).add(b.p), r = pw.clone().sub(b.p), ro = pw.clone().sub(o.p);
-        const q = inBox(o, pw, false, this.velAt(b, r, _dv).sub(this.velAt(o, ro, _u3)), mem[0][i]); if (!q) { mem[0][i] = 0; continue; }
+      let mem = cm.get(o); const had = !!mem;
+      if (!mem) { mem = _MEM; mem[0].fill(0); mem[1].fill(0); }
+      // (lying still against something asleep, it rests on it as on the ground and leaves it asleep; moving, it wakes it)
+      const st = o.sleep && b.v.lengthSq() < 0.1225 && (b.ball || b.w.lengthSq() < 1);
+      if (t1) for (let i = 0; i < 26; i++) {
+        const c = b.bp[i]; if (Math.abs(E[0]*c.x + E[4]*c.y + E[8]*c.z + tx) >= H.x + sk || Math.abs(E[1]*c.x + E[5]*c.y + E[9]*c.z + ty) >= H.y + sk || Math.abs(E[2]*c.x + E[6]*c.y + E[10]*c.z + tz) >= H.z + sk) { mem[0][i] = 0; continue; }
+        const pw = _b.copy(c).applyQuaternion(b.q).add(b.p); _r1.subVectors(pw, b.p); _r2.subVectors(pw, o.p);
+        const q = inBox(o, pw, false, this.velAt(b, _r1, _dv).sub(this.velAt(o, _r2, _u3)), mem[0][i]); if (!q) { mem[0][i] = 0; continue; }
         mem[0][i] = q.code;
-        cs.push({ r, ro, n: q.n, ob: o, pen: q.pen, j: 0, i: -1, fresh: true });
-      }
-      for (let i = 0; i < 26; i++) {
-        const pw = _b.copy(o.bp[i]).applyQuaternion(o.q).add(o.p), r = pw.clone().sub(b.p), ro = pw.clone().sub(o.p);
-        const q = inBox(b, pw, false, this.velAt(o, ro, _dv).sub(this.velAt(b, r, _u3)), mem[1][i]); if (!q) { mem[1][i] = 0; continue; }
+        cs.push({ r: b.ball ? q.n.clone().multiplyScalar(-b.ball) : _r1.clone(), ro: o.ball ? q.n.clone().multiplyScalar(o.ball) : _r2.clone(), n: q.n, ob: o, pen: q.pen, j: 0, i: -1, fresh: true, st });
+      } else if (had) mem[0].fill(0);
+      if (t2) for (let i = 0; i < 26; i++) {
+        const c = o.bp[i]; if (Math.abs(E[0]*c.x + E[1]*c.y + E[2]*c.z + ux) >= K.x + sk || Math.abs(E[4]*c.x + E[5]*c.y + E[6]*c.z + uy) >= K.y + sk || Math.abs(E[8]*c.x + E[9]*c.y + E[10]*c.z + uz) >= K.z + sk) { mem[1][i] = 0; continue; }
+        const pw = _b.copy(c).applyQuaternion(o.q).add(o.p); _r1.subVectors(pw, b.p); _r2.subVectors(pw, o.p);
+        const q = inBox(b, pw, false, this.velAt(o, _r2, _dv).sub(this.velAt(b, _r1, _u3)), mem[1][i]); if (!q) { mem[1][i] = 0; continue; }
         mem[1][i] = q.code;
-        cs.push({ r, ro, n: q.n.negate(), ob: o, pen: q.pen, j: 0, i: -1, fresh: true });
-      }
-      if (cs.length === n0) { cm.delete(o); if (ig) { b.ign.delete(o); if (o.ign) o.ign.delete(b); } continue; }
-      cm.set(o, mem);
+        q.n.negate(); cs.push({ r: b.ball ? q.n.clone().multiplyScalar(-b.ball) : _r1.clone(), ro: o.ball ? q.n.clone().multiplyScalar(o.ball) : _r2.clone(), n: q.n, ob: o, pen: q.pen, j: 0, i: -1, fresh: true, st });
+      } else if (had) mem[1].fill(0);
+      if (cs.length === n0) { if (had) cm.delete(o); if (ig) { b.ign.delete(o); if (o.ign) o.ign.delete(b); } continue; }
+      if (!had) cm.set(o, [mem[0].slice(), mem[1].slice()]);
       if (ig || (Math.abs(b.born - o.born) < 1e-6 && this.t - b.born < 0.05)) { cs.length = n0; (b.ign || (b.ign = new Set())).add(o); (o.ign || (o.ign = new Set())).add(b); continue; }
+      if (o.sleep && !st) { o.sleep = false; o.still = 0; }
       touch = true;
     }
     // a landing: how fast it came down, for its sound
@@ -250,11 +278,11 @@ export class Debris {
       for (const c of cs) {
         const C = c.car, O = c.ob, rel = (out) => { this.velAt(b, c.r, out); if (C) { out.x -= C.vx; out.z -= C.vz; } else if (O) out.sub(this.velAt(O, c.ro, _u3)); return out; };
         // what's on the other side gives too, by its weight: a car (sideways only: it's on its wheels), another piece
-        const other = (n) => C ? C.im*(n.x*n.x + n.z*n.z) : O ? O.im : 0;
-        const give = (J) => { if (C) { C.vx -= J.x*C.im; C.vz -= J.z*C.im; C.hit = Math.max(C.hit || 0, b.m); } else if (O) { O.v.addScaledVector(J, -O.im); if (O.sleep) { O.sleep = false; O.still = 0; } } };
+        const other = (n) => c.st ? 0 : C ? C.im*(n.x*n.x + n.z*n.z) : O ? O.im : 0;
+        const give = (J) => { if (c.st) return; if (C) { C.vx -= J.x*C.im; C.vz -= J.z*C.im; C.hit = Math.max(C.hit || 0, b.m); } else if (O) { O.v.addScaledVector(J, -O.im); if (O.sleep) { O.sleep = false; O.still = 0; } } };
         const vn = rel(_a).dot(c.n), k = this.kn(b, c.r, c.n) + other(c.n);
         // (pressed into something: out at its own speed, gently, so a body isn't fired off a bumper)
-        const bias = C || O ? Math.min(2, c.pen*8) : 0;
+        const bias = C || O ? Math.min(c.st ? 0.3 : 2, Math.max(0, c.pen - SLOP)*8) : 0;
         // (someone on foot pushes only as hard as a person can, about 450 N: they shove a plank or a crate along, never a
         // concrete pole or a shelter; walking into one, they're held)
         let dj = -(vn - bias)/k; const j0 = c.j; c.j = Math.max(0, j0 + dj); if (C && C.side) c.j = Math.min(c.j, 450*DT); dj = c.j - j0;
@@ -282,10 +310,10 @@ export class Debris {
     for (const c of cs) {
       if (!(c.car || c.ob) || c.pen <= SLOP) continue;
       // (what's lying on the road is held there by its grip on it too: a person walking into something heavy takes all of it)
-      const mo = c.car ? c.car.m : c.ob.m, mb = b.m*(touch && c.car && c.car.side ? 1 + 25*b.mu : 1), sh = mo/(mo + mb), d = (c.pen - SLOP)*0.5;
+      const mo = c.car ? c.car.m : c.ob.m, mb = b.m*(touch && c.car && c.car.side ? 1 + 25*b.mu : 1), sh = c.st ? 1 : mo/(mo + mb), d = (c.pen - SLOP)*0.5;
       b.p.addScaledVector(c.n, d*sh);
       if (c.car) { c.car.px -= c.n.x*d*(1 - sh); c.car.pz -= c.n.z*d*(1 - sh); }
-      else { c.ob.p.addScaledVector(c.n, -d*(1 - sh)); c.ob._dirty = true; }
+      else if (!c.st) { c.ob.p.addScaledVector(c.n, -d*(1 - sh)); c.ob._dirty = true; }
     }
     for (const c of cs) if (c.i >= 0) b.jn[c.i] = c.j || 1e-6;
     // walls, posts, buildings: out of them, and the speed into them gone
@@ -311,8 +339,21 @@ export class Debris {
     // (what rolls loses its roll slowly, to the road's roughness; what lies on it, fast)
     b.v.multiplyScalar(1 - 0.02*DT); b.w.multiplyScalar(1 - (touch ? (b.ball ? 0.35 : 0.6) : 0.05)*DT);
     if (b.ball && touch) { const h = Math.hypot(b.v.x, b.v.z), dv = Math.min(h, (b.roll ?? 0.06)*G0*DT); if (h > 1e-5) { b.v.x -= b.v.x/h*dv; b.v.z -= b.v.z/h*dv; } }
+    // (something small that's stopped travelling doesn't go on spinning on the spot)
+    if (touch && b.r0 < 0.15 && b.v.lengthSq() < 0.0144) b.w.multiplyScalar(1 - 8*DT);
     if (touch && b.v.lengthSq() < 0.012 && b.w.lengthSq() < 0.03) { if ((b.still += DT) > 0.6) { b.sleep = true; b.v.set(0, 0, 0); b.w.set(0, 0, 0); b._dirty = true; } }
     else b.still = 0;
+    // (and what's only trembling where it lies, pressed between its neighbours, going nowhere and turning nowhere for a second, is at rest too)
+    if (!b.sleep && (touch || b.r0 < 0.15)) {
+      const a = b._at || (b._at = { p: b.p.clone(), q: b.q.clone(), t: this.t });
+      if (a.p.distanceToSquared(b.p) > 0.000225 || (b.r0 >= 0.15 && Math.abs(a.q.dot(b.q)) < 0.9992)) { a.p.copy(b.p); a.q.copy(b.q); a.t = this.t; }
+      else if (this.t - a.t > 1) { b.sleep = true; b.v.set(0, 0, 0); b.w.set(0, 0, 0); b._dirty = true; a.t = this.t; }
+    } else if (b._at) b._at.t = this.t;
+    // (and something small that's done nothing but jostle among its neighbours for a couple of seconds, never getting anywhere, settles)
+    if (!b.sleep && b.r0 < 0.15) {
+      if (b._lf < 0 || b.v.lengthSq() > 0.1225) b._lf = this.t;
+      else if (this.t - b._lf > 2.5) { b.sleep = true; b.v.set(0, 0, 0); b.w.set(0, 0, 0); b._dirty = true; }
+    }
     if (b.p.y < -50) { b.sleep = true; b._dirty = true; }
   }
 }
