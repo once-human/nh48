@@ -146,11 +146,17 @@ void main(){
     c = mix(mix(c, bl, drunk*.6), bb, .38*drunk);
     c *= 1. - r*1.4*drunk;
   }
-  // poster paint: the colours a little stronger than life (the dull ones most), a little more contrast. Film: a real tone curve through the same light
+  // poster paint: the colours as they are, the dull ones only a touch livelier, and a little contrast. Film: a real tone
+  // curve through the same light, and no more colour than the light gave (ACES strengthens colour on its own: a filtered
+  // photo, greens gone lurid, is what pushing it further looked like)
   vec3 pst = c; float cl = lum(pst), cs = max(pst.r, max(pst.g, pst.b)) - min(pst.r, min(pst.g, pst.b));
-  pst = mix(vec3(cl), pst, 1.16 + .2*(1. - smoothstep(.0, .5, cs)));
-  pst = clamp(pst, 0., 1.); pst = mix(pst, pst*pst*(3. - 2.*pst), .32);
-  if (film > 0.) { vec3 lin = pow(max(c, vec3(0.)), vec3(2.2)); lin = mix(vec3(lum(lin)), lin, 1.14); vec3 fl = enc(aces(lin*.92)); fl += (h12(gl_FragCoord.xy + fract(time)*91.) - .5)*.012; c = mix(pst, fl, film); } else c = pst;
+  pst = mix(vec3(cl), pst, 1.03 + .08*(1. - smoothstep(.0, .5, cs)));
+  pst = clamp(pst, 0., 1.); pst = mix(pst, pst*pst*(3. - 2.*pst), .2);
+  // (a phone camera's look, a Pixel's: the tone curve on brightness alone, so every colour keeps the hue and strength
+  // the light gave it; highlights roll off softly into white rather than clipping, and shadows keep their detail)
+  if (film > 0.) { vec3 lin = pow(max(c, vec3(0.)), vec3(2.2))*.92; float Ll = max(lum(lin), 1e-4), Tl = aces(vec3(Ll)).x;
+    vec3 tm = lin*(Tl/Ll); tm = mix(tm, aces(lin), smoothstep(.55, 1.4, Ll)); tm = mix(vec3(lum(tm)), tm, .96);
+    vec3 fl = enc(max(tm, vec3(0.)))*.975 + .012; fl += (h12(gl_FragCoord.xy + fract(time)*91.) - .5)*.012; c = mix(pst, fl, film); } else c = pst;
   // the paper
   if (paper > 0.) { float pap = fb2(fp*.35)*.8 + h12(floor(fp/1.5))*.2; c *= 1. + (.955 + pap*.075 - 1.)*paper;
     float speck = step(.995, h12(floor(fp/1.6) + 5.)); c = mix(c, c*.78, speck*.5*paper); }

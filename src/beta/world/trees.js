@@ -44,12 +44,12 @@ const LEAF_FS = CHUNK + `void main(){
   LOD_OUT
   vec4 t = texture2D(tMap, vU); if (t.a < .45) discard;
   vec3 n = normalize(vN); if (!gl_FrontFacing) n = -n;
-  vec3 b = t.rgb*vC*1.15;
+  vec3 b = t.rgb*vC*1.1; b = mix(vec3(dot(b, vec3(.3, .59, .11))), b, .8);     // (Pune's trees are a dusty green, never a lime one)
   float e = nz(vW.xz*.9 + vW.y*.7) - .5, ndl = dot(n, sunDir), lit = mix(smoothstep(-.05, .22, ndl + e*.5), smoothstep(-.35, .75, ndl + e*.25), uReal);
   float sh = 1.; if (shadowOn > .5 && lit > 0.) { float s0 = shadowAt(vW, n); sh = mix(smoothstep(.25, .7, s0 + e*.35), s0, uReal); } float L = lit*sh*dayK;
   // dabs of paint: a dark hollow under the crown, warm top, each clump a little its own colour
   b *= .78 + .5*nz(vW.xz*.23 + vW.y*.17);
-  vec3 c = mix(b*shadeCol*vec3(.7, .85, .8)*(.75 + .25*smoothstep(0., 8., vH)) + vec3(.008, .016, .01)*dayK, b*sunCol*vec3(1.1, 1.04, .84), L) + lampOn(b, vW, n)*.8;
+  vec3 c = mix(b*shadeCol*vec3(.78, .84, .84)*(.75 + .25*smoothstep(0., 8., vH)) + vec3(.008, .016, .01)*dayK, b*sunCol*vec3(1.1, 1.04, .84), L) + lampOn(b, vW, n)*.8;
   float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), 1.); }`;
 const BARK_FS = CHUNK + `void main(){
   LOD_OUT
