@@ -1,3 +1,4 @@
+// Live: one of the game's three modes (story, free roam, live; G.mode says which), started with G.beginLive.
 // Live: Puneri's mode for the city as it is right now. It never stops: Esc brings the menu up over a world that goes on
 // (the traffic, the people, the voices), heard a little muffled and a little quieter behind it, and with the window in
 // the background the city still runs (on a timer: the browser stops drawing a hidden page). The city as it is right now. The clock is Pune's (IST, second for second, so it's dark when it's dark
@@ -47,7 +48,8 @@ export function liveMode(G) {
     fetchSky();
     setTimeout(() => G.hud?.toast?.('Live', 'Real time, real weather. Nothing pauses', 'info', 5), 1500);
   }
-  // the title: Live, under Free roam
+  G.beginLive = start;
+  // the title: Live, its own entry after Free roam
   const button = () => {
     const f = document.querySelector('#t-free'); if (!f) return false;
     if (document.querySelector('#t-live')) return true;

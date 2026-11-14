@@ -78,7 +78,7 @@ export class Diary {
     const L = this.el.querySelector('.dy-page.l'), R = this.el.querySelector('.dy-page.r');
     L.style.backgroundImage = `url(${url(paper(900, 1200, this.i * 2 + 1, true))})`;
     R.style.backgroundImage = `url(${url(paper(900, 1200, this.i * 2 + 2, false))})`;
-    if (!C) { L.innerHTML = `<div class="dy-h"><small>दैनंदिनी</small><b>${G.free ? 'Free roam' : 'Nothing yet'}</b></div><p class="dy-t">${G.free ? 'No story in free roam. Just Pune.' : 'The first page is waiting.'}</p>`; R.innerHTML = ''; return; }
+    if (!C) { L.innerHTML = `<div class="dy-h"><small>दैनंदिनी</small><b>${G.live ? 'Live' : G.free ? 'Free roam' : 'Nothing yet'}</b></div><p class="dy-t">${G.live ? 'No story in live. Pune as it is right now.' : G.free ? 'No story in free roam. Just Pune.' : 'The first page is waiting.'}</p>`; R.innerHTML = ''; return; }
     const m = C.m, st = S.st, F = S.flags, day = Math.floor((G.clock || 0) / 24) + 1, a = ACT[m.act] || ['', ''];
     // what happened: the messages that started it, then each step (ticked when done)
     const texts = []; for (const t of m.texts || []) { const v = t.fn ? t.fn() : [t]; for (const q of v) texts.push(q); }

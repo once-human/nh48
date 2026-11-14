@@ -499,7 +499,7 @@ export class HUD {
   syncPause() {
     { const g = this.pause.querySelector('#p-time-g'); if (g) g.hidden = !this.game.free; }
     const pw = this.pause && this.pause.querySelector('#p-who'), sv = savedCharacter();
-    if (pw) { pw.textContent = sv ? sv.name : 'Paused'; this.pause.querySelector('.pz-k').textContent = this.game.free ? 'Free roam' : 'Paused'; }
+    if (pw) { pw.textContent = sv ? sv.name : 'Paused'; this.pause.querySelector('.pz-k').textContent = this.game.live ? 'Live' : this.game.free ? 'Free roam' : 'Paused'; }
     const g = this.game;
     const area = this.$('h-area')?.textContent || 'Pune', street = this.$('h-street')?.textContent || '';
     this.pause.querySelector('#p-meta').innerHTML = `<span>${street || area}</span><span>${this.$('h-clock')?.textContent || ''}</span><span>${fmtRupees(g.stats?.money ?? 0)}</span>`;

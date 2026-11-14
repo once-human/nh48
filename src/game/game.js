@@ -354,7 +354,7 @@ export class Game {
     // screen comes up now, the city fades in behind it when they're done
     this.warming = this.prewarm().catch(() => {}).finally(() => { this._warmDone = true; });
     if (this.test.play) this.startPlay(this.test.play === 'shift');
-    if (this.resumed) { if (this._freeAt) this.beginFree(); else this.startPlay(false); this.hud.toast('Recovered', 'Your graphics driver reset, so the game reloaded where you were.', 'info', 4); }
+    if (this.resumed) { if (this._freeAt) { if (this._freeAt.live && this.beginLive) this.beginLive(); else this.beginFree(); } else this.startPlay(false); this.hud.toast('Recovered', 'Your graphics driver reset, so the game reloaded where you were.', 'info', 4); }
   }
   // compile every shader the game will need now, behind the loading screen, instead of the first
   // time someone new walks up or you take a vehicle (that compile was the freeze)
@@ -690,9 +690,11 @@ export class Game {
     if (!D) return;
     for (let i = D.length - 1; i >= 0; i--) { const T = D[i]; if ((T.t -= dt) <= 0) { D.splice(i, 1); T.fn(); } }
   }
+  // the three games you can be in: your story, free roam, and live. Only the story is ever saved
+  get mode() { return this.live ? 'live' : this.free ? 'free' : 'story'; }
   saveResume() {
     const P = this.player;
-    try { sessionStorage.setItem('nh48_resume', JSON.stringify({ x: P.x, z: P.z, th: P.onFoot ? P.foot.yaw : P.th, foot: !!P.onFoot, free: !!this.free, hour: this.hour, t: Date.now() })); } catch (e) { /* ignore */ }
+    try { sessionStorage.setItem('nh48_resume', JSON.stringify({ x: P.x, z: P.z, th: P.onFoot ? P.foot.yaw : P.th, foot: !!P.onFoot, free: !!this.free, live: !!this.live, hour: this.hour, t: Date.now() })); } catch (e) { /* ignore */ }
     this.saveStats();
   }
 
@@ -1153,7 +1155,7 @@ export class Game {
     const veh = !P.onFoot ? P.cur : null;
     if (veh && veh.fuel !== undefined && veh.fuel <= 0) return { main: 'Out of fuel', sub: 'Crawl to a pump (on the map), or call roadside help from the backpack', urgent: true };
     // free roam: a short hint at the start, then a clean screen
-    if (!r.enabled) return this.t - (this.playT0 || 0) < 6 ? { main: this.free ? 'Free roam' : 'Pune', sub: this.free ? 'No cops, unlimited cash · [ ] time of day · M to go anywhere' : 'Esc for menu · M for map' } : { main: '', sub: '' };
+    if (!r.enabled) return this.t - (this.playT0 || 0) < 6 ? { main: this.live ? 'Live' : this.free ? 'Free roam' : 'Pune', sub: this.live ? 'Pune as it is right now · M to go anywhere' : this.free ? 'No cops, unlimited cash · [ ] time of day · M to go anywhere' : 'Esc for menu · M for map' } : { main: '', sub: '' };
     const c = r.current;
     if (c && c.state === 'boarding') return { main: `${c.name} is getting in…`, sub: '' };
     if (c && c.state === 'onboard') {
