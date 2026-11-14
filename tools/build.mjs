@@ -105,7 +105,7 @@ const PV = puneHash.digest('hex').slice(0, 10);
 
 // the version, read off the history of changes (tools/version.mjs): nothing to raise by hand
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-const { version: VER, count: NUM } = gameVersion(root, pkg.changes);
+const { version: VER, build: NUM, how: HOW } = gameVersion(root, pkg.changes);
 let SHA = process.env.VERCEL_GIT_COMMIT_SHA || ''; try { SHA = SHA || execSync('git rev-parse HEAD', { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch (e) { /* no git */ }
 SHA = SHA.slice(0, 7);
 globalThis.__nhBuild = {
@@ -113,6 +113,6 @@ globalThis.__nhBuild = {
   manifest: JSON.stringify({ ...sizes, __voices: voiceIndex, __v: hashes, __pv: PV, __built: new Date().toISOString(), __ver: VER, __sha: SHA, __num: NUM }),
 };
 const assetTotal = Object.values(sizes).reduce((a, b) => a + b, 0);
-console.log(`assets in ${Date.now() - t0}ms  ${(assetTotal / 1024).toFixed(0)}KB in ${Object.keys(sizes).length} files  v${VER} (change ${NUM}, ${SHA})`);
+console.log(`assets in ${Date.now() - t0}ms  ${(assetTotal / 1024).toFixed(0)}KB in ${Object.keys(sizes).length} files  Version ${VER} (${NUM}) ${SHA}, ${HOW}`);
 for (const f of ['test.html', 'beta', 'experiment']) fs.rmSync(path.join(dist, f), { recursive: true, force: true });
 await import('./build-game.mjs');
