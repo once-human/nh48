@@ -6,7 +6,8 @@
 //
 //   VERSION 5.6.12  GENERATION.RELEASE.FIX. What a change IS decides which number moves, not how big it was or how
 //                   the work was cut into commits:
-//     GENERATION  a new way to play: a new mode (story, free roam, live, ...), or the game rebuilt.
+//     GENERATION  a new way to play: a new mode (story, free roam, live, ...), the game rebuilt, or a new map.
+//                 (a new city, or the whole map remade)
 //     RELEASE     something new in the game: a story chapter or part, a mechanic, a system, a vehicle, a power,
 //                 a district, a screen.
 //     FIX         everything else: fixes, tuning, polish, map and asset updates, tooling.
@@ -17,13 +18,16 @@
 //   2. The changes from before that line existed: the generations are written down below (HISTORY), by what they were.
 //   3. Nothing said: the code is measured. If what is new or rewritten since the last release's snapshot has reached
 //      5% of the game as it stood then, it is a release whether or not anyone called it one (a feature built quietly
-//      across fifty small commits still counts, once). Never a generation: size alone doesn't make a new way to play.
+//      across fifty small commits still counts, once). The same goes for the world itself: when a twentieth of the
+//      map and asset files (data/, assets/) are new or changed since that snapshot, it is a release.
+//      Measuring never makes a generation: a re-bake touches every map file without being a new map, and only
+//      the change itself can say which it was (step 1).
 //
 // The whole history is needed. A shallow checkout (Vercel without VERCEL_DEEP_CLONE=true) is deepened here; if that
 // can't be done the version is carried on, fixes only, from the last one written down in package.json ("changes").
 import { execSync } from 'node:child_process';
 
-const RELEASE = 0.05;
+const RELEASE = 0.05, WORLD = /^\S+\t\S+\t((?:data|assets)\/.+)$/, WORLD_RELEASE = 0.05;
 // the generations before commits said what they were
 const HISTORY = {
   '42af50046a3c2be496a4c30ff56cbc3b6af13663': 'generation',   // the first Puneri
@@ -48,8 +52,8 @@ export function gameVersion(root, known = {}) {
   // every change, oldest first: its hash, what it says it is, and what it added to and took from the code
   const commits = [];
   for (const part of sh('git log --first-parent --diff-merges=first-parent --reverse --format=@%H%n%B%x00 --numstat HEAD').split(/^@(?=[0-9a-f]{40}$)/m).slice(1)) {
-    const [msg, stat = ''] = part.split('\0'), h = msg.slice(0, 40), c = { h, add: 0, del: 0, said: (SAID.exec(msg) || [])[1]?.toLowerCase() || HISTORY[h] };
-    for (const l of stat.split('\n')) { const m = CODE.exec(l); if (m) { c.add += +m[1]; c.del += +m[2]; } }
+    const [msg, stat = ''] = part.split('\0'), h = msg.slice(0, 40), c = { h, add: 0, del: 0, world: 0, said: (SAID.exec(msg) || [])[1]?.toLowerCase() || HISTORY[h] };
+    for (const l of stat.split('\n')) { const m = CODE.exec(l); if (m) { c.add += +m[1]; c.del += +m[2]; } else if (WORLD.test(l)) c.world++; }
     commits.push(c);
   }
   // lines added between two snapshots (new or rewritten code that is still there)
@@ -62,13 +66,22 @@ export function gameVersion(root, known = {}) {
     const n = fresh(A.h, c.h); if (n >= A.need) return true;
     A.at = A.churn + (A.need - n); return false;
   };
-  let v = [0, 0, 0], size = 0, rel = null;
+  // the world: how many map and asset files there were at a snapshot, and how many are new or changed since
+  const files = (h) => sh(`git ls-tree -r --name-only ${h} -- data assets`).split('\n').filter(Boolean).length;
+  const changed = (a, b) => sh(`git diff --name-only --no-renames --diff-filter=AM ${a} ${b} -- data assets`).split('\n').filter(Boolean).length;
+  const wmark = (h, share) => ({ h, need: Math.max(3, Math.ceil(files(h)*share)), churn: 0, at: 0 });
+  const wreached = (A, c) => {
+    A.churn += c.world; if (A.churn < Math.max(A.at, A.need)) return false;
+    const n = changed(A.h, c.h); if (n >= A.need) return true;
+    A.at = A.churn + (A.need - n); return false;
+  };
+  let v = [0, 0, 0], size = 0, rel = null, wrel = null;
   for (const c of commits) {
     size += c.add - c.del;
-    const grown = rel ? reached(rel, c) : false;
+    const grown = (rel ? reached(rel, c) : false) | (wrel ? wreached(wrel, c) : false);
     const kind = c.said || (grown ? 'release' : 'fix');
     if (kind === 'generation') v = [v[0] + 1, 0, 0]; else if (kind === 'release') v = [v[0], v[1] + 1, 0]; else v[2]++;
-    if (kind !== 'fix' || grown || !rel) { rel = mark(c.h, size, RELEASE); rel.at = rel.need; }
+    if (kind !== 'fix' || grown || !rel) { rel = mark(c.h, size, RELEASE); rel.at = rel.need; wrel = wmark(c.h, WORLD_RELEASE); }
   }
   return { version: v.join('.'), build: commits.length, how: 'full history', at: commits.at(-1)?.h };
 }

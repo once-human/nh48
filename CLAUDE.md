@@ -11,7 +11,7 @@
 The game's version is worked out from the history by `tools/version.mjs`; nobody sets it by hand. End every commit
 message with one line (before any Co-Authored-By lines), judged by what the change is for the player, not by its size:
 
-    Change: generation - <why>      a new way to play: a new mode, or the game rebuilt
+    Change: generation - <why>      a new way to play: a new mode, the game rebuilt, a new city or the map remade
     Change: release - <why>         something new in the game: a story chapter or part, a mechanic, a system,
                                     a vehicle, a power, a district, a screen
     Change: fix - <why>             everything else: fixes, tuning, polish, map and asset updates, tooling
