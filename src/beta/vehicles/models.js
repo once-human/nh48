@@ -1619,7 +1619,7 @@ export function buildUnder(kind0, which) {
 }
 
 // ---------------------------------------------------------------- city bus (fictional Pune livery)
-const PANE = [0.07, 0.085, 0.1, 4], RUBBER = [0.03, 0.03, 0.033], STEEL = [0.5, 0.5, 0.52];
+const GLASSC = [0.07, 0.085, 0.1], PANE = [0.07, 0.085, 0.1, 4], RUBBER = [0.03, 0.03, 0.033], STEEL = [0.5, 0.5, 0.52];
 // a body of stations along x: outline(x) gives half the section, bottom middle round to the roof's middle, as [z, y]. `at`
 // shapes the ends (where a height's face really is at that x); both ends are closed off.
 function shell(b, xs, outline, at, colorOf, closeN = 6) {
@@ -1638,13 +1638,21 @@ export function buildBus(opts = {}) {
   const front = (y) => hl - (y > 1.08 ? 0.03 + 0.42*Math.pow((y - 1.08)/2.1, 1.3) : 0.035*(1.08 - y)), rear = (y) => -hl + (y > 2.3 ? 0.12*(y - 2.3)/0.9 : 0) + (y < 0.7 ? 0.08*(0.7 - y)/0.3 : 0);
   const at = (x, y, z) => { const c = Math.pow(Math.abs(z)/hw, 3.4); return Math.max(rear(y) + 0.16*c, Math.min(front(y) - 0.2*c, x)); };
   const yArch = (x) => { let yb = 0; for (const w of WX) { const d = Math.abs(x - w); if (d < AR) yb = Math.max(yb, 0.5 + Math.sqrt(AR*AR - d*d)); } return yb; };
-  const outline = (x) => { const a = yArch(x), yb = Math.max(0.42, a), low = Math.max(yb + 0.03, 0.56); return [[0, 0.42], [hw - 0.42, 0.42], [hw - 0.42, yb], [hw - 0.03, yb], [hw, low], [hw, Math.max(low + 0.05, 0.86)], [hw, Math.max(low + 0.1, 1.1)], [hw, 1.32], [hw, 1.38], [hw - 0.01, 1.66], [hw - 0.02, 2.0], [hw - 0.032, 2.32], [hw - 0.06, 2.66], [hw - 0.13, 2.88], [hw - 0.34, 3.05], [hw - 0.72, 3.13], [hw*0.3, 3.165], [0, 3.175]]; };
+  const outline = (x) => { const a = yArch(x), yb = Math.max(0.42, a), low = Math.max(yb + 0.03, 0.56); return [[0, 0.42], [hw - 0.42, 0.42], [hw - 0.42, yb], [hw - 0.03, yb], [hw, low], [hw, Math.max(low + 0.05, 0.86)], [hw, Math.max(low + 0.1, 1.1)], [hw, 1.32], [hw, 1.38], [hw - 0.005, 1.53], [hw - 0.01, 1.66], [hw - 0.02, 2.0], [hw - 0.031, 2.29], [hw - 0.06, 2.66], [hw - 0.13, 2.88], [hw - 0.34, 3.05], [hw - 0.72, 3.13], [hw*0.3, 3.165], [0, 3.175]]; };
   const DOORS = [[hl - 1.17, hl - 0.25], [-0.62, 0.42]];
-  const xs = stationsOf([-hl, -hl + 0.12, ...Array.from({ length: 46 }, (_, i) => -hl + (i + 1)*L/47), hl - 0.12, hl, ...DOORS.flat(), ...WX.flatMap(w => [-1, -.92, -.75, -.5, -.25, 0, .25, .5, .75, .92, 1].map(k => w + k*AR))], 0.02);
+  // the windows: a bay between each pair of pillars down both sides (none where a door is), cut out of the body
+  const bay = 1.15, x0 = -hl + 0.72, x1 = hl - 1.22, BAYS = [];
+  for (let x = x0; x + bay*0.5 < x1; x += bay) BAYS.push([x + 0.085, Math.min(x1, x + bay) - 0.085]);
+  const isDoor = (a, e, s) => s < 0 && ((a < hl - 0.2 && e > hl - 1.2) || (a < 0.45 && e > -0.65));
+  const xs = stationsOf([...BAYS.flat(), -hl, -hl + 0.12, ...Array.from({ length: 46 }, (_, i) => -hl + (i + 1)*L/47), hl - 0.12, hl, ...DOORS.flat(), ...WX.flatMap(w => [-1, -.92, -.75, -.5, -.25, 0, .25, .5, .75, .92, 1].map(k => w + k*AR))], 0.02);
   const sideZ = (y) => hw - Math.max(0, y - 1.38)*0.034;
   shell(b, xs, outline, at, (q) => {
     // the doorways are open: the leaves are their own pieces (vehicles/busdoors.js), folding in at a stop
     if (q.z < -(hw - 0.25) && Math.abs(q.nz) > 0.5 && q.y > 0.46 && q.y < 2.42 && DOORS.some(([a, e]) => q.x > a + 0.005 && q.x < e - 0.005)) return null;
+    // the windows are open too, and the windscreen and the back window: glass in them (below), the bus's inside behind
+    if (Math.abs(q.nz) > 0.5 && Math.abs(q.z) > hw - 0.25 && q.y > 1.53 && q.y < 2.29 && BAYS.some(([a, e]) => q.x > a && q.x < e && !isDoor(a - 0.035, e + 0.035, q.z < 0 ? -1 : 1))) return null;
+    if (q.nx > 0.5 && q.x > hl - 0.7 && q.y > 1.32 && q.y < 2.66 && Math.abs(q.z) < 1.1) return null;
+    if (q.nx < -0.5 && q.x < -hl + 0.4 && q.y > 1.66 && q.y < 2.29 && Math.abs(q.z) < 0.9) return null;
     if (q.ny < -0.55 || Math.abs(q.z) < hw - 0.05 && q.y < 1.0 && Math.abs(q.nx) < 0.7) return [...RUBBER, 0];
     if (q.y > 2.92) return [...roofC, 0];
     if (q.y > 1.3 && q.y < 1.385) return [...band, 0];
@@ -1655,7 +1663,6 @@ export function buildBus(opts = {}) {
   for (const w of WX) { b.addGeo(G.cyl12, M(w, 0.5, 0, 0.09, 2.1, 0.09, Math.PI/2), [0.12, 0.12, 0.13]); rbox(b, w - 0.16, 0.34, -0.2, w + 0.16, 0.64, 0.2, [0.1, 0.1, 0.11]); for (const s of [-1, 1]) { rbox(b, w - 0.56, 0.42, s*0.72 - .05, w + 0.56, 0.5, s*0.72 + .05, [0.14, 0.14, 0.15]); wheel(b, w, 0.5, s*(hw - 0.25), 0.5, 0.3); } }
   for (const w of WX) for (const s of [-1, 1]) { rbox(b, w - AR - 0.02, 0.32, s*(hw - 0.12), w - AR + 0.03, 0.72, s*(hw - 0.01), RUBBER); tube(b, [[w - AR*.97, 0.98, s*(hw + .012)], [w - AR*.6, 1.03 + .12, s*(hw + .012)], [w, 1.16, s*(hw + .012)], [w + AR*.6, 1.15, s*(hw + .012)], [w + AR*.97, 0.98, s*(hw + .012)]], 0.015, [0.15, 0.15, 0.16], 14, 5); }
   // the sides: panels and their rivets, rubbing strip, reflectors, a flap, windows between pillars with sliding panes
-  const bay = 1.15, x0 = -hl + 0.72, x1 = hl - 1.22;
   for (const s of [-1, 1]) {
     tube(b, [[-hl + 0.1, 0.92, s*(hw + .012)], [hl - 0.1, 0.92, s*(hw + .012)]], 0.014, [0.45, 0.1, 0.09], 2, 5);
     tube(b, [[-hl + 0.14, 2.9, s*(sideZ(2.75) - .03)], [hl - 0.5, 2.9, s*(sideZ(2.75) - .03)]], 0.03, [0.2, 0.2, 0.2], 2, 6);    // the rain gutter
@@ -1663,9 +1670,10 @@ export function buildBus(opts = {}) {
     for (const rx of [-hl + 0.34, -0.9, hl - 1.1]) box(b, rx - 0.05, 0.72, s*hw, rx + 0.05, 0.78, s*(hw + 0.008), [1, 0.5, 0.08], 0, 0.3);
     rbox(b, -1.5, 0.72, s*hw, -0.9, 1.14, s*(hw + 0.012), [0.6, 0.14, 0.12]);                 // service flap
     for (let x = x0; x + bay*0.5 < x1; x += bay) {
-      const a = x + 0.05, e = Math.min(x1, x + bay) - 0.05, door = s < 0 && ((a < hl - 0.2 && e > hl - 1.2) || (a < 0.45 && e > -0.65)); if (door) continue;
-      patch(b, 3, 3, (u, v) => [a + (e - a)*u, 1.5 + 0.82*v, s*(sideZ(1.5 + 0.82*v) + 0.005)], [...RUBBER, 0], [0, 0, s]);
-      patch(b, 3, 3, (u, v) => [a + 0.035 + (e - a - 0.07)*u, 1.535 + 0.75*v, s*(sideZ(1.53 + 0.75*v) + 0.012)], PANE, [0, 0, s]);
+      const a = x + 0.05, e = Math.min(x1, x + bay) - 0.05; if (isDoor(a, e, s)) continue;
+      // the rubber round the opening, the pane in it
+      for (const [fa, fe, fy, fh] of [[a, a + 0.05, 1.5, 0.82], [e - 0.05, e, 1.5, 0.82], [a, e, 1.5, 0.045], [a, e, 2.275, 0.045]]) patch(b, 1, 1, (u, v) => [fa + (fe - fa)*u, fy + fh*v, s*(sideZ(fy + fh*v) + 0.005)], [...RUBBER, 0], [0, 0, s]);
+      patch(gl, 3, 3, (u, v) => [a + 0.02 + (e - a - 0.04)*u, 1.52 + 0.78*v, s*(sideZ(1.52 + 0.78*v) + 0.009)], GLASSC, [0, 0, s]);
       box(b, a, 1.885, s*sideZ(1.9), e, 1.915, s*(sideZ(1.9) + 0.024), RUBBER);                 // top sash of the slider
       box(b, (a + e)/2 - 0.012, 1.915, s*sideZ(2.1), (a + e)/2 + 0.012, 2.3, s*(sideZ(2.1) + 0.02), [0.55, 0.55, 0.57]);
     }
@@ -1682,8 +1690,8 @@ export function buildBus(opts = {}) {
   // the front: windscreen in two curved panes, wipers, a route board under a hood, grille, lamps, bumper
   const fz = (y, z) => front(y) - 0.2*Math.pow(Math.abs(z)/hw, 3.4) + 0.006;
   for (const s of [-1, 1]) {
-    patch(b, 10, 8, (u, v) => { const y = 1.18 + 1.42*v, z = s*(0.012 + (hw - 0.14)*u); return [fz(y, z), y, z]; }, [...RUBBER, 0], [1, 0.1, 0]);
-    patch(b, 10, 8, (u, v) => { const y = 1.22 + 1.34*v, z = s*(0.04 + (hw - 0.21)*u); return [fz(y, z) + 0.006, y, z]; }, PANE, [1, 0.1, 0]);
+    for (const [z0, z1, y0, y1] of [[hw - 0.2, hw - 0.1, 1.24, 2.62], [0.012, hw - 0.1, 1.24, 1.34]]) patch(b, 6, 6, (u, v) => { const y = y0 + (y1 - y0)*v, z = s*(z0 + (z1 - z0)*u); return [fz(y, z), y, z]; }, [...RUBBER, 0], [1, 0.1, 0]);
+    patch(gl, 10, 8, (u, v) => { const y = 1.3 + 1.33*v, z = s*(0.024 + (hw - 0.17)*u); return [fz(y, z) + 0.006, y, z]; }, GLASSC, [1, 0.1, 0]);
     rod(b, [fz(1.25, s*0.8) + 0.04, 1.25, s*0.8], [fz(1.95, s*0.34) + 0.03, 1.95, s*0.34], 0.007, RUBBER);
     rod(b, [fz(1.2, s*0.8) + 0.04, 1.2, s*0.8], [fz(1.25, s*0.8) + 0.04, 1.26, s*0.8], 0.018, RUBBER);
     // headlamps, indicator, fog lamp
@@ -1705,8 +1713,8 @@ export function buildBus(opts = {}) {
   for (let k = 0; k < 7; k++) rbox(b, hl - 0.015, 0.68 + k*0.045, -0.48, hl + 0.018, 0.7 + k*0.045, 0.48, [0.09, 0.09, 0.1]);
   // the back: its window, the engine's louvres, lamps, a board, ladder rungs
   const rx = (y) => rear(y) - 0.006;
-  patch(b, 8, 6, (u, v) => { const y = 1.62 + 0.86*v, z = (u - .5)*(W - 0.62); return [rx(y) + .16*Math.pow(Math.abs(z)/hw, 3.4), y, z]; }, [...RUBBER, 0], [-1, 0, 0]);
-  patch(b, 8, 6, (u, v) => { const y = 1.66 + 0.78*v, z = (u - .5)*(W - 0.7); return [rx(y) - 0.006 + .16*Math.pow(Math.abs(z)/hw, 3.4), y, z]; }, PANE, [-1, 0, 0]);
+  for (const [z0, z1, y0, y1] of [[-0.97, -0.86, 1.6, 2.36], [0.86, 0.97, 1.6, 2.36], [-0.97, 0.97, 1.6, 1.68], [-0.97, 0.97, 2.27, 2.36]]) patch(b, 6, 2, (u, v) => { const y = y0 + (y1 - y0)*v, z = z0 + (z1 - z0)*u; return [rx(y) + .16*Math.pow(Math.abs(z)/hw, 3.4), y, z]; }, [...RUBBER, 0], [-1, 0, 0]);
+  patch(gl, 8, 6, (u, v) => { const y = 1.64 + 0.68*v, z = (u - .5)*1.84; return [rx(y) - 0.006 + .16*Math.pow(Math.abs(z)/hw, 3.4), y, z]; }, GLASSC, [-1, 0, 0]);
   for (let k = 0; k < 12; k++) rbox(b, -hl - 0.022, 0.62 + k*0.058, -0.86, -hl + 0.02, 0.645 + k*0.058, 0.86, [0.09, 0.09, 0.1]);
   rbox(b, -hl - 0.09, 0.38, -hw - 0.012, -hl + 0.09, 0.6, hw + 0.012, [0.12, 0.12, 0.13]);
   box(b, rx(2.76) - 0.012, 2.62, -0.7, rx(2.76) + 0.01, 2.9, 0.7, [1, 0.45, 0.05], 0, 0.7);
@@ -1759,7 +1767,8 @@ export function buildBus(opts = {}) {
   // wheel (yours is you)
   for (const [x, y, z, k] of BUS_PAX) addRider(b, x, y, z, { lean: -0.06, fixedHead: true, shirt: PAX_SHIRTS[k % PAX_SHIRTS.length], pants: PAX_PANTS[(k*7) % PAX_PANTS.length], hair: HAIRS[(k*3) % HAIRS.length], handX: x + 0.36, handY: y + 0.1, handW: 0.12, footX: x + 0.46, footY: fl + 0.04 });
   if (opts.driver) { const [x, y, z] = BUS_DRV; addRider(b, x, y, z, { lean: -0.04, fixedHead: true, shirt: [0.62, 0.66, 0.72], pants: [0.2, 0.22, 0.3], handX: hl - 0.92, handY: fl + 0.9, handW: 0.17, footX: x + 0.62, footY: fl + 0.06 }); }
-  return { body: b.build(), glass: gl.build(), dims: { L, W, H, wb: 5.4 } };
+  const body = b.build(), glass = gl.build(); body.userData.glassSrc = glass;       // (far off, one mesh: the panes go back on as dark panels. beta/vehicles/lod.js)
+  return { body, glass, dims: { L, W, H, wb: 5.4 } };
 }
 
 // ---------------------------------------------------------------- tempo (mini truck)

@@ -37,7 +37,8 @@ function panelGeo(w, edge) {
 function panel(w, edge) {
   if (!mats) mats = {
     frame: new THREE.MeshStandardMaterial({ color: 0x8e9398, roughness: 0.38, metalness: 0.65 }),
-    glass: new THREE.MeshStandardMaterial({ color: 0x1c262c, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.42, depthWrite: false }),
+    // (the bus's own window glass, so the doors match the windows beside them: dark and glossy, not a clear sheet)
+    glass: (window.__nhAskG && window.__nhAskG.vmats && window.__nhAskG.vmats.glass) || new THREE.MeshStandardMaterial({ color: 0x0c1114, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.8, depthWrite: false }),
     kick: new THREE.MeshStandardMaterial({ color: 0xa8241b, roughness: 0.45, metalness: 0.1 }),
     rubber: new THREE.MeshStandardMaterial({ color: 0x121212, roughness: 0.95 }),
     bar: new THREE.MeshStandardMaterial({ color: 0xc9cdd2, roughness: 0.22, metalness: 0.85 }),

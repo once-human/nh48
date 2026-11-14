@@ -2,7 +2,7 @@
 // and rates, spawns and the rest all go back when you leave it.
 import { Shell, Terminal, plain } from './console.js';
 import { Vehicle, SPECS, specOf, defaultPaint, makeService } from '@orig/vehicles/vehicle.js';
-import { buildAmbulance, buildPoliceJeep } from '@orig/vehicles/emodels.js';
+import { buildAmbulance, buildPoliceJeep } from '../vehicles/emodels.js';
 import { serviceCabin } from '../vehicles/servicecab.js';
 import { TYPES } from '@orig/traffic/traffic.js';
 import { WEATHERS } from '@orig/gfx/weather.js';

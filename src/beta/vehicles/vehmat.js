@@ -136,13 +136,17 @@ const GLASS_FS = CHUNK + `uniform vec4 uCrk[3];
 void main(){
   FADE_OUT
   vec3 n = normalize(vN), V = normalize(cameraPosition - vW); if (!gl_FrontFacing) n = -n;
-  vec3 R = reflect(-V, n); float e = nz(gl_FragCoord.xy*.09) - .5, hz = smoothstep(-.05, .12, R.y + e*.1), fres = .25 + .75*pow(1. - max(dot(n, V), 0.), 2.5);
-  vec3 env = mix(vec3(.1, .1, .1)*(.3 + .7*dayK), skyCol*(.25 + .75*dayK)*1.1, hz), c = mix(uTint, env, clamp(fres*(.75 + .25*step(.2, fract(vW.x*1.3 + vW.z*1.1 + vW.y*2.1 + e))), 0., .9));
-  float s = pow(max(dot(R, sunDir), 0.), 90.)*dayK; c += sunCol*smoothstep(.3, .7, s);
-  // clear glass is clear looked down through, and a mirror of the sky looked across; a film's dark whichever way
-  // (a car's glass: lightly tinted looked straight through, so you see who's in it and the cabin, and more and more a
-  // mirror of the sky the more it's looked along; a film from the garage is dark whichever way)
-  float k = clamp((fres - .25)/.75, 0., 1.), al = mix(mix(.62, .9, k), mix(.3, .86, k), uClear);
+  // a vehicle's glass, as the dark glossy panes read from outside: its own deep green-grey body, the sky over a hard
+  // horizon and the road under it laid across it (the same world the paint next to it carries), a soft sheen in bands,
+  // the sun's glint; seen through only dimly looked straight at (the cabin and who's in it, darkened), and a mirror
+  // looked along. Never a clear hole: two panes of it and the street behind the car is all but gone
+  vec3 R = reflect(-V, n); float e = nz(gl_FragCoord.xy*.09) - .5, hz = smoothstep(-.03, .07, R.y + e*.08), fr = pow(1. - max(dot(n, V), 0.), 3.);
+  vec3 env = mix(vec3(.13, .12, .115)*(.4 + dayK*.6), skyCol*(.3 + .7*dayK)*(1.1 - R.y*.4), hz);
+  vec3 own = mix(uTint, vec3(.03, .05, .043), uClear*.65)*(.45 + .75*dayK);
+  float sheen = smoothstep(.5, .62, fract(vL.x*.8 + vL.y*1.6 + vL.z*.35 + e*.12))*(1. - fr)*dayK;
+  vec3 c = mix(own, env, clamp(.1 + .72*fr + sheen*.08, 0., .9));
+  float s = pow(max(dot(R, sunDir), 0.), 60.)*dayK; c += sunCol*smoothstep(.25, .6, s)*1.2;
+  float al = mix(mix(.8, .97, fr), mix(.6, .95, fr), uClear);
   // a cracked windscreen (beta/vehicles/glassbreak.js): from each place it was struck, lines running out and broken rings
   // round it, white where the glass has let go of itself, crushed to frost at the very spot
   float ck = 0.;
