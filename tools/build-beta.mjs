@@ -383,7 +383,7 @@ const PATCHES = {
     // someone being dragged or waking up is posed every frame, seen or not (behind you, they were posed every few
     // frames and your hands, holding them, jumped between where they were and where they'd been)
     ["if (seen ? (dd < 30 || (dd < 70 ?", "if (p._drag || p._wake ? true : seen ? (dd < 45 || (dd < 100 ?"],
-    ["H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; }", "H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; } else H.mixer.rest && H.mixer.rest();\n    if (this.postPed && (dd < 40 || p._rag)) this.postPed(p, H, dt);"]],
+    ["H.mixer.update(Math.min(s.dtAcc, 0.25)); s.dtAcc = 0; upd = true; }", "H.mixer.update(Math.min(s.dtAcc, 1)); s.dtAcc = 0; upd = true; } else H.mixer.rest && H.mixer.rest();\n    if (this.postPed && (dd < 40 || p._rag)) this.postPed(p, H, dt);"]],
   // animals: the walk follows how far they really move (no gliding when the game moves them, no 2.6x cap when they run)
   [S('people/animals.js')]: [
     // (what's down lies down: beta/people/runover.js)
@@ -429,6 +429,13 @@ const PATCHES = {
     ["edge(3, 'KeyV');", "edge(3, 'KeyC');"],
   ],
   [S('game/game.js')]: [
+    // Everyone else runs in real time too. The traffic, the people and the animals were moved on by a twentieth of a
+    // second a frame at most, while what you drive never was: under twenty frames a second the whole street slowed
+    // down and you went through it like the only thing at full speed. A long frame is worked out in as many steps of
+    // a twentieth as it takes
+    ["this.traffic.update(Math.min(dt, 0.05), P.x, P.z, this.inView);", "{ const n_ = Math.max(1, Math.ceil(dt / 0.05 - 1e-6)), h_ = dt / n_; for (let i_ = 0; i_ < n_; i_++) this.traffic.update(h_, P.x, P.z, this.inView); }"],
+    ["this.people.update(Math.min(dt, 0.05), P, this.inView);", "{ const n_ = Math.max(1, Math.ceil(dt / 0.05 - 1e-6)), h_ = dt / n_; for (let i_ = 0; i_ < n_; i_++) this.people.update(h_, P, this.inView); }"],
+    ["if (this.fauna) this.fauna.update(Math.min(dt, 0.05), this.camera.position.x, this.camera.position.z);", "if (this.fauna) { const n_ = Math.max(1, Math.ceil(dt / 0.05 - 1e-6)), h_ = dt / n_; for (let i_ = 0; i_ < n_; i_++) this.fauna.update(h_, this.camera.position.x, this.camera.position.z); }"],
     // blood from the body where it comes to rest, not from where they were hit (beta/gfx/blood.js)
     ["else if (ev.type === 'pedDied' && this.blood) this.blood.spill(ev.x, ev.z, 0.9, 30);", "else if (ev.type === 'pedDied' && this.blood) this.blood.spill(ev.x, ev.z, 0.9, 30, ev.p);"],
     ["this.blood.spill(ev.p.x, ev.p.z, sev === 'dead' ? 1.1 : sev === 'critical' ? 0.85 : 0.35, sev === 'ko' ? 15 : 40);", "this.blood.spill(ev.p.x, ev.p.z, sev === 'dead' ? 1.1 : sev === 'critical' ? 0.85 : 0.35, sev === 'ko' ? 15 : 40, ev.p);"],
