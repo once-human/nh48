@@ -1,48 +1,16 @@
-// Build NH48 into dist/:
-//   dist/index.html   – page body for the artifact (inline CSS, fonts as data URIs, inline ES module)
-//   dist/test.html    – the same page wrapped in a full document, for local tests over http
-//   dist/assets/...   – map, textures, models and audio, fetched at runtime relative to the page
+// Build Puneri into dist/: node tools/build.mjs
+//   dist/index.html   the game, one page (inline CSS and JS)
+//   dist/assets/...   map, textures, models, fonts and audio, fetched at runtime relative to the page
+// This file lays out the assets and the manifest; tools/build-game.mjs (run from here) bundles the game and writes the page.
 // three.js, its addons, postprocessing and n8ao load from jsDelivr through an import map.
-import * as esbuild from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
+import { execSync } from 'node:child_process';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-const dev = process.argv.includes('--dev');
 const t0 = Date.now();
-const V = { three: '0.186.1', pp: '6.39.5', n8ao: '2.0.1' };
-const IMPORTS = {
-  three: `https://cdn.jsdelivr.net/npm/three@${V.three}/build/three.module.min.js`,
-  'three/addons/': `https://cdn.jsdelivr.net/npm/three@${V.three}/examples/jsm/`,
-  'three/examples/jsm/': `https://cdn.jsdelivr.net/npm/three@${V.three}/examples/jsm/`,
-  postprocessing: `https://cdn.jsdelivr.net/npm/postprocessing@${V.pp}/build/index.js`,
-  n8ao: `https://cdn.jsdelivr.net/npm/n8ao@${V.n8ao}/dist/N8AO.js`,
-};
-// NH_LOCAL=1: serve the libraries from node_modules (for tests where the CDN can't be reached)
-if (process.env.NH_LOCAL) {
-  IMPORTS.three = './nm/three/build/three.module.js';
-  IMPORTS['three/addons/'] = IMPORTS['three/examples/jsm/'] = './nm/three/examples/jsm/';
-  IMPORTS.postprocessing = './nm/postprocessing/build/index.js';
-  IMPORTS.n8ao = './nm/n8ao/dist/N8AO.js';
-}
-const res = await esbuild.build({
-  entryPoints: [path.join(root, 'src/main.js')],
-  bundle: true, format: 'esm', minify: !dev, sourcemap: false, write: false, legalComments: 'none',
-  target: ['es2022', 'chrome100', 'safari16', 'firefox110'],
-  external: ['three', 'three/addons/*', 'three/examples/jsm/*', 'postprocessing', 'n8ao'],
-  define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning',
-  plugins: [{
-    // ez-tree imports its bundled bark/leaf images from ./textures; NH48 brings its own
-    name: 'eztree-textures',
-    setup(b) {
-      b.onResolve({ filter: /^\.\/textures$/ }, (a) => (a.importer.includes('ez-tree') ? { path: path.join(root, 'src/gfx/eztreeStub.js') } : undefined));
-    },
-  }],
-});
-const js = res.outputFiles[0].text;
-
 // fonts (data URIs; the artifact CSP allows data: fonts)
 const NM = path.join(root, 'node_modules');
 const DEV = 'U+0900-097F,U+1CD0-1CF9,U+200C-200D,U+20A8,U+20B9,U+20F0,U+25CC,U+A830-A839,U+A8E0-A8FF,U+11B00-11B09';
@@ -134,28 +102,19 @@ const puneHash = crypto.createHash('sha1');
 for (const k of Object.keys(hashes).sort()) if (k.startsWith('assets/pune/') || k.startsWith('assets/fonts/')) { puneHash.update(k + hashes[k]); if (!/base\.json\.gz$/.test(k)) { delete hashes[k]; delete sizes[k]; } }
 const PV = puneHash.digest('hex').slice(0, 10);
 
-const tpl = fs.readFileSync(path.join(root, 'src/page.html'), 'utf8');
-const css = fs.readFileSync(path.join(root, 'src/style.css'), 'utf8');
-const importMap = `<script type="importmap">${JSON.stringify({ imports: IMPORTS })}</script>`;
-const body = tpl
-  .replace('/*FONTS*/', () => fontCss)
-  .replace('/*CSS*/', () => css)
-  .replace('<!--IMPORTMAP-->', () => importMap)
-  .replace('/*MANIFEST*/', () => JSON.stringify({ ...sizes, __voices: voiceIndex, __v: hashes, __pv: PV, __built: new Date().toISOString() }))
-  .replace('/*JS*/', () => js.replace(/<\/script/gi, '<\\/script'));
-fs.writeFileSync(path.join(dist, 'index.html'), body);
-// the deployed page (vercel copies test.html to index.html): what a link shows when it's shared on WhatsApp,
-// Instagram, X: the title, a line, the picture (assets/og.jpg, 1200x630)
-const SITE = 'https://pune.onkar.buzz';
-const DESC = 'Drive real Pune in your browser. FC Road, Shaniwar Wada, Parvati, the metro, autos on the meter. Free, nothing to install.';
-const ICON = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 52"><path d="M4 22a16 16 0 0 1 32 0v26H4z" fill="#F4F1EA"/><path d="M4 22a16 16 0 0 1 32 0z" fill="#F2B705"/><rect x="4" y="44" width="32" height="4" fill="#C9C4B8"/></svg>')}`;
-const HEAD = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">`
-  + `<title>Puneri · Drive real Pune</title><meta name="description" content="${DESC}"><meta name="theme-color" content="#101216"><link rel="icon" href="${ICON}">`
-  + `<meta property="og:type" content="website"><meta property="og:site_name" content="Puneri"><meta property="og:url" content="${SITE}/">`
-  + `<meta property="og:title" content="Puneri"><meta property="og:description" content="${DESC}">`
-  + `<meta property="og:image" content="${SITE}/assets/og.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Shaniwar Wada in Puneri">`
-  + `<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Puneri"><meta name="twitter:description" content="${DESC}"><meta name="twitter:image" content="${SITE}/assets/og.jpg">`;
-fs.writeFileSync(path.join(dist, 'test.html'), `<!doctype html><html lang="en"><head>${HEAD}<style>:root{color-scheme:dark}body{margin:0}[hidden]{display:none!important}</style></head><body>${body}</body></html>`);
-const kb = (n) => (n / 1024).toFixed(0) + 'KB';
+// The version. package.json's "version" is the release, MAJOR.MINOR.PATCH, raised by hand:
+//   MAJOR  the game rebuilt (1 = the pencil-and-ink Pune that was /beta, now the game)
+//   MINOR  something new to do or see
+//   PATCH  fixes and tuning
+// The build is stamped on top by itself: the commit it was made from, and the time.
+const sh = (c) => { try { return execSync(c, { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch (e) { return ''; } };
+const VER = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+const SHA = (process.env.VERCEL_GIT_COMMIT_SHA || sh('git rev-parse HEAD')).slice(0, 7);
+globalThis.__nhBuild = {
+  fontCss,
+  manifest: JSON.stringify({ ...sizes, __voices: voiceIndex, __v: hashes, __pv: PV, __built: new Date().toISOString(), __ver: VER, __sha: SHA }),
+};
 const assetTotal = Object.values(sizes).reduce((a, b) => a + b, 0);
-console.log(`built in ${Date.now() - t0}ms  page ${kb(body.length)} (js ${kb(js.length)}, fonts ${kb(fontCss.length)})  assets ${kb(assetTotal)} in ${Object.keys(sizes).length} files`);
+console.log(`assets in ${Date.now() - t0}ms  ${(assetTotal / 1024).toFixed(0)}KB in ${Object.keys(sizes).length} files  v${VER} ${SHA}`);
+for (const f of ['test.html', 'beta', 'experiment']) fs.rmSync(path.join(dist, f), { recursive: true, force: true });
+await import('./build-game.mjs');

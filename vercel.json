@@ -2,8 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "npm ci --no-audit --no-fund",
-  "buildCommand": "node tools/build.mjs && cp dist/test.html dist/index.html && rm dist/test.html && node tools/build-experiment.mjs && node tools/build-beta.mjs",
+  "buildCommand": "node tools/build.mjs",
   "outputDirectory": "dist",
+  "redirects": [
+    { "source": "/beta", "destination": "/", "permanent": false },
+    { "source": "/beta/:path*", "destination": "/", "permanent": false }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",

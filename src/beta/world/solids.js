@@ -95,7 +95,7 @@ Collision.prototype.addRingR = function (pts, kind = 0, out = []) {
   return out;
 };
 
-// what the game calls (propsChunk.js and tiles.js, patched in tools/build-beta.mjs)
+// what the game calls (propsChunk.js and tiles.js, patched in tools/build-game.mjs)
 export function makeSolids(W) {
   return {
     // a stall [x, z, a, kind] (cm), drawn at compose(x, 0.15, z, atan2(cos a, sin a))

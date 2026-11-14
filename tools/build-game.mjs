@@ -1,13 +1,7 @@
-// Build /beta (Puneri, with the new look) into dist/beta/index.html. Run after tools/build.mjs: it shares that
-// build's dist/assets (map tiles, fonts, models, voices) and reads its manifest from dist/index.html or dist/test.html.
+// The game's bundle and page (dist/index.html). Run by tools/build.mjs, which lays out dist/assets first.
 //
-// The game in /beta is the game: every file under src/ is bundled as it is. Only what draws the city is swapped,
-// at build time, for the new look (src/beta), and never anything that decides what happens:
-//   - src/world/world.js gets the new buildings and ground builders (they produce the same shop doors, shutters
-//     and boards the game reads, from the same map data; collision never came from the drawing), and the painted
-//     materials in place of the old ground, wall, roof, prop and water ones
-//   - the story is left out (src/beta/game/story.js answers "no story" to everything that asks)
-//   - the first-minutes tutorial skips the auto steps (there's no auto of your own in /beta)
+// The game is src/ with the pencil-and-ink layer in src/beta laid over it at build time (it began as /beta and is now
+// the only game): SWAPS replaces a module with its stand-in under src/beta, PATCHES edits a line of a file under src/.
 // A file under src/beta can still reach any original with '@orig/<path under src>'.
 import * as esbuild from 'esbuild';
 import fs from 'node:fs';
@@ -701,22 +695,19 @@ const swapPlugin = {
 };
 const common = { bundle: true, minify: !dev, write: false, legalComments: 'none', target: ['es2022', 'chrome100', 'safari16', 'firefox110'], logLevel: 'warning', define: { 'process.env.NODE_ENV': '"production"' } };
 // the city's buildings are generated in a worker: its own small bundle, carried in the page as text
-const wres = await esbuild.build({ ...common, entryPoints: [S('beta/world/worker.js')], format: 'iife' });
+const wres = await esbuild.build({ ...common, metafile: true, entryPoints: [S('beta/world/worker.js')], format: 'iife' });
 const workerJs = wres.outputFiles[0].text;
 const res = await esbuild.build({
-  ...common, entryPoints: [S('beta/main.js')], format: 'esm',
+  ...common, metafile: true, entryPoints: [S('beta/main.js')], format: 'esm',
   external: ['three', 'three/addons/*', 'three/examples/jsm/*', 'postprocessing', 'n8ao'], plugins: [swapPlugin],
 });
 const js = res.outputFiles[0].text;
+if (process.env.NH_USED) fs.writeFileSync(process.env.NH_USED, [...Object.keys(res.metafile.inputs), ...Object.keys(wres.metafile.inputs)].join('\n'));
 
-// the main build's manifest (asset sizes, voice offsets, versions): /beta reads the same files
+// the assets' manifest (sizes, voice offsets, versions) and the fonts, from tools/build.mjs
 const dist = path.join(root, 'dist');
-const mainPage = ['index.html', 'test.html'].map(f => path.join(dist, f)).filter(f => fs.existsSync(f) && fs.readFileSync(f, 'utf8').includes('id="manifest"'))[0];
-if (!mainPage) throw new Error('build-beta: run tools/build.mjs first (no dist/index.html or dist/test.html with a manifest)');
-const mainHtml = fs.readFileSync(mainPage, 'utf8');
-const mm = mainHtml.match(/<script id="manifest" type="application\/json">([\s\S]*?)<\/script>/);
-const manifest = mm[1];
-const fontCss = (mainHtml.match(/@font-face\{[^}]*\}/g) || []).join('\n');
+if (!globalThis.__nhBuild) throw new Error('run tools/build.mjs (it runs this)');
+const { manifest, fontCss } = globalThis.__nhBuild;
 
 const tpl = fs.readFileSync(S('page.html'), 'utf8');
 const css = fs.readFileSync(S('style.css'), 'utf8') + fs.readFileSync(S('beta/beta.css'), 'utf8');
@@ -728,11 +719,15 @@ const body = tpl
   .replace('/*MANIFEST*/', () => manifest)
   .replace('/*JS*/', () => js.replace(/<\/script/gi, '<\\/script'));
 const ICON = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 52"><path d="M4 22a16 16 0 0 1 32 0v26H4z" fill="#F4F1EA"/><path d="M4 22a16 16 0 0 1 32 0z" fill="#F2B705"/><rect x="4" y="44" width="32" height="4" fill="#C9C4B8"/><path d="M8 40 30 18M12 44 34 22" stroke="#171411" stroke-width="2"/></svg>')}`;
+// what a link shows when it's shared on WhatsApp, Instagram, X: the title, a line, the picture (assets/og.jpg, 1200x630)
+const SITE = 'https://pune.onkar.buzz';
+const DESC = 'Drive real Pune in your browser. FC Road, Shaniwar Wada, Parvati, the metro, autos on the meter. Free, nothing to install.';
 const HEAD = '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
-  + '<base href="/"><title>Puneri · beta</title><meta name="robots" content="noindex">'
-  + `<meta name="description" content="Puneri, rebuilt: all of Pune drawn in pencil and ink."><meta name="theme-color" content="#101216"><link rel="icon" href="${ICON}">`;
+  + `<base href="/"><title>Puneri · Drive real Pune</title><meta name="description" content="${DESC}"><meta name="theme-color" content="#101216"><link rel="icon" href="${ICON}">`
+  + `<meta property="og:type" content="website"><meta property="og:site_name" content="Puneri"><meta property="og:url" content="${SITE}/">`
+  + `<meta property="og:title" content="Puneri"><meta property="og:description" content="${DESC}">`
+  + `<meta property="og:image" content="${SITE}/assets/og.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Shaniwar Wada in Puneri">`
+  + `<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Puneri"><meta name="twitter:description" content="${DESC}"><meta name="twitter:image" content="${SITE}/assets/og.jpg">`;
 const worker = `<script id="beta-worker" type="text/js-worker">${workerJs.replace(/<\/script/gi, '<\\/script')}</script>`;
-const out = path.join(dist, 'beta');
-fs.mkdirSync(out, { recursive: true });
-fs.writeFileSync(path.join(out, 'index.html'), `<!doctype html><html lang="en"><head>${HEAD}<style>:root{color-scheme:dark}body{margin:0}[hidden]{display:none!important}</style></head><body>${worker}${body}</body></html>`);
-console.log(`beta built in ${Date.now() - t0}ms  page ${(body.length / 1024).toFixed(0)}KB (js ${(js.length / 1024).toFixed(0)}KB, worker ${(workerJs.length / 1024).toFixed(0)}KB)`);
+fs.writeFileSync(path.join(dist, 'index.html'), `<!doctype html><html lang="en"><head>${HEAD}<style>:root{color-scheme:dark}body{margin:0}[hidden]{display:none!important}</style></head><body>${worker}${body}</body></html>`);
+console.log(`game built in ${Date.now() - t0}ms  page ${(body.length / 1024).toFixed(0)}KB (js ${(js.length / 1024).toFixed(0)}KB, worker ${(workerJs.length / 1024).toFixed(0)}KB)`);

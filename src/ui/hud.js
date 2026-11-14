@@ -479,8 +479,9 @@ export class HUD {
     p.querySelectorAll('#p-q button').forEach(b => b.onclick = () => { this.game.setQuality(b.dataset.q); this.syncPause(); });
     p.querySelector('#p-ch-pay').onclick = () => { if (this.game.police) this.game.police.payDues(); this.syncPause(); };
     // which build this is, and whether there's a newer one up
-    const built = (() => { try { return JSON.parse(document.getElementById('manifest').textContent).__built || ''; } catch (e) { return ''; } })();
-    p.querySelector('#p-ver').textContent = built ? 'Build of ' + new Date(built).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Local build';
+    const mf = (() => { try { return JSON.parse(document.getElementById('manifest').textContent); } catch (e) { return {}; } })(), built = mf.__built || '';
+    const ver = 'v' + (mf.__ver || '0') + (mf.__sha ? ' (' + mf.__sha + ')' : '');
+    p.querySelector('#p-ver').textContent = !built ? ver + ' · local build' : ver + ' · ' + new Date(built).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
     p.querySelector('#p-upd').onclick = async (e) => {
       const b = e.currentTarget; if (b.dataset.ready) { location.reload(); return; }
       b.disabled = true; b.textContent = 'Checking…';

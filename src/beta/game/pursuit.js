@@ -4,7 +4,7 @@
 // you go in doesn't know you're there: that's the hiding place. Out of the door again and whoever came in after you
 // comes out after you.
 // (The chase itself, the speeds, the catching, the traffic and the signals: patches on game/police.js and
-// vehicles/driver.js in tools/build-beta.mjs.)
+// vehicles/driver.js in tools/build-game.mjs.)
 import { Police } from '@orig/game/police.js';
 import { Interiors } from '@orig/world/interiors.js';
 import { Brain } from '@orig/people/brain.js';

@@ -5,7 +5,7 @@
 // fourth frame. On those bones and frames the turn went on top of last frame's turn, and again, and the neck, the
 // hips, the spine wound round and round. Now each mixer remembers the pose its clips last made, puts the bones back to
 // it before every step (so a bone no clip moves is where it was, not where the last turn left it), and can put them
-// back on a frame it doesn't step at all (people/crowd.js, patched in tools/build-beta.mjs): whatever's built on top
+// back on a frame it doesn't step at all (people/crowd.js, patched in tools/build-game.mjs): whatever's built on top
 // is built on the clip's pose, every frame, and never on itself.
 import * as THREE from 'three';
 

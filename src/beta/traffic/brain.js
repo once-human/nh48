@@ -21,7 +21,7 @@
 //
 // The sim's own rules stay as they are (traffic.js: following, signals, weaving) and the layers over it keep the last
 // word on where a vehicle can physically be (spacing.js, steer.js). This only decides what each driver wants.
-// Hooks called from traffic.js step (tools/build-beta.mjs): brainSpeed, brainSee, brainSig; v._bPref, v._bCreep.
+// Hooks called from traffic.js step (tools/build-game.mjs): brainSpeed, brainSee, brainSig; v._bPref, v._bCreep.
 import { Traffic } from '@orig/traffic/traffic.js';
 
 const clamp = (x, a, b) => x < a ? a : x > b ? b : x, lerp = (a, b, t) => a + (b - a)*t;

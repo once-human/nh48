@@ -1,5 +1,5 @@
 // (/beta's: the same two, with their windows cut out of the body and real vehicle glass in them, a cabin behind it.
-// tools/build-beta.mjs swaps this in for src/vehicles/emodels.js)
+// tools/build-game.mjs swaps this in for src/vehicles/emodels.js)
 // The 108 ambulance (a Force Traveller-style high-roof van) and the Pune Police jeep (a Bolero-style box SUV), built
 // properly: a rounded body from a side profile, glass that sits on it, wheels that turn, the light bar, the livery
 // in Marathi and English, grille, lamps, mirrors, bumpers. Each returns { group, wheels, lights: { red, blue },

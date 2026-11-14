@@ -1,5 +1,5 @@
 // Ctrl standing still: down on your haunches (Ctrl again, or moving off at a run, a jump, a vehicle, and you're up).
-// Ctrl on the move is still the roll, the way you're going (people/fight.js, patched in tools/build-beta.mjs).
+// Ctrl on the move is still the roll, the way you're going (people/fight.js, patched in tools/build-game.mjs).
 // Crouched you can creep about, slowly, still low. No clip for it: built on whatever the clip is doing (the idle, or
 // the walk while you creep): the hips come down, the legs fold to keep the feet where the clip put them (the knees
 // forward and a little out), the back leans in and the neck comes up so you still look ahead, and standing still the

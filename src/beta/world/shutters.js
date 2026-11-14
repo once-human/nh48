@@ -1,6 +1,6 @@
 // Rolling shutters that roll. When a shop opens or shuts with the clock its shutter goes up or comes down over a few
 // seconds, rattling if you're near enough to hear it, and the shop's board light goes with it: lit while it's open,
-// fading as the shutter comes down, dark once it's shut. (setShutters, patched in build-beta.mjs, only says where
+// fading as the shutter comes down, dark once it's shut. (setShutters, patched in build-game.mjs, only says where
 // each should end up; this moves them.)
 import * as THREE from 'three';
 import { People } from '@orig/people/peds.js';

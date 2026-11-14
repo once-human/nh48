@@ -120,7 +120,8 @@ export class Game {
     let resume = null;
     try { resume = JSON.parse(sessionStorage.getItem('nh48_resume') || 'null'); sessionStorage.removeItem('nh48_resume'); } catch (e) { /* ignore */ }
     if (resume && Date.now() - resume.t < 120000 && !this.params.has('test')) {
-      start.x = resume.x; start.z = resume.z; start.th = resume.th; this.hour = resume.hour;
+      // free roam is its own game: it comes back as free roam, and the story stays where the story was
+      if (resume.free) this._freeAt = resume; else { start.x = resume.x; start.z = resume.z; start.th = resume.th; this.hour = resume.hour; }
       this.resumed = true;
     }
     player.reset(start.x, start.z, start.th);
@@ -353,7 +354,7 @@ export class Game {
     // screen comes up now, the city fades in behind it when they're done
     this.warming = this.prewarm().catch(() => {}).finally(() => { this._warmDone = true; });
     if (this.test.play) this.startPlay(this.test.play === 'shift');
-    if (this.resumed) { this.startPlay(false); this.hud.toast('Recovered', 'Your graphics driver reset, so the game reloaded where you were.', 'info', 4); }
+    if (this.resumed) { if (this._freeAt) this.beginFree(); else this.startPlay(false); this.hud.toast('Recovered', 'Your graphics driver reset, so the game reloaded where you were.', 'info', 4); }
   }
   // compile every shader the game will need now, behind the loading screen, instead of the first
   // time someone new walks up or you take a vehicle (that compile was the freeze)
@@ -691,7 +692,7 @@ export class Game {
   }
   saveResume() {
     const P = this.player;
-    try { sessionStorage.setItem('nh48_resume', JSON.stringify({ x: P.x, z: P.z, th: P.th, hour: this.hour, t: Date.now() })); } catch (e) { /* ignore */ }
+    try { sessionStorage.setItem('nh48_resume', JSON.stringify({ x: P.x, z: P.z, th: P.onFoot ? P.foot.yaw : P.th, foot: !!P.onFoot, free: !!this.free, hour: this.hour, t: Date.now() })); } catch (e) { /* ignore */ }
     this.saveStats();
   }
 
@@ -834,6 +835,12 @@ export class Game {
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     this.state = 'play';
     this.tut && this.later(1.2, () => this.tut.start());     // the first minutes, taught by doing (once, for everyone)
+    if (this._freeAt && this.free) {
+      // back from a reload in free roam: the same spot and time of day, still in free roam
+      const R = this._freeAt; this.wadaIntro = false; this.hour = R.hour;
+      try { if (R.foot) this.player.teleportFoot(R.x, R.z, R.th, this.traffic); else this.player.reset(R.x, R.z, R.th); } catch (e) { /* stay */ }
+    }
+    this._freeAt = null;
     if (this.wadaIntro) {
       this.wadaIntro = false;
       const L = this.W.landmarks && this.W.landmarks.find(l => l.id === 'shaniwar');

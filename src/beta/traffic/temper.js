@@ -1,5 +1,5 @@
 // traffic/temper.js for /beta: the one who gets out. Stand in a driver's way (in a car or on your feet) and they hoot,
-// then lean on the horn (the traffic's own step: tools/build-beta.mjs); most then back up a little and squeeze
+// then lean on the horn (the traffic's own step: tools/build-game.mjs); most then back up a little and squeeze
 // round you. A few have had enough: the engine's left running, the door opens, and they come to your window. In a
 // car they bang on it and tell you what they think; on foot, or the moment you get out, it's a fight. Then back
 // to their own vehicle and round you. One at a time, and not again for a while.

@@ -3,7 +3,7 @@
 // sets off it's the other way, turning round on the spot first. (She used to be shoved out of whatever she overlapped, a
 // parked car or a shop's edge, every frame, and told to wander across the road, so she went sideways until she reached the
 // shops and shook against them.) One that's shooed off or follows you goes at a cow's trot (a patch on people/strays.js in
-// tools/build-beta.mjs), and stays where that leaves her.
+// tools/build-game.mjs), and stays where that leaves her.
 import { People } from '@orig/people/peds.js';
 import { Strays } from '@orig/people/strays.js';
 

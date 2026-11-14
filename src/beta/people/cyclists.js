@@ -3,7 +3,7 @@
 // 4.6 m, a roadster's wheel and gearing), the feet on the pedals all the way round, the knees coming up and over;
 // coasting (slowing down) the pedals stay where they are; stopped, the left foot comes off and down onto the road
 // and the right one waits on its pedal, up at the front ready to push off.
-// (Which ones get a body, the seat, the grips, no helmet: patches on traffic.js and people/crowd.js in tools/build-beta.mjs.)
+// (Which ones get a body, the seat, the grips, no helmet: patches on traffic.js and people/crowd.js in tools/build-game.mjs.)
 import * as THREE from 'three';
 import { Crowd } from '@orig/people/crowd.js';
 import { Pilot } from '@orig/game/pilot.js';
