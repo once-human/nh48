@@ -1,10 +1,8 @@
 # Puneri (nh48)
 
-## How to work here
+## Building
 
-- Commit and push straight to `main`. No side branches, no pull requests.
-- Build with `node tools/build.mjs` (`NH_LOCAL=1` to use local libraries). Don't run the game or take screenshots unless asked.
-- Commit messages are one plain-English paragraph a player could read, saying what changed for them.
+`node tools/build.mjs` builds the game into `dist/` (`NH_LOCAL=1` uses the libraries in `node_modules`).
 
 ## Every commit says what kind of change it is
 
