@@ -856,11 +856,17 @@ function dress(C, kind, mats) {
     // the windows' inside, kept to the body as it is (dents, a door hung open on its own hinge). Made the first time
     // you're in this car (from outside the windows are their own outside, and nobody sees the inside of them)
     if (!v.inCockpit && !C._glass) return;
+    if (!v.inCockpit && C._gOut) return; C._gOut = !v.inCockpit;
     C._glass = true;
+    // (from the seat the windows are these inside panes, with the wipers' arcs and the dust on them: the outside of the
+    // glass isn't drawn over them)
+    const gmat = v.glassMesh && v.glassMesh.material;
+    v.tilt.traverse((m) => { if (m.isMesh && gmat && m.material === gmat && !m.userData.cgPane) m.visible = !v.inCockpit; });
     v.tilt.traverse((m) => {
-      if (!m.isMesh || m.material !== v.bodyMesh.material || !m.geometry.attributes.paint) return;
+      if (!m.isMesh || !m.geometry.attributes.paint || !(m.material === v.bodyMesh.material || (gmat && m.material === gmat))) return;
       let g = m.userData.cg;
-      if (!g) { g = m.userData.cg = { mesh: new THREE.Mesh(new THREE.BufferGeometry(), glassM), geo: null, ver: -1 }; g.mesh.frustumCulled = false; g.mesh.renderOrder = 2; m.add(g.mesh); }
+      // (beside the pane it's the inside of, not under it: the pane itself is hidden from the seat)
+      if (!g) { g = m.userData.cg = { mesh: new THREE.Mesh(new THREE.BufferGeometry(), glassM), geo: null, ver: -1 }; g.mesh.frustumCulled = false; g.mesh.renderOrder = 2; g.mesh.userData.cgPane = true; (m.parent || m).add(g.mesh); if (m.parent) { g.mesh.position.copy(m.position); g.mesh.quaternion.copy(m.quaternion); g.mesh.scale.copy(m.scale); } }
       const pv = m.geometry.attributes.position.version;
       if (g.geo !== m.geometry || g.ver !== pv) { g.geo = m.geometry; g.ver = pv; g.mesh.geometry.dispose(); g.mesh.geometry = innerGlass(m.geometry, belt, hw, xf0); }
     });

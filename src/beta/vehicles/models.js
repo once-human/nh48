@@ -1198,7 +1198,7 @@ function exotic(b, spec, kind) {
   for (const d of [0, .01, .025, .05, .08, .12, .17, .23, .3, .38]) stn.push(-hl + d, hl - d);
   add(-hl + .3, hl - .3, Math.ceil((L - .6)/.09));
   for (const c of [xw, -xw]) add(c - Ra - .04, c + Ra + .04, 22);
-  stn.push(...WIN.wind, ...WIN.rear);
+  stn.push(...WIN.wind, ...WIN.rear, ...WIN.side);
   const X = stationsOf(stn), cut = [];
   const grid = X.map((x) => {
     const r = sec(x), row = [], cu = [];
@@ -1213,6 +1213,7 @@ function exotic(b, spec, kind) {
   gridSurface(b, grid, (q) => {
     const r = rowQ(q.k), x = q.x, wind = x > WIN.wind[0] && x < WIN.wind[1] && r >= R_RAIL, rearG = x > WIN.rear[0] && x < WIN.rear[1] && r >= R_RAIL + 1;
     if (q.inside) { if (wind || rearG) return null; if (x > WIN.side[0] && x < WIN.side[1] && r >= R_BASE && r < R_RAIL) return null; return r > 3 ? INSIDE : null; }
+    if (x > WIN.side[0] && x < WIN.side[1] && r >= R_BASE && r < R_RAIL) return null;       // (the door glass's opening: the pane and its frame are laid in it below)
     if (r < 2 || q.ny < -.55) return [...UNDER, 0, MATTE];
     if (r <= 3) return BLACKED;
     if (wind || rearG) return WINDOW;
@@ -1250,7 +1251,16 @@ function exotic(b, spec, kind) {
     // the side glass: laid on the cabin so its edge is one clean line, the frame round it, and a tail that closes to a point
     const [xr, xf] = WIN.side, close = por ? .36 : .3, tBot = (x) => lerp(.08, .86, ss((xr + close - x)/close));
     const glassPatch = (grow, off, c) => patch(b, 44, 1, (u, v) => { const x = lerp(xr - grow, xf + grow*.5, u), lo = Math.max(0, tBot(x) - grow*1.2), hi = Math.min(1, .86 + grow*1.2); return onGlass(s, x, lerp(lo, hi, v), off); }, c, [0, .4, s]);
-    glassPatch(.035, .003, por ? [.62, .62, .64] : BLACKED); glassPatch(0, .006, WINDOW);
+    // (the body is open behind the pane now, so it's seen through. Where the glass isn't, the body goes on: under it,
+    // the waist and the tail the glass closes to, and over it up to the roof rail; and the frame is a band round the
+    // pane, not a sheet behind it)
+    { const FR = por ? [.62, .62, .64] : BLACKED, g = .035, loAt = (x) => Math.max(0, tBot(Math.max(xr, Math.min(xf, x))));
+      patch(b, 44, 1, (u, v) => { const x = lerp(xr, xf, u); return onGlass(s, x, lerp(0, loAt(x), v), 0); }, PAINTED, [0, .4, s]);
+      patch(b, 44, 1, (u, v) => onGlass(s, lerp(xr, xf, u), lerp(.86, 1, v), 0), PAINTED, [0, .4, s]);
+      patch(b, 44, 1, (u, v) => { const x = lerp(xr - g, xf + g*.5, u), lo = loAt(x); return onGlass(s, x, lerp(Math.max(0, lo - g*1.2), Math.min(1, lo + .012), v), .003); }, FR, [0, .4, s]);
+      patch(b, 44, 1, (u, v) => onGlass(s, lerp(xr - g, xf + g*.5, u), lerp(.848, Math.min(1, .86 + g*1.2), v), .003), FR, [0, .4, s]);
+      patch(b, 1, 6, (u, v) => onGlass(s, lerp(xf - .012, xf + g*.5, u), lerp(Math.max(0, .08 - g*1.2), Math.min(1, .86 + g*1.2), v), .003), FR, [0, .4, s]); }
+    glassPatch(0, .006, WINDOW);
     if (WIN.pillar < 1e8) patch(b, 1, 3, (u, v) => onGlass(s, WIN.pillar - .025 + u*.05, lerp(.05, .88, v), .008), BLACKED, [0, .4, s]);
     // the windscreen's pillar: a post up the screen's edge between it and the door glass, so they're two panes and not
     // one, and it's there from inside too (the body's skin is only seen from outside)
@@ -1366,6 +1376,11 @@ export function buildCar(kind0, opts = {}) {
     const f = skinOf(spec, kind); for (let i = i0; i < b.p.length; i += 3) { const q = f(b.p[i], b.p[i + 1], b.p[i + 2]); b.p[i] = q[0]; b.p[i + 1] = q[1]; b.p[i + 2] = q[2]; }
     lidToGlass(b, gl, -1.75, -0.58);
   }
+  // Every window is glass you see through, on every car: the windscreen, the back glass and the door glass come off
+  // the body (where they were dark glossy panels of it) into the car's glass, which is drawn as glass. What's behind
+  // them is the cabin that's built into every car, and whoever's driving it. (Not a door mirror's glass, out past the
+  // body's side, nor a lamp's lens, below the waist.)
+  { const y0 = spec.beltY - 0.12, zm = spec.W/2 + 0.01; lidToGlass(b, gl, 0, 0, (x, y, z) => y > y0 && Math.abs(z) < zm); }
   if (kind === 'taxi') {
     box(b, -0.15, spec.H, -0.25, 0.15, spec.H + 0.12, 0.25, [0.98, 0.85, 0.15], 0, 0.4);
   }
@@ -1376,7 +1391,8 @@ export function buildCar(kind0, opts = {}) {
     const r0 = spec.roofR + 0.12, r1 = spec.roofF - 0.1, zr = spec.W/2 - 0.28;
     for (const s of [-1, 1]) box(b, r0, spec.H - 0.04, s * (zr + 0.05), r1, spec.H + 0.02, s * zr, [0.2, 0.2, 0.2]);
   }
-  return { body: b.build(), glass: gl.build(), dims: { L: spec.L, W: spec.W, H: spec.H, wb: spec.L - 2 * spec.overhang } };
+  const body = b.build(), glass = gl.build(); body.userData.glassSrc = glass;       // (for the far models, which are one mesh: beta/vehicles/lod.js)
+  return { body, glass, dims: { L: spec.L, W: spec.W, H: spec.H, wb: spec.L - 2 * spec.overhang } };
 }
 
 // ---------------------------------------------------------------- a mid-engined supercar's engine
@@ -1422,10 +1438,10 @@ function superBay(b, spec) {
   b.addGeo(G.cyl12, M(-1.36, .76, -.25, .022, .03, .022), YEL);
 }
 // the triangles of a car's glass between x0 and x1 taken off the body into its glass (drawn as glass: seen through)
-function lidToGlass(b, gl, x0, x1) {
+function lidToGlass(b, gl, x0, x1, ok) {
   const I = b.i, P = b.p, Pt = b.paint, keep = [];
   if (!Pt) return;
-  const isG = (v) => Pt[v] > 3.5 && Pt[v] < 4.5 && P[v*3] > x0 && P[v*3] < x1;
+  const isG = (v) => Pt[v] > 3.5 && Pt[v] < 4.5 && (ok ? ok(P[v*3], P[v*3 + 1], P[v*3 + 2]) : P[v*3] > x0 && P[v*3] < x1);
   for (let t = 0; t + 2 < I.length; t += 3) {
     const a = I[t], c = I[t + 1], d = I[t + 2];
     if (!(isG(a) && isG(c) && isG(d))) { keep.push(a, c, d); continue; }

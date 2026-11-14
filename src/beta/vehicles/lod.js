@@ -4,7 +4,24 @@
 import * as THREE from 'three';
 
 // (`edges` keeps what faces different ways apart, for a model you can still make out; far off it can all run together)
+// a car's windows are its glass now, not its body: from further off, where there's only the one mesh, they go back onto it
+// as the dark glossy panels they were (or the car would be drawn with holes for windows)
+function withGlass(g) {
+  const gl = g.userData && g.userData.glassSrc; if (!gl || !gl.attributes.position.count) return g;
+  const out = new THREE.BufferGeometry(), n0 = g.attributes.position.count, n1 = gl.attributes.position.count;
+  for (const k in g.attributes) {
+    const a = g.attributes[k]; if (a.isInstancedBufferAttribute) continue;
+    const e = gl.attributes[k], s = a.itemSize, arr = new a.array.constructor((n0 + n1)*s); arr.set(a.array.subarray(0, n0*s));
+    if (e && e.itemSize === s) arr.set(e.array.subarray(0, n1*s), n0*s); else if (k === 'paint') arr.fill(4, n0*s);
+    out.setAttribute(k, new THREE.BufferAttribute(arr, s, a.normalized));
+  }
+  const I0 = g.index ? g.index.array : null, I1 = gl.index ? gl.index.array : null, m0 = I0 ? I0.length : n0, m1 = I1 ? I1.length : n1, I = new Uint32Array(m0 + m1);
+  for (let i = 0; i < m0; i++) I[i] = I0 ? I0[i] : i; for (let i = 0; i < m1; i++) I[m0 + i] = n0 + (I1 ? I1[i] : i);
+  out.setIndex(new THREE.BufferAttribute(I, 1));
+  return out;
+}
 export function reduced(g, cell, edges = true) {
+  g = withGlass(g);
   const P = g.attributes.position, N = g.attributes.normal, names = Object.keys(g.attributes).filter(k => k !== 'position' && k !== 'normal' && !g.attributes[k].isInstancedBufferAttribute);
   const keyOf = new Map(), map = new Int32Array(P.count), sum = [], cnt = [];
   for (let i = 0; i < P.count; i++) {

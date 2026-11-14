@@ -138,7 +138,9 @@ const GLASS_FS = CHUNK + `void main(){
   vec3 env = mix(vec3(.1, .1, .1)*(.3 + .7*dayK), skyCol*(.25 + .75*dayK)*1.1, hz), c = mix(uTint, env, clamp(fres*(.75 + .25*step(.2, fract(vW.x*1.3 + vW.z*1.1 + vW.y*2.1 + e))), 0., .9));
   float s = pow(max(dot(R, sunDir), 0.), 90.)*dayK; c += sunCol*smoothstep(.3, .7, s);
   // clear glass is clear looked down through, and a mirror of the sky looked across; a film's dark whichever way
-  float k = clamp((fres - .25)/.75, 0., 1.), al = mix(.4, mix(.1, .72, k), uClear);
+  // (a car's glass: lightly tinted looked straight through, so you see who's in it and the cabin, and more and more a
+  // mirror of the sky the more it's looked along; a film from the garage is dark whichever way)
+  float k = clamp((fres - .25)/.75, 0., 1.), al = mix(mix(.62, .9, k), mix(.3, .86, k), uClear);
   float f = fogDensity*vZ; gl_FragColor = vec4(mix(c, fogCol, 1. - exp(-f*f)), al); }`;
 
 function mat(fs, vs, opts = {}) {
