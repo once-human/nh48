@@ -386,7 +386,7 @@ export class Skin {
     if (seenN < near.length) near.sort((a, b) => (b._seen - a._seen) || (a._d2 - b._d2));
     const mark = () => { for (const M of [this.parts.m, this.parts.f]) for (const R of M.values()) { R.lo.seen = R.lo.fill; if (R.hi) R.hi.seen = R.hi.fill; } for (const r of this.rigid.values()) r.seen = r.fill; };
     for (const M of this.parts.m.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; if (M.sh) M.sh.fill = 0; } for (const M of this.parts.f.values()) { M.lo.fill = 0; if (M.hi) M.hi.fill = 0; if (M.sh) M.sh.fill = 0; } for (const r of this.rigid.values()) r.fill = 0;
-    const D = this.data, n = Math.min(near.length, this.max, SLOTS), hi2 = this.hiR*this.hiR, now = performance.now(); this.drawnAt = now;
+    const D = this.data, n = Math.min(near.length, this.max, SLOTS), hi2 = this.hiR*this.hiR, now = performance.now(); this.prevAt = this.drawnAt || 0; this.drawnAt = now;
     for (let s = 0; s < n; s++) {
       if (s === seenN) mark();
       const H = near[s], k = H.look && H.look.female ? 'f' : 'm', row = s*TEX_W*4;

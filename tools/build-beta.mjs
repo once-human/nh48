@@ -354,7 +354,9 @@ const PATCHES = {
   [S('people/crowd.js')]: [
     // (a street you drive into fills with real people at once: bodies are handed out four a tick, eight for those right by
     // you. At two a tick the ones in front of your car were still the far-off figures for seconds)
-    ["if (!s && this.pool.length < this.cap + 8 && (made < 2 || (urgent && made < 4)))", "if (!s && this.pool.length < this.cap + 8 && (made < 4 || (urgent && made < 8)))"],
+    // (and someone riding always gets one, the pillion as much as the rider: with every spare body of her kind in use she
+    // was left as the rough figure behind a fully drawn rider)
+    ["if (!s && this.pool.length < this.cap + 8 && (made < 2 || (urgent && made < 4)))", "if (!s && (p.rideOf ? this.pool.length < this.cap + 60 : this.pool.length < this.cap + 8 && (made < 4 || (urgent && made < 8))))"],
     ["if (this.t <= 0) { this.t = 0.25; this.assign(cx, cz); }", "if (this.t <= 0) { this.t = 0.12; this.assign(cx, cz); }"],
     // a Bullet's rider sits it as a motorbike's does (it was given a scooter's seat, so it was never made a real rider)
     ["const bike = /^bike/.test(o.type);", "const bike = /^(bike|bullet)/.test(o.type);"],
@@ -636,7 +638,10 @@ const PATCHES = {
     // a car you're getting into: the one built for you stands in its place (beta/vehicles/cardoor.js)
     ["const seated = v.wreck || (v.rich", "if (v.hideBody) continue; const seated = v.wreck || (v._tp && v._tp.empty) || (v.rich"],
     // and drawn empty only once the real riders are actually being drawn on it (beta/draw/skin.js marks them)
-    ["v._riders.every(r => r.body));", "v._riders.every(r => r.body && r.body.H && performance.now() - (r.body.H._drawnT || 0) < 250));"],
+    // (drawn the last time people were drawn, or the time before: by the count of frames, not the clock. By the clock, a
+    // quarter of a second, a PC drawing five frames a second failed it every other frame: the riders went back to
+    // the rough figures and came back, over and over)
+    ["v._riders.every(r => r.body));", "v._riders.every(r => r.body && r.body.H && (r.body.H._drawnT || 0) >= ((window.__nhAskG && window.__nhAskG.skin && window.__nhAskG.skin.prevAt) || 0) && r.body.H._drawnT > 0));"],
     // a two-wheeler going over: drawn however its body lies as it falls, slides and is hauled back up (beta/traffic/topple.js)
     ["q.setFromEuler(e);", "q.setFromEuler(e); if (v._tp && v._tp.Q) q.copy(v._tp.Q);"],
     ["p.set(v.rx ?? v.x, (v.y || 0) + (v.fallen > 0 ? 0.3 : 0), v.rz ?? v.z);", "if (v._tp && v._tp.Q) p.set(v._tp.ox, v._tp.oy, v._tp.oz); else p.set(v.rx ?? v.x, (v.y || 0) + (v.fallen > 0 ? 0.3 : 0), v.rz ?? v.z);"],
